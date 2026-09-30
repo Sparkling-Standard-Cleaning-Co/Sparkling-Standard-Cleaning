@@ -1,0 +1,34 @@
+# Validation pipeline — runs on every push and pull request.
+# Deployment is handled by the owner's Cloudflare project, not by this workflow.
+
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Type check
+        run: npm run check
+      - name: Estimator unit tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Static site validation (links, SEO, QRs, checklist leaks)
+        run: npm run validate
+      - name: Smoke test
+        run: npm run smoke
+      - name: Fake-testimonial detector
+        run: node scripts/check-fake-testimonials.mjs
+      - name: No-fabrication audit
+        run: node scripts/audit-facts.mjs
