@@ -1,0 +1,21 @@
+---
+// Cloudflare Turnstile widget — rendered only when a site key is configured.
+// The matching secret lives server-side (functions/api/lead.ts). When no key
+// is configured, spam protection relies on the honeypot + timing checks.
+
+interface Props {
+  class?: string;
+}
+
+const { class: className = '' } = Astro.props;
+const siteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? '';
+---
+
+{
+  siteKey && (
+    <div class:list={['turnstile-wrap', className]} style="margin-bottom: var(--space-5)">
+      <div class="cf-turnstile" data-sitekey={siteKey} data-theme="light"></div>
+      <script is:inline async defer src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>
+    </div>
+  )
+}

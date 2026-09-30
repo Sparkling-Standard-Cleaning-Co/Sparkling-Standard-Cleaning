@@ -1,0 +1,58 @@
+---
+import Icon from './Icon.astro';
+import type { IconName } from '../lib/icons';
+
+// Honest trust/positioning statements derived from owner-approved facts.
+// Never add numbers, guarantees, credentials or claims here without approval.
+
+interface TrustItem {
+  icon: IconName;
+  title: string;
+  text: string;
+}
+
+interface Props {
+  items?: TrustItem[];
+}
+
+const defaultItems: TrustItem[] = [
+  {
+    icon: 'star',
+    title: 'Detail-first cleaning',
+    text: 'The small things get noticed here — fingerprints, buildup and spots a quick clean walks past.',
+  },
+  {
+    icon: 'heart',
+    title: 'Owner-operated',
+    text: 'Your cleaning is done by the founder, with an occasional trusted helper alongside her — never a rotating crew.',
+  },
+  {
+    icon: 'clipboard',
+    title: 'Every request reviewed personally',
+    text: 'Dates, scope and price are confirmed by the owner before anything is booked. No auto-generated appointments.',
+  },
+  {
+    icon: 'calendar',
+    title: 'Seven days a week',
+    text: 'Morning through early evening, with flexible scheduling for commercial accounts.',
+  },
+];
+
+const { items = defaultItems } = Astro.props;
+---
+
+<div class="trust-strip">
+  <div class="container trust-strip__grid">
+    {
+      items.map((item) => (
+        <div class="trust-item">
+          <Icon name={item.icon} />
+          <div>
+            <p class="trust-item__title">{item.title}</p>
+            <p class="trust-item__text">{item.text}</p>
+          </div>
+        </div>
+      ))
+    }
+  </div>
+</div>

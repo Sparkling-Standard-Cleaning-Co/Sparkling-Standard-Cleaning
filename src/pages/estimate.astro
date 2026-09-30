@@ -1,0 +1,83 @@
+---
+import { getEntry, getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import EstimateWizard from '../components/EstimateWizard.astro';
+import FaqItem from '../components/FaqItem.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { faqNode, breadcrumbNode } from '../lib/schema';
+
+const entry = await getEntry('site', 'estimate');
+if (!entry) throw new Error('Missing content entry: src/content/site/estimate.md');
+const { data } = entry;
+
+const faqs = await getCollection('faqs');
+const pageFaqs = faqs
+  .filter((faq) => data.estimateFaqIds.includes(faq.id))
+  .sort((a, b) => a.data.order - b.data.order);
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Instant Estimate', path: '/estimate/' },
+  ]),
+  ...(pageFaqs.length > 0
+    ? [faqNode(pageFaqs.map((faq) => ({ question: faq.data.question, answer: faq.data.answer })))]
+    : []),
+];
+---
+
+<BaseLayout title={data.metaTitle} description={data.metaDescription} schema={schema}>
+  <section class="section section--tight">
+    <div class="container">
+      <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Instant Estimate', path: '/estimate/' }]} />
+      <div class="section-head mt-4">
+        <h1>
+          {data.hero.headline}
+          {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
+        </h1>
+        <p class="lead">{data.hero.lead}</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="container" style="margin-bottom: var(--space-8)">
+    <EstimateWizard />
+  </div>
+
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">What to expect</p>
+        <h2>Six short steps, no interrogation</h2>
+      </div>
+      <ol class="steps steps--4" style="display:grid">
+        {data.steps.map((step) => (
+          <li class="step">
+            <h3 class="step__title">{step.title}</h3>
+            <p class="step__text">{step.text}</p>
+          </li>
+        ))}
+      </ol>
+      {data.estimateNote && <p class="small text-muted mt-4">{data.estimateNote}</p>}
+    </div>
+  </section>
+
+  {
+    pageFaqs.length > 0 && (
+      <section class="section">
+        <div class="container container--narrow">
+          <div class="section-head">
+            <p class="eyebrow">Estimate questions</p>
+            <h2>Good to know before you start</h2>
+          </div>
+          <div class="faq-list">
+            {pageFaqs.map((faq) => (
+              <FaqItem question={faq.data.question} answer={faq.data.answer} />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+</BaseLayout>

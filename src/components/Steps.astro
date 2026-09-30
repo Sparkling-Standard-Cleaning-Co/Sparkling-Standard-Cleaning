@@ -1,0 +1,25 @@
+---
+interface Step {
+  title: string;
+  text: string;
+}
+
+interface Props {
+  steps: Step[];
+  columns?: 3 | 4;
+  class?: string;
+}
+
+const { steps, columns = 4, class: className = '' } = Astro.props;
+---
+
+<ol class:list={['steps', columns === 4 && 'steps--4', className]}>
+  {
+    steps.map((step) => (
+      <li class="step">
+        <h3 class="step__title">{step.title}</h3>
+        <p class="step__text">{step.text}</p>
+      </li>
+    ))
+  }
+</ol>

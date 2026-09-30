@@ -1,0 +1,77 @@
+---
+// Detail proof — real before/after work from real jobs only (directive §41).
+// When no genuine entries exist yet, this renders an honest explainer of the
+// proof standard instead of fabricated photos (directive §77).
+
+import { getCollection } from 'astro:content';
+import Icon from './Icon.astro';
+
+interface Props {
+  heading?: string | undefined;
+  eyebrow?: string | undefined;
+  lead?: string | undefined;
+  /** Render the explainer when the collection is empty (homepage behavior). */
+  placeholder?: boolean;
+}
+
+const {
+  heading = 'Proof, not polished marketing',
+  eyebrow = 'Detail proof',
+  lead = 'Every photo on this site will come from real work with the customer’s permission — never staged dirt, never stock photos pretending to be a job.',
+  placeholder = true,
+} = Astro.props;
+
+const entries = (await getCollection('proof')).sort((a, b) => a.data.order - b.data.order);
+
+const standard = [
+  { icon: 'home', title: 'Real job', text: 'A home, rental or commercial space we actually cleaned.' },
+  { icon: 'alert-circle', title: 'Real condition', text: 'What it looked like when we arrived — before anything was touched.' },
+  { icon: 'droplet', title: 'Real process', text: 'The detail work that made the difference, shown honestly.' },
+  { icon: 'camera', title: 'Real result', text: 'The finished detail, photographed and published only with permission.' },
+] as const;
+---
+
+<section class="section section--alt" aria-labelledby="proof-heading">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">{eyebrow}</p>
+      <h2 id="proof-heading">{heading}</h2>
+      <p class="lead">{lead}</p>
+    </div>
+
+    {
+      entries.length > 0 ? (
+        <div class="grid grid--2">
+          {entries.map((entry) => (
+            <article class="photo-pair card">
+              <div class="photo-pair">
+                {entry.data.photos.map((photo) => (
+                  <figure>
+                    <img src={photo.image.src} alt={photo.alt} width={photo.image.width} height={photo.image.height} loading="lazy" />
+                    <figcaption>{photo.label}</figcaption>
+                  </figure>
+                ))}
+              </div>
+              <div class="photo-card__body">
+                <h3 class="card__title">{entry.data.title}</h3>
+                <p class="card__text">{entry.data.summary}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        placeholder && (
+          <div class="grid grid--4">
+            {standard.map((item) => (
+              <div class="card card--muted">
+                <span class="card__icon"><Icon name={item.icon} /></span>
+                <h3 class="card__title">{item.title}</h3>
+                <p class="card__text">{item.text}</p>
+              </div>
+            ))}
+          </div>
+        )
+      )
+    }
+  </div>
+</section>

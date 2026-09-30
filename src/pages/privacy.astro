@@ -1,0 +1,199 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { business, isPending } from '../config/business';
+import { analyticsConfigured } from '../lib/analytics/consent';
+import { breadcrumbNode } from '../lib/schema';
+
+// IMPORTANT: this page must always describe EXACTLY what the site does today.
+// If analytics, forms, spam protection or stored data change, update this page
+// in the same change (rule documented in AGENTS.md).
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Privacy', path: '/privacy/' },
+  ]),
+];
+
+const analyticsLive = analyticsConfigured();
+const hasEmail = !isPending(business.email);
+---
+
+<BaseLayout
+  title="Privacy Policy"
+  description="How this website handles your information: consent-gated analytics, form data used only to respond, and the choices you control."
+  schema={schema}
+>
+  <section class="section section--tight">
+    <div class="container container--narrow">
+      <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Privacy', path: '/privacy/' }]} />
+      <h1 class="mt-4">Privacy policy</h1>
+      <p class="lead">
+        Clear rules, plainly written. This policy describes what this website actually does — not
+        what it might do someday.
+      </p>
+      <p class="small text-muted">Last updated: September 30, 2026.</p>
+
+      <div class="prose stack mt-6">
+        <section>
+          <h2>The short version</h2>
+          <ul>
+            <li>We use your form details only to respond to your request.</li>
+            <li>Analytics are off until you explicitly allow them — and we never run ads or sell data.</li>
+            <li>We never send your name, phone, email, address, ZIP, photos or form contents to analytics.</li>
+            <li>You can withdraw your analytics choice at any time.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>What this website collects</h2>
+          <h3>Information you send us</h3>
+          <p>
+            When you submit an estimate, message, commercial walkthrough request or turnover
+            request, we receive what you typed — typically your name, phone, email and details about
+            the property or request. This information is used to respond to you, prepare your
+            estimate and provide services. It is not used for analytics, advertising or sold to
+            anyone.
+          </p>
+
+          <h3>Campaign attribution</h3>
+          <p>
+            So we can understand which marketing actually works, incoming links may carry campaign
+            parameters (for example <code>utm_source</code>). When you submit a request, those
+            parameters, the page you landed on and the site that referred you are included with
+            your request. Attribution values never contain your personal information and are never
+            sent to analytics services.
+          </p>
+
+          <h3>Data stored in your browser</h3>
+          <p>
+            This site stores a small amount of information locally on your device:
+          </p>
+          <ul>
+            <li>
+              <strong>Your analytics choice</strong> (local storage) — so the banner doesn't ask
+              every visit.
+            </li>
+            <li>
+              <strong>Estimate progress</strong> (local storage) — so an accidental refresh doesn't
+              lose your answers. Contact details are never stored in the draft.
+            </li>
+            <li>
+              <strong>Attribution touchpoints</strong> (local storage) — campaign parameters and the
+              landing page, kept to attach to a future request.
+            </li>
+            <li>
+              <strong>A single-use submission receipt</strong> (session storage) — cleared when
+              used, so a confirmed request can be counted once, only with your consent.
+            </li>
+          </ul>
+          <p>You can clear all of this at any time through your browser settings.</p>
+        </section>
+
+        <section>
+          <h2>Analytics — only with your permission</h2>
+          {
+            analyticsLive ? (
+              <>
+                <p>
+                  This site uses two analytics services, and <strong>neither loads until you
+                  explicitly allow analytics</strong>:
+                </p>
+                <ul>
+                  <li>
+                    <strong>Umami</strong> — privacy-focused, cookieless, aggregate statistics only
+                    (pages viewed, buttons clicked). No personal data, no cross-site tracking.
+                  </li>
+                  <li>
+                    <strong>Google Analytics 4 via Google Tag Manager</strong> — loaded only after
+                    you allow it, with Consent Mode v2 defaults all-denied first. Advertising
+                    storage and personalization are never granted by this site. Google receives a
+                    request only after your consent.
+                  </li>
+                </ul>
+                <p>
+                  Analytics events use fixed names (like “call click” or “estimate started”) and
+                  never include names, contact details, addresses, ZIP codes, photos or anything
+                  you typed.
+                </p>
+              </>
+            ) : (
+              <p>
+                No analytics services are currently configured or loaded on this site. If analytics
+                are enabled in the future, they will follow the same rules below: nothing loads
+                until you explicitly allow it, and no personal information is ever sent.
+              </p>
+            )
+          }
+          <p>
+            <strong>Advertising:</strong> this site runs no advertising and grants no advertising
+            consent. If you refuse analytics, nothing is collected — and if you allow it later,
+            events from before your permission are never replayed.
+          </p>
+          <p>
+            <strong>Change your mind anytime:</strong> clear this site's data in your browser (or
+            contact us) and the consent prompt returns. Withdrawal stops further collection
+            immediately.
+          </p>
+        </section>
+
+        <section>
+          <h2>Forms and spam protection</h2>
+          <p>
+            Submissions are protected by a hidden-field check and a minimum completion-time check.
+            If enabled, Cloudflare Turnstile may also be used to verify that a submission is human.
+            Your form details are delivered to the business through the configured form service and
+            are used only to respond to you.
+          </p>
+        </section>
+
+        <section>
+          <h2>Service photos and proof</h2>
+          <p>
+            Work photos may be taken for quality and completion purposes. Photos of your property
+            are used publicly only with your permission. Photos are never taken or shared of
+            identifying documents, security details, family information or personal items. See the
+            photo standards in our operations documentation.
+          </p>
+        </section>
+
+        <section>
+          <h2>Payments</h2>
+          <p>
+            The payment processor is still being finalized. When payments are processed online, they
+            will be handled by the processor directly — this website never stores card numbers.
+          </p>
+        </section>
+
+        <section>
+          <h2>Your choices and contact</h2>
+          <ul>
+            <li>Ask us what information we hold about you and request correction or deletion.</li>
+            <li>Withdraw analytics consent at any time.</li>
+            <li>Ask us to stop contacting you about services.</li>
+          </ul>
+          <p>
+            {
+              hasEmail ? (
+                <>Reach us at <a href={`mailto:${business.email}`}>{business.email}</a>{' '}
+                or through the <a href="/contact/">contact page</a>.</>
+              ) : (
+                <>Reach us through the <a href="/contact/">contact page</a>.</>
+              )
+            }
+          </p>
+        </section>
+
+        <section>
+          <h2>Changes to this policy</h2>
+          <p>
+            If how this site handles information changes, this page changes with it — before the
+            change goes live. The date above shows the current version.
+          </p>
+        </section>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

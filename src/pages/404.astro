@@ -1,0 +1,34 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { footerServicesNav } from '../lib/site';
+---
+
+<BaseLayout
+  title="Page Not Found"
+  description="That page doesn't exist. Here are the pages people usually want."
+  noindex
+>
+  <section class="section">
+    <div class="container container--narrow text-center">
+      <p class="eyebrow">404</p>
+      <h1>That page isn't here</h1>
+      <p class="lead" style="margin-inline: auto">
+        The link may be old, or the page may have moved. The pages below cover almost everything
+        people look for.
+      </p>
+      <div class="btn-row" style="justify-content: center; margin-top: var(--space-5)">
+        <a class="btn btn--primary btn--large" href="/estimate/">Get Instant Estimate</a>
+        <a class="btn btn--ghost" href="/">Back to Home</a>
+      </div>
+      <ul class="checklist mt-6" style="text-align: left; display: inline-grid">
+        {
+          footerServicesNav.map((item) => (
+            <li>
+              <a href={item.href}>{item.label}</a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+</BaseLayout>

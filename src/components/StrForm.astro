@@ -1,0 +1,167 @@
+---
+import { isFormEnabled } from '../config/business';
+import Icon from './Icon.astro';
+import TurnstileWidget from './TurnstileWidget.astro';
+
+const configured = isFormEnabled();
+
+interface Props {
+  class?: string;
+}
+
+const { class: className = '' } = Astro.props;
+---
+
+<form class:list={['form-card', className]} data-lead-form data-variant="str" action="#" method="post">
+  {
+    !configured && (
+      <p class="form-status" data-state="info" style="display:block">
+        Turnover form delivery is not connected on this preview build. The form below shows the
+        real request experience; submissions in preview cannot be delivered.
+      </p>
+    )
+  }
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="str-name">Your name</label>
+      <input class="input" id="str-name" name="name" type="text" autocomplete="name" required />
+    </div>
+    <div class="field">
+      <label for="str-property">Property location (ZIP or address)</label>
+      <input class="input" id="str-property" name="property_location" type="text" autocomplete="postal-code" required placeholder="e.g. 32561 or the property address" />
+    </div>
+  </div>
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="str-phone">Phone</label>
+      <input class="input" id="str-phone" name="phone" type="tel" autocomplete="tel" required />
+    </div>
+    <div class="field">
+      <label for="str-email">Email</label>
+      <input class="input" id="str-email" name="email" type="email" autocomplete="email" required />
+    </div>
+  </div>
+
+  <div class="field-row field-row--3">
+    <div class="field">
+      <label for="str-bedrooms">Bedrooms</label>
+      <input class="input" id="str-bedrooms" name="bedrooms" type="number" min="0" max="20" inputmode="numeric" required />
+    </div>
+    <div class="field">
+      <label for="str-baths">Full bathrooms</label>
+      <input class="input" id="str-baths" name="full_baths" type="number" min="0" max="20" inputmode="numeric" required />
+    </div>
+    <div class="field">
+      <label for="str-beds">Beds to reset</label>
+      <input class="input" id="str-beds" name="beds" type="number" min="1" max="30" inputmode="numeric" required />
+    </div>
+  </div>
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="str-frequency">Turnover frequency</label>
+      <select class="select" id="str-frequency" name="turnover_frequency" required>
+        <option value="">Most common pattern?</option>
+        <option value="per-stay">Between every stay</option>
+        <option value="weekly">Weekly</option>
+        <option value="biweekly">Every two weeks</option>
+        <option value="occasional">Occasional / backup cleaner</option>
+        <option value="seasonal">Seasonal</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="str-same-day">Same-day turnovers?</label>
+      <select class="select" id="str-same-day" name="same_day_turnovers" required>
+        <option value="">Choose one…</option>
+        <option value="yes">Yes — same-day check-out/check-in happens</option>
+        <option value="sometimes">Sometimes</option>
+        <option value="no">No — there is at least a day between guests</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="str-checkout">Check-out time</label>
+      <input class="input" id="str-checkout" name="checkout_time" type="text" placeholder="e.g. 10:00 AM" />
+    </div>
+    <div class="field">
+      <label for="str-checkin">Check-in time</label>
+      <input class="input" id="str-checkin" name="checkin_time" type="text" placeholder="e.g. 4:00 PM" />
+    </div>
+  </div>
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="str-laundry">Laundry</label>
+      <select class="select" id="str-laundry" name="laundry" required>
+        <option value="onsite">Onsite (standard)</option>
+        <option value="offsite">Offsite (premium arrangement)</option>
+        <option value="discuss">Discuss options</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="str-consumables">Consumables</label>
+      <select class="select" id="str-consumables" name="consumables" required>
+        <option value="host-supplies">I supply them; you check and report</option>
+        <option value="restock-agreement">I'd like a restocking arrangement</option>
+        <option value="discuss">Discuss options</option>
+      </select>
+    </div>
+  </div>
+
+  <fieldset class="field">
+    <legend>What should each turnover include?</legend>
+    <div class="option-grid option-grid--2">
+      <label class="option">
+        <input type="checkbox" name="checklist" value="yes" checked />
+        <span class="option__control"></span>
+        <span><span class="option__label">Completion checklist</span></span>
+      </label>
+      <label class="option">
+        <input type="checkbox" name="photos" value="yes" />
+        <span class="option__control"></span>
+        <span><span class="option__label">Turnaround photos</span></span>
+      </label>
+      <label class="option">
+        <input type="checkbox" name="issue_report" value="yes" checked />
+        <span class="option__control"></span>
+        <span><span class="option__label">Issue / damage reports</span></span>
+      </label>
+      <label class="option">
+        <input type="checkbox" name="recurring" value="yes" />
+        <span class="option__control"></span>
+        <span><span class="option__label">Recurring schedule arrangement</span></span>
+      </label>
+    </div>
+  </fieldset>
+
+  <div class="field">
+    <label for="str-notes">Anything else we should know?</label>
+    <textarea class="textarea" id="str-notes" name="notes" rows="4" placeholder="Parking, entry, laundry setup, supply closet, pet rules, guest quirks…"></textarea>
+  </div>
+
+  <TurnstileWidget />
+
+  <div class="honeypot" aria-hidden="true">
+    <label for="str-company-website">Company website</label>
+    <input id="str-company-website" name="company_website" type="text" tabindex="-1" autocomplete="off" />
+  </div>
+
+  <p class="small text-muted">
+    Sending this request does not book anything — the owner reviews every turnover request and
+    confirms scope, schedule and price personally. See our <a href="/privacy/">privacy policy</a>.
+  </p>
+
+  <button class="btn btn--primary btn--large btn--block" type="submit" data-cta="str-submit">
+    <Icon name="send" size={18} /> Request Turnover Service
+  </button>
+
+  <p class="form-status" data-form-status role="status" aria-live="polite"></p>
+</form>
+
+<script>
+  import '../scripts/lead-forms';
+</script>

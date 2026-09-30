@@ -1,0 +1,41 @@
+---
+// Customer reviews — renders ONLY genuine owner-supplied entries from
+// src/content/reviews/. Never fabricate reviews, never invent star ratings,
+// and never render an empty reviews shell "to fill space" (directive §43, §56, §77).
+
+import { getCollection } from 'astro:content';
+
+interface Props {
+  heading?: string;
+  eyebrow?: string;
+}
+
+const { heading = 'What customers say', eyebrow = 'Reviews' } = Astro.props;
+
+const reviews = (await getCollection('reviews')).sort((a, b) => a.data.order - b.data.order);
+---
+
+{
+  reviews.length > 0 && (
+    <section class="section section--alt" aria-labelledby="reviews-heading">
+      <div class="container">
+        <div class="section-head section-head--center">
+          <p class="eyebrow">{eyebrow}</p>
+          <h2 id="reviews-heading">{heading}</h2>
+        </div>
+        <div class="grid grid--3">
+          {reviews.map((review) => (
+            <blockquote class="card">
+              <p>“{review.data.quote}”</p>
+              <footer class="small text-muted">
+                <strong>{review.data.author}</strong>
+                {review.data.context ? ` — ${review.data.context}` : ''}
+                {review.data.source === 'google' ? ' · Google review' : ''}
+              </footer>
+            </blockquote>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}

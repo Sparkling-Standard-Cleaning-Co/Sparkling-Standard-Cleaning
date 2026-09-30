@@ -1,0 +1,33 @@
+---
+import { business, isPending } from '../config/business';
+
+interface Props {
+  class?: string;
+  /** Show the small descriptor line under the wordmark. */
+  tagline?: boolean;
+}
+
+const { class: className = '', tagline = true } = Astro.props;
+
+const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
+const pendingName = isPending(business.displayName);
+const name = pendingName ? 'PENDING_BUSINESS_NAME' : business.displayName;
+---
+
+<a href="/" class:list={['brand', className]} aria-label={pendingName ? 'Home — development placeholder brand' : `${name} — home`}>
+  <svg class="brand__mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+    <g fill="var(--color-rose-500)">
+      <path d="M24 3c3.5 5 7 8.6 7 13a7 7 0 0 1-14 0c0-4.4 3.5-8 7-13z"></path>
+      <path d="M24 3c3.5 5 7 8.6 7 13a7 7 0 0 1-14 0c0-4.4 3.5-8 7-13z" transform="rotate(72 24 24)"></path>
+      <path d="M24 3c3.5 5 7 8.6 7 13a7 7 0 0 1-14 0c0-4.4 3.5-8 7-13z" transform="rotate(144 24 24)"></path>
+      <path d="M24 3c3.5 5 7 8.6 7 13a7 7 0 0 1-14 0c0-4.4 3.5-8 7-13z" transform="rotate(216 24 24)"></path>
+      <path d="M24 3c3.5 5 7 8.6 7 13a7 7 0 0 1-14 0c0-4.4 3.5-8 7-13z" transform="rotate(288 24 24)"></path>
+    </g>
+    <circle cx="24" cy="24" r="3.4" fill="var(--color-champagne-500)"></circle>
+  </svg>
+  <span class="brand__text">
+    <span class:list={['brand__name', pendingName && 'pending-wordmark']}>{name}</span>
+    {tagline && <span class="brand__tagline">Pensacola-area cleaning</span>}
+    {pendingName && preview && <span class="pending-badge" style="margin-top:2px">Name pending</span>}
+  </span>
+</a>

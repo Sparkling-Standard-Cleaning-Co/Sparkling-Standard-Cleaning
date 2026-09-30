@@ -1,0 +1,50 @@
+// Canonical icon-name union for Icon.astro and any component that accepts an
+// icon prop. Extend this union when adding an icon — never inline ad-hoc SVGs.
+
+export type IconName =
+  | 'phone'
+  | 'message'
+  | 'mail'
+  | 'calendar'
+  | 'clock'
+  | 'map-pin'
+  | 'check'
+  | 'check-circle'
+  | 'arrow-right'
+  | 'chevron-down'
+  | 'chevron-left'
+  | 'menu'
+  | 'x'
+  | 'home'
+  | 'refresh'
+  | 'star'
+  | 'key'
+  | 'briefcase'
+  | 'church'
+  | 'user'
+  | 'users'
+  | 'heart'
+  | 'leaf'
+  | 'shield'
+  | 'droplet'
+  | 'clipboard'
+  | 'camera'
+  | 'paw'
+  | 'list'
+  | 'box'
+  | 'card'
+  | 'info'
+  | 'alert-circle'
+  | 'building'
+  | 'send'
+  | 'external';
+
+/** Social platform glyph names for SocialIcon.astro. */
+export type SocialName =
+  | 'facebook'
+  | 'instagram'
+  | 'tiktok'
+  | 'youtube'
+  | 'nextdoor'
+  | 'linkedin'
+  | 'google';

@@ -1,0 +1,88 @@
+---
+import { getEntry } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import CtaBand from '../components/CtaBand.astro';
+import Icon from '../components/Icon.astro';
+import { breadcrumbNode } from '../lib/schema';
+
+const entry = await getEntry('site', 'service-area');
+if (!entry) throw new Error('Missing content entry: src/content/site/service-area.md');
+const { data } = entry;
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Service Area', path: '/service-area/' },
+  ]),
+];
+---
+
+<BaseLayout title={data.metaTitle} description={data.metaDescription} schema={schema}>
+  <section class="section section--tight">
+    <div class="container">
+      <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Service Area', path: '/service-area/' }]} />
+      <div class="section-head mt-4">
+        <h1>
+          {data.hero.headline}
+          {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
+        </h1>
+        <p class="lead">{data.hero.lead}</p>
+        <a class="btn btn--primary btn--large mt-4" href="/estimate/" data-cta="area-estimate">
+          {data.hero.ctaLabel ?? 'Check Your ZIP in the Estimate'}
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="container split">
+      <div>
+        <p class="eyebrow">Coverage</p>
+        <h2>{data.communities?.heading}</h2>
+        <p>{data.communities?.lead}</p>
+        <ul class="checklist mt-4">
+          {data.communities?.list.map((place) => (
+            <li>
+              <Icon name="map-pin" size={18} />
+              <span>{place}</span>
+            </li>
+          ))}
+        </ul>
+        {data.coverageNote && <p class="small text-muted mt-4">{data.coverageNote}</p>}
+      </div>
+      <div class="card">
+        <p class="eyebrow">Beyond the usual map</p>
+        <h2 class="card__title">{data.beyond?.heading}</h2>
+        <p class="card__text">{data.beyond?.text}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container container--narrow stack">
+      {
+        data.sections.map((section) => (
+          <div>
+            {section.eyebrow && <p class="eyebrow">{section.eyebrow}</p>}
+            <h2>{section.heading}</h2>
+            {section.lead && <p class="lead">{section.lead}</p>}
+            {section.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <div class="container section section--tight">
+    <CtaBand
+      title={data.ctaBand?.heading ?? 'Not sure if we reach you?'}
+      text={data.ctaBand?.text}
+      primaryLabel="Check Your ZIP"
+      primaryHref="/estimate/"
+      secondaryLabel="Ask Directly"
+      secondaryHref="/contact/"
+    />
+  </div>
+</BaseLayout>

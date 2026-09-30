@@ -1,0 +1,14 @@
+---
+// Preview-only placeholder notice. Renders NOTHING in production builds —
+// production deployment is gated on real facts (scripts/validate-production-env.mjs).
+
+interface Props {
+  /** What is pending, e.g. "Phone number". */
+  label: string;
+}
+
+const { label } = Astro.props;
+const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
+---
+
+{preview && <span class="pending-badge" title={`${label} has not been supplied by the owner yet`}>{label} pending</span>}

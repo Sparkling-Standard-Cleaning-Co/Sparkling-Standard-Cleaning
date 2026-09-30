@@ -1,0 +1,251 @@
+---
+import { getCollection, getEntry } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ServiceCard from '../components/ServiceCard.astro';
+import TrustChips from '../components/TrustChips.astro';
+import Steps from '../components/Steps.astro';
+import FaqItem from '../components/FaqItem.astro';
+import ProofGrid from '../components/ProofGrid.astro';
+import Reviews from '../components/Reviews.astro';
+import CtaBand from '../components/CtaBand.astro';
+import Icon from '../components/Icon.astro';
+import { breadcrumbNode } from '../lib/schema';
+
+const home = await getEntry('site', 'home');
+if (!home) throw new Error('Missing content entry: src/content/site/home.md');
+const { data } = home;
+
+const services = (await getCollection('services')).sort((a, b) => a.data.order - b.data.order);
+const faqs = (await getCollection('faqs'))
+  .filter((faq) => ['process', 'pricing', 'payments'].includes(faq.data.category))
+  .sort((a, b) => a.data.order - b.data.order)
+  .slice(0, 4);
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
+---
+
+<BaseLayout title={data.metaTitle} description={data.metaDescription} schema={schema}>
+  <section class="hero">
+    <div class="container hero__inner">
+      <div>
+        <h1>
+          {data.hero.headline}
+          {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
+        </h1>
+        <p class="lead">{data.hero.lead}</p>
+        <div class="btn-row">
+          <a class="btn btn--primary btn--large" href="/estimate/" data-cta="home-hero-estimate">
+            {data.hero.ctaLabel ?? 'Get Instant Estimate'}
+          </a>
+          <a class="btn btn--ghost" href="/house-cleaning/" data-cta="home-hero-services">Explore Services</a>
+        </div>
+      </div>
+      <div class="hero__panel">
+        <p class="eyebrow">The difference, in one thought</p>
+        <p style="font-family: var(--font-display); font-size: var(--text-xl); margin-bottom: var(--space-3)">
+          “A house deserves more than someone rushing through a checklist.”
+        </p>
+        <p class="small text-muted mb-0">
+          That belief is why this company exists — and why the details get the time they need.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <TrustChips />
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">{data.servicesIntro?.eyebrow}</p>
+        <h2>{data.servicesIntro?.heading}</h2>
+        {data.servicesIntro?.lead && <p class="lead">{data.servicesIntro.lead}</p>}
+      </div>
+      <div class="grid grid--3">
+        {
+          services.map((service, index) => (
+            <ServiceCard
+              title={service.data.title}
+              summary={service.data.summary}
+              href={service.data.path}
+              icon={service.data.icon}
+              featured={index === 0}
+            />
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {
+    data.founderBand && (
+      <section class="section section--alt">
+        <div class="container split">
+          <div>
+            <p class="eyebrow">{data.founderBand.eyebrow}</p>
+            <h2>{data.founderBand.heading}</h2>
+            {data.founderBand.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+            {data.founderBand.linkLabel && (
+              <a class="btn btn--secondary" href="/about/" data-cta="home-founder">{data.founderBand.linkLabel}</a>
+            )}
+          </div>
+          <div class="card">
+            <p class="eyebrow">Details we notice</p>
+            <ul class="checklist">
+              <li><span>The toothbrush holder — cleaned, not skipped</span></li>
+              <li><span>Fingerprints on switch plates and frames</span></li>
+              <li><span>Buildup behind faucets and along edges</span></li>
+              <li><span>Dust removed, not moved around</span></li>
+              <li><span>Beds and rooms reset, not just surfaces wiped</span></li>
+            </ul>
+            <p class="small text-muted" style="margin-top: var(--space-3)">
+              Examples of the standard — not a rigid promise list. Every home is different, and that's
+              the point.
+            </p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    data.estimateBand && (
+      <section class="section">
+        <div class="container">
+          <div class="card card--feature" style="padding: clamp(1.5rem, 4vw, 2.5rem)">
+            <div class="split" style="align-items: center">
+              <div>
+                <p class="eyebrow">{data.estimateBand.eyebrow}</p>
+                <h2>{data.estimateBand.heading}</h2>
+                <p style="margin-bottom: var(--space-5)">{data.estimateBand.text}</p>
+                <a class="btn btn--primary btn--large" href="/estimate/" data-cta="home-mid-estimate">
+                  {data.estimateBand.ctaLabel}
+                </a>
+              </div>
+              <ul class="checklist">
+                <li><span>No account required</span></li>
+                <li><span>No auto-booking — the owner confirms personally</span></li>
+                <li><span>Progress saved on your device as you go</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section section--alt">
+    <div class="container grid grid--2">
+      {
+        data.recurringBand && (
+          <div class="card card--link">
+            <span class="card__icon"><Icon name="refresh" /></span>
+            <p class="eyebrow mb-0">{data.recurringBand.eyebrow}</p>
+            <h3 class="card__title">{data.recurringBand.heading}</h3>
+            <p class="card__text">{data.recurringBand.text}</p>
+            <a class="card__more" href="/recurring-cleaning/">{data.recurringBand.linkLabel} <Icon name="arrow-right" size={16} /></a>
+          </div>
+        )
+      }
+      {
+        data.strBand && (
+          <div class="card card--link">
+            <span class="card__icon"><Icon name="key" /></span>
+            <p class="eyebrow mb-0">{data.strBand.eyebrow}</p>
+            <h3 class="card__title">{data.strBand.heading}</h3>
+            <p class="card__text">{data.strBand.text}</p>
+            <a class="card__more" href="/short-term-rental-cleaning/">{data.strBand.linkLabel} <Icon name="arrow-right" size={16} /></a>
+          </div>
+        )
+      }
+      {
+        data.moveoutBand && (
+          <div class="card card--link">
+            <span class="card__icon"><Icon name="box" /></span>
+            <p class="eyebrow mb-0">{data.moveoutBand.eyebrow}</p>
+            <h3 class="card__title">{data.moveoutBand.heading}</h3>
+            <p class="card__text">{data.moveoutBand.text}</p>
+            <a class="card__more" href="/move-in-move-out-cleaning/">{data.moveoutBand.linkLabel} <Icon name="arrow-right" size={16} /></a>
+          </div>
+        )
+      }
+      {
+        data.commercialBand && (
+          <div class="card card--link">
+            <span class="card__icon"><Icon name="briefcase" /></span>
+            <p class="eyebrow mb-0">{data.commercialBand.eyebrow}</p>
+            <h3 class="card__title">{data.commercialBand.heading}</h3>
+            <p class="card__text">{data.commercialBand.text}</p>
+            <a class="card__more" href="/commercial-cleaning/">{data.commercialBand.linkLabel} <Icon name="arrow-right" size={16} /></a>
+          </div>
+        )
+      }
+    </div>
+  </section>
+
+  <ProofGrid
+    heading={data.proof?.heading}
+    eyebrow={data.proof?.eyebrow}
+    lead={data.proof?.lead}
+  />
+
+  {
+    data.process && (
+      <section class="section">
+        <div class="container">
+          <div class="section-head">
+            <p class="eyebrow">{data.process.eyebrow}</p>
+            <h2>{data.process.heading}</h2>
+          </div>
+          <Steps steps={data.process.steps} />
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">{data.areaBand?.eyebrow}</p>
+        <h2>{data.areaBand?.heading}</h2>
+        <p class="lead">{data.areaBand?.text}</p>
+      </div>
+      <a class="btn btn--secondary" href="/service-area/">See the Service Area</a>
+    </div>
+  </section>
+
+  <Reviews />
+
+  {
+    faqs.length > 0 && (
+      <section class="section">
+        <div class="container container--narrow">
+          <div class="section-head">
+            <p class="eyebrow">Questions</p>
+            <h2>A few things people ask</h2>
+          </div>
+          <div class="faq-list">
+            {faqs.map((faq) => (
+              <FaqItem question={faq.data.question} answer={faq.data.answer} />
+            ))}
+          </div>
+          <p class="mt-4">
+            <a href="/faq/">Read all FAQs →</a>
+          </p>
+        </div>
+      </section>
+    )
+  }
+
+  <div class="container section section--tight">
+    <CtaBand
+      title={data.finalCta?.heading ?? 'Ready for a cleaner home?'}
+      text={data.finalCta?.text}
+      primaryLabel="Get Instant Estimate"
+      primaryHref="/estimate/"
+      secondaryLabel="Contact Us"
+      secondaryHref="/contact/"
+    />
+  </div>
+</BaseLayout>

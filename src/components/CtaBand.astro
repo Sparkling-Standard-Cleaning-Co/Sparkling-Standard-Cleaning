@@ -1,0 +1,27 @@
+---
+interface Props {
+  title: string;
+  text?: string | undefined;
+  primaryLabel: string;
+  primaryHref: string;
+  secondaryLabel?: string | undefined;
+  secondaryHref?: string | undefined;
+}
+
+const { title, text, primaryLabel, primaryHref, secondaryLabel, secondaryHref } = Astro.props;
+---
+
+<div class="cta-band">
+  <div>
+    <h2>{title}</h2>
+    {text && <p>{text}</p>}
+  </div>
+  <div class="btn-row">
+    <a class="btn btn--primary btn--large" href={primaryHref} data-cta="cta-band-primary">{primaryLabel}</a>
+    {
+      secondaryLabel && secondaryHref && (
+        <a class="btn btn--ghost" href={secondaryHref} data-cta="cta-band-secondary">{secondaryLabel}</a>
+      )
+    }
+  </div>
+</div>

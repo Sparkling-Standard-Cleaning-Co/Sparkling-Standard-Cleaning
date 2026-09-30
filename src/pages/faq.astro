@@ -1,0 +1,106 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import FaqItem from '../components/FaqItem.astro';
+import CtaBand from '../components/CtaBand.astro';
+import { faqNode, breadcrumbNode } from '../lib/schema';
+
+const faqs = (await getCollection('faqs')).sort((a, b) => a.data.order - b.data.order);
+
+const categoryOrder = [
+  'process',
+  'pricing',
+  'payments',
+  'policies',
+  'recurring',
+  'deep-cleaning',
+  'move-cleaning',
+  'str',
+  'commercial',
+  'service-area',
+  'pets',
+  'products',
+  'exclusions',
+] as const;
+
+const categoryLabels: Record<(typeof categoryOrder)[number], string> = {
+  process: 'Estimates & scheduling',
+  pricing: 'Pricing',
+  payments: 'Payments',
+  policies: 'Policies',
+  recurring: 'Recurring cleaning',
+  'deep-cleaning': 'Deep cleaning',
+  'move-cleaning': 'Move-in / move-out',
+  str: 'Short-term rentals',
+  commercial: 'Commercial & churches',
+  'service-area': 'Service area',
+  pets: 'Pets',
+  products: 'Products & preferences',
+  exclusions: 'What we don’t take on',
+};
+
+const groups = categoryOrder
+  .map((category) => ({
+    category,
+    label: categoryLabels[category],
+    entries: faqs.filter((faq) => faq.data.category === category),
+  }))
+  .filter((group) => group.entries.length > 0);
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'FAQ', path: '/faq/' },
+  ]),
+  faqNode(faqs.map((faq) => ({ question: faq.data.question, answer: faq.data.answer }))),
+];
+---
+
+<BaseLayout
+  title="Frequently Asked Questions"
+  description="Answers about estimates, pricing, payments, recurring cleaning, move-outs, rentals, commercial work, pets, products and what we don't take on."
+  schema={schema}
+>
+  <section class="section section--tight">
+    <div class="container">
+      <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'FAQ', path: '/faq/' }]} />
+      <div class="section-head mt-4">
+        <h1>Frequently asked questions</h1>
+        <p class="lead">
+          Straight answers — including the ones other companies avoid. If your question isn't here,
+          send it to us and it might become the next answer.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container container--narrow stack">
+      {
+        groups.map((group) => (
+          <div>
+            <h2>{group.label}</h2>
+            <div class="faq-list">
+              {group.entries.map((faq) => (
+                <FaqItem question={faq.data.question} answer={faq.data.answer} />
+              ))}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <div class="container section section--tight">
+    <CtaBand
+      title="Still have a question?"
+      text="Ask directly — or get an instant estimate and see most of your answers answered on the spot."
+      primaryLabel="Get Instant Estimate"
+      primaryHref="/estimate/"
+      secondaryLabel="Contact Us"
+      secondaryHref="/contact/"
+    />
+  </div>
+</BaseLayout>

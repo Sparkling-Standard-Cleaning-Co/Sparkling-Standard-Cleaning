@@ -1,0 +1,28 @@
+---
+import { contactPhone } from '../config/business';
+import Icon from './Icon.astro';
+
+const phone = contactPhone();
+---
+
+<div class="mobile-action-bar" role="group" aria-label="Quick actions">
+  {
+    phone ? (
+      <>
+        <a class="btn btn--secondary" href={phone.href} data-cta="sticky-call">
+          <Icon name="phone" size={18} /> Call
+        </a>
+        <a class="btn btn--secondary" href={phone.sms} data-cta="sticky-text">
+          <Icon name="message" size={18} /> Text
+        </a>
+      </>
+    ) : (
+      <a class="btn btn--secondary" href="/contact/" data-cta="sticky-contact">
+        <Icon name="mail" size={18} /> Contact
+      </a>
+    )
+  }
+  <a class="btn btn--primary" href="/estimate/" data-cta="sticky-estimate">
+    <Icon name="calendar" size={18} /> Estimate
+  </a>
+</div>

@@ -1,0 +1,109 @@
+---
+import { business, isPending, siteName } from '../config/business';
+import { footerServicesNav, footerCompanyNav, footerResourcesNav } from '../lib/site';
+import Logo from './Logo.astro';
+import SocialIcon from './SocialIcon.astro';
+import type { SocialName } from '../lib/icons';
+
+const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
+const year = new Date().getFullYear();
+
+const socialEntries = (
+  Object.entries(business.socials) as Array<[SocialName, string | 'PENDING']>
+).filter(([, url]) => url !== 'PENDING');
+---
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="site-footer__grid">
+      <div>
+        <Logo class="brand" />
+        <p class="small" style="margin-top: var(--space-4)">
+          Residential and commercial cleaning serving Pensacola, Cantonment and surrounding
+          communities, with select nearby service into Alabama.
+        </p>
+        {preview && <p class="small"><span class="pending-badge">Pre-launch preview</span></p>}
+      </div>
+
+      <div>
+        <h3>Services</h3>
+        <ul>
+          {footerServicesNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+        </ul>
+      </div>
+
+      <div>
+        <h3>Company</h3>
+        <ul>
+          {footerCompanyNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+        </ul>
+        <h3 style="margin-top: var(--space-5)">Resources</h3>
+        <ul>
+          {footerResourcesNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+        </ul>
+      </div>
+
+      <div>
+        <h3>Contact</h3>
+        <ul>
+          {
+            isPending(business.phone) ? (
+              <li>
+                {preview ? (
+                  <>
+                    <span class="small">Phone: </span>
+                    <span class="pending-badge">Pending owner input</span>
+                  </>
+                ) : (
+                  <span class="small">Phone being set up — use the contact form meanwhile.</span>
+                )}
+              </li>
+            ) : (
+              <>
+                <li><a href={business.phone.href} data-cta="footer-call">Call {business.phone.display}</a></li>
+                <li><a href={business.phone.sms} data-cta="footer-text">Text {business.phone.display}</a></li>
+              </>
+            )
+          }
+          {
+            isPending(business.email) ? (
+              <li>
+                {preview ? (
+                  <>
+                    <span class="small">Email: </span>
+                    <span class="pending-badge">Pending owner input</span>
+                  </>
+                ) : (
+                  <span class="small">Email being set up — use the contact form meanwhile.</span>
+                )}
+              </li>
+            ) : (
+              <li><a href={`mailto:${business.email}`}>{business.email}</a></li>
+            )
+          }
+          <li>{business.hours.display}</li>
+        </ul>
+        {
+          socialEntries.length > 0 && (
+            <ul style="display:flex; gap: var(--space-3); margin-top: var(--space-4); list-style:none">
+              {socialEntries.map(([platform, url]) => (
+                <li>
+                  <a href={url} aria-label={`${siteName()} on ${platform}`} rel="me noopener" target="_blank">
+                    <SocialIcon name={platform} />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+      </div>
+    </div>
+
+    <div class="site-footer__bottom">
+      <span>© {year} {siteName()}. All rights reserved.</span>
+      <span>
+        <a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a> · <a href="/service-area/">Service Area</a>
+      </span>
+    </div>
+  </div>
+</footer>

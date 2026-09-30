@@ -1,0 +1,154 @@
+---
+import { isFormEnabled } from '../config/business';
+import Icon from './Icon.astro';
+import TurnstileWidget from './TurnstileWidget.astro';
+
+const configured = isFormEnabled();
+
+interface Props {
+  class?: string;
+  /** Pre-select the church facility type (church page usage). */
+  churchPreset?: boolean;
+}
+
+const { class: className = '', churchPreset = false } = Astro.props;
+
+const facilityTypes = [
+  { value: 'church', label: 'Church / faith facility' },
+  { value: 'office', label: 'Office' },
+  { value: 'professional', label: 'Professional office / suite' },
+  { value: 'retail', label: 'Retail' },
+  { value: 'salon', label: 'Salon / barbershop' },
+  { value: 'gym', label: 'Gym / fitness facility' },
+  { value: 'medical', label: 'Medical / dental office' },
+  { value: 'apartment', label: 'Apartment community' },
+  { value: 'property-management', label: 'Property management portfolio' },
+  { value: 'warehouse', label: 'Small warehouse' },
+  { value: 'other', label: 'Other facility' },
+];
+---
+
+<form class:list={['form-card', className]} data-lead-form data-variant="commercial" action="#" method="post">
+  {
+    !configured && (
+      <p class="form-status" data-state="info" style="display:block">
+        Commercial form delivery is not connected on this preview build. The form below shows the
+        real request experience; submissions in preview cannot be delivered.
+      </p>
+    )
+  }
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="commercial-organization">Business / organization</label>
+      <input class="input" id="commercial-organization" name="organization" type="text" autocomplete="organization" required />
+    </div>
+    <div class="field">
+      <label for="commercial-name">Contact name</label>
+      <input class="input" id="commercial-name" name="name" type="text" autocomplete="name" required />
+    </div>
+  </div>
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="commercial-phone">Phone</label>
+      <input class="input" id="commercial-phone" name="phone" type="tel" autocomplete="tel" required />
+    </div>
+    <div class="field">
+      <label for="commercial-email">Email</label>
+      <input class="input" id="commercial-email" name="email" type="email" autocomplete="email" required />
+    </div>
+  </div>
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="commercial-facility">Facility type</label>
+      <select class="select" id="commercial-facility" name="facility_type" required>
+        <option value="">Choose the closest match…</option>
+        {facilityTypes.map((type) => (
+          <option value={type.value} selected={churchPreset && type.value === 'church'}>{type.label}</option>
+        ))}
+      </select>
+    </div>
+    <div class="field">
+      <label for="commercial-sqft">Approximate square footage</label>
+      <input class="input" id="commercial-sqft" name="square_feet" type="text" inputmode="numeric" placeholder="e.g. 4,000" />
+    </div>
+  </div>
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="commercial-frequency">Cleaning frequency</label>
+      <select class="select" id="commercial-frequency" name="frequency" required>
+        <option value="">How often?</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="biweekly">Biweekly</option>
+        <option value="monthly">Monthly</option>
+        <option value="one-time">One-time / project</option>
+        <option value="not-sure">Not sure yet</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="commercial-time">Preferred time window</label>
+      <select class="select" id="commercial-time" name="time_preference" required>
+        <option value="">When should we clean?</option>
+        <option value="daytime">Daytime</option>
+        <option value="before-hours">Before opening</option>
+        <option value="after-hours">After closing</option>
+        <option value="overnight">Overnight</option>
+        <option value="flexible">Flexible / discuss</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="commercial-days">Preferred days</label>
+      <input class="input" id="commercial-days" name="preferred_days" type="text" placeholder="e.g. Tuesday & Friday evenings" />
+    </div>
+    <div class="field">
+      <label for="commercial-walkthrough">Preferred walkthrough date</label>
+      <input class="input" id="commercial-walkthrough" name="walkthrough_date" type="date" />
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="commercial-situation">Current cleaning situation</label>
+    <input
+      class="input"
+      id="commercial-situation"
+      name="current_situation"
+      type="text"
+      placeholder="Who cleans now, and what would you like to change?"
+    />
+  </div>
+
+  <div class="field">
+    <label for="commercial-notes">Anything else we should know?</label>
+    <textarea class="textarea" id="commercial-notes" name="notes" rows="4" placeholder="Access details, surfaces, restrooms, events, constraints…"></textarea>
+  </div>
+
+  <TurnstileWidget />
+
+  <div class="honeypot" aria-hidden="true">
+    <label for="commercial-company-website">Company website</label>
+    <input id="commercial-company-website" name="company_website" type="text" tabindex="-1" autocomplete="off" />
+  </div>
+
+  <p class="small text-muted">
+    Sending this request does not book anything. We will schedule a walkthrough, prepare a clear
+    scope and quote, and confirm with you before any work begins. See our
+    <a href="/privacy/">privacy policy</a>.
+  </p>
+
+  <button class="btn btn--primary btn--large btn--block" type="submit" data-cta="commercial-submit">
+    <Icon name="send" size={18} /> Request a Walkthrough
+  </button>
+
+  <p class="form-status" data-form-status role="status" aria-live="polite"></p>
+</form>
+
+<script>
+  import '../scripts/lead-forms';
+</script>

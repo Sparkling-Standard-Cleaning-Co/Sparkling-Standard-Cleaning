@@ -1,0 +1,116 @@
+---
+import { getEntry } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import ContactForm from '../components/ContactForm.astro';
+import Icon from '../components/Icon.astro';
+import { business, contactPhone, isPending } from '../config/business';
+import { breadcrumbNode } from '../lib/schema';
+
+const entry = await getEntry('site', 'contact');
+if (!entry) throw new Error('Missing content entry: src/content/site/contact.md');
+const { data } = entry;
+
+const phone = contactPhone();
+const hasEmail = !isPending(business.email);
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Contact', path: '/contact/' },
+  ]),
+];
+---
+
+<BaseLayout title={data.metaTitle} description={data.metaDescription} schema={schema}>
+  <section class="section section--tight">
+    <div class="container">
+      <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Contact', path: '/contact/' }]} />
+      <div class="section-head mt-4">
+        <h1>
+          {data.hero.headline}
+          {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
+        </h1>
+        <p class="lead">{data.hero.lead}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container split split--sidebar">
+      <div class="stack">
+        <div class="card">
+          <h2 class="card__title">{data.waysHeading}</h2>
+          <div class="grid grid--2 mt-4">
+            <div class="trust-item">
+              <Icon name="phone" />
+              <div>
+                <p class="trust-item__title">Call</p>
+                {
+                  phone ? (
+                    <p class="trust-item__text">
+                      <a href={phone.href} data-cta="contact-call">{phone.display}</a>
+                    </p>
+                  ) : (
+                    <p class="trust-item__text">Number being set up — use the form or text once available.</p>
+                  )
+                }
+              </div>
+            </div>
+            <div class="trust-item">
+              <Icon name="message" />
+              <div>
+                <p class="trust-item__title">Text</p>
+                {
+                  phone ? (
+                    <p class="trust-item__text">
+                      <a href={phone.sms} data-cta="contact-text">{phone.display}</a>
+                    </p>
+                  ) : (
+                    <p class="trust-item__text">Texting activates with the phone number.</p>
+                  )
+                }
+              </div>
+            </div>
+            <div class="trust-item">
+              <Icon name="mail" />
+              <div>
+                <p class="trust-item__title">Email</p>
+                {
+                  hasEmail ? (
+                    <p class="trust-item__text"><a href={`mailto:${business.email}`}>{business.email}</a></p>
+                  ) : (
+                    <p class="trust-item__text">Email being set up — the form reaches the owner directly.</p>
+                  )
+                }
+              </div>
+            </div>
+            <div class="trust-item">
+              <Icon name="clock" />
+              <div>
+                <p class="trust-item__title">Hours</p>
+                <p class="trust-item__text">{business.hours.days} · {business.hours.residentialWindow}</p>
+              </div>
+            </div>
+          </div>
+          <p class="small text-muted mt-4 mb-0">{data.contactNote}</p>
+        </div>
+
+        <div class="card card--muted">
+          <h2 class="card__title">Looking for a price?</h2>
+          <p class="card__text">
+            The instant estimate answers most pricing questions in about a minute — and it's honest
+            about what needs a personal review.
+          </p>
+          <a class="btn btn--secondary" href="/estimate/" data-cta="contact-estimate">Get Instant Estimate</a>
+        </div>
+      </div>
+
+      <div>
+        <h2>{data.formHeading}</h2>
+        <ContactForm />
+      </div>
+    </div>
+  </section>
+</BaseLayout>

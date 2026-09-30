@@ -1,0 +1,61 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Icon from '../components/Icon.astro';
+import { contactPhone } from '../config/business';
+
+const phone = contactPhone();
+---
+
+<BaseLayout
+  title="Request Received"
+  description="Your request has been received and will be reviewed personally. This is a request — not a confirmed booking yet."
+  noindex
+>
+  <section class="section">
+    <div class="container container--narrow text-center">
+      <span class="card__icon" style="margin-inline: auto"><Icon name="check-circle" /></span>
+      <h1 class="mt-4">Request received — thank you.</h1>
+      <p class="lead" style="margin-inline: auto">
+        To be clear about where things stand: this is a <strong>request</strong>, not a confirmed
+        booking yet. The owner reviews every request personally.
+      </p>
+
+      <div class="card mt-6 text-center" style="text-align:left">
+        <h2 class="card__title">What happens next</h2>
+        <ol class="steps" style="gap: var(--space-4); margin-top: var(--space-4)">
+          <li class="step" style="padding-top: var(--space-5)">
+            <p class="step__title">Review</p>
+            <p class="step__text">Your scope, condition details and preferred date are reviewed — usually the same day.</p>
+          </li>
+          <li class="step" style="padding-top: var(--space-5)">
+            <p class="step__title">Confirmation</p>
+            <p class="step__text">You'll hear back with final scope, price and the exact date/time details.</p>
+          </li>
+          <li class="step" style="padding-top: var(--space-5)">
+            <p class="step__title">Booked</p>
+            <p class="step__text">Only after you confirm is your cleaning placed on the calendar.</p>
+          </li>
+        </ol>
+      </div>
+
+      <p class="mt-6">
+        Need to add something — photos, access notes, a date change? Just reply or reach out:
+      </p>
+      <div class="btn-row" style="justify-content: center">
+        {
+          phone && (
+            <>
+              <a class="btn btn--secondary" href={phone.href} data-cta="thankyou-call">
+                <Icon name="phone" size={18} /> Call
+              </a>
+              <a class="btn btn--secondary" href={phone.sms} data-cta="thankyou-text">
+                <Icon name="message" size={18} /> Text
+              </a>
+            </>
+          )
+        }
+        <a class="btn btn--ghost" href="/">Back to Home</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

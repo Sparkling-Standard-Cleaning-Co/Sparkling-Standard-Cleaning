@@ -1,0 +1,232 @@
+---
+import { getCollection, render, type CollectionEntry } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import Checklist from '../components/Checklist.astro';
+import FaqItem from '../components/FaqItem.astro';
+import ServiceCard from '../components/ServiceCard.astro';
+import CtaBand from '../components/CtaBand.astro';
+import CommercialForm from '../components/CommercialForm.astro';
+import StrForm from '../components/StrForm.astro';
+import Icon from '../components/Icon.astro';
+import { serviceNode, breadcrumbNode, faqNode } from '../lib/schema';
+
+export async function getStaticPaths() {
+  const services = await getCollection('services');
+  return services.map((entry) => ({
+    params: { service: entry.data.path.replaceAll('/', '') },
+    props: { entry },
+  }));
+}
+
+interface Props {
+  entry: CollectionEntry<'services'>;
+}
+
+const { entry } = Astro.props;
+const data = entry.data;
+const { Content } = await render(entry);
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const services = await getCollection('services');
+const faqs = await getCollection('faqs');
+const checklists = await getCollection('checklists');
+
+const pageFaqs = faqs
+  .filter((faq) => data.faqIds.includes(faq.id))
+  .sort((a, b) => a.data.order - b.data.order);
+
+const related = services
+  .filter((service) => data.related.includes(service.data.path))
+  .sort((a, b) => a.data.order - b.data.order);
+
+const checklist = data.checklistId
+  ? checklists.find((item) => item.id === data.checklistId && item.data.visibility === 'public')
+  : undefined;
+
+const schema = [
+  serviceNode({
+    site,
+    name: data.title,
+    description: data.metaDescription,
+    path: data.path,
+    serviceType: data.serviceType,
+  }),
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: data.title, path: data.path },
+  ]),
+  ...(pageFaqs.length > 0
+    ? [faqNode(pageFaqs.map((faq) => ({ question: faq.data.question, answer: faq.data.answer })))]
+    : []),
+];
+---
+
+<BaseLayout title={data.metaTitle ?? data.title} description={data.metaDescription} schema={schema}>
+  <section class="section section--tight">
+    <div class="container">
+      <Breadcrumbs
+        trail={[
+          { name: 'Home', path: '/' },
+          { name: data.title, path: data.path },
+        ]}
+      />
+      <div class="split" style="align-items: start; margin-top: var(--space-5)">
+        <div>
+          {data.heroEyebrow && <p class="eyebrow">{data.heroEyebrow}</p>}
+          <h1>{data.title} in Pensacola &amp; Cantonment</h1>
+          <p class="lead">{data.heroLead}</p>
+          <div class="btn-row mt-4">
+            <a class="btn btn--primary btn--large" href={data.ctaHref} data-cta="service-primary">
+              {data.ctaLabel}
+            </a>
+            <a class="btn btn--ghost" href="/contact/" data-cta="service-contact">Ask a Question</a>
+          </div>
+        </div>
+        <div class="card card--muted">
+          <span class="card__icon"><Icon name={data.icon} /></span>
+          <h2 class="card__title" style="margin-top: var(--space-3)">Who this is for</h2>
+          <Checklist items={data.goodFor} />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="container split split--sidebar">
+      <div class="prose">
+        <Content />
+      </div>
+      <aside class="stack">
+        {
+          data.includes.length > 0 && (
+            <div class="card">
+              <h2 class="card__title">What's normally included</h2>
+              <Checklist items={data.includes} />
+            </div>
+          )
+        }
+        {
+          checklist && (
+            <div class="card card--muted">
+              <h2 class="card__title">{checklist.data.title}</h2>
+              <Checklist items={checklist.data.items} />
+              {checklist.data.note && <p class="small text-muted" style="margin-top: var(--space-3)">{checklist.data.note}</p>}
+            </div>
+          )
+        }
+      </aside>
+    </div>
+  </section>
+
+  {
+    data.notIncluded.length > 0 && (
+      <section class="section">
+        <div class="container">
+          <div class="section-head">
+            <p class="eyebrow">Honest boundaries</p>
+            <h2>What this service doesn't cover</h2>
+            <p class="lead">
+              Being clear up front prevents surprises. Some of these are easy add-ons; others are
+              services we don't offer and will tell you so directly.
+            </p>
+          </div>
+          <div class="grid grid--2">
+            <div class="card">
+              <Checklist items={data.notIncluded} />
+            </div>
+            <div class="card card--muted">
+              <h3 class="card__title">Prefer to ask first?</h3>
+              <p class="card__text">
+                If you're unsure whether your situation fits, describe it in the estimate or send a
+                message — there's no judgment in the question.
+              </p>
+              <a class="btn btn--secondary" href="/contact/">Ask Us</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    data.embedForm && (
+      <section
+        class="section"
+        id={data.embedForm === 'str' ? 'turnover-request' : 'walkthrough'}
+      >
+        <div class="container container--narrow">
+          <div class="section-head">
+            <p class="eyebrow">{data.embedForm === 'str' ? 'Turnover requests' : 'Walkthrough requests'}</p>
+            <h2>{data.embedForm === 'str' ? 'Request Turnover Service' : 'Request a Walkthrough'}</h2>
+            <p class="lead">
+              {data.embedForm === 'str'
+                ? 'Tell us about the property and how turnovers run. The owner reviews every request personally and confirms scope, schedule and price before anything is booked.'
+                : 'Tell us about your facility. We schedule a walkthrough, prepare a clear scope and quote, and confirm with you before any work begins.'}
+            </p>
+          </div>
+          {data.embedForm === 'str' ? (
+            <StrForm />
+          ) : (
+            <CommercialForm churchPreset={entry.id === 'church-cleaning'} />
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  {
+    pageFaqs.length > 0 && (
+      <section class="section section--alt">
+        <div class="container container--narrow">
+          <div class="section-head">
+            <p class="eyebrow">Common questions</p>
+            <h2>{data.title} questions</h2>
+          </div>
+          <div class="faq-list">
+            {pageFaqs.map((faq) => (
+              <FaqItem question={faq.data.question} answer={faq.data.answer} />
+            ))}
+          </div>
+          <p class="mt-4">
+            <a href="/faq/">See all frequently asked questions →</a>
+          </p>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    related.length > 0 && (
+      <section class="section">
+        <div class="container">
+          <div class="section-head">
+            <p class="eyebrow">Related services</p>
+            <h2>You might also be looking for</h2>
+          </div>
+          <div class="grid grid--3">
+            {related.map((service) => (
+              <ServiceCard
+                title={service.data.title}
+                summary={service.data.summary}
+                href={service.data.path}
+                icon={service.data.icon}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <div class="container section section--tight">
+    <CtaBand
+      title={`Ready for ${data.title.toLowerCase()}?`}
+      text="Start with the estimate — it tells you honestly what your home needs and what it should cost."
+      primaryLabel={data.ctaLabel}
+      primaryHref={data.ctaHref}
+      secondaryLabel="Get in Touch"
+      secondaryHref="/contact/"
+    />
+  </div>
+</BaseLayout>

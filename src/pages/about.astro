@@ -1,0 +1,148 @@
+---
+import { getEntry } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import Checklist from '../components/Checklist.astro';
+import CtaBand from '../components/CtaBand.astro';
+import Icon from '../components/Icon.astro';
+import { business, contactPhone, isPending } from '../config/business';
+import { breadcrumbNode } from '../lib/schema';
+
+const entry = await getEntry('site', 'about');
+if (!entry) throw new Error('Missing content entry: src/content/site/about.md');
+const { data } = entry;
+
+const phone = contactPhone();
+const hasEmail = !isPending(business.email);
+const details = [...business.founder.detailExamples];
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'About', path: '/about/' },
+  ]),
+];
+---
+
+<BaseLayout title={data.metaTitle} description={data.metaDescription} schema={schema}>
+  <section class="hero">
+    <div class="container">
+      <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'About', path: '/about/' }]} />
+      <div class="section-head mt-5" style="max-width: 52rem">
+        <h1>
+          {data.hero.headline}
+          {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
+        </h1>
+        <p class="lead">{data.hero.lead}</p>
+        <a class="btn btn--primary btn--large mt-4" href="/estimate/" data-cta="about-estimate">
+          {data.hero.ctaLabel ?? 'Get Instant Estimate'}
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container split">
+      <div class="stack">
+        {
+          data.sections.slice(0, 2).map((section) => (
+            <div id={section.id}>
+              {section.eyebrow && <p class="eyebrow">{section.eyebrow}</p>}
+              <h2>{section.heading}</h2>
+              {section.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+            </div>
+          ))
+        }
+      </div>
+      <div class="card">
+        <p class="eyebrow">The details she noticed</p>
+        <h2 class="card__title">Why “detail-first” is not a slogan</h2>
+        <Checklist items={details} />
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="container container--narrow stack">
+      {
+        data.sections.slice(2).map((section) => (
+          <div id={section.id}>
+            {section.eyebrow && <p class="eyebrow">{section.eyebrow}</p>}
+            <h2>{section.heading}</h2>
+            {section.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+          </div>
+        ))
+      }
+      <blockquote class="card card--feature">
+        <p style="font-family: var(--font-display); font-size: var(--text-lg); margin-bottom: var(--space-3)">
+          “{business.founder.coreStory}”
+        </p>
+        <p class="small text-muted mb-0">
+          — {isPending(business.founder.firstName) ? 'The founder' : business.founder.firstName}, {business.founder.role}
+        </p>
+      </blockquote>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="grid grid--4">
+        <div class="card">
+          <span class="card__icon"><Icon name="phone" /></span>
+          <h3 class="card__title">{data.infoTitles?.call ?? 'Talk to a human'}</h3>
+          {
+            phone ? (
+              <p class="card__text">
+                Call or text <a href={phone.href} data-cta="about-call">{phone.display}</a> —
+                the founder answers.
+              </p>
+            ) : (
+              <p class="card__text">
+                A direct line is being set up — send a message and you'll get a real reply.
+              </p>
+            )
+          }
+        </div>
+        <div class="card">
+          <span class="card__icon"><Icon name="clock" /></span>
+          <h3 class="card__title">{data.infoTitles?.hours ?? 'When we clean'}</h3>
+          <p class="card__text">
+            {business.hours.days}, {business.hours.residentialWindow}. Commercial accounts can also
+            book evening and overnight windows.
+          </p>
+        </div>
+        <div class="card">
+          <span class="card__icon"><Icon name="map-pin" /></span>
+          <h3 class="card__title">{data.infoTitles?.area ?? 'Where we serve'}</h3>
+          <p class="card__text">{business.serviceArea.summary}</p>
+        </div>
+        <div class="card">
+          <span class="card__icon"><Icon name="heart" /></span>
+          <h3 class="card__title">{data.infoTitles?.values ?? 'What guides us'}</h3>
+          <p class="card__text">
+            Honest work, careful hands, and respect for every home and every family we serve.
+          </p>
+        </div>
+      </div>
+      {
+        hasEmail && (
+          <p class="small text-muted mt-4">
+            Prefer email? <a href={`mailto:${business.email}`}>{business.email}</a>
+          </p>
+        )
+      }
+    </div>
+  </section>
+
+  <div class="container section section--tight">
+    <CtaBand
+      title={data.ctaBand?.heading ?? 'Want to see the standard for yourself?'}
+      text={data.ctaBand?.text}
+      primaryLabel="Get Instant Estimate"
+      primaryHref="/estimate/"
+      secondaryLabel="Contact Us"
+      secondaryHref="/contact/"
+    />
+  </div>
+</BaseLayout>

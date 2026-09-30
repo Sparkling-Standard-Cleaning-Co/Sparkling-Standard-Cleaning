@@ -1,0 +1,61 @@
+---
+import { business, siteName } from '../config/business';
+import { localBusinessNode } from '../lib/schema';
+import { socialUrls } from '../config/business';
+
+interface Props {
+  title: string;
+  description: string;
+  noindex?: boolean;
+  /** Additional page-level JSON-LD nodes (Service, BreadcrumbList, FAQPage…). */
+  schema?: object[];
+}
+
+const { title, description, noindex = false, schema = [] } = Astro.props;
+
+const site = Astro.site ?? new URL(business.url === 'PENDING' ? 'https://pending-website-url.invalid' : business.url);
+const path = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`;
+const canonical = new URL(path, site).href;
+
+// Preview deployments set PUBLIC_PREVIEW_MODE=true so they are never indexed.
+// Directive §79: preview is noindex, nofollow. Production must show
+// "index, follow" (verified by scripts/verify-seo.mjs).
+const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
+const robots = noindex || preview ? 'noindex, nofollow' : 'index, follow';
+
+const pageTitle = title.includes(siteName()) ? title : `${title} | ${siteName()}`;
+
+const businessNode = localBusinessNode(site, socialUrls());
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>{pageTitle}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+<meta name="robots" content={robots} />
+<meta name="theme-color" content="#fdfbf8" />
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-48.png" sizes="48x48" type="image/png" />
+<link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png" />
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+
+<link rel="preload" href="/fonts/fraunces-normal-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="/fonts/nunito-sans-normal-latin.woff2" as="font" type="font/woff2" crossorigin />
+
+<meta property="og:site_name" content={siteName()} />
+<meta property="og:type" content="website" />
+<meta property="og:title" content={pageTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={new URL('/brand/og-default.png', site).href} />
+<meta name="twitter:card" content="summary_large_image" />
+
+<script type="application/ld+json" set:html={JSON.stringify(businessNode)} />
+
+{
+  schema.map((node) => (
+    <script type="application/ld+json" set:html={JSON.stringify(node)} />
+  ))
+}

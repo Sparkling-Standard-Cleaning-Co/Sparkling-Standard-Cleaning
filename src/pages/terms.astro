@@ -1,0 +1,179 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { business, contactPhone, isPending } from '../config/business';
+import { pricing } from '../config/pricing';
+import { breadcrumbNode } from '../lib/schema';
+
+// These terms describe the currently implemented model: requests (not instant
+// bookings), estimate ranges confirmed personally, payment after service, and
+// the make-it-right policy. Cancellation percentages stay OUT of this page
+// until the owner approves final values (pricing.cancellation.ownerApproved).
+// Owner legal review is a launch blocker — see docs/launch/OWNER-INPUT-REQUIRED.md.
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Terms', path: '/terms/' },
+  ]),
+];
+
+const hasEmail = !isPending(business.email);
+const phone = contactPhone();
+---
+
+<BaseLayout
+  title="Terms of Service"
+  description="The terms for estimates, booking requests, scheduling, payment, cancellations and the make-it-right policy."
+  schema={schema}
+>
+  <section class="section section--tight">
+    <div class="container container--narrow">
+      <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Terms', path: '/terms/' }]} />
+      <h1 class="mt-4">Terms of service</h1>
+      <p class="lead">
+        The rules of working together, written to be read — not to be survived.
+      </p>
+      <p class="small text-muted">Last updated: September 30, 2026.</p>
+
+      <div class="prose stack mt-6">
+        <section>
+          <h2>Estimates and requests</h2>
+          <ul>
+            <li>
+              The online estimate is an <strong>estimated range</strong>, not a guaranteed price.
+              Final scope, condition, access and unusual circumstances can affect the final
+              confirmed price.
+            </li>
+            <li>
+              Submitting an estimate or request is a <strong>request, not a confirmed booking</strong>.
+              A booking exists only after the owner confirms the scope, date and final price with
+              you.
+            </li>
+            <li>
+              If the property's condition differs materially from what was described, we may discuss
+              a revised price, adjust the scope to the agreed amount, or reschedule with a custom
+              quote — always discussed with you before work continues.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Scheduling and arrival windows</h2>
+          <ul>
+            <li>
+              The first appointment of the day can be scheduled for an exact arrival time. Later
+              appointments use an arrival window.
+            </li>
+            <li>
+              We clean {business.hours.days.toLowerCase()}, generally between
+              {business.hours.residentialWindow}. Commercial work can be scheduled outside those
+              hours by agreement.
+            </li>
+            <li>A home takes as long as it honestly takes; we do not rush jobs to protect a clock.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Payment</h2>
+          <ul>
+            <li>Residential cleaning is payable after the cleaning is complete.</li>
+            <li>
+              Accepted methods include {business.payments.accepted.join(', ')}, plus{' '}
+              {business.payments.alternate.join(', ')}.
+            </li>
+            <li>Commercial and recurring arrangements are invoiced on the schedule agreed in the scope.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Cancellations, rescheduling and access</h2>
+          <ul>
+            <li>We ask for at least 24 hours' notice to cancel or reschedule.</li>
+            <li>
+              Cancellations with 24 or more hours' notice normally carry no fee. Inside 24 hours —
+              or for same-day cancellations, no-access and lockouts — a partial fee may apply. The
+              current policy and any applicable amount are confirmed with your booking, and the
+              founder may exercise reasonable discretion for established clients and genuine
+              emergencies.
+            </li>
+            <li>If we cannot access the property for a booked visit, it is treated as a same-day cancellation.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Our make-it-right policy</h2>
+          <p>{pricing.satisfaction.statement}</p>
+          <p>
+            This applies to items within the agreed cleaning scope. It does not extend to unrelated
+            work, restoration, repair, or conditions outside the scope.
+          </p>
+        </section>
+
+        <section>
+          <h2>What we do not take on</h2>
+          <p>
+            Post-construction cleaning is not offered. Specialist and hazardous situations —
+            including biohazards, sharps, crime scenes, severe hoarding, mold remediation, serious
+            infestations, fire restoration, hazardous chemical remediation and unsafe height work —
+            require certified specialist providers and are outside our scope. If a job requires a
+            specialist, we will say so directly.
+          </p>
+        </section>
+
+        <section>
+          <h2>Pets</h2>
+          <p>
+            Pets are welcome. If an animal creates a safety risk or prevents the work from being
+            done properly, we will ask that it be secured during the visit.
+          </p>
+        </section>
+
+        <section>
+          <h2>Photos and marketing</h2>
+          <p>
+            Completion photos may be taken for quality and documentation. Photos of your property
+            are used publicly only with your permission, and photos are never used in a way that
+            exposes identifying or private information.
+          </p>
+        </section>
+
+        <section>
+          <h2>Liability</h2>
+          <p>
+            We work carefully and treat every home with respect. If something within our agreed
+            scope is missed or damaged through our work, contact us promptly and we will make it
+            right — that is the policy and the promise. Our responsibility is limited to correcting
+            or addressing the affected work within the agreed scope.
+          </p>
+        </section>
+
+        <section>
+          <h2>Changes</h2>
+          <p>
+            These terms may be updated as the business finalizes its policies. The version in effect
+            for your booking is the one confirmed with you before your cleaning.
+          </p>
+        </section>
+
+        <section>
+          <h2>Contact</h2>
+          <p>
+            {
+              phone || hasEmail ? (
+                <>
+                  Questions about these terms?{' '}
+                  {phone && <>Call or text <a href={phone.href}>{phone.display}</a>. </>}
+                  {hasEmail && <>Email <a href={`mailto:${business.email}`}>{business.email}</a>.</>}
+                </>
+              ) : (
+                <>Questions about these terms? Reach us through the <a href="/contact/">contact page</a>.</>
+              )
+            }
+          </p>
+        </section>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

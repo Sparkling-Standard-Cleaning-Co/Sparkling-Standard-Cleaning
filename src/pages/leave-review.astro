@@ -1,0 +1,61 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import Icon from '../components/Icon.astro';
+import { business, isPending } from '../config/business';
+
+// Utility page (noindexed, excluded from the sitemap). Renders the review CTA
+// ONLY when the owner has configured a real review link — never an invented
+// one. See docs/marketing/REVIEW-GROWTH-SYSTEM.md.
+
+const reviewUrl = isPending(business.reviews.submissionUrl) ? null : business.reviews.submissionUrl;
+---
+
+<BaseLayout
+  title="Leave a Review"
+  description="Share your experience with a quick review — it helps a small local business more than you'd think."
+  noindex
+>
+  <section class="section">
+    <div class="container container--narrow text-center">
+      <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Leave a Review', path: '/leave-review/' }]} />
+      <h1 class="mt-4">Thank you for trusting us with your home</h1>
+      <p class="lead" style="margin-inline: auto">
+        If we did right by you, a quick review helps more than you'd think — it's how neighbors
+        find a cleaning company they can trust.
+      </p>
+
+      {
+        reviewUrl ? (
+          <div class="card mt-6">
+            <p class="mb-4"><strong>It takes about 30 seconds:</strong></p>
+            <a
+              class="btn btn--primary btn--large"
+              href={reviewUrl}
+              rel="noopener"
+              data-review-link="google"
+            >
+              <Icon name="star" size={18} /> Leave a Google Review
+            </a>
+          </div>
+        ) : (
+          <div class="card card--muted mt-6" style="text-align: left">
+            <h2 class="card__title">The review link is being set up</h2>
+            <p class="card__text">
+              The owner's Google review link has not been added yet, so there is nothing to click
+              here — and we would never point you at a link that isn't real. If you'd like to share
+              feedback right now, send it through the contact page and it goes straight to the
+              founder.
+            </p>
+            <a class="btn btn--secondary" href="/contact/">Share Feedback</a>
+          </div>
+        )
+      }
+
+      <p class="small text-muted mt-6">
+        If anything about your clean wasn't right, tell us first — we will work quickly to make it
+        right. That matters more than a review.
+      </p>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,26 @@
+---
+import { analyticsConfigured } from '../lib/analytics/consent';
+import Icon from './Icon.astro';
+
+// Rendered only when at least one analytics service is configured. The
+// controller script shows/hides it based on the stored choice.
+const configured = analyticsConfigured();
+---
+
+{
+  configured && (
+    <div class="consent-banner" data-consent-banner data-visible="false" role="region" aria-label="Analytics choice">
+      <p>
+        <strong>Your privacy comes first.</strong> We use privacy-friendly analytics to understand
+        which pages help people — nothing is loaded until you say so, and we never sell data or run
+        ads. You can change your choice anytime on the <a href="/privacy/">privacy page</a>.
+      </p>
+      <div class="consent-banner__actions">
+        <button class="btn btn--primary btn--small" type="button" data-consent="allow">
+          <Icon name="check" size={16} /> Allow analytics
+        </button>
+        <button class="btn btn--ghost btn--small" type="button" data-consent="deny">No thanks</button>
+      </div>
+    </div>
+  )
+}

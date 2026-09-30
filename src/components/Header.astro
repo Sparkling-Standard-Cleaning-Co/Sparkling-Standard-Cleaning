@@ -1,0 +1,96 @@
+---
+import { contactPhone } from '../config/business';
+import { primaryNav } from '../lib/site';
+import Logo from './Logo.astro';
+import Icon from './Icon.astro';
+import PendingNote from './PendingNote.astro';
+
+const pathname = Astro.url.pathname;
+const phone = contactPhone();
+const isActive = (href: string) => pathname === href || (href !== '/' && pathname.startsWith(href));
+---
+
+<header class="site-header">
+  <div class="container site-header__inner">
+    <Logo />
+
+    <nav class="site-nav" aria-label="Primary">
+      <ul class="site-nav__links">
+        {
+          primaryNav.map((item) => (
+            <li>
+              <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+                {item.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+      {
+        phone && (
+          <a class="btn btn--ghost btn--small" href={phone.href} data-cta="header-call">
+            <Icon name="phone" size={18} />
+            {' '}{phone.display}
+          </a>
+        )
+      }
+      <a class="btn btn--primary btn--small" href="/estimate/" data-cta="header-estimate">Get Instant Estimate</a>
+      {!phone && <PendingNote label="Phone" />}
+    </nav>
+
+    <button
+      class="nav-toggle"
+      type="button"
+      data-nav-toggle
+      aria-expanded="false"
+      aria-controls="mobile-nav"
+    >
+      <span class="visually-hidden">Menu</span>
+      <Icon name="menu" size={22} />
+    </button>
+  </div>
+
+  <div class="container">
+    <nav id="mobile-nav" class="mobile-nav" data-nav-panel data-open="false" aria-label="Mobile">
+      <ul class="mobile-nav__links">
+        {
+          primaryNav.map((item) => (
+            <li>
+              <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+                {item.label}
+              </a>
+            </li>
+          ))
+        }
+        <li><a href="/service-area/">Service Area</a></li>
+        <li><a href="/contact/">Contact</a></li>
+        <li><a href="/faq/">FAQ</a></li>
+      </ul>
+      <div class="btn-row" style="margin-top: var(--space-4)">
+        <a class="btn btn--primary btn--block" href="/estimate/">Get Instant Estimate</a>
+        {
+          phone && (
+            <>
+              <a class="btn btn--secondary" href={phone.href} data-cta="mobile-nav-call">
+                <Icon name="phone" size={18} /> Call
+              </a>
+              <a class="btn btn--secondary" href={phone.sms} data-cta="mobile-nav-text">
+                <Icon name="message" size={18} /> Text
+              </a>
+            </>
+          )
+        }
+      </div>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const toggle = document.querySelector('[data-nav-toggle]');
+  const panel = document.querySelector('[data-nav-panel]');
+  toggle?.addEventListener('click', () => {
+    const open = panel?.getAttribute('data-open') === 'true';
+    panel?.setAttribute('data-open', String(!open));
+    toggle.setAttribute('aria-expanded', String(!open));
+  });
+</script>

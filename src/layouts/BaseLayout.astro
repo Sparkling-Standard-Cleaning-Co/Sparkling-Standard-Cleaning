@@ -1,0 +1,39 @@
+---
+import '../styles/global.css';
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import MobileActionBar from '../components/MobileActionBar.astro';
+import ConsentBanner from '../components/ConsentBanner.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  noindex?: boolean;
+  schema?: object[];
+}
+
+const { title, description, noindex = false, schema = [] } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead title={title} description={description} noindex={noindex} schema={schema} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <Header />
+    <main id="main" class="site-main">
+      <slot />
+    </main>
+    <Footer />
+    <MobileActionBar />
+    <ConsentBanner />
+    <script>
+      import '../scripts/consent-controller';
+      import '../scripts/analytics-clicks';
+      import '../scripts/attribution-capture';
+    </script>
+  </body>
+</html>
