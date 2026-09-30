@@ -1,0 +1,40 @@
+{
+  "name": "pensacola-cleaning-company",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Marketing, estimate, and lead system for a Pensacola-area residential and commercial cleaning company.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "verify": "npm run check && npm run build && npm run validate",
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "validate": "node scripts/validate-site.mjs",
+    "links": "node scripts/links.mjs",
+    "seo": "node scripts/verify-seo.mjs",
+    "pending": "node scripts/check-pending-facts.mjs",
+    "testimonials": "node scripts/check-fake-testimonials.mjs",
+    "marketing:links": "node scripts/generate-marketing-links.mjs",
+    "marketing:qr": "node scripts/generate-marketing-links.mjs --qr",
+    "marketing:verify": "node scripts/generate-marketing-links.mjs --check",
+    "validate:production": "node scripts/validate-production-env.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "audit:facts": "node scripts/audit-facts.mjs"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.4.0",
+    "astro": "^5.13.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0",
+    "qrcode": "^1.5.4",
+    "typescript": "^5.7.3"
+  }
+}
