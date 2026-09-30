@@ -8,18 +8,18 @@ work as complete; update this file when verification runs.
 | Check | Command | Result |
 | --- | --- | --- |
 | TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints |
-| Production build | `npm run build` | 17 pages + sitemap, no errors |
+| Production build | `npm run build` | 18 pages + sitemap, no errors |
 | Estimator unit tests | `npm test` | 27/27 pass (anchors, frequencies, add-ons, minimums, travel, thresholds, malformed input) |
-| Internal links | `npm run links` | ~986 links across 17 pages, all resolve |
-| SEO checks | `npm run seo` | unique titles/descriptions, canonicals, robots, JSON-LD, sitemap |
+| Internal links | `npm run links` | 1037 links across 18 pages, all resolve |
+| SEO checks | `npm run seo` | unique titles/descriptions across 18 pages, canonicals, robots, JSON-LD, sitemap |
 | Marketing registry + QR decode | `npm run marketing:verify` | registry valid, docs in sync, 13 QR assets decode-verified |
 | Internal checklist leak check | `npm run validate` | 2 internal checklists verified absent from public build |
-| Static smoke test | `npm run smoke` | all pages, layout shell, estimate flow structure, form variants |
+| Static smoke test | `npm run smoke` | 17 required pages, layout shell, estimate flow structure, form variants |
 | Fake-testimonial detector | `npm run testimonials` | clean |
 | No-fabrication audit | `npm run audit:facts` | no unsupported claims (4 review-context terms confirmed negative/exclusion usage) |
 | PENDING-fact gate | `npm run pending` | **fails as designed** — placeholder brand/domain still PENDING (this is the production gate working) |
-| Preview noindex behavior | `PUBLIC_PREVIEW_MODE=true npm run build` + `robots.txt` | `noindex, nofollow` + `Disallow: /` |
-| Production robots behavior | default build | `Allow: /` + sitemap (verified before go-live build) |
+| Preview noindex behavior | `PUBLIC_PREVIEW_MODE=true npm run build` + `robots.txt` | verified: `noindex, nofollow`, `Disallow: /`, preview badges shown |
+| Production robots behavior | default build | verified: `Allow: /` + sitemap |
 
 ## Pending (cannot be verified in this environment — owner or tooling required)
 
