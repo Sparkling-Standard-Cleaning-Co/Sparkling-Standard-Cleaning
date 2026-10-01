@@ -13,6 +13,14 @@
   box-sizing: border-box;
 }
 
+/* The `hidden` attribute must always win. Author display rules (e.g.
+   `.btn { display: inline-flex }`, `.field { display: grid }`) otherwise
+   override the user-agent `[hidden] { display: none }` rule, which made the
+   wizard show both Continue and Send My Request on the final step. */
+[hidden] {
+  display: none !important;
+}
+
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
