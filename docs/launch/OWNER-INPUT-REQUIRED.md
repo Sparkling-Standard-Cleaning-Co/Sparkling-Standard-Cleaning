@@ -25,9 +25,9 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 
 | # | Item | Where | Notes |
 | --- | --- | --- | --- |
-| 1 | **Web3Forms access key** | `WEB3FORMS_ACCESS_KEY` (Secret) + `PUBLIC_WEB3FORMS_ACCESS_KEY` (Text — same key) in Cloudflare | Verified live 2026-10-01: forms currently cannot deliver (`/api/lead` → `503 not_configured`). Add both variables, redeploy, then run the authorized live tests. Steps: `docs/launch/REVENUE-READINESS-PLAN.md` §2. |
+| 1 | **Web3Forms access key** | `WEB3FORMS_ACCESS_KEY` (Secret) + `PUBLIC_WEB3FORMS_ACCESS_KEY` (Text — same key) in Cloudflare | **Done 2026-10-01.** Verified: public key present in the deployed bundle; `/api/lead` returns `200 {"ok":true}`; four marked live tests (residential, estimate, commercial, STR) accepted by the provider. Outstanding: owner confirms inbox delivery. |
 | 2 | **Operating origin** | `TRAVEL_ORIGIN` ("lat,lng", Cloudflare Secret) | Private Cantonment-area location near Highway 97. Verified live 2026-10-01: `/api/travel` → `503 origin_not_configured`. Server-side only — never published on the site, in schema, in the repository or in marketing material. |
-| 3 | **Live form-delivery test** | after deployment | One authorized submission per category (residential, estimate, commercial, STR) must arrive at `owner@sparkling-standard.com`. |
+| 3 | **Live form-delivery test** | after deployment | **Submitted 2026-10-01** (one clearly marked test per category; all provider-accepted). Owner: confirm all four arrived at `owner@sparkling-standard.com`. |
 | 4 | **Stripe enabled methods** | `business.payments` | Confirm which methods are actually enabled in the Stripe account (cards / Apple Pay / Google Pay / ACH). The site currently lists cards, Apple Pay, Google Pay and ACH. |
 | 5 | **Owner launch approval** | `business.launch.productionApproved = true` | Deliberate, reviewable code change after this list is cleared. |
 

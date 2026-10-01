@@ -62,6 +62,20 @@ Lighthouse/PageSpeed Insights could not be run: the public PSI API returned a da
 The Core Web Vitals above are direct Chromium measurements with the method recorded, not
 Lighthouse scores.
 
+## Verified — production hotfix (2026-10-01, commit `6afe7a1`)
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Estimator final-step navigation | Committed browser suite, 360/768/1440 px | steps 1–5 show Continue (+Back from step 2); step 6 shows Back + **exactly one primary action** labelled "Send My Request"; no Continue. Root cause fixed at the stylesheet (`[hidden]{display:none!important}` — `.btn`/`.field` display rules were overriding the `hidden` attribute) |
+| Wizard regression suite | `npm run test:browser` | **7/7 pass**: navigation contract at three widths, validation blocks advancement, draft restore after reload, double-submission prevention (button disabled while sending; honest failure; re-enabled), no 360 px overflow |
+| Other `hidden` elements | Browser suite | live estimate panel hidden initially; STR-only field hidden for standard service; honeypot unaffected |
+| Unit tests | `npm test` | 52/52 pass |
+| Deployment | Cloudflare Pages check-run for `6afe7a1` | success; fresh bundle hashes served; site serves the new build |
+| Public (build-time) Web3Forms key | masked bundle inspection | present in the deployed bundle (value not logged) |
+| Runtime Web3Forms relay | live `/api/lead` marked probe | `200 {"ok":true}` — provider accepted |
+| Four live funnels (owner-authorized, clearly marked tests) | real browser submissions | residential, instant estimate, commercial, STR: each `/api/lead` → `200`; correct success message; redirect to `/thank-you/`; estimate final step showed range `$235 – $285` and one primary action |
+| Inbox delivery | owner inbox | **pending owner confirmation** — API acceptance is not inbox delivery |
+
 ## Pending (cannot be verified in this environment — owner or tooling required)
 
 | Item | Why pending | How to verify |

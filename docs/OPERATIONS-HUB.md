@@ -74,10 +74,10 @@ Every arrow maps to an authoritative document — see §10.
 - **Deployment:** GitHub `main` → the company's own Cloudflare Pages project
   (`sparkling-standard-cleaning`). Build `npm run build`, output `dist`, Node 22.16.0
   (`.node-version`). Pages Functions in `functions/` deploy automatically.
-- **Deployment status: live.** `https://sparkling-standard.com` serves the Git-connected
-  project; every push to `main` deploys. The site is currently indexable (`index, follow`) —
-  the owner has not recorded final launch authorization, so indexing state must not change
-  without it. Full guide: `docs/deployment/DEPLOYMENT.md`.
+- **Deployment status: live and indexable (owner-approved 2026-10-01).**
+  `https://sparkling-standard.com` serves the Git-connected project; every push to `main`
+  deploys. Never introduce noindex/disallow; keep intentionally excluded utility pages
+  excluded. Full guide: `docs/deployment/DEPLOYMENT.md`.
 - `PUBLIC_PREVIEW_MODE=true` produces a noindex build and is used for the temporary pages.dev
   staging deployment only. It must be removed before launch. Noindex is not access control.
 - URLs are permanent; there is no redirect mechanism in a static build.
@@ -95,8 +95,10 @@ Every arrow maps to an authoritative document — see §10.
 5. The owner receives the inquiry at `owner@sparkling-standard.com` and replies personally.
    There is no CRM; follow-up is manual.
 
-Funnel verification status (residential, commercial, STR): blocked until the deployment exists
-and the Web3Forms key is entered — tracked in `docs/operations/PLATFORM-STATUS.md`.
+Funnel verification status: **live as of 2026-10-01** (commit `6afe7a1`) — all four funnels return
+provider acceptance and show the honest request-received confirmation; owner inbox confirmation
+of the four marked test messages is still pending. Details:
+`docs/verification/VERIFICATION.md`.
 
 ## 6. Analytics, consent and attribution
 
@@ -159,11 +161,10 @@ Truthful snapshot; the register in `docs/operations/PLATFORM-STATUS.md` is autho
 
 **Blocked / pending (owner):**
 
-- **Form delivery is blocked**: `/api/lead` returns `503 not_configured` until the Web3Forms
-  key is entered in Cloudflare (`WEB3FORMS_ACCESS_KEY` secret + `PUBLIC_WEB3FORMS_ACCESS_KEY`
-  text) and a deployment is triggered — steps in `docs/launch/REVENUE-READINESS-PLAN.md` §2.
-- `TRAVEL_ORIGIN`; analytics IDs; Stripe enabled-method confirmation; SMS capability; legal
-  entity spelling; review/social profiles; final launch authorization.
+- `TRAVEL_ORIGIN` (private `"lat,lng"`) — routed travel stays off until set; the estimator runs
+  in offline zone mode meanwhile (verified 2026-10-01).
+- Analytics IDs; Stripe enabled-method confirmation; SMS capability; legal entity spelling;
+  review/social profiles; confirmation that the four marked test inquiries reached the inbox.
 
 ## 10. Documentation directory
 
