@@ -1,0 +1,18 @@
+# Normalize all text files to LF in the repository and in checkouts.
+# The generated marketing documents (docs/marketing/UTM-*.md|.csv) are
+# byte-compared by `npm run validate`, so CRLF checkouts (Windows with system
+# core.autocrlf=true) would break validation. This file keeps every clone
+# consistent. See AGENTS.md.
+
+* text=auto eol=lf
+
+# Binary assets — never converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
