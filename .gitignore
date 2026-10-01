@@ -16,6 +16,12 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
+# deployment secrets (local only — never commit)
+deploy/secrets.env
+deploy/secrets*.json
+.dev.vars
+.dev.vars.*
+
 # local preview/server runtime files
 preview-out.log
 preview-err.log

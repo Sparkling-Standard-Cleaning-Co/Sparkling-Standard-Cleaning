@@ -1,0 +1,26 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Optional Wrangler configuration TEMPLATE — Cloudflare Pages.
+#
+# The production Pages project is connected to GitHub in the Cloudflare
+# dashboard, where the build command, output directory and environment
+# variables live. You only need an actual `wrangler.toml` if you deploy with the
+# Wrangler CLI, for example:
+#
+#   npx wrangler pages deploy dist --project-name sparkling-standard-cleaning
+#
+# To use: copy this file to `wrangler.toml`. It contains no secrets, so the copy
+# may be committed. NEVER put secrets in `[vars]` — use the dashboard
+# ("Secret" type) or `npx wrangler pages secret bulk` instead.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name = "sparkling-standard-cleaning"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-10-01"
+
+# Public, non-secret overrides only. These are OPTIONAL: the committed source
+# already ships the owner-confirmed defaults (src/config/business.ts and
+# astro.config.mjs). Uncomment only to override in a Wrangler-driven workflow.
+#
+# [vars]
+# PUBLIC_SITE_URL = "https://sparkling-standard.com"
+# PUBLIC_BUSINESS_NAME = "Sparkling Standard Cleaning Co."

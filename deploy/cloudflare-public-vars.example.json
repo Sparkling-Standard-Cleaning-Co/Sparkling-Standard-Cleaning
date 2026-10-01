@@ -1,0 +1,18 @@
+{
+  "_comment": "REFERENCE ONLY — the Cloudflare dashboard has no file-import for environment variables. Enter these manually in Pages project → Settings → Environment variables. Values here are public by design and already ship as source defaults; set them only to override.",
+  "_required_production": {
+    "PUBLIC_SITE_URL": "https://sparkling-standard.com"
+  },
+  "_optional_public_overrides": {
+    "PUBLIC_BUSINESS_NAME": "Sparkling Standard Cleaning Co.",
+    "PUBLIC_BUSINESS_PHONE": "8502468479",
+    "PUBLIC_BUSINESS_EMAIL": "owner@sparkling-standard.com",
+    "PUBLIC_WEB3FORMS_ACCESS_KEY": "<the existing Web3Forms access key — a public client-side identifier>",
+    "PUBLIC_UMAMI_WEBSITE_ID": "<when the Umami site exists>",
+    "PUBLIC_GTM_CONTAINER_ID": "<when the GTM container exists>",
+    "PUBLIC_TURNSTILE_SITE_KEY": "<when Turnstile is enabled>"
+  },
+  "_temporary_staging_only": {
+    "PUBLIC_PREVIEW_MODE": "true — set on the first pages.dev deployment only; REMOVE before launch"
+  }
+}

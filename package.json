@@ -23,6 +23,7 @@
     "marketing:qr": "node scripts/generate-marketing-links.mjs --qr",
     "marketing:verify": "node scripts/generate-marketing-links.mjs --check",
     "validate:production": "node scripts/validate-production-env.mjs",
+    "deploy:secrets": "node scripts/generate-deploy-secrets.mjs",
     "smoke": "node scripts/smoke.mjs",
     "audit:facts": "node scripts/audit-facts.mjs"
   },
