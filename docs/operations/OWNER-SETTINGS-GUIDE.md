@@ -102,9 +102,27 @@ should not be available — remove it from the list instead.
 | `REFERENCE_GAS_PRICE` / `TRAVEL_CACHE_SECONDS` | Runtime fuel fallback / cache | 3.1 / 21600 s | Cloudflare text vars | Internal | Optional |
 | `VEHICLE_MPG`, `INCLUDED_ONE_WAY_MILES`, `MAX_INSTANT_ESTIMATE_DISTANCE` | Documented planning values | — | `.env.example` | Internal | **Currently not consumed by code** — informational only until the shared-config refactor (`ESTIMATOR-LOCATION-ENGINE.md`) wires or removes them |
 
-The maximum automatic-estimate **driving time** policy (the "about one hour" rule) is designed but
-not yet implemented; today the boundary is a provisional ZIP list. See
-`docs/operations/ESTIMATOR-LOCATION-ENGINE.md`.
+The travel economics and driving policy now live in **one shared file** —
+`src/config/travel.ts` — imported by both the website estimator and the serverless travel
+function. Edit that file to change mpg, wear per mile, included miles, the fallback fuel price,
+the **maximum automatic-estimate driving time** (`maxDrivingMinutes`, currently 60) and the
+**review band** (`reviewBandMinutes`, currently 15). Cloudflare environment values still override
+the fuel price and cache duration at runtime.
+
+### Instant quoting — `src/config/pricing.ts` → `instantQuote`
+
+| Setting | Controls | Current value | Notes |
+| --- | --- | --- | --- |
+| `instantQuote.enabled` | Shows one offered price instead of the estimate range | **false** | Requires owner approval of the impact report before enabling |
+| `instantQuote.selection` | Which model value becomes the offered price | `expected` | `expected` is the model price (never the low end); `midpoint`/`high` are alternatives |
+| `instantQuote.marginFloor` | Hard floor as a multiple of the model price | 1.0 | The offered price can never fall below the model price |
+| `instantQuote.validityHours` | How long an instant quote is honored | 336 h (14 days) | Proposed; owner approval required |
+
+Before enabling: run `npm run estimate:quotes` for the before/after impact report, confirm the
+formula, then flip `instantQuote.enabled` in a reviewed change (rebuild required). The quoted
+price comes from the same labor/risk calculation as the range — there is no second pricing
+engine. Unrouted locations still show the range or a personal-confirmation message, and never a
+refused customer.
 
 ## D. Business hours and scheduling — `src/config/business.ts` → `hours`
 
@@ -167,6 +185,8 @@ never advertised by the site.
 | Task | Steps |
 | --- | --- |
 | Change an estimate multiplier | GitHub → `src/config/pricing.ts` → edit the value → commit → wait for the Cloudflare check → run `npm run estimate:quotes` comparison (locally) |
+| Change travel economics or the driving boundary | GitHub → `src/config/travel.ts` → edit → commit (this updates both the website and the travel function) |
+| Enable instant single-price quoting | Review `npm run estimate:quotes` output → approve the formula → flip `instantQuote.enabled` to `true` in `src/config/pricing.ts` → commit |
 | Add an add-on | Add an item under `addons.items` with a new id → commit → tests must pass |
 | Change business hours | `src/config/business.ts` → `hours` → commit |
 | Add a service-area ZIP (temporary, until the location engine ships) | `src/config/geography.ts` → add `{ city, state, zone, lat, lng }` → commit |

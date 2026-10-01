@@ -1,4 +1,4 @@
-// POST /api/travel — serverless travel lookup (Cloudflare Pages Functions).
+﻿// POST /api/travel â€” serverless travel lookup (Cloudflare Pages Functions).
 //
 // Returns a preliminary ONE-WAY route distance for a ZIP code plus the best
 // available Gulf Coast gasoline reference price. Routing providers are called
@@ -6,9 +6,9 @@
 //
 // Behavior:
 //  - TRAVEL_ORIGIN must be configured; otherwise 503 (client stays in the
-//    offline zone mode — the estimate keeps working either way).
+//    offline zone mode â€” the estimate keeps working either way).
 //  - With a routing provider configured, real route distance is used.
-//    Without one, straight-line distance × 1.18 approximates the road route
+//    Without one, straight-line distance Ã— 1.18 approximates the road route
 //    and is labeled as such via `method`.
 //  - Gas price failure never fails the request: the configured reference
 //    price is returned with source 'configured_reference'.
@@ -27,50 +27,18 @@ interface Env {
   TRAVEL_CACHE_SECONDS?: string;
 }
 
-// Approximate ZIP centroids — mirrors src/config/geography.ts. Kept local so
-// the function bundle has no build-time dependency on the Astro src tree.
-const ZIP_CENTROIDS: Record<string, { lat: number; lng: number; zone: string }> = {
-  '32501': { lat: 30.42, lng: -87.22, zone: 'core' },
-  '32502': { lat: 30.41, lng: -87.23, zone: 'core' },
-  '32503': { lat: 30.45, lng: -87.21, zone: 'core' },
-  '32504': { lat: 30.48, lng: -87.19, zone: 'core' },
-  '32505': { lat: 30.44, lng: -87.26, zone: 'core' },
-  '32506': { lat: 30.4, lng: -87.31, zone: 'core' },
-  '32507': { lat: 30.36, lng: -87.35, zone: 'core' },
-  '32508': { lat: 30.35, lng: -87.28, zone: 'core' },
-  '32511': { lat: 30.42, lng: -87.22, zone: 'core' },
-  '32514': { lat: 30.53, lng: -87.22, zone: 'core' },
-  '32526': { lat: 30.49, lng: -87.32, zone: 'core' },
-  '32533': { lat: 30.61, lng: -87.34, zone: 'core' },
-  '32530': { lat: 30.61, lng: -87.03, zone: 'surrounding' },
-  '32561': { lat: 30.35, lng: -87.16, zone: 'surrounding' },
-  '32563': { lat: 30.39, lng: -87.07, zone: 'surrounding' },
-  '32565': { lat: 30.95, lng: -87.15, zone: 'surrounding' },
-  '32566': { lat: 30.42, lng: -86.89, zone: 'surrounding' },
-  '32570': { lat: 30.66, lng: -87.05, zone: 'surrounding' },
-  '32571': { lat: 30.62, lng: -87.16, zone: 'surrounding' },
-  '32577': { lat: 30.72, lng: -87.31, zone: 'surrounding' },
-  '32583': { lat: 30.58, lng: -86.98, zone: 'surrounding' },
-  '36426': { lat: 31.1, lng: -87.07, zone: 'extended' },
-  '36502': { lat: 31.02, lng: -87.49, zone: 'extended' },
-  '36507': { lat: 30.88, lng: -87.77, zone: 'extended' },
-  '36526': { lat: 30.6, lng: -87.9, zone: 'extended' },
-  '36527': { lat: 30.67, lng: -87.91, zone: 'extended' },
-  '36530': { lat: 30.42, lng: -87.6, zone: 'extended' },
-  '36532': { lat: 30.52, lng: -87.9, zone: 'extended' },
-  '36535': { lat: 30.41, lng: -87.68, zone: 'extended' },
-  '36542': { lat: 30.25, lng: -87.7, zone: 'extended' },
-  '36551': { lat: 30.62, lng: -87.75, zone: 'extended' },
-  '36561': { lat: 30.29, lng: -87.57, zone: 'extended' },
-  '36567': { lat: 30.55, lng: -87.71, zone: 'extended' },
-  '36580': { lat: 30.49, lng: -87.7, zone: 'extended' },
-};
+import { zipReference } from '../../src/config/geography.ts';
+import { travelConfig } from '../../src/config/travel.ts';
+
+// ZIP reference data lives in src/config/geography.ts (shared single source).
+// It is preliminary location data, never treated as a precise customer address.
 
 // Per-isolate cache (Workers instances are short-lived; this is opportunistic).
 const routeCache = new Map<string, { expires: number; value: RoutePayload }>();
 
 interface RoutePayload {
   oneWayMiles: number;
+  durationMinutes: number | null;
   gasPrice: number | null;
   gasPriceSource: 'eia_live' | 'configured_reference' | 'none';
   provider: string;
@@ -103,11 +71,25 @@ function straightLineMiles(a: { lat: number; lng: number }, b: { lat: number; ln
   return 2 * 3958.8 * Math.asin(Math.sqrt(h)) * 1.18;
 }
 
+function parseGoogleDuration(value: unknown): number | null {
+  // Google Routes returns durations like "1234s".
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^(\d+(?:\.\d+)?)s$/);
+  if (!match) return null;
+  const seconds = Number(match[1]);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
 async function routeDistance(
   env: Env,
   origin: { lat: number; lng: number },
   destination: { lat: number; lng: number },
-): Promise<{ oneWayMiles: number; provider: string; method: RoutePayload['method'] }> {
+): Promise<{
+  oneWayMiles: number;
+  durationMinutes: number | null;
+  provider: string;
+  method: RoutePayload['method'];
+}> {
   const provider = env.ROUTES_PROVIDER?.trim().toLowerCase();
   const apiKey = env.ROUTES_API_KEY?.trim();
 
@@ -119,7 +101,7 @@ async function routeDistance(
           headers: {
             'Content-Type': 'application/json',
             'X-Goog-Api-Key': apiKey,
-            'X-Goog-FieldMask': 'routes.distanceMeters',
+            'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
           },
           body: JSON.stringify({
             origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
@@ -130,11 +112,18 @@ async function routeDistance(
           }),
         });
         const data = (await response.json().catch(() => ({}))) as {
-          routes?: Array<{ distanceMeters?: number }>;
+          routes?: Array<{ distanceMeters?: number; duration?: string }>;
         };
-        const meters = data.routes?.[0]?.distanceMeters;
+        const route = data.routes?.[0];
+        const meters = route?.distanceMeters;
+        const seconds = parseGoogleDuration(route?.duration);
         if (response.ok && typeof meters === 'number' && meters > 0) {
-          return { oneWayMiles: meters / 1609.344, provider, method: 'route' };
+          return {
+            oneWayMiles: meters / 1609.344,
+            durationMinutes: seconds !== null ? seconds / 60 : null,
+            provider,
+            method: 'route',
+          };
         }
       } else if (provider === 'mapbox') {
         const url =
@@ -142,11 +131,18 @@ async function routeDistance(
           `?access_token=${encodeURIComponent(apiKey)}&overview=false`;
         const response = await fetch(url);
         const data = (await response.json().catch(() => ({}))) as {
-          routes?: Array<{ distance?: number }>;
+          routes?: Array<{ distance?: number; duration?: number }>;
         };
-        const meters = data.routes?.[0]?.distance;
+        const route = data.routes?.[0];
+        const meters = route?.distance;
+        const seconds = typeof route?.duration === 'number' && route.duration > 0 ? route.duration : null;
         if (response.ok && typeof meters === 'number' && meters > 0) {
-          return { oneWayMiles: meters / 1609.344, provider, method: 'route' };
+          return {
+            oneWayMiles: meters / 1609.344,
+            durationMinutes: seconds !== null ? seconds / 60 : null,
+            provider,
+            method: 'route',
+          };
         }
       }
     } catch {
@@ -156,6 +152,7 @@ async function routeDistance(
 
   return {
     oneWayMiles: straightLineMiles(origin, destination),
+    durationMinutes: null,
     provider: 'straight_line',
     method: 'straight_line_estimate',
   };
@@ -203,23 +200,28 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (!match) return json({ ok: false, error: 'invalid_request' }, 400);
   const normalized = match[1] as string;
 
-  const destination = ZIP_CENTROIDS[normalized];
+  const destination = zipReference[normalized];
   if (!destination) {
     return json({ ok: false, error: 'zip_not_referenced' }, 400);
   }
 
-  const cacheSeconds = Math.max(60, Number(env.TRAVEL_CACHE_SECONDS ?? 21600) || 21600);
+  const cacheSeconds = Math.max(
+    60,
+    Number(env.TRAVEL_CACHE_SECONDS ?? travelConfig.cacheSeconds) || travelConfig.cacheSeconds,
+  );
   const cached = routeCache.get(normalized);
   if (cached && cached.expires > Date.now()) {
     return json(cached.value);
   }
 
-  const reference = Number(env.REFERENCE_GAS_PRICE ?? 3.1) || 3.1;
+  const reference =
+    Number(env.REFERENCE_GAS_PRICE ?? travelConfig.fallbackGasPrice) || travelConfig.fallbackGasPrice;
   const distance = await routeDistance(env, origin, { lat: destination.lat, lng: destination.lng });
   const gas = await gulfCoastGasPrice(env.EIA_API_KEY?.trim(), reference);
 
   const payload: RoutePayload = {
     oneWayMiles: Math.round(distance.oneWayMiles * 10) / 10,
+    durationMinutes: distance.durationMinutes !== null ? Math.round(distance.durationMinutes) : null,
     gasPrice: gas.gasPrice,
     gasPriceSource: gas.gasPriceSource,
     provider: distance.provider,

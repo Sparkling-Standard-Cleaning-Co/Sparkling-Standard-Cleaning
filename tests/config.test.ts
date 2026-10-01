@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 
 import { pricing, pricingValue, type ConfigValue } from '../src/config/pricing.ts';
 import { zipReference, zonePolicy, normalizeZip } from '../src/config/geography.ts';
+import { travelConfig } from '../src/config/travel.ts';
 
 function collectConfigValues(node: unknown, found: ConfigValue<unknown>[] = []): ConfigValue<unknown>[] {
   if (node && typeof node === 'object') {
@@ -125,6 +126,24 @@ test('zone policy: instant zones estimate, manual zones explain themselves', () 
       `${zone} needs a customer-safe manual reason`,
     );
   }
+});
+
+test('driving policy and instant-quote settings are structurally valid', () => {
+  assert.ok(pricingValue(pricing.drivingPolicy.maxDrivingMinutes) > 0);
+  assert.ok(pricingValue(pricing.drivingPolicy.reviewBandMinutes) >= 0);
+  assert.ok(['expected', 'midpoint', 'high'].includes(pricingValue(pricing.instantQuote.selection)));
+  assert.ok(pricingValue(pricing.instantQuote.marginFloor) >= 1, 'margin floor must be at least 1');
+  assert.ok(pricingValue(pricing.instantQuote.validityHours) > 0);
+  // Binding instant prices stay off until the owner approves the impact report.
+  assert.equal(pricingValue(pricing.instantQuote.enabled), false);
+});
+
+test('travel economics match the shared travel configuration', () => {
+  assert.equal(pricingValue(pricing.travel.clientDefaults.mpg), travelConfig.mpg);
+  assert.equal(pricingValue(pricing.travel.includedOneWayMiles), travelConfig.includedOneWayMiles);
+  assert.equal(pricingValue(pricing.travel.perMileWearCost), travelConfig.wearPerMile);
+  assert.equal(pricingValue(pricing.travel.fallbackGasPrice), travelConfig.fallbackGasPrice);
+  assert.equal(pricingValue(pricing.drivingPolicy.maxDrivingMinutes), travelConfig.maxDrivingMinutes);
 });
 
 test('normalizeZip accepts ZIP+4 and rejects malformed input', () => {

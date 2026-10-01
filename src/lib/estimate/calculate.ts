@@ -35,6 +35,9 @@ export interface EstimateContext {
     referenceGasPrice: number;
     zoneAdjustments: { core: number; surrounding: number };
     maxInstantDistanceMiles: number;
+    /** Optional policy overrides (default to the shared travel config). */
+    maxDrivingMinutes?: number;
+    reviewBandMinutes?: number;
   };
 }
 
@@ -47,6 +50,7 @@ const EMPTY_TRAVEL: TravelEstimate = {
   zone: 'unknown',
   oneWayMiles: null,
   roundTripMiles: null,
+  durationMinutes: null,
   gasPricePerGallon: null,
   gasPriceSource: 'none',
   adjustment: 0,

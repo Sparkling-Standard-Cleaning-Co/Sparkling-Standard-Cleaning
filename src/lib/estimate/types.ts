@@ -84,6 +84,14 @@ export interface TravelEstimate {
   zone: ServiceZone;
   oneWayMiles: number | null;
   roundTripMiles: number | null;
+  /** Routed driving duration in minutes when the provider returned one. */
+  durationMinutes: number | null;
+  /**
+   * Driving-time policy outcome for routed trips. 'within' is the ordinary
+   * boundary; 'review_band' is the approved additional band; 'beyond' needs
+   * personal confirmation. Undefined when no routed duration exists.
+   */
+  drivingTimeStatus?: 'within' | 'review_band' | 'beyond';
   gasPricePerGallon: number | null;
   gasPriceSource: 'eia_live' | 'configured_reference' | 'none';
   adjustment: number;
@@ -120,6 +128,8 @@ export interface EstimateResult {
 /** What the optional serverless travel function returns. */
 export interface RoutedTravelInfo {
   oneWayMiles: number;
+  /** Driving duration in minutes when the provider returns one. */
+  durationMinutes?: number | null;
   /** Optional live gas price in USD/gal from the configured provider. */
   gasPrice: number | null;
   gasPriceSource: 'eia_live' | 'configured_reference' | 'none';

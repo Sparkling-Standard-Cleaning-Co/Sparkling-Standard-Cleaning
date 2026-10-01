@@ -2,6 +2,11 @@
 // Central pricing configuration — SINGLE SOURCE OF TRUTH for every number
 // the estimator uses and every price/policy decision the site presents.
 //
+// Travel economics are shared with the serverless function via
+// `src/config/travel.ts` (imported below) — do not duplicate those numbers.
+
+import { travelConfig } from './travel.ts';
+
 // ── WHAT IS PUBLIC vs INTERNAL ───────────────────────────────────────────────
 // PUBLIC (may be shown to customers):
 //   * Estimated RANGES produced by the estimator (the product itself).
@@ -205,13 +210,23 @@ export const pricing = {
   travel: {
     /**
      * Miles included (one way) in the base price before a travel adjustment.
-     * Mirror of INCLUDED_ONE_WAY_MILES in .env.example / the travel function.
+     * Numbers come from the shared travel config (src/config/travel.ts) so the
+     * client and the serverless function cannot drift apart.
      */
-    includedOneWayMiles: provisional(15, 'Directive §31 starting point. Adjust with the owner once the operating origin and zone map are approved.'),
+    includedOneWayMiles: provisional(
+      travelConfig.includedOneWayMiles,
+      'Shared with functions/api/travel.ts via src/config/travel.ts. Directive §31 starting point.',
+    ),
     /** Per-mile vehicle cost (fuel excluded; fuel is priced live) in USD. */
-    perMileWearCost: provisional(0.12, 'Provisional wear allowance (tires, oil, depreciation). Reviewed monthly against real job data.'),
+    perMileWearCost: provisional(
+      travelConfig.wearPerMile,
+      'Shared wear allowance (tires, oil, depreciation). Reviewed monthly against real job data.',
+    ),
     /** Gulf Coast weekly retail gasoline reference used when the EIA feed is down. */
-    fallbackGasPrice: provisional(3.1, 'Reference only — NOT a Pensacola pump price claim. Keep current via docs/operations/ESTIMATOR-CALIBRATION.md; the live EIA feed overrides it when available.'),
+    fallbackGasPrice: provisional(
+      travelConfig.fallbackGasPrice,
+      'Reference only — NOT a Pensacola pump price claim. The live EIA feed overrides it when available.',
+    ),
     /** Flat adjustments used by the offline zone fallback (no routing). */
     zoneAdjustments: {
       core: provisional(0, 'Core area: travel economics are already inside the estimate. No line item is ever shown to the customer (directive §34).'),
@@ -219,14 +234,54 @@ export const pricing = {
     },
     /**
      * Client-side mirrors of the server travel environment values. The server
-     * function (functions/api/travel.ts) owns the authoritative values from
-     * .env; these defaults keep the offline estimator reasonable when the
-     * function is not deployed or reachable.
+     * function owns the authoritative values from the shared travel config;
+     * these keep the offline estimator reasonable.
      */
     clientDefaults: {
-      mpg: provisional(24, 'Mirror of VEHICLE_MPG. Update both together when the vehicle changes.'),
-      maxInstantDistanceMiles: provisional(45, 'Mirror of MAX_INSTANT_ESTIMATE_DISTANCE. Beyond this a routed job requires manual confirmation.'),
+      mpg: provisional(travelConfig.mpg, 'Shared with functions/api/travel.ts. Update both together when the vehicle changes.'),
+      maxInstantDistanceMiles: provisional(
+        travelConfig.maxInstantDistanceMiles,
+        'Hard safety cap for routed trips without a duration. Beyond this a routed job requires manual confirmation.',
+      ),
     },
+  },
+
+  // ── Driving-time policy (location engine) ─────────────────────────────────
+  drivingPolicy: {
+    /**
+     * Ordinary service boundary in minutes of routed driving time. A routed
+     * destination within this qualifies for an ordinary instant estimate.
+     * PROVISIONAL — owner must approve the final value before binding quotes.
+     */
+    maxDrivingMinutes: provisional(
+      travelConfig.maxDrivingMinutes,
+      'Owner intent: about one hour of actual driving time from the private operating origin. Requires owner approval before binding instant prices.',
+    ),
+    /** Additional review band beyond the boundary (needs personal confirmation). */
+    reviewBandMinutes: provisional(
+      travelConfig.reviewBandMinutes,
+      'Proposed 15-minute band; owner approval required. Within the band the estimate is shown and marked for personal confirmation.',
+    ),
+  },
+
+  // ── Instant quote (single offered price) ──────────────────────────────────
+  instantQuote: {
+    /**
+     * Enables the single-price instant quote experience. FALSE until the owner
+     * approves the formula and the pricing matrix — the estimate range remains
+     * the production experience meanwhile.
+     */
+    enabled: provisional(false, 'Owner approval pending (reference-quote impact report first).'),
+    /**
+     * Which value from the calculation becomes the offered price. 'expected' is
+     * the model price and never the lowest range value; 'midpoint' and 'high'
+     * are alternatives for owner review.
+     */
+    selection: provisional('expected' as 'expected' | 'midpoint' | 'high', 'Default protects margin: the offered price is the model price, not the low end of a range.'),
+    /** Offered prices are never below expectedPrice × this margin floor. */
+    marginFloor: provisional(1, 'Hard margin safeguard: selection candidates below expectedPrice are discarded.'),
+    /** Quote validity window in hours (proposed 14 days; owner approval required). */
+    validityHours: provisional(336, 'Proposed validity: 14 days. Owner must approve before binding offers are enabled.'),
   },
 
   // ── Cancellation policy (directive §36) — PROVISIONAL, not final ──────────

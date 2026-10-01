@@ -4,6 +4,43 @@ Branch work only. Nothing in this document changes production behavior until the
 the policy values and the change is merged deliberately. Reproduced against the deployed site and
 the current source on 2026-10-01.
 
+## Implementation status (branch `feat/estimator-location-config`)
+
+**Implemented and tested on this branch:**
+
+- Shared travel economics + driving policy: `src/config/travel.ts` (single source for client and
+  the Pages Function; pricing re-exports it, removing the duplicated constants).
+- Real driving duration: `functions/api/travel.ts` requests `routes.duration` (Google) and reads
+  Mapbox `duration`; both return rounded `durationMinutes`.
+- ZIP data deduplicated: the function imports `zipReference` from `src/config/geography.ts`.
+- Client routing gate removed: every valid ZIP now calls `/api/travel`, so a routed duration can
+  qualify locations the provisional zone list would have sent to manual review.
+- Driving-time policy: `maxDrivingMinutes` (60) + `reviewBandMinutes` (15, pending approval);
+  `within` = ordinary estimate, `review_band` = estimate flagged for personal confirmation,
+  `beyond` = manual confirmation with honest "send a request anyway" copy. Routed trips without a
+  duration keep the hard distance safety cap. Tests: `tests/travel-policy.test.ts` (9 cases,
+  mocked route data).
+- Instant single price (feature disabled by default): `src/lib/estimate/quote.ts` selects the
+  offered price from the same calculation (`expected` by default), enforces the margin floor and
+  minimum, rounds up to the configured step, and produces a display reference + expiry. Tests:
+  `tests/quote.test.ts` (12 cases). Enablement awaits owner approval.
+
+**Designed but not yet implemented (next increment):**
+
+- Server-verified quotes: the browser price is not trusted. The planned mechanism is stateless
+  re-pricing inside the lead relay — the Function imports the same estimator + configuration,
+  recomputes the price from the submitted structured fields in offline mode, and marks the owner
+  notification `quote_verified: match | mismatch | unverifiable` (tolerance for routed-travel
+  variance). No database needed for verification. Persistent quote retrieval or real timeslot
+  reservations would require storage and will be proposed separately rather than faked with
+  stateless tokens.
+- Reservation journey UI (Reserve / Call / Text actions, order-style summary, "Request This
+  Cleaning" submission carrying the quote), SMS prefill behind the existing `smsEnabled` gate,
+  and quote fields in owner notifications. The call/SMS actions depend on the SMS verification
+  the owner still owes; the text action stays hidden until then.
+- Live routing validation (requires `TRAVEL_ORIGIN` + a provider key) — mocked thresholds are
+  covered; live results will be documented separately when credentials exist.
+
 ## 1. Reproduced behavior (offline zone mode, `TRAVEL_ORIGIN` unset)
 
 Generated with the live engine (`npm run estimate:quotes`, 3/2 maintained baseline):

@@ -13,6 +13,7 @@
 import { calculateEstimate } from '../src/lib/estimate/calculate.ts';
 import { pricing, pricingValue } from '../src/config/pricing.ts';
 import { zoneForZip } from '../src/config/geography.ts';
+import { selectInstantAmount } from '../src/lib/estimate/quote.ts';
 
 const context = {
   travel: {
@@ -66,17 +67,26 @@ console.log(
     ` | minimum job: $${pricingValue(pricing.minimumJob)}` +
     ` | rounding: $${pricingValue(pricing.rounding.toNearest)}`,
 );
+console.log(
+  `  instant quote: ${pricingValue(pricing.instantQuote.enabled) ? 'ENABLED' : 'disabled (approval pending)'}` +
+    ` | selection: ${pricingValue(pricing.instantQuote.selection)}` +
+    ` | margin floor: ×${pricingValue(pricing.instantQuote.marginFloor)}` +
+    ` | validity: ${pricingValue(pricing.instantQuote.validityHours)} h` +
+    ` | driving policy: ${pricingValue(pricing.drivingPolicy.maxDrivingMinutes)} min + ${pricingValue(pricing.drivingPolicy.reviewBandMinutes)} min review band`,
+);
 console.log('');
 
 const rows = scenarios.map(([label, overrides]) => {
   const input = { ...base, ...overrides };
   const result = calculateEstimate(input, context);
+  const instant = selectInstantAmount(result);
   return {
     scenario: label,
     zone: zoneForZip(input.zip ?? ''),
     laborHours: result.laborHours !== null ? result.laborHours.toFixed(2) : '-',
     expected: result.expectedPrice !== null ? `$${result.expectedPrice.toFixed(0)}` : 'custom',
     range: result.low !== null ? `$${result.low} – $${result.high}` : 'confirmation',
+    instantPrice: instant !== null ? `$${instant}` : 'confirmation',
     status: result.status,
     flags: result.flags.map((flag) => flag.code).join(',') || '-',
   };
@@ -97,6 +107,7 @@ for (const row of rows) {
       row.laborHours.padStart(5),
       row.expected.padStart(8),
       row.range.padStart(16),
+      row.instantPrice.padStart(13),
       row.status.padEnd(widths.status),
       row.flags.padEnd(widths.flags),
     ].join('  '),

@@ -4,7 +4,6 @@
 
 import { pricing } from '../config/pricing';
 import { business, contactPhone, isPending } from '../config/business';
-import { zoneForZip } from '../config/geography';
 import { calculateEstimate, type EstimateContext } from '../lib/estimate/calculate';
 import { SERVICE_SHORT } from '../lib/estimate/labels';
 import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInfo, ServiceType } from '../lib/estimate/types';
@@ -255,17 +254,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   // ── Travel lookup (optional enhancement; zone fallback always works) ──────
+  // Every valid ZIP asks the routing function; a real driving duration can
+  // qualify a location that the provisional zone list would have sent to
+  // manual review. The function answers 503 until configured, and the client
+  // silently keeps the zone fallback.
   async function lookupTravel(): Promise<void> {
     const zip = textValue('zip');
     if (!zip || zip.length < 5 || zip === lastTravelLookup) return;
     lastTravelLookup = zip;
-
-    if (zoneForZip(zip) !== 'core' && zoneForZip(zip) !== 'surrounding') {
-      routed = undefined;
-      routedZip = null;
-      recalc();
-      return;
-    }
 
     const cacheKey = `${TRAVEL_CACHE_PREFIX}${zip}`;
     try {
