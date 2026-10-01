@@ -21,6 +21,8 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
   and production deployment is blocked by validation until the remaining facts land. See
   `docs/launch/OWNER-INPUT-REQUIRED.md`.
 - Everything below works today and is verified by the committed test/validation suite.
+- **Start with `docs/OPERATIONS-HUB.md`** — the single entry point for the whole system. Platform
+  status: `docs/operations/PLATFORM-STATUS.md`. Deployment: `docs/deployment/DEPLOYMENT.md`.
 
 ## Stack
 
@@ -55,7 +57,8 @@ All optional for local development; all documented in `.env.example`.
 | `PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Optional Cloudflare Turnstile spam protection. |
 | `TRAVEL_ORIGIN`, `ROUTES_PROVIDER`, `ROUTES_API_KEY` | Server-side travel routing for the estimator. |
 | `EIA_API_KEY` | Optional live Gulf Coast gas price feed; falls back to `REFERENCE_GAS_PRICE`. |
-| `VEHICLE_MPG`, `INCLUDED_ONE_WAY_MILES`, `MAX_INSTANT_ESTIMATE_DISTANCE`, `TRAVEL_CACHE_SECONDS` | Travel economics. |
+| `TRAVEL_CACHE_SECONDS`, `ROUTES_PROVIDER`, `REFERENCE_GAS_PRICE` | Runtime travel configuration read by `functions/api/travel.ts`. |
+| `VEHICLE_MPG`, `INCLUDED_ONE_WAY_MILES`, `MAX_INSTANT_ESTIMATE_DISTANCE` | Documented planning values — the estimator currently uses the constants in `src/config/pricing.ts`; setting these in Cloudflare has no effect yet. |
 
 ## Development, builds and verification
 
@@ -65,14 +68,15 @@ All optional for local development; all documented in `.env.example`.
 | `npm run build` | Production build into `dist/` |
 | `npm run preview` | Serve the production build |
 | `npm run check` | TypeScript/Astro diagnostics (0 errors required) |
-| `npm test` | Estimator unit tests (anchors, thresholds, travel, fail-safes) |
+| `npm test` | Estimator + Pages Function fail-safe tests (45 total) |
 | `npm run verify` | `check` + `build` + `validate` (minimum bar) |
 | `npm run validate` | Links, SEO, marketing registry, QR decode verification, checklist leak check |
-| `npm run pending` | PENDING-fact gate (fails pre-launch **by design**) |
+| `npm run pending` | PENDING-fact gate (passes on the branded build) |
 | `npm run validate:production` | Production environment gate (needs real facts) |
 | `npm run smoke` | Static smoke test of the built output |
 | `npm run audit:facts` | No-fabrication audit of claims |
 | `npm run marketing:links` / `marketing:qr` / `marketing:verify` | UTM docs + QR assets |
+| `npm run deploy:secrets` | Build `deploy/secrets.env` for `wrangler pages secret bulk` |
 | `node scripts/photo.mjs <path>` | Photo guardrail (dimensions/size/format) |
 | `node scripts/indexnow.mjs` | Submit changed URLs to IndexNow (post-launch) |
 

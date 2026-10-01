@@ -197,7 +197,9 @@ Full strategy (including the no-doorway policy and schema decisions): `docs/seo/
 
 ## How future AI agents should modify the project
 
-1. Read this file and the relevant docs before editing.
+1. Read this file and the relevant docs before editing. The system map is
+   `docs/OPERATIONS-HUB.md`; current platform status lives only in
+   `docs/operations/PLATFORM-STATUS.md`.
 2. Establish repository state (`git status`, `git log -3`) and never overwrite unexpected work.
 3. Change the single source of truth — not the generated copies.
 4. Add/update focused tests for behavioral changes (`npm test`), update docs where rules live.

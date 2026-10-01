@@ -15,6 +15,7 @@ generated marketing documents are byte-compared by validation.
 | TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints |
 | Production build | `npm run build` | 18 pages + sitemap, no errors |
 | Estimator unit tests | `npm test` | 27/27 pass (anchors, frequencies, add-ons, minimums, travel, thresholds, malformed input) |
+| Pages Function fail-safe tests | `npm test` | 18/18 pass (`/api/lead`: invalid input, honeypot, no-contact, Turnstile-missing-token, not-configured 503, provider success/failure, 405; `/api/travel`: missing origin, malformed/unreferenced ZIP, straight-line fallback, provider route, provider failure fallback, EIA failure fallback, live EIA price, 405) — **45 tests total** |
 | Internal links | `npm run links` | 982 links across 18 pages, all resolve |
 | SEO checks | `npm run seo` | unique titles/descriptions across 18 pages, canonicals, robots, JSON-LD, sitemap |
 | Marketing registry + QR decode | `npm run marketing:verify` | registry valid, docs in sync, 13 QR asset groups decode-verified against `https://sparkling-standard.com` URLs |
@@ -35,6 +36,8 @@ generated marketing documents are byte-compared by validation.
 | Estimator draft persistence | reload mid-flow | restored to the saved step (fixed a bug where the progress restored but the visible step did not) |
 | Estimator fail-safe travel lookup | static preview (`/api/travel` 404) | falls back to zone-based travel without breaking the estimate — expected until Cloudflare Pages Functions run in deployment |
 | Header reflow | 960/1024/1152/1280/1440 px | wordmark never truncated; navigation reflows; phone button hidden only in the 960–1088 px band where it cannot fit (number remains in mobile menu, footer and contact surfaces) |
+| Deployment configuration package | `npm run deploy:secrets` with dummy values + `git check-ignore` | generates the git-ignored `deploy/secrets.env` in the `wrangler pages secret bulk` format; missing required keys exit non-zero; the ignore rules were verified |
+| Operations documentation | `docs/OPERATIONS-HUB.md`, `docs/operations/PLATFORM-STATUS.md`, `docs/operations/AUTOMATION-REGISTER.md` | created as the single entry point, the only platform-status register, and the automation inventory |
 
 ## Pending (cannot be verified in this environment — owner or tooling required)
 
