@@ -24,6 +24,7 @@
     "marketing:verify": "node scripts/generate-marketing-links.mjs --check",
     "validate:production": "node scripts/validate-production-env.mjs",
     "deploy:secrets": "node scripts/generate-deploy-secrets.mjs",
+    "live:check": "node scripts/live-check.mjs",
     "smoke": "node scripts/smoke.mjs",
     "audit:facts": "node scripts/audit-facts.mjs"
   },

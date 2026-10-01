@@ -39,6 +39,32 @@ professional companies $25–$50 per cleaner per hour. Our model is deliberately
 because it funds a slower, more detailed standard and real overhead — but a 3/2 at ~4.9
 labor-hours is priced at ~$250–270 at the current $55 rate, above the typical local company visit.
 
+## Direct local benchmark — Refresh Cleaning LLC (public site, checked 2026-10-01)
+
+The closest public local competitor (Cantonment; serves Pensacola + Baldwin County AL) publishes
+starting prices on its website. Recorded here as **one benchmark, not the market**:
+
+| Service | Published starting price | Notes |
+| --- | --- | --- |
+| Bi-weekly / basic cleaning | **$160** | "\*Prices based on 2000 sq ft and below. Free Quotes Available!" |
+| Monthly cleaning | **$200** | same size basis |
+| One-time / drop-in (incl. move-in/move-out) | **$300** | same size basis |
+| Gift certificate | **$200** | purchased via Venmo / CashApp / PayPal |
+
+Implications for this proposal:
+
+- Their biweekly floor (**$160**) sits ~22% below our Option C ($196) and ~27% below Option B
+  ($219) for a 3/2 — and roughly **38% below** the current $257 model. Their "starts at" pricing
+  is a lighter-scope floor; our model prices ~4.7 labor-hours of detail work at the founder's
+  $35/hr floor.
+- Their one-time **$300** closely matches our **deep-clean** band ($336–370) and sits near our
+  standard one-time ($246–270), suggesting the one-time/deep end of our model is competitive,
+  while **recurring is the price-sensitive battleground**.
+- The gift-certificate benchmark ($200 face value) is useful if the owner pursues Phase-7 gift
+  certificates; it implies a face value around one deep clean or two recurring visits.
+
+No price is published or changed by this document; it exists for owner decision-making only.
+
 ## Current model output (actual estimator engine, internal math)
 
 Generated with `src/lib/estimate/` at the current provisional $55/labor-hour target (core ZIP,
