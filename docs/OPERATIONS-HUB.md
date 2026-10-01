@@ -175,6 +175,7 @@ Truthful snapshot; the register in `docs/operations/PLATFORM-STATUS.md` is autho
 `docs/launch/PRICING-PROPOSAL.md`, `docs/launch/REVENUE-READINESS-PLAN.md`,
 `docs/operations/ESTIMATOR-CALIBRATION.md`,
 `docs/operations/ESTIMATOR-LOCATION-ENGINE.md`, `docs/operations/OWNER-SETTINGS-GUIDE.md`,
+`docs/operations/SEARCH-CONSOLE-SETUP.md`,
 `docs/operations/SERVICE-SCOPE-MATRIX.md`, `docs/operations/PROPERTY-ACCESS-SECURITY.md`,
 `docs/operations/CAPABILITY-REVIEW.md`.
 
