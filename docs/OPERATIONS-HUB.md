@@ -171,7 +171,8 @@ Truthful snapshot; the register in `docs/operations/PLATFORM-STATUS.md` is autho
 
 **Launch & operations:** `docs/launch/OWNER-INPUT-REQUIRED.md`,
 `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/ESTIMATOR-CALIBRATION.md`,
-`docs/operations/SERVICE-SCOPE-MATRIX.md`, `docs/operations/PROPERTY-ACCESS-SECURITY.md`.
+`docs/operations/SERVICE-SCOPE-MATRIX.md`, `docs/operations/PROPERTY-ACCESS-SECURITY.md`,
+`docs/operations/CAPABILITY-REVIEW.md`.
 
 **Deployment & verification:** `docs/deployment/DEPLOYMENT.md`,
 `docs/verification/VERIFICATION.md`.
