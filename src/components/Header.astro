@@ -12,7 +12,7 @@ const isActive = (href: string) => pathname === href || (href !== '/' && pathnam
 
 <header class="site-header">
   <div class="container site-header__inner">
-    <Logo />
+    <Logo compact />
 
     <nav class="site-nav" aria-label="Primary">
       <ul class="site-nav__links">
@@ -62,6 +62,8 @@ const isActive = (href: string) => pathname === href || (href !== '/' && pathnam
             </li>
           ))
         }
+        <li><a href="/move-in-move-out-cleaning/">Move-In / Move-Out</a></li>
+        <li><a href="/about/">About</a></li>
         <li><a href="/service-area/">Service Area</a></li>
         <li><a href="/contact/">Contact</a></li>
         <li><a href="/faq/">FAQ</a></li>

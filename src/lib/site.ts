@@ -10,10 +10,8 @@ export const primaryNav: NavItem[] = [
   { label: 'House Cleaning', href: '/house-cleaning/' },
   { label: 'Recurring', href: '/recurring-cleaning/' },
   { label: 'Deep Cleaning', href: '/deep-cleaning/' },
-  { label: 'Move-Out', href: '/move-in-move-out-cleaning/' },
   { label: 'Rentals', href: '/short-term-rental-cleaning/' },
   { label: 'Commercial', href: '/commercial-cleaning/' },
-  { label: 'About', href: '/about/' },
 ];
 
 /** Footer services column (includes the long-tail pages). */

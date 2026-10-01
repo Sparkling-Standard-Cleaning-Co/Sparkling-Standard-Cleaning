@@ -500,8 +500,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   restoreDraft();
   syncConditionalFields();
-  updateChrome();
-  recalc();
+  showStep(currentStep);
 
   // Debug handle — preview builds only. Never rendered publicly.
   if (preview) {

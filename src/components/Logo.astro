@@ -5,13 +5,15 @@ interface Props {
   class?: string;
   /** Show the small descriptor line under the wordmark. */
   tagline?: boolean;
+  /** Use the short public wordmark (header) instead of the full name. */
+  compact?: boolean;
 }
 
-const { class: className = '', tagline = true } = Astro.props;
+const { class: className = '', tagline = true, compact = false } = Astro.props;
 
 const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const pendingName = isPending(business.displayName);
-const name = pendingName ? 'PENDING_BUSINESS_NAME' : business.displayName;
+const name = pendingName ? 'PENDING_BUSINESS_NAME' : compact ? business.wordmark : business.displayName;
 ---
 
 <a href="/" class:list={['brand', className]} aria-label={pendingName ? 'Home — development placeholder brand' : `${name} — home`}>

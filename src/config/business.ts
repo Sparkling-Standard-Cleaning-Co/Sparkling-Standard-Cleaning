@@ -72,6 +72,12 @@ export const business = {
   displayName: envFact(import.meta.env.PUBLIC_BUSINESS_NAME) ?? 'Sparkling Standard Cleaning Co.',
 
   /**
+   * Short public wordmark (site header). The approved brand emphasis is
+   * "Sparkling Standard", with "Cleaning Co." as the secondary descriptor.
+   */
+  wordmark: 'Sparkling Standard',
+
+  /**
    * Registered legal entity name. The owner has registered the business as
    * "Sparkling Standard Cleaning Co."; the precise legal spelling/entity
    * suffix is still being verified. Do not publish until confirmed.
