@@ -43,9 +43,8 @@ export function localBusinessNode(site: URL, socialUrls: string[]): JsonLdNode {
     image: new URL('/brand/icon-512.png', site).href,
     logo: new URL('/brand/icon-512.png', site).href,
     priceRange: '$$',
-    description:
-      'Residential and commercial cleaning serving Pensacola, Cantonment and surrounding communities, with select nearby service into Alabama.',
-    slogan: 'Cleaning that notices the little things.',
+    description: business.serviceArea.summary,
+    slogan: 'The Details Are Our Standard.',
     telephone: isPending(business.phone) ? undefined : business.phone.e164,
     email: isPending(business.email) ? undefined : business.email,
     legalName: isPending(business.legalName) ? undefined : business.legalName,

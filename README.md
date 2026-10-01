@@ -1,8 +1,9 @@
-# Pensacola Cleaning Company — digital operating system
+# Sparkling Standard Cleaning Co. — digital operating system
 
-Marketing, estimate and lead-capture platform for an owner-operated residential and commercial
-cleaning company serving Pensacola, Cantonment and surrounding communities, with select nearby
-service into Alabama.
+Marketing, estimate and lead-capture platform for Sparkling Standard Cleaning Co. (public brand:
+"Sparkling Standard"), an owner-operated residential and commercial cleaning company based in
+Cantonment and serving Pensacola, surrounding communities within about an hour of Cantonment, and
+select nearby areas into Alabama.
 
 This is **not** a brochure site. It is the beginning of a full operating loop:
 
@@ -11,11 +12,14 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
        → REVIEW → REFERRAL → ATTRIBUTED REVENUE
 ```
 
-## Status (September 2026)
+## Status (October 2026)
 
-- **Pre-launch.** Company name, domain, phone, email and operating origin are `PENDING` owner
-  inputs. Preview builds are `noindex, nofollow`, and production deployment is blocked by
-  validation until the facts land. See `docs/launch/OWNER-INPUT-REQUIRED.md`.
+- **Pre-launch.** Owner-confirmed: company name, domain (`https://sparkling-standard.com`),
+  phone, email, founder background, service territory, Stripe and the Cloudflare account. Still
+  pending before production: legal entity spelling, Web3Forms access key, travel origin, analytics
+  IDs, review/social profiles and owner launch approval. Preview builds are `noindex, nofollow`,
+  and production deployment is blocked by validation until the remaining facts land. See
+  `docs/launch/OWNER-INPUT-REQUIRED.md`.
 - Everything below works today and is verified by the committed test/validation suite.
 
 ## Stack
@@ -109,9 +113,11 @@ All optional for local development; all documented in `.env.example`.
 
 ## Deployment
 
-GitHub (`main`) → owner's Cloudflare project → production. There is **no Cloudflare project or
-wrangler configuration yet** — that is intentional until the domain exists. The full checklist,
-including the production gates, lives in `docs/deployment/DEPLOYMENT.md`:
+GitHub (`main`) → the company's dedicated Cloudflare Pages project → production. The domain
+(`sparkling-standard.com`) is registered, active on Cloudflare DNS, and will be attached as the
+Pages custom domain. There is **no wrangler configuration in this repository** — deployment
+settings live in the Cloudflare dashboard. The full checklist, including the production gates,
+lives in `docs/deployment/DEPLOYMENT.md`:
 
 ```
 npm run verify

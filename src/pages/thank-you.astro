@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from '../components/Icon.astro';
-import { contactPhone } from '../config/business';
+import { business, contactPhone } from '../config/business';
 
 const phone = contactPhone();
 ---
@@ -48,9 +48,11 @@ const phone = contactPhone();
               <a class="btn btn--secondary" href={phone.href} data-cta="thankyou-call">
                 <Icon name="phone" size={18} /> Call
               </a>
-              <a class="btn btn--secondary" href={phone.sms} data-cta="thankyou-text">
-                <Icon name="message" size={18} /> Text
-              </a>
+              {business.flags.smsEnabled && (
+                <a class="btn btn--secondary" href={phone.sms} data-cta="thankyou-text">
+                  <Icon name="message" size={18} /> Text
+                </a>
+              )}
             </>
           )
         }

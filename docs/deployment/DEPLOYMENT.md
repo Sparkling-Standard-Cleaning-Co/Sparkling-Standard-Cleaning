@@ -1,32 +1,42 @@
 # Deployment
 
-GitHub (`main`) → the owner's GitHub-connected Cloudflare project → production. **No Cloudflare
-project, account ID, project ID, domain or token exists in this repository — by design.** They
-will be created in the Cloudflare dashboard after the domain is approved.
+GitHub (`main`) → the company's dedicated Cloudflare Pages project → production. **No Cloudflare
+account ID, project ID or token exists in this repository — by design.** They live in the
+Cloudflare dashboard of the company's own account (separate from any other business).
+
+Current infrastructure (owner-confirmed October 2026):
+
+- Domain `sparkling-standard.com` is registered (Squarespace registrar) and active on the
+  company's Cloudflare DNS.
+- Google Workspace handles company email (`owner@sparkling-standard.com`) — MX, SPF and DKIM
+  records are live and must **never** be modified or deleted while configuring the website.
+  Do **not** enable Cloudflare Email Routing for this domain.
+- The repository is `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`.
 
 Nothing here is live yet. Do not claim production is running until step 0 below is done and
 verified.
 
-## Step 0 — create the Cloudflare project (owner, post-name)
+## Step 0 — create the Cloudflare Pages project (owner)
 
-1. Cloudflare dashboard → Pages (or Workers) → create project → connect the
-   `Pensacolacleaningcompany/PensacolaCleaningcompany` repository.
+1. Cloudflare dashboard (company account) → Workers & Pages → Pages → create project → connect
+   the `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning` repository only.
 2. Build settings: build command `npm run build`, output directory `dist`.
+   Production branch: `main`. Framework preset: Astro (if offered).
 3. Functions: the repository's `functions/` directory is picked up automatically by the
-   Pages/Workers build (Cloudflare Pages Functions).
+   Pages build (Cloudflare Pages Functions).
 4. Set environment variables (all of them live in the dashboard, never in git):
 
 | Variable | Environment | Notes |
 | --- | --- | --- |
-| `PUBLIC_SITE_URL` | Production | Real domain, no trailing slash |
-| `PUBLIC_BUSINESS_NAME` / `_LEGAL_NAME` | Production | Owner-approved facts |
-| `PUBLIC_BUSINESS_PHONE` / `_EMAIL` | Production | Owner-approved facts |
-| `WEB3FORMS_ACCESS_KEY` | Production | Server-side form relay |
-| `PUBLIC_WEB3FORMS_ACCESS_KEY` | Production | Public static fallback |
-| `PUBLIC_UMAMI_WEBSITE_ID` | Production | Optional |
-| `PUBLIC_GTM_CONTAINER_ID` | Production | Optional |
+| `PUBLIC_SITE_URL` | Production | `https://sparkling-standard.com` (no trailing slash) |
+| `PUBLIC_BUSINESS_NAME` / `_LEGAL_NAME` | Production | Company name is confirmed; legal name only when verified |
+| `PUBLIC_BUSINESS_PHONE` / `_EMAIL` | Production | Owner-confirmed contact facts |
+| `WEB3FORMS_ACCESS_KEY` | Production | Server-side form relay — enter the existing owner-created key |
+| `PUBLIC_WEB3FORMS_ACCESS_KEY` | Production | Public static fallback (same key; client-safe) |
+| `PUBLIC_UMAMI_WEBSITE_ID` | Production | Optional analytics (unique to this business) |
+| `PUBLIC_GTM_CONTAINER_ID` | Production | Optional analytics (unique to this business) |
 | `PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Production | Recommended |
-| `TRAVEL_ORIGIN`, `ROUTES_PROVIDER`, `ROUTES_API_KEY`, `EIA_API_KEY` | Production | Estimator travel |
+| `TRAVEL_ORIGIN`, `ROUTES_PROVIDER`, `ROUTES_API_KEY`, `EIA_API_KEY` | Production | Estimator travel (origin is private — server-side only) |
 | `VEHICLE_MPG`, `INCLUDED_ONE_WAY_MILES`, `MAX_INSTANT_ESTIMATE_DISTANCE`, `REFERENCE_GAS_PRICE`, `TRAVEL_CACHE_SECONDS` | Production | Travel economics |
 | `PUBLIC_PREVIEW_MODE` | **Never set in production**; `true` on preview branches | Forces noindex |
 
@@ -62,5 +72,7 @@ from the dashboard. No database ties this site down — rollbacks are safe.
 
 - Never push directly to `main` without owner approval (it deploys).
 - Never put secrets in the repository; only `PUBLIC_*` client-safe values live in `.env.example`.
-- Regenerate QR codes (`npm run marketing:qr`) after the final domain lands — QRs printed
-  before that point point at a placeholder origin and must not be used.
+- Regenerate QR codes (`npm run marketing:qr`) whenever the domain or registry changes — every QR
+  is decode-verified against its intended URL by `npm run marketing:verify`.
+- Never modify Google Workspace DNS records (MX/SPF/DKIM) or enable Cloudflare Email Routing while
+  configuring the website.

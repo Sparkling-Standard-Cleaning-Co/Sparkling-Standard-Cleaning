@@ -63,12 +63,12 @@ const schema = [
               <div>
                 <p class="trust-item__title">Text</p>
                 {
-                  phone ? (
+                  phone && business.flags.smsEnabled ? (
                     <p class="trust-item__text">
                       <a href={phone.sms} data-cta="contact-text">{phone.display}</a>
                     </p>
                   ) : (
-                    <p class="trust-item__text">Texting activates with the phone number.</p>
+                    <p class="trust-item__text">Texting availability is being verified — call or send a message.</p>
                   )
                 }
               </div>

@@ -1,5 +1,5 @@
 ---
-import { contactPhone } from '../config/business';
+import { business, contactPhone } from '../config/business';
 import { primaryNav } from '../lib/site';
 import Logo from './Logo.astro';
 import Icon from './Icon.astro';
@@ -74,9 +74,11 @@ const isActive = (href: string) => pathname === href || (href !== '/' && pathnam
               <a class="btn btn--secondary" href={phone.href} data-cta="mobile-nav-call">
                 <Icon name="phone" size={18} /> Call
               </a>
-              <a class="btn btn--secondary" href={phone.sms} data-cta="mobile-nav-text">
-                <Icon name="message" size={18} /> Text
-              </a>
+              {business.flags.smsEnabled && (
+                <a class="btn btn--secondary" href={phone.sms} data-cta="mobile-nav-text">
+                  <Icon name="message" size={18} /> Text
+                </a>
+              )}
             </>
           )
         }

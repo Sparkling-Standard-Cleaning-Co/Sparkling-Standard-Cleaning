@@ -18,9 +18,9 @@
 //   docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md
 //   public/marketing/qr/*.svg | *.png | *-print.png
 //
-// The production origin comes from PUBLIC_SITE_URL at generation time. Until
-// the final domain is approved, generated docs show a placeholder origin and
-// validation warns that campaign URLs are not yet publishable.
+// The production origin comes from PUBLIC_SITE_URL at generation time. The
+// owner-confirmed domain is the fallback, so committed docs and QR assets
+// carry the real URLs even when no environment variable is set.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Internal destination pages that campaign links may point at. */
@@ -493,7 +493,7 @@ export const canonicalPaths: string[] = Object.values(destinations);
 
 export function resolveSiteUrl(raw: string | undefined): string {
   const trimmed = raw?.trim();
-  if (!trimmed) return 'https://pending-website-url.invalid';
+  if (!trimmed) return 'https://sparkling-standard.com';
   return trimmed.replace(/\/+$/, '');
 }
 

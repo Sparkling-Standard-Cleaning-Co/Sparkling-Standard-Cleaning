@@ -66,27 +66,31 @@ const phoneEnv = formatPhone(envFact(import.meta.env.PUBLIC_BUSINESS_PHONE));
 // ── Business entity ──────────────────────────────────────────────────────────
 export const business = {
   /**
-   * Final company name. PENDING until the owner approves it — never invent.
-   * Preview builds render a clearly-marked development placeholder wordmark.
+   * Final company name — owner-confirmed October 2026 (public brand:
+   * "Sparkling Standard", with "Cleaning Co." as the descriptor).
    */
-  displayName: envFact(import.meta.env.PUBLIC_BUSINESS_NAME) ?? PENDING,
+  displayName: envFact(import.meta.env.PUBLIC_BUSINESS_NAME) ?? 'Sparkling Standard Cleaning Co.',
 
-  /** Registered legal entity name. PENDING until formed/approved. */
+  /**
+   * Registered legal entity name. The owner has registered the business as
+   * "Sparkling Standard Cleaning Co."; the precise legal spelling/entity
+   * suffix is still being verified. Do not publish until confirmed.
+   */
   legalName: envFact(import.meta.env.PUBLIC_BUSINESS_LEGAL_NAME) ?? PENDING,
 
-  /** Production origin without trailing slash. PENDING until the domain exists. */
-  url: envFact(import.meta.env.PUBLIC_SITE_URL) ?? PENDING,
+  /** Production origin without trailing slash — owner-confirmed domain. */
+  url: envFact(import.meta.env.PUBLIC_SITE_URL) ?? 'https://sparkling-standard.com',
 
-  /** Public contact phone. PENDING until the owner provides the number. */
-  phone: phoneEnv ?? PENDING,
+  /** Public contact phone — owner-confirmed number. */
+  phone: phoneEnv ?? formatPhone('850-246-8479') ?? PENDING,
 
-  /** Public contact email. PENDING until the owner provides the address. */
-  email: envFact(import.meta.env.PUBLIC_BUSINESS_EMAIL) ?? PENDING,
+  /** Public contact email — owner-confirmed address. */
+  email: envFact(import.meta.env.PUBLIC_BUSINESS_EMAIL) ?? 'owner@sparkling-standard.com',
 
   // ── Founder (approved background from the owner's directive) ──────────────
-  // Her name is NOT published until she approves it. Never invent one.
+  // Owner-approved for publication (October 2026). Never invent details.
   founder: {
-    firstName: PENDING as Fact<string>,
+    firstName: 'Hayli' as Fact<string>,
     /** Public role wording. */
     role: 'Founder & Owner-Operator',
     /** True: the business is currently owner-operated by the founder. */
@@ -97,6 +101,7 @@ export const business = {
      * certifications) that the owner has not supplied.
      */
     approvedBackground: [
+      'An 18-year-old college student who started the company to give customers the detailed attention rushed cleaning does not allow',
       'Started in residential cleaning and grew up around a grandmother who owned a cleaning business',
       'Worked with that family cleaning business, then for established local cleaning companies',
       'Worked directly with customers through every clean',
@@ -143,7 +148,7 @@ export const business = {
   serviceArea: {
     /** The one approved public description. */
     summary:
-      'Serving Pensacola, Cantonment and surrounding communities, with select nearby service into Alabama.',
+      'Serving Pensacola, Cantonment and surrounding communities within about an hour of Cantonment, with select nearby service into Alabama.',
     /** Approved primary communities (no radius claims until approved). */
     primaryCommunities: ['Pensacola', 'Cantonment'],
     /** Approved broad region labels for structured data / copy. */
@@ -188,7 +193,8 @@ export const business = {
     /** Residential payment timing, owner-approved. */
     residentialTiming:
       'Payment is due after the cleaning is complete — you see the result before you pay.',
-    processor: PENDING as Fact<string>,
+    /** Owner-confirmed processor. Enabled methods are confirmed separately. */
+    processor: 'Stripe',
   },
 
   // ── Insurance / licensing (never claimed until approved) ──────────────────
@@ -255,6 +261,12 @@ export const business = {
      * legitimate backend confirms bookings; the site only takes REQUESTS.
      */
     instantBooking: false,
+    /**
+     * Text-message CTAs. FALSE until the owner confirms the business number
+     * can receive SMS — a number being mobile-style is not proof. Flip only
+     * after a real text has been sent and received.
+     */
+    smsEnabled: false,
     /** Reviews section/nav visibility is automatic once genuine entries exist. */
     reviewsVisibleWhenPresent: true,
   },
@@ -301,6 +313,6 @@ export function siteName(): string {
 /** Confirmed public profile URLs only (PENDING values filtered out). */
 export function socialUrls(): string[] {
   return Object.values(business.socials).filter(
-    (value): value is string => typeof value === 'string' && value.length > 0,
+    (value): value is string => typeof value === 'string' && value.length > 0 && value !== PENDING,
   );
 }

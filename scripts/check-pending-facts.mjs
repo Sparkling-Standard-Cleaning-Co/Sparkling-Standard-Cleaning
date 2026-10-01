@@ -48,6 +48,35 @@ for (const file of files) {
   }
 }
 
+// Structured data must never carry a bare "PENDING" value. JSON-LD is parsed
+// and walked (rather than pattern-matched) so real content that merely mentions
+// the word can never trip this check, while an unconfirmed fact that leaks into
+// schema is caught before production.
+function containsPending(value) {
+  if (typeof value === 'string') return value === 'PENDING';
+  if (Array.isArray(value)) return value.some(containsPending);
+  if (value && typeof value === 'object') return Object.values(value).some(containsPending);
+  return false;
+}
+
+for (const file of files.filter((f) => f.endsWith('.html'))) {
+  const content = fs.readFileSync(file, 'utf8');
+  const blocks = [...content.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+  const relative = path.relative(DIST, file).split(path.sep).join('/');
+  for (const block of blocks) {
+    if (!block[1].includes('PENDING')) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(block[1]);
+    } catch {
+      continue; // malformed JSON-LD is flagged by scripts/verify-seo.mjs
+    }
+    if (containsPending(parsed)) {
+      problems.push(`${relative}: JSON-LD contains a PENDING value`);
+    }
+  }
+}
+
 if (problems.length > 0) {
   console.error('PRODUCTION BLOCKED — PENDING facts found in the build:');
   for (const problem of [...new Set(problems)]) console.error(` - ${problem}`);

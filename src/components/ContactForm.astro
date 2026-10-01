@@ -72,7 +72,7 @@ const { class: className = '' } = Astro.props;
       Prefer to talk?
       {
         phone ? (
-          <> Call <a href={phone.href} data-cta="contact-fallback-call">{phone.display}</a> or text <a href={phone.sms} data-cta="contact-fallback-text">{phone.display}</a>.</>
+          <> Call <a href={phone.href} data-cta="contact-fallback-call">{phone.display}</a>{business.flags.smsEnabled && <> or text <a href={phone.sms} data-cta="contact-fallback-text">{phone.display}</a></>}.</>
         ) : (
           <> A direct phone line is pending — send a message and we will reply.</>
         )

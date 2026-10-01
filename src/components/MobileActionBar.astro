@@ -1,5 +1,5 @@
 ---
-import { contactPhone } from '../config/business';
+import { business, contactPhone } from '../config/business';
 import Icon from './Icon.astro';
 
 const phone = contactPhone();
@@ -12,9 +12,11 @@ const phone = contactPhone();
         <a class="btn btn--secondary" href={phone.href} data-cta="sticky-call">
           <Icon name="phone" size={18} /> Call
         </a>
-        <a class="btn btn--secondary" href={phone.sms} data-cta="sticky-text">
-          <Icon name="message" size={18} /> Text
-        </a>
+        {business.flags.smsEnabled && (
+          <a class="btn btn--secondary" href={phone.sms} data-cta="sticky-text">
+            <Icon name="message" size={18} /> Text
+          </a>
+        )}
       </>
     ) : (
       <a class="btn btn--secondary" href="/contact/" data-cta="sticky-contact">

@@ -19,8 +19,7 @@ const socialEntries = (
       <div>
         <Logo class="brand" />
         <p class="small" style="margin-top: var(--space-4)">
-          Residential and commercial cleaning serving Pensacola, Cantonment and surrounding
-          communities, with select nearby service into Alabama.
+          {business.serviceArea.summary}
         </p>
         {preview && <p class="small"><span class="pending-badge">Pre-launch preview</span></p>}
       </div>
@@ -61,7 +60,9 @@ const socialEntries = (
             ) : (
               <>
                 <li><a href={business.phone.href} data-cta="footer-call">Call {business.phone.display}</a></li>
-                <li><a href={business.phone.sms} data-cta="footer-text">Text {business.phone.display}</a></li>
+                {business.flags.smsEnabled && (
+                  <li><a href={business.phone.sms} data-cta="footer-text">Text {business.phone.display}</a></li>
+                )}
               </>
             )
           }

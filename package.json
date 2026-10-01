@@ -1,9 +1,9 @@
 {
-  "name": "pensacola-cleaning-company",
+  "name": "sparkling-standard-cleaning",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Marketing, estimate, and lead system for a Pensacola-area residential and commercial cleaning company.",
+  "description": "Marketing, estimate, and lead system for Sparkling Standard Cleaning Co., serving the Pensacola and Cantonment area.",
   "engines": {
     "node": ">=20"
   },

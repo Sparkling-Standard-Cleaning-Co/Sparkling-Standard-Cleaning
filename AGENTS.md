@@ -1,4 +1,4 @@
-# AGENTS.md — Pensacola-area Cleaning Company Digital Operating System
+# AGENTS.md — Sparkling Standard Cleaning Co. Digital Operating System
 
 Permanent instructions for AI engineering agents (OpenCode and similar) working in this
 repository. Read this file fully before making any change. Every statement below reflects the
@@ -7,17 +7,28 @@ the owner; never silently work around this file.
 
 ## Project identity
 
-- Marketing, estimate and lead-capture website for an owner-operated residential and commercial
-  cleaning company serving **Pensacola, Cantonment and surrounding communities, with select
-  nearby service into Alabama**.
-- **The final company name, domain, phone, email and operating origin are PENDING.** Until the
-  owner approves them, they live as `PENDING` facts in `src/config/business.ts`, the site is
-  preview-only, and production deployment is blocked by validation.
-- Repo: `Pensacolacleaningcompany/PensacolaCleaningcompany`. **`main` is the production branch.**
+- Marketing, estimate and lead-capture website for **Sparkling Standard Cleaning Co.** (public
+  brand: "Sparkling Standard"), an owner-operated residential and commercial cleaning company
+  based in Cantonment and serving Pensacola, surrounding communities within about an hour of
+  Cantonment, and select nearby areas into Alabama.
+- **Owner-confirmed facts (October 2026):** company name, domain
+  (`https://sparkling-standard.com`), phone (`(850) 246-8479`), email
+  (`owner@sparkling-standard.com`), founder (Hayli — 18-year-old founder/owner-operator, approved
+  background in `business.founder`), service territory (about one hour of actual driving time
+  from the private operating origin), Stripe as payment processor, and a dedicated Cloudflare
+  account with the domain active on Cloudflare DNS.
+- **Still PENDING (do not invent):** legal entity spelling/suffix, the private operating origin
+  (`TRAVEL_ORIGIN`), insurance/bonding/licensing claims, SMS capability (`business.flags.smsEnabled`
+  is FALSE until a real text has been received), Web3Forms access key, analytics IDs, review and
+  social profile URLs, final cancellation percentages, and owner launch approval
+  (`business.launch.productionApproved`). Until these land, the site is preview-only and
+  production deployment is blocked by validation. See `docs/launch/OWNER-INPUT-REQUIRED.md`.
+- Repo: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`. **`main` is the production
+  branch.**
 - Local dev server: http://localhost:4321. Build output: `dist/`.
-- Hosting will be the owner's GitHub-connected Cloudflare project (no Cloudflare project exists
-  yet). This repository contains **no deployment configuration** — deployment settings live in
-  the Cloudflare dashboard after the domain exists. See `docs/deployment/DEPLOYMENT.md`.
+- Hosting is the owner's dedicated GitHub-connected Cloudflare project (Cloudflare Pages).
+  This repository contains **no deployment configuration** — deployment settings live in the
+  Cloudflare dashboard. See `docs/deployment/DEPLOYMENT.md`.
 
 ## THE NO-FABRICATION RULE (non-negotiable)
 
@@ -106,6 +117,9 @@ intentional** while those collections are empty — not errors.
 
 - **Never push without explicit owner approval** — a push to `main` triggers the production
   deployment once the Cloudflare project exists.
+- **Line endings are LF-normalized** (`.gitattributes`: `text=auto eol=lf`). The generated
+  marketing documents are byte-compared by validation; never commit CRLF variants of them.
+  Keep the repository-local `core.autocrlf=false` setting on Windows clones.
 - Use the repository-local Git identity only (`git config --local`); never change global config.
 - Never, without explicit owner authorization: force push, rewrite history, `git reset`,
   `git clean`, `git stash pop`/`drop`, delete branches, or touch Cloudflare settings or DNS.

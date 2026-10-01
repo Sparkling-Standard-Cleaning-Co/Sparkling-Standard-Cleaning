@@ -7,14 +7,14 @@
 // Run after changing the mark or the business name:
 //   node scripts/generate-brand-images.mjs
 //
-// The wordmark uses whatever PUBLIC_BUSINESS_NAME is set (PENDING otherwise);
-// production validation blocks deployment while the name is PENDING.
+// The wordmark uses whatever PUBLIC_BUSINESS_NAME is set; it defaults to the
+// owner-confirmed company name. Run after changing the mark or the name.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 
-const name = (process.env.PUBLIC_BUSINESS_NAME || 'PENDING_BUSINESS_NAME').trim();
+const name = (process.env.PUBLIC_BUSINESS_NAME || 'Sparkling Standard Cleaning Co.').trim();
 const ROSE = '#c97285';
 const ROSE_SOFT = '#e8b3bf';
 const CHAMPAGNE = '#c6a369';
@@ -57,8 +57,8 @@ const og = `
   <circle cx="40" cy="620" r="260" fill="#f7efdf"/>
   <g transform="translate(84 84) scale(2.4)">${mark(ROSE, CHAMPAGNE, 48).replace(/<\/?svg[^>]*>/g, '')}</g>
   <text x="84" y="320" font-family="Georgia, 'Times New Roman', serif" font-size="64" fill="${INK}">${esc(name)}</text>
-  <text x="84" y="392" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#6f5f57">Residential &amp; commercial cleaning · Pensacola, FL</text>
-  <text x="84" y="452" font-family="Arial, Helvetica, sans-serif" font-size="26" fill="${ROSE}">Cleaning that notices the little things.</text>
+  <text x="84" y="392" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#6f5f57">Residential &amp; commercial cleaning · Pensacola &amp; Cantonment, FL</text>
+  <text x="84" y="452" font-family="Arial, Helvetica, sans-serif" font-size="26" fill="${ROSE}">The Details Are Our Standard.</text>
   <rect x="84" y="520" width="180" height="6" rx="3" fill="${CHAMPAGNE}"/>
 </svg>`;
 
