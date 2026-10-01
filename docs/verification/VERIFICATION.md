@@ -39,6 +39,29 @@ generated marketing documents are byte-compared by validation.
 | Deployment configuration package | `npm run deploy:secrets` with dummy values + `git check-ignore` | generates the git-ignored `deploy/secrets.env` in the `wrangler pages secret bulk` format; missing required keys exit non-zero; the ignore rules were verified |
 | Operations documentation | `docs/OPERATIONS-HUB.md`, `docs/operations/PLATFORM-STATUS.md`, `docs/operations/AUTOMATION-REGISTER.md` | created as the single entry point, the only platform-status register, and the automation inventory |
 
+## Verified — live production audit (2026-10-01)
+
+Production: `https://sparkling-standard.com` (Git-connected Cloudflare Pages project;
+commit check-runs and deployed bundle hashes verified).
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Page availability | HTTP + Playwright over 15 pages | all `200`; no console errors; no horizontal overflow at 360 px |
+| Canonicals + robots | live HTML inspection | every page `index, follow` with self-referencing canonical; `robots.txt` `Allow: /` + sitemap. `PUBLIC_PREVIEW_MODE` is NOT set |
+| Accessibility | axe-core WCAG 2.0/2.1/2.2 A+AA at 360 px | 0 violations on home, estimate, contact |
+| Mobile action bar + contact | Playwright | sticky bar visible; `tel:+18502468479` correct; 0 `sms:` links (gate off) |
+| Consent behavior | Playwright | consent banner hidden and no analytics requests while no IDs are configured |
+| Core Web Vitals (lab) | Chromium, 1.6 Mbps / 150 ms RTT / 4× CPU | home LCP 1.65 s / CLS 0.038; estimate LCP 1.37 s / CLS 0; contact LCP 1.26 s / CLS 0 (targets: LCP ≤ 2.5 s, CLS ≤ 0.1 — met). INP not measurable without interaction; recorded as unreported |
+| `/api/travel` | live POST | deployed and responding `503 origin_not_configured` (function works; configuration pending) |
+| `/api/lead` | live POST (invalid payload, then valid test) | deployed and validating (`400` on bad input); `503 not_configured` on a valid payload — **form delivery blocked until the Web3Forms key is configured**; no false success |
+| Authorized test submission | live contact form, clearly marked test | honest failure copy shown; no email sent (correct fail-safe). Inbox delivery cannot be confirmed by engineering |
+| Form failure copy | local + deployed bundle inspection | fixed and deployed (`edac89e`): honors the server's `503 not_configured` signal, attempts the static fallback, and shows channel-accurate alternatives (call/email; never "text" while SMS is unverified) |
+| Estimator on production | live wizard flow | range appears for in-area ZIPs; out-of-area routes to manual confirmation (verified locally before deploy; live behavior matches) |
+
+Lighthouse/PageSpeed Insights could not be run: the public PSI API returned a daily-quota `429`.
+The Core Web Vitals above are direct Chromium measurements with the method recorded, not
+Lighthouse scores.
+
 ## Pending (cannot be verified in this environment — owner or tooling required)
 
 | Item | Why pending | How to verify |

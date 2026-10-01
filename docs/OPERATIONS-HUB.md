@@ -74,11 +74,10 @@ Every arrow maps to an authoritative document — see §10.
 - **Deployment:** GitHub `main` → the company's own Cloudflare Pages project
   (`sparkling-standard-cleaning`). Build `npm run build`, output `dist`, Node 22.16.0
   (`.node-version`). Pages Functions in `functions/` deploy automatically.
-- **Deployment status: the Pages project is not yet created.** The Git setup screen currently
-  shows "Production branch → No labels found"; the fix procedure is in
-  `docs/deployment/DEPLOYMENT.md` §2. Nothing is live yet.
-- **Full guide:** `docs/deployment/DEPLOYMENT.md` (build config, variables, secrets, staging
-  noindex, validation, rollback, troubleshooting, launch authorization).
+- **Deployment status: live.** `https://sparkling-standard.com` serves the Git-connected
+  project; every push to `main` deploys. The site is currently indexable (`index, follow`) —
+  the owner has not recorded final launch authorization, so indexing state must not change
+  without it. Full guide: `docs/deployment/DEPLOYMENT.md`.
 - `PUBLIC_PREVIEW_MODE=true` produces a noindex build and is used for the temporary pages.dev
   staging deployment only. It must be removed before launch. Noindex is not access control.
 - URLs are permanent; there is no redirect mechanism in a static build.
@@ -160,9 +159,11 @@ Truthful snapshot; the register in `docs/operations/PLATFORM-STATUS.md` is autho
 
 **Blocked / pending (owner):**
 
-- Cloudflare Pages project creation (Git access fix — `docs/deployment/DEPLOYMENT.md` §2).
-- Web3Forms key entry; `TRAVEL_ORIGIN`; analytics IDs; Stripe enabled-method confirmation; SMS
-  capability; legal entity spelling; review/social profiles; launch approval.
+- **Form delivery is blocked**: `/api/lead` returns `503 not_configured` until the Web3Forms
+  key is entered in Cloudflare (`WEB3FORMS_ACCESS_KEY` secret + `PUBLIC_WEB3FORMS_ACCESS_KEY`
+  text) and a deployment is triggered — steps in `docs/launch/REVENUE-READINESS-PLAN.md` §2.
+- `TRAVEL_ORIGIN`; analytics IDs; Stripe enabled-method confirmation; SMS capability; legal
+  entity spelling; review/social profiles; final launch authorization.
 
 ## 10. Documentation directory
 
@@ -170,7 +171,8 @@ Truthful snapshot; the register in `docs/operations/PLATFORM-STATUS.md` is autho
 `docs/operations/AUTOMATION-REGISTER.md`.
 
 **Launch & operations:** `docs/launch/OWNER-INPUT-REQUIRED.md`,
-`docs/launch/PRICING-PROPOSAL.md`, `docs/operations/ESTIMATOR-CALIBRATION.md`,
+`docs/launch/PRICING-PROPOSAL.md`, `docs/launch/REVENUE-READINESS-PLAN.md`,
+`docs/operations/ESTIMATOR-CALIBRATION.md`,
 `docs/operations/SERVICE-SCOPE-MATRIX.md`, `docs/operations/PROPERTY-ACCESS-SECURITY.md`,
 `docs/operations/CAPABILITY-REVIEW.md`.
 
@@ -179,6 +181,7 @@ Truthful snapshot; the register in `docs/operations/PLATFORM-STATUS.md` is autho
 
 **Marketing:** `docs/marketing/90-DAY-LAUNCH-PLAN.md`,
 `docs/marketing/CONTENT-OPERATING-SYSTEM.md`, `docs/marketing/LEAD-MEASUREMENT-MODEL.md`,
+`docs/marketing/COMPETITIVE-COMPARISON.md`, `docs/marketing/LEAD-LEDGER-TEMPLATE.csv`,
 `docs/marketing/WEEKLY-SCORECARD.md`, `docs/marketing/REVIEW-GROWTH-SYSTEM.md`,
 `docs/marketing/REFERRAL-PROGRAM.md`, `docs/marketing/COMMERCIAL-OUTREACH.md`,
 `docs/marketing/STR-HOST-OUTREACH.md`, generated UTM docs.
