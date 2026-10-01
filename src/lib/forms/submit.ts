@@ -64,7 +64,14 @@ export async function submitLead(
       body: JSON.stringify(payload),
     });
     if (response.ok) return { ok: true };
-    if (![404, 405, 501].includes(response.status)) {
+    if (response.status === 503) {
+      // The relay is deployed but its server key is not configured. It tells
+      // the client to use the static fallback — do exactly that instead of
+      // reporting a server error.
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (data.error !== 'not_configured') return { ok: false, reason: 'server_error' };
+      // fall through to the direct provider path
+    } else if (![404, 405, 501].includes(response.status)) {
       if (response.status === 400 || response.status === 422) return { ok: false, reason: 'spam_rejected' };
       return { ok: false, reason: 'server_error' };
     }

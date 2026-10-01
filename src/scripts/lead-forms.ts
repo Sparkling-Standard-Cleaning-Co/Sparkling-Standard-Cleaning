@@ -2,21 +2,19 @@
 // STR). Success is shown only after the provider confirms; every failure path
 // has an honest message and a direct-contact alternative.
 
+import { business, contactPhone, isPending } from '../config/business';
 import { attributionFields } from '../lib/attribution';
 import { submitLead, recordConversion, type SubmitOutcome } from '../lib/forms/submit';
+import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { track, type AnalyticsEventName } from '../lib/analytics/events';
 
 type Variant = 'contact' | 'commercial' | 'str';
 
-type FailureReason = Extract<SubmitOutcome, { ok: false }>['reason'];
-
-const FAILURE_MESSAGES: Record<FailureReason, string> = {
-  not_configured:
-    'The message service is not connected yet. Please call or text us directly — we do not want to lose your request.',
-  provider_error: 'Something went wrong sending your message. Please try again, or call or text us directly.',
-  network_error: 'We could not reach the message service. Check your connection and try again, or call or text us directly.',
-  server_error: 'Something went wrong on our side. Please try again, or call or text us directly.',
-  spam_rejected: 'Your message could not be verified. Please try again, or call or text us directly.',
+const phone = contactPhone();
+const contact = {
+  phoneDisplay: phone?.display,
+  email: isPending(business.email) ? undefined : business.email,
+  smsEnabled: business.flags.smsEnabled,
 };
 
 function statusFor(form: HTMLFormElement): HTMLElement | null {
@@ -32,7 +30,7 @@ function setStatus(form: HTMLFormElement, state: 'success' | 'error' | 'info', m
 
 function failureMessage(outcome: SubmitOutcome): string {
   if (outcome.ok) return '';
-  return FAILURE_MESSAGES[outcome.reason];
+  return failureCopy(outcome.reason as FailureReason, contact);
 }
 
 function collectFields(form: HTMLFormElement): Record<string, string> {
@@ -92,12 +90,12 @@ for (const form of document.querySelectorAll<HTMLFormElement>('[data-lead-form]'
     // Honeypot: humans never fill a hidden "company_website" field.
     const honeypot = form.querySelector<HTMLInputElement>('input[name="company_website"]');
     if (honeypot && honeypot.value.trim() !== '') {
-      setStatus(form, 'error', FAILURE_MESSAGES.spam_rejected);
+      setStatus(form, 'error', failureCopy('spam_rejected', contact));
       return;
     }
     // Minimum time-on-form guard: instant submits are almost always bots.
     if (Date.now() - mountedAt < 2500) {
-      setStatus(form, 'error', FAILURE_MESSAGES.spam_rejected);
+      setStatus(form, 'error', failureCopy('spam_rejected', contact));
       return;
     }
 

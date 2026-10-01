@@ -3,17 +3,26 @@
 // travel API is unavailable. Nothing is ever auto-booked.
 
 import { pricing } from '../config/pricing';
+import { business, contactPhone, isPending } from '../config/business';
 import { zoneForZip } from '../config/geography';
 import { calculateEstimate, type EstimateContext } from '../lib/estimate/calculate';
 import { SERVICE_SHORT } from '../lib/estimate/labels';
 import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInfo, ServiceType } from '../lib/estimate/types';
 import { submitLead, recordConversion } from '../lib/forms/submit';
+import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { track } from '../lib/analytics/events';
 import { attributionFields } from '../lib/attribution';
 
 const DRAFT_KEY = 'pcc-estimate-draft';
 const TRAVEL_CACHE_PREFIX = 'pcc-travel-';
 const CONTACT_FIELD_NAMES = new Set(['name', 'phone', 'email', 'serviceAddress', 'notes']);
+
+const phone = contactPhone();
+const contact = {
+  phoneDisplay: phone?.display,
+  email: isPending(business.email) ? undefined : business.email,
+  smsEnabled: business.flags.smsEnabled,
+};
 
 const STEP_LABELS = [
   'Your service',
@@ -400,7 +409,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (honeypot && honeypot.value.trim() !== '') {
       if (status) {
         status.dataset.state = 'error';
-        status.textContent = 'Your request could not be verified. Please call or text us directly.';
+        status.textContent = failureCopy('spam_rejected', contact);
       }
       return;
     }
@@ -428,8 +437,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       if (submitButton) submitButton.disabled = false;
       if (status) {
         status.dataset.state = 'error';
-        status.textContent =
-          'We could not send your request. Please try again, or call or text us directly — your answers are still saved in this browser.';
+        status.textContent = `${failureCopy(outcome.reason as FailureReason, contact)} Your answers are still saved in this browser.`;
       }
       return;
     }
