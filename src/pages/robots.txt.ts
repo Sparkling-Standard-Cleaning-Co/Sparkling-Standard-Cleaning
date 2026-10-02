@@ -1,12 +1,14 @@
 // Environment-aware robots.txt.
-//  - Preview builds (PUBLIC_PREVIEW_MODE=true): Disallow all.
+//  - Preview builds (PUBLIC_PREVIEW_MODE=true OR any non-main Cloudflare
+//    Pages branch): Disallow all.
 //  - Production: allow everything, point at the sitemap.
 // Never index a PENDING brand (directive §79).
 
 import type { APIRoute } from 'astro';
+import { isPreviewBuild } from '../lib/preview';
 
 export const GET: APIRoute = ({ site }) => {
-  const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
+  const preview = isPreviewBuild();
 
   if (preview) {
     return new Response('User-agent: *\nDisallow: /\n', {

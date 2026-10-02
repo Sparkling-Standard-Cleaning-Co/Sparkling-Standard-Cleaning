@@ -2,6 +2,7 @@
 import { business, siteName } from '../config/business';
 import { localBusinessNode } from '../lib/schema';
 import { socialUrls } from '../config/business';
+import { isPreviewBuild } from '../lib/preview';
 
 interface Props {
   title: string;
@@ -17,10 +18,11 @@ const site = Astro.site ?? new URL(business.url === 'PENDING' ? 'https://pending
 const path = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`;
 const canonical = new URL(path, site).href;
 
-// Preview deployments set PUBLIC_PREVIEW_MODE=true so they are never indexed.
+// Preview deployments are never indexed: PUBLIC_PREVIEW_MODE=true or any
+// non-main Cloudflare Pages branch (CF_PAGES_BRANCH) forces noindex.
 // Directive §79: preview is noindex, nofollow. Production must show
 // "index, follow" (verified by scripts/verify-seo.mjs).
-const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
+const preview = isPreviewBuild();
 const robots = noindex || preview ? 'noindex, nofollow' : 'index, follow';
 
 const pageTitle = title.includes(siteName()) ? title : `${title} | ${siteName()}`;
