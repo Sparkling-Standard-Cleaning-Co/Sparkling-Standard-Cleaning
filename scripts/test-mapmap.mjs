@@ -58,22 +58,37 @@ async function getJson(url, headers = {}) {
   return { status: response.status, data };
 }
 
-// 1. Key status (quota-free).
-console.log('1. Key status');
+// 1. Key status (quota-free) — hard safety gates before any metered call.
+const PLANNED_CALLS = 6; // suggest + geocode + 2 routes + margin
+console.log('1. Key status and safety gates');
 const before = await getJson(`${base}/v1/keys/self`, { Authorization: `Bearer ${key}` });
 if (before.status !== 200) {
-  fail(`key status returned HTTP ${before.status} (check the key and its state)`);
-} else {
-  const d = before.data;
+  console.error(`ABORT: key status returned HTTP ${before.status}. Nothing was sent; no charges are possible.`);
+  process.exit(1);
+}
+{
+  const d = before.data ?? {};
   console.log(
     `  state=${d.state} quota=${d.monthly_quota} used=${d.used_this_month} remaining=${d.remaining} credits_pence=${d.credits_pence}`,
   );
-  if (Number(d.credits_pence ?? 0) > 0) {
-    console.log('  note: prepaid credit exists on this account; this script never tops up and never spends credit.');
-  }
   if (d.state !== 'verified') {
-    fail('key is not verified yet (confirm the email link to reach the free 50,000/month tier)');
+    console.error('ABORT: the key is not verified. Confirm the email link before running tests.');
+    process.exit(1);
   }
+  const remaining = Number(d.remaining ?? 0);
+  if (remaining < 100) {
+    console.error(`ABORT: only ${remaining} free calls remain this month; tests need ${PLANNED_CALLS} + margin.`);
+    process.exit(1);
+  }
+  const credits = Number(d.credits_pence ?? 0);
+  if (credits !== 0) {
+    console.error(
+      'ABORT: this account holds prepaid credit. With credit present, a quota overrun could consume it; ' +
+        'this script guarantees no test can spend credit, so it refuses to run. Remove the credit or use a zero-credit key.',
+    );
+    process.exit(1);
+  }
+  console.log('  ✓ verified key, ample free allowance, zero prepaid credit — no possible charge path.');
 }
 
 // 2. Address suggestions (public test address; first 5,000/day unbilled).
@@ -140,10 +155,18 @@ for (const destination of destinations) {
   if (minutes === null) fail(`${destination.label}: provider returned no driving duration`);
 }
 
-// Quota impact.
+// Quota impact — confirm no credit was touched and usage stayed within plan.
 const after = await getJson(`${base}/v1/keys/self`, { Authorization: `Bearer ${key}` });
 if (after.status === 200) {
-  console.log(`quota used this month after the run: ${after.data.used_this_month} (before: ${before.data?.used_this_month ?? '?'})`);
+  const a = after.data ?? {};
+  const spent =
+    Number(a.used_this_month ?? 0) - Number(before.data?.used_this_month ?? 0);
+  console.log(
+    `quota used this month: ${a.used_this_month} (before ${before.data?.used_this_month ?? '?'}; delta ${spent})`,
+  );
+  console.log(`credits after the run: ${a.credits_pence} (must be 0)`);
+  if (Number(a.credits_pence ?? 0) !== 0) fail('prepaid credit was touched — stop and inspect the account');
+  if (spent > PLANNED_CALLS) fail(`usage delta ${spent} exceeded the planned ${PLANNED_CALLS} calls`);
 }
 
 if (failures.length > 0) {
