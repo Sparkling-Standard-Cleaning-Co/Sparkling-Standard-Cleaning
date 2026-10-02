@@ -69,6 +69,10 @@ for (const [label, needle] of [
   ['submit button', 'data-submit'],
   ['live estimate panel', 'data-estimate-live'],
   ['address finder', 'data-address-finder'],
+  ['street address field', 'id="est-address"'],
+  ['city field', 'id="est-address-city"'],
+  ['state selector', 'id="est-address-state"'],
+  ['ZIP field', 'id="est-zip"'],
   ['map confirmation card', 'data-address-map'],
   ['manual address fallback', 'data-address-manual-panel'],
   ['reservation summary', 'data-reservation-summary'],
@@ -96,6 +100,13 @@ const bundleText = fs
   .join('\n');
 if (!bundleText.includes('unverified_direct_submission')) {
   problems.push('built scripts: missing the unverified direct-submission marker');
+}
+if (!bundleText.includes('setWorkerUrl')) {
+  problems.push('built scripts: MapLibre worker URL is not configured (blank-map guard)');
+}
+const workerAssets = fs.readdirSync(astroDir).filter((file) => /worker.*\.js$/i.test(file));
+if (workerAssets.length === 0) {
+  problems.push('built assets: the MapLibre worker bundle was not emitted');
 }
 if (bundleText.includes('routes.googleapis.com') || bundleText.includes('api.mapbox.com')) {
   problems.push('built scripts: a paid routing provider was bundled');

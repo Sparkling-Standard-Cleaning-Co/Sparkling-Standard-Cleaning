@@ -200,10 +200,14 @@ export async function resolveServerDestination(
 ): Promise<ServerDestination | null> {
   const street = (fields.service_address ?? '').trim();
   const unit = (fields.address_unit ?? '').trim();
+  const city = (fields.address_city ?? '').trim();
+  const state = (fields.address_state ?? '').trim();
   const zip = (fields.zip ?? '').trim();
 
   if (street.length >= 5) {
-    const queryParts = [unit ? `${street} ${unit}` : street, zip].filter(Boolean);
+    const line1 = unit ? `${street} ${unit}` : street;
+    const region = [city, state].filter(Boolean).join(', ');
+    const queryParts = [line1, region, zip].filter(Boolean);
     const resolved = await resolveAddress(env, queryParts.join(', ')).catch(() => null);
     if (resolved) return { lat: resolved.lat, lng: resolved.lng, source: 'address_geocode' };
   }

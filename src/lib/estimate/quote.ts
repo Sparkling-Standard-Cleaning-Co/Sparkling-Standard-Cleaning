@@ -72,10 +72,14 @@ export function selectInstantAmount(
 /**
  * Builds the full instant quote, or null when the job needs confirmation.
  * `now` is injectable so expiry is deterministic in tests.
+ *
+ * `destinationConfirmed` is false when the estimate only knows a ZIP, not a
+ * customer-confirmed address: the route may be live, but travel to a ZIP
+ * centroid is never presented as verified.
  */
 export function buildInstantQuote(
   result: EstimateResult,
-  input: { serviceType: string; zip: string },
+  input: { serviceType: string; zip: string; destinationConfirmed?: boolean },
   now: number = Date.now(),
 ): InstantQuote | null {
   const amount = selectInstantAmount(result);
@@ -88,7 +92,7 @@ export function buildInstantQuote(
     expiresAt: new Date(now + pricing.instantQuote.validityHours.value * 3_600_000).toISOString(),
     selection: pricing.instantQuote.selection.value,
     travelMode: result.travel.mode,
-    travelVerified: result.travel.verified,
+    travelVerified: result.travel.verified && (input.destinationConfirmed ?? true),
     confidence: result.confidence,
     minimumApplied: result.minimumApplied,
     configVersion: pricing.instantQuote.configVersion.value,

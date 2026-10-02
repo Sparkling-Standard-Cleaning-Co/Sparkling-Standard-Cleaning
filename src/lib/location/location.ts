@@ -28,6 +28,11 @@ export interface GeocodeSuggestion {
   id: string;
   label: string;
   /**
+   * Provider document kind: 'address' has a house number, while 'street',
+   * 'poi', 'locality' and 'postcode' are not precise destinations.
+   */
+  kind?: string;
+  /**
    * Provider-embedded coordinates. MapMap suggestions are directly plottable,
    * so the client can confirm a destination without a retrieve round-trip.
    */
@@ -87,8 +92,82 @@ export function formatLocationLine(location: ConfirmedLocation): string {
   return parts.join(' · ');
 }
 
-/** Query sent to /api/geocode resolve for manual entry. */
-export function buildGeocodeQuery(street: string, unit: string | undefined, zip: string | undefined): string {
+/** Query sent to /api/geocode for exact-address resolution. */
+export function buildGeocodeQuery(
+  street: string,
+  unit: string | undefined,
+  city: string | undefined,
+  state: string | undefined,
+  zip: string | undefined,
+): string {
   const streetPart = [street.trim(), unit?.trim()].filter(Boolean).join(' ');
-  return [streetPart, zip?.trim()].filter(Boolean).join(', ');
+  const region = [city?.trim(), state?.trim()].filter(Boolean).join(', ');
+  return [streetPart, region, zip?.trim()].filter(Boolean).join(', ');
 }
+
+/** The house number a street line starts with, if any. */
+export function houseNumberFromStreet(street: string): string | null {
+  const match = street.trim().match(/^(\d+[a-z]?(?:-\d+[a-z]?)?)\b/i);
+  return match ? (match[1] as string).toLowerCase() : null;
+}
+
+/** True when a provider label actually contains the requested house number. */
+export function labelHasHouseNumber(label: string, houseNumber: string | null): boolean {
+  if (!houseNumber) return true;
+  return label.toLowerCase().includes(houseNumber);
+}
+
+/** US states + DC for the address form (Florida first — the home market). */
+export const US_STATES: ReadonlyArray<{ code: string; name: string }> = [
+  { code: 'FL', name: 'Florida' },
+  { code: 'AL', name: 'Alabama' },
+  { code: 'AK', name: 'Alaska' },
+  { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' },
+  { code: 'CA', name: 'California' },
+  { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' },
+  { code: 'DE', name: 'Delaware' },
+  { code: 'DC', name: 'District of Columbia' },
+  { code: 'GA', name: 'Georgia' },
+  { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' },
+  { code: 'IL', name: 'Illinois' },
+  { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' },
+  { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' },
+  { code: 'ME', name: 'Maine' },
+  { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' },
+  { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' },
+  { code: 'MO', name: 'Missouri' },
+  { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' },
+  { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' },
+  { code: 'NM', name: 'New Mexico' },
+  { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' },
+  { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' },
+  { code: 'OR', name: 'Oregon' },
+  { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' },
+  { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' },
+  { code: 'TX', name: 'Texas' },
+  { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' },
+  { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' },
+  { code: 'WI', name: 'Wisconsin' },
+  { code: 'WY', name: 'Wyoming' },
+] as const;

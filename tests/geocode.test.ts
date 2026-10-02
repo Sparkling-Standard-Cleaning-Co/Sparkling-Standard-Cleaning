@@ -247,6 +247,112 @@ test('geocode resolve: a Census match exposes the ZIP from its label', async () 
   assert.equal(data.result.zip, '32502');
 });
 
+test('geocode resolve: an exact MapMap house-number match is preferred over Census', async () => {
+  let censusCalls = 0;
+  const response = await withFetch(
+    async (url) => {
+      if (String(url).includes('geocoding.geo.census.gov')) {
+        censusCalls += 1;
+        return jsonResponse({ result: { addressMatches: [] } });
+      }
+      return jsonResponse({
+        features: [
+          {
+            properties: {
+              id: 'osm:w10919246:addr',
+              housenumber: '6360',
+              street: 'Haupert Lane',
+              city: 'Molino',
+              state: 'FL',
+              postcode: '32577',
+            },
+            geometry: { coordinates: [-87.34, 30.72] },
+          },
+        ],
+      });
+    },
+    () =>
+      geocodePost({
+        request: request({ action: 'resolve', query: '6360 Haupert Ln, Molino, FL, 32577' }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  const data = (await response.json()) as { result: { source: string; label: string; precise: boolean } };
+  assert.equal(response.status, 200);
+  assert.equal(data.result.source, 'mapmap');
+  assert.match(data.result.label, /6360 Haupert Lane/);
+  assert.equal(data.result.precise, true);
+  assert.equal(censusCalls, 0, 'Census is not needed when MapMap has the exact address');
+});
+
+test('geocode resolve: a MapMap street-level result falls through to the exact Census match', async () => {
+  const response = await withFetch(
+    async (url) => {
+      if (String(url).includes('geocoding.geo.census.gov')) {
+        return jsonResponse({
+          result: {
+            addressMatches: [
+              {
+                matchedAddress: '6360 HAUPERT LN, MOLINO, FL, 32577',
+                coordinates: { x: -87.339, y: 30.716 },
+              },
+            ],
+          },
+        });
+      }
+      // MapMap knows only the street, not the house number.
+      return jsonResponse({
+        features: [
+          {
+            properties: { id: 'osm:w10919246:street', name: 'Haupert Lane', street: 'Haupert Lane', type: 'street' },
+            geometry: { coordinates: [-87.34, 30.72] },
+          },
+        ],
+      });
+    },
+    () =>
+      geocodePost({
+        request: request({ action: 'resolve', query: '6360 Haupert Ln, Molino, FL, 32577' }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  const data = (await response.json()) as {
+    result: { source: string; label: string; city?: string; state?: string; zip?: string; precise: boolean };
+  };
+  assert.equal(response.status, 200);
+  assert.equal(data.result.source, 'census');
+  assert.equal(data.result.label, '6360 HAUPERT LN, MOLINO, FL, 32577');
+  assert.equal(data.result.city, 'MOLINO');
+  assert.equal(data.result.state, 'FL');
+  assert.equal(data.result.zip, '32577');
+  assert.equal(data.result.precise, true);
+});
+
+test('geocode resolve: a MapMap POI result never replaces the requested house number', async () => {
+  const response = await withFetch(
+    async (url) => {
+      if (String(url).includes('geocoding.geo.census.gov')) {
+        return jsonResponse({ result: { addressMatches: [] } });
+      }
+      return jsonResponse({
+        features: [
+          {
+            properties: { id: 'osm:w360431754:poi', name: 'Molino Volunteer Fire Department', street: 'Molino Road', type: 'poi' },
+            geometry: { coordinates: [-87.3439, 30.7165] },
+          },
+        ],
+      });
+    },
+    () =>
+      geocodePost({
+        request: request({ action: 'resolve', query: '6360 Haupert Ln, Molino, FL, 32577' }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { ok: false, error: 'not_found' });
+});
+
 test('geocode resolve-id: passes the provider document id through', async () => {
   const response = await withFetch(
     async (url) => {

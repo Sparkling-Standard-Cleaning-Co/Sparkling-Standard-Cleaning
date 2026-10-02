@@ -7,9 +7,12 @@ import assert from 'node:assert/strict';
 import {
   buildGeocodeQuery,
   formatLocationLine,
+  houseNumberFromStreet,
   isPlausibleCoordinate,
+  labelHasHouseNumber,
   locationKey,
   streetLineFromLabel,
+  US_STATES,
   zipFromLabel,
   type ConfirmedLocation,
 } from '../src/lib/location/location.ts';
@@ -70,8 +73,34 @@ test('provider labels are reduced to the street line without repeating the regio
   assert.equal(streetLineFromLabel('100 S Baylen St', undefined, undefined, undefined), '100 S Baylen St');
 });
 
-test('manual geocoder queries join street, unit and ZIP for Census/MapMap', () => {
-  assert.equal(buildGeocodeQuery('100 S Baylen St', '4B', '32502'), '100 S Baylen St 4B, 32502');
-  assert.equal(buildGeocodeQuery('100 S Baylen St', undefined, '32502'), '100 S Baylen St, 32502');
-  assert.equal(buildGeocodeQuery('100 S Baylen St', '', ''), '100 S Baylen St');
+test('manual geocoder queries join street, unit, city, state and ZIP', () => {
+  assert.equal(
+    buildGeocodeQuery('6360 Haupert Ln', undefined, 'Molino', 'FL', '32577'),
+    '6360 Haupert Ln, Molino, FL, 32577',
+  );
+  assert.equal(
+    buildGeocodeQuery('100 S Baylen St', '4B', 'Pensacola', 'FL', '32502'),
+    '100 S Baylen St 4B, Pensacola, FL, 32502',
+  );
+  assert.equal(buildGeocodeQuery('100 S Baylen St', undefined, undefined, 'FL', '32502'), '100 S Baylen St, FL, 32502');
+  assert.equal(buildGeocodeQuery('100 S Baylen St', '', '', '', ''), '100 S Baylen St');
+});
+
+test('house-number helpers distinguish exact addresses from street-level results', () => {
+  assert.equal(houseNumberFromStreet('6360 Haupert Ln'), '6360');
+  assert.equal(houseNumberFromStreet('12A Palm Ave'), '12a');
+  assert.equal(houseNumberFromStreet('Haupert Lane'), null);
+  assert.equal(houseNumberFromStreet(''), null);
+
+  assert.equal(labelHasHouseNumber('6360 HAUPERT LN, MOLINO, FL, 32577', '6360'), true);
+  assert.equal(labelHasHouseNumber('Haupert Lane, Molino, Florida, 32577', '6360'), false);
+  assert.equal(labelHasHouseNumber('Haupert Lane, Molino, Florida, 32577', null), true);
+});
+
+test('the state selector includes Florida and Alabama first', () => {
+  assert.equal(US_STATES[0].code, 'FL');
+  assert.equal(US_STATES[1].code, 'AL');
+  assert.ok(US_STATES.some((state) => state.name === 'Florida'));
+  assert.ok(US_STATES.some((state) => state.name === 'Alabama'));
+  assert.equal(new Set(US_STATES.map((state) => state.code)).size, US_STATES.length, 'no duplicate states');
 });

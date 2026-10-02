@@ -221,6 +221,39 @@ test('an unresolvable address falls back to the provisional ZIP centroid', async
   assert.equal(destination?.lat, 30.45);
 });
 
+test('the server composes street, city, state and ZIP for exact address lookup', async () => {
+  const urls: string[] = [];
+  const destination = await withFetch(
+    async (url) => {
+      const href = String(url);
+      urls.push(decodeURIComponent(href));
+      if (href.includes('api.mapmap.ai/geocode?')) return jsonResponse({ features: [] });
+      return jsonResponse({
+        result: {
+          addressMatches: [
+            { matchedAddress: '6360 HAUPERT LN, MOLINO, FL, 32577', coordinates: { x: -87.339, y: 30.716 } },
+          ],
+        },
+      });
+    },
+    () =>
+      resolveServerDestination(
+        {
+          service_address: '6360 Haupert Ln',
+          address_city: 'Molino',
+          address_state: 'FL',
+          zip: '32577',
+        },
+        routedEnv,
+      ),
+  );
+  assert.equal(destination?.source, 'address_geocode');
+  assert.ok(
+    urls.some((url) => url.includes('6360 Haupert Ln, Molino, FL, 32577')),
+    'the exact-address query includes city, state and ZIP',
+  );
+});
+
 // ── Match / mismatch verdicts ────────────────────────────────────────────────
 
 test('a matching reservation with live travel, precise address and current config is fully verified', async () => {

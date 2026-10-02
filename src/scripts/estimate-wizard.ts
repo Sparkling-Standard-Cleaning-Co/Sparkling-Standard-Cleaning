@@ -175,6 +175,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
         ? buildInstantQuote(result, {
             serviceType: input.serviceType ?? 'standard',
             zip: input.zip ?? '',
+            // Travel is only ever presented as verified for a customer-
+            // confirmed destination, never a ZIP centroid.
+            destinationConfirmed: location !== null,
           })
         : null;
     renderResult(result);
@@ -187,7 +190,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   function travelCopy(result: EstimateResult): string {
     const travel = result.travel;
-    if (travel.mode === 'routed' && travel.verified) {
+    // A live route to a ZIP centroid is an estimate, not a confirmed
+    // destination: only a customer-confirmed address can read as confirmed.
+    if (location && travel.mode === 'routed' && travel.verified) {
       const minutes = travel.durationMinutes !== null ? `${Math.round(travel.durationMinutes)} min` : null;
       const miles = travel.oneWayMiles !== null ? `${Math.round(travel.oneWayMiles * 10) / 10} mi` : null;
       const detail = [miles, minutes].filter(Boolean).join(' / ');
@@ -734,6 +739,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
             : 'manual_review',
       service_address: location?.street ?? textValue('serviceAddress') ?? '',
       address_unit: location?.unit ?? textValue('addressUnit') ?? '',
+      address_city: location?.city ?? textValue('addressCity') ?? '',
+      address_state: location?.state ?? textValue('addressState') ?? '',
       address_confirmed: location ? 'yes' : 'no',
       ...(location
         ? {

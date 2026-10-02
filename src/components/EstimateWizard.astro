@@ -2,6 +2,7 @@
 import { pricing } from '../config/pricing';
 import { business, contactPhone, isPending } from '../config/business';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
+import { US_STATES } from '../lib/location/location';
 import Icon from './Icon.astro';
 import TurnstileWidget from './TurnstileWidget.astro';
 import ResponseGuarantee from './ResponseGuarantee.astro';
@@ -124,7 +125,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
                 name="serviceAddress"
                 type="text"
                 autocomplete="address-line1"
-                placeholder="Start typing, e.g. 100 S Baylen St"
+                placeholder="e.g. 6360 Haupert Ln"
                 role="combobox"
                 aria-expanded="false"
                 aria-autocomplete="list"
@@ -142,6 +143,32 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
                 maxlength="30"
                 placeholder="Optional"
               />
+            </div>
+          </div>
+
+          <div class="field-row field-row--3">
+            <div class="field field--grow">
+              <label for="est-address-city">City</label>
+              <input
+                class="input"
+                id="est-address-city"
+                name="addressCity"
+                type="text"
+                autocomplete="address-level2"
+                placeholder="e.g. Molino"
+              />
+            </div>
+            <div class="field">
+              <label for="est-address-state">State</label>
+              <select class="select" id="est-address-state" name="addressState" autocomplete="address-level1" required>
+                {US_STATES.map((state) => (
+                  <option value={state.code} selected={state.code === 'FL'}>{state.name}</option>
+                ))}
+              </select>
+            </div>
+            <div class="field field--zip">
+              <label for="est-zip">ZIP code</label>
+              <input class="input" id="est-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" placeholder="e.g. 32577" required />
             </div>
           </div>
 
@@ -164,9 +191,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             </button>
             <div class="address-finder__manual" id="est-address-manual-panel" data-address-manual-panel hidden>
               <p class="hint">
-                Type the full street address above (and your ZIP below), then ask us to find it.
-                If the lookup still misses, your ZIP is enough to continue — Sparkling Standard
-                confirms travel personally.
+                Type the full street address above (with city, state and ZIP), then ask us to find
+                it. If the exact address still cannot be pinpointed, your address stays on the
+                request for our review and travel is confirmed personally before booking.
               </p>
               <button type="button" class="btn btn--ghost btn--small" data-address-resolve>
                 Find this address
@@ -203,14 +230,10 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </div>
         </div>
 
-        <div class="field">
-          <label for="est-zip">Service ZIP code</label>
-          <input class="input" id="est-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" placeholder="e.g. 32503" required />
-          <span class="hint">
-            Confirms coverage and preliminary travel. Confirming your exact address above gives
-            you the most accurate proposed price.
-          </span>
-        </div>
+        <p class="hint">
+          Confirming your exact address gives you the most accurate proposed price. Never sent to
+          analytics.
+        </p>
       </section>
 
       <!-- Step 2 — the home -->

@@ -1,18 +1,22 @@
-// Address finder — street-address autocomplete, manual fallback, and map-pin
-// confirmation. Loaded only on the estimate page.
+// Address finder — separated street/city/state/ZIP fields, debounced
+// autocomplete, exact-address resolution and map-pin confirmation.
 //
-// Privacy / cost rules:
-//  - Suggestions are debounced (350 ms) and every new keystroke aborts the
-//    previous request, so free provider quotas are conserved.
-//  - The interactive map (MapLibre GL + OpenFreeMap, both free) is imported
-//    lazily — only after an address resolves, never on page load.
-//  - No address, coordinate or ZIP is ever sent to analytics.
+// Correctness rules for the rural-address defect:
+//  - Autocomplete queries are composed from ALL entered address information.
+//  - Saving a suggestion only counts as a precise destination when it carries
+//    the entered house number. A street-level or POI suggestion triggers an
+//    exact full-address resolution instead (MapMap exact-only → Census).
+//  - When the exact address cannot be resolved, the customer's original
+//    address is preserved, nothing is confirmed, and travel stays preliminary
+//    (confirmed manually by Sparkling Standard).
 //  - A confirmed location is the ONLY source of destination coordinates.
 
 import {
   buildGeocodeQuery,
   formatLocationLine,
+  houseNumberFromStreet,
   isPlausibleCoordinate,
+  labelHasHouseNumber,
   streetLineFromLabel,
   zipFromLabel,
   type ConfirmedLocation,
@@ -38,7 +42,6 @@ export interface AddressFinderHandle {
 
 interface ResolvedCandidate {
   label: string;
-  street: string;
   lat: number;
   lng: number;
   zip?: string;
@@ -48,11 +51,25 @@ interface ResolvedCandidate {
   adjusted: boolean;
 }
 
+interface ResolveResult {
+  label?: string;
+  lat?: number;
+  lng?: number;
+  zip?: string;
+  city?: string;
+  state?: string;
+  source?: string;
+  /** False when the provider could only manage a street-level match. */
+  precise?: boolean;
+}
+
 export function initAddressFinder(options: AddressFinderOptions): AddressFinderHandle | null {
   const { form, onChange } = options;
   const root = form.querySelector<HTMLElement>('[data-address-finder]');
   const streetInput = form.querySelector<HTMLInputElement>('#est-address');
   const unitInput = form.querySelector<HTMLInputElement>('#est-address-unit');
+  const cityInput = form.querySelector<HTMLInputElement>('#est-address-city');
+  const stateInput = form.querySelector<HTMLSelectElement>('#est-address-state');
   const zipInput = form.querySelector<HTMLInputElement>('#est-zip');
   if (!root || !streetInput) return null;
   // Non-null aliases keep TypeScript narrowing inside the closures below.
@@ -88,6 +105,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   let map: import('maplibre-gl').Map | null = null;
   let marker: import('maplibre-gl').Marker | null = null;
   let mapReady = false;
+  let resizeObserver: ResizeObserver | null = null;
 
   function setState(state: string): void {
     finderRoot.dataset.state = state;
@@ -141,7 +159,10 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   function invalidateConfirmation(): void {
-    if (!confirmed) return;
+    if (!confirmed) {
+      setState('typing');
+      return;
+    }
     confirmed = null;
     candidate = null;
     if (confirmedCard) confirmedCard.hidden = true;
@@ -150,16 +171,57 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     onChange(null);
   }
 
-  function fillZip(zip: string | undefined): void {
-    if (!zipInput || !zip) return;
-    if (zipInput.value.trim() === zip) return;
-    zipInput.value = zip;
-    zipInput.dispatchEvent(new Event('change', { bubbles: true }));
+  function composeQuery(): string {
+    return buildGeocodeQuery(
+      streetField.value,
+      unitInput?.value,
+      cityInput?.value,
+      stateInput?.value,
+      zipInput?.value,
+    );
+  }
+
+  function fillField(input: HTMLInputElement | HTMLSelectElement | null, value: string | undefined): void {
+    if (!input || !value) return;
+    if (input instanceof HTMLSelectElement) {
+      input.value = value.toUpperCase();
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+    if (input.value.trim() === value) return;
+    input.value = value;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function applyResolvedAddress(resolved: ResolveResult): ResolvedCandidate | null {
+    const { label, lat, lng } = resolved;
+    if (
+      typeof label !== 'string' ||
+      typeof lat !== 'number' ||
+      typeof lng !== 'number' ||
+      !isPlausibleCoordinate(lat, lng)
+    ) {
+      return null;
+    }
+    // Fill authoritative city/state/ZIP from the resolved address.
+    fillField(cityInput, resolved.city);
+    fillField(stateInput, resolved.state);
+    fillField(zipInput, resolved.zip ?? zipFromLabel(label) ?? undefined);
+    return {
+      label,
+      lat,
+      lng,
+      source: resolved.source === 'mapmap' ? 'mapmap' : 'census',
+      adjusted: false,
+      ...(resolved.zip ? { zip: resolved.zip } : {}),
+      ...(resolved.city ? { city: resolved.city } : {}),
+      ...(resolved.state ? { state: resolved.state } : {}),
+    };
   }
 
   function showCandidate(resolved: ResolvedCandidate, options: { manual?: boolean } = {}): void {
     candidate = resolved;
-    if (resolved.zip) fillZip(resolved.zip);
+    if (resolved.zip) fillField(zipInput, resolved.zip);
     if (mapCard) mapCard.hidden = false;
     if (confirmedCard) confirmedCard.hidden = true;
     // The confirm action is available even before/without the map: the map is
@@ -170,13 +232,93 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     confirmButton?.focus();
   }
 
+  /** Exact address could not be placed: preserve the address, confirm nothing. */
+  function exactResolveFailed(message?: string): void {
+    candidate = null;
+    confirmed = null;
+    if (confirmedCard) confirmedCard.hidden = true;
+    if (mapCard) mapCard.hidden = true;
+    setState('unresolved');
+    setStatus(
+      message ??
+        'We could not pinpoint that exact address yet. Your address is saved for our review — travel will be confirmed before booking.',
+      'error',
+    );
+    onChange(null);
+  }
+
+  async function requestResolvedAddress(query: string, suggestion?: GeocodeSuggestion): Promise<void> {
+    setState('resolving');
+    setStatus('Looking up that exact address…', 'info');
+    try {
+      confirmAbort?.abort();
+      confirmAbort = new AbortController();
+      const response = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ action: 'resolve', query: query.slice(0, 120) }),
+        signal: confirmAbort.signal,
+      });
+      if (response.status === 503) {
+        setState('unavailable');
+        setStatus(
+          'Address lookup is not connected right now — continue with your ZIP and we will confirm travel personally.',
+          'info',
+        );
+        return;
+      }
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: ResolveResult };
+      if (response.ok && data.ok && data.result) {
+        const resolved = applyResolvedAddress(data.result);
+        if (resolved && data.result.precise !== false) {
+          showCandidate(resolved);
+          return;
+        }
+      }
+      // The exact address could not be confirmed. If the customer did not
+      // enter a house number at all, a street-level suggestion is acceptable
+      // as a starting pin (they can drag it), clearly marked as approximate.
+      const houseNumber = houseNumberFromStreet(streetField.value);
+      if (!houseNumber && suggestion?.lat !== undefined && suggestion?.lng !== undefined) {
+        showCandidate({
+          label: suggestion.label,
+          lat: suggestion.lat,
+          lng: suggestion.lng,
+          source: 'mapmap',
+          adjusted: false,
+        });
+        setStatus('Street-level match — drag the pin to your exact home and confirm.', 'info');
+        return;
+      }
+      if (!houseNumber && !suggestion) {
+        // Manual entry without a house number: keep the address, allow review.
+        exactResolveFailed(
+          'Enter the full street address, including the house number, or continue with your ZIP — travel will be confirmed before booking.',
+        );
+        return;
+      }
+      exactResolveFailed();
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') return;
+      exactResolveFailed(
+        "We couldn't reach the address lookup right now. Your address is saved for our review — travel will be confirmed before booking.",
+      );
+    }
+  }
+
   async function ensureMap(): Promise<MapLibreModule | null> {
     if (mapModule) return mapModule;
     if (!mapLoading) {
       mapLoading = (async () => {
         try {
-          const [module] = await Promise.all([
+          const [module, workerUrl] = await Promise.all([
             import('maplibre-gl'),
+            // OpenFreeMap/MapLibre Vite guidance: point MapLibre at its own
+            // emitted worker bundle. Without this the worker never loads in
+            // production and the map renders blank.
+            import('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url')
+              .then((workerModule) => workerModule.default)
+              .catch(() => null),
             // The stylesheet is emitted as an asset and attached only when the
             // map actually initializes, never on page load.
             import('maplibre-gl/dist/maplibre-gl.css?url')
@@ -191,6 +333,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
               })
               .catch(() => undefined),
           ]);
+          if (workerUrl) module.setWorkerUrl(workerUrl);
           mapModule = module;
           return module;
         } catch {
@@ -222,10 +365,16 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         map.on('load', () => {
           mapReady = true;
           mapFallback?.setAttribute('hidden', '');
+          // The container may have been hidden or resized while loading.
+          map?.resize();
         });
         map.on('error', () => {
           if (!mapReady) mapFallback?.removeAttribute('hidden');
         });
+        if (typeof ResizeObserver !== 'undefined') {
+          resizeObserver ??= new ResizeObserver(() => map?.resize());
+          resizeObserver.observe(mapCanvas);
+        }
       } else {
         map.setCenter([resolved.lng, resolved.lat]);
         map.resize();
@@ -246,63 +395,15 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
             onChange(confirmed);
           }
           setTravelNote(
-            'Pin moved — we will verify travel to the corrected location when you confirm.',
+            'Pin moved — we will confirm travel to the corrected location when you request your cleaning.',
           );
-          setStatus(
-            'Pin adjusted. Confirm to use this corrected destination.',
-            'info',
-          );
+          setStatus('Pin adjusted. Confirm to use this corrected destination.', 'info');
         });
       }
+      // Ensure a fresh layout pass after the card becomes visible.
+      window.requestAnimationFrame(() => map?.resize());
     } catch {
       mapFallback?.removeAttribute('hidden');
-    }
-  }
-
-  /**
-   * Enriches a directly-plotted suggestion with authoritative ZIP/city/state
-   * data from the forward geocoder. It never overrides a newer choice or an
-   * already-confirmed destination, and a failure keeps the provider's own
-   * suggestion coordinates.
-   */
-  async function enrichCandidate(label: string, fallback: ResolvedCandidate): Promise<void> {
-    try {
-      confirmAbort?.abort();
-      confirmAbort = new AbortController();
-      const response = await fetch('/api/geocode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ action: 'resolve', query: label.slice(0, 120) }),
-        signal: confirmAbort.signal,
-      });
-      if (!response.ok) return;
-      const data = (await response.json().catch(() => ({}))) as {
-        ok?: boolean;
-        result?: { label?: string; lat?: number; lng?: number; zip?: string; city?: string; state?: string };
-      };
-      if (!data.ok || !data.result) return;
-      const { label: resolvedLabel, lat, lng, zip, city, state } = data.result;
-      if (typeof lat !== 'number' || typeof lng !== 'number' || !isPlausibleCoordinate(lat, lng)) return;
-      // The customer moved on (different input or a confirmation) — keep theirs.
-      if (confirmed || streetField.value.trim() !== label) return;
-      candidate = {
-        label: resolvedLabel ?? label,
-        street: streetLineFromLabel(resolvedLabel ?? label, city, state, zip),
-        lat,
-        lng,
-        source: 'mapmap',
-        adjusted: false,
-        ...(zip ? { zip } : {}),
-        ...(city ? { city } : {}),
-        ...(state ? { state } : {}),
-      };
-      if (zip) fillZip(zip);
-      setState('resolved');
-      void showMap(candidate);
-    } catch (error) {
-      if ((error as Error).name === 'AbortError') return;
-      // Keep the provider suggestion coordinates from the fallback candidate.
-      void fallback;
     }
   }
 
@@ -310,88 +411,29 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     const suggestion = suggestions[index];
     if (!suggestion) return;
     clearSuggestions();
-    setState('resolving');
-    setStatus('Looking up that address…', 'info');
-    streetField.value = suggestion.label;
+    const houseNumber = houseNumberFromStreet(streetField.value);
+    const exactSuggestion =
+      suggestion.kind === 'address' && labelHasHouseNumber(suggestion.label, houseNumber);
 
-    // Preferred path: the provider already embedded coordinates, so the
-    // destination can be plotted without a retrieve call (the retrieve
-    // endpoint is not available on every gateway).
-    if (
-      typeof suggestion.lat === 'number' &&
-      typeof suggestion.lng === 'number' &&
-      isPlausibleCoordinate(suggestion.lat, suggestion.lng)
-    ) {
-      showCandidate({
-        label: suggestion.label,
-        street: streetLineFromLabel(suggestion.label),
-        lat: suggestion.lat,
-        lng: suggestion.lng,
-        source: 'mapmap',
-        adjusted: false,
-      });
-      void enrichCandidate(suggestion.label, {
-        label: suggestion.label,
-        street: streetLineFromLabel(suggestion.label),
-        lat: suggestion.lat,
-        lng: suggestion.lng,
-        source: 'mapmap',
-        adjusted: false,
-      });
-      return;
-    }
-
-    // Legacy/id-only providers: retrieve the document by id.
-    try {
-      confirmAbort?.abort();
-      confirmAbort = new AbortController();
-      const response = await fetch('/api/geocode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ action: 'resolve-id', id: suggestion.id }),
-        signal: confirmAbort.signal,
-      });
-      const data = (await response.json().catch(() => ({}))) as {
-        ok?: boolean;
-        result?: { label?: string; lat?: number; lng?: number; zip?: string; city?: string; state?: string };
-      };
-      if (!response.ok || !data.ok || !data.result) throw new Error('not_found');
-      const { label, lat, lng, zip, city, state } = data.result;
-      if (
-        typeof label !== 'string' ||
-        typeof lat !== 'number' ||
-        typeof lng !== 'number' ||
-        !isPlausibleCoordinate(lat, lng)
-      ) {
-        throw new Error('not_found');
-      }
+    if (exactSuggestion) {
+      // Keep the customer's own street line; the provider coordinates are the
+      // precise destination, and the confirmation card summarizes the address
+      // from the separate fields.
       const resolved: ResolvedCandidate = {
-        label,
-        street: streetLineFromLabel(label, city, state, zip),
-        lat,
-        lng,
+        label: suggestion.label,
+        lat: suggestion.lat ?? Number.NaN,
+        lng: suggestion.lng ?? Number.NaN,
         source: 'mapmap',
         adjusted: false,
-        ...(zip ? { zip } : {}),
-        ...(city ? { city } : {}),
-        ...(state ? { state } : {}),
       };
-      if (!zipInput?.value.trim() && !zip) {
-        const fromLabel = zipFromLabel(label);
-        if (fromLabel) {
-          resolved.zip = fromLabel;
-          resolved.street = streetLineFromLabel(label, city, state, fromLabel);
-        }
+      if (isPlausibleCoordinate(resolved.lat, resolved.lng)) {
+        showCandidate(resolved);
+        return;
       }
-      showCandidate(resolved);
-    } catch (error) {
-      if ((error as Error).name === 'AbortError') return;
-      setState('idle');
-      setStatus(
-        "We couldn't confirm that suggestion. Try the manual entry below or continue with your ZIP.",
-        'error',
-      );
     }
+    // Street-level/POI/local results are never treated as the precise
+    // destination: resolve the full address (MapMap exact-only → Census).
+    await requestResolvedAddress(composeQuery(), suggestion);
   }
 
   async function requestSuggestions(query: string): Promise<void> {
@@ -402,7 +444,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       const response = await fetch('/api/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ action: 'suggest', query }),
+        body: JSON.stringify({ action: 'suggest', query: query.slice(0, 120) }),
         signal: suggestAbort.signal,
       });
       if (response.status === 503) {
@@ -441,81 +483,32 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   async function manualResolve(): Promise<void> {
     const street = streetField.value.trim();
     const zip = zipInput?.value.trim() ?? '';
-    if (street.length < 5) {
-      setStatus('Enter your street address first.', 'error');
+    if (street.length < 5 && zip.length < 5) {
+      setStatus('Enter your street address (or ZIP) first.', 'error');
       streetField.focus();
       return;
     }
-    setState('resolving');
-    setStatus('Looking up that address…', 'info');
-    try {
-      confirmAbort?.abort();
-      confirmAbort = new AbortController();
-      const response = await fetch('/api/geocode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          action: 'resolve',
-          query: buildGeocodeQuery(street, unitInput?.value, zip || undefined),
-        }),
-        signal: confirmAbort.signal,
-      });
-      if (response.status === 503) {
-        setState('unavailable');
-        setStatus(
-          'Address lookup is not connected right now — continue with your ZIP and we will verify travel personally.',
-          'info',
-        );
-        return;
-      }
-      const data = (await response.json().catch(() => ({}))) as {
-        ok?: boolean;
-        result?: { label?: string; lat?: number; lng?: number; zip?: string; city?: string; state?: string; source?: string };
-      };
-      if (!response.ok || !data.ok || !data.result) throw new Error('not_found');
-      const { label, lat, lng, zip: foundZip, city, state, source } = data.result;
-      if (
-        typeof label !== 'string' ||
-        typeof lat !== 'number' ||
-        typeof lng !== 'number' ||
-        !isPlausibleCoordinate(lat, lng)
-      ) {
-        throw new Error('not_found');
-      }
-      showCandidate({
-        label,
-        street: streetLineFromLabel(label, city, state, foundZip),
-        lat,
-        lng,
-        source: source === 'mapmap' ? 'mapmap' : 'census',
-        adjusted: false,
-        ...(foundZip ? { zip: foundZip } : {}),
-        ...(city ? { city } : {}),
-        ...(state ? { state } : {}),
-      });
-    } catch (error) {
-      if ((error as Error).name === 'AbortError') return;
-      setState('idle');
-      setStatus(
-        "We couldn't find that exact address. Check the spelling, or continue with your ZIP — Sparkling Standard will confirm the location.",
-        'error',
-      );
-    }
+    await requestResolvedAddress(composeQuery());
   }
 
   function confirmLocation(): void {
     if (!candidate) return;
+    const streetText = streetField.value.trim();
     confirmed = {
       label: candidate.label,
-      street: candidate.street || candidate.label,
+      street: streetText || streetLineFromLabel(candidate.label),
       ...(unitInput?.value.trim() ? { unit: unitInput.value.trim() } : {}),
       lat: candidate.lat,
       lng: candidate.lng,
       ...(candidate.zip || zipInput?.value.trim()
         ? { zip: candidate.zip ?? zipInput?.value.trim() ?? '' }
         : {}),
-      ...(candidate.city ? { city: candidate.city } : {}),
-      ...(candidate.state ? { state: candidate.state } : {}),
+      ...(candidate.city || cityInput?.value.trim()
+        ? { city: candidate.city ?? cityInput?.value.trim() ?? '' }
+        : {}),
+      ...(candidate.state || stateInput?.value
+        ? { state: candidate.state ?? stateInput?.value ?? '' }
+        : {}),
       source: candidate.source,
       ...(candidate.adjusted ? { adjusted: true } : {}),
       confirmedAt: new Date().toISOString(),
@@ -524,7 +517,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     if (confirmedCard) confirmedCard.hidden = false;
     if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(confirmed);
     setTravelNote(
-      'Travel will be calculated from our operating base to this confirmed pin when your price is prepared.',
+      'Travel will be calculated from our base to this confirmed pin when your price is prepared.',
     );
     setState('confirmed');
     setStatus('Destination confirmed. We will calculate travel to this exact location.', 'success');
@@ -543,8 +536,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   streetField.addEventListener('input', () => {
     invalidateConfirmation();
     window.clearTimeout(suggestTimer);
-    const query = streetField.value.trim();
-    if (query.length < MIN_SUGGEST_LENGTH) {
+    const query = composeQuery();
+    if (streetField.value.trim().length < MIN_SUGGEST_LENGTH) {
       clearSuggestions();
       setState('idle');
       setStatus(
@@ -579,6 +572,20 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     // Let a suggestion mousedown win; otherwise close the list.
     window.setTimeout(() => clearSuggestions(), 150);
   });
+
+  // Changing the city, state or ZIP changes the destination: confirmation and
+  // suggestions are invalidated, and autocomplete is refreshed using ALL
+  // available address information.
+  for (const field of [cityInput, stateInput, zipInput]) {
+    field?.addEventListener('change', () => {
+      invalidateConfirmation();
+      clearSuggestions();
+      if (streetField.value.trim().length >= MIN_SUGGEST_LENGTH) {
+        window.clearTimeout(suggestTimer);
+        suggestTimer = window.setTimeout(() => void requestSuggestions(composeQuery()), SUGGEST_DEBOUNCE_MS);
+      }
+    });
+  }
 
   manualToggle?.addEventListener('click', () => {
     const expanded = manualToggle.getAttribute('aria-expanded') === 'true';
@@ -616,10 +623,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       if (mapCard) mapCard.hidden = true;
       if (mapFallback) mapFallback.setAttribute('hidden', '');
       setState('idle');
-      setStatus(
-        'Start typing your street address — suggestions appear as you type.',
-        'info',
-      );
+      setStatus('Start typing your street address — suggestions appear as you type.', 'info');
       onChange(null);
     },
     focus: () => streetField.focus(),

@@ -225,7 +225,7 @@ test('address autocomplete: debounced suggestions resolve and confirm a destinat
     await page.click('[data-address-confirm]');
     await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
     const label = (await page.locator('[data-address-confirmed-label]').textContent())?.trim() ?? '';
-    assert.match(label, /100 S Baylen St/, 'confirmed label shown');
+    assert.match(label, /100 S Baylen/, 'confirmed label shown');
     assert.doesNotMatch(label, /32502, FL 32502|Pensacola, FL 32502 · Pensacola/, 'region is not duplicated');
     assert.equal(
       await page.locator('[data-address-finder]').getAttribute('data-state'),
@@ -379,7 +379,7 @@ test('reservation summary carries every answer and the call/text actions work', 
     assert.match(summaryText, /One-time/);
     assert.match(summaryText, /1,600 sqft/);
     assert.match(summaryText, /Inside oven/);
-    assert.match(summaryText, /100 S Baylen St/);
+    assert.match(summaryText, /100 S Baylen/);
     assert.match(summaryText, /Confirmed route/);
 
     const reference = (await page.locator('[data-reservation-reference]').textContent()) ?? '';
@@ -410,7 +410,7 @@ test('reservation summary carries every answer and the call/text actions work', 
     assert.equal(fields.quoted_price, '280');
     assert.match(fields.quote_reference, /^SS-\d{8}-[0-9A-Z]{6}$/);
     assert.equal(fields.quote_config_version, '2026-10-01.option-c.v1');
-    assert.equal(fields.service_address, '100 S Baylen St');
+    assert.equal(fields.service_address, '100 S Baylen');
     assert.equal(fields.address_unit, '');
     assert.equal(fields.address_confirmed, 'yes');
     assert.equal(fields.pin_latitude, '30.411100');

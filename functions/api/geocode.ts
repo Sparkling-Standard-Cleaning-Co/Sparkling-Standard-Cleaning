@@ -19,12 +19,11 @@
 // Responses: 200 { ok: true, ... } | 400 | 404 | 405 | 429 | 502 | 503
 
 import {
-  censusResolve,
   featureId,
   featureLabel,
   mapMapKey,
-  mapMapResolve,
   mapMapResolveId,
+  resolveAddress,
   type GeocodeEnv,
   type PhotonFeature,
 } from '../../src/lib/location/server-geocode.ts';
@@ -88,6 +87,8 @@ function cleanQuery(value: unknown): string | null {
 interface Suggestion {
   id: string;
   label: string;
+  /** Provider document kind: 'address', 'street', 'poi', 'locality', … */
+  kind?: string;
   /** Provider-embedded coordinates (MapMap suggestions are directly plottable). */
   lat?: number;
   lng?: number;
@@ -113,11 +114,18 @@ function parseSuggestPayload(data: unknown): Suggestion[] {
       const id = typeof row.id === 'string' ? row.id : '';
       const name = typeof row.name === 'string' ? row.name : '';
       const context = typeof row.context === 'string' ? row.context : '';
+      const kind = typeof row.kind === 'string' ? row.kind : undefined;
       const label = [name, context].filter(Boolean).join(', ');
       const lat = typeof row.lat === 'number' && Number.isFinite(row.lat) ? row.lat : undefined;
       const lng = typeof row.lon === 'number' && Number.isFinite(row.lon) ? row.lon : undefined;
       if (!id || !label) continue;
-      list.push({ id, label, ...(lat !== undefined ? { lat } : {}), ...(lng !== undefined ? { lng } : {}) });
+      list.push({
+        id,
+        label,
+        ...(kind ? { kind } : {}),
+        ...(lat !== undefined ? { lat } : {}),
+        ...(lng !== undefined ? { lng } : {}),
+      });
     }
     return list;
   }
@@ -173,14 +181,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'resolve') {
       const query = cleanQuery(payload.query);
       if (!query) return json({ ok: false, error: 'invalid_request' }, 400);
-      if (configured) {
-        const provider = await mapMapResolve(env, query).catch(() => null);
-        if (provider) return json({ ok: true, result: provider });
-        // Fall through to Census when MapMap has no match or errors.
-      }
-      const census = await censusResolve(query).catch(() => null);
-      if (!census) return json({ ok: false, error: 'not_found' }, 404);
-      return json({ ok: true, result: census });
+      // Exact house-number resolution: MapMap when it has the exact address,
+      // otherwise the free Census Geocoder. Street-level or POI results are
+      // never substituted for a requested house number.
+      const resolved = await resolveAddress(env, query).catch(() => null);
+      if (!resolved) return json({ ok: false, error: 'not_found' }, 404);
+      return json({ ok: true, result: resolved });
     }
 
     if (action === 'resolve-id') {
