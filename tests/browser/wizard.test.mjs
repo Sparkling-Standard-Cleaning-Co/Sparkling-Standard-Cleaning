@@ -90,6 +90,7 @@ const isVisible = (page, selector) => page.locator(selector).isVisible();
 
 async function fillStepOne(page, zip = '32503') {
   await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+  await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-zip', zip);
   await page.click('[data-next]');
 }
@@ -209,9 +210,18 @@ test('step 1 requires a service selection and a ZIP before advancing', async () 
 
     await page.click('label.option:has(input[name="serviceType"][value="standard"])');
     await page.click('[data-next]');
-    assert.equal(await activeStep(page), 1, 'stayed without a ZIP');
+    assert.equal(await activeStep(page), 1, 'stayed without an address');
+    assert.equal(await page.locator('#est-address').getAttribute('aria-invalid'), 'true');
+    assert.match(
+      (await page.locator('[data-error-for="est-address"]').textContent()) ?? '',
+      /Please enter your street address/i,
+    );
 
     await page.fill('#est-zip', '32503');
+    await page.click('[data-next]');
+    assert.equal(await activeStep(page), 1, 'stayed without a street address');
+
+    await page.fill('#est-address', '100 S Baylen St');
     await page.click('[data-next]');
     assert.equal(await activeStep(page), 2, 'advances once step 1 is complete');
   } finally {

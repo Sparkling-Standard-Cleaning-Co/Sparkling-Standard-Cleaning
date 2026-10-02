@@ -117,6 +117,19 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return undefined;
   }
 
+  function submissionAddress(): { zip: string; method: 'manual' | 'gps'; street: string; unit: string; city: string; state: string; location: ConfirmedLocation | null } {
+    const fromFinder = addressFinder?.getSubmission();
+    return {
+      method: fromFinder?.method ?? 'manual',
+      location: fromFinder?.location ?? null,
+      street: fromFinder?.street ?? textValue('serviceAddress') ?? '',
+      unit: fromFinder?.unit ?? textValue('addressUnit') ?? '',
+      city: fromFinder?.city ?? textValue('addressCity') ?? '',
+      state: fromFinder?.state ?? textValue('addressState') ?? 'FL',
+      zip: fromFinder?.zip ?? textValue('zip') ?? '',
+    };
+  }
+
   function gatherInput(): EstimateInputDraft {
     const addonIds = [...form.querySelectorAll<HTMLInputElement>('input[name="addons"]:checked')].map(
       (input) => input.value,
@@ -133,14 +146,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
       condition: radioValue('condition') as EstimateInput['condition'],
       lastClean: textValue('lastClean') as EstimateInput['lastClean'],
       addonIds,
-      zip: textValue('zip') ?? '',
+      zip: submissionAddress().zip,
       pets: textValue('pets') as EstimateInput['pets'],
     };
   }
 
   function currentTravelKey(): string {
-    const zip = textValue('zip') ?? '';
-    if (location) return `${zip}|${locationKey(location.lat, location.lng)}`;
+    const { zip, location: confirmed } = submissionAddress();
+    if (confirmed) return `${zip}|${locationKey(confirmed.lat, confirmed.lng)}`;
     return zip.length >= 5 ? `zip:${zip}` : '';
   }
 
@@ -518,51 +531,240 @@ function initEstimateWizard(form: HTMLFormElement): void {
       ...section.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
         'input, select, textarea',
       ),
-    ].filter((field) => !field.closest('[hidden]'));
+    ].filter((field) => !field.closest('[hidden]') && !field.closest('[data-address-permission]'));
+  }
+
+  // ── Inline validation ─────────────────────────────────────────────────────
+  const attemptedSteps = new Set<number>();
+  const errorSummary = form.querySelector<HTMLElement>('[data-error-summary]');
+  const errorSummaryList = form.querySelector<HTMLElement>('[data-error-summary-list]');
+
+  function keyOf(field: HTMLElement): string {
+    return field.id || field.getAttribute('name') || 'field';
+  }
+
+  function errorElFor(field: HTMLElement): HTMLElement {
+    const key = keyOf(field);
+    let el = form.querySelector<HTMLElement>(`[data-error-for="${key}"]`);
+    if (!el) {
+      el = document.createElement('p');
+      el.className = 'field-error';
+      el.id = `${key}-error`;
+      el.dataset.errorFor = key;
+      el.hidden = true;
+      const anchor = field.closest('.field') ?? field.closest('.address-gps') ?? field.parentElement;
+      anchor?.appendChild(el);
+    }
+    return el;
+  }
+
+  function controlFor(field: HTMLElement): HTMLElement {
+    if (field instanceof HTMLInputElement && field.type === 'radio') {
+      return (field.closest('fieldset') as HTMLElement | null) ?? field;
+    }
+    return field;
+  }
+
+  function setFieldError(field: HTMLElement, message: string): void {
+    const control = controlFor(field);
+    const el = errorElFor(control);
+    el.textContent = message;
+    el.hidden = false;
+    if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement) {
+      control.classList.add('input--invalid');
+      control.setAttribute('aria-invalid', 'true');
+      const describedBy = new Set((control.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean));
+      describedBy.add(el.id);
+      control.setAttribute('aria-describedby', [...describedBy].join(' '));
+    }
+  }
+
+  function clearFieldError(field: HTMLElement): void {
+    const control = controlFor(field);
+    const el = form.querySelector<HTMLElement>(`[data-error-for="${keyOf(control)}"]`);
+    if (el) {
+      el.hidden = true;
+      el.textContent = '';
+    }
+    if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement) {
+      control.classList.remove('input--invalid');
+      control.removeAttribute('aria-invalid');
+      const describedBy = (control.getAttribute('aria-describedby') ?? '')
+        .split(/\s+/)
+        .filter((id) => id && id !== el?.id);
+      if (describedBy.length > 0) control.setAttribute('aria-describedby', describedBy.join(' '));
+      else control.removeAttribute('aria-describedby');
+    }
+  }
+
+  function clearAllErrors(): void {
+    for (const el of form.querySelectorAll<HTMLElement>('[data-error-for]')) {
+      el.hidden = true;
+      el.textContent = '';
+    }
+    for (const field of form.querySelectorAll<HTMLElement>('.input--invalid, .select--invalid, .textarea--invalid, [aria-invalid]')) {
+      field.classList.remove('input--invalid', 'select--invalid', 'textarea--invalid');
+      field.removeAttribute('aria-invalid');
+    }
+    if (errorSummary) errorSummary.hidden = true;
+    if (errorSummaryList) errorSummaryList.innerHTML = '';
+  }
+
+  /** Method-aware message for one control, or null when it is valid. */
+  function messageFor(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): string | null {
+    const submission = submissionAddress();
+    // Hidden manual fields never block a GPS-based request.
+    if (submission.method === 'gps' && (field.id === 'est-address' || field.id === 'est-zip')) return null;
+    const value = field.value.trim();
+    if (field.id === 'est-gps-zip' || field.id === 'est-zip') {
+      return /^\d{5}(-\d{4})?$/.test(value) ? null : 'Please enter a valid ZIP code.';
+    }
+    if (field.id === 'est-address') {
+      return value === '' ? field.dataset.errorRequired ?? 'Please enter your street address.' : null;
+    }
+    const required = field.hasAttribute('required') || field.dataset.errorRequired !== undefined;
+    if (value === '') {
+      return required ? field.dataset.errorRequired ?? 'This field is required.' : null;
+    }
+    if (field instanceof HTMLInputElement && field.type === 'email' && !field.validity.valid) {
+      return 'Please enter a valid email address.';
+    }
+    if (field instanceof HTMLInputElement && field.type === 'tel' && value.replace(/\D/g, '').length < 10) {
+      return 'Please enter a valid phone number.';
+    }
+    if (field instanceof HTMLInputElement && field.type === 'number' && !field.validity.valid) {
+      return field.dataset.errorRange ?? 'Please enter a valid number.';
+    }
+    if (field instanceof HTMLInputElement && field.type === 'date' && !field.validity.valid) {
+      return 'Please choose a preferred date.';
+    }
+    if (!field.validity.valid) return field.dataset.errorInvalid ?? 'Please check this field.';
+    return null;
+  }
+
+  function radioGroupMessage(section: HTMLElement, name: string): string | null {
+    const group = section.querySelector<HTMLElement>(`fieldset[data-group-error="${name}"]`);
+    if (!group) return null;
+    const anyChecked = form.querySelector(`input[name="${name}"]:checked`);
+    if (anyChecked) return null;
+    return group.dataset.groupMessage ?? 'Please make a selection.';
+  }
+
+  function showErrorSummary(errors: Array<{ field: HTMLElement; message: string }>): void {
+    if (!errorSummary || !errorSummaryList) return;
+    errorSummaryList.innerHTML = '';
+    if (errors.length === 0) {
+      errorSummary.hidden = true;
+      return;
+    }
+    for (const error of errors) {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = error.message;
+      button.addEventListener('click', () => focusInvalid(error.field));
+      item.appendChild(button);
+      errorSummaryList.appendChild(item);
+    }
+    errorSummary.hidden = false;
+  }
+
+  function focusInvalid(field: HTMLElement): void {
+    // A collapsed manual section must open before its field can be focused.
+    const details = field.closest('details');
+    if (details instanceof HTMLDetailsElement) details.open = true;
+    const target = controlFor(field);
+    if (target instanceof HTMLElement) {
+      target.scrollIntoView({ block: 'center' });
+      target.focus?.();
+    }
   }
 
   function validateStep(step: number): boolean {
-    let valid = true;
-    for (const field of stepFields(step)) {
-      if (field instanceof HTMLInputElement && field.type === 'radio') {
-        continue; // radio groups validated by the first required member below
-      }
-      if (!field.checkValidity()) {
-        field.reportValidity();
-        valid = false;
-        break;
+    attemptedSteps.add(step);
+    const section = steps[step - 1];
+    if (!section) return true;
+    const errors: Array<{ field: HTMLElement; message: string }> = [];
+
+    // Radio groups (service type, condition).
+    for (const group of section.querySelectorAll<HTMLElement>('fieldset[data-group-error]')) {
+      const name = group.dataset.groupError ?? '';
+      const message = radioGroupMessage(section, name);
+      if (message) {
+        const first = section.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+        if (first) {
+          setFieldError(first, message);
+          errors.push({ field: first, message });
+        }
+      } else {
+        const first = section.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+        if (first) clearFieldError(first);
       }
     }
-    if (valid) {
-      const group = steps[step - 1]?.querySelector<HTMLInputElement>('input[type="radio"][required]');
-      if (group) {
-        const name = group.name;
-        const anyChecked = form.querySelector(`input[name="${name}"]:checked`);
-        if (!anyChecked) {
-          group.reportValidity();
-          valid = false;
+
+    for (const field of stepFields(step)) {
+      if (field instanceof HTMLInputElement && field.type === 'radio') continue;
+      const message = messageFor(field);
+      if (message) {
+        setFieldError(field, message);
+        errors.push({ field, message });
+      } else {
+        clearFieldError(field);
+      }
+    }
+
+    // Address method rules.
+    if (step === 1) {
+      const submission = submissionAddress();
+      if (submission.method === 'gps') {
+        if (!submission.location) {
+          const gpsButton = form.querySelector<HTMLElement>('[data-address-gps]');
+          const message = 'Please confirm your current location, or enter the address manually.';
+          if (gpsButton) {
+            setFieldError(gpsButton, message);
+            errors.push({ field: gpsButton, message });
+          }
+        } else if (!/^\d{5}(-\d{4})?$/.test(submission.zip)) {
+          const gpsZip = form.querySelector<HTMLInputElement>('#est-gps-zip');
+          if (gpsZip) {
+            setFieldError(gpsZip, 'Please enter a valid ZIP code.');
+            errors.push({ field: gpsZip, message: 'Please enter a valid ZIP code.' });
+          }
         }
       }
     }
-    return valid;
-  }
 
-  /** Validates every step up to `step` so the navigator cannot skip ahead. */
-  function canJumpTo(step: number): boolean {
-    for (let index = 1; index < step; index += 1) {
-      if (!validateStepQuietly(index)) return false;
+    showErrorSummary(errors);
+    if (errors.length > 0) {
+      const first = errors[0];
+      if (first) focusInvalid(first.field);
+      return false;
     }
     return true;
   }
 
-  function validateStepQuietly(step: number): boolean {
-    for (const field of stepFields(step)) {
-      if (field instanceof HTMLInputElement && field.type === 'radio') continue;
-      if (!field.checkValidity()) return false;
-    }
-    const group = steps[step - 1]?.querySelector<HTMLInputElement>('input[type="radio"][required]');
-    if (group) {
-      return Boolean(form.querySelector(`input[name="${group.name}"]:checked`));
+  /** Quiet validation used by the step navigator (no messages). */
+  function canJumpTo(step: number): boolean {
+    for (let index = 1; index < step; index += 1) {
+      const section = steps[index - 1];
+      if (!section) continue;
+      for (const group of section.querySelectorAll<HTMLElement>('fieldset[data-group-error]')) {
+        const name = group.dataset.groupError ?? '';
+        if (!form.querySelector(`input[name="${name}"]:checked`)) return false;
+      }
+      for (const field of stepFields(index)) {
+        if (field instanceof HTMLInputElement && field.type === 'radio') continue;
+        if (messageFor(field)) return false;
+      }
+      if (index === 1) {
+        const submission = submissionAddress();
+        if (submission.method === 'gps') {
+          if (!submission.location || !/^\d{5}(-\d{4})?$/.test(submission.zip)) return false;
+        } else {
+          const street = form.querySelector<HTMLInputElement>('#est-address');
+          if (!street || street.value.trim() === '') return false;
+        }
+      }
     }
     return true;
   }
@@ -625,8 +827,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       // Cache is best-effort.
     }
 
-    const zip = textValue('zip');
-    const confirmed = location;
+    const { zip, location: confirmed } = submissionAddress();
     try {
       const response = await fetch('/api/travel', {
         method: 'POST',
@@ -678,6 +879,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
   function resetWizard(): void {
     form.reset();
     addressFinder?.reset();
+    clearAllErrors();
+    attemptedSteps.clear();
     location = null;
     routed = undefined;
     routedKey = null;
@@ -706,13 +909,17 @@ function initEstimateWizard(form: HTMLFormElement): void {
   // ── Submission ────────────────────────────────────────────────────────────
   function buildSubmissionFields(result: EstimateResult): Record<string, string> {
     const input = gatherInput();
+    // The selected address method is the ONLY source of the submitted
+    // destination: GPS never merges stale manual fields and vice versa.
+    const submission = submissionAddress();
+    const confirmedLocation = submission.location;
     const isReservation = result.status === 'estimated' && latestQuote !== null;
     const fields: Record<string, string> = {
       request_type: isReservation ? 'reservation_request' : 'residential_estimate',
       estimate_status: result.status,
       service_type: input.serviceType ?? '',
       property_type: input.propertyType ?? '',
-      zip: input.zip ?? '',
+      zip: submission.zip,
       square_feet: input.squareFeet !== undefined ? String(input.squareFeet) : '',
       bedrooms: input.bedrooms !== undefined ? String(input.bedrooms) : '',
       full_baths: input.fullBaths !== undefined ? String(input.fullBaths) : '',
@@ -737,17 +944,18 @@ function initEstimateWizard(form: HTMLFormElement): void {
           : result.travel.mode === 'zone'
             ? 'preliminary_zone'
             : 'manual_review',
-      service_address: location?.street ?? textValue('serviceAddress') ?? '',
-      address_unit: location?.unit ?? textValue('addressUnit') ?? '',
-      address_city: location?.city ?? textValue('addressCity') ?? '',
-      address_state: location?.state ?? textValue('addressState') ?? '',
-      address_confirmed: location ? 'yes' : 'no',
-      ...(location
+      address_method: submission.method,
+      service_address: submission.street,
+      address_unit: submission.unit,
+      address_city: submission.city,
+      address_state: submission.state,
+      address_confirmed: confirmedLocation ? 'yes' : 'no',
+      ...(confirmedLocation
         ? {
-            pin_latitude: location.lat.toFixed(6),
-            pin_longitude: location.lng.toFixed(6),
-            pin_source: location.source,
-            pin_adjusted: location.adjusted ? 'yes' : 'no',
+            pin_latitude: confirmedLocation.lat.toFixed(6),
+            pin_longitude: confirmedLocation.lng.toFixed(6),
+            pin_source: confirmedLocation.source,
+            pin_adjusted: confirmedLocation.adjusted ? 'yes' : 'no',
           }
         : {}),
       preferred_date: textValue('preferredDate') ?? '',
@@ -868,24 +1076,85 @@ function initEstimateWizard(form: HTMLFormElement): void {
     });
   }
 
-  form.addEventListener('input', () => {
+  form.addEventListener('input', (event) => {
     if (!estimateStarted) {
       estimateStarted = true;
       const serviceType = currentServiceType();
       track('estimate_start', serviceType ? { service_type: serviceType } : {});
+    }
+    const target = event.target;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLSelectElement ||
+      target instanceof HTMLTextAreaElement
+    ) {
+      const errorShown = form.querySelector<HTMLElement>(`[data-error-for="${keyOf(controlFor(target))}"]:not([hidden])`);
+      if (errorShown) {
+        const message = messageFor(target);
+        if (message) setFieldError(target, message);
+        else {
+          clearFieldError(target);
+          if (errorSummary && !form.querySelector('[data-error-for]:not([hidden])')) errorSummary.hidden = true;
+        }
+      }
     }
     syncConditionalFields();
     recalc();
   });
 
   form.addEventListener('change', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLSelectElement ||
+      target instanceof HTMLTextAreaElement
+    ) {
+      if (target instanceof HTMLInputElement && target.type === 'radio') {
+        clearFieldError(target);
+        const group = target.closest('.field.wizard__step, .wizard__step')?.querySelector<HTMLElement>(
+          `fieldset[data-group-error="${target.name}"]`,
+        );
+        if (group) clearFieldError(group.querySelector<HTMLInputElement>(`input[name="${target.name}"]`) ?? target);
+      } else {
+        const errorShown = form.querySelector<HTMLElement>(`[data-error-for="${keyOf(controlFor(target))}"]:not([hidden])`);
+        const message = messageFor(target);
+        if (message) setFieldError(target, message);
+        else clearFieldError(target);
+        if (errorShown && !message && errorSummary && !form.querySelector('[data-error-for]:not([hidden])')) {
+          errorSummary.hidden = true;
+        }
+      }
+    }
     syncConditionalFields();
     recalc();
-    const target = event.target as HTMLElement | null;
     if (target instanceof HTMLInputElement && target.name === 'zip') {
       void lookupTravel();
     }
   });
+
+  // Validate the active step's fields when they lose focus (format + required).
+  form.addEventListener(
+    'focusout',
+    (event) => {
+      const target = event.target;
+      if (
+        !(target instanceof HTMLInputElement) &&
+        !(target instanceof HTMLSelectElement) &&
+        !(target instanceof HTMLTextAreaElement)
+      ) {
+        return;
+      }
+      if (target instanceof HTMLInputElement && target.type === 'radio') return;
+      if (!target.closest('.wizard__step[data-active="true"]')) return;
+      const message = messageFor(target);
+      if (message && (target.value.trim() !== '' || attemptedSteps.has(currentStep))) {
+        setFieldError(target, message);
+      } else if (!message) {
+        clearFieldError(target);
+      }
+    },
+    true,
+  );
 
   form.addEventListener('submit', (event) => {
     void handleSubmit(event);

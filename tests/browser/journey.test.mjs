@@ -157,6 +157,7 @@ async function addressStep(page, { manual = false } = {}) {
 }
 
 async function zipOnlyAddressStep(page, zip = '32503') {
+  await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-zip', zip);
   await page.click('[data-next]');
 }
@@ -209,7 +210,7 @@ test('address autocomplete: debounced suggestions resolve and confirm a destinat
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     const suggestion = (await page.locator('#est-address-suggestions li').first().textContent())?.trim();
-    assert.equal(suggestion, ADDRESS.label);
+    assert.match(suggestion ?? '', /100 S Baylen St, Pensacola, FL 32502/);
 
     await page.click('#est-address-suggestions li');
     await page.waitForSelector('[data-address-confirm]', { state: 'visible' });

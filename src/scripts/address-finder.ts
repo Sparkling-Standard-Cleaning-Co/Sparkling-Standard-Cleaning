@@ -1,15 +1,18 @@
-// Address finder — separated street/city/state/ZIP fields, debounced
-// autocomplete, exact-address resolution and map-pin confirmation.
+// Address finder — GPS-first address selection with an explicit manual mode.
 //
-// Correctness rules for the rural-address defect:
-//  - Autocomplete queries are composed from ALL entered address information.
-//  - Saving a suggestion only counts as a precise destination when it carries
-//    the entered house number. A street-level or POI suggestion triggers an
-//    exact full-address resolution instead (MapMap exact-only → Census).
-//  - When the exact address cannot be resolved, the customer's original
-//    address is preserved, nothing is confirmed, and travel stays preliminary
-//    (confirmed manually by Sparkling Standard).
-//  - A confirmed location is the ONLY source of destination coordinates.
+// MODE SEPARATION (the old bug): the selected method is the ONLY source of the
+// submitted destination.
+//  - 'gps'    : the device pin plus ONLY the address information returned by
+//               the current reverse-geocoding request. Stale manual fields are
+//               never merged into the GPS confirmation, calculator, SMS or
+//               owner notification.
+//  - 'manual' : the typed street/city/state/ZIP fields plus a resolved or
+//               unresolved manual candidate. Selecting GPS never deletes the
+//               typed values, but they are ignored while GPS is active.
+//
+// Other rules preserved: exact house-number matching (MapMap exact-only →
+// Census), geographic filtering on the server, the autocomplete/resolution
+// race guards, MapLibre worker configuration and lazy loading.
 
 import {
   buildGeocodeQuery,
@@ -29,6 +32,18 @@ const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 /** GPS readings below this accuracy (metres) may fill the address fields. */
 const GPS_ACCURACY_LIMIT_METERS = 150;
 
+export type AddressMethod = 'manual' | 'gps';
+
+export interface AddressSubmission {
+  method: AddressMethod;
+  location: ConfirmedLocation | null;
+  street: string;
+  unit: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
 export interface AddressFinderOptions {
   form: HTMLFormElement;
   onChange: (location: ConfirmedLocation | null) => void;
@@ -36,10 +51,16 @@ export interface AddressFinderOptions {
 
 export interface AddressFinderHandle {
   getLocation(): ConfirmedLocation | null;
-  /** Clear any confirmed location and return to the editing state. */
+  /** The method-isolated address used for submission and validation. */
+  getSubmission(): AddressSubmission;
+  /** True when the GPS method still needs a coverage ZIP from the customer. */
+  needsZip(): boolean;
+  /** Clear everything and return to the initial manual state. */
   reset(): void;
   /** Re-focus the street input (used when a step is entered). */
   focus(): void;
+  /** Open and focus the manual-entry section. */
+  focusManual(): void;
 }
 
 interface ResolvedCandidate {
@@ -65,6 +86,16 @@ interface ResolveResult {
   precise?: boolean;
 }
 
+type PermissionReason = 'denied' | 'unavailable' | 'timeout' | 'unsupported';
+
+const emptyParts = (): { street: string; unit: string; city: string; state: string; zip: string } => ({
+  street: '',
+  unit: '',
+  city: '',
+  state: '',
+  zip: '',
+});
+
 export function initAddressFinder(options: AddressFinderOptions): AddressFinderHandle | null {
   const { form, onChange } = options;
   const root = form.querySelector<HTMLElement>('[data-address-finder]');
@@ -81,6 +112,16 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   const suggestionsList = root.querySelector<HTMLUListElement>('[data-address-suggestions]');
   const statusEl = root.querySelector<HTMLElement>('[data-address-status]');
   const gpsButton = root.querySelector<HTMLButtonElement>('[data-address-gps]');
+  const gpsRetryButton = root.querySelector<HTMLButtonElement>('[data-address-gps-retry]');
+  const manualOpenButton = root.querySelector<HTMLButtonElement>('[data-address-manual-open]');
+  const manualDetails = root.querySelector<HTMLDetailsElement>('[data-address-manual-details]');
+  const permissionPanel = root.querySelector<HTMLElement>('[data-address-permission]');
+  const permissionTitle = root.querySelector<HTMLElement>('[data-permission-title]');
+  const permissionMessage = root.querySelector<HTMLElement>('[data-permission-message]');
+  const permissionSteps = root.querySelector<HTMLOListElement>('[data-permission-steps]');
+  const permissionRetryNote = root.querySelector<HTMLElement>('[data-permission-retry-note]');
+  const gpsZipField = root.querySelector<HTMLElement>('[data-gps-zip]');
+  const gpsZipInput = form.querySelector<HTMLInputElement>('#est-gps-zip');
   const resolveButton = root.querySelector<HTMLButtonElement>('[data-address-resolve]');
   const mapCard = root.querySelector<HTMLElement>('[data-address-map]');
   const mapCanvas = root.querySelector<HTMLElement>('[data-address-map-canvas]');
@@ -96,19 +137,15 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   let suggestTimer: number | undefined;
   let suggestAbort: AbortController | null = null;
   let confirmAbort: AbortController | null = null;
-  let candidate: ResolvedCandidate | null = null;
-  let confirmed: ConfirmedLocation | null = null;
-  /**
-   * Bumped whenever a resolution starts. A debounced autocomplete response
-   * that arrives afterwards is discarded, so it can never overwrite the
-   * "address found" state (or a later failure state).
-   */
+  let method: AddressMethod = 'manual';
+  let manualCandidate: ResolvedCandidate | null = null;
+  let manualConfirmed: ConfirmedLocation | null = null;
+  let gpsCandidate: ResolvedCandidate | null = null;
+  let gpsConfirmed: ConfirmedLocation | null = null;
+  let gpsParts = emptyParts();
+  /** Bumped whenever a resolution/GPS lookup starts, discarding late suggestions. */
   let searchSeq = 0;
-  /**
-   * True while the resolved address is being written back into the city/state/
-   * ZIP fields. Those programmatic changes must not schedule a new autocomplete
-   * that would overwrite the "address found" state.
-   */
+  /** True while resolved values are written programmatically into fields. */
   let applyingResolved = false;
 
   // MapLibre is imported lazily and only once per page.
@@ -124,6 +161,16 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     finderRoot.dataset.state = state;
   }
 
+  function setMethod(next: AddressMethod): void {
+    method = next;
+    finderRoot.dataset.method = next;
+  }
+
+  /** Read through a function so async guards always see the CURRENT method. */
+  function methodIsGps(): boolean {
+    return method === 'gps';
+  }
+
   function setStatus(message: string, kind: 'info' | 'error' | 'success' = 'info'): void {
     if (!statusEl) return;
     statusEl.textContent = message;
@@ -132,6 +179,14 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
 
   function setTravelNote(message: string): void {
     if (confirmedTravel) confirmedTravel.textContent = message;
+  }
+
+  function activeConfirmed(): ConfirmedLocation | null {
+    return methodIsGps() ? gpsConfirmed : manualConfirmed;
+  }
+
+  function emit(): void {
+    onChange(activeConfirmed());
   }
 
   function clearSuggestions(): void {
@@ -145,8 +200,16 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     streetField.removeAttribute('aria-activedescendant');
   }
 
+  function cancelSuggestions(): void {
+    searchSeq += 1;
+    window.clearTimeout(suggestTimer);
+    suggestAbort?.abort();
+    clearSuggestions();
+  }
+
   function renderSuggestions(): void {
     if (!suggestionsList) return;
+    const houseNumber = houseNumberFromStreet(streetField.value);
     suggestionsList.innerHTML = '';
     suggestions.forEach((suggestion, index) => {
       const item = document.createElement('li');
@@ -154,7 +217,14 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       item.setAttribute('role', 'option');
       item.setAttribute('aria-selected', String(index === activeIndex));
       item.dataset.index = String(index);
-      item.textContent = suggestion.label;
+      const exact = suggestion.kind === 'address' && labelHasHouseNumber(suggestion.label, houseNumber);
+      const label = document.createElement('span');
+      label.className = 'address-suggestions__label';
+      label.textContent = suggestion.label;
+      const badge = document.createElement('span');
+      badge.className = `address-suggestions__badge ${exact ? 'address-suggestions__badge--exact' : ''}`;
+      badge.textContent = exact ? 'Exact address' : 'Street match';
+      item.append(label, badge);
       item.addEventListener('mousedown', (event) => {
         // mousedown fires before the input blurs.
         event.preventDefault();
@@ -171,19 +241,36 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     }
   }
 
-  function invalidateConfirmation(): void {
-    if (!confirmed) {
-      // Editing discards an unconfirmed candidate too.
-      candidate = null;
-      setState('typing');
-      return;
+  // ── Method isolation ──────────────────────────────────────────────────────
+  function invalidateManual(): void {
+    manualCandidate = null;
+    manualConfirmed = null;
+    if (method === 'manual') {
+      if (confirmedCard) confirmedCard.hidden = true;
+      if (mapCard) mapCard.hidden = true;
     }
-    confirmed = null;
-    candidate = null;
-    if (confirmedCard) confirmedCard.hidden = true;
+  }
+
+  function invalidateGps(): void {
+    gpsCandidate = null;
+    gpsConfirmed = null;
+    gpsParts = emptyParts();
+    if (gpsZipField) gpsZipField.hidden = true;
+    if (gpsZipInput) gpsZipInput.value = '';
+  }
+
+  /** Any manual interaction switches the active method back to manual. */
+  function ensureManualMode(): void {
+    if (methodIsGps()) {
+      cancelSuggestions();
+      invalidateGps();
+      hidePermissionPanel();
+    }
+    setMethod('manual');
     if (mapCard) mapCard.hidden = true;
+    if (confirmedCard) confirmedCard.hidden = true;
     setState('typing');
-    onChange(null);
+    emit();
   }
 
   function composeQuery(): string {
@@ -218,7 +305,6 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     ) {
       return null;
     }
-    // Fill authoritative city/state/ZIP from the resolved address.
     applyingResolved = true;
     try {
       fillField(cityInput, resolved.city);
@@ -239,25 +325,23 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     };
   }
 
-  function showCandidate(resolved: ResolvedCandidate, options: { manual?: boolean } = {}): void {
-    candidate = resolved;
+  function showManualCandidate(resolved: ResolvedCandidate): void {
+    setMethod('manual');
+    manualCandidate = resolved;
     clearSuggestions();
     if (resolved.zip) fillField(zipInput, resolved.zip);
     settleDestinationValues();
     if (mapCard) mapCard.hidden = false;
     if (confirmedCard) confirmedCard.hidden = true;
-    // The confirm action is available even before/without the map: the map is
-    // an enhancement, never a requirement.
-    setState(options.manual ? 'resolved_manual' : 'resolved');
+    setState('resolved');
     setStatus('Address found — confirm your location on the map.', 'success');
     void showMap(resolved);
     confirmButton?.focus();
   }
 
-  /** Exact address could not be placed: preserve the address, confirm nothing. */
   function exactResolveFailed(): void {
-    candidate = null;
-    confirmed = null;
+    manualCandidate = null;
+    manualConfirmed = null;
     if (confirmedCard) confirmedCard.hidden = true;
     if (mapCard) mapCard.hidden = true;
     setState('unresolved');
@@ -265,16 +349,194 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       "We couldn't pinpoint this address. You can still request your cleaning, and we'll confirm the location.",
       'error',
     );
-    onChange(null);
+    emit();
   }
 
+  // ── GPS permission guidance ───────────────────────────────────────────────
+  function hidePermissionPanel(): void {
+    if (permissionPanel) permissionPanel.hidden = true;
+  }
+
+  function showPermissionHelp(reason: PermissionReason): void {
+    if (!permissionPanel) return;
+    const copy: Record<PermissionReason, { title: string; message: string; steps: string[]; retryNote: boolean }> = {
+      denied: {
+        title: 'Location access is off.',
+        message:
+          'Your browser blocked location for this page. Turn it back on in your settings, then return here and try again.',
+        steps: [
+          'iPhone Safari: Settings → Privacy & Security → Location Services → Safari Websites → Allow. Also allow Location Services itself.',
+          'Android Chrome: tap the lock icon next to the address bar → Permissions → Location → Allow. Make sure Location is on in your device quick settings.',
+          'Desktop browsers: click the lock/tune icon next to the address and allow Location, then reload if asked.',
+        ],
+        retryNote: true,
+      },
+      unavailable: {
+        title: "We couldn't get your location.",
+        message: 'Device location services may be turned off, or your signal may be too weak right now.',
+        steps: [
+          'iPhone: Settings → Privacy & Security → Location Services → turn on Location Services.',
+          'Android: swipe down and turn on Location, then check Settings → Location.',
+          'Move near a window or outside for a clearer signal, then try again.',
+        ],
+        retryNote: false,
+      },
+      timeout: {
+        title: 'Location is taking too long.',
+        message: "We couldn't get a location fix in time. Move somewhere with a clearer signal and try again, or enter your address manually.",
+        steps: [],
+        retryNote: false,
+      },
+      unsupported: {
+        title: "Location sharing isn't supported here.",
+        message: 'This browser cannot share your location. Enter your address manually and we will confirm the property with you.',
+        steps: [],
+        retryNote: false,
+      },
+    };
+    const entry = copy[reason];
+    if (permissionTitle) permissionTitle.textContent = entry.title;
+    if (permissionMessage) permissionMessage.textContent = entry.message;
+    if (permissionSteps) {
+      permissionSteps.innerHTML = '';
+      for (const step of entry.steps) {
+        const item = document.createElement('li');
+        item.textContent = step;
+        permissionSteps.appendChild(item);
+      }
+      permissionSteps.hidden = entry.steps.length === 0;
+    }
+    if (permissionRetryNote) permissionRetryNote.hidden = !entry.retryNote;
+    permissionPanel.hidden = false;
+  }
+
+  function openManualSection(): void {
+    if (manualDetails) manualDetails.open = true;
+    ensureManualMode();
+    streetField.focus();
+  }
+
+  async function handleGpsPosition(position: GeolocationPosition): Promise<void> {
+    const { latitude, longitude, accuracy } = position.coords;
+    const poorAccuracy = Number.isFinite(accuracy) && accuracy > GPS_ACCURACY_LIMIT_METERS;
+
+    // GPS mode: the manual destination is invalidated and its values stay
+    // isolated. Only this device pin (and the fresh reverse result below) can
+    // become the submitted destination.
+    setMethod('gps');
+    cancelSuggestions();
+    invalidateManual();
+    hidePermissionPanel();
+    gpsParts = emptyParts();
+    if (gpsZipField) gpsZipField.hidden = true;
+    if (gpsZipInput) gpsZipInput.value = '';
+    if (confirmedCard) confirmedCard.hidden = true;
+
+    gpsCandidate = {
+      label: 'Current location from your device',
+      lat: latitude,
+      lng: longitude,
+      source: 'gps',
+      adjusted: false,
+    };
+    if (mapCard) mapCard.hidden = false;
+    setState('gps');
+    void showMap(gpsCandidate);
+    setStatus(
+      poorAccuracy
+        ? `Your location is only accurate to about ${Math.round(accuracy)} m — check the pin and add the address if needed.`
+        : 'We found your location — looking up the address…',
+      'info',
+    );
+
+    try {
+      const response = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ action: 'reverse', lat: latitude, lng: longitude }),
+      });
+      if (method !== 'gps') return; // a manual edit superseded this lookup
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: ResolveResult };
+      if (response.ok && data.ok && data.result) {
+        const result = data.result;
+        gpsParts = {
+          street:
+            result.precise === true && !poorAccuracy
+              ? streetLineFromLabel(result.label ?? '', result.city, result.state, result.zip ?? undefined)
+              : '',
+          unit: '',
+          city: result.city ?? '',
+          state: result.state ?? '',
+          zip: result.zip ?? zipFromLabel(result.label) ?? '',
+        };
+        if (gpsCandidate) {
+          gpsCandidate = {
+            ...gpsCandidate,
+            label: gpsParts.street ? result.label ?? 'Current location from your device' : 'Current location from your device',
+            ...(gpsParts.zip ? { zip: gpsParts.zip } : {}),
+            ...(gpsParts.city ? { city: gpsParts.city } : {}),
+            ...(gpsParts.state ? { state: gpsParts.state } : {}),
+          };
+        }
+        if (gpsZipField) gpsZipField.hidden = Boolean(gpsParts.zip);
+        if (gpsParts.street) {
+          setStatus('We found this address — confirm this is the property you want cleaned.', 'info');
+        } else {
+          setStatus(
+            poorAccuracy
+              ? 'Your location is approximate — check the pin, add the address if needed, then confirm.'
+              : "We couldn't match your location to an exact street address — check the pin, add the address if needed, then confirm.",
+            'info',
+          );
+        }
+        confirmButton?.focus();
+        return;
+      }
+      if (gpsZipField) gpsZipField.hidden = false;
+      setStatus(
+        "We couldn't look up the address from your location — check the pin, add the address if needed, then confirm.",
+        'info',
+      );
+    } catch {
+      if (method !== 'gps') return;
+      if (gpsZipField) gpsZipField.hidden = false;
+      setStatus(
+        'We found your location, but the address lookup is unavailable — check the pin, add the address if needed, then confirm.',
+        'info',
+      );
+    }
+  }
+
+  function useCurrentLocation(): void {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      showPermissionHelp('unsupported');
+      setStatus('Your browser does not support location sharing — enter your address manually.', 'info');
+      return;
+    }
+    hidePermissionPanel();
+    setState('locating');
+    setStatus('Getting your location…', 'info');
+    navigator.geolocation.getCurrentPosition(
+      (position) => void handleGpsPosition(position),
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) showPermissionHelp('denied');
+        else if (error.code === error.POSITION_UNAVAILABLE) showPermissionHelp('unavailable');
+        else showPermissionHelp('timeout');
+        setState('permission');
+        setStatus(
+          error.code === error.PERMISSION_DENIED
+            ? 'Location access is off — see the steps below, or enter your address manually.'
+            : "We couldn't get your location — see the steps below, or enter your address manually.",
+          'info',
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  }
+
+  // ── Manual resolution ─────────────────────────────────────────────────────
   async function requestResolvedAddress(query: string): Promise<void> {
-    // A resolution supersedes any pending or in-flight autocomplete: cancel the
-    // debounce, abort the suggest request and invalidate its future responses.
-    searchSeq += 1;
-    window.clearTimeout(suggestTimer);
-    suggestAbort?.abort();
-    clearSuggestions();
+    cancelSuggestions();
     setState('resolving');
     setStatus('Looking up that exact address…', 'info');
     try {
@@ -286,6 +548,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         body: JSON.stringify({ action: 'resolve', query: query.slice(0, 120) }),
         signal: confirmAbort.signal,
       });
+      if (methodIsGps()) return; // manual entry was abandoned mid-flight
       if (response.status === 503) {
         setState('unavailable');
         setStatus(
@@ -297,124 +560,123 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       const data = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: ResolveResult };
       if (response.ok && data.ok && data.result) {
         const resolved = applyResolvedAddress(data.result);
-        // Only an exact house-number match may become a confirmed destination.
         if (resolved && data.result.precise === true) {
-          showCandidate(resolved);
+          showManualCandidate(resolved);
           return;
         }
       }
       exactResolveFailed();
     } catch (error) {
       if ((error as Error).name === 'AbortError') return;
+      if (methodIsGps()) return;
       exactResolveFailed();
     }
   }
 
-  /**
-   * GPS → address. The device position is shown as an UNCONFIRMED pin the
-   * customer must explicitly confirm; reverse geocoding fills the address
-   * fields only when the provider returns an exact house number and the GPS
-   * accuracy is good. A nearest-road or locality match is never presented as a
-   * verified street address.
-   */
-  async function handleGpsPosition(position: GeolocationPosition): Promise<void> {
-    const { latitude, longitude, accuracy } = position.coords;
-    showCandidate({
-      label: 'Current location (from your device)',
-      lat: latitude,
-      lng: longitude,
-      source: 'gps',
-      adjusted: false,
-    });
-    setState('gps');
-    const poorAccuracy = Number.isFinite(accuracy) && accuracy > GPS_ACCURACY_LIMIT_METERS;
-    setStatus(
-      poorAccuracy
-        ? `Your location is only accurate to about ${Math.round(accuracy)} m — check the pin and correct the address if needed.`
-        : 'We found your location — confirming the address…',
-      'info',
-    );
+  async function chooseSuggestion(index: number): Promise<void> {
+    const suggestion = suggestions[index];
+    if (!suggestion) return;
+    clearSuggestions();
+    ensureManualMode();
+    const houseNumber = houseNumberFromStreet(streetField.value);
+    const exactSuggestion =
+      suggestion.kind === 'address' && labelHasHouseNumber(suggestion.label, houseNumber);
+
+    if (exactSuggestion) {
+      const candidate: ResolvedCandidate = {
+        label: suggestion.label,
+        lat: suggestion.lat ?? Number.NaN,
+        lng: suggestion.lng ?? Number.NaN,
+        source: 'mapmap',
+        adjusted: false,
+      };
+      if (isPlausibleCoordinate(candidate.lat, candidate.lng)) {
+        showManualCandidate(candidate);
+        return;
+      }
+    }
+    // Street-level/POI results are never precise: resolve the full address.
+    await requestResolvedAddress(composeQuery());
+  }
+
+  async function requestSuggestions(query: string): Promise<void> {
+    suggestAbort?.abort();
+    suggestAbort = new AbortController();
+    const seq = searchSeq;
+    setState('suggesting');
     try {
       const response = await fetch('/api/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ action: 'reverse', lat: latitude, lng: longitude }),
+        body: JSON.stringify({
+          action: 'suggest',
+          query: query.slice(0, 120),
+          street: streetField.value.trim().slice(0, 80),
+          city: cityInput?.value.trim().slice(0, 60) ?? '',
+          state: stateInput?.value ?? 'FL',
+          zip: zipInput?.value.trim() ?? '',
+        }),
+        signal: suggestAbort.signal,
       });
-      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: ResolveResult };
-      if (response.ok && data.ok && data.result) {
-        const result = data.result;
-        if (result.precise === true && !poorAccuracy) {
-          applyingResolved = true;
-          try {
-            const label = result.label ?? '';
-            fillField(
-              streetField,
-              streetLineFromLabel(label, result.city, result.state, result.zip ?? zipFromLabel(label) ?? undefined) ||
-                undefined,
-            );
-            fillField(cityInput, result.city);
-            fillField(stateInput, result.state);
-            fillField(zipInput, result.zip ?? zipFromLabel(label) ?? undefined);
-          } finally {
-            applyingResolved = false;
-          }
-          if (candidate) {
-            candidate = {
-              ...candidate,
-              label: result.label ?? candidate.label,
-              ...(result.zip ? { zip: result.zip } : {}),
-              ...(result.city ? { city: result.city } : {}),
-              ...(result.state ? { state: result.state } : {}),
-            };
-          }
-          settleDestinationValues();
-          setStatus('We found this address — confirm this is the property you want cleaned.', 'info');
-          return;
-        }
+      if (seq !== searchSeq || methodIsGps()) return;
+      if (response.status === 503) {
+        clearSuggestions();
+        setState('unavailable');
         setStatus(
-          poorAccuracy
-            ? 'Your location is approximate — check the pin, correct the address if needed, then confirm.'
-            : "We couldn't match your location to an exact street address — check the pin and address, then confirm or correct them.",
+          'Address suggestions are not connected right now — press Find My Address or continue with your ZIP.',
           'info',
         );
         return;
       }
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        suggestions?: GeocodeSuggestion[];
+        needsLocation?: boolean;
+      };
+      if (seq !== searchSeq || methodIsGps()) return;
+      if (!response.ok || !data.ok || !Array.isArray(data.suggestions)) {
+        throw new Error('provider_failed');
+      }
+      if (manualCandidate || manualConfirmed) return; // never clobber a resolved choice
+      clearSuggestions();
+      if (data.needsLocation) {
+        setState('needs_location');
+        setStatus('Add your city or ZIP to narrow the search.', 'info');
+        return;
+      }
+      suggestions = data.suggestions;
+      activeIndex = -1;
+      setState(suggestions.length > 0 ? 'suggestions' : 'idle');
+      if (suggestions.length === 0) {
+        setStatus('No matching addresses yet — press Find My Address or add your city or ZIP.', 'info');
+      } else {
+        setStatus('Choose your address from the list, or press Find My Address.', 'info');
+      }
+      renderSuggestions();
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') return;
+      if (seq !== searchSeq || methodIsGps()) return;
+      clearSuggestions();
+      setState('idle');
       setStatus(
-        poorAccuracy
-          ? 'Your location is approximate — check the pin, correct the address if needed, then confirm.'
-          : "We couldn't look up the address from your location — check the pin, enter the address, then confirm.",
-        'info',
-      );
-    } catch {
-      setStatus(
-        'We found your location, but the address lookup is unavailable — check the pin and enter the address if needed.',
+        'Address lookup is unavailable right now — press Find My Address or continue with your ZIP.',
         'info',
       );
     }
   }
 
-  function useCurrentLocation(): void {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setStatus('Your browser does not support location sharing — enter your address manually.', 'info');
+  async function manualResolve(): Promise<void> {
+    ensureManualMode();
+    const street = streetField.value.trim();
+    if (street.length < 5) {
+      setStatus('Enter your street address first, then press Find My Address.', 'error');
+      streetField.focus();
       return;
     }
-    setState('locating');
-    setStatus('Getting your location…', 'info');
-    navigator.geolocation.getCurrentPosition(
-      (position) => void handleGpsPosition(position),
-      (error) => {
-        setState('idle');
-        setStatus(
-          error.code === error.PERMISSION_DENIED
-            ? 'Location access was denied — enter your address above or continue with your ZIP.'
-            : "We couldn't get your location right now — enter your address manually or continue with your ZIP.",
-          'info',
-        );
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
-    );
+    await requestResolvedAddress(composeQuery());
   }
 
+  // ── Map + confirmation ────────────────────────────────────────────────────
   async function ensureMap(): Promise<MapLibreModule | null> {
     if (mapModule) return mapModule;
     if (!mapLoading) {
@@ -428,8 +690,6 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
             import('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url')
               .then((workerModule) => workerModule.default)
               .catch(() => null),
-            // The stylesheet is emitted as an asset and attached only when the
-            // map actually initializes, never on page load.
             import('maplibre-gl/dist/maplibre-gl.css?url')
               .then(({ default: cssUrl }) => {
                 if (cssUrl && !document.querySelector(`link[data-maplibre-css]`)) {
@@ -474,7 +734,6 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         map.on('load', () => {
           mapReady = true;
           mapFallback?.setAttribute('hidden', '');
-          // The container may have been hidden or resized while loading.
           map?.resize();
         });
         map.on('error', () => {
@@ -495,169 +754,101 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
           .setLngLat([resolved.lng, resolved.lat])
           .addTo(map);
         marker.on('dragend', () => {
-          if (!marker || !candidate) return;
+          if (!marker) return;
           const position = marker.getLngLat();
-          candidate = { ...candidate, lat: position.lat, lng: position.lng, adjusted: true };
+          const active = methodIsGps() ? gpsCandidate : manualCandidate;
+          if (!active) return;
+          const updated = { ...active, lat: position.lat, lng: position.lng, adjusted: true };
+          if (methodIsGps()) gpsCandidate = updated;
+          else manualCandidate = updated;
+          const confirmed = activeConfirmed();
           if (confirmed) {
-            // Correcting a confirmed pin keeps the confirmation in sync.
-            confirmed = { ...confirmed, lat: position.lat, lng: position.lng, adjusted: true };
-            onChange(confirmed);
+            const nextConfirmed = { ...confirmed, lat: position.lat, lng: position.lng, adjusted: true };
+            if (methodIsGps()) gpsConfirmed = nextConfirmed;
+            else manualConfirmed = nextConfirmed;
+            emit();
           }
-          setTravelNote(
-            'Pin moved — we will confirm travel to the corrected location when you request your cleaning.',
-          );
+          setTravelNote('Pin moved — travel will use this corrected destination.');
           setStatus('Pin adjusted. Confirm to use this corrected destination.', 'info');
         });
       }
-      // Ensure a fresh layout pass after the card becomes visible.
       window.requestAnimationFrame(() => map?.resize());
     } catch {
       mapFallback?.removeAttribute('hidden');
     }
   }
 
-  async function chooseSuggestion(index: number): Promise<void> {
-    const suggestion = suggestions[index];
-    if (!suggestion) return;
-    clearSuggestions();
-    const houseNumber = houseNumberFromStreet(streetField.value);
-    const exactSuggestion =
-      suggestion.kind === 'address' && labelHasHouseNumber(suggestion.label, houseNumber);
-
-    if (exactSuggestion) {
-      // Keep the customer's own street line; the provider coordinates are the
-      // precise destination, and the confirmation card summarizes the address
-      // from the separate fields.
-      const resolved: ResolvedCandidate = {
-        label: suggestion.label,
-        lat: suggestion.lat ?? Number.NaN,
-        lng: suggestion.lng ?? Number.NaN,
-        source: 'mapmap',
-        adjusted: false,
+  function confirmLocation(): void {
+    if (methodIsGps()) {
+      if (!gpsCandidate) return;
+      const zip = gpsParts.zip || gpsZipInput?.value.trim() || '';
+      gpsConfirmed = {
+        label: gpsCandidate.label || 'Current location from your device',
+        street: gpsParts.street,
+        lat: gpsCandidate.lat,
+        lng: gpsCandidate.lng,
+        ...(zip ? { zip } : {}),
+        ...(gpsParts.city ? { city: gpsParts.city } : {}),
+        ...(gpsParts.state ? { state: gpsParts.state } : {}),
+        source: 'gps',
+        ...(gpsCandidate.adjusted ? { adjusted: true } : {}),
+        confirmedAt: new Date().toISOString(),
       };
-      if (isPlausibleCoordinate(resolved.lat, resolved.lng)) {
-        showCandidate(resolved);
-        return;
-      }
-    }
-    // Street-level/POI/local results are never treated as the precise
-    // destination: resolve the full address (MapMap exact-only → Census).
-    await requestResolvedAddress(composeQuery());
-  }
-
-  async function requestSuggestions(query: string): Promise<void> {
-    suggestAbort?.abort();
-    suggestAbort = new AbortController();
-    const seq = searchSeq;
-    setState('suggesting');
-    try {
-      const response = await fetch('/api/geocode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          action: 'suggest',
-          query: query.slice(0, 120),
-          street: streetField.value.trim().slice(0, 80),
-          city: cityInput?.value.trim().slice(0, 60) ?? '',
-          state: stateInput?.value ?? 'FL',
-          zip: zipInput?.value.trim() ?? '',
-        }),
-        signal: suggestAbort.signal,
-      });
-      if (seq !== searchSeq) return; // a resolution superseded this lookup
-      if (response.status === 503) {
-        clearSuggestions();
-        setState('unavailable');
-        setStatus(
-          'Address suggestions are not connected right now — enter the address manually or continue with your ZIP.',
-          'info',
-        );
-        return;
-      }
-      const data = (await response.json().catch(() => ({}))) as {
-        ok?: boolean;
-        suggestions?: GeocodeSuggestion[];
-        needsLocation?: boolean;
-      };
-      if (seq !== searchSeq) return; // a resolution superseded this lookup
-      if (candidate || confirmed) return; // never clobber a resolved choice
-      if (!response.ok || !data.ok || !Array.isArray(data.suggestions)) {
-        throw new Error('provider_failed');
-      }
-      // Never leave irrelevant results visible.
-      clearSuggestions();
-      if (data.needsLocation) {
-        setState('needs_location');
-        setStatus('Add your city or ZIP to narrow the search.', 'info');
-        return;
-      }
-      suggestions = data.suggestions;
-      activeIndex = -1;
-      setState(suggestions.length > 0 ? 'suggestions' : 'idle');
-      if (suggestions.length === 0) {
-        setStatus('No matching addresses yet — press Find My Address or add your city or ZIP.', 'info');
-      } else {
-        setStatus('Choose your address from the list, or press Find My Address.', 'info');
-      }
-      renderSuggestions();
-    } catch (error) {
-      if ((error as Error).name === 'AbortError') return;
-      if (seq !== searchSeq) return; // a resolution superseded this lookup
-      clearSuggestions();
-      setState('idle');
-      setStatus(
-        'Address lookup is unavailable right now — enter the address manually or continue with your ZIP.',
-        'info',
+      if (mapCard) mapCard.hidden = false;
+      if (confirmedCard) confirmedCard.hidden = false;
+      if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(gpsConfirmed);
+      setTravelNote(
+        gpsParts.street
+          ? 'Travel will be calculated from our base to this confirmed pin when your price is prepared.'
+          : 'We will confirm the exact address with you; travel to this pin stays preliminary until then.',
       );
-    }
-  }
-
-  async function manualResolve(): Promise<void> {
-    const street = streetField.value.trim();
-    if (street.length < 5) {
-      setStatus('Enter your street address first, then press Find My Address.', 'error');
-      streetField.focus();
+      setState('confirmed');
+      setStatus('Destination confirmed. We will calculate travel to this exact location.', 'success');
+      emit();
       return;
     }
-    await requestResolvedAddress(composeQuery());
-  }
 
-  function confirmLocation(): void {
-    if (!candidate) return;
+    if (!manualCandidate) return;
     const streetText = streetField.value.trim();
-    confirmed = {
-      label: candidate.label,
-      street: streetText || streetLineFromLabel(candidate.label),
+    manualConfirmed = {
+      label: manualCandidate.label,
+      street: streetText || streetLineFromLabel(manualCandidate.label),
       ...(unitInput?.value.trim() ? { unit: unitInput.value.trim() } : {}),
-      lat: candidate.lat,
-      lng: candidate.lng,
-      ...(candidate.zip || zipInput?.value.trim()
-        ? { zip: candidate.zip ?? zipInput?.value.trim() ?? '' }
+      lat: manualCandidate.lat,
+      lng: manualCandidate.lng,
+      ...(manualCandidate.zip || zipInput?.value.trim()
+        ? { zip: manualCandidate.zip ?? zipInput?.value.trim() ?? '' }
         : {}),
-      ...(candidate.city || cityInput?.value.trim()
-        ? { city: candidate.city ?? cityInput?.value.trim() ?? '' }
+      ...(manualCandidate.city || cityInput?.value.trim()
+        ? { city: manualCandidate.city ?? cityInput?.value.trim() ?? '' }
         : {}),
-      ...(candidate.state || stateInput?.value
-        ? { state: candidate.state ?? stateInput?.value ?? '' }
+      ...(manualCandidate.state || stateInput?.value
+        ? { state: manualCandidate.state ?? stateInput?.value ?? '' }
         : {}),
-      source: candidate.source,
-      ...(candidate.adjusted ? { adjusted: true } : {}),
+      source: manualCandidate.source,
+      ...(manualCandidate.adjusted ? { adjusted: true } : {}),
       confirmedAt: new Date().toISOString(),
     };
     settleDestinationValues();
     if (mapCard) mapCard.hidden = false;
     if (confirmedCard) confirmedCard.hidden = false;
-    if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(confirmed);
-    setTravelNote(
-      'Travel will be calculated from our base to this confirmed pin when your price is prepared.',
-    );
+    if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(manualConfirmed);
+    setTravelNote('Travel will be calculated from our base to this confirmed pin when your price is prepared.');
     setState('confirmed');
     setStatus('Destination confirmed. We will calculate travel to this exact location.', 'success');
-    onChange(confirmed);
+    emit();
   }
 
   function startChange(): void {
-    invalidateConfirmation();
+    if (methodIsGps()) {
+      invalidateGps();
+      if (mapCard) mapCard.hidden = true;
+      if (confirmedCard) confirmedCard.hidden = true;
+      openManualSection();
+      setStatus('Edit the address or pick a different suggestion.', 'info');
+      return;
+    }
+    invalidateManual();
     if (mapCard) mapCard.hidden = true;
     setStatus('Edit the address or pick a different suggestion.', 'info');
     streetField.focus();
@@ -665,17 +856,57 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   // ── Event wiring ──────────────────────────────────────────────────────────
+  const lastFieldValues = new WeakMap<HTMLInputElement | HTMLSelectElement, string>();
+  function settleDestinationValues(): void {
+    for (const field of [cityInput, stateInput, zipInput]) {
+      if (field) lastFieldValues.set(field, field.value);
+    }
+  }
+  function watchDestinationField(field: HTMLInputElement | HTMLSelectElement | null): void {
+    if (!field) return;
+    lastFieldValues.set(field, field.value);
+    field.addEventListener('change', () => {
+      const previous = lastFieldValues.get(field) ?? '';
+      lastFieldValues.set(field, field.value);
+      if (previous === field.value) return;
+      if (applyingResolved) return;
+      if (method === 'manual') {
+        if (manualCandidate || manualConfirmed) {
+          invalidateManual();
+          emit();
+        }
+        if (streetField.value.trim().length >= MIN_SUGGEST_LENGTH) {
+          window.clearTimeout(suggestTimer);
+          suggestTimer = window.setTimeout(() => void requestSuggestions(composeQuery()), SUGGEST_DEBOUNCE_MS);
+        }
+      } else {
+        // Editing manual fields while GPS is active switches back to manual.
+        ensureManualMode();
+        if (streetField.value.trim().length >= MIN_SUGGEST_LENGTH) {
+          window.clearTimeout(suggestTimer);
+          suggestTimer = window.setTimeout(() => void requestSuggestions(composeQuery()), SUGGEST_DEBOUNCE_MS);
+        }
+      }
+    });
+  }
+  watchDestinationField(cityInput);
+  watchDestinationField(stateInput);
+  watchDestinationField(zipInput);
+
   streetField.addEventListener('input', () => {
-    invalidateConfirmation();
+    if (methodIsGps()) ensureManualMode();
+    else if (manualCandidate || manualConfirmed) {
+      invalidateManual();
+      emit();
+    } else {
+      setState('typing');
+    }
     window.clearTimeout(suggestTimer);
     const query = composeQuery();
     if (streetField.value.trim().length < MIN_SUGGEST_LENGTH) {
       clearSuggestions();
       setState('idle');
-      setStatus(
-        'Start typing your street address — or enter it manually below and continue with your ZIP.',
-        'info',
-      );
+      setStatus('Start typing your street address — suggestions appear as you type.', 'info');
       return;
     }
     suggestTimer = window.setTimeout(() => void requestSuggestions(query), SUGGEST_DEBOUNCE_MS);
@@ -701,80 +932,79 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   });
 
   streetField.addEventListener('blur', () => {
-    // Let a suggestion mousedown win; otherwise close the list.
     window.setTimeout(() => clearSuggestions(), 150);
   });
 
-  // Changing the city, state or ZIP changes the destination: confirmation and
-  // suggestions are invalidated, and autocomplete is refreshed using ALL
-  // available address information. A change event that carries the same value
-  // (e.g. the native blur-change after a programmatic fill) must NOT invalidate
-  // a resolved destination.
-  const lastFieldValues = new WeakMap<HTMLInputElement | HTMLSelectElement, string>();
-  /** Records the current city/state/ZIP as settled, so the native blur-change
-   *  that follows a programmatic fill cannot invalidate a resolved address. */
-  function settleDestinationValues(): void {
-    for (const field of [cityInput, stateInput, zipInput]) {
-      if (field) lastFieldValues.set(field, field.value);
+  gpsZipInput?.addEventListener('change', () => {
+    if (gpsConfirmed) {
+      const zip = gpsZipInput.value.trim();
+      gpsConfirmed = { ...gpsConfirmed, ...(zip ? { zip } : {}) };
+      if (!zip) delete (gpsConfirmed as { zip?: string }).zip;
+      emit();
     }
-  }
-  function watchDestinationField(field: HTMLInputElement | HTMLSelectElement | null): void {
-    if (!field) return;
-    lastFieldValues.set(field, field.value);
-    field.addEventListener('change', () => {
-      const previous = lastFieldValues.get(field) ?? '';
-      lastFieldValues.set(field, field.value);
-      if (previous === field.value) return;
-      // Programmatic fills from a resolution/GPS lookup must not invalidate the
-      // very candidate they are completing.
-      if (applyingResolved) return;
-      // Only a real destination change (after a candidate/confirmation exists)
-      // invalidates. A native blur-change must never clear a suggestion the
-      // customer is about to click, or a resolved destination.
-      if (candidate || confirmed) invalidateConfirmation();
-      if (streetField.value.trim().length >= MIN_SUGGEST_LENGTH) {
-        window.clearTimeout(suggestTimer);
-        suggestTimer = window.setTimeout(() => void requestSuggestions(composeQuery()), SUGGEST_DEBOUNCE_MS);
-      }
-    });
-  }
-  watchDestinationField(cityInput);
-  watchDestinationField(stateInput);
-  watchDestinationField(zipInput);
+  });
 
   resolveButton?.addEventListener('click', () => void manualResolve());
   gpsButton?.addEventListener('click', () => useCurrentLocation());
+  gpsRetryButton?.addEventListener('click', () => useCurrentLocation());
+  manualOpenButton?.addEventListener('click', () => openManualSection());
   confirmButton?.addEventListener('click', confirmLocation);
   changeButton?.addEventListener('click', startChange);
 
   unitInput?.addEventListener('change', () => {
-    // Unit changes do not move the pin; they only update the confirmed label.
-    if (confirmed) {
-      const next: ConfirmedLocation = { ...confirmed };
+    if (method === 'manual' && manualConfirmed) {
+      const next: ConfirmedLocation = { ...manualConfirmed };
       const unit = unitInput.value.trim();
       if (unit) next.unit = unit;
       else delete next.unit;
-      confirmed = next;
-      if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(confirmed);
-      onChange(confirmed);
+      manualConfirmed = next;
+      if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(manualConfirmed);
+      emit();
     }
   });
 
+  setMethod('manual');
   setState('idle');
 
   return {
-    getLocation: () => confirmed,
+    getLocation: () => activeConfirmed(),
+    getSubmission: () => {
+      if (methodIsGps()) {
+        return {
+          method,
+          location: gpsConfirmed,
+          street: gpsParts.street,
+          unit: '',
+          city: gpsParts.city,
+          state: gpsParts.state,
+          zip: gpsParts.zip || gpsZipInput?.value.trim() || '',
+        };
+      }
+      return {
+        method,
+        location: manualConfirmed,
+        street: streetField.value.trim(),
+        unit: unitInput?.value.trim() ?? '',
+        city: cityInput?.value.trim() ?? '',
+        state: stateInput?.value ?? 'FL',
+        zip: zipInput?.value.trim() ?? '',
+      };
+    },
+    needsZip: () => methodIsGps() && !gpsParts.zip && !(gpsZipInput?.value.trim() ?? ''),
     reset: () => {
-      confirmed = null;
-      candidate = null;
-      clearSuggestions();
+      cancelSuggestions();
+      invalidateManual();
+      invalidateGps();
+      hidePermissionPanel();
+      setMethod('manual');
       if (confirmedCard) confirmedCard.hidden = true;
       if (mapCard) mapCard.hidden = true;
       if (mapFallback) mapFallback.setAttribute('hidden', '');
       setState('idle');
       setStatus('Start typing your street address — suggestions appear as you type.', 'info');
-      onChange(null);
+      emit();
     },
     focus: () => streetField.focus(),
+    focusManual: () => openManualSection(),
   };
 }

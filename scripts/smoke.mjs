@@ -75,6 +75,8 @@ for (const [label, needle] of [
   ['ZIP field', 'id="est-zip"'],
   ['map confirmation card', 'data-address-map'],
   ['find-my-address control', 'data-address-resolve'],
+  ['manual address section', 'data-address-manual-details'],
+  ['location permission guidance', 'data-address-permission'],
   ['use-my-current-location control', 'data-address-gps'],
   ['reservation summary', 'data-reservation-summary'],
   ['price preview', 'data-price-preview'],
