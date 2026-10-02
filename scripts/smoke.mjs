@@ -3,7 +3,7 @@
 // This environment cannot run a real browser, so the smoke test asserts the
 // structural guarantees that matter (documented in docs/VERIFICATION.md):
 // required pages exist, every page has the layout shell, the estimate flow
-// has all six steps and the request/submit states, and no obviously broken
+// has all seven steps and the request/submit states, and no obviously broken
 // interactive markup ships. Run: npm run smoke (after npm run build).
 
 import fs from 'node:fs';
@@ -64,14 +64,18 @@ for (const [label, needle] of [
   ['estimate form', 'data-estimate-form'],
   ['progress indicator', 'data-progress-fill'],
   ['step 1', 'data-step="1"'],
-  ['step 6', 'data-step="6"'],
+  ['step 7', 'data-step="7"'],
   ['submit button', 'data-submit'],
   ['live estimate panel', 'data-estimate-live'],
+  ['address finder', 'data-address-finder'],
+  ['map confirmation card', 'data-address-map'],
+  ['manual address fallback', 'data-address-manual-panel'],
+  ['reservation summary', 'data-reservation-summary'],
 ]) {
   if (!estimate.includes(needle)) problems.push(`estimate page: missing ${label}`);
 }
-if ((estimate.match(/data-step="/g) ?? []).length !== 6) {
-  problems.push('estimate page: expected exactly 6 steps');
+if ((estimate.match(/data-step="/g) ?? []).length !== 7) {
+  problems.push('estimate page: expected exactly 7 steps');
 }
 
 // Lead forms with correct variants.

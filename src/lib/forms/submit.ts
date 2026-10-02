@@ -14,7 +14,7 @@ import type { AnalyticsEventName } from '../analytics/events';
 import { track } from '../analytics/events';
 
 export type SubmitOutcome =
-  | { ok: true }
+  | { ok: true; via: 'relay' | 'provider' }
   | { ok: false; reason: 'not_configured' | 'provider_error' | 'network_error' | 'server_error' | 'spam_rejected' };
 
 function turnstileToken(): string | undefined {
@@ -56,14 +56,15 @@ export async function submitLead(
 ): Promise<SubmitOutcome> {
   const payload = { subject, fields, turnstileToken: turnstileToken() };
 
-  // 1) Preferred path: serverless relay with server-side validation.
+  // 1) Preferred path: serverless relay with server-side validation and
+  //    authoritative quote verification for priced reservations.
   try {
     const response = await fetch(business.forms.serverSubmitPath, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (response.ok) return { ok: true };
+    if (response.ok) return { ok: true, via: 'relay' };
     if (response.status === 503) {
       // The relay is deployed but its server key is not configured. It tells
       // the client to use the static fallback — do exactly that instead of
@@ -80,7 +81,9 @@ export async function submitLead(
     // Network failure → fall through to the direct provider.
   }
 
-  // 2) Static fallback: direct provider submission with the public key.
+  // 2) Static fallback: direct provider submission with the public key. This
+  //    path has no server to verify a quote, so it is labeled honestly for the
+  //    owner (verification_path) and the customer copy stays request-only.
   if (!business.forms.web3formsAccessKey) {
     return { ok: false, reason: 'not_configured' };
   }
@@ -92,11 +95,12 @@ export async function submitLead(
         access_key: business.forms.web3formsAccessKey,
         subject,
         botcheck: '',
+        verification_path: 'direct_provider',
         ...fields,
       }),
     });
     const data = (await response.json().catch(() => ({}))) as { success?: boolean };
-    if (response.ok && data.success === true) return { ok: true };
+    if (response.ok && data.success === true) return { ok: true, via: 'provider' };
     return { ok: false, reason: 'provider_error' };
   } catch {
     return { ok: false, reason: 'network_error' };

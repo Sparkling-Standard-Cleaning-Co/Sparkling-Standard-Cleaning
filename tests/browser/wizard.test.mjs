@@ -1,9 +1,10 @@
-// Browser tests — estimate wizard navigation, final-step actions, validation,
+// Browser tests — estimate wizard navigation, step structure, validation,
 // double-submission prevention, draft restore, and mobile overflow.
 //
 // Run with: npm run test:browser   (builds first, then serves the build on :4399)
 //
 // Uses the project's own Playwright devDependency; no @playwright/test runner.
+// Provider APIs are mocked (page.route) — no external service is contacted.
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,12 +43,41 @@ after(async () => {
   server?.kill();
 });
 
+async function mockApis(page) {
+  await page.route('**/api/geocode', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, suggestions: [] }),
+    });
+  });
+  await page.route('**/api/travel', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        oneWayMiles: 15,
+        durationMinutes: 30,
+        gasPrice: 3.1,
+        gasPriceSource: 'configured_reference',
+        provider: 'mapmap',
+        method: 'route',
+        verified: true,
+        zone: 'core',
+      }),
+    });
+  });
+  // The map is an enhancement; keep tile traffic off in the test suite.
+  await page.route('**tiles.openfreemap.org/**', (route) => route.abort());
+}
+
 async function openWizard(width, height) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   await page.addStyleTag({
     content: '.mobile-action-bar{display:none!important} .site-header{position:static!important}',
   });
+  await mockApis(page);
   await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
   return { context, page };
 }
@@ -60,13 +90,17 @@ const activeStep = (page) =>
 
 const isVisible = (page, selector) => page.locator(selector).isVisible();
 
-async function fillStep1(page, zip = '32503') {
+async function fillStep1(page) {
   await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+  await page.click('[data-next]');
+}
+
+async function fillStep2ZipOnly(page, zip = '32503') {
   await page.fill('#est-zip', zip);
   await page.click('[data-next]');
 }
 
-async function fillStep2(page) {
+async function fillStep3(page) {
   await page.selectOption('#est-property', 'house');
   await page.fill('#est-sqft', '1600');
   await page.fill('#est-bedrooms', '3');
@@ -75,7 +109,7 @@ async function fillStep2(page) {
   await page.click('[data-next]');
 }
 
-async function fillStep3(page) {
+async function fillStep4(page) {
   await page.selectOption('#est-frequency', 'biweekly');
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
@@ -83,8 +117,8 @@ async function fillStep3(page) {
   await page.click('[data-next]');
 }
 
-async function fillStep4And5(page) {
-  await page.click('[data-next]'); // step 4: no add-ons
+async function fillStep5And6(page) {
+  await page.click('[data-next]'); // step 5: no add-ons
   await page.fill('#est-date', '2026-12-01');
   await page.selectOption('#est-arrival', 'morning');
   await page.click('[data-next]');
@@ -105,26 +139,31 @@ for (const [name, width, height] of [
       assert.equal(await isVisible(page, '[data-next]'), true, 'Continue visible on step 1');
       assert.equal(await isVisible(page, '[data-back]'), false, 'Back hidden on step 1');
       assert.equal(await isVisible(page, '[data-submit]'), false, 'Submit hidden on step 1');
-      // Same hidden-attribute defect surface: the live result panel and the
-      // STR-only field must stay hidden until their conditions are met.
+      // The live result panel and the STR-only field must stay hidden until
+      // their conditions are met.
       assert.equal(await isVisible(page, '[data-estimate-live]'), false, 'live panel hidden initially');
       assert.equal(await isVisible(page, '[data-str-only]'), false, 'STR-only field hidden for standard');
 
       await fillStep1(page);
-      assert.equal(await activeStep(page), 2);
-      await fillStep2(page);
+      assert.equal(await activeStep(page), 2, 'address step after the service step');
+      assert.equal(await isVisible(page, '[data-address-finder]'), true, 'address finder on step 2');
+      assert.equal(await isVisible(page, '[data-address-map]'), false, 'map hidden until an address resolves');
+      assert.equal(await isVisible(page, '[data-address-confirmed]'), false, 'confirmation hidden initially');
+      await fillStep2ZipOnly(page);
       assert.equal(await activeStep(page), 3);
       await fillStep3(page);
       assert.equal(await activeStep(page), 4);
-      await fillStep4And5(page);
-      assert.equal(await activeStep(page), 6);
+      await fillStep4(page);
+      assert.equal(await activeStep(page), 5);
+      await fillStep5And6(page);
+      assert.equal(await activeStep(page), 7);
 
-      // Final step: Back + ONE primary action labelled Send My Request.
+      // Final step: Back + ONE primary action labelled for the reservation.
       assert.equal(await isVisible(page, '[data-back]'), true, 'Back visible on final step');
       assert.equal(await isVisible(page, '[data-next]'), false, 'Continue hidden on final step');
       assert.equal(await isVisible(page, '[data-submit]'), true, 'Submit visible on final step');
       const submitLabel = (await page.locator('[data-submit]').textContent())?.trim();
-      assert.match(submitLabel ?? '', /Send My Request/i);
+      assert.match(submitLabel ?? '', /Reserve This Cleaning/i);
 
       const visiblePrimary = await page
         .locator('.wizard__nav .btn--primary:visible')
@@ -133,7 +172,7 @@ for (const [name, width, height] of [
 
       // Back navigation restores Continue and hides the final submit.
       await page.click('[data-back]');
-      assert.equal(await activeStep(page), 5);
+      assert.equal(await activeStep(page), 6);
       assert.equal(await isVisible(page, '[data-next]'), true, 'Continue visible after going back');
       assert.equal(await isVisible(page, '[data-submit]'), false, 'Submit hidden after going back');
     } finally {
@@ -147,9 +186,19 @@ for (const [name, width, height] of [
 test('step 1 does not advance without a service selection', async () => {
   const { context, page } = await openWizard(390, 900);
   try {
-    await page.fill('#est-zip', '32503');
     await page.click('[data-next]');
     assert.equal(await activeStep(page), 1, 'stayed on step 1 without a required choice');
+  } finally {
+    await context.close();
+  }
+});
+
+test('step 2 requires a ZIP when no confirmed address exists', async () => {
+  const { context, page } = await openWizard(390, 900);
+  try {
+    await fillStep1(page);
+    await page.click('[data-next]');
+    assert.equal(await activeStep(page), 2, 'ZIP is still the minimum coverage input');
   } finally {
     await context.close();
   }
@@ -161,7 +210,7 @@ test('saved draft restores the step after reload', async () => {
   const { context, page } = await openWizard(390, 900);
   try {
     await fillStep1(page);
-    await fillStep2(page);
+    await fillStep2ZipOnly(page);
     assert.equal(await activeStep(page), 3);
     await page.reload({ waitUntil: 'load' });
     assert.equal(await activeStep(page), 3, 'draft restored to the saved step');
@@ -184,9 +233,10 @@ test('final submit disables while sending and reports honest failure', async () 
       });
     });
     await fillStep1(page);
-    await fillStep2(page);
+    await fillStep2ZipOnly(page);
     await fillStep3(page);
-    await fillStep4And5(page);
+    await fillStep4(page);
+    await fillStep5And6(page);
     await page.fill('#est-name', 'Browser test (please ignore)');
     await page.fill('#est-phone', '8500000000');
     await page.fill('#est-email', 'owner@sparkling-standard.com');
@@ -213,10 +263,12 @@ test('no horizontal overflow while advancing the wizard at 360px', async () => {
       page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     assert.ok((await overflow()) <= 1, 'step 1 overflow');
     await fillStep1(page);
-    assert.ok((await overflow()) <= 1, 'step 2 overflow');
-    await fillStep2(page);
+    assert.ok((await overflow()) <= 1, 'address step overflow');
+    await fillStep2ZipOnly(page);
+    assert.ok((await overflow()) <= 1, 'home step overflow');
     await fillStep3(page);
-    await fillStep4And5(page);
+    await fillStep4(page);
+    await fillStep5And6(page);
     assert.ok((await overflow()) <= 1, 'final step overflow');
   } finally {
     await context.close();

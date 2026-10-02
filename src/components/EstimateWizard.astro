@@ -1,5 +1,6 @@
 ---
 import { pricing } from '../config/pricing';
+import { business, contactPhone, isPending } from '../config/business';
 import Icon from './Icon.astro';
 import TurnstileWidget from './TurnstileWidget.astro';
 import { isFormEnabled } from '../config/business';
@@ -7,17 +8,20 @@ import { isFormEnabled } from '../config/business';
 const configured = isFormEnabled();
 const addons = pricing.addons.items;
 const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
+const phone = contactPhone();
+const email = isPending(business.email) ? null : business.email;
+const smsEnabled = business.flags.smsEnabled;
 ---
 
 <div class="estimate-layout split split--sidebar">
   <form class="wizard" id="estimate-form" data-estimate-form action="#" method="post">
     <div class="wizard__progress">
-      <div class="wizard__progress-bar" role="progressbar" aria-label="Estimate progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="17" data-progress-bar>
+      <div class="wizard__progress-bar" role="progressbar" aria-label="Estimate progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="14" data-progress-bar>
         <div class="wizard__progress-fill" data-progress-fill></div>
       </div>
       <p class="wizard__step-label">
-        <span data-step-label>Step 1 of 6 — Your service</span>
-        <span data-progress-percent>17%</span>
+        <span data-step-label>Step 1 of 7 — Your service</span>
+        <span data-progress-percent>14%</span>
       </p>
     </div>
 
@@ -25,20 +29,23 @@ const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
       {
         !configured && (
           <p class="form-status" data-state="info" style="display:block">
-            Request delivery is not connected on this preview build. The estimate still works —
-            sending this request in preview cannot deliver it{preview ? ' (preview mode)' : ''}.
+            Request delivery is not connected on this preview build. The estimate and reservation
+            summary still work — sending this request in preview cannot deliver it{preview ? ' (preview mode)' : ''}.
           </p>
         )
       }
 
       <div class="estimate-result" data-estimate-live hidden aria-live="polite">
-        <p class="estimate-result__label" data-estimate-label>Estimated cleaning investment</p>
-        <p class="estimate-result__range" data-estimate-range>—</p>
+        <p class="estimate-result__label" data-estimate-label>Your proposed cleaning price</p>
+        <p class="estimate-result__price" data-estimate-price>—</p>
+        <p class="estimate-result__range" data-estimate-range hidden></p>
         <p class="estimate-result__note" data-estimate-note></p>
+        <p class="estimate-result__travel" data-estimate-travel></p>
+        <p class="estimate-result__reference" data-estimate-reference hidden></p>
         <ul class="estimate-flags" data-estimate-flags></ul>
       </div>
 
-      <!-- Step 1 — service + location -->
+      <!-- Step 1 — service -->
       <section class="wizard__step" data-step="1" data-active="true" aria-label="Your service">
         <fieldset class="field">
           <legend>What kind of cleaning are you looking for?</legend>
@@ -77,15 +84,111 @@ const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
             </label>
           </div>
         </fieldset>
+      </section>
+
+      <!-- Step 2 — service address -->
+      <section class="wizard__step" data-step="2" aria-label="Service address">
+        <div class="address-finder" data-address-finder data-state="idle">
+          <div class="field-row field-row--2">
+            <div class="field field--grow">
+              <label for="est-address">Street address</label>
+              <input
+                class="input"
+                id="est-address"
+                name="serviceAddress"
+                type="text"
+                autocomplete="address-line1"
+                placeholder="Start typing, e.g. 100 S Baylen St"
+                role="combobox"
+                aria-expanded="false"
+                aria-autocomplete="list"
+                aria-controls="est-address-suggestions"
+              />
+            </div>
+            <div class="field field--unit">
+              <label for="est-address-unit">Apt / unit</label>
+              <input
+                class="input"
+                id="est-address-unit"
+                name="addressUnit"
+                type="text"
+                autocomplete="address-line2"
+                maxlength="30"
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+
+          <ul
+            class="address-suggestions"
+            id="est-address-suggestions"
+            role="listbox"
+            aria-label="Address suggestions"
+            data-address-suggestions
+            hidden
+          ></ul>
+
+          <p class="hint address-finder__status" data-address-status data-kind="" aria-live="polite">
+            Start typing your street address — suggestions appear as you type.
+          </p>
+
+          <div class="address-finder__fallback">
+            <button type="button" class="link-button" data-address-manual aria-expanded="false" aria-controls="est-address-manual-panel">
+              Enter the address manually instead
+            </button>
+            <div class="address-finder__manual" id="est-address-manual-panel" data-address-manual-panel hidden>
+              <p class="hint">
+                Type the full street address above (and your ZIP below), then ask us to find it.
+                If the lookup still misses, your ZIP is enough to continue — the owner verifies
+                travel personally.
+              </p>
+              <button type="button" class="btn btn--ghost btn--small" data-address-resolve>
+                Find this address
+              </button>
+            </div>
+          </div>
+
+          <div class="address-map" data-address-map hidden>
+            <div class="address-map__canvas" data-address-map-canvas></div>
+            <p class="hint">
+              Confirm this is the right destination, or drag the pin to correct it. The map loads
+              only when you look up an address.
+            </p>
+            <p class="hint address-map__fallback" data-address-map-fallback hidden>
+              Map preview is unavailable right now — the confirmed coordinates from your address
+              still work. You can continue.
+            </p>
+            <div class="address-finder__actions">
+              <button type="button" class="btn btn--primary btn--small" data-address-confirm>
+                Confirm this location
+              </button>
+              <button type="button" class="btn btn--ghost btn--small" data-address-change>
+                Change address
+              </button>
+            </div>
+          </div>
+
+          <div class="address-confirmed" data-address-confirmed hidden>
+            <p class="address-confirmed__title">
+              <Icon name="check" size={16} /> Destination confirmed
+            </p>
+            <p class="address-confirmed__label" data-address-confirmed-label></p>
+            <p class="hint" data-address-confirmed-travel></p>
+          </div>
+        </div>
+
         <div class="field">
           <label for="est-zip">Service ZIP code</label>
           <input class="input" id="est-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" placeholder="e.g. 32503" required />
-          <span class="hint">Used only to confirm coverage and travel — never sent to analytics.</span>
+          <span class="hint">
+            Used to confirm coverage and preliminary travel — never sent to analytics. Confirming
+            your exact address above improves the travel calculation.
+          </span>
         </div>
       </section>
 
-      <!-- Step 2 — the home -->
-      <section class="wizard__step" data-step="2" aria-label="Your home">
+      <!-- Step 3 — the home -->
+      <section class="wizard__step" data-step="3" aria-label="Your home">
         <div class="field">
           <label for="est-property">Property type</label>
           <select class="select" id="est-property" name="propertyType" required>
@@ -124,8 +227,8 @@ const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
         </div>
       </section>
 
-      <!-- Step 3 — condition + rhythm -->
-      <section class="wizard__step" data-step="3" aria-label="Condition and rhythm">
+      <!-- Step 4 — condition + rhythm -->
+      <section class="wizard__step" data-step="4" aria-label="Condition and rhythm">
         <div class="field">
           <label for="est-frequency">How often should we clean?</label>
           <select class="select" id="est-frequency" name="frequency" required>
@@ -189,8 +292,8 @@ const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
         </div>
       </section>
 
-      <!-- Step 4 — add-ons -->
-      <section class="wizard__step" data-step="4" aria-label="Optional extras">
+      <!-- Step 5 — add-ons -->
+      <section class="wizard__step" data-step="5" aria-label="Optional extras">
         <fieldset class="field">
           <legend>Any extras? (optional)</legend>
           <p class="hint" style="margin-bottom: var(--space-3)">
@@ -214,8 +317,8 @@ const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
         </fieldset>
       </section>
 
-      <!-- Step 5 — timing -->
-      <section class="wizard__step" data-step="5" aria-label="Timing">
+      <!-- Step 6 — timing -->
+      <section class="wizard__step" data-step="6" aria-label="Timing">
         <div class="field-row field-row--2">
           <div class="field">
             <label for="est-date">Preferred date</label>
@@ -238,8 +341,37 @@ const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
         </p>
       </section>
 
-      <!-- Step 6 — details -->
-      <section class="wizard__step" data-step="6" aria-label="Your details">
+      <!-- Step 7 — price + reservation + details -->
+      <section class="wizard__step" data-step="7" aria-label="Price and reservation">
+        <div class="reservation-summary" data-reservation-summary hidden>
+          <p class="reservation-summary__eyebrow">Your proposed cleaning price</p>
+          <p class="reservation-summary__price" data-reservation-price>—</p>
+          <p class="reservation-summary__meta" data-reservation-reference hidden></p>
+          <p class="reservation-summary__meta" data-reservation-validity hidden></p>
+
+          <dl class="summary-list" data-reservation-scope></dl>
+          <p class="reservation-summary__qualification" data-reservation-qualification></p>
+
+          <div class="reservation-actions">
+            <p class="reservation-actions__note">
+              <strong>Reserve This Cleaning</strong> sends a reservation request with all of your
+              calculator details — it is not a confirmed appointment until the owner confirms.
+            </p>
+            <div class="reservation-actions__links">
+              {phone && (
+                <a class="btn btn--ghost btn--small" data-reserve-call href={phone.href}>
+                  <Icon name="phone" size={16} /> Call to Reserve
+                </a>
+              )}
+              {phone && smsEnabled && (
+                <a class="btn btn--ghost btn--small" data-reserve-text href={phone.sms}>
+                  <Icon name="message" size={16} /> Text to Reserve
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div class="field-row field-row--2">
           <div class="field">
             <label for="est-name">Your name</label>
@@ -253,10 +385,6 @@ const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
         <div class="field">
           <label for="est-email">Email</label>
           <input class="input" id="est-email" name="email" type="email" autocomplete="email" required />
-        </div>
-        <div class="field">
-          <label for="est-address">Service address (optional — helps confirm travel)</label>
-          <input class="input" id="est-address" name="serviceAddress" type="text" autocomplete="street-address" />
         </div>
         <div class="field">
           <label for="est-notes">Notes (optional)</label>
@@ -274,8 +402,8 @@ const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
           <input id="est-company-website" name="company_website" type="text" tabindex="-1" autocomplete="off" />
         </div>
         <p class="small text-muted">
-          Sending this request does not book anything. The owner reviews it, confirms scope, date
-          and final price, and only then is your cleaning booked. See our
+          Sending this request does not book anything. The owner reviews it, verifies the scope,
+          date and price, and only then is your cleaning booked. See our
           <a href="/privacy/">privacy policy</a>.
         </p>
       </section>
@@ -288,7 +416,7 @@ const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
       <span class="spacer"></span>
       <button class="btn btn--primary" type="button" data-next>Continue <Icon name="arrow-right" size={16} /></button>
       <button class="btn btn--primary btn--large" type="submit" data-submit hidden data-cta="estimate-submit">
-        Send My Request
+        Reserve This Cleaning
       </button>
     </div>
     <p class="form-status" data-form-status role="status" aria-live="polite" style="margin: 0 var(--space-6) var(--space-5)"></p>
@@ -298,22 +426,46 @@ const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
     <div class="card card--muted">
       <h2 class="card__title">How the estimate works</h2>
       <p class="card__text">
-        The range is built on real labor-time math for homes like yours — not a template price.
-        It's an estimate, not a guaranteed quote: final scope, condition, access and unusual
-        circumstances are confirmed personally before anything is booked.
+        Your confirmed address sets the destination; the owner's private starting point is used
+        only inside our server to calculate real driving time. The price is built on real
+        labor-time math for homes like yours — not a template price. It's a proposed price on a
+        request, not a confirmed booking: final scope, access and unusual circumstances are
+        confirmed personally first.
       </p>
     </div>
     <div class="card">
       <h3 class="card__title">After you send</h3>
-      <ol class="steps" style="gap: var(--space-4)">
-        <li class="step" style="padding-top: var(--space-5)"><p class="step__title">Request reviewed</p><p class="step__text">The owner reads every request — never an auto-confirmation.</p></li>
-        <li class="step" style="padding-top: var(--space-5)"><p class="step__title">Scope & price confirmed</p><p class="step__text">You'll hear back with the final details and any questions.</p></li>
+      <ol class="steps" style="gap: var(--space-4); margin-top: var(--space-5)">
+        <li class="step" style="padding-top: var(--space-5)"><p class="step__title">Request verified</p><p class="step__text">Our server recalculates your quote — never trusted from the browser.</p></li>
+        <li class="step" style="padding-top: var(--space-5)"><p class="step__title">Scope & price confirmed</p><p class="step__text">The owner reads every request and confirms the final details.</p></li>
         <li class="step" style="padding-top: var(--space-5)"><p class="step__title">Booking confirmed</p><p class="step__text">Only then is your cleaning on the calendar.</p></li>
       </ol>
     </div>
+    {
+      (phone || email) && (
+        <div class="card">
+          <h3 class="card__title">Prefer to talk it through?</h3>
+          {phone && (
+            <p class="card__text">
+              Call or text <a href={phone.href}>{phone.display}</a>
+              {email && (
+                <> — or email <a href={`mailto:${email}`}>{email}</a>.</>
+              )}
+            </p>
+          )}
+          {!phone && email && (
+            <p class="card__text">
+              Email <a href={`mailto:${email}`}>{email}</a>.
+            </p>
+          )}
+        </div>
+      )
+    }
     <p class="small text-muted">
       Your progress is saved on this device as you go — an accidental refresh won't lose your answers.
-      You can <button type="button" class="link-button" data-estimate-reset style="background:none;border:0;padding:0;color:var(--color-rose-700);text-decoration:underline;cursor:pointer;font:inherit">start over</button> at any time.
+      Contact details and your full address are never stored in the draft. You can
+      <button type="button" class="link-button" data-estimate-reset style="background:none;border:0;padding:0;color:var(--color-rose-700);text-decoration:underline;cursor:pointer;font:inherit">start over</button>
+      at any time.
     </p>
   </aside>
 </div>
