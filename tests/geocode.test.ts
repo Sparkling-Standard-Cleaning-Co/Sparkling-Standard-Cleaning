@@ -190,6 +190,30 @@ test('geocode resolve-id: passes the provider document id through', async () => 
 
 // ── Throttling ───────────────────────────────────────────────────────────────
 
+test('geocode: the shared ROUTES_API_KEY secret works without a duplicate key', async () => {
+  const response = await withFetch(
+    async () => jsonResponse({ features: [] }),
+    () =>
+      geocodePost({
+        request: request({ action: 'suggest', query: 'Pensacola FL' }),
+        env: { ROUTES_API_KEY: 'shared-routes-secret' },
+      } as never),
+  );
+  assert.equal(response.status, 200, 'ROUTES_API_KEY must configure the provider');
+});
+
+test('geocode: MAPMAP_API_KEY still works as an alias', async () => {
+  const response = await withFetch(
+    async () => jsonResponse({ features: [] }),
+    () =>
+      geocodePost({
+        request: request({ action: 'suggest', query: 'Pensacola FL' }),
+        env: { MAPMAP_API_KEY: 'alias-key' },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+});
+
 test('geocode: a single IP is throttled within the minute window', async () => {
   const ip = '203.0.113.77';
   let lastStatus = 0;

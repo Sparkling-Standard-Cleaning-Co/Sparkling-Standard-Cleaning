@@ -17,8 +17,16 @@
 // Responses: 200 { ok: true, ... } | 400 | 404 | 405 | 429 | 502 | 503
 
 interface Env {
+  /** Existing shared routing secret configured in Cloudflare (preferred). */
+  ROUTES_API_KEY?: string;
+  /** Optional alias so the function also works with a dedicated key. */
   MAPMAP_API_KEY?: string;
   MAPMAP_BASE?: string;
+}
+
+/** One provider credential for all mapping functions — no duplicate secrets. */
+function mapMapKey(env: Env): string {
+  return env.ROUTES_API_KEY?.trim() || env.MAPMAP_API_KEY?.trim() || '';
 }
 
 const MAX_QUERY = 120;
@@ -107,7 +115,7 @@ function featureId(feature: PhotonFeature): string | null {
 
 async function mapMapJson(env: Env, path: string): Promise<{ status: number; data: any }> {
   const response = await fetch(`${mapMapBase(env)}${path}`, {
-    headers: { Authorization: `Bearer ${env.MAPMAP_API_KEY?.trim() ?? ''}` },
+    headers: { Authorization: `Bearer ${mapMapKey(env)}` },
   });
   const data = await response.json().catch(() => ({}));
   return { status: response.status, data };
@@ -143,7 +151,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
   const action = typeof payload.action === 'string' ? payload.action : '';
-  const configured = Boolean(env.MAPMAP_API_KEY?.trim());
+  const configured = Boolean(mapMapKey(env));
 
   try {
     if (action === 'suggest') {
