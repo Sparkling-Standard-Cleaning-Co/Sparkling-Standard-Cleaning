@@ -1359,6 +1359,35 @@ fieldset {
   font-weight: var(--weight-bold);
 }
 
+/* Link-styled button (start over, inline text actions). */
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--color-rose-700);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.link-button:hover {
+  color: var(--color-rose-800);
+}
+
+.address-finder__locate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-alt);
+  border-radius: var(--radius-md);
+}
+
+.address-finder__locate .hint {
+  margin: 0;
+}
+
 .address-finder__fallback {
   font-size: var(--text-sm);
 }

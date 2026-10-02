@@ -60,7 +60,11 @@ async function openWithMocks(page, handlers) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ ok: true, suggestions: handlers.suggestions }),
+        body: JSON.stringify({
+          ok: true,
+          suggestions: handlers.suggestions,
+          ...(handlers.needsLocation ? { needsLocation: true } : {}),
+        }),
       });
       return;
     }
@@ -237,6 +241,28 @@ test('an exact Census result (Alabama) confirms the destination and carries city
     assert.equal(fields.address_state, 'AL');
     assert.equal(fields.zip, '36502');
     assert.ok(fields.pin_latitude, 'the confirmed pin travels with the request');
+  } finally {
+    await context.close();
+  }
+});
+
+test('irrelevant provider matches prompt for a city or ZIP instead of showing nationwide results', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  try {
+    const captured = await openWithMocks(page, { suggestions: [], needsLocation: true });
+    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+    await page.fill('#est-address', '3370 S Highway 97');
+    await page.waitForFunction(
+      () => /narrow the search/i.test(document.querySelector('[data-address-status]')?.textContent ?? ''),
+      undefined,
+      { timeout: 15000 },
+    );
+    assert.equal(await page.locator('#est-address-suggestions li').count(), 0, 'no suggestions remain visible');
+    assert.equal(await page.locator('#est-address-suggestions').isVisible(), false);
+    const last = captured.suggest.at(-1);
+    assert.equal(last.state, 'FL');
+    assert.match(last.street, /3370 S Highway 97/);
   } finally {
     await context.close();
   }

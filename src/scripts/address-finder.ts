@@ -78,8 +78,6 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
 
   const suggestionsList = root.querySelector<HTMLUListElement>('[data-address-suggestions]');
   const statusEl = root.querySelector<HTMLElement>('[data-address-status]');
-  const manualToggle = root.querySelector<HTMLButtonElement>('[data-address-manual]');
-  const manualPanel = root.querySelector<HTMLElement>('[data-address-manual-panel]');
   const resolveButton = root.querySelector<HTMLButtonElement>('[data-address-resolve]');
   const mapCard = root.querySelector<HTMLElement>('[data-address-map]');
   const mapCanvas = root.querySelector<HTMLElement>('[data-address-map-canvas]');
@@ -227,27 +225,26 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     // The confirm action is available even before/without the map: the map is
     // an enhancement, never a requirement.
     setState(options.manual ? 'resolved_manual' : 'resolved');
-    setStatus('Check the map pin and confirm this is the right location.', 'info');
+    setStatus('Address found — confirm your location on the map.', 'success');
     void showMap(resolved);
     confirmButton?.focus();
   }
 
   /** Exact address could not be placed: preserve the address, confirm nothing. */
-  function exactResolveFailed(message?: string): void {
+  function exactResolveFailed(): void {
     candidate = null;
     confirmed = null;
     if (confirmedCard) confirmedCard.hidden = true;
     if (mapCard) mapCard.hidden = true;
     setState('unresolved');
     setStatus(
-      message ??
-        'We could not pinpoint that exact address yet. Your address is saved for our review — travel will be confirmed before booking.',
+      "We couldn't pinpoint this address. You can still request your cleaning, and we'll confirm the location.",
       'error',
     );
     onChange(null);
   }
 
-  async function requestResolvedAddress(query: string, suggestion?: GeocodeSuggestion): Promise<void> {
+  async function requestResolvedAddress(query: string): Promise<void> {
     setState('resolving');
     setStatus('Looking up that exact address…', 'info');
     try {
@@ -270,39 +267,16 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       const data = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: ResolveResult };
       if (response.ok && data.ok && data.result) {
         const resolved = applyResolvedAddress(data.result);
-        if (resolved && data.result.precise !== false) {
+        // Only an exact house-number match may become a confirmed destination.
+        if (resolved && data.result.precise === true) {
           showCandidate(resolved);
           return;
         }
       }
-      // The exact address could not be confirmed. If the customer did not
-      // enter a house number at all, a street-level suggestion is acceptable
-      // as a starting pin (they can drag it), clearly marked as approximate.
-      const houseNumber = houseNumberFromStreet(streetField.value);
-      if (!houseNumber && suggestion?.lat !== undefined && suggestion?.lng !== undefined) {
-        showCandidate({
-          label: suggestion.label,
-          lat: suggestion.lat,
-          lng: suggestion.lng,
-          source: 'mapmap',
-          adjusted: false,
-        });
-        setStatus('Street-level match — drag the pin to your exact home and confirm.', 'info');
-        return;
-      }
-      if (!houseNumber && !suggestion) {
-        // Manual entry without a house number: keep the address, allow review.
-        exactResolveFailed(
-          'Enter the full street address, including the house number, or continue with your ZIP — travel will be confirmed before booking.',
-        );
-        return;
-      }
       exactResolveFailed();
     } catch (error) {
       if ((error as Error).name === 'AbortError') return;
-      exactResolveFailed(
-        "We couldn't reach the address lookup right now. Your address is saved for our review — travel will be confirmed before booking.",
-      );
+      exactResolveFailed();
     }
   }
 
@@ -433,7 +407,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     }
     // Street-level/POI/local results are never treated as the precise
     // destination: resolve the full address (MapMap exact-only → Census).
-    await requestResolvedAddress(composeQuery(), suggestion);
+    await requestResolvedAddress(composeQuery());
   }
 
   async function requestSuggestions(query: string): Promise<void> {
@@ -444,7 +418,14 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       const response = await fetch('/api/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ action: 'suggest', query: query.slice(0, 120) }),
+        body: JSON.stringify({
+          action: 'suggest',
+          query: query.slice(0, 120),
+          street: streetField.value.trim().slice(0, 80),
+          city: cityInput?.value.trim().slice(0, 60) ?? '',
+          state: stateInput?.value ?? 'FL',
+          zip: zipInput?.value.trim() ?? '',
+        }),
         signal: suggestAbort.signal,
       });
       if (response.status === 503) {
@@ -456,17 +437,28 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         );
         return;
       }
-      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; suggestions?: GeocodeSuggestion[] };
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        suggestions?: GeocodeSuggestion[];
+        needsLocation?: boolean;
+      };
       if (!response.ok || !data.ok || !Array.isArray(data.suggestions)) {
         throw new Error('provider_failed');
+      }
+      // Never leave irrelevant results visible.
+      clearSuggestions();
+      if (data.needsLocation) {
+        setState('needs_location');
+        setStatus('Add your city or ZIP to narrow the search.', 'info');
+        return;
       }
       suggestions = data.suggestions;
       activeIndex = -1;
       setState(suggestions.length > 0 ? 'suggestions' : 'idle');
       if (suggestions.length === 0) {
-        setStatus('No matching addresses yet — keep typing, enter it manually, or use your ZIP.', 'info');
+        setStatus('No matching addresses yet — press Find My Address or add your city or ZIP.', 'info');
       } else {
-        setStatus('Choose your address from the list.', 'info');
+        setStatus('Choose your address from the list, or press Find My Address.', 'info');
       }
       renderSuggestions();
     } catch (error) {
@@ -482,9 +474,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
 
   async function manualResolve(): Promise<void> {
     const street = streetField.value.trim();
-    const zip = zipInput?.value.trim() ?? '';
-    if (street.length < 5 && zip.length < 5) {
-      setStatus('Enter your street address (or ZIP) first.', 'error');
+    if (street.length < 5) {
+      setStatus('Enter your street address first, then press Find My Address.', 'error');
       streetField.focus();
       return;
     }
@@ -586,13 +577,6 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       }
     });
   }
-
-  manualToggle?.addEventListener('click', () => {
-    const expanded = manualToggle.getAttribute('aria-expanded') === 'true';
-    manualToggle.setAttribute('aria-expanded', String(!expanded));
-    if (manualPanel) manualPanel.hidden = expanded;
-    if (!expanded) streetField.focus();
-  });
 
   resolveButton?.addEventListener('click', () => void manualResolve());
   confirmButton?.addEventListener('click', confirmLocation);

@@ -74,7 +74,7 @@ for (const [label, needle] of [
   ['state selector', 'id="est-address-state"'],
   ['ZIP field', 'id="est-zip"'],
   ['map confirmation card', 'data-address-map'],
-  ['manual address fallback', 'data-address-manual-panel'],
+  ['find-my-address control', 'data-address-resolve'],
   ['reservation summary', 'data-reservation-summary'],
   ['price preview', 'data-price-preview'],
   ['post-send timeline', 'timeline__stage'],

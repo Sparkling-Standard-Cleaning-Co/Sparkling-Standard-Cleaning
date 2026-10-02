@@ -146,7 +146,9 @@ export async function censusResolve(query: string): Promise<GeocodedAddress | nu
     lat,
     lng,
     source: 'census',
-    precise: containsHouseNumber(label, requested),
+    // Census returns address-range matches; only a query WITH a house number
+    // can count as an exact property.
+    precise: requested !== null && containsHouseNumber(label, requested),
   };
   const zip = label.match(/,\s*(\d{5})(?:-\d{4})?\s*$/)?.[1];
   if (zip) result.zip = zip;
@@ -173,10 +175,11 @@ export async function mapMapResolve(env: GeocodeEnv, query: string): Promise<Geo
   const requested = queryHouseNumber(query);
   const features = ((data as { features?: PhotonFeature[] })?.features ?? []);
   // Prefer an exact house-number feature; never accept a street/POI result for
-  // a house-number query.
+  // a house-number query, and never mark a no-number query "precise".
   for (const feature of features) {
     const address = parsePhotonFeature(feature, 'mapmap');
     if (!address) continue;
+    if (requested === null) return { ...address, precise: false };
     if (containsHouseNumber(address.label, requested)) return { ...address, precise: true };
   }
   return null;

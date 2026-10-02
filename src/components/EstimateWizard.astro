@@ -185,20 +185,11 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             Start typing your street address — suggestions appear as you type.
           </p>
 
-          <div class="address-finder__fallback">
-            <button type="button" class="link-button" data-address-manual aria-expanded="false" aria-controls="est-address-manual-panel">
-              Enter the address manually instead
+          <div class="address-finder__locate">
+            <button type="button" class="btn btn--secondary btn--small" data-address-resolve>
+              Find My Address
             </button>
-            <div class="address-finder__manual" id="est-address-manual-panel" data-address-manual-panel hidden>
-              <p class="hint">
-                Type the full street address above (with city, state and ZIP), then ask us to find
-                it. If the exact address still cannot be pinpointed, your address stays on the
-                request for our review and travel is confirmed personally before booking.
-              </p>
-              <button type="button" class="btn btn--ghost btn--small" data-address-resolve>
-                Find this address
-              </button>
-            </div>
+            <p class="hint">Autocomplete is optional — complete the fields above and press Find My Address.</p>
           </div>
 
           <div class="address-map" data-address-map hidden>

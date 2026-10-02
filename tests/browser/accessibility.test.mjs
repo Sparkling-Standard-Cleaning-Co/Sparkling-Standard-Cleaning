@@ -64,7 +64,7 @@ async function openEstimate(width = 1280, height = 900) {
       contentType: 'application/json',
       body: JSON.stringify({
         ok: true,
-        result: { ...ADDRESS, zip: '32502', city: 'Pensacola', state: 'FL', source: 'mapmap' },
+        result: { ...ADDRESS, zip: '32502', city: 'Pensacola', state: 'FL', source: 'mapmap', precise: true },
       }),
     });
   });

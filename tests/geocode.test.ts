@@ -353,6 +353,86 @@ test('geocode resolve: a MapMap POI result never replaces the requested house nu
   assert.deepEqual(await response.json(), { ok: false, error: 'not_found' });
 });
 
+test('geocode suggest: out-of-state rows are filtered out for the selected state', async () => {
+  const response = await withFetch(
+    async () =>
+      jsonResponse({
+        suggestions: [
+          { id: 'ga', name: '3370 S Highway 97', context: 'Georgia, United States', kind: 'street', lat: 34, lon: -84 },
+          { id: 'tn', name: '3370 S Highway 97', context: 'Tennessee, United States', kind: 'street', lat: 35, lon: -86 },
+          { id: 'fl', name: '3370 South Highway 97', context: 'Milton, Florida, 32570, United States', kind: 'street', lat: 30.63, lon: -87.05 },
+        ],
+      }),
+    () =>
+      geocodePost({
+        request: request({
+          action: 'suggest',
+          query: '3370 S Highway 97, FL',
+          street: '3370 S Highway 97',
+          state: 'FL',
+        }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as { suggestions: Array<{ label: string }>; needsLocation?: boolean };
+  assert.equal(data.suggestions.length, 1);
+  assert.match(data.suggestions[0].label, /Florida/);
+  assert.equal(data.needsLocation, undefined);
+});
+
+test('geocode suggest: with nothing in-state and no city/ZIP, the response asks for a location', async () => {
+  const response = await withFetch(
+    async () =>
+      jsonResponse({
+        suggestions: [
+          { id: 'ga', name: '3370 S Highway 97', context: 'Georgia, United States', kind: 'street', lat: 34, lon: -84 },
+          { id: 'tn', name: '3370 S Highway 97', context: 'Tennessee, United States', kind: 'street', lat: 35, lon: -86 },
+        ],
+      }),
+    () =>
+      geocodePost({
+        request: request({
+          action: 'suggest',
+          query: '3370 S Highway 97, FL',
+          street: '3370 S Highway 97',
+          state: 'FL',
+        }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  const data = (await response.json()) as { suggestions: unknown[]; needsLocation?: boolean };
+  assert.equal(data.suggestions.length, 0);
+  assert.equal(data.needsLocation, true);
+});
+
+test('geocode suggest: a conflicting ZIP row is dropped for the entered ZIP', async () => {
+  const response = await withFetch(
+    async () =>
+      jsonResponse({
+        suggestions: [
+          { id: 'a', name: '1459 Molino Road', context: 'Florida, 32570, United States', kind: 'address', lat: 30.6, lon: -87.1 },
+          { id: 'b', name: '1459 Molino Road', context: 'Florida, 32577, United States', kind: 'address', lat: 30.72, lon: -87.35 },
+        ],
+      }),
+    () =>
+      geocodePost({
+        request: request({
+          action: 'suggest',
+          query: '1459 Molino Road, Molino, FL, 32577',
+          street: '1459 Molino Road',
+          city: 'Molino',
+          state: 'FL',
+          zip: '32577',
+        }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  const data = (await response.json()) as { suggestions: Array<{ label: string }> };
+  assert.equal(data.suggestions.length, 1);
+  assert.match(data.suggestions[0].label, /32577/);
+});
+
 test('geocode resolve-id: passes the provider document id through', async () => {
   const response = await withFetch(
     async (url) => {

@@ -27,12 +27,16 @@ import {
   type GeocodeEnv,
   type PhotonFeature,
 } from '../../src/lib/location/server-geocode.ts';
+import {
+  rankSuggestions,
+  suggestQueryVariants,
+  type RawSuggestion,
+} from '../../src/lib/location/suggestion-ranking.ts';
 
 interface Env extends GeocodeEnv {}
 
 const MAX_QUERY = 120;
 const MIN_QUERY = 3;
-const SUGGEST_LIMIT = 6;
 const WINDOW_MS = 60_000;
 const PER_IP_PER_MINUTE = 20;
 const DAILY_CAP = 500;
@@ -106,8 +110,8 @@ export const SUGGEST_BIAS = '-87.2169,30.4213';
  * (verified against the provider's OpenAPI schema). Photon-style `features`
  * payloads from other conforming gateways are still accepted defensively.
  */
-function parseSuggestPayload(data: unknown): Suggestion[] {
-  const list: Suggestion[] = [];
+function parseSuggestPayload(data: unknown): RawSuggestion[] {
+  const list: RawSuggestion[] = [];
   const rows = (data as { suggestions?: unknown })?.suggestions;
   if (Array.isArray(rows)) {
     for (const row of rows as Array<Record<string, unknown>>) {
@@ -115,13 +119,13 @@ function parseSuggestPayload(data: unknown): Suggestion[] {
       const name = typeof row.name === 'string' ? row.name : '';
       const context = typeof row.context === 'string' ? row.context : '';
       const kind = typeof row.kind === 'string' ? row.kind : undefined;
-      const label = [name, context].filter(Boolean).join(', ');
       const lat = typeof row.lat === 'number' && Number.isFinite(row.lat) ? row.lat : undefined;
       const lng = typeof row.lon === 'number' && Number.isFinite(row.lon) ? row.lon : undefined;
-      if (!id || !label) continue;
+      if (!id || !(name || context)) continue;
       list.push({
         id,
-        label,
+        name,
+        context,
         ...(kind ? { kind } : {}),
         ...(lat !== undefined ? { lat } : {}),
         ...(lng !== undefined ? { lng } : {}),
@@ -133,21 +137,78 @@ function parseSuggestPayload(data: unknown): Suggestion[] {
   for (const feature of features ?? []) {
     const label = featureLabel(feature);
     const id = featureId(feature);
-    if (label && id) list.push({ id, label });
+    if (label && id) list.push({ id, name: label, context: '' });
   }
   return list;
 }
 
-async function suggestions(env: Env, query: string): Promise<Suggestion[]> {
+const PROVIDER_LIMIT = 10;
+const DISPLAY_LIMIT = 6;
+
+async function providerSuggest(env: Env, query: string): Promise<RawSuggestion[]> {
   const response = await fetch(
     `${(env.MAPMAP_BASE?.trim() || 'https://api.mapmap.ai').replace(/\/+$/, '')}` +
-      `/geocode/suggest?q=${encodeURIComponent(query)}&limit=${SUGGEST_LIMIT}` +
+      `/geocode/suggest?q=${encodeURIComponent(query)}&limit=${PROVIDER_LIMIT}` +
       `&bias=${encodeURIComponent(SUGGEST_BIAS)}&lang=en`,
     { headers: { Authorization: `Bearer ${mapMapKey(env)}` } },
   );
   if (response.status !== 200) throw new Error(`provider HTTP ${response.status}`);
   const data = await response.json().catch(() => ({}));
   return parseSuggestPayload(data);
+}
+
+interface SuggestParts {
+  query: string;
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
+/**
+ * Geographically intelligent suggestions: state is a hard filter, ZIP is a
+ * hard filter when present, street names must match (with road-name
+ * variations), and exact house numbers rank first. At most two provider calls
+ * are made (primary + one variant) to conserve the free allowance.
+ */
+async function suggestionsForAddress(env: Env, parts: SuggestParts): Promise<{
+  suggestions: Suggestion[];
+  needsLocation: boolean;
+}> {
+  const providerQuery = [parts.street, parts.city].filter(Boolean).join(', ') || parts.query;
+  const location = { street: parts.street, city: parts.city, state: parts.state, zip: parts.zip };
+  const houseNumber = parts.street.trim().match(/^(\d+[a-z]?)\b/i)?.[1]?.toLowerCase() ?? null;
+
+  let rows = await providerSuggest(env, providerQuery);
+  let result = rankSuggestions(rows, location, houseNumber);
+
+  // One variant attempt handles road-name variations (Hwy/SR/state directions)
+  // before deciding the location is unknown.
+  if (result.ranked.length === 0) {
+    const [variant] = suggestQueryVariants(parts.street, parts.city || undefined);
+    if (variant) {
+      const variantRows = await providerSuggest(env, variant);
+      if (variantRows.length > 0) {
+        rows = variantRows;
+        result = rankSuggestions(rows, location, houseNumber);
+      }
+    }
+  }
+
+  const suggestions: Suggestion[] = result.ranked.slice(0, DISPLAY_LIMIT).map((row) => ({
+    id: row.id,
+    label: row.label,
+    ...(row.kind ? { kind: row.kind } : {}),
+    ...(row.lat !== undefined ? { lat: row.lat } : {}),
+    ...(row.lng !== undefined ? { lng: row.lng } : {}),
+  }));
+
+  return { suggestions, needsLocation: result.needsLocation };
+}
+
+function cleanPart(value: unknown, max = 80): string {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, max);
 }
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
@@ -157,7 +218,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'rate_limited' }, 429);
   }
 
-  let payload: { action?: unknown; query?: unknown; id?: unknown };
+  let payload: { action?: unknown; query?: unknown; id?: unknown; street?: unknown; city?: unknown; state?: unknown; zip?: unknown };
   try {
     payload = (await request.json()) as typeof payload;
   } catch {
@@ -169,10 +230,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   try {
     if (action === 'suggest') {
       const query = cleanQuery(payload.query);
-      if (!query) return json({ ok: false, error: 'invalid_request' }, 400);
+      const parts: SuggestParts = {
+        query: query ?? '',
+        street: cleanPart(payload.street),
+        city: cleanPart(payload.city, 60),
+        state: cleanPart(payload.state, 2).toUpperCase(),
+        zip: cleanPart(payload.zip, 10),
+      };
+      // Legacy callers may send only `query`; keep that working.
+      if (!parts.query && !parts.street) return json({ ok: false, error: 'invalid_request' }, 400);
       if (!configured) return json({ ok: false, error: 'provider_not_configured' }, 503);
       try {
-        return json({ ok: true, suggestions: await suggestions(env, query) });
+        const { suggestions, needsLocation } = await suggestionsForAddress(env, parts);
+        return json({ ok: true, suggestions, ...(needsLocation ? { needsLocation: true } : {}) });
       } catch {
         return json({ ok: false, error: 'provider_failed' }, 502);
       }

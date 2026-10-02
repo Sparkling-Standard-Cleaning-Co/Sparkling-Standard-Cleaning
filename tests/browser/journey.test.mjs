@@ -90,7 +90,7 @@ async function mockProviders(page, options = {}) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ ok: true, result: { ...ADDRESS, source: 'mapmap' } }),
+        body: JSON.stringify({ ok: true, result: { ...ADDRESS, source: 'mapmap', precise: true } }),
       });
       return;
     }
@@ -242,8 +242,6 @@ test('manual address entry works when suggestions are not used', async () => {
   const { context, page } = await openEstimate(1440, 900);
   try {
     await step1(page);
-    await page.click('[data-address-manual]');
-    assert.equal(await isVisible(page, '[data-address-manual-panel]'), true);
     await page.fill('#est-address', '100 S Baylen St');
     await page.click('[data-address-resolve]');
     await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
