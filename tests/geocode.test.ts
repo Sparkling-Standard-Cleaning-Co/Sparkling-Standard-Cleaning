@@ -171,6 +171,46 @@ test('geocode resolve: an unfindable address is honestly not_found', async () =>
   assert.deepEqual(await response.json(), { ok: false, error: 'not_found' });
 });
 
+test('geocode resolve: passes ZIP/city/state through when the provider supplies them', async () => {
+  const response = await withFetch(
+    async () =>
+      jsonResponse({
+        features: [mapmapFeature({ postcode: '32502', city: 'Pensacola', state: 'FL' })],
+      }),
+    () =>
+      geocodePost({
+        request: request({ action: 'resolve', query: '100 S Baylen St, Pensacola, FL' }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  const data = (await response.json()) as { result: { zip?: string; city?: string; state?: string } };
+  assert.equal(response.status, 200);
+  assert.equal(data.result.zip, '32502');
+  assert.equal(data.result.city, 'Pensacola');
+  assert.equal(data.result.state, 'FL');
+});
+
+test('geocode resolve: a Census match exposes the ZIP from its label', async () => {
+  const response = await withFetch(
+    async () =>
+      jsonResponse({
+        result: {
+          addressMatches: [
+            { matchedAddress: '100 S BAYLEN ST, PENSACOLA, FL, 32502-1234', coordinates: { x: -87.2164, y: 30.4111 } },
+          ],
+        },
+      }),
+    () =>
+      geocodePost({
+        request: request({ action: 'resolve', query: '100 S Baylen St' }),
+        env: {},
+      } as never),
+  );
+  const data = (await response.json()) as { result: { zip?: string; source: string } };
+  assert.equal(data.result.source, 'census');
+  assert.equal(data.result.zip, '32502');
+});
+
 test('geocode resolve-id: passes the provider document id through', async () => {
   const response = await withFetch(
     async (url) => {

@@ -96,6 +96,17 @@ export interface TravelEstimate {
   gasPriceSource: 'eia_live' | 'configured_reference' | 'none';
   adjustment: number;
   requiresManualConfirmation: boolean;
+  /**
+   * How travel was established:
+   *  - 'route' — a live provider route from the private operating origin
+   *    (the only mode that counts as verified travel);
+   *  - 'straight_line_estimate' — road-distance approximation, preliminary;
+   *  - 'zone' — provisional ZIP zone fallback, preliminary;
+   *  - 'none' — no usable travel information.
+   */
+  method: 'route' | 'straight_line_estimate' | 'zone' | 'none';
+  /** True ONLY for a live provider route; preliminary otherwise. */
+  verified: boolean;
   reason?: string | undefined;
 }
 
@@ -134,4 +145,8 @@ export interface RoutedTravelInfo {
   gasPrice: number | null;
   gasPriceSource: 'eia_live' | 'configured_reference' | 'none';
   provider: string;
+  /** Server-reported derivation; 'route' is a live provider route. */
+  method?: 'route' | 'straight_line_estimate';
+  /** Server-reported verification flag; true only for a live provider route. */
+  verified?: boolean;
 }

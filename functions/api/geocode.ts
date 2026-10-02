@@ -8,26 +8,28 @@
 //                                    (MapMap /geocode/retrieve passthrough)
 //
 // Rules:
-//  - Provider keys live only in the function environment (MAPMAP_API_KEY).
+//  - Provider keys live only in the function environment (ROUTES_API_KEY or the
+//    MAPMAP_API_KEY alias). They are never returned to the browser.
 //  - The private operating origin is NEVER read, returned or logged here.
 //  - Requests are throttled per client IP and capped per isolate-days as a
 //    circuit breaker; the MapMap free tier cannot bill, and Census is free.
-//  - Only minimal fields are returned to the browser (label, coords, id).
+//  - Only minimal fields are returned to the browser (label, coords, id, and
+//    ZIP/city/state when the provider supplies them).
 //
 // Responses: 200 { ok: true, ... } | 400 | 404 | 405 | 429 | 502 | 503
 
-interface Env {
-  /** Existing shared routing secret configured in Cloudflare (preferred). */
-  ROUTES_API_KEY?: string;
-  /** Optional alias so the function also works with a dedicated key. */
-  MAPMAP_API_KEY?: string;
-  MAPMAP_BASE?: string;
-}
+import {
+  censusResolve,
+  featureId,
+  featureLabel,
+  mapMapKey,
+  mapMapResolve,
+  mapMapResolveId,
+  type GeocodeEnv,
+  type PhotonFeature,
+} from '../../src/lib/location/server-geocode.ts';
 
-/** One provider credential for all mapping functions — no duplicate secrets. */
-function mapMapKey(env: Env): string {
-  return env.ROUTES_API_KEY?.trim() || env.MAPMAP_API_KEY?.trim() || '';
-}
+interface Env extends GeocodeEnv {}
 
 const MAX_QUERY = 120;
 const MIN_QUERY = 3;
@@ -88,53 +90,21 @@ interface Suggestion {
   label: string;
 }
 
-function mapMapBase(env: Env): string {
-  return (env.MAPMAP_BASE?.trim() || 'https://api.mapmap.ai').replace(/\/+$/, '');
-}
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-type PhotonFeature = {
-  properties?: Record<string, any>;
-  geometry?: { coordinates?: [number, number] };
-};
-
-function featureLabel(feature: PhotonFeature): string | null {
-  const p = feature.properties ?? {};
-  const label =
-    (typeof p.label === 'string' && p.label) ||
-    [p.name, p.street, p.city, p.state, p.postcode].filter((part) => typeof part === 'string' && part).join(', ');
-  return label || null;
-}
-
-function featureId(feature: PhotonFeature): string | null {
-  const p = feature.properties ?? {};
-  if (typeof p.id === 'string') return p.id;
-  if (p.osm_type !== undefined && p.osm_id !== undefined) return `${p.osm_type}${p.osm_id}`;
-  return null;
-}
-
-async function mapMapJson(env: Env, path: string): Promise<{ status: number; data: any }> {
-  const response = await fetch(`${mapMapBase(env)}${path}`, {
-    headers: { Authorization: `Bearer ${mapMapKey(env)}` },
-  });
-  const data = await response.json().catch(() => ({}));
-  return { status: response.status, data };
-}
-
-async function censusResolve(query: string): Promise<{ label: string; lat: number; lng: number } | null> {
-  const url =
-    'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress' +
-    `?address=${encodeURIComponent(query)}&benchmark=Public_AR_Current&format=json`;
-  const response = await fetch(url);
-  if (!response.ok) return null;
-  const data = (await response.json().catch(() => ({}))) as {
-    result?: { addressMatches?: Array<{ matchedAddress?: string; coordinates?: { x?: number; y?: number } }> };
-  };
-  const match = data.result?.addressMatches?.[0];
-  const lat = Number(match?.coordinates?.y);
-  const lng = Number(match?.coordinates?.x);
-  if (!match?.matchedAddress || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { label: match.matchedAddress, lat, lng };
+async function suggestions(env: Env, query: string): Promise<Suggestion[]> {
+  const response = await fetch(
+    `${(env.MAPMAP_BASE?.trim() || 'https://api.mapmap.ai').replace(/\/+$/, '')}` +
+      `/geocode/suggest?q=${encodeURIComponent(query)}&limit=${SUGGEST_LIMIT}&country=us`,
+    { headers: { Authorization: `Bearer ${mapMapKey(env)}` } },
+  );
+  if (response.status !== 200) throw new Error(`provider HTTP ${response.status}`);
+  const data = (await response.json().catch(() => ({}))) as { features?: PhotonFeature[] };
+  const list: Suggestion[] = [];
+  for (const feature of data.features ?? []) {
+    const label = featureLabel(feature);
+    const id = featureId(feature);
+    if (label && id) list.push({ id, label });
+  }
+  return list;
 }
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
@@ -158,63 +128,33 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const query = cleanQuery(payload.query);
       if (!query) return json({ ok: false, error: 'invalid_request' }, 400);
       if (!configured) return json({ ok: false, error: 'provider_not_configured' }, 503);
-      const { status, data } = await mapMapJson(
-        env,
-        `/geocode/suggest?q=${encodeURIComponent(query)}&limit=${SUGGEST_LIMIT}&country=us`,
-      );
-      if (status !== 200) return json({ ok: false, error: 'provider_failed' }, 502);
-      const suggestions: Suggestion[] = [];
-      for (const feature of (data?.features ?? []) as PhotonFeature[]) {
-        const label = featureLabel(feature);
-        const id = featureId(feature);
-        if (label && id) suggestions.push({ id, label });
+      try {
+        return json({ ok: true, suggestions: await suggestions(env, query) });
+      } catch {
+        return json({ ok: false, error: 'provider_failed' }, 502);
       }
-      return json({ ok: true, suggestions });
     }
 
     if (action === 'resolve') {
       const query = cleanQuery(payload.query);
       if (!query) return json({ ok: false, error: 'invalid_request' }, 400);
       if (configured) {
-        const { status, data } = await mapMapJson(
-          env,
-          `/geocode?q=${encodeURIComponent(query)}&limit=1&country=us`,
-        );
-        if (status === 200) {
-          const feature = (data?.features ?? [])[0] as PhotonFeature | undefined;
-          const coords = feature?.geometry?.coordinates;
-          const label = feature ? featureLabel(feature) : null;
-          if (label && Array.isArray(coords) && coords.length === 2) {
-            const [lng, lat] = coords;
-            if (Number.isFinite(lat) && Number.isFinite(lng)) {
-              return json({ ok: true, result: { label, lat, lng, source: 'mapmap' } });
-            }
-          }
-        }
+        const provider = await mapMapResolve(env, query).catch(() => null);
+        if (provider) return json({ ok: true, result: provider });
         // Fall through to Census when MapMap has no match or errors.
       }
-      const census = await censusResolve(query);
+      const census = await censusResolve(query).catch(() => null);
       if (!census) return json({ ok: false, error: 'not_found' }, 404);
-      return json({ ok: true, result: { ...census, source: 'census' } });
+      return json({ ok: true, result: census });
     }
 
     if (action === 'resolve-id') {
       if (!configured) return json({ ok: false, error: 'provider_not_configured' }, 503);
       const id = typeof payload.id === 'string' ? payload.id.trim().slice(0, 120) : '';
       if (!id) return json({ ok: false, error: 'invalid_request' }, 400);
-      const { status, data } = await mapMapJson(env, `/geocode/retrieve?id=${encodeURIComponent(id)}`);
-      if (status !== 200) return json({ ok: false, error: 'provider_failed' }, 502);
-      const feature = (data?.features ?? [])[0] as PhotonFeature | undefined;
-      const coords = feature?.geometry?.coordinates;
-      const label = feature ? featureLabel(feature) : null;
-      if (!label || !Array.isArray(coords) || coords.length !== 2) {
-        return json({ ok: false, error: 'not_found' }, 404);
-      }
-      const [lng, lat] = coords;
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        return json({ ok: false, error: 'not_found' }, 404);
-      }
-      return json({ ok: true, result: { label, lat, lng, source: 'mapmap' } });
+      const result = await mapMapResolveId(env, id).catch(() => null);
+      if (!result) return json({ ok: false, error: 'not_found' }, 404);
+      return json({ ok: true, result });
     }
 
     return json({ ok: false, error: 'invalid_request' }, 400);

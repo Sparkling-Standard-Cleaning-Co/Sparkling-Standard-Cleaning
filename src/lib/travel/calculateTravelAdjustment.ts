@@ -109,6 +109,8 @@ export function calculateTravelAdjustment(input: TravelCalculationInput): Travel
       gasPriceSource,
       adjustment,
       requiresManualConfirmation,
+      method: input.routed.method === 'route' ? 'route' : 'straight_line_estimate',
+      verified: input.routed.verified === true || input.routed.method === 'route',
       ...(reason ? { reason } : {}),
     };
   }
@@ -124,6 +126,8 @@ export function calculateTravelAdjustment(input: TravelCalculationInput): Travel
       gasPriceSource: 'none',
       adjustment: input.zoneAdjustments[input.zone],
       requiresManualConfirmation: false,
+      method: 'zone',
+      verified: false,
     };
   }
 
@@ -137,6 +141,8 @@ export function calculateTravelAdjustment(input: TravelCalculationInput): Travel
     gasPriceSource: 'none',
     adjustment: 0,
     requiresManualConfirmation: !policy.instantEstimate,
+    method: 'none',
+    verified: false,
     reason: policy.manualReason,
   };
 }

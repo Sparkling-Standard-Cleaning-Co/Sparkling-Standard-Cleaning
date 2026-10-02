@@ -55,6 +55,8 @@ const EMPTY_TRAVEL: TravelEstimate = {
   gasPriceSource: 'none',
   adjustment: 0,
   requiresManualConfirmation: true,
+  method: 'none',
+  verified: false,
 };
 
 export function calculateEstimate(

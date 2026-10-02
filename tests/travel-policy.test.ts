@@ -106,3 +106,47 @@ test('policy values can be overridden by context (owner tuning)', () => {
   assert.equal(result.status, 'custom_confirmation_required');
   assert.equal(result.travel.drivingTimeStatus, 'review_band');
 });
+
+// ── Preliminary vs verified travel ───────────────────────────────────────────
+
+test('a live provider route is marked verified travel', () => {
+  const result = calculateEstimate(
+    input(),
+    context({
+      oneWayMiles: 24,
+      durationMinutes: 28,
+      gasPrice: 3.1,
+      gasPriceSource: 'configured_reference',
+      provider: 'mapmap',
+      method: 'route',
+      verified: true,
+    }),
+  );
+  assert.equal(result.status, 'estimated');
+  assert.equal(result.travel.method, 'route');
+  assert.equal(result.travel.verified, true);
+});
+
+test('a straight-line route estimate is explicitly preliminary', () => {
+  const result = calculateEstimate(
+    input(),
+    context({
+      oneWayMiles: 24,
+      durationMinutes: null,
+      gasPrice: 3.1,
+      gasPriceSource: 'configured_reference',
+      provider: 'straight_line',
+      method: 'straight_line_estimate',
+      verified: false,
+    }),
+  );
+  assert.equal(result.status, 'estimated');
+  assert.equal(result.travel.method, 'straight_line_estimate');
+  assert.equal(result.travel.verified, false);
+});
+
+test('offline zone mode is never presented as verified travel', () => {
+  const result = calculateEstimate(input(), context());
+  assert.equal(result.travel.method, 'zone');
+  assert.equal(result.travel.verified, false);
+});

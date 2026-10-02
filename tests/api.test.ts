@@ -1,7 +1,7 @@
 // Pages Function fail-safe tests (deployment reliability).
 // Run with: npm test  (Node's built-in test runner + TypeScript type stripping)
 //
-// These tests exercise the /api/lead and /api/travel handlers directly with
+// ── /api/lead ──────────────────────────────────────────────────────────────
 // constructed requests and environments. They encode the deployment contract:
 //  - missing configuration fails safe (503) so the client can fall back,
 //  - malformed or spammy input is rejected (400),
@@ -39,7 +39,7 @@ async function withFetch<T>(
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-// ── /api/lead ────────────────────────────────────────────────────────────────
+// ── /api/lead ──────────────────────────────────────────────────────────────
 
 test('lead: malformed JSON body is rejected', async () => {
   const response = await leadPost({
@@ -120,7 +120,7 @@ test('lead: GET is method-not-allowed', async () => {
   assert.equal(response.status, 405);
 });
 
-// ── /api/travel ──────────────────────────────────────────────────────────────
+// ── /api/travel ─────────────────────────────────────────────────────────────
 
 test('travel: missing origin returns origin_not_configured', async () => {
   const response = await travelPost({ request: jsonRequest({ zip: '32503' }), env: {} } as never);
@@ -269,3 +269,73 @@ test('travel: GET is method-not-allowed', async () => {
   const response = await travelGet();
   assert.equal(response.status, 405);
 });
+
+// ── /api/travel with confirmed destination coordinates ──────────────────────
+
+test('travel: confirmed coordinates produce a labeled straight-line route without a provider', async () => {
+  const response = await travelPost({
+    request: jsonRequest({ zip: '32503', lat: 30.4111, lng: -87.2164 }),
+    env: { TRAVEL_ORIGIN: '30.6100,-87.3400' },
+  } as never);
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as Record<string, unknown>;
+  assert.equal(data.method, 'straight_line_estimate');
+  assert.equal(data.verified, false);
+  assert.equal(typeof data.oneWayMiles, 'number');
+  assert.ok((data.oneWayMiles as number) > 0);
+});
+
+test('travel: confirmed coordinates use the configured provider route and duration', async () => {
+  const response = await withFetch(
+    async (url) => {
+      // Distinct destination from the straight-line test above (the function
+      // caches per destination for the isolate).
+      assert.match(String(url), /\/route\/v1\/driving\/-87\.34,30\.61;-87\.3,30\.5/);
+      return jsonResponse({ code: 'Ok', routes: [{ distance: 24140.2, duration: 1800.5 }] });
+    },
+    () =>
+      travelPost({
+        request: jsonRequest({ zip: '32504', lat: 30.5, lng: -87.3 }),
+        env: {
+          TRAVEL_ORIGIN: '30.6100,-87.3400',
+          ROUTES_PROVIDER: 'mapmap',
+          ROUTES_API_KEY: 'dummy-mapmap-key',
+        },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as Record<string, unknown>;
+  assert.equal(data.method, 'route');
+  assert.equal(data.verified, true);
+  assert.equal(data.durationMinutes, 30);
+});
+
+test('travel: coordinates without a ZIP are accepted (confirmed pin path)', async () => {
+  const response = await travelPost({
+    request: jsonRequest({ lat: 30.4111, lng: -87.2164 }),
+    env: { TRAVEL_ORIGIN: '30.6100,-87.3400' },
+  } as never);
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as Record<string, unknown>;
+  assert.equal(data.zone, 'unknown');
+  assert.ok((data.oneWayMiles as number) > 0);
+});
+
+test('travel: invalid coordinates fall back to a valid ZIP instead of failing the estimate', async () => {
+  const response = await travelPost({
+    request: jsonRequest({ zip: '32503', lat: 999, lng: 'nope' }),
+    env: { TRAVEL_ORIGIN: '30.6100,-87.3400' },
+  } as never);
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as Record<string, unknown>;
+  assert.equal(data.zone, 'core');
+});
+
+test('travel: no coordinates and no ZIP is an invalid request', async () => {
+  const response = await travelPost({
+    request: jsonRequest({}),
+    env: { TRAVEL_ORIGIN: '30.6100,-87.3400' },
+  } as never);
+  assert.equal(response.status, 400);
+});
+
