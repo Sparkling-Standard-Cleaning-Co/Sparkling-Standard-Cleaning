@@ -26,7 +26,7 @@ Date: **2026-10-01**.
 | Visual evidence archive in-repo | Screenshot folders under `docs/verification/` | ⚠️ screenshots produced but kept outside the repo | ⏳ optional — add curated before/after screenshots when the owner reviews the staging site |
 | Marketing operating system | 90-day plan, weekly workflow, calendar, scorecard, review system | ✅ exists | done — `docs/marketing/` |
 | UTM/QR attribution system | Central registry, generated docs, decode-verified QR | ✅ exists | done — `src/config/marketing-links.ts` + generated docs |
-| Consent-gated analytics | Nothing loads before consent; fixed event names; no PII | ✅ exists (IDs not yet configured) | done — activate when IDs land |
+| Consent-gated analytics | Nothing loads before consent; fixed event names; no PII | ✅ live (GTM `GTM-KSQ26HMG`; Umami awaits an ID) | Verify GA4 events inside the container |
 | SEO organization | Page ownership map, strategy, audits | ✅ core exists | maintained — `docs/seo/SEO-STRATEGY.md` |
 | Role onboarding | Separate developer/marketer/owner start-here documents | ⚠️ hub section only | acceptable for a solo owner; split only when a second operator joins |
 | Maintenance schedule | Recurring operational cadence document | ❌ does not exist | ⏳ small addition, see backlog |

@@ -75,11 +75,12 @@ Preconditions: production Pages project variables match the expected configurati
    confirm `/api/travel` still returns `straight_line_estimate` and never calls a paid endpoint.
 4. Run the full journey on the preview (desktop + mobile): address suggestions → pin confirmation
    → proposed price → reservation request; confirm Call/Text links and the privacy page.
-5. Submit one **marked test reservation** (subject clearly marked "TEST — internal") with a
-   synthetic name and the owner's own email. After owner authorization, verify the owner inbox
-   receives it with the server fields: `quote_verified`, `verified_price`/`client_price`,
-   `server_config_version`, `pin_check`, `quote_valid_through`, and a plain-language
-   `verification_note`.
+5. Submit one test reservation with a synthetic name and the owner's own email. On a preview
+   branch the subject and body are **automatically marked** `[PREVIEW TEST — NOT A REAL BOOKING]`
+   by `functions/api/lead.ts` (no manual label needed); on production, label it "TEST — internal"
+   manually. After owner authorization, verify the owner inbox receives it with the server fields:
+   `quote_verified`, `verified_price`/`client_price`, `server_config_version`, `pin_check`,
+   `quote_valid_through`, and a plain-language `verification_note`.
 6. Repeat once with a deliberately different `quoted_price` (devtools) to confirm the email shows
    `quote_verified=mismatch` and the customer receipt shows the price-check warning.
 7. Confirm the built bundle contains no `TRAVEL_ORIGIN`, `ROUTES_API_KEY`/`MAPMAP_API_KEY` names

@@ -29,7 +29,31 @@ interface Env extends QuoteVerificationEnv {
   WEB3FORMS_ACCESS_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
+  /** Explicit preview marker; set on a Cloudflare Pages preview environment. */
+  PREVIEW_TEST_MODE?: string;
+  /** The branch that serves production. Defaults to `main`. */
+  PRODUCTION_BRANCH?: string;
+  /** Cloudflare Pages injects the deployed branch automatically. */
+  CF_PAGES_BRANCH?: string;
 }
+
+/**
+ * True when this deployment is NOT the production branch. Cloudflare Pages
+ * injects CF_PAGES_BRANCH on every deployment, so preview environments are
+ * marked automatically without configuration; PREVIEW_TEST_MODE=true forces
+ * the marker anywhere else. Every preview submission is then labeled as a
+ * test in the subject and body so it can never be mistaken for a real lead.
+ */
+function isPreviewDeployment(env: Env): boolean {
+  if (env.PREVIEW_TEST_MODE === 'true') return true;
+  const branch = env.CF_PAGES_BRANCH?.trim();
+  if (!branch) return false;
+  return branch !== (env.PRODUCTION_BRANCH?.trim() || 'main');
+}
+
+export const PREVIEW_TEST_PREFIX = '[PREVIEW TEST — NOT A REAL BOOKING] ';
+export const PREVIEW_TEST_NOTE =
+  'YES — this submission came from a preview/test environment. It is NOT a real cleaning request; do not schedule it or treat it as a customer lead.';
 
 // The estimator sends structured scope + quote + attribution fields; the cap
 // stays bounded (a hard server-side limit) while fitting the full request.
@@ -72,6 +96,8 @@ const SERVER_OWNED_KEYS = new Set([
   'travel_duration_minutes',
   'travel_verified',
   'travel_destination_source',
+  'preview_test',
+  'preview_branch',
 ]);
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -141,6 +167,7 @@ export async function onRequestPost(context: {
   if (!subject || typeof payload.fields !== 'object' || payload.fields === null) {
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
+  const previewTest = isPreviewDeployment(env);
 
   // Sanitize: flat string values, safe keys, bounded counts and lengths.
   // Client-supplied server-owned fields (e.g. quote_verified) are dropped here.
@@ -271,6 +298,18 @@ export async function onRequestPost(context: {
     }
   }
 
+  // Preview/test deployments: make the test unmistakable in BOTH the subject
+  // and the body before the provider ever sees it. Production (branch main)
+  // is never marked and never altered.
+  if (previewTest) {
+    clean.preview_test = PREVIEW_TEST_NOTE;
+    clean.preview_branch = (env.CF_PAGES_BRANCH ?? env.PRODUCTION_BRANCH ?? 'unknown').slice(0, 60);
+  }
+  const forwardedSubject =
+    previewTest && !subject.startsWith('[PREVIEW TEST')
+      ? `${PREVIEW_TEST_PREFIX}${subject}`.slice(0, MAX_SUBJECT_LENGTH)
+      : subject;
+
   const endpoint = env.WEB3FORMS_ENDPOINT ?? 'https://api.web3forms.com/submit';
   try {
     const response = await fetch(endpoint, {
@@ -278,7 +317,7 @@ export async function onRequestPost(context: {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         access_key: env.WEB3FORMS_ACCESS_KEY,
-        subject,
+        subject: forwardedSubject,
         botcheck: '',
         ...clean,
       }),

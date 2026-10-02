@@ -69,15 +69,31 @@ for (const file of targets) {
     if (match) review.push(`${file}: [${label}] "${match[0]}"`);
   }
 
-  // "guaranteed" is only a violation as a POSITIVE claim — the anti-bait-and-switch
-  // copy deliberately says "not a guaranteed price". Check the context window.
+  // "guaranteed" is only a violation as a POSITIVE customer-facing claim — the
+  // anti-bait-and-switch copy deliberately says "not a guaranteed price".
+  // Code identifiers (const guarantee, responseGuarantee, card--guarantee,
+  // guarantee-terms) are not claims. Check a symmetric window for a negation
+  // or an explicit unpublished/proposed/disabled disclaimer.
   const guaranteeRegex = /\bguaranteed?\b/gi;
   let guaranteeMatch;
   while ((guaranteeMatch = guaranteeRegex.exec(content)) !== null) {
-    const window = content.slice(Math.max(0, guaranteeMatch.index - 40), guaranteeMatch.index).toLowerCase();
-    const negated = /\b(not|never|no|isn't|without)\b/.test(window);
-    if (!negated) {
-      failures.push(`${file}: [guarantee claim] "${guaranteeMatch[0]}" without a negation nearby`);
+    const word = guaranteeMatch[0];
+    const before = content.slice(Math.max(0, guaranteeMatch.index - 40), guaranteeMatch.index);
+    const after = content.slice(guaranteeMatch.index + word.length, guaranteeMatch.index + word.length + 40);
+    const isIdentifier =
+      /[=.[(]\s*$/.test(before) ||
+      /^\s*[.=:)\]]/.test(after) ||
+      /[-_]\s*$/.test(before) ||
+      /^\s*[-_]/.test(after);
+    if (isIdentifier) continue;
+    const window = content
+      .slice(Math.max(0, guaranteeMatch.index - 120), guaranteeMatch.index + word.length + 120)
+      .toLowerCase();
+    const disclaimed =
+      /\b(not|never|no|isn't|without|unpublished|proposed|pending|disabled)\b/.test(window) ||
+      /requires?\s+(explicit\s+)?(owner\s+)?approval/.test(window);
+    if (!disclaimed) {
+      failures.push(`${file}: [guarantee claim] "${word}" without a negation or disclaimer nearby`);
     }
   }
 }

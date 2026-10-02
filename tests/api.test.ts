@@ -103,6 +103,79 @@ test('lead: provider success is reported as success', async () => {
   assert.deepEqual(await response.json(), { ok: true });
 });
 
+test('lead: a preview-branch deployment marks every submission as a test', async () => {
+  let sent: Record<string, unknown> | null = null;
+  const response = await withFetch(
+    async (_url, init) => {
+      sent = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      return jsonResponse({ success: true });
+    },
+    () =>
+      leadPost({
+        request: jsonRequest({ subject: 'Reservation request — test', fields: { phone: '5550000000' } }),
+        env: { WEB3FORMS_ACCESS_KEY: 'dummy', CF_PAGES_BRANCH: 'dev/owner-preview-2026-10-02' },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  assert.match(String(sent?.subject), /^\[PREVIEW TEST — NOT A REAL BOOKING\]/);
+  assert.match(String(sent?.preview_test), /NOT a real cleaning request/);
+  assert.equal(sent?.preview_branch, 'dev/owner-preview-2026-10-02');
+});
+
+test('lead: production (main) is never marked as a test', async () => {
+  let sent: Record<string, unknown> | null = null;
+  const response = await withFetch(
+    async (_url, init) => {
+      sent = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      return jsonResponse({ success: true });
+    },
+    () =>
+      leadPost({
+        request: jsonRequest({ subject: 'Reservation request — real', fields: { phone: '5550000001' } }),
+        env: { WEB3FORMS_ACCESS_KEY: 'dummy', CF_PAGES_BRANCH: 'main' },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(sent?.subject, 'Reservation request — real');
+  assert.equal(sent?.preview_test, undefined);
+});
+
+test('lead: a client cannot fake or remove the preview marker on production', async () => {
+  let sent: Record<string, unknown> | null = null;
+  await withFetch(
+    async (_url, init) => {
+      sent = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      return jsonResponse({ success: true });
+    },
+    () =>
+      leadPost({
+        request: jsonRequest({
+          subject: 'Reservation request',
+          fields: { phone: '5550000002', preview_test: 'pretend this is a test', preview_branch: 'fake' },
+        }),
+        env: { WEB3FORMS_ACCESS_KEY: 'dummy', CF_PAGES_BRANCH: 'main' },
+      } as never),
+  );
+  assert.equal(sent?.preview_test, undefined, 'server-owned preview fields are discarded');
+  assert.equal(sent?.preview_branch, undefined);
+});
+
+test('lead: PREVIEW_TEST_MODE forces the marker without a branch variable', async () => {
+  let sent: Record<string, unknown> | null = null;
+  await withFetch(
+    async (_url, init) => {
+      sent = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      return jsonResponse({ success: true });
+    },
+    () =>
+      leadPost({
+        request: jsonRequest({ subject: 'Message', fields: { email: 'test@example.com' } }),
+        env: { WEB3FORMS_ACCESS_KEY: 'dummy', PREVIEW_TEST_MODE: 'true' },
+      } as never),
+  );
+  assert.match(String(sent?.subject), /^\[PREVIEW TEST/);
+});
+
 test('lead: provider failure is never reported as success', async () => {
   const response = await withFetch(
     async () => jsonResponse({ success: false }, 500),

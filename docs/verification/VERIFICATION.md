@@ -14,8 +14,7 @@ generated marketing documents are byte-compared by validation.
 | --- | --- | --- |
 | TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints |
 | Production build | `npm run build` | 18 pages + sitemap, no errors |
-| Estimator unit tests | `npm test` | 27/27 pass (anchors, frequencies, add-ons, minimums, travel, thresholds, malformed input) |
-| Pages Function fail-safe tests | `npm test` | 18/18 pass (`/api/lead`: invalid input, honeypot, no-contact, Turnstile-missing-token, not-configured 503, provider success/failure, 405; `/api/travel`: missing origin, malformed/unreferenced ZIP, straight-line fallback, provider route, provider failure fallback, EIA failure fallback, live EIA price, 405) — **45 tests total** |
+| Estimator unit tests | `npm test` | Runs the full unit suite in one command (estimator anchors, frequencies, add-ons, minimums, travel, thresholds, malformed input, address ranking, quote verification, promotion engine, Pages Functions) — the exact current count is re-run and recorded at every change, never carried over |
 | Internal links | `npm run links` | 982 links across 18 pages, all resolve |
 | SEO checks | `npm run seo` | unique titles/descriptions across 18 pages, canonicals, robots, JSON-LD, sitemap |
 | Marketing registry + QR decode | `npm run marketing:verify` | registry valid, docs in sync, 13 QR asset groups decode-verified against `https://sparkling-standard.com` URLs |
@@ -33,7 +32,7 @@ generated marketing documents are byte-compared by validation.
 | Accessibility scan (axe-core, WCAG 2.0/2.1/2.2 A+AA) | 15 pages at 360 px | **0 violations**. Fixed: touch-target sizes in footer/standalone links and footer-tagline color contrast found in earlier scans. |
 | Estimator flow (real browser) | 3/2 1600 sq ft, maintained, biweekly, ZIP 32503 | completes the wizard; live range `$235 – $285` shown before submission; matches the internal labor model |
 | Estimator out-of-area behavior | same flow with ZIP 90210 | "Custom confirmation required" with an honest explanation — never a fake price |
-| Estimator draft persistence | reload mid-flow | restored to the saved step (fixed a bug where the progress restored but the visible step did not) |
+| Estimator draft persistence | reload mid-flow | **Intentionally none**: every visit/reload/back-forward starts a fresh blank estimate. Estimated answers are never stored in localStorage; only a per-session travel cache and the consent/attribution keys exist (browser test asserts the fresh start). Earlier documentation claiming draft restore was stale and has been corrected |
 | Estimator fail-safe travel lookup | static preview (`/api/travel` 404) | falls back to zone-based travel without breaking the estimate — expected until Cloudflare Pages Functions run in deployment |
 | Header reflow | 960/1024/1152/1280/1440 px | wordmark never truncated; navigation reflows; phone button hidden only in the 960–1088 px band where it cannot fit (number remains in mobile menu, footer and contact surfaces) |
 | Deployment configuration package | `npm run deploy:secrets` with dummy values + `git check-ignore` | generates the git-ignored `deploy/secrets.env` in the `wrangler pages secret bulk` format; missing required keys exit non-zero; the ignore rules were verified |
@@ -49,12 +48,12 @@ commit check-runs and deployed bundle hashes verified).
 | Page availability | HTTP + Playwright over 15 pages | all `200`; no console errors; no horizontal overflow at 360 px |
 | Canonicals + robots | live HTML inspection | every page `index, follow` with self-referencing canonical; `robots.txt` `Allow: /` + sitemap. `PUBLIC_PREVIEW_MODE` is NOT set |
 | Accessibility | axe-core WCAG 2.0/2.1/2.2 A+AA at 360 px | 0 violations on home, estimate, contact |
-| Mobile action bar + contact | Playwright | sticky bar visible; `tel:+18504268479` correct; 0 `sms:` links (gate off) |
-| Consent behavior | Playwright | consent banner hidden and no analytics requests while no IDs are configured |
+| Mobile action bar + contact | Playwright | sticky bar visible; `tel:+18504268479` correct; SMS enabled (`business.flags.smsEnabled: true`, owner-verified) so the text link is present |
+| Consent behavior | Playwright | consent banner shown until a choice is made; GTM (`GTM-KSQ26HMG`) loads only after explicit analytics consent; no analytics request before it. Umami has no ID configured and does not load |
 | Core Web Vitals (lab) | Chromium, 1.6 Mbps / 150 ms RTT / 4× CPU | home LCP 1.65 s / CLS 0.038; estimate LCP 1.37 s / CLS 0; contact LCP 1.26 s / CLS 0 (targets: LCP ≤ 2.5 s, CLS ≤ 0.1 — met). INP not measurable without interaction; recorded as unreported |
-| `/api/travel` | live POST | deployed and responding `503 origin_not_configured` (function works; configuration pending) |
-| `/api/lead` | live POST (invalid payload, then valid test) | deployed and validating (`400` on bad input); `503 not_configured` on a valid payload — **form delivery blocked until the Web3Forms key is configured**; no false success |
-| Authorized test submission | live contact form, clearly marked test | honest failure copy shown; no email sent (correct fail-safe). Inbox delivery cannot be confirmed by engineering |
+| `/api/travel` | live POST | deployed and verified (`method: route, verified: true` with the configured origin) |
+| `/api/lead` | live POST (invalid payload, then valid test) | deployed, validating (`400` on bad input), and delivering via the server relay; owner-confirmed inbox delivery (2026-10-02) |
+| Authorized test submission | live contact form, clearly marked test | delivered; failure copy remains channel-accurate (call/email/text) |
 | Form failure copy | local + deployed bundle inspection | fixed and deployed (`edac89e`): honors the server's `503 not_configured` signal, attempts the static fallback, and shows channel-accurate alternatives (call/email; never "text" while SMS is unverified) |
 | Estimator on production | live wizard flow | range appears for in-area ZIPs; out-of-area routes to manual confirmation (verified locally before deploy; live behavior matches) |
 
@@ -67,7 +66,7 @@ Lighthouse scores.
 | Check | Method | Result |
 | --- | --- | --- |
 | Estimator final-step navigation | Committed browser suite, 360/768/1440 px | steps 1–5 show Continue (+Back from step 2); step 6 shows Back + **exactly one primary action** labelled "Send My Request"; no Continue. Root cause fixed at the stylesheet (`[hidden]{display:none!important}` — `.btn`/`.field` display rules were overriding the `hidden` attribute) |
-| Wizard regression suite | `npm run test:browser` | **7/7 pass**: navigation contract at three widths, validation blocks advancement, draft restore after reload, double-submission prevention (button disabled while sending; honest failure; re-enabled), no 360 px overflow |
+| Wizard regression suite | `npm run test:browser` | navigation contract at three widths, validation blocks advancement, **fresh start after reload** (no draft is stored), double-submission prevention (button disabled while sending; honest failure; re-enabled), no 360 px overflow |
 | Other `hidden` elements | Browser suite | live estimate panel hidden initially; STR-only field hidden for standard service; honeypot unaffected |
 | Unit tests | `npm test` | 52/52 pass |
 | Deployment | Cloudflare Pages check-run for `6afe7a1` | success; fresh bundle hashes served; site serves the new build |
@@ -83,11 +82,11 @@ Lighthouse scores.
 | Live form delivery | Requires the Web3Forms key and inbox | Owner-authorized test submission per form category after configuring `WEB3FORMS_*`; confirm it arrives at `owner@sparkling-standard.com` |
 | Live Turnstile | Requires Cloudflare keys | Enable, submit, confirm challenge appears server-side |
 | Real route distance / EIA price | Requires `TRAVEL_ORIGIN` + provider keys | `POST /api/travel` after deployment with keys |
-| Cloudflare preview deployment | Requires Cloudflare account access | Connect the repository, deploy, verify pages + Pages Functions |
+| Cloudflare preview deployment | Requires the owner to enable preview branches in the Cloudflare dashboard (Settings → Builds → Branch control); the repo cannot change that setting. Preview submissions are auto-marked as tests by the function | Enable branch previews, push a non-main branch, then verify the preview hostname is NOT the production domain and that a test submission arrives with `[PREVIEW TEST — NOT A REAL BOOKING]` |
 | Real-device mobile smoke | Playwright emulation only (no physical device) | Manual pass on a phone: estimate flow, sticky bar, tap-to-call |
 | Visual review (founder eye) | Screenshots prepared for review; automated checks cannot judge taste | Owner reviews the preview and screenshots; change requests tracked in git |
-| Lighthouse lab metrics | Needs a deployed URL and Chrome | Run PageSpeed Insights on the production preview |
-| Image optimization behavior | No real content images exist yet | When the first real photos land, verify `astro:assets` output in the build |
+| Lighthouse lab metrics | Needs a deployed URL and Chrome | Run PageSpeed Insights on the production site |
+| Genuine photography | No real Sparkling Standard project photos exist yet; representative licensed interiors are registered in `docs/design/IMAGE-SOURCE-REGISTER.md` | Replace stock files with permissioned real photos, then verify `astro:assets` output and update the register |
 | Search indexing | Post-launch | Search Console coverage after sitemap submission |
 
 ## How to re-run everything

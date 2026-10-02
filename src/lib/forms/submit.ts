@@ -118,13 +118,27 @@ export async function submitLead(
   if (!business.forms.web3formsAccessKey) {
     return { ok: false, reason: 'not_configured' };
   }
+  // A preview build cannot use the server relay marker, so it marks its own
+  // direct submissions as tests — never mistakable for a real lead.
+  const previewMode = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
+  const previewFields = previewMode
+    ? {
+        preview_test:
+          'YES — this submission came from a preview/test build. It is NOT a real cleaning request; do not schedule it or treat it as a customer lead.',
+        preview_branch: 'preview-build',
+      }
+    : {};
+  const forwardedSubject =
+    previewMode && !subject.startsWith('[PREVIEW TEST')
+      ? `[PREVIEW TEST — NOT A REAL BOOKING] ${subject}`.slice(0, 200)
+      : subject;
   try {
     const response = await fetch(business.forms.web3formsEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         access_key: business.forms.web3formsAccessKey,
-        subject,
+        subject: forwardedSubject,
         botcheck: '',
         verification_path: 'direct_provider',
         verification_status: 'unverified_direct_submission',
@@ -132,6 +146,7 @@ export async function submitLead(
           'UNVERIFIED: submitted directly to the form provider — no authoritative server verification was available for this estimate.',
         submitted_at_client: new Date().toISOString(),
         ...fields,
+        ...previewFields,
       }),
     });
     const data = (await response.json().catch(() => ({}))) as { success?: boolean };
