@@ -278,11 +278,25 @@ export const pricing = {
   // ── Instant quote (single offered price) ──────────────────────────────────
   instantQuote: {
     /**
-     * Enables the single-price instant quote experience. FALSE until the owner
-     * approves the formula and the pricing matrix — the estimate range remains
-     * the production experience meanwhile.
+     * Enables the proposed-price experience: one clearly labeled cleaning
+     * price derived from the estimate model, shown with the reservation
+     * request flow. Owner-directed (2026-10-01) — the price is a proposal on
+     * a non-binding REQUEST, never a confirmed booking.
      */
-    enabled: provisional(false, 'Owner approval pending (reference-quote impact report first).'),
+    enabled: approved(true, 'Owner-directed proposed-price experience (2026-10-01). Always labeled as a request pending owner confirmation.'),
+    /**
+     * Binding customer offers (auto-accepted prices/charges) remain disabled
+     * until the server-side verification path is live AND the owner approves
+     * the reference-quote impact report. The reservation flow is
+     * request-only while this is false.
+     */
+    binding: approved(false, 'Binding offers stay off: every reservation is server-verified and owner-confirmed, never auto-charged.'),
+    /**
+     * Configuration version recorded with every quote and verified against
+     * the server before a reservation is accepted. Bump when pricing logic,
+     * rates or policy values change so old quotes cannot be silently reused.
+     */
+    configVersion: approved('2026-10-01.option-c.v1', 'Quote provenance marker. Increment on any pricing/policy change.'),
     /**
      * Which value from the calculation becomes the offered price. 'expected' is
      * the model price and never the lowest range value; 'midpoint' and 'high'

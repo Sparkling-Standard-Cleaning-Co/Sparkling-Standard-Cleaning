@@ -41,8 +41,10 @@ function input(overrides: Partial<EstimateInput> = {}): EstimateInput {
   };
 }
 
-test('the instant feature is disabled by default pending owner approval', () => {
-  assert.equal(pricing.instantQuote.enabled.value, false);
+test('the proposed-price experience is enabled while binding offers stay disabled', () => {
+  assert.equal(pricing.instantQuote.enabled.value, true);
+  assert.equal(pricing.instantQuote.binding.value, false, 'requests only — never an auto-accepted charge');
+  assert.ok(pricing.instantQuote.configVersion.value.length > 5);
 });
 
 test('an eligible home receives one deterministic price', () => {
@@ -129,7 +131,7 @@ test('quote references are well-formed, deterministic per minute and non-sensiti
   assert.ok(!a.includes('32503') && !a.includes('255'), 'contains no customer information');
 });
 
-test('quote expiration follows the configured validity window', () => {
+test('quote expiration and provenance follow the configured policy', () => {
   const now = Date.UTC(2026, 9, 1, 12, 0, 0);
   const quote = buildInstantQuote(calculateEstimate(input(), context), { serviceType: 'standard', zip: '32503' }, now);
   assert.ok(quote !== null);
@@ -137,4 +139,6 @@ test('quote expiration follows the configured validity window', () => {
   assert.equal(isQuoteValid(now, now + pricing.instantQuote.validityHours.value * 3_600_000), true);
   assert.equal(isQuoteValid(now, now + pricing.instantQuote.validityHours.value * 3_600_000 + 1), false);
   assert.ok(new Date(quote.expiresAt).getTime() > now);
+  assert.equal(quote.configVersion, pricing.instantQuote.configVersion.value);
+  assert.equal(quote.travelVerified, false, 'zone-mode travel is preliminary');
 });

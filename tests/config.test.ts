@@ -138,8 +138,15 @@ test('driving policy and instant-quote settings are structurally valid', () => {
   assert.ok(['expected', 'midpoint', 'high'].includes(pricingValue(pricing.instantQuote.selection)));
   assert.ok(pricingValue(pricing.instantQuote.marginFloor) >= 1, 'margin floor must be at least 1');
   assert.ok(pricingValue(pricing.instantQuote.validityHours) > 0);
-  // Binding instant prices stay off until the owner approves the impact report.
-  assert.equal(pricingValue(pricing.instantQuote.enabled), false);
+  // The proposed-price experience is owner-directed (2026-10-01); binding
+  // customer offers remain OFF until the server verification path passes.
+  assert.equal(pricingValue(pricing.instantQuote.enabled), true);
+  assert.equal(pricingValue(pricing.instantQuote.binding), false);
+  assert.ok(
+    typeof pricingValue(pricing.instantQuote.configVersion) === 'string' &&
+      pricingValue(pricing.instantQuote.configVersion).length > 5,
+    'quotes must carry a configuration version',
+  );
 });
 
 test('travel economics match the shared travel configuration', () => {

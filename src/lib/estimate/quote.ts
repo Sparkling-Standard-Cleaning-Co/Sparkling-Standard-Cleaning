@@ -6,14 +6,11 @@
 //  - The offered price is selected from the model's own values and can never
 //    fall below expectedPrice × marginFloor, nor below the minimum job value.
 //  - Rounding rounds UP to the configured step so the safeguard survives it.
-//  - The quote reference is a DISPLAY reference only. It is not an
-//    authorization token; binding offers must be verified server-side against
-//    the approved configuration before this feature is enabled in production
-//    (see docs/operations/ESTIMATOR-LOCATION-ENGINE.md § verification design).
-//
-// The feature is disabled by default via pricing.instantQuote.enabled; the
-// production experience remains the estimate range until the owner approves
-// the formula with the reference-quote impact report.
+//  - The quote carries the pricing configuration version and an expiry. It is
+//    a PROPOSAL on a non-binding request: binding offers stay disabled
+//    (pricing.instantQuote.binding === false) and every reservation request is
+//    recalculated server-side in functions/api/lead.ts before the owner sees
+//    it. A client-supplied price is never trusted.
 
 import { pricing } from '../../config/pricing.ts';
 import type { EstimateResult } from './types.ts';
@@ -30,8 +27,12 @@ export interface InstantQuote {
   expiresAt: string;
   selection: QuoteSelection;
   travelMode: EstimateResult['travel']['mode'];
+  /** True only when travel came from a live provider route. */
+  travelVerified: boolean;
   confidence: EstimateResult['confidence'];
   minimumApplied: boolean;
+  /** Pricing configuration version the quote was built from. */
+  configVersion: string;
 }
 
 const roundUpToStep = (value: number, step: number): number => Math.ceil(value / step) * step;
@@ -81,8 +82,10 @@ export function buildInstantQuote(
     expiresAt: new Date(now + pricing.instantQuote.validityHours.value * 3_600_000).toISOString(),
     selection: pricing.instantQuote.selection.value,
     travelMode: result.travel.mode,
+    travelVerified: result.travel.verified,
     confidence: result.confidence,
     minimumApplied: result.minimumApplied,
+    configVersion: pricing.instantQuote.configVersion.value,
   };
 }
 
