@@ -75,6 +75,7 @@ for (const [label, needle] of [
   ['ZIP field', 'id="est-zip"'],
   ['map confirmation card', 'data-address-map'],
   ['find-my-address control', 'data-address-resolve'],
+  ['use-my-current-location control', 'data-address-gps'],
   ['reservation summary', 'data-reservation-summary'],
   ['price preview', 'data-price-preview'],
   ['post-send timeline', 'timeline__stage'],
@@ -110,6 +111,22 @@ if (workerAssets.length === 0) {
 }
 if (bundleText.includes('routes.googleapis.com') || bundleText.includes('api.mapbox.com')) {
   problems.push('built scripts: a paid routing provider was bundled');
+}
+if (!bundleText.includes('GTM-KSQ26HMG')) {
+  problems.push('built scripts: the GTM container id is missing from the production build');
+}
+
+// Sitemap + robots must ship in the build and reference the production domain.
+const sitemapIndex = fs.readFileSync(path.join(DIST, 'sitemap-index.xml'), 'utf8');
+if (!sitemapIndex.includes('<sitemapindex') || !sitemapIndex.includes('https://sparkling-standard.com/sitemap-0.xml')) {
+  problems.push('sitemap-index.xml: missing or wrong child sitemap reference');
+}
+const robots = fs.readFileSync(path.join(DIST, 'robots.txt'), 'utf8');
+if (!robots.includes('Sitemap: https://sparkling-standard.com/sitemap-index.xml')) {
+  problems.push('robots.txt: missing the production sitemap reference');
+}
+if (/noindex/i.test(fs.readFileSync(path.join(DIST, 'estimate', 'index.html'), 'utf8'))) {
+  problems.push('estimate page: accidental noindex directive');
 }
 
 // Lead forms with correct variants.

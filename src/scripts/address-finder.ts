@@ -26,6 +26,8 @@ import {
 const SUGGEST_DEBOUNCE_MS = 350;
 const MIN_SUGGEST_LENGTH = 4;
 const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+/** GPS readings below this accuracy (metres) may fill the address fields. */
+const GPS_ACCURACY_LIMIT_METERS = 150;
 
 export interface AddressFinderOptions {
   form: HTMLFormElement;
@@ -47,7 +49,7 @@ interface ResolvedCandidate {
   zip?: string;
   city?: string;
   state?: string;
-  source: 'mapmap' | 'census' | 'manual';
+  source: 'mapmap' | 'census' | 'manual' | 'gps';
   adjusted: boolean;
 }
 
@@ -78,6 +80,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
 
   const suggestionsList = root.querySelector<HTMLUListElement>('[data-address-suggestions]');
   const statusEl = root.querySelector<HTMLElement>('[data-address-status]');
+  const gpsButton = root.querySelector<HTMLButtonElement>('[data-address-gps]');
   const resolveButton = root.querySelector<HTMLButtonElement>('[data-address-resolve]');
   const mapCard = root.querySelector<HTMLElement>('[data-address-map]');
   const mapCanvas = root.querySelector<HTMLElement>('[data-address-map-canvas]');
@@ -305,6 +308,111 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       if ((error as Error).name === 'AbortError') return;
       exactResolveFailed();
     }
+  }
+
+  /**
+   * GPS → address. The device position is shown as an UNCONFIRMED pin the
+   * customer must explicitly confirm; reverse geocoding fills the address
+   * fields only when the provider returns an exact house number and the GPS
+   * accuracy is good. A nearest-road or locality match is never presented as a
+   * verified street address.
+   */
+  async function handleGpsPosition(position: GeolocationPosition): Promise<void> {
+    const { latitude, longitude, accuracy } = position.coords;
+    showCandidate({
+      label: 'Current location (from your device)',
+      lat: latitude,
+      lng: longitude,
+      source: 'gps',
+      adjusted: false,
+    });
+    setState('gps');
+    const poorAccuracy = Number.isFinite(accuracy) && accuracy > GPS_ACCURACY_LIMIT_METERS;
+    setStatus(
+      poorAccuracy
+        ? `Your location is only accurate to about ${Math.round(accuracy)} m — check the pin and correct the address if needed.`
+        : 'We found your location — confirming the address…',
+      'info',
+    );
+    try {
+      const response = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ action: 'reverse', lat: latitude, lng: longitude }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: ResolveResult };
+      if (response.ok && data.ok && data.result) {
+        const result = data.result;
+        if (result.precise === true && !poorAccuracy) {
+          applyingResolved = true;
+          try {
+            const label = result.label ?? '';
+            fillField(
+              streetField,
+              streetLineFromLabel(label, result.city, result.state, result.zip ?? zipFromLabel(label) ?? undefined) ||
+                undefined,
+            );
+            fillField(cityInput, result.city);
+            fillField(stateInput, result.state);
+            fillField(zipInput, result.zip ?? zipFromLabel(label) ?? undefined);
+          } finally {
+            applyingResolved = false;
+          }
+          if (candidate) {
+            candidate = {
+              ...candidate,
+              label: result.label ?? candidate.label,
+              ...(result.zip ? { zip: result.zip } : {}),
+              ...(result.city ? { city: result.city } : {}),
+              ...(result.state ? { state: result.state } : {}),
+            };
+          }
+          settleDestinationValues();
+          setStatus('We found this address — confirm this is the property you want cleaned.', 'info');
+          return;
+        }
+        setStatus(
+          poorAccuracy
+            ? 'Your location is approximate — check the pin, correct the address if needed, then confirm.'
+            : "We couldn't match your location to an exact street address — check the pin and address, then confirm or correct them.",
+          'info',
+        );
+        return;
+      }
+      setStatus(
+        poorAccuracy
+          ? 'Your location is approximate — check the pin, correct the address if needed, then confirm.'
+          : "We couldn't look up the address from your location — check the pin, enter the address, then confirm.",
+        'info',
+      );
+    } catch {
+      setStatus(
+        'We found your location, but the address lookup is unavailable — check the pin and enter the address if needed.',
+        'info',
+      );
+    }
+  }
+
+  function useCurrentLocation(): void {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setStatus('Your browser does not support location sharing — enter your address manually.', 'info');
+      return;
+    }
+    setState('locating');
+    setStatus('Getting your location…', 'info');
+    navigator.geolocation.getCurrentPosition(
+      (position) => void handleGpsPosition(position),
+      (error) => {
+        setState('idle');
+        setStatus(
+          error.code === error.PERMISSION_DENIED
+            ? 'Location access was denied — enter your address above or continue with your ZIP.'
+            : "We couldn't get your location right now — enter your address manually or continue with your ZIP.",
+          'info',
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
   }
 
   async function ensureMap(): Promise<MapLibreModule | null> {
@@ -617,11 +725,13 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       const previous = lastFieldValues.get(field) ?? '';
       lastFieldValues.set(field, field.value);
       if (previous === field.value) return;
+      // Programmatic fills from a resolution/GPS lookup must not invalidate the
+      // very candidate they are completing.
+      if (applyingResolved) return;
       // Only a real destination change (after a candidate/confirmation exists)
       // invalidates. A native blur-change must never clear a suggestion the
       // customer is about to click, or a resolved destination.
       if (candidate || confirmed) invalidateConfirmation();
-      if (applyingResolved) return;
       if (streetField.value.trim().length >= MIN_SUGGEST_LENGTH) {
         window.clearTimeout(suggestTimer);
         suggestTimer = window.setTimeout(() => void requestSuggestions(composeQuery()), SUGGEST_DEBOUNCE_MS);
@@ -633,6 +743,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   watchDestinationField(zipInput);
 
   resolveButton?.addEventListener('click', () => void manualResolve());
+  gpsButton?.addEventListener('click', () => useCurrentLocation());
   confirmButton?.addEventListener('click', confirmLocation);
   changeButton?.addEventListener('click', startChange);
 

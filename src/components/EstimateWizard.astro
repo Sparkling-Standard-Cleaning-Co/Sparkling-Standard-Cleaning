@@ -186,10 +186,16 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </p>
 
           <div class="address-finder__locate">
+            <button type="button" class="btn btn--secondary btn--small" data-address-gps>
+              <Icon name="map-pin" size={16} /> Use My Current Location
+            </button>
             <button type="button" class="btn btn--secondary btn--small" data-address-resolve>
               Find My Address
             </button>
-            <p class="hint">Autocomplete is optional — complete the fields above and press Find My Address.</p>
+            <p class="hint">
+              Autocomplete is optional — press Find My Address, or share your location if you are
+              at the property.
+            </p>
           </div>
 
           <div class="address-map" data-address-map hidden>

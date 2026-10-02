@@ -450,6 +450,98 @@ test('geocode resolve-id: passes the provider document id through', async () => 
   assert.equal(data.result.source, 'mapmap');
 });
 
+// ── Reverse geocoding (GPS → address) ────────────────────────────────────────
+
+test('geocode reverse: without a provider key it reports not configured', async () => {
+  const response = await geocodePost({
+    request: request({ action: 'reverse', lat: 30.719, lng: -87.442 }),
+    env: {},
+  } as never);
+  assert.equal(response.status, 503);
+});
+
+test('geocode reverse: invalid coordinates are rejected before any provider call', async () => {
+  for (const body of [
+    { action: 'reverse', lat: 999, lng: -87.442 },
+    { action: 'reverse', lat: 30.719, lng: 'nope' },
+    { action: 'reverse' },
+  ]) {
+    const response = await geocodePost({ request: request(body), env: { MAPMAP_API_KEY: 'dummy-key' } } as never);
+    assert.equal(response.status, 400);
+  }
+});
+
+test('geocode reverse: a provider house-number result is precise and carries city/state/zip', async () => {
+  const response = await withFetch(
+    async (url) => {
+      assert.match(String(url), /\/geocode\/reverse\?lon=-87\.442&lat=30\.719&limit=1/);
+      return jsonResponse({
+        features: [
+          {
+            properties: {
+              id: 'osm:w10919246:addr',
+              housenumber: '6360',
+              street: 'Haupert Lane',
+              city: 'Molino',
+              state: 'FL',
+              postcode: '32577',
+            },
+            geometry: { coordinates: [-87.442, 30.719] },
+          },
+        ],
+      });
+    },
+    () =>
+      geocodePost({
+        request: request({ action: 'reverse', lat: 30.719, lng: -87.442 }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  const data = (await response.json()) as {
+    result: { label: string; precise: boolean; city?: string; state?: string; zip?: string };
+  };
+  assert.equal(response.status, 200);
+  assert.equal(data.result.precise, true);
+  assert.match(data.result.label, /6360 Haupert Lane/);
+  assert.equal(data.result.city, 'Molino');
+  assert.equal(data.result.state, 'FL');
+  assert.equal(data.result.zip, '32577');
+});
+
+test('geocode reverse: a street-level result is never marked precise', async () => {
+  const response = await withFetch(
+    async () =>
+      jsonResponse({
+        features: [
+          {
+            properties: { id: 'osm:w10919246:street', name: 'Haupert Lane', street: 'Haupert Lane', type: 'street' },
+            geometry: { coordinates: [-87.442, 30.719] },
+          },
+        ],
+      }),
+    () =>
+      geocodePost({
+        request: request({ action: 'reverse', lat: 30.719, lng: -87.442 }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  const data = (await response.json()) as { result: { precise: boolean } };
+  assert.equal(response.status, 200);
+  assert.equal(data.result.precise, false);
+});
+
+test('geocode reverse: no provider match is honestly not_found', async () => {
+  const response = await withFetch(
+    async () => jsonResponse({ features: [] }),
+    () =>
+      geocodePost({
+        request: request({ action: 'reverse', lat: 30.719, lng: -87.442 }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  assert.equal(response.status, 404);
+});
+
 // ── Throttling ───────────────────────────────────────────────────────────────
 
 test('geocode: the shared ROUTES_API_KEY secret works without a duplicate key', async () => {

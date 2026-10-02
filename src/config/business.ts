@@ -223,7 +223,12 @@ export const business = {
     },
     /** GTM container (GA4 configured inside; gtag.js is never loaded directly). */
     gtm: {
-      containerId: envFact(import.meta.env.PUBLIC_GTM_CONTAINER_ID) ?? '',
+      /**
+       * Owner-provided Google Tag Manager container (2026-10-02). Container
+       * IDs are public client identifiers by design; PUBLIC_GTM_CONTAINER_ID
+       * still overrides this default when set in the build environment.
+       */
+      containerId: envFact(import.meta.env.PUBLIC_GTM_CONTAINER_ID) ?? 'GTM-KSQ26HMG',
     },
     /**
      * Consent state storage key. Analytics (both services) load only after an

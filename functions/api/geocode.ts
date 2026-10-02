@@ -24,6 +24,7 @@ import {
   mapMapKey,
   mapMapResolveId,
   resolveAddress,
+  reverseGeocode,
   type GeocodeEnv,
   type PhotonFeature,
 } from '../../src/lib/location/server-geocode.ts';
@@ -218,7 +219,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'rate_limited' }, 429);
   }
 
-  let payload: { action?: unknown; query?: unknown; id?: unknown; street?: unknown; city?: unknown; state?: unknown; zip?: unknown };
+  let payload: { action?: unknown; query?: unknown; id?: unknown; street?: unknown; city?: unknown; state?: unknown; zip?: unknown; lat?: unknown; lng?: unknown };
   try {
     payload = (await request.json()) as typeof payload;
   } catch {
@@ -257,6 +258,18 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const resolved = await resolveAddress(env, query).catch(() => null);
       if (!resolved) return json({ ok: false, error: 'not_found' }, 404);
       return json({ ok: true, result: resolved });
+    }
+
+    if (action === 'reverse') {
+      const lat = typeof payload.lat === 'number' ? payload.lat : Number(payload.lat);
+      const lng = typeof payload.lng === 'number' ? payload.lng : Number(payload.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return json({ ok: false, error: 'invalid_request' }, 400);
+      }
+      if (!configured) return json({ ok: false, error: 'provider_not_configured' }, 503);
+      const result = await reverseGeocode(env, lat, lng).catch(() => null);
+      if (!result) return json({ ok: false, error: 'not_found' }, 404);
+      return json({ ok: true, result });
     }
 
     if (action === 'resolve-id') {

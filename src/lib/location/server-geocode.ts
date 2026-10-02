@@ -196,6 +196,24 @@ export async function mapMapResolveId(env: GeocodeEnv, id: string): Promise<Geoc
 }
 
 /**
+ * GPS → address reverse geocoding through the MapMap proxy. The returned
+ * address is `precise` only when the provider supplies a house number; a
+ * nearest-road or locality result is never treated as a verified street
+ * address. Returns null when unconfigured or unmatched.
+ */
+export async function reverseGeocode(env: GeocodeEnv, lat: number, lng: number): Promise<GeocodedAddress | null> {
+  if (!mapMapKey(env)) return null;
+  const { status, data } = await mapMapJson(
+    env,
+    `/geocode/reverse?lon=${encodeURIComponent(String(lng))}&lat=${encodeURIComponent(String(lat))}&limit=1`,
+  );
+  if (status !== 200) return null;
+  const feature = ((data as { features?: PhotonFeature[] })?.features ?? [])[0];
+  if (!feature) return null;
+  return parsePhotonFeature(feature, 'mapmap');
+}
+
+/**
  * Authoritative full-address resolution: an exact MapMap match when the
  * configured provider has one, otherwise the free Census Geocoder. Returns
  * null when neither can place the exact address (the customer's original

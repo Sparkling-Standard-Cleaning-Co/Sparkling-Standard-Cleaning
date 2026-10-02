@@ -96,6 +96,7 @@ async function openWithMocks(page, handlers) {
   });
   await page.route('**tiles.openfreemap.org/**', (route) => route.abort());
   await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
+  await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
   return captured;
 }
 

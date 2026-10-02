@@ -76,6 +76,7 @@ async function openWizard(width, height) {
   const page = await context.newPage();
   await mockApis(page);
   await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
+  await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
   return { context, page };
 }
 

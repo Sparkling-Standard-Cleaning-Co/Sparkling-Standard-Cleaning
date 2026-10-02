@@ -124,11 +124,9 @@ async function mockProviders(page, options = {}) {
 async function openEstimate(width, height, options = {}) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
-  await page.addStyleTag({
-    content: '.mobile-action-bar{display:none!important} .site-header{position:static!important}',
-  });
   const travelRequests = await mockProviders(page, options);
   await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
+  await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
   return { context, page, travelRequests };
 }
 
@@ -746,6 +744,7 @@ test('the contact form still submits and shows an honest success state', async (
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
     });
     await page.goto(BASE + '/contact/', { waitUntil: 'load' });
+    await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
     await page.fill('#contact-name', 'Browser test (please ignore)');
     await page.fill('#contact-phone', '8500000000');
     await page.fill('#contact-email', 'owner@sparkling-standard.com');

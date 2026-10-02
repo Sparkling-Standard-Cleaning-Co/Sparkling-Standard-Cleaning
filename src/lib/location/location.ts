@@ -2,7 +2,7 @@
 // wizard summary and the reservation submission. Pure helpers only so it can
 // be unit-tested with the Node test runner.
 
-export type LocationSource = 'mapmap' | 'census' | 'manual';
+export type LocationSource = 'mapmap' | 'census' | 'manual' | 'gps';
 
 /** A destination the customer explicitly confirmed (never a silent ZIP swap). */
 export interface ConfirmedLocation {
