@@ -67,7 +67,8 @@ export interface EstimateFlag {
     | 'LARGE_PROPERTY_REVIEW'
     | 'MULTIPLE_PETS_NOTE'
     | 'STR_SAME_DAY_NOTE'
-    | 'NO_GAS_PRICE_REFERENCE';
+    | 'NO_GAS_PRICE_REFERENCE'
+    | 'FOUNDING_UPGRADE_GRANTED';
   message: string;
   severity: FlagSeverity;
 }
@@ -114,8 +115,18 @@ export interface PricingBreakdown {
   /** Selected eligible extras (subset of addonPrices), exact cents. */
   selectedExtras: Array<{ id: string; label: string; charge: number }>;
   extrasSubtotal: number;
-  /** Applied incentive (single tier), or null when none is active. */
-  discount: { percent: number; amount: number; label: string } | null;
+  /**
+   * The single applied promotion (never stacked), or null when none is
+   * active. `id`/`source` identify the exact configured program so a quote's
+   * provenance is auditable.
+   */
+  discount: {
+    id?: string;
+    source?: string;
+    percent: number;
+    amount: number;
+    label: string;
+  } | null;
   /** proposedTotal − (basePrice + extrasSubtotal − discountAmount); ≥ 0. */
   roundingAdjustment: number;
   /** The offered price before the $5 round-up (expectedPrice equivalent). */
