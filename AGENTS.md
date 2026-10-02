@@ -142,6 +142,13 @@ Never publish unapproved promotional promises or activate binding pricing withou
   `/api/geocode`, a manual fallback, and a lazy-loaded MapLibre GL + OpenFreeMap pin confirmation.
   A confirmed pin is the only destination source — never let a ZIP centroid silently replace it.
   GPS/manual modes are isolated: the selected method is the only source of the submitted address.
+  A suggestion the provider only knows at street level opens the same pin confirmation and records
+  `pin_precision: 'street'` — the exact house number is never fabricated and travel stays preliminary.
+- The **promotion engine** (`src/lib/estimate/promotions.ts`) is pure and shared by the browser
+  estimator and server verification: at most ONE promotion per quote, owner-gated, term-gated,
+  minimum-job floor enforced, specialty work excluded, customer-kind programs fail closed. All
+  shipped programs are disabled — never enable or publish one without the owner's written terms, the
+  `docs/launch/PROMOTION-PROPOSALS.md` review and a `configVersion` bump.
 - Client-side JS is minimal, bundled by Astro from `src/scripts/` (no framework). The estimator
   computes in the browser so the instant estimate works on a fully static page. A browser price is
   a PROPOSAL: every priced reservation request is recalculated server-side
@@ -173,11 +180,12 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Travel economics, included miles, zone adjustments | `src/config/travel.ts`, `src/config/geography.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Location selection, geocoding, GPS/manual modes | `src/scripts/address-finder.ts`, `src/lib/location/`, `functions/api/geocode.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`) | `docs/verification/VERIFICATION.md` |
+| Promotions, bundles, Founding-10 (all disabled) | `src/lib/estimate/promotions.ts` + `src/config/owner-pricing.ts` | `docs/launch/PROMOTION-PROPOSALS.md` |
 | Lead capture, notification fields, provider relay | `functions/api/lead.ts`, `src/lib/forms/` | `docs/verification/VERIFICATION.md` |
 | Services, FAQs, checklists, page copy | `src/content/`, `src/content/site/` | `docs/CONTENT-GUIDE.md` |
 | SEO, structured data, sitemap, robots, page ownership | `src/components/BaseHead.astro`, `src/lib/schema.ts`, page files | `docs/seo/SEO-STRATEGY.md`, `docs/operations/SEARCH-CONSOLE-SETUP.md` |
 | Analytics, consent, event taxonomy, attribution | `src/scripts/consent-controller.ts`, `src/lib/analytics/`, `src/lib/attribution.ts` | `docs/analytics/ANALYTICS-SETUP.md` |
-| Visual design, tokens, images, icons, OG image | `src/styles/`, `public/brand/` | `docs/design/DESIGN-SYSTEM.md`, `docs/design/IMAGE-GUIDE.md` |
+| Visual design, tokens, images, icons, OG image | `src/styles/`, `public/brand/`, `src/assets/images/` | `docs/design/DESIGN-SYSTEM.md`, `docs/design/IMAGE-GUIDE.md`, `docs/design/IMAGE-SOURCE-REGISTER.md` |
 | Photo privacy rules | `docs/privacy/PHOTO-PRIVACY-SOP.md` |
 | UTM links and QR assets | `src/config/marketing-links.ts` | `docs/marketing/UTM-MASTER-LINKS.md`, `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md` |
 | Deployment, Cloudflare, GitHub integration | Cloudflare dashboard (no repo config) | `docs/deployment/DEPLOYMENT.md` |
@@ -255,8 +263,10 @@ required**, **whether a rebuild/regenerate step is needed**, and **what could br
 | `npm run build` | Production build into `dist/` |
 | `npm run preview` | Serve the production build locally |
 | `npm run check` | `astro check` — TypeScript diagnostics (must be 0 errors) |
-| `npm test` | Estimator/unit tests (Node test runner, type-stripped TS) |
+| `npm test` | Full unit suite: estimator, quote verification, address ranking, promotions, Page Functions (Node test runner, type-stripped TS) |
 | `npm run test:browser` | Playwright browser regression suite (builds first) |
+| `npm run address:check` | Live address-pipeline check against the real provider (local `.env` key; prints results only, never secrets) |
+| `npm run promotions:impact` | Internal financial model for the disabled promotion proposals |
 | `npm run verify` | `check` + `build` + `validate` — minimum bar for any change |
 | `npm run validate` | Links, SEO, marketing registry, QR decode, checklist leak checks |
 | `npm run links` / `npm run seo` | Focused broken-link / SEO checks on `dist/` |
@@ -290,14 +300,26 @@ collections are intentionally empty — not errors.
 
 ## Current operational / provisional / pending snapshot
 
-- **Operational:** production site and deploy pipeline, estimator (GPS + manual), MapMap geocode
-  and routing, Web3Forms delivery, GTM consent-gated analytics, SMS, Facebook + Nextdoor profiles,
-  approved favicon kit, sitemap/robots, quote verification and owner notification.
+- **Operational:** production site and deploy pipeline, estimator (GPS + manual + street-level
+  pin confirmation for streets the provider only knows by name), MapMap geocode and routing,
+  Web3Forms delivery, GTM consent-gated analytics, SMS, Facebook + Nextdoor profiles, approved
+  favicon kit, sitemap/robots, quote verification and owner notification.
+- **Address reliability (2026-10-02):** state matching parses both full names and USPS codes;
+  partially typed street names match by safe prefix; same-state results rank by proximity to the
+  public Pensacola centre; provider alternates include suffix expansion and a house-numberless
+  street-level fallback. Exact house numbers are never fabricated. Live checks:
+  `npm run address:check`. Rules and evidence: `docs/operations/ESTIMATOR-LOCATION-ENGINE.md`.
+- **Representative imagery (2026-10-02):** licensed stock interiors (Pexels License, no cost) on
+  the homepage and about page, each labeled representative — never presented as our work.
+  Source/licence register: `docs/design/IMAGE-SOURCE-REGISTER.md`. Replace with genuine,
+  permissioned photography when it exists.
 - **Provisional (internal only, publication flags off):** add-on pricing surface, multi-add-on
-  incentive, response guarantee, appreciation discounts, founding promotion, market comparisons.
-  Each requires explicit owner approval before activation; never publish an unapproved promise.
+  incentive, response guarantee, appreciation discounts, add-on bundles, Founding-10 program and
+  market comparisons. The promotion engine applies at most one discount, never below the minimum
+  job, and always fails closed without owner-approved terms. Financial review:
+  `docs/launch/PROMOTION-PROPOSALS.md`; regenerate with `npm run promotions:impact`.
 - **Pending owner input:** legal entity spelling/suffix, insurance/bonding/licensing claims, review
-  profile/submission links, remaining social URLs, final cancellation percentages, and any
-  marketing claim not yet supplied.
+  profile/submission links, remaining social URLs, Umami website ID, final cancellation
+  percentages, and any marketing claim not yet supplied.
 - Current platform details: `docs/operations/PLATFORM-STATUS.md`. Owner checklist:
   `docs/launch/OWNER-INPUT-REQUIRED.md`.

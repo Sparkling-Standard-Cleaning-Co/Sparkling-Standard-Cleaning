@@ -27,8 +27,10 @@
     "deploy:secrets": "node scripts/generate-deploy-secrets.mjs",
     "estimate:quotes": "node scripts/quote-preview.mjs",
     "estimate:discount-impact": "node scripts/discount-impact.mjs",
+    "promotions:impact": "node scripts/promotions-impact.mjs",
     "live:check": "node scripts/live-check.mjs",
     "mapmap:verify": "node scripts/test-mapmap.mjs",
+    "address:check": "node scripts/address-live-check.mjs",
     "smoke": "node scripts/smoke.mjs",
     "audit:facts": "node scripts/audit-facts.mjs"
   },

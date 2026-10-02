@@ -35,11 +35,18 @@ server's independent re-check and the owner notification all read the same value
 3. Change **only the number** after the colon. Keep the commas and the structure exactly as they
    are — the file is machine-checked and a missing comma stops the website from building.
 4. Scroll to the bottom and press **Commit changes…**
-5. Write a short message, e.g. `Raise recurring rate to $45`, and commit to the `main` branch.
-6. **Saving is not publishing.** The commit starts an automatic rebuild. The live site updates in
-   roughly **2–4 minutes**. If the file has an error, the build fails and the live site simply keeps
-   the previous prices — nothing breaks for customers, but your change does not go live. The next
-   section shows how to check before that happens.
+5. Write a short message, e.g. `Raise recurring rate to $45`, and — **only after you have checked
+   the result** (section 3) — commit to the `main` branch.
+6. **Committing to `main` publishes to the live website.** `main` is the production branch: the
+   commit triggers an automatic rebuild and the live site updates in roughly **2–4 minutes**. If
+   the file has an error the build fails and the live site keeps the previous prices, so customers
+   never see a broken page — but a valid change is live, quickly, with no undo button.
+
+**To change pricing without publishing immediately:** create a branch (for example
+`owner/pricing-draft`) and commit there instead. A branch can produce an isolated preview URL for
+you to review (your developer/Cloudflare dashboard controls whether previews are enabled), and
+nothing goes live until the change is merged into `main` with the owner's approval. Never keep a
+draft in `main`.
 
 ---
 
@@ -116,11 +123,23 @@ for one add-on instead, add a line to that add-on:
 - Remove the `fixedPriceUsd` line to return to labor-based pricing.
 
 ### 10. Promotions and discounts
-The `promotions` section holds the proposals (multi-add-on incentive, response guarantee, loyalty /
-appreciation discounts, founding offer). **Every proposal is disabled and its percent is `null`
-until the owner approves exact terms in writing.** Enabling a proposal changes what customers are
-promised — do not turn one on without the owner's explicit approval of the final numbers and
-conditions.
+The `promotions` section holds every prepared program: the multi-add-on incentive, the response
+guarantee, the appreciation discounts, the add-on bundles and the Founding-10 program.
+**Every program ships disabled with `value: null` until the owner approves exact terms in
+writing.** Additional rules:
+
+- Only **one** promotion can ever apply to a quote; the engine picks the single largest effective
+  discount. Programs never stack with each other or with the multi-add-on incentive.
+- A discount can never take a quote below the minimum job, and specialty/custom-quote work is
+  never discounted.
+- First-time-only programs (like the Founding first-clean discount) cannot apply automatically
+  until the estimator can prove a customer is new — that question does not exist yet, so those
+  programs fail closed.
+- The Founding-10 cap is **owner-tracked**, never counted by the website. Never write a
+  customer-facing claim like “3 spots left.”
+- Read `docs/launch/PROMOTION-PROPOSALS.md` before enabling anything; it contains the financial
+  scenarios, safeguards and the activation checklist (including the required `configVersion`
+  bump).
 
 ---
 

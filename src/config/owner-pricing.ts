@@ -40,15 +40,111 @@ import type {
 } from './pricing.ts';
 
 /**
- * A proposed promotion that has no approved terms yet. Keep `enabled` false
- * and `percent` null until the owner supplies real, approved terms — never
- * invent a discount to fill the placeholder.
+ * Who a promotion is allowed to apply to. `new` means the customer's first
+ * cleaning with Sparkling Standard; `established_recurring` means a customer
+ * with completed recurring visits. The estimator does not yet ask which a
+ * visitor is, so programs that require a customer kind fail closed and never
+ * apply automatically — they are reserved for an owner-reviewed flow.
  */
-export interface ProposedPromotion {
+export type PromotionCustomerKind = 'any' | 'new' | 'established_recurring';
+
+export interface PromotionEligibility {
+  /** Empty array means every estimable service. */
+  services: PricingServiceType[];
+  /** Empty array means every frequency. */
+  frequencies: Frequency[];
+  customer: PromotionCustomerKind;
+}
+
+/**
+ * A configurable discount program. `value` stays null and `enabled` stays
+ * false until the owner approves exact written terms — never invent a
+ * discount to fill a placeholder. Every program is non-stackable: the engine
+ * applies at most ONE discount to a quote.
+ */
+export interface PromotionTerms {
+  /** Internal stable id recorded with any quote that uses it. */
+  id: string;
   /** Keep false until the owner approves the exact terms in writing. */
   enabled: boolean;
-  /** Owner-supplied rate (0.10 = 10%). `null` means not configured yet. */
-  percent: number | null;
+  kind: 'percent' | 'fixed';
+  /** Percent (0.10 = 10%) or USD when `kind` is 'fixed'. Null = unset. */
+  value: number | null;
+  /** Which part of the price the discount may reduce. Never travel. */
+  appliesTo: 'addons' | 'total' | 'first_visit';
+  eligibility: PromotionEligibility;
+  /** Internal safety cap in USD; null = no owner-approved cap yet. */
+  maxDiscountUsd: number | null;
+  /** ISO date (YYYY-MM-DD) after which the program must not apply. */
+  expiresOn: string | null;
+  /** Exactly one promotion applies. Kept literal for honesty in the type. */
+  stackable: false;
+}
+
+/** One add-on bundle: a discount on the eligible add-on subtotal when the
+ *  customer selects a required set (and, optionally, a recurring rhythm). */
+export interface AddonBundleDefinition {
+  id: string;
+  label: string;
+  enabled: boolean;
+  /** Every id must be selected (non-specialty only) for the bundle to apply. */
+  requiredAddonIds: string[];
+  /** Empty array means any frequency; otherwise only these qualify. */
+  eligibleFrequencies: Frequency[];
+  /** Optional: require any recurring rhythm (weekly/biweekly/monthly). */
+  requiresRecurring: boolean;
+  kind: 'percent' | 'fixed';
+  /** Percent off the eligible add-on subtotal, or USD. Null = unset. */
+  value: number | null;
+  maxDiscountUsd: number | null;
+  expiresOn: string | null;
+  stackable: false;
+}
+
+/**
+ * Founding-10 program — three possible mechanisms, none chosen or active.
+ * The owner picks one and supplies terms; the estimator never invents terms.
+ * The customer count is owner-controlled: the site does not claim live
+ * availability, and no cap is enforced from browser state.
+ */
+export interface FoundingTenConfig {
+  enabled: boolean;
+  /** Null until the owner chooses a mechanism. */
+  mechanism: 'first_clean_discount' | 'recurring_discount' | 'complimentary_upgrade' | null;
+  /** Mechanism 1: one-time discount on the first cleaning. */
+  firstClean: {
+    kind: 'percent' | 'fixed';
+    value: number | null;
+    maxDiscountUsd: number | null;
+  };
+  /** Mechanism 2: ongoing discount for qualifying recurring customers. */
+  recurring: {
+    kind: 'percent' | 'fixed';
+    value: number | null;
+    maxDiscountUsd: number | null;
+    durationMonths: number | null;
+    qualifyingFrequencies: Frequency[];
+  };
+  /** Mechanism 3: complimentary upgrade / add-on instead of a price cut. */
+  upgrade: {
+    addonIds: string[];
+    maxValueUsd: number | null;
+    appliesToFrequencies: Frequency[];
+  };
+  /**
+   * Capacity is OWNER-MANUAL by design: the site cannot count verified
+   * enrollments without infrastructure this business does not have at zero
+   * cost. The owner tracks slots; the customer reserves, never auto-wins.
+   */
+  capacity: {
+    slots: number;
+    enforcement: 'owner_manual';
+    /** Null = not tracked here. Never present a number as live availability. */
+    awardedCount: number | null;
+  };
+  /** Always true for this program: the owner approves each enrollment. */
+  reservationRequired: boolean;
+  expiresOn: string | null;
 }
 
 export interface OwnerPricingConfig {
@@ -155,21 +251,21 @@ export interface OwnerPricingConfig {
       businessTimezone: string;
     };
     /**
-     * Placeholder only — NOT connected to the estimator and not published.
-     * The appreciation-discount idea (returning/loyal customers) has no
-     * approved percentage. Configure `percent` only after owner approval.
+     * Appreciation discounts for returning/loyal customers. One program per
+     * entry; all disabled with no terms until the owner approves them. The
+     * engine applies at most one promotion per quote.
      */
-    appreciationDiscounts: ProposedPromotion;
+    appreciationDiscounts: PromotionTerms[];
     /**
-     * Placeholder only — NOT connected to the estimator and not published.
-     * The proposed founding-customer promotion has no approved terms.
+     * Add-on bundles that reward profitable, retention-friendly combinations.
+     * All disabled with no terms until owner approval.
      */
-    foundingTen: ProposedPromotion;
+    addonBundles: AddonBundleDefinition[];
     /**
-     * Placeholder only — NOT connected to the estimator and not published.
-     * The proposed "bundle" promotion has no approved terms.
+     * Founding-10 program — three prepared mechanisms, none selected or
+     * active. Requires explicit owner approval before any part is enabled.
      */
-    bundleSparkle: ProposedPromotion;
+    foundingTen: FoundingTenConfig;
   };
 }
 
@@ -287,19 +383,70 @@ export const ownerPricing: OwnerPricingConfig = {
       eligibleServices: ['standard', 'deep', 'move_in_out', 'str_turnover'],
       businessTimezone: 'America/Chicago',
     },
-    // Placeholders only — not connected to the estimator or any published
-    // page. `percent` stays null until the owner approves real terms.
-    appreciationDiscounts: {
-      enabled: false,
-      percent: null,
-    },
+    // Prepared programs — DISABLED with no terms. Study the financial
+    // scenarios in docs/launch/PROMOTION-PROPOSALS.md, approve exact terms,
+    // then set `value` AND `enabled` in the same owner-approved change.
+    appreciationDiscounts: [
+      {
+        id: 'appreciation-established-recurring',
+        enabled: false,
+        kind: 'percent',
+        value: null,
+        appliesTo: 'total',
+        eligibility: { services: [], frequencies: ['weekly', 'biweekly', 'monthly'], customer: 'established_recurring' },
+        maxDiscountUsd: null,
+        expiresOn: null,
+        stackable: false,
+      },
+      {
+        id: 'appreciation-referral-welcome',
+        enabled: false,
+        kind: 'fixed',
+        value: null,
+        appliesTo: 'first_visit',
+        eligibility: { services: ['standard'], frequencies: ['weekly', 'biweekly', 'monthly'], customer: 'new' },
+        maxDiscountUsd: null,
+        expiresOn: null,
+        stackable: false,
+      },
+    ],
+    addonBundles: [
+      {
+        id: 'bundle-kitchen-refresh',
+        label: 'Kitchen refresh bundle',
+        enabled: false,
+        requiredAddonIds: ['inside_fridge', 'inside_oven'],
+        eligibleFrequencies: [],
+        requiresRecurring: false,
+        kind: 'percent',
+        value: null,
+        maxDiscountUsd: null,
+        expiresOn: null,
+        stackable: false,
+      },
+      {
+        id: 'bundle-recurring-care',
+        label: 'Recurring care bundle',
+        enabled: false,
+        requiredAddonIds: ['bed_linen_change', 'dishes'],
+        eligibleFrequencies: ['weekly', 'biweekly'],
+        requiresRecurring: true,
+        kind: 'percent',
+        value: null,
+        maxDiscountUsd: null,
+        expiresOn: null,
+        stackable: false,
+      },
+    ],
     foundingTen: {
       enabled: false,
-      percent: null,
-    },
-    bundleSparkle: {
-      enabled: false,
-      percent: null,
+      mechanism: null,
+      firstClean: { kind: 'percent', value: null, maxDiscountUsd: null },
+      recurring: { kind: 'percent', value: null, maxDiscountUsd: null, durationMonths: null, qualifyingFrequencies: [] },
+      upgrade: { addonIds: [], maxValueUsd: null, appliesToFrequencies: [] },
+      capacity: { slots: 10, enforcement: 'owner_manual', awardedCount: null },
+      reservationRequired: true,
+      expiresOn: null,
     },
   },
 };

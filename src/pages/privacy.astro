@@ -18,6 +18,10 @@ const schema = [
 ];
 
 const analyticsLive = analyticsConfigured();
+// Name ONLY the analytics services that are actually configured in this
+// build. The policy must describe today's behavior, not a possible future.
+const umamiLive = business.analytics.umami.websiteId.trim() !== '';
+const gtmLive = business.analytics.gtm.containerId.trim() !== '';
 const hasEmail = !isPending(business.email);
 ---
 
@@ -98,20 +102,24 @@ const hasEmail = !isPending(business.email);
             analyticsLive ? (
               <>
                 <p>
-                  This site uses two analytics services, and <strong>neither loads until you
-                  explicitly allow analytics</strong>:
+                  This site uses {umamiLive && gtmLive ? 'two analytics services' : 'one analytics service'},
+                  and <strong>nothing loads until you explicitly allow analytics</strong>:
                 </p>
                 <ul>
-                  <li>
-                    <strong>Umami</strong> — privacy-focused, cookieless, aggregate statistics only
-                    (pages viewed, buttons clicked). No personal data, no cross-site tracking.
-                  </li>
-                  <li>
-                    <strong>Google Analytics 4 via Google Tag Manager</strong> — loaded only after
-                    you allow it, with Consent Mode v2 defaults all-denied first. Advertising
-                    storage and personalization are never granted by this site. Google receives a
-                    request only after your consent.
-                  </li>
+                  {umamiLive && (
+                    <li>
+                      <strong>Umami</strong> — privacy-focused, cookieless, aggregate statistics only
+                      (pages viewed, buttons clicked). No personal data, no cross-site tracking.
+                    </li>
+                  )}
+                  {gtmLive && (
+                    <li>
+                      <strong>Google Analytics 4 via Google Tag Manager</strong> — loaded only after
+                      you allow it, with Consent Mode v2 defaults all-denied first. Advertising
+                      storage and personalization are never granted by this site. Google receives a
+                      request only after your consent.
+                    </li>
+                  )}
                 </ul>
                 <p>
                   Analytics events use fixed names (like “call click” or “estimate started”) and

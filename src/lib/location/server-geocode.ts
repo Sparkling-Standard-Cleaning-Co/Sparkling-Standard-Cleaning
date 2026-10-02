@@ -8,7 +8,7 @@
 // Exact-address rule: when the requested address carries a house number, a
 // provider result is accepted ONLY when it actually contains that house
 // number. MapMap's dataset does not cover every rural address (e.g. it knows
-// "Haupert Lane" as a street but not "6360 Haupert Lane"), so a street-level
+// "Maplewood Lane" as a street but not "4242 Maplewood Lane"), so a street-level
 // or POI result must fall through to the free Census Geocoder rather than
 // being silently treated as the precise destination.
 
@@ -82,7 +82,7 @@ export function featureId(feature: PhotonFeature): string | null {
   return null;
 }
 
-/** The house number a query asks for, if any (e.g. "6360" from "6360 Haupert Ln"). */
+/** The house number a query asks for, if any (e.g. "4242" from "4242 Maplewood Ln"). */
 export function queryHouseNumber(query: string): string | null {
   const match = query.trim().match(/^(\d+[a-z]?(?:-\d+[a-z]?)?)\b/i);
   return match ? (match[1] as string).toLowerCase() : null;
@@ -153,7 +153,7 @@ export async function censusResolve(query: string): Promise<GeocodedAddress | nu
   };
   const zip = label.match(/,\s*(\d{5})(?:-\d{4})?\s*$/)?.[1];
   if (zip) result.zip = zip;
-  // "6360 HAUPERT LN, MOLINO, FL, 32577" → city + state when present.
+  // "4242 MAPLEWOOD LN, MOLINO, FL, 32577" → city + state when present.
   const parts = label.split(',').map((part) => part.trim());
   if (parts.length >= 3) {
     const statePart = parts[parts.length - 2] ?? '';

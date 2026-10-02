@@ -68,16 +68,17 @@ Preconditions: production Pages project variables match the expected configurati
 `WEB3FORMS_ACCESS_KEY` (Secret), `PUBLIC_WEB3FORMS_ACCESS_KEY`, optional `TURNSTILE_SECRET_KEY`,
 `PUBLIC_TURNSTILE_SITE_KEY`, `PUBLIC_SITE_URL`. `PUBLIC_PREVIEW_MODE` must NOT be set on production.
 
-1. Functions answer on the deployed preview: `POST /api/travel` with a public ZIP returns
+1. Functions answer on the deployed site: `POST /api/travel` with a public ZIP returns
    `200` with `provider`/`method`/`verified` and **no origin or key material**.
 2. `POST /api/geocode` returns suggestions (with coordinates) and resolves an address.
-3. Paid-provider guard: temporarily set `ROUTES_PROVIDER=google` on a preview deployment and
+3. Paid-provider guard: in a local throwaway configuration, set `ROUTES_PROVIDER=google` and
    confirm `/api/travel` still returns `straight_line_estimate` and never calls a paid endpoint.
-4. Run the full journey on the preview (desktop + mobile): address suggestions → pin confirmation
-   → proposed price → reservation request; confirm Call/Text links and the privacy page.
-5. Submit one **marked test reservation** (subject clearly marked "TEST — internal") with a
-   synthetic name and the owner's own email. After owner authorization, verify the owner inbox
-   receives it with the server fields: `quote_verified`, `verified_price`/`client_price`,
+4. Run the full journey on the deployed site (desktop + mobile): address suggestions → pin
+   confirmation → proposed price → reservation request; confirm Call/Text links and the privacy page.
+5. After owner authorization, submit one test reservation with a synthetic name and the owner's
+   own email, with the subject clearly marked "TEST — internal". No test submission may be sent
+   without authorization or in a way that could be mistaken for a customer inquiry. Verify the
+   owner inbox receives it with the server fields: `quote_verified`, `verified_price`/`client_price`,
    `server_config_version`, `pin_check`, `quote_valid_through`, and a plain-language
    `verification_note`.
 6. Repeat once with a deliberately different `quoted_price` (devtools) to confirm the email shows

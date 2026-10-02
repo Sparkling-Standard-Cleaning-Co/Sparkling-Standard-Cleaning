@@ -16,7 +16,7 @@ genuine content. Nothing here changes pricing, indexing or public claims without
   corrected honest failure message is live (deployed 2026-10-01).
 - Travel: `/api/travel` returns `503 origin_not_configured`; the estimator works in offline zone
   mode meanwhile.
-- Analytics: architecture active but no IDs configured (no GTM/Umami requests are made, consent
+- Analytics: architecture active; GTM `GTM-KSQ26HMG` is configured and consent-gated, Umami has no ID (no analytics request is made before consent;
   banner hidden).
 - Performance (mobile-throttled Chromium, 4× CPU): LCP 1.26–1.65 s, CLS ≤ 0.038, ~96 KB/page.
 - Accessibility: axe WCAG 2.0/2.1/2.2 A+AA, 0 violations across representative pages.

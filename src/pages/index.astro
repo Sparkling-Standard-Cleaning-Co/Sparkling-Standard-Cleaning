@@ -1,4 +1,5 @@
 ---
+import { Image } from 'astro:assets';
 import { getCollection, getEntry } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ServiceCard from '../components/ServiceCard.astro';
@@ -10,12 +11,25 @@ import Reviews from '../components/Reviews.astro';
 import CtaBand from '../components/CtaBand.astro';
 import Icon from '../components/Icon.astro';
 import { breadcrumbNode } from '../lib/schema';
+import heroPhoto from '../assets/images/living-room-bright.jpg';
+import kitchenPhoto from '../assets/images/kitchen-white-clean.jpg';
+import bedroomPhoto from '../assets/images/bedroom-made.jpg';
+import moveoutPhoto from '../assets/images/empty-room-moveout.jpg';
+import officePhoto from '../assets/images/office-planted.jpg';
+import sinkPhoto from '../assets/images/kitchen-sink-detail.jpg';
 
 const home = await getEntry('site', 'home');
 if (!home) throw new Error('Missing content entry: src/content/site/home.md');
 const { data } = home;
 
-const services = (await getCollection('services')).sort((a, b) => a.data.order - b.data.order);
+const allServices = (await getCollection('services')).sort((a, b) => a.data.order - b.data.order);
+// Recurring residential cleaning is the primary business objective, so the
+// homepage grid leads with it and marks it featured. Service pages and query
+// ownership are unaffected.
+const recurringService = allServices.find((service) => service.data.path === '/recurring-cleaning/');
+const services = recurringService
+  ? [recurringService, ...allServices.filter((service) => service !== recurringService)]
+  : allServices;
 const faqs = (await getCollection('faqs'))
   .filter((faq) => ['process', 'pricing', 'payments'].includes(faq.data.category))
   .sort((a, b) => a.data.order - b.data.order)
@@ -40,15 +54,28 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
           </a>
           <a class="btn btn--ghost" href="/house-cleaning/" data-cta="home-hero-services">Explore Services</a>
         </div>
+        <p class="small text-muted" style="margin-top: var(--space-4)">
+          Planning regular cleaning? <a href="/recurring-cleaning/" data-cta="home-hero-recurring">See how weekly and every-two-weeks pricing works.</a>
+        </p>
       </div>
-      <div class="hero__panel">
-        <p class="eyebrow">The difference, in one thought</p>
+      <div class="hero__panel hero__panel--media">
+        <Image
+          src={heroPhoto}
+          alt="A bright, tidy living room with a sectional sofa, large windows and soft natural light."
+          widths={[480, 720, 1080]}
+          sizes="(min-width: 56rem) 34rem, 92vw"
+          loading="eager"
+          decoding="async"
+          class="card__media-image"
+        />
+        <p class="eyebrow" style="margin-top: var(--space-5)">The difference, in one thought</p>
         <p style="font-family: var(--font-display); font-size: var(--text-xl); margin-bottom: var(--space-3)">
           “A house deserves more than someone rushing through a checklist.”
         </p>
         <p class="small text-muted mb-0">
           That belief is why this company exists — and why the details get the time they need.
         </p>
+        <p class="media-caption">Representative interior photograph — real project photos are added only with customer approval.</p>
       </div>
     </div>
   </section>
@@ -64,13 +91,13 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
       </div>
       <div class="grid grid--3">
         {
-          services.map((service, index) => (
+          services.map((service) => (
             <ServiceCard
               title={service.data.title}
               summary={service.data.summary}
               href={service.data.path}
               icon={service.data.icon}
-              featured={index === 0}
+              featured={service.data.path === '/recurring-cleaning/'}
             />
           ))
         }
@@ -79,8 +106,41 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
   </section>
 
   {
+    data.recurringPlans && data.recurringPlans.items.length > 0 && (
+      <section class="section section--alt" aria-labelledby="recurring-plans-heading">
+        <div class="container">
+          <div class="section-head">
+            <p class="eyebrow">{data.recurringPlans.eyebrow}</p>
+            <h2 id="recurring-plans-heading">{data.recurringPlans.heading}</h2>
+            <p class="lead">{data.recurringPlans.text}</p>
+          </div>
+          <div class="grid grid--3">
+            {data.recurringPlans.items.map((plan) => (
+              <div class="card">
+                <span class="card__icon"><Icon name="refresh" /></span>
+                <h3 class="card__title">{plan.title}</h3>
+                <p class="card__text">{plan.text}</p>
+                <a
+                  class="card__more"
+                  href={`/estimate/?frequency=${plan.frequency}`}
+                  data-cta={`home-recurring-${plan.frequency}`}
+                >
+                  Start this estimate <Icon name="arrow-right" size={16} />
+                </a>
+              </div>
+            ))}
+          </div>
+          <p class="mt-4">
+            <a class="tap-link" href="/recurring-cleaning/">{data.recurringPlans.linkLabel} →</a>
+          </p>
+        </div>
+      </section>
+    )
+  }
+
+  {
     data.founderBand && (
-      <section class="section section--alt">
+      <section class="section">
         <div class="container split">
           <div>
             <p class="eyebrow">{data.founderBand.eyebrow}</p>
@@ -91,6 +151,17 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
             )}
           </div>
           <div class="card">
+            <div class="card__media">
+              <Image
+                src={sinkPhoto}
+                alt="A clean kitchen sink and polished faucet against white cabinets and a light tile backsplash."
+                widths={[360, 560, 800]}
+                sizes="(min-width: 56rem) 30rem, 92vw"
+                loading="lazy"
+                decoding="async"
+                class="card__media-image"
+              />
+            </div>
             <p class="eyebrow">Details we notice</p>
             <ul class="checklist">
               <li><span>The toothbrush holder — cleaned, not skipped</span></li>
@@ -126,7 +197,7 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
               <ul class="checklist">
                 <li><span>No account required</span></li>
                 <li><span>No auto-booking — Sparkling Standard confirms personally</span></li>
-                <li><span>Progress saved on your device as you go</span></li>
+                <li><span>Fresh, private estimate — nothing is saved in your browser</span></li>
               </ul>
             </div>
           </div>
@@ -140,7 +211,17 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
       {
         data.recurringBand && (
           <div class="card card--link">
-            <span class="card__icon"><Icon name="refresh" /></span>
+            <div class="card__media">
+              <Image
+                src={kitchenPhoto}
+                alt="A bright white kitchen with a large island, tidy counters and no clutter."
+                widths={[360, 560, 800]}
+                sizes="(min-width: 48rem) 30rem, 92vw"
+                loading="lazy"
+                decoding="async"
+                class="card__media-image"
+              />
+            </div>
             <p class="eyebrow mb-0">{data.recurringBand.eyebrow}</p>
             <h3 class="card__title">{data.recurringBand.heading}</h3>
             <p class="card__text">{data.recurringBand.text}</p>
@@ -151,7 +232,17 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
       {
         data.strBand && (
           <div class="card card--link">
-            <span class="card__icon"><Icon name="key" /></span>
+            <div class="card__media">
+              <Image
+                src={bedroomPhoto}
+                alt="A neatly made bed with layered pillows and soft neutral bedding in a calm bedroom."
+                widths={[360, 560, 800]}
+                sizes="(min-width: 48rem) 30rem, 92vw"
+                loading="lazy"
+                decoding="async"
+                class="card__media-image"
+              />
+            </div>
             <p class="eyebrow mb-0">{data.strBand.eyebrow}</p>
             <h3 class="card__title">{data.strBand.heading}</h3>
             <p class="card__text">{data.strBand.text}</p>
@@ -162,7 +253,17 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
       {
         data.moveoutBand && (
           <div class="card card--link">
-            <span class="card__icon"><Icon name="box" /></span>
+            <div class="card__media">
+              <Image
+                src={moveoutPhoto}
+                alt="An empty room with freshly cleaned hardwood floors and bright natural light."
+                widths={[360, 560, 800]}
+                sizes="(min-width: 48rem) 30rem, 92vw"
+                loading="lazy"
+                decoding="async"
+                class="card__media-image"
+              />
+            </div>
             <p class="eyebrow mb-0">{data.moveoutBand.eyebrow}</p>
             <h3 class="card__title">{data.moveoutBand.heading}</h3>
             <p class="card__text">{data.moveoutBand.text}</p>
@@ -173,7 +274,17 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
       {
         data.commercialBand && (
           <div class="card card--link">
-            <span class="card__icon"><Icon name="briefcase" /></span>
+            <div class="card__media">
+              <Image
+                src={officePhoto}
+                alt="A bright, orderly office with clean desks, plants and natural light."
+                widths={[360, 560, 800]}
+                sizes="(min-width: 48rem) 30rem, 92vw"
+                loading="lazy"
+                decoding="async"
+                class="card__media-image"
+              />
+            </div>
             <p class="eyebrow mb-0">{data.commercialBand.eyebrow}</p>
             <h3 class="card__title">{data.commercialBand.heading}</h3>
             <p class="card__text">{data.commercialBand.text}</p>

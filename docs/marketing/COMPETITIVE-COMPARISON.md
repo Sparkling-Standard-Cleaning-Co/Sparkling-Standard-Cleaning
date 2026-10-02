@@ -26,7 +26,7 @@ Properties examined:
 | Gift certificates | Not offered (Phase 7 assessment) | **Yes** — $200, purchased via Venmo/CashApp/PayPal | Not offered |
 | Payments | Stripe confirmed; method list pending owner confirmation | Venmo, CashApp, PayPal | Card/ACH etc. |
 | Booking semantics | Honest: requests confirmed personally; no instant-booking claim | "Book Today!" button leads to Facebook | Request form |
-| Analytics/consent | Consent-gated architecture implemented; **IDs not configured** | None observable | Full GTM/GA4 + Umami, consent-gated |
+| Analytics/consent | Consent-gated architecture; GTM/GA4 live (`GTM-KSQ26HMG`), Umami awaiting an ID | None observable | Full GTM/GA4 + Umami, consent-gated |
 | Attribution/QR system | Registry + 13 decode-verified QR groups | None | Full UTM/QR registry + verification |
 | SEO infrastructure | Canonicals, sitemap, JSON-LD, page ownership, verify scripts | Basic (Mobirise builder; little structure observable) | Extensive SEO documentation + verification |
 | Accessibility (measured) | axe WCAG 2.0/2.1/2.2 A+AA: **0 violations** across 15 pages (2026-10-01) | Not measured here | Documented target |
@@ -66,7 +66,7 @@ conversion data after launch.
 | --- | --- | --- |
 | Form delivery (residential, estimate, commercial, STR) | `WEB3FORMS_ACCESS_KEY` runtime secret + `PUBLIC_WEB3FORMS_ACCESS_KEY` build variable not set | Add both (same key) in Cloudflare → redeploy → authorized live test |
 | Real travel routing + live fuel price | `TRAVEL_ORIGIN`, optional `ROUTES_PROVIDER`/`ROUTES_API_KEY`, `EIA_API_KEY` not set | Add secrets → redeploy |
-| Analytics (GTM/GA4, Umami) | No IDs | Create accounts, add IDs, verify consent behavior |
+| Analytics (GTM/GA4, Umami) | GTM/GA4 live; Umami has no ID | Verify consent behavior; create Umami only if wanted |
 | Turnstile spam protection | Optional keys not set | Enable in Cloudflare |
 | Review system | No Google Business Profile / review link | Create GBP, then activate the documented review workflow |
 | Indexing accelerators | IndexNow key not set (site is already indexable) | Optional post-launch |

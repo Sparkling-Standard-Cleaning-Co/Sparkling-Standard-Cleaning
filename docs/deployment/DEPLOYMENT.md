@@ -6,13 +6,16 @@ dashboard, stop and reconcile before deploying. Owner-confirmed facts live in
 `docs/launch/OWNER-INPUT-REQUIRED.md`.
 
 - Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
-- Cloudflare Pages project (intended): `sparkling-standard-cleaning`
+- Cloudflare Pages project: `sparkling-standard-cleaning`
 - Production branch: `main`
-- Custom domain (not attached yet): `https://sparkling-standard.com`
+- **Production website: LIVE at `https://sparkling-standard.com`** (custom domain attached;
+  verified 2026-10-02 — see `docs/operations/PLATFORM-STATUS.md`)
 - Runtime: Cloudflare Pages + Pages Functions (`functions/`), Astro 5 static build
 
-Nothing is live yet. Do not claim production is running until the validation and launch
-authorization steps below are complete.
+The site is live. `business.launch.productionApproved` is still `false` as the formal
+owner-checklist gate (legal name, insurance/licensing wording, review links, final cancellation
+percentages) — it does **not** describe deployment state. Any push to `main` triggers a live
+production deployment: treat every commit to `main` as publishing.
 
 ## 1. Exact build configuration
 
@@ -20,13 +23,13 @@ authorization steps below are complete.
 | --- | --- |
 | Git provider / repository | GitHub, `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning` only |
 | Production branch | `main` |
-| Preview deployments | Disabled by owner choice (Settings → Builds → Branch control → Preview branch: **None**) |
+| Preview deployments | **Not used by owner decision (2026-10-02).** Production deploys from `main` only; no preview environment variables, preview secrets, Cloudflare Access or preview infrastructure are configured or required. A temporary `PUBLIC_PREVIEW_MODE=true` staging deploy remains available if ever needed (section 6) |
 | Framework preset | Astro (if offered) or None |
 | Build command | `npm run build` |
 | Build output directory | `dist` |
 | Root directory | `/` (repository root) |
 | Node.js | 22.16.0 via the committed `.node-version` file (Pages V3 image default; equivalent to setting `NODE_VERSION=22.16.0`) |
-| Functions | `functions/` at the repository root is picked up automatically (`/api/lead`, `/api/travel`) |
+| Functions | `functions/` at the repository root is picked up automatically (`/api/lead`, `/api/travel`, `/api/geocode`) |
 | Build cache | May be enabled; no adverse effect |
 
 `npm run build` runs `astro build` only. It does not run tests or validation — run those locally
@@ -91,15 +94,17 @@ Do these in order, stopping when the branch list appears.
 
 - Node.js ≥ 20 for the build (pinned to 22.16.0 by `.node-version`).
 - No database, no server framework, no paid add-ons.
-- Two Pages Functions only:
+- Three Pages Functions (all configured on production as of 2026-10-02):
   - `POST /api/lead` — validates and relays form submissions to Web3Forms using the runtime
     `WEB3FORMS_ACCESS_KEY`; returns `503 not_configured` when the key is missing so the client can
     use its static fallback instead of showing a false success.
-  - `POST /api/travel` — route distance + Gulf Coast gasoline reference; returns
-    `503 origin_not_configured` until `TRAVEL_ORIGIN` is set; the estimator keeps working in
-    offline zone mode either way.
-- Outbound calls: `api.web3forms.com`, `routes.googleapis.com` or `api.mapbox.com` (optional),
-  `api.eia.gov` (optional), `challenges.cloudflare.com` (Turnstile, optional).
+  - `POST /api/travel` — route distance/duration + Gulf Coast gasoline reference; live and verified
+    on production. Returns `503 origin_not_configured` only when `TRAVEL_ORIGIN` is missing; the
+    estimator keeps working in offline zone mode either way.
+  - `POST /api/geocode` — server-side address suggestions/resolution/reverse proxy. Provider keys
+    stay in the function environment; the private travel origin is never read or returned here.
+- Outbound calls: `api.web3forms.com`, `api.mapmap.ai` (addresses + routing), `geocoding.geo.census.gov`
+  (free fallback), `api.eia.gov` (optional), `challenges.cloudflare.com` (Turnstile, optional).
 
 ## 4. Environment variables — build-time vs runtime
 
@@ -173,21 +178,22 @@ them in Cloudflare currently has no effect.
 Never commit `.env`, `deploy/secrets.env`, `deploy/secrets*.json`, or `.dev.vars`; all are
 git-ignored.
 
-## 6. Temporary staging deployment (first pages.dev test)
+## 6. Staging and previews (owner decision: not used)
 
-Preview branch builds are disabled, so the first test deployment runs from `main` — which
-Cloudflare classifies as a **production deployment** even though it is only a staging test.
+**The owner does not use Cloudflare preview environments.** No preview branches, preview
+environment variables, preview secrets or Cloudflare Access applications are configured or
+required. Production deploys from `main` only; a non-`main` branch is a normal Git branch, not a
+deployment target.
 
-1. Before the first deploy, add the Text variable `PUBLIC_PREVIEW_MODE=true` to the **Production**
-   environment. This makes the built site `noindex, nofollow` and `robots.txt` `Disallow: /`, so
-   the `*.pages.dev` URL is not submitted for indexing.
-2. Do **not** attach the custom domain yet (settings → Custom domains stays empty).
-3. Deploy and run the verification checklist (section 8) against the `*.pages.dev` URL.
-4. `noindex` is not access control — anyone with the URL can view the staging site. If genuinely
-   restricted access is required, add Cloudflare Access (section 12).
-5. Before launch: **remove** `PUBLIC_PREVIEW_MODE`, trigger a new deployment, and confirm
-   `robots.txt` shows `Allow: /` and pages show `index, follow` (section 11). This step is
-   mandatory and is part of the owner launch checklist.
+Reviewing a change before it reaches customers is done with:
+
+1. `npm run check && npm test && npm run test:browser` locally, and
+2. `npm run build && npm run preview` for a local copy of the production build.
+
+If a temporary, noindexed staging URL is ever needed, build with `PUBLIC_PREVIEW_MODE=true`
+(that single pre-existing mechanism forces `noindex, nofollow` plus `robots.txt Disallow: /`) and
+deploy it deliberately rather than enabling preview infrastructure. Never leave
+`PUBLIC_PREVIEW_MODE` set on the production environment.
 
 ## 7. Validation gates
 
@@ -195,9 +201,11 @@ Local, before any deploy (all must pass):
 
 ```
 npm run verify                 # astro check + build + links/SEO/QR/checklist validation
-npm test                       # 27 estimator tests
+npm test                       # full unit suite (estimator, API, promotion, address ranking)
+npm run test:browser           # Playwright browser regression suite (builds first)
+npm run address:check          # live address-pipeline check (needs the local .env provider key)
 npm run pending                # no PENDING placeholder facts in the built output
-node scripts/validate-production-env.mjs   # production gate — expected to FAIL until owner inputs land
+node scripts/validate-production-env.mjs   # production gate — formal owner checklist items
 ```
 
 Live, immediately after a deployment (section 8 lists the exact checks). Do not report a
@@ -244,33 +252,33 @@ deployment as successful from the dashboard status alone.
 | Site is `noindex` after launch | `PUBLIC_PREVIEW_MODE=true` still set | Remove it and redeploy (section 11) |
 | Cloudflare shows "repository used on a different Cloudflare account" | Repository connected to a Pages project in another Cloudflare account | Remove it in that account only if you control it; never modify another company's working setup |
 
-## 11. Launch authorization
+## 11. Formal production approval (the site is already live)
 
-Production launch requires ALL of the following, in order:
+The live site and pipeline are verified operational. `business.launch.productionApproved` remains
+`false` as the **formal owner checklist gate** (legal entity spelling, insurance/bonding/licensing
+claims, genuine review links, final cancellation percentages, remaining profile URLs). Closing it
+requires ALL of the following:
 
-1. `docs/launch/OWNER-INPUT-REQUIRED.md` BLOCKS PRODUCTION items resolved (Web3Forms key entered,
-   `TRAVEL_ORIGIN` set, live form tests received, Stripe methods confirmed, owner approval).
-2. **Remove `PUBLIC_PREVIEW_MODE`** from the Production environment and redeploy.
-3. Confirm live: `robots.txt` = `Allow: /`; meta robots = `index, follow`; canonical = the
-   production domain with trailing slash.
-4. Live form delivery confirmed for every category (section 8).
-5. Owner approves attaching the custom domain.
-6. Attach `sparkling-standard.com` in Pages → Custom domains. Cloudflare manages the DNS in this
-   account, so no nameserver changes occur. **Do not touch Google Workspace MX/SPF/DKIM records
-   and do not enable Email Routing.**
-7. Set `business.launch.productionApproved = true` in `src/config/business.ts` (a deliberate,
+1. `docs/launch/OWNER-INPUT-REQUIRED.md` items resolved (legal name, claims, review links,
+   remaining profile URLs, final cancellation percentages).
+2. Confirm live: `robots.txt` = `Allow: /`; meta robots = `index, follow`; canonical = the
+   production domain with trailing slash; `PUBLIC_PREVIEW_MODE` is NOT set in Production.
+3. Live form delivery confirmed for every category (section 8), with any test submission clearly
+   marked as a test in its subject and body.
+4. Owner approves the remaining business claims in writing.
+5. Set `business.launch.productionApproved = true` in `src/config/business.ts` (a deliberate,
    reviewable commit) and run the production gate:
    `node scripts/validate-production-env.mjs` — it must pass.
-8. Post-launch: submit the sitemap in Search Console, create the Google Business Profile, and
+6. Ongoing: keep the sitemap current in Search Console, maintain the Google Business Profile, and
    regenerate marketing QR assets if the domain changes (`npm run marketing:qr`; every QR is
    decode-verified).
 
-## 12. Optional — Cloudflare Access for the staging URL
+## 12. Cloudflare Access — not used
 
-`noindex` keeps search engines away; it does not restrict visitors. For genuine access control on
-the `*.pages.dev` staging URL, use Zero Trust → Access → Applications → **Self-hosted and
-private** → add the pages.dev hostname with an email one-time-PIN policy. Remove or bypass the
-Access application before the public launch so real customers are not challenged.
+The owner does not use Cloudflare Access. Production is the public website; there is no
+access-controlled staging surface to manage. If an isolated environment is ever genuinely
+required, treat it as a separate, explicitly approved project rather than adding Access to this
+one.
 
 ## 13. Reference files
 

@@ -10,10 +10,10 @@ import { chromium } from 'playwright';
 
 const PORT = 4405;
 const BASE = `http://localhost:${PORT}`;
-const MOLINO = { latitude: 30.719, longitude: -87.442 };
+const MOLINO = { latitude: 30.72, longitude: -87.31 };
 
 const MOLINO_RESULT = {
-  label: '6360 HAUPERT LN, MOLINO, FL, 32577',
+  label: '4242 MAPLEWOOD LN, MOLINO, FL, 32577',
   lat: MOLINO.latitude,
   lng: MOLINO.longitude,
   zip: '32577',
@@ -170,7 +170,7 @@ test('GPS resolves an exact address and only confirms it explicitly', async () =
     await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
     await page.click('[data-address-confirm]');
     await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
-    assert.match((await page.locator('[data-address-confirmed-label]').textContent()) ?? '', /HAUPERT LN/);
+    assert.match((await page.locator('[data-address-confirmed-label]').textContent()) ?? '', /MAPLEWOOD LN/);
   } finally {
     await context.close();
   }
@@ -183,7 +183,7 @@ test('a street-level reverse result never invents a street address', async () =>
     geolocation: { ...MOLINO, accuracy: 20 },
     permissions: ['geolocation'],
     mockOptions: {
-      reverseResult: { label: 'Haupert Lane, Florida', lat: MOLINO.latitude, lng: MOLINO.longitude, source: 'mapmap', precise: false },
+      reverseResult: { label: 'Maplewood Lane, Florida', lat: MOLINO.latitude, lng: MOLINO.longitude, source: 'mapmap', precise: false },
     },
   });
   try {
@@ -221,7 +221,7 @@ test('the manual address section starts closed and reopens only on request', asy
     assert.equal(await page.locator('#est-address').isVisible(), true, 'manual fields appear when opened');
     const placeholder = await page.locator('#est-address').getAttribute('placeholder');
     assert.match(placeholder ?? '', /123 Super Clean Way/, 'fictional example placeholder');
-    assert.doesNotMatch(placeholder ?? '', /Haupert/i, 'no real private address is used');
+    assert.doesNotMatch(placeholder ?? '', /Maplewood|4242/i, 'no test fixture address leaks into the placeholder');
     // Navigating a step forward and back preserves the customer's purposeful choice.
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-zip', '32503');
@@ -420,7 +420,7 @@ test('an unresolved manual address can still be submitted for confirmation', asy
     await page.waitForSelector('[data-address-finder][data-state="unresolved"]');
     assert.match(
       (await page.locator('[data-address-status]').textContent()) ?? '',
-      /couldn't pinpoint this address/i,
+      /couldn't pinpoint the exact address/i,
     );
     await completeRemainingSteps(page);
     await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });

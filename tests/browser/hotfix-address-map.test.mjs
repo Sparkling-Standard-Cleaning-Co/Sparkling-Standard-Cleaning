@@ -1,5 +1,6 @@
-// Focused hotfix tests — address lookup for house numbers MapMap does not
-// contain (Molino) and an Alabama address, plus the no-silent-street rule.
+// Focused address tests — a street-level match where the provider has no
+// house number (pin confirmation, never a fabricated address), an exact
+// Alabama address, the no-nationwide-results rule, and the map worker.
 //
 // Run with: npm run test:browser on :4404.
 
@@ -123,16 +124,17 @@ async function completeAfterAddress(page) {
   await page.fill('#est-email', 'owner@sparkling-standard.com');
 }
 
-test('a street-level suggestion never replaces the entered house number; the address is preserved for review', async () => {
+test('a street-level suggestion opens pin confirmation without inventing a house number', async () => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   try {
     const captured = await openWithMocks(page, {
-      // MapMap knows the street but not 6360; resolve finds no exact address.
+      // The provider knows the street but has no house number for 4242;
+      // resolve finds no exact address, so the customer pins the street.
       suggestions: [
         {
           id: 'osm:w10919246:street',
-          label: 'Haupert Lane, Florida, 32577, United States',
+          label: 'Maplewood Lane, Florida, 32577, United States',
           kind: 'street',
           lat: 30.7165,
           lng: -87.3439,
@@ -142,7 +144,7 @@ test('a street-level suggestion never replaces the entered house number; the add
     });
 
     await page.click('label.option:has(input[name="serviceType"][value="standard"])');
-    await page.fill('#est-address', '6360 Haupert Lane');
+    await page.fill('#est-address', '4242 Maplewood Lane');
     await page.fill('#est-address-city', 'Molino');
     await page.selectOption('#est-address-state', 'FL');
     await page.fill('#est-zip', '32577');
@@ -150,39 +152,42 @@ test('a street-level suggestion never replaces the entered house number; the add
 
     // Autocomplete is built from all entered information.
     const lastSuggest = captured.suggest.at(-1);
-    assert.match(lastSuggest.query, /6360 Haupert Lane/);
+    assert.match(lastSuggest.query, /4242 Maplewood Lane/);
     assert.match(lastSuggest.query, /Molino/);
     assert.match(lastSuggest.query, /FL/);
     assert.match(lastSuggest.query, /32577/);
 
     await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-finder][data-state="unresolved"]', { timeout: 10000 });
-    assert.equal(await page.locator('[data-address-confirm]').isVisible(), false, 'no precise pin was offered');
+    await page.waitForSelector('[data-address-confirm]', { state: 'visible' }, { timeout: 10000 });
     const status = (await page.locator('[data-address-status]').textContent()) ?? '';
-    assert.match(status, /saved for our review|pinpoint/i, `manual-review status: "${status}"`);
+    assert.match(status, /found the street|verify the exact address/i, `street-level status: "${status}"`);
 
-    // The customer's original address is preserved.
-    assert.equal(await page.inputValue('#est-address'), '6360 Haupert Lane');
+    // The customer's original address is preserved and can be pinned.
+    assert.equal(await page.inputValue('#est-address'), '4242 Maplewood Lane');
     assert.equal(await page.inputValue('#est-address-city'), 'Molino');
     assert.equal(await page.inputValue('#est-address-state'), 'FL');
     assert.equal(await page.inputValue('#est-zip'), '32577');
+    await page.click('[data-address-confirm]');
+    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
+    assert.equal(await page.inputValue('#est-address'), '4242 Maplewood Lane');
 
     await completeAfterAddress(page);
-    // Travel stays preliminary without a confirmed destination.
+    // Travel stays preliminary without a verified street address.
     const travel = (await page.locator('[data-estimate-travel]').textContent()) ?? '';
     assert.match(travel, /proposed price includes estimated travel/i);
-    assert.doesNotMatch(travel, /Travel confirmed/i);
+    assert.doesNotMatch(travel, /driving distance to your selected location/i);
 
     await page.click('[data-submit]');
     await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'warning');
     assert.ok(captured.lead, 'request sent');
     const fields = captured.lead.fields;
-    assert.equal(fields.address_confirmed, 'no');
-    assert.equal(fields.service_address, '6360 Haupert Lane');
+    assert.equal(fields.address_confirmed, 'yes');
+    assert.equal(fields.pin_precision, 'street', 'street-level precision is declared truthfully');
+    assert.equal(fields.service_address, '4242 Maplewood Lane');
     assert.equal(fields.address_city, 'Molino');
     assert.equal(fields.address_state, 'FL');
     assert.equal(fields.zip, '32577');
-    assert.equal(fields.pin_latitude, undefined, 'no pin coordinates are submitted');
+    assert.ok(fields.pin_latitude, 'the pinned street point travels with the request');
   } finally {
     await context.close();
   }

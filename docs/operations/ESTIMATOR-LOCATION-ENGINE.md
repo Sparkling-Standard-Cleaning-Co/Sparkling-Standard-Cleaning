@@ -4,6 +4,51 @@ Branch work only. Nothing in this document changes production behavior until the
 the policy values and the change is merged deliberately. Reproduced against the deployed site and
 the current source on 2026-10-01.
 
+## Update 2026-10-02 — address reliability rebuild (branch `dev/owner-preview-2026-10-02`)
+
+Owner testing after the first round of autocomplete fixes still failed, so the whole request path
+was re-investigated against the live provider and the production function (read-only probes; see
+`npm run address:check`, which runs the real `/api/geocode` module against the live provider with
+public/synthetic addresses only). Verified root causes and the fixes now on this branch:
+
+1. **State matching was full-name-only substring matching.** The ranking required the literal word
+   "florida" (or "alabama") in the suggestion context; a supplier sending `FL`/`AL` would have
+   every row silently dropped. Matching is now structural: comma-separated context parts are
+   parsed as USPS codes or full state names, with a full-name fallback, and rows with no state
+   signal fail closed. This also removed substring false positives (e.g. "Indiana Avenue,
+   Florida" no longer matches "india").
+2. **Street matching required exact token equality**, so a partially typed street never matched the
+   provider's full word (`Bayl` could not match `Baylen`). Matching now accepts a safe prefix
+   (3+ characters) but requires **every** distinctive requested token, so "Pine Forest" can never
+   match "Pine Hollow" and an unrelated same-numbered street is still dropped.
+3. **Ranking ignored distance.** Provider rows carried coordinates but ordering was provider order
+   only, which is why a South Miami or Atlanta match could outrank the local street. Ranking now
+   applies a proximity adjustment from the **public Pensacola city centre** (`SERVICE_CENTER`) —
+   never the private operating origin. Proximity reorders; it never excludes, because address
+   discovery is not service eligibility.
+4. **Provider queries gave up too early.** Some complete-looking queries return nothing while the
+   same street resolves without the house number, and suffix spelling changes results
+   (`Ln` vs `Lane`). The proxy now tries up to four alternates, in order: direction/suffix
+   expansion, numbered-road expansion, suffix abbreviation, and a house-numberless street-level
+   fallback. Working addresses normally cost one provider call; unpromising input stops early.
+5. **A street-level suggestion was a dead end.** Selecting a street match previously forced an
+   exact-address resolve; when that failed the customer got an error with no way to continue.
+   Now the resolver is still tried first (MapMap exact-only → free Census), and if it cannot find
+   the house number the suggestion's own point becomes a pinnable **street-level destination**.
+   The request carries `pin_precision: street` and the exact property is confirmed personally;
+   no house number is ever fabricated and travel stays preliminary.
+6. **Partial input fired useless provider calls** (a house number alone is not a search). The
+   client now requires at least three letters before requesting suggestions.
+7. **The known problematic test address was committed throughout the tests and source comments.**
+   All fixtures now use public or clearly synthetic addresses (`4242 Maplewood Ln` style), so no
+   private owner/customer address remains in the repository, docs or logs.
+
+Live evidence (2026-10-02, `npm run address:check`, real provider key, no credit possible):
+partial + city returned a Florida match and rejected Georgia; `Ave` and `Avenue` returned the same
+three Alabama matches; `100 Main St` with FL selected returned only a Florida row; and
+`100 S Baylen St, Pensacola, FL 32502` resolved precisely through Census. These are live
+integration results, distinct from the mocked unit/browser suites.
+
 ## Implementation status (branch `feat/estimator-location-config`)
 
 **Implemented and tested on this branch:**

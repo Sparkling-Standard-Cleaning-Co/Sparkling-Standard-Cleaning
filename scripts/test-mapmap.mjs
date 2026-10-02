@@ -92,6 +92,8 @@ if (before.status !== 200) {
 }
 
 // 2. Address suggestions (public test address; first 5,000/day unbilled).
+// The deployed provider returns `{ suggestions: [...] }`; Photon-style
+// `{ features: [...] }` gateways are still accepted defensively.
 console.log('2. Address suggestions (Pensacola test address)');
 const suggest = await getJson(
   `${base}/geocode/suggest?q=${encodeURIComponent('100 S Baylen St, Pensacola')}&limit=5&bias=-87.2169,30.4213`,
@@ -100,14 +102,16 @@ const suggest = await getJson(
 if (suggest.status !== 200) {
   fail(`suggest returned HTTP ${suggest.status}`);
 } else {
-  const features = suggest.data?.features ?? [];
-  console.log(`  suggestions: ${features.length}`);
-  for (const feature of features.slice(0, 3)) {
-    const p = feature.properties ?? {};
-    const label = p.label ?? [p.name, p.street, p.city, p.state, p.postcode].filter(Boolean).join(', ');
-    console.log(`    - ${label}`);
+  const rows = Array.isArray(suggest.data?.suggestions)
+    ? suggest.data.suggestions
+    : (suggest.data?.features ?? []).map((feature) => feature.properties ?? {});
+  console.log(`  suggestions: ${rows.length}`);
+  for (const row of rows.slice(0, 3)) {
+    const label =
+      row.label ?? [row.name, row.city, row.state, row.postcode].filter(Boolean).join(', ') ?? row.context;
+    console.log(`    - ${label || row.name || '(unlabeled)'}`);
   }
-  if (features.length === 0) fail('no suggestions returned for a known Pensacola address (coverage gap?)');
+  if (rows.length === 0) fail('no suggestions returned for a known Pensacola address (coverage gap?)');
 }
 
 // 3. Single-shot geocode.

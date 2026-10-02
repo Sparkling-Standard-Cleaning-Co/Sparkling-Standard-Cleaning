@@ -196,6 +196,23 @@ const site = defineCollection({
     servicesIntro: z
       .object({ eyebrow: z.string(), heading: z.string(), lead: z.string().optional() })
       .optional(),
+    recurringPlans: z
+      .object({
+        eyebrow: z.string(),
+        heading: z.string(),
+        text: z.string(),
+        linkLabel: z.string(),
+        items: z
+          .array(
+            z.object({
+              title: z.string(),
+              frequency: z.enum(['weekly', 'biweekly', 'monthly']),
+              text: z.string(),
+            }),
+          )
+          .default([]),
+      })
+      .optional(),
     founderBand: z
       .object({
         eyebrow: z.string(),

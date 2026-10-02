@@ -10,10 +10,12 @@
 
 import { pricing } from '../../config/pricing.ts';
 import { zoneForZip } from '../../config/geography.ts';
+import type { AddonBundleDefinition, FoundingTenConfig, PromotionCustomerKind, PromotionTerms } from '../../config/owner-pricing.ts';
 import { calculateTravelAdjustment } from '../travel/calculateTravelAdjustment.ts';
 import { resolveAddonCharge, selectAddons } from './addons.ts';
 import { computeLaborHours } from './labor.ts';
 import { recurringResetSuggested } from './frequency.ts';
+import { evaluatePromotions } from './promotions.ts';
 import { validateEstimateInput } from './validation.ts';
 import type {
   AddonPriceLine,
@@ -49,6 +51,21 @@ export interface EstimateContext {
     enabled: boolean;
     tiers: Array<{ minAddons: number; percent: number }>;
     maxDiscount?: number | null;
+  };
+  /**
+   * Optional promotion overrides (tests / future owner flows). Defaults to
+   * the centralized, DISABLED pricing.promotions configuration. The same
+   * evaluator runs on the server, so eligibility cannot drift between the
+   * browser quote and the verified quote.
+   */
+  promotions?: {
+    appreciationDiscounts?: PromotionTerms[];
+    addonBundles?: AddonBundleDefinition[];
+    foundingTen?: FoundingTenConfig;
+    /** What the flow can prove about the customer. 'unknown' fails closed. */
+    customerKind?: 'unknown' | PromotionCustomerKind;
+    /** ISO date used for expiry checks; defaults to today (UTC). */
+    todayIso?: string;
   };
 }
 
@@ -93,34 +110,6 @@ const EMPTY_PRICING: PricingBreakdown = {
   subtotal: 0,
   minimumApplied: false,
 };
-
-/** Applies exactly one incentive tier. Returns the effective discount. */
-function applyAddonIncentive(input: {
-  eligibleAddonCount: number;
-  addonSubtotal: number;
-  gross: number;
-  minimum: number;
-  incentive: { enabled: boolean; tiers: Array<{ minAddons: number; percent: number }>; maxDiscount?: number | null };
-}): { percent: number; amount: number; label: string } | null {
-  if (!input.incentive.enabled || input.eligibleAddonCount < 2 || input.addonSubtotal <= 0) return null;
-  const tier = [...input.incentive.tiers]
-    .sort((a, b) => b.minAddons - a.minAddons)
-    .find((candidate) => input.eligibleAddonCount >= candidate.minAddons);
-  if (!tier || tier.percent <= 0) return null;
-  const cap = typeof input.incentive.maxDiscount === 'number' ? input.incentive.maxDiscount : Number.POSITIVE_INFINITY;
-  const raw = Math.min(round2(input.addonSubtotal * tier.percent), cap, input.addonSubtotal);
-  // The discount never pushes the job below the minimum or reduces the base
-  // cleaning price; only the effective (price-changing) part is reported.
-  const discountedGross = Math.max(input.minimum, input.gross - raw);
-  const effective = round2(input.gross - discountedGross);
-  if (effective <= 0) return null;
-  const percentLabel = `${Math.round(tier.percent * 100)}%`;
-  const label =
-    input.eligibleAddonCount >= 3
-      ? `${percentLabel} off extras (${input.eligibleAddonCount} add-ons)`
-      : `${percentLabel} off extras`;
-  return { percent: tier.percent, amount: effective, label };
-}
 
 export function calculateEstimate(
   raw: EstimateInputDraft | null | undefined,
@@ -229,7 +218,6 @@ export function calculateEstimate(
     .map((addon) => ({ id: addon.id, label: addon.label, charge: resolveAddonCharge(addon, rate) ?? 0 }));
   const extrasSubtotal = round2(selectedExtras.reduce((sum, addon) => sum + addon.charge, 0));
   const addonRaw = extrasSubtotal;
-  const eligibleAddonCount = selectedExtras.length;
 
   const rawPrice = round2(baseRaw + addonRaw);
   const gross = Math.max(minimumJob, rawPrice);
@@ -243,13 +231,22 @@ export function calculateEstimate(
     })),
     maxDiscount: pricing.addonIncentive.maxDiscount.value,
   };
-  const discount = applyAddonIncentive({
-    eligibleAddonCount,
+  const evaluation = evaluatePromotions({
+    serviceType: input.serviceType,
+    frequency: input.frequency,
+    eligibleAddonIds: selectedExtras.map((extra) => extra.id),
+    addonChargesById: Object.fromEntries(selectedExtras.map((extra) => [extra.id, extra.charge])),
     addonSubtotal: addonRaw,
     gross,
-    minimum: minimumJob,
-    incentive,
+    minimumJob,
+    todayIso: context.promotions?.todayIso ?? new Date().toISOString().slice(0, 10),
+    customerKind: context.promotions?.customerKind ?? 'unknown',
+    addonIncentive: incentive,
+    appreciationDiscounts: context.promotions?.appreciationDiscounts ?? pricing.promotions.appreciationDiscounts,
+    addonBundles: context.promotions?.addonBundles ?? pricing.promotions.addonBundles,
+    foundingTen: context.promotions?.foundingTen ?? pricing.promotions.foundingTen,
   });
+  const discount = evaluation.discount;
   const discountedGross = discount ? round2(gross - discount.amount) : gross;
   const expectedPrice = round2(discountedGross + travel.adjustment);
   const roundingAdjustment = round2(roundUpToStep(expectedPrice, step) - expectedPrice);
@@ -279,8 +276,8 @@ export function calculateEstimate(
     ...(discount
       ? [
           {
-            step: 'price:addon_incentive',
-            detail: `Applied incentive ${discount.label} (single tier, never stacked)`,
+            step: 'price:promotion',
+            detail: `Applied promotion "${discount.label}" [${discount.id}] (single promotion, never stacked)`,
             value: discount.amount,
           },
         ]
@@ -294,6 +291,15 @@ export function calculateEstimate(
       code: 'MINIMUM_JOB_APPLIED',
       severity: 'info',
       message: 'Small jobs carry the standard minimum visit value.',
+    });
+  }
+
+  if (evaluation.grant) {
+    flags.push({
+      code: 'FOUNDING_UPGRADE_GRANTED',
+      severity: 'info',
+      message:
+        'A complimentary founding-customer upgrade applies to this request; the owner confirms it personally.',
     });
   }
 

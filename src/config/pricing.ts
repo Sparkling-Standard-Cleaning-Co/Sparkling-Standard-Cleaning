@@ -227,6 +227,19 @@ export const pricing = {
     note: 'Automatic acknowledgments do not count as a response; the clock starts when a request arrives during business hours, or when the next business day begins. Does not combine with other promotions. Requires documented receipt and response timestamps.',
   },
 
+  // ── Prepared promotions (ALL DISABLED — owner approval required) ──────────
+  // The promotion engine applies at most ONE program per quote. Every program
+  // here ships disabled with no terms (`value: null`). Enabling any program
+  // requires: explicit owner approval of exact terms, the financial review in
+  // docs/launch/PROMOTION-PROPOSALS.md, and a quote configVersion bump so old
+  // quotes cannot be silently reused under new promotion rules.
+  promotions: {
+    appreciationDiscounts: ownerPricing.promotions.appreciationDiscounts,
+    addonBundles: ownerPricing.promotions.addonBundles,
+    foundingTen: ownerPricing.promotions.foundingTen,
+    note: 'Prepared, unpublished promotion programs. Disabled with no terms until the owner approves exact written terms and the required configVersion bump.',
+  },
+
   // ── Instant-estimate boundaries (directive §27) ────────────────────────────
   customQuoteThresholds: {
     squareFeetOver: provisional(4500, 'Beyond this the labor model loses confidence — request a walkthrough or custom scope.'),
