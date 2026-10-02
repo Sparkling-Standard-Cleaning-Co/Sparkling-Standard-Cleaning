@@ -127,6 +127,7 @@ async function openEstimate(width, height, options = {}) {
   const travelRequests = await mockProviders(page, options);
   await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
+  await page.click('[data-address-manual-summary]');
   return { context, page, travelRequests };
 }
 

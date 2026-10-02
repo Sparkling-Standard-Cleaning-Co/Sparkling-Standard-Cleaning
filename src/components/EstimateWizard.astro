@@ -147,15 +147,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
                 </button>
               </div>
             </div>
-
-            <div class="field address-gps__zip" data-gps-zip hidden>
-              <label for="est-gps-zip">ZIP code (for coverage)</label>
-              <input class="input" id="est-gps-zip" name="gpsZip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" placeholder="e.g. 32577" pattern="[0-9]{5}(-[0-9]{4})?" />
-              <span class="hint">Your device location didn't include a ZIP code — add it so we can check coverage.</span>
-            </div>
           </div>
 
-          <details class="address-manual" data-address-manual-details open>
+          <details class="address-manual" data-address-manual-details>
             <summary class="address-manual__summary" data-address-manual-summary>
               Enter a different address manually
             </summary>
@@ -169,7 +163,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
                     name="serviceAddress"
                     type="text"
                     autocomplete="address-line1"
-                    placeholder="e.g. 6360 Haupert Ln"
+                    placeholder="e.g. 123 Super Clean Way"
                     role="combobox"
                     aria-expanded="false"
                     aria-autocomplete="list"

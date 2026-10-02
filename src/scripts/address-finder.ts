@@ -53,8 +53,6 @@ export interface AddressFinderHandle {
   getLocation(): ConfirmedLocation | null;
   /** The method-isolated address used for submission and validation. */
   getSubmission(): AddressSubmission;
-  /** True when the GPS method still needs a coverage ZIP from the customer. */
-  needsZip(): boolean;
   /** Clear everything and return to the initial manual state. */
   reset(): void;
   /** Re-focus the street input (used when a step is entered). */
@@ -120,8 +118,6 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   const permissionMessage = root.querySelector<HTMLElement>('[data-permission-message]');
   const permissionSteps = root.querySelector<HTMLOListElement>('[data-permission-steps]');
   const permissionRetryNote = root.querySelector<HTMLElement>('[data-permission-retry-note]');
-  const gpsZipField = root.querySelector<HTMLElement>('[data-gps-zip]');
-  const gpsZipInput = form.querySelector<HTMLInputElement>('#est-gps-zip');
   const resolveButton = root.querySelector<HTMLButtonElement>('[data-address-resolve]');
   const mapCard = root.querySelector<HTMLElement>('[data-address-map]');
   const mapCanvas = root.querySelector<HTMLElement>('[data-address-map-canvas]');
@@ -255,8 +251,6 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     gpsCandidate = null;
     gpsConfirmed = null;
     gpsParts = emptyParts();
-    if (gpsZipField) gpsZipField.hidden = true;
-    if (gpsZipInput) gpsZipInput.value = '';
   }
 
   /** Any manual interaction switches the active method back to manual. */
@@ -428,8 +422,6 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     invalidateManual();
     hidePermissionPanel();
     gpsParts = emptyParts();
-    if (gpsZipField) gpsZipField.hidden = true;
-    if (gpsZipInput) gpsZipInput.value = '';
     if (confirmedCard) confirmedCard.hidden = true;
 
     gpsCandidate = {
@@ -478,7 +470,6 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
             ...(gpsParts.state ? { state: gpsParts.state } : {}),
           };
         }
-        if (gpsZipField) gpsZipField.hidden = Boolean(gpsParts.zip);
         if (gpsParts.street) {
           setStatus('We found this address — confirm this is the property you want cleaned.', 'info');
         } else {
@@ -492,27 +483,42 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         confirmButton?.focus();
         return;
       }
-      if (gpsZipField) gpsZipField.hidden = false;
       setStatus(
-        "We couldn't look up the address from your location — check the pin, add the address if needed, then confirm.",
+        "We couldn't look up the address from your location — check the pin, then confirm your map location.",
         'info',
       );
     } catch {
       if (method !== 'gps') return;
-      if (gpsZipField) gpsZipField.hidden = false;
       setStatus(
-        'We found your location, but the address lookup is unavailable — check the pin, add the address if needed, then confirm.',
+        'We found your location, but the address lookup is unavailable — check the pin, then confirm your map location.',
         'info',
       );
     }
   }
 
-  function useCurrentLocation(): void {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      showPermissionHelp('unsupported');
-      setStatus('Your browser does not support location sharing — enter your address manually.', 'info');
-      return;
+  // ── GPS permission ────────────────────────────────────────────────────────
+  /**
+   * Progressive enhancement: when the Permissions API is available, check the
+   * CURRENT geolocation permission before asking. A browser that already
+   * reports 'denied' cannot show its native prompt again, so the recovery
+   * panel is shown immediately instead of a request that is guaranteed to
+   * fail. Unsupported browsers fall back to the plain Geolocation API call,
+   * which is the only universally supported behavior.
+   */
+  async function geolocationPermission(): Promise<'granted' | 'prompt' | 'denied' | 'unknown'> {
+    try {
+      const permissions = navigator.permissions;
+      if (!permissions?.query) return 'unknown';
+      const status = await permissions.query({ name: 'geolocation' as PermissionName });
+      return status.state === 'granted' || status.state === 'prompt' || status.state === 'denied'
+        ? status.state
+        : 'unknown';
+    } catch {
+      return 'unknown';
     }
+  }
+
+  function beginLocationRequest(): void {
     hidePermissionPanel();
     setState('locating');
     setStatus('Getting your location…', 'info');
@@ -532,6 +538,24 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
+  }
+
+  function useCurrentLocation(): void {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      showPermissionHelp('unsupported');
+      setStatus('Your browser does not support location sharing — enter your address manually.', 'info');
+      return;
+    }
+    void (async () => {
+      const permission = await geolocationPermission();
+      if (permission === 'denied') {
+        showPermissionHelp('denied');
+        setState('permission');
+        setStatus('Location access is off — see the steps below, or enter your address manually.', 'info');
+        return;
+      }
+      beginLocationRequest();
+    })();
   }
 
   // ── Manual resolution ─────────────────────────────────────────────────────
@@ -781,7 +805,10 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   function confirmLocation(): void {
     if (methodIsGps()) {
       if (!gpsCandidate) return;
-      const zip = gpsParts.zip || gpsZipInput?.value.trim() || '';
+      // A reliable ZIP from reverse geocoding is preserved automatically; when
+      // there is none, coverage and travel use the confirmed coordinates and
+      // the address is confirmed personally. No ZIP is ever fabricated.
+      const zip = gpsParts.zip;
       gpsConfirmed = {
         label: gpsCandidate.label || 'Current location from your device',
         street: gpsParts.street,
@@ -800,7 +827,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       setTravelNote(
         gpsParts.street
           ? 'Travel will be calculated from our base to this confirmed pin when your price is prepared.'
-          : 'We will confirm the exact address with you; travel to this pin stays preliminary until then.',
+          : 'Travel and coverage use this confirmed map location; we will confirm the exact street address personally.',
       );
       setState('confirmed');
       setStatus('Destination confirmed. We will calculate travel to this exact location.', 'success');
@@ -935,15 +962,6 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     window.setTimeout(() => clearSuggestions(), 150);
   });
 
-  gpsZipInput?.addEventListener('change', () => {
-    if (gpsConfirmed) {
-      const zip = gpsZipInput.value.trim();
-      gpsConfirmed = { ...gpsConfirmed, ...(zip ? { zip } : {}) };
-      if (!zip) delete (gpsConfirmed as { zip?: string }).zip;
-      emit();
-    }
-  });
-
   resolveButton?.addEventListener('click', () => void manualResolve());
   gpsButton?.addEventListener('click', () => useCurrentLocation());
   gpsRetryButton?.addEventListener('click', () => useCurrentLocation());
@@ -977,7 +995,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
           unit: '',
           city: gpsParts.city,
           state: gpsParts.state,
-          zip: gpsParts.zip || gpsZipInput?.value.trim() || '',
+          zip: gpsParts.zip,
         };
       }
       return {
@@ -990,12 +1008,13 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         zip: zipInput?.value.trim() ?? '',
       };
     },
-    needsZip: () => methodIsGps() && !gpsParts.zip && !(gpsZipInput?.value.trim() ?? ''),
     reset: () => {
       cancelSuggestions();
       invalidateManual();
       invalidateGps();
       hidePermissionPanel();
+      // Start Over always returns to the closed-by-default manual section.
+      if (manualDetails) manualDetails.open = false;
       setMethod('manual');
       if (confirmedCard) confirmedCard.hidden = true;
       if (mapCard) mapCard.hidden = true;

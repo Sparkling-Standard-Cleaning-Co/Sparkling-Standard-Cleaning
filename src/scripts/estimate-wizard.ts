@@ -134,6 +134,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     const addonIds = [...form.querySelectorAll<HTMLInputElement>('input[name="addons"]:checked')].map(
       (input) => input.value,
     );
+    const submission = submissionAddress();
     return {
       serviceType: radioValue('serviceType') as ServiceType | undefined,
       propertyType: textValue('propertyType') as EstimateInput['propertyType'],
@@ -146,7 +147,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
       condition: radioValue('condition') as EstimateInput['condition'],
       lastClean: textValue('lastClean') as EstimateInput['lastClean'],
       addonIds,
-      zip: submissionAddress().zip,
+      zip: submission.zip,
+      ...(submission.location ? { destinationConfirmed: true } : {}),
       pets: textValue('pets') as EstimateInput['pets'],
     };
   }
@@ -516,12 +518,40 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   function showStep(step: number): void {
-    currentStep = Math.min(Math.max(step, 1), steps.length);
+    const next = Math.min(Math.max(step, 1), steps.length);
+    const changed = next !== currentStep;
+    // Anchor the questionnaire: record where the steps container sits in the
+    // viewport before the height changes, then compensate exactly.
+    const anchor = form.getBoundingClientRect().top;
+    currentStep = next;
     for (const [index, element] of steps.entries()) {
       element.dataset.active = String(index + 1 === currentStep);
     }
     updateChrome();
     recalc();
+    if (!changed) return;
+
+    // Switching steps must never move the page unexpectedly: any layout shift
+    // (taller/shorter step, scroll anchoring) is compensated so the wizard
+    // stays visually anchored where the customer was reading.
+    const shift = form.getBoundingClientRect().top - anchor;
+    if (Math.abs(shift) > 1) window.scrollBy({ top: shift, left: 0, behavior: 'auto' });
+
+    // Accessible focus management without scrolling the document.
+    const heading = steps[currentStep - 1]?.querySelector<HTMLElement>('.wizard__step-heading');
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
+
+    // Scroll the horizontal step navigator internally (never the page) so the
+    // active step stays visible on narrow screens.
+    const nav = form.querySelector<HTMLElement>('[data-wizard-steps]');
+    const activeItem = stepItems.find((item) => Number(item.dataset.stepItem ?? 0) === currentStep);
+    if (nav && activeItem && nav.scrollWidth > nav.clientWidth) {
+      const target = activeItem.offsetLeft - nav.clientWidth / 2 + activeItem.offsetWidth / 2;
+      nav.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+    }
   }
 
   function stepFields(step: number): Array<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement> {
@@ -616,7 +646,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     // Hidden manual fields never block a GPS-based request.
     if (submission.method === 'gps' && (field.id === 'est-address' || field.id === 'est-zip')) return null;
     const value = field.value.trim();
-    if (field.id === 'est-gps-zip' || field.id === 'est-zip') {
+    if (field.id === 'est-zip') {
       return /^\d{5}(-\d{4})?$/.test(value) ? null : 'Please enter a valid ZIP code.';
     }
     if (field.id === 'est-address') {
@@ -713,23 +743,17 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
     }
 
-    // Address method rules.
+    // Address method rules. A confirmed GPS destination is enough on its own:
+    // coverage and travel use the confirmed map location when no reliable ZIP
+    // was returned, so no ZIP entry is ever demanded for GPS.
     if (step === 1) {
       const submission = submissionAddress();
-      if (submission.method === 'gps') {
-        if (!submission.location) {
-          const gpsButton = form.querySelector<HTMLElement>('[data-address-gps]');
-          const message = 'Please confirm your current location, or enter the address manually.';
-          if (gpsButton) {
-            setFieldError(gpsButton, message);
-            errors.push({ field: gpsButton, message });
-          }
-        } else if (!/^\d{5}(-\d{4})?$/.test(submission.zip)) {
-          const gpsZip = form.querySelector<HTMLInputElement>('#est-gps-zip');
-          if (gpsZip) {
-            setFieldError(gpsZip, 'Please enter a valid ZIP code.');
-            errors.push({ field: gpsZip, message: 'Please enter a valid ZIP code.' });
-          }
+      if (submission.method === 'gps' && !submission.location) {
+        const gpsButton = form.querySelector<HTMLElement>('[data-address-gps]');
+        const message = 'Please confirm your current location, or enter the address manually.';
+        if (gpsButton) {
+          setFieldError(gpsButton, message);
+          errors.push({ field: gpsButton, message });
         }
       }
     }
@@ -759,7 +783,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       if (index === 1) {
         const submission = submissionAddress();
         if (submission.method === 'gps') {
-          if (!submission.location || !/^\d{5}(-\d{4})?$/.test(submission.zip)) return false;
+          if (!submission.location) return false;
         } else {
           const street = form.querySelector<HTMLInputElement>('#est-address');
           if (!street || street.value.trim() === '') return false;
@@ -1009,9 +1033,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
     const fields = buildSubmissionFields(result);
     const isReservation = fields.request_type === 'reservation_request';
     const priceLabel = fields.quoted_price ? ` — $${fields.quoted_price}` : '';
+    const destinationLabel =
+      fields.zip || fields.address_city || (fields.address_method === 'gps' ? 'confirmed map pin' : 'location pending');
     const subject = isReservation
-      ? `Reservation request — ${SERVICE_SHORT[fields.service_type as ServiceType] ?? 'cleaning'}${priceLabel} — ${fields.zip}`
-      : `Cleaning request — ${SERVICE_SHORT[fields.service_type as ServiceType] ?? 'estimate'} — ${fields.zip}`;
+      ? `Reservation request — ${SERVICE_SHORT[fields.service_type as ServiceType] ?? 'cleaning'}${priceLabel} — ${destinationLabel}`
+      : `Cleaning request — ${SERVICE_SHORT[fields.service_type as ServiceType] ?? 'estimate'} — ${destinationLabel}`;
     const outcome = await submitLead(fields, subject);
 
     if (!outcome.ok) {

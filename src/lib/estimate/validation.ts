@@ -76,7 +76,8 @@ export function validateEstimateInput(
   const pets = raw.pets === undefined ? undefined : asEnum<PetSituation>(raw.pets, PET_SITUATIONS);
 
   const normalizedZip = normalizeZip(raw.zip ?? null);
-  if (!normalizedZip) issues.push('Enter a 5-digit service ZIP code.');
+  const destinationConfirmed = raw.destinationConfirmed === true;
+  if (!normalizedZip && !destinationConfirmed) issues.push('Enter a 5-digit service ZIP code.');
 
   const squareFeet = clampNumber(raw.squareFeet, 200, 20000);
   if (squareFeet === null) issues.push('Enter the approximate square footage.');
@@ -95,7 +96,13 @@ export function validateEstimateInput(
     ? raw.addonIds.filter((id): id is string => typeof id === 'string' && knownAddonIds.has(id))
     : [];
 
-  if (issues.length > 0 || !serviceType || !condition || !normalizedZip || squareFeet === null) {
+  if (
+    issues.length > 0 ||
+    !serviceType ||
+    !condition ||
+    (!normalizedZip && !destinationConfirmed) ||
+    squareFeet === null
+  ) {
     return { ok: false, issues: issues.length > 0 ? issues : ['The estimate input is incomplete.'] };
   }
 
@@ -110,8 +117,9 @@ export function validateEstimateInput(
       frequency,
       condition,
       addonIds,
-      zip: normalizedZip,
-      normalizedZip,
+      zip: normalizedZip ?? '',
+      normalizedZip: normalizedZip ?? '',
+      ...(destinationConfirmed ? { destinationConfirmed: true } : {}),
       ...(propertyType ? { propertyType } : {}),
       ...(lastClean ? { lastClean } : {}),
       ...(beds !== undefined ? { beds } : {}),

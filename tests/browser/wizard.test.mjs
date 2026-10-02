@@ -77,6 +77,7 @@ async function openWizard(width, height) {
   await mockApis(page);
   await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
+  await page.click('[data-address-manual-summary]');
   return { context, page };
 }
 

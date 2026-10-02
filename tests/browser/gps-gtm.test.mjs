@@ -190,7 +190,7 @@ test('a street-level reverse result never invents a street address', async () =>
     await page.click('[data-address-gps]');
     await page.waitForFunction(() => /couldn't match your location to an exact street address/.test(document.querySelector('[data-address-status]')?.textContent ?? ''));
     assert.equal(await page.inputValue('#est-address'), '', 'street is not invented');
-    assert.equal(await page.locator('[data-gps-zip]').isVisible(), true, 'ZIP is requested for coverage');
+    assert.equal(await page.locator('[data-gps-zip]').count(), 0, 'no ZIP prompt exists for GPS');
     await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
     await page.click('[data-address-confirm]');
     await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
@@ -198,6 +198,37 @@ test('a street-level reverse result never invents a street address', async () =>
       (await page.locator('[data-address-confirmed-label]').textContent()) ?? '',
       /Current location from your device/,
     );
+    // A confirmed GPS destination continues without any ZIP entry.
+    await page.click('[data-next]');
+    assert.equal(
+      await page.locator('.wizard__step[data-active="true"][data-step="2"]').count(),
+      1,
+      'GPS without ZIP advances to step 2',
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+// ── Manual section is closed by default ──────────────────────────────────────
+
+test('the manual address section starts closed and reopens only on request', async () => {
+  const { context, page } = await openEstimate({});
+  try {
+    assert.equal(await page.locator('[data-address-manual-details]').getAttribute('open'), null, 'closed on load');
+    assert.equal(await page.locator('#est-address').isVisible(), false, 'manual fields hidden by default');
+    await page.click('[data-address-manual-summary]');
+    assert.equal(await page.locator('#est-address').isVisible(), true, 'manual fields appear when opened');
+    const placeholder = await page.locator('#est-address').getAttribute('placeholder');
+    assert.match(placeholder ?? '', /123 Super Clean Way/, 'fictional example placeholder');
+    assert.doesNotMatch(placeholder ?? '', /Haupert/i, 'no real private address is used');
+    // Navigating a step forward and back preserves the customer's purposeful choice.
+    await page.fill('#est-address', '100 S Baylen St');
+    await page.fill('#est-zip', '32503');
+    await page.click('[data-next]');
+    await page.click('[data-back]');
+    assert.equal(await page.locator('[data-address-manual-details]').getAttribute('open'), '', 'stays open after back navigation');
+    assert.equal(await page.inputValue('#est-address'), '100 S Baylen St', 'answers preserved');
   } finally {
     await context.close();
   }
@@ -289,6 +320,7 @@ test('switching from manual to GPS isolates the old address everywhere', async (
   });
   try {
     // Type a wrong manual address first.
+    await page.click('[data-address-manual-summary]');
     await page.fill('#est-address', '111 Old Manual Road');
     await page.fill('#est-address-city', 'Oldtown');
     await page.fill('#est-zip', '11111');
@@ -380,6 +412,7 @@ test('an unconfirmed GPS pin is validated as an address that needs confirmation'
 test('an unresolved manual address can still be submitted for confirmation', async () => {
   const { context, page, leadPayloads } = await openEstimate({ mockOptions: { resolveResult: null } });
   try {
+    await page.click('[data-address-manual-summary]');
     await page.fill('#est-address', '777 Nowhere Road');
     await page.fill('#est-address-city', 'Molino');
     await page.fill('#est-zip', '32577');

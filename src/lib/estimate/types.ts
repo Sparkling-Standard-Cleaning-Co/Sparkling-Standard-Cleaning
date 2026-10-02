@@ -33,6 +33,12 @@ export interface EstimateInput {
   lastClean?: LastProfessionalClean;
   addonIds: string[];
   zip: string;
+  /**
+   * True when the customer confirmed a destination pin (GPS or map pin) and a
+   * ZIP is genuinely unavailable. Travel then comes from the confirmed
+   * coordinates; the request stays preliminary, never verified postal data.
+   */
+  destinationConfirmed?: boolean;
   pets?: PetSituation;
 }
 

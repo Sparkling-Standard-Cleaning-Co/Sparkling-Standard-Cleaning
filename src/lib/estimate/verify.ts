@@ -71,7 +71,7 @@ export interface QuoteVerificationTravel {
   /** True only when a live provider route was used. */
   verified: boolean;
   /** How the server established the destination point. */
-  destinationSource: 'address_geocode' | 'zip_centroid' | 'none';
+  destinationSource: 'address_geocode' | 'zip_centroid' | 'customer_pin' | 'none';
 }
 
 export interface QuoteVerification {
@@ -160,8 +160,21 @@ export function mapReservationFields(fields: Record<string, string>): EstimateIn
     lastClean: fields.last_cleaned as EstimateInputDraft['lastClean'],
     addonIds,
     zip: fields.zip ?? '',
+    // A GPS-confirmed pin lets the estimate run without a ZIP. The route still
+    // comes from the submitted coordinates and can never produce a fully
+    // verified verdict on its own.
+    ...(isGpsPinDestination(fields) ? { destinationConfirmed: true } : {}),
     pets: fields.pets as EstimateInputDraft['pets'],
   };
+}
+
+/** True when the flat fields describe a customer-confirmed GPS pin destination. */
+export function isGpsPinDestination(fields: Record<string, string>): boolean {
+  return (
+    fields.address_method === 'gps' &&
+    fields.address_confirmed === 'yes' &&
+    parseSubmittedPin(fields) !== null
+  );
 }
 
 function buildEstimateContext(routed: RoutedTravelInfo | undefined): EstimateContext {
@@ -191,8 +204,9 @@ interface ServerDestination {
 
 /**
  * Resolves the destination server-side. Client-submitted coordinates are
- * deliberately ignored. Address geocoding is attempted first; the provisional
- * ZIP centroid is only a fallback.
+ * deliberately ignored, with ONE explicit exception the owner directed: a
+ * confirmed GPS destination that has no address or ZIP to geocode is priced
+ * from its own confirmed pin (`customer_pin`), always labeled preliminary.
  */
 export async function resolveServerDestination(
   fields: Record<string, string>,
@@ -210,6 +224,13 @@ export async function resolveServerDestination(
     const queryParts = [line1, region, zip].filter(Boolean);
     const resolved = await resolveAddress(env, queryParts.join(', ')).catch(() => null);
     if (resolved) return { lat: resolved.lat, lng: resolved.lng, source: 'address_geocode' };
+  }
+
+  // GPS-confirmed pin wins over the ZIP centroid: it is the actual confirmed
+  // destination, while the centroid is only a coverage reference.
+  if (isGpsPinDestination(fields)) {
+    const pin = parseSubmittedPin(fields);
+    if (pin) return { lat: pin.lat, lng: pin.lng, source: 'customer_pin' };
   }
 
   const zipMatch = zip.match(/^(\d{5})(?:-\d{4})?$/);
@@ -392,6 +413,10 @@ export async function verifyReservationQuote(
         'the route provider returned no driving duration, so the minute-based coverage boundary could not be applied',
       );
     }
+  } else if (travel.verified && travel.destinationSource === 'customer_pin') {
+    uncertainties.push(
+      'travel was routed to the customer-confirmed device pin, not a server-geocoded street address — the exact address must be confirmed personally',
+    );
   } else if (travel.verified) {
     uncertainties.push('travel was routed to the ZIP-centre reference, not the street address');
   } else if (travel.method === 'straight_line_estimate') {
