@@ -34,12 +34,16 @@ test('every pricing value declares a valid approval state with a note', () => {
   }
 });
 
-test('owner labor target stays below the gross rate', () => {
-  assert.ok(
-    pricingValue(pricing.laborEconomics.ownerLaborTargetPerHour) <
-      pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour),
-    'owner labor target must be below gross revenue per labor-hour',
-  );
+test('owner labor target stays below both approved Option C rates', () => {
+  const owner = pricingValue(pricing.laborEconomics.ownerLaborTargetPerHour);
+  const other = pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour);
+  const recurring = pricingValue(pricing.laborEconomics.recurringGrossRevenuePerLaborHour);
+  assert.ok(owner < other, 'owner target must be below the other-services rate');
+  assert.ok(owner < recurring, 'owner target must be below the recurring rate');
+  assert.ok(recurring <= other, 'recurring maintenance rate must not exceed the other-services rate');
+  // Option C values are owner-approved (2026-10-01).
+  assert.equal(pricing.laborEconomics.targetGrossRevenuePerLaborHour.state, 'approved');
+  assert.equal(pricing.laborEconomics.recurringGrossRevenuePerLaborHour.state, 'approved');
 });
 
 test('condition factors are ordered and at least 1', () => {

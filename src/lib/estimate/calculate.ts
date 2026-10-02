@@ -133,7 +133,12 @@ export function calculateEstimate(
   }
 
   // ── Price math ─────────────────────────────────────────────────────────────
-  const rate = pricing.laborEconomics.targetGrossRevenuePerLaborHour.value;
+  // Option C (owner-approved 2026-10-01): recurring maintenance carries the
+  // $42/labor-hour rate; other service categories carry $50/labor-hour.
+  const isRecurringMaintenance = input.serviceType === 'standard' && input.frequency !== 'one_time';
+  const rate = isRecurringMaintenance
+    ? pricing.laborEconomics.recurringGrossRevenuePerLaborHour.value
+    : pricing.laborEconomics.targetGrossRevenuePerLaborHour.value;
   const minimumJob = pricing.minimumJob.value;
   const rawPrice = labor.hours * rate;
   const priceBeforeTravel = Math.max(minimumJob, rawPrice);

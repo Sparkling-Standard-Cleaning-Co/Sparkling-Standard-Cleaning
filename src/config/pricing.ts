@@ -40,6 +40,10 @@ function provisional<T>(value: T, note: string): ConfigValue<T> {
   return { value, state: 'provisional', note };
 }
 
+function approved<T>(value: T, note: string): ConfigValue<T> {
+  return { value, state: 'approved', note };
+}
+
 // ── Estimator service types (matches src/lib/estimate/types.ts) ──────────────
 export type PricingServiceType = 'standard' | 'deep' | 'move_in_out' | 'str_turnover';
 export type Frequency = 'weekly' | 'biweekly' | 'monthly' | 'one_time';
@@ -72,13 +76,20 @@ export const pricing = {
     /**
      * Target GROSS revenue per labor-hour used to convert estimated labor into
      * the estimate range. INTERNAL ONLY — this is not what anyone is paid and
-     * must never be displayed. It exists so the estimate reflects the true
-     * cost of doing quality work (overhead, supplies, travel, fees, taxes,
-     * marketing, admin, callbacks, equipment) rather than a bare wage.
+     * must never be displayed.
+     *
+     * Option C (owner-approved 2026-10-01): $42/labor-hour for applicable
+     * recurring maintenance (recurring standard cleans) and $50/labor-hour for
+     * other approved service categories (one-time, deep, move-out, STR).
+     * The model must still cover real operating costs and margin.
      */
-    targetGrossRevenuePerLaborHour: provisional(
-      55,
-      'Directive §21 initial production-rate target. Recalibrate after the first 10–30 jobs using actual labor-hours and revenue (docs/operations/ESTIMATOR-CALIBRATION.md). Never displayed publicly.',
+    targetGrossRevenuePerLaborHour: approved(
+      50,
+      'Option C — other service categories rate (one-time, deep, move-in/out, STR). Owner-approved 2026-10-01. Never displayed publicly.',
+    ),
+    recurringGrossRevenuePerLaborHour: approved(
+      42,
+      'Option C — applicable recurring maintenance rate (weekly/biweekly/monthly standard cleans). Owner-approved 2026-10-01. Never displayed publicly.',
     ),
     /**
      * Desired owner labor compensation floor BEFORE overheads and profit.

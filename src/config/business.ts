@@ -268,11 +268,11 @@ export const business = {
      */
     instantBooking: false,
     /**
-     * Text-message CTAs. FALSE until the owner confirms the business number
-     * can receive SMS — a number being mobile-style is not proof. Flip only
-     * after a real text has been sent and received.
+     * Text-message CTAs. ENABLED 2026-10-01: the owner verified that the
+     * business number receives SMS and explicitly authorized text contact.
+     * Never enable without that verification.
      */
-    smsEnabled: false,
+    smsEnabled: true,
     /** Reviews section/nav visibility is automatic once genuine entries exist. */
     reviewsVisibleWhenPresent: true,
   },

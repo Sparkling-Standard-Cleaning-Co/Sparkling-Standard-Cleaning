@@ -40,7 +40,8 @@ values**; nothing here approves a price change.
 
 | Setting (path) | Controls | Current value | Permitted range / notes | Public? | Approval to change | Affects |
 | --- | --- | --- | --- | --- | --- | --- |
-| `laborEconomics.targetGrossRevenuePerLaborHour` | Gross revenue per labor-hour used to build estimate ranges | **$55** | Any number > owner target; internal math only | Never displayed | Owner decision | Every estimate |
+| `laborEconomics.targetGrossRevenuePerLaborHour` | Gross rate for other service categories (one-time, deep, move-out, STR) | **$50** (approved) | Any number > owner target; internal math only | Never displayed | Owner decision | One-time/deep/move-out/STR estimates |
+| `laborEconomics.recurringGrossRevenuePerLaborHour` | Gross rate for applicable recurring maintenance (recurring standard cleans) | **$42** (approved) | Must not exceed the other-services rate; internal math only | Never displayed | Owner decision | Weekly/biweekly/monthly estimates |
 | `laborEconomics.ownerLaborTargetPerHour` | Founder pay floor before overhead | **$35** | Must stay below the gross rate | Never displayed | Owner decision | Margin sanity tests |
 | `minimumJob` | Smallest job value applied silently | **$125** | > 0; not advertised while publication flag is off | Internal | Owner approval | Small jobs, add-on-only visits |
 | `laborModel.baseHours.standard / deep / move_in_out / str_turnover` | Base labor hours per service type | 2.0 / 3.2 / 3.4 / 1.2 | > 0 | Internal | Owner approval | Labor hours, price |
