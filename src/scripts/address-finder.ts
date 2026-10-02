@@ -259,6 +259,53 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     }
   }
 
+  /**
+   * Enriches a directly-plotted suggestion with authoritative ZIP/city/state
+   * data from the forward geocoder. It never overrides a newer choice or an
+   * already-confirmed destination, and a failure keeps the provider's own
+   * suggestion coordinates.
+   */
+  async function enrichCandidate(label: string, fallback: ResolvedCandidate): Promise<void> {
+    try {
+      confirmAbort?.abort();
+      confirmAbort = new AbortController();
+      const response = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ action: 'resolve', query: label.slice(0, 120) }),
+        signal: confirmAbort.signal,
+      });
+      if (!response.ok) return;
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        result?: { label?: string; lat?: number; lng?: number; zip?: string; city?: string; state?: string };
+      };
+      if (!data.ok || !data.result) return;
+      const { label: resolvedLabel, lat, lng, zip, city, state } = data.result;
+      if (typeof lat !== 'number' || typeof lng !== 'number' || !isPlausibleCoordinate(lat, lng)) return;
+      // The customer moved on (different input or a confirmation) — keep theirs.
+      if (confirmed || streetField.value.trim() !== label) return;
+      candidate = {
+        label: resolvedLabel ?? label,
+        street: streetLineFromLabel(resolvedLabel ?? label, city, state, zip),
+        lat,
+        lng,
+        source: 'mapmap',
+        adjusted: false,
+        ...(zip ? { zip } : {}),
+        ...(city ? { city } : {}),
+        ...(state ? { state } : {}),
+      };
+      if (zip) fillZip(zip);
+      setState('resolved');
+      void showMap(candidate);
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') return;
+      // Keep the provider suggestion coordinates from the fallback candidate.
+      void fallback;
+    }
+  }
+
   async function chooseSuggestion(index: number): Promise<void> {
     const suggestion = suggestions[index];
     if (!suggestion) return;
@@ -266,6 +313,35 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     setState('resolving');
     setStatus('Looking up that address…', 'info');
     streetField.value = suggestion.label;
+
+    // Preferred path: the provider already embedded coordinates, so the
+    // destination can be plotted without a retrieve call (the retrieve
+    // endpoint is not available on every gateway).
+    if (
+      typeof suggestion.lat === 'number' &&
+      typeof suggestion.lng === 'number' &&
+      isPlausibleCoordinate(suggestion.lat, suggestion.lng)
+    ) {
+      showCandidate({
+        label: suggestion.label,
+        street: streetLineFromLabel(suggestion.label),
+        lat: suggestion.lat,
+        lng: suggestion.lng,
+        source: 'mapmap',
+        adjusted: false,
+      });
+      void enrichCandidate(suggestion.label, {
+        label: suggestion.label,
+        street: streetLineFromLabel(suggestion.label),
+        lat: suggestion.lat,
+        lng: suggestion.lng,
+        source: 'mapmap',
+        adjusted: false,
+      });
+      return;
+    }
+
+    // Legacy/id-only providers: retrieve the document by id.
     try {
       confirmAbort?.abort();
       confirmAbort = new AbortController();

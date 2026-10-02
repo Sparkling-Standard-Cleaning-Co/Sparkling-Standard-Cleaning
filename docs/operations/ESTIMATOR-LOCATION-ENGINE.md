@@ -42,24 +42,41 @@ the current source on 2026-10-01.
   `tests/api.test.ts`.
 - Privacy policy updated for address processing, geocoding, maps and server verification.
 
-**Live local check (2026-10-01, `wrangler pages dev` with the branch `.env`):**
+**Live provider check (2026-10-01, `wrangler pages dev` with the branch `.env`):**
 
-- `/api/travel` with a ZIP returned a labeled `straight_line_estimate` (the live MapMap route call
-  failed over to the safe fallback); the response contains no origin or credentials.
-- `/api/geocode` `resolve` returned a real MapMap result with coordinates + ZIP/city/state; the
-  `suggest` endpoint returned no features for the test address (MapMap coverage for Pensacola
-  remains unverified — see `PLATFORM-STATUS.md`).
-- The full customer journey ran against the real functions: manual address lookup → pin
-  confirmation → `$280` proposed price → quote reference → call/text actions. Local submission
-  correctly reported "message service is not connected" because the local `.env` carries no
-  Web3Forms key; production has it configured.
+Diagnosis performed directly against `api.mapmap.ai` (18 metered/free calls, key state `verified`,
+`/health` 200) and then re-verified through our own Pages Functions:
+
+- **Road routing works across the territory.** Public pairs returned HTTP 200 `code: Ok`:
+  Pensacola → Cantonment 28.7 km / 22.7 min, Pensacola → Pace 23.5 km / 17.8 min,
+  Pensacola → Atmore 79.2 km / 56.2 min (UK control pair also OK). The earlier fallback was a
+  configuration gap: `ROUTES_PROVIDER` was unset, so the provider branch was never attempted.
+  `resolveRoute` now infers `mapmap` when only a MapMap key is present; re-verified through
+  `/api/travel`: ZIP 32503 returned `method: route, verified: true, 14 mi / 16 min`.
+- **Suggestions were a client-side schema bug, not a provider failure.** `/geocode/suggest`
+  returns `{ suggestions: [{ id, name, context, kind, lat, lon }] }` (OpenAPI-confirmed); our
+  proxy parsed Photon `features`, so it always answered with zero rows. The proxy now parses both
+  shapes, applies the public Pensacola-centre `bias` (relevance verified: "Pace" and
+  "Cantonment" return Florida first), and returns embedded coordinates. The UI plots those
+  coordinates directly and enriches ZIP/city/state via forward geocoding.
+- **`/geocode/retrieve` is HTTP 501 on this gateway** ("search-as-you-type is not enabled …
+  needs `SN_GEOCODE_DIR`"), so the client no longer depends on it for suggestions; the id-only
+  retrieve path remains as a fallback for gateways that support it.
+- Forward geocoding returns a match for Pensacola, Cantonment, Pace and Atmore (HTTP 200), and
+  the full customer journey now runs live: suggestions → pin → **verified route travel** →
+  `$280` proposed price (oven extra included) → quote reference → call/text actions. Local
+  submission correctly reports "message service is not connected" because the local `.env`
+  carries no Web3Forms key; production has it configured.
+- No quota/credit issue: key is `verified`, monthly quota available, and the MapMap free tier
+  refuses rather than bills at quota. No key or private origin appeared in any response.
 
 **Still awaiting owner approval before binding offers:**
 
 - The 60-minute boundary and 15-minute review band values.
 - The proposed-price formula sign-off (reference-quote impact report).
-- MapMap coverage confirmation for the Pensacola/Cantonment territory (live route calls currently
-  fall back to the labeled straight-line estimate; no charges are possible on the free tier).
+- Activating verified MapMap routing on production (set `ROUTES_PROVIDER=mapmap`, or leave it
+  unset and the key-present inference applies). Coverage is verified live; the pricing/policy
+  sign-off is what remains.
 
 ## 1. Reproduced behavior (offline zone mode, `TRAVEL_ORIGIN` unset)
 

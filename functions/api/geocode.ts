@@ -88,23 +88,58 @@ function cleanQuery(value: unknown): string | null {
 interface Suggestion {
   id: string;
   label: string;
+  /** Provider-embedded coordinates (MapMap suggestions are directly plottable). */
+  lat?: number;
+  lng?: number;
 }
 
-async function suggestions(env: Env, query: string): Promise<Suggestion[]> {
-  const response = await fetch(
-    `${(env.MAPMAP_BASE?.trim() || 'https://api.mapmap.ai').replace(/\/+$/, '')}` +
-      `/geocode/suggest?q=${encodeURIComponent(query)}&limit=${SUGGEST_LIMIT}&country=us`,
-    { headers: { Authorization: `Bearer ${mapMapKey(env)}` } },
-  );
-  if (response.status !== 200) throw new Error(`provider HTTP ${response.status}`);
-  const data = (await response.json().catch(() => ({}))) as { features?: PhotonFeature[] };
+/**
+ * Public service-area centre used only to BIAS suggestion ordering
+ * (lon,lat). It is a coarse Pensacola city-centre point — never the private
+ * operating origin — and bias only reorders, it never excludes.
+ */
+export const SUGGEST_BIAS = '-87.2169,30.4213';
+
+/**
+ * /geocode/suggest returns `{ suggestions: [{ id, name, context, kind, lat, lon }] }`
+ * (verified against the provider's OpenAPI schema). Photon-style `features`
+ * payloads from other conforming gateways are still accepted defensively.
+ */
+function parseSuggestPayload(data: unknown): Suggestion[] {
   const list: Suggestion[] = [];
-  for (const feature of data.features ?? []) {
+  const rows = (data as { suggestions?: unknown })?.suggestions;
+  if (Array.isArray(rows)) {
+    for (const row of rows as Array<Record<string, unknown>>) {
+      const id = typeof row.id === 'string' ? row.id : '';
+      const name = typeof row.name === 'string' ? row.name : '';
+      const context = typeof row.context === 'string' ? row.context : '';
+      const label = [name, context].filter(Boolean).join(', ');
+      const lat = typeof row.lat === 'number' && Number.isFinite(row.lat) ? row.lat : undefined;
+      const lng = typeof row.lon === 'number' && Number.isFinite(row.lon) ? row.lon : undefined;
+      if (!id || !label) continue;
+      list.push({ id, label, ...(lat !== undefined ? { lat } : {}), ...(lng !== undefined ? { lng } : {}) });
+    }
+    return list;
+  }
+  const features = (data as { features?: PhotonFeature[] })?.features;
+  for (const feature of features ?? []) {
     const label = featureLabel(feature);
     const id = featureId(feature);
     if (label && id) list.push({ id, label });
   }
   return list;
+}
+
+async function suggestions(env: Env, query: string): Promise<Suggestion[]> {
+  const response = await fetch(
+    `${(env.MAPMAP_BASE?.trim() || 'https://api.mapmap.ai').replace(/\/+$/, '')}` +
+      `/geocode/suggest?q=${encodeURIComponent(query)}&limit=${SUGGEST_LIMIT}` +
+      `&bias=${encodeURIComponent(SUGGEST_BIAS)}&lang=en`,
+    { headers: { Authorization: `Bearer ${mapMapKey(env)}` } },
+  );
+  if (response.status !== 200) throw new Error(`provider HTTP ${response.status}`);
+  const data = await response.json().catch(() => ({}));
+  return parseSuggestPayload(data);
 }
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {

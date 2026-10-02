@@ -71,7 +71,17 @@ async function mockProviders(page, options = {}) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ ok: true, suggestions: [{ id: 'us:123', label: ADDRESS.label }] }),
+        body: JSON.stringify({
+          ok: true,
+          // MapMap suggestions carry name/context/lat/lon; the client plots
+          // them directly and enriches via resolve. Gateways without embedded
+          // coordinates are covered by a dedicated id-only test.
+          suggestions: [
+            options.suggestCoords === false
+              ? { id: 'us:123', label: ADDRESS.label }
+              : { id: 'osm:w73681389:addr', label: ADDRESS.label, lat: ADDRESS.lat, lng: ADDRESS.lng },
+          ],
+        }),
       });
       return;
     }
@@ -236,6 +246,22 @@ test('manual address entry works when suggestions are not used', async () => {
     assert.equal(await isVisible(page, '[data-address-manual-panel]'), true);
     await page.fill('#est-address', '100 S Baylen St');
     await page.click('[data-address-resolve]');
+    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
+    await page.click('[data-address-confirm]');
+    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
+    assert.equal(await page.inputValue('#est-zip'), '32502');
+  } finally {
+    await context.close();
+  }
+});
+
+test('id-only suggestion gateways still resolve through the retrieve endpoint', async () => {
+  const { context, page } = await openEstimate(1440, 900, { suggestCoords: false });
+  try {
+    await step1(page);
+    await page.fill('#est-address', '100 S Baylen');
+    await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
+    await page.click('#est-address-suggestions li');
     await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
     await page.click('[data-address-confirm]');
     await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });

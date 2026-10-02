@@ -68,7 +68,43 @@ test('geocode suggest: without a provider key it reports not configured', async 
   assert.deepEqual(await response.json(), { ok: false, error: 'provider_not_configured' });
 });
 
-test('geocode suggest: maps provider features to minimal suggestions', async () => {
+test('geocode suggest: maps provider suggestions (name/context/lat/lon) to plottable rows', async () => {
+  const response = await withFetch(
+    async (url) => {
+      assert.match(String(url), /\/geocode\/suggest\?q=100%20S%20Baylen%20St/);
+      assert.match(String(url), /bias=-87\.2169%2C30\.4213/, 'public service-area bias is applied');
+      assert.doesNotMatch(String(url), /country=/, 'unsupported country param is not sent');
+      return jsonResponse({
+        suggestions: [
+          {
+            id: 'osm:w73681389:addr',
+            name: '100 S Baylen St',
+            context: 'Pensacola, Florida, United States',
+            kind: 'address',
+            lat: 30.4111,
+            lon: -87.2164,
+          },
+        ],
+      });
+    },
+    () =>
+      geocodePost({
+        request: request({ action: 'suggest', query: '100 S Baylen St' }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as {
+    suggestions: Array<{ id: string; label: string; lat?: number; lng?: number }>;
+  };
+  assert.equal(data.suggestions.length, 1);
+  assert.equal(data.suggestions[0].id, 'osm:w73681389:addr');
+  assert.equal(data.suggestions[0].label, '100 S Baylen St, Pensacola, Florida, United States');
+  assert.equal(data.suggestions[0].lat, 30.4111);
+  assert.equal(data.suggestions[0].lng, -87.2164);
+});
+
+test('geocode suggest: still accepts Photon-style feature payloads from conforming gateways', async () => {
   const response = await withFetch(
     async () => jsonResponse({ features: [mapmapFeature()] }),
     () =>

@@ -27,6 +27,12 @@ export interface ConfirmedLocation {
 export interface GeocodeSuggestion {
   id: string;
   label: string;
+  /**
+   * Provider-embedded coordinates. MapMap suggestions are directly plottable,
+   * so the client can confirm a destination without a retrieve round-trip.
+   */
+  lat?: number;
+  lng?: number;
 }
 
 /** Rejects impossible coordinates and out-of-range values. */

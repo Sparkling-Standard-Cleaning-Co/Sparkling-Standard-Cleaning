@@ -321,6 +321,25 @@ test('travel: coordinates without a ZIP are accepted (confirmed pin path)', asyn
   assert.ok((data.oneWayMiles as number) > 0);
 });
 
+test('travel: a MapMap key without an explicit provider still routes (inferred provider)', async () => {
+  const response = await withFetch(
+    async (url) => {
+      assert.match(String(url), /\/route\/v1\/driving\/-87\.34,30\.61;-87\.25,30\.42/);
+      return jsonResponse({ code: 'Ok', routes: [{ distance: 12000, duration: 900 }] });
+    },
+    () =>
+      travelPost({
+        request: jsonRequest({ zip: '32505', lat: 30.42, lng: -87.25 }),
+        env: { TRAVEL_ORIGIN: '30.6100,-87.3400', ROUTES_API_KEY: 'dummy-mapmap-key' },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as Record<string, unknown>;
+  assert.equal(data.method, 'route');
+  assert.equal(data.verified, true);
+  assert.equal(data.provider, 'mapmap');
+});
+
 test('travel: invalid coordinates fall back to a valid ZIP instead of failing the estimate', async () => {
   const response = await travelPost({
     request: jsonRequest({ zip: '32503', lat: 999, lng: 'nope' }),

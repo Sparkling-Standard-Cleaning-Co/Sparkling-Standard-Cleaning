@@ -72,8 +72,11 @@ export async function resolveRoute(
   origin: LatLng,
   destination: LatLng,
 ): Promise<ServerRoute> {
-  const provider = env.ROUTES_PROVIDER?.trim().toLowerCase();
   const apiKey = env.ROUTES_API_KEY?.trim();
+  // Explicit provider wins. When only a key is configured, default to MapMap:
+  // it is the provider this branch is built around, and a mismatched key for
+  // another provider simply errors into the labeled straight-line fallback.
+  const provider = env.ROUTES_PROVIDER?.trim().toLowerCase() || (apiKey ? 'mapmap' : '');
 
   if (provider && apiKey) {
     try {
