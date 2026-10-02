@@ -95,6 +95,12 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   let confirmAbort: AbortController | null = null;
   let candidate: ResolvedCandidate | null = null;
   let confirmed: ConfirmedLocation | null = null;
+  /**
+   * Bumped whenever a resolution starts. A debounced autocomplete response
+   * that arrives afterwards is discarded, so it can never overwrite the
+   * "address found" state (or a later failure state).
+   */
+  let searchSeq = 0;
 
   // MapLibre is imported lazily and only once per page.
   type MapLibreModule = typeof import('maplibre-gl');
@@ -219,6 +225,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
 
   function showCandidate(resolved: ResolvedCandidate, options: { manual?: boolean } = {}): void {
     candidate = resolved;
+    clearSuggestions();
     if (resolved.zip) fillField(zipInput, resolved.zip);
     if (mapCard) mapCard.hidden = false;
     if (confirmedCard) confirmedCard.hidden = true;
@@ -245,6 +252,12 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   async function requestResolvedAddress(query: string): Promise<void> {
+    // A resolution supersedes any pending or in-flight autocomplete: cancel the
+    // debounce, abort the suggest request and invalidate its future responses.
+    searchSeq += 1;
+    window.clearTimeout(suggestTimer);
+    suggestAbort?.abort();
+    clearSuggestions();
     setState('resolving');
     setStatus('Looking up that exact address…', 'info');
     try {
@@ -413,6 +426,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   async function requestSuggestions(query: string): Promise<void> {
     suggestAbort?.abort();
     suggestAbort = new AbortController();
+    const seq = searchSeq;
     setState('suggesting');
     try {
       const response = await fetch('/api/geocode', {
@@ -428,6 +442,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         }),
         signal: suggestAbort.signal,
       });
+      if (seq !== searchSeq) return; // a resolution superseded this lookup
       if (response.status === 503) {
         clearSuggestions();
         setState('unavailable');
@@ -442,6 +457,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         suggestions?: GeocodeSuggestion[];
         needsLocation?: boolean;
       };
+      if (seq !== searchSeq) return; // a resolution superseded this lookup
       if (!response.ok || !data.ok || !Array.isArray(data.suggestions)) {
         throw new Error('provider_failed');
       }
@@ -463,6 +479,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       renderSuggestions();
     } catch (error) {
       if ((error as Error).name === 'AbortError') return;
+      if (seq !== searchSeq) return; // a resolution superseded this lookup
       clearSuggestions();
       setState('idle');
       setStatus(

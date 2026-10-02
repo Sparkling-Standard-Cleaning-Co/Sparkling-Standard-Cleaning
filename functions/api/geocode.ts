@@ -150,7 +150,7 @@ async function providerSuggest(env: Env, query: string): Promise<RawSuggestion[]
     `${(env.MAPMAP_BASE?.trim() || 'https://api.mapmap.ai').replace(/\/+$/, '')}` +
       `/geocode/suggest?q=${encodeURIComponent(query)}&limit=${PROVIDER_LIMIT}` +
       `&bias=${encodeURIComponent(SUGGEST_BIAS)}&lang=en`,
-    { headers: { Authorization: `Bearer ${mapMapKey(env)}` } },
+    { headers: { Authorization: `Bearer ${mapMapKey(env)}` }, signal: AbortSignal.timeout(7000) },
   );
   if (response.status !== 200) throw new Error(`provider HTTP ${response.status}`);
   const data = await response.json().catch(() => ({}));

@@ -118,6 +118,7 @@ export function parsePhotonFeature(feature: PhotonFeature, source: 'mapmap'): Ge
 async function mapMapJson(env: GeocodeEnv, path: string): Promise<{ status: number; data: unknown }> {
   const response = await fetch(`${mapMapBase(env)}${path}`, {
     headers: { Authorization: `Bearer ${mapMapKey(env)}` },
+    signal: AbortSignal.timeout(7000),
   });
   const data = await response.json().catch(() => ({}));
   return { status: response.status, data };
@@ -130,7 +131,7 @@ export async function censusResolve(query: string): Promise<GeocodedAddress | nu
   const url =
     'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress' +
     `?address=${encodeURIComponent(query)}&benchmark=Public_AR_Current&format=json`;
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!response.ok) return null;
   const data = (await response.json().catch(() => ({}))) as {
     result?: { addressMatches?: Array<{ matchedAddress?: string; coordinates?: { x?: number; y?: number } }> };
@@ -203,5 +204,9 @@ export async function mapMapResolveId(env: GeocodeEnv, id: string): Promise<Geoc
 export async function resolveAddress(env: GeocodeEnv, query: string): Promise<GeocodedAddress | null> {
   const provider = await mapMapResolve(env, query).catch(() => null);
   if (provider) return provider;
+  const first = await censusResolve(query).catch(() => null);
+  if (first) return first;
+  // Census occasionally misses or times out once; one immediate retry is cheap,
+  // keyless and materially improves exact-address resolution.
   return censusResolve(query).catch(() => null);
 }
