@@ -363,11 +363,22 @@ export async function verifyReservationQuote(
   }
 
   // The price reproduces — but a reproduced number alone is not "verified".
-  // Full verification requires live travel to the customer's geocoded street
-  // address AND a quote built on the current configuration.
+  // Full verification requires ALL of: an exact price match, live travel with
+  // a real driving duration to the customer's geocoded street address, a
+  // confirmed pin that matches that address, and the current configuration.
   const uncertainties: string[] = [];
+  if (difference !== 0) {
+    uncertainties.push(
+      `the submitted price differs by $${Math.abs(difference)} from our exact calculation ($${amount})`,
+    );
+  }
   if (travel.verified && travel.destinationSource === 'address_geocode') {
     // Live route to the precise address: certainty about travel.
+    if (travel.durationMinutes === null || travel.durationMinutes <= 0) {
+      uncertainties.push(
+        'the route provider returned no driving duration, so the minute-based coverage boundary could not be applied',
+      );
+    }
   } else if (travel.verified) {
     uncertainties.push('travel was routed to the ZIP-centre reference, not the street address');
   } else if (travel.method === 'straight_line_estimate') {
@@ -380,14 +391,25 @@ export async function verifyReservationQuote(
   } else if (configMatch === 'mismatch') {
     uncertainties.push('the quote was built on a different configuration version');
   }
-  if (pinCheck === 'adjusted') {
-    uncertainties.push(
-      'the customer moved the confirmed pin away from the geocoded address, so travel must be confirmed against the corrected point',
-    );
-  } else if (pinCheck === 'divergent') {
-    uncertainties.push(
-      `the submitted pin is about ${pinDistanceMeters} m from the server-geocoded address, so travel must be confirmed against the corrected point`,
-    );
+  switch (pinCheck) {
+    case 'adjusted':
+      uncertainties.push(
+        'the customer moved the confirmed pin away from the geocoded address, so travel must be confirmed against the corrected point',
+      );
+      break;
+    case 'divergent':
+      uncertainties.push(
+        `the submitted pin is about ${pinDistanceMeters} m from the server-geocoded address, so travel must be confirmed against the corrected point`,
+      );
+      break;
+    case 'unknown':
+      uncertainties.push(
+        'no confirmed destination pin was submitted, so the mapped location could not be matched to the address',
+      );
+      break;
+    default:
+      // 'ok' — the confirmed pin matches the server-resolved address.
+      break;
   }
 
   if (uncertainties.length === 0) {
@@ -396,7 +418,7 @@ export async function verifyReservationQuote(
       'verified',
       amount,
       range,
-      `Verified: $${amount} matches our calculation, travel is a ${travelCopy} to the confirmed address, and the configuration version matches.`,
+      `Verified: $${amount} exactly matches our calculation, travel is a ${travelCopy} to the confirmed address, the confirmed pin matches that address, and the configuration version matches.`,
     );
   }
 
@@ -409,7 +431,7 @@ export async function verifyReservationQuote(
     'preliminary',
     amount,
     range,
-    `Preliminary: $${amount} matches our calculation, but ${uncertainties.join('; ')} (${travelSummary}). Travel must be confirmed before treating this as travel-inclusive.`,
+    `Preliminary: our calculation is $${amount}, but ${uncertainties.join('; ')} (${travelSummary}). The owner must confirm before this can be treated as a verified travel-inclusive price.`,
   );
 }
 

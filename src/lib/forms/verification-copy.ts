@@ -30,13 +30,13 @@ export function reservationReceipt(
       return {
         state: 'success',
         message:
-          'Reservation request received — our server verified this price for your confirmed address. The owner will confirm scope and date; nothing is booked yet.',
+          'Reservation request received — our server verified this proposed price calculation for your confirmed address. The owner will confirm the final price, scope and date; nothing is booked yet.',
       };
     case 'preliminary':
       return {
         state: 'warning',
         message:
-          'Reservation request received — the price calculation matches, but travel was still preliminary. The owner will verify the route and confirm the final travel-inclusive price before anything is scheduled.',
+          'Reservation request received — our calculation reproduces the proposed price, but travel was still preliminary. The owner will verify the route and confirm the final travel-inclusive price before anything is scheduled.',
       };
     case 'mismatch':
       return {

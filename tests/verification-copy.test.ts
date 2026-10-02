@@ -17,13 +17,17 @@ const v = (status: LeadVerification['status']): LeadVerification => ({
 test('only the verified verdict is presented as verified', () => {
   const verified = reservationReceipt(v('verified'), 'relay');
   assert.equal(verified.state, 'success');
-  assert.match(verified.message, /verified this price/i);
+  assert.match(verified.message, /verified this proposed price calculation/i);
   assert.match(verified.message, /nothing is booked yet/i);
 
   for (const status of ['preliminary', 'mismatch', 'unverifiable'] as const) {
     const receipt = reservationReceipt(v(status), 'relay');
     assert.equal(receipt.state, 'warning', `${status} must not be a plain success`);
-    assert.doesNotMatch(receipt.message, /verified this price/i, `${status} must not claim full verification`);
+    assert.doesNotMatch(
+      receipt.message,
+      /verified this proposed price/i,
+      `${status} must not claim full verification`,
+    );
   }
 });
 

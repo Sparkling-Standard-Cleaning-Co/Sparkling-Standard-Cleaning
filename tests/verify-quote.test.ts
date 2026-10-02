@@ -106,6 +106,10 @@ function fields(overrides: Record<string, string> = {}): Record<string, string> 
     service_address: '100 S Baylen St',
     quote_reference: 'SS-20261001-ABC123',
     quote_config_version: pricing.instantQuote.configVersion.value,
+    // A confirmed pin that matches the stubbed geocoded address.
+    pin_latitude: '30.411100',
+    pin_longitude: '-87.216400',
+    pin_adjusted: 'no',
     ...overrides,
   };
 }
@@ -271,12 +275,14 @@ test('an inflated client price is a mismatch', async () => {
   assert.equal(verification.verifiedPrice, quoted);
 });
 
-test('a small variance within the stated tolerance still matches', async () => {
+test('a small variance within the stated tolerance is preliminary, never an exact match', async () => {
   const quoted = browserPrice();
   const verification = await withFetch(providerStub(), () =>
     verifyReservationQuote(fields({ quoted_price: String(quoted + QUOTE_MATCH_TOLERANCE) }), routedEnv),
   );
-  assert.equal(verification.status, 'verified');
+  assert.equal(verification.status, 'preliminary');
+  assert.match(verification.note, /differs by \$10 from our exact calculation/i);
+  assert.notEqual(verification.status, 'verified');
 });
 
 test('browser-submitted coordinates cannot redirect the route — and a divergent pin is flagged', async () => {
@@ -508,11 +514,46 @@ test('a small pin jitter with no reported move does not degrade a verified quote
   assert.equal(verification.status, 'verified');
 });
 
-test('reservations without pin coordinates keep the previous verified behavior', async () => {
+test('a reservation without a confirmed pin can never be fully verified', async () => {
   const quoted = browserPrice();
+  const withoutPin = fields({ quoted_price: String(quoted) });
+  delete withoutPin.pin_latitude;
+  delete withoutPin.pin_longitude;
+  delete withoutPin.pin_adjusted;
   const verification = await withFetch(providerStub(), () =>
-    verifyReservationQuote(fields({ quoted_price: String(quoted) }), routedEnv),
+    verifyReservationQuote(withoutPin, routedEnv),
   );
   assert.equal(verification.pinCheck, 'unknown');
-  assert.equal(verification.status, 'verified');
+  assert.equal(verification.status, 'preliminary');
+  assert.match(verification.note, /no confirmed destination pin was submitted/i);
+});
+
+test('a live route without a driving duration can never be fully verified', async () => {
+  const quoted = browserPrice();
+  const verification = await withFetch(
+    async (url) => {
+      const href = String(url);
+      if (href.includes('/route/v1/')) {
+        // Distance only: the provider withheld the duration, so the
+        // minute-based coverage boundary cannot be applied.
+        return jsonResponse({ code: 'Ok', routes: [{ distance: 24140.2 }] });
+      }
+      if (href.includes('api.mapmap.ai/geocode?')) {
+        return jsonResponse({
+          features: [
+            {
+              properties: { label: '100 S Baylen St, Pensacola, FL 32502', id: 'us:123', postcode: '32502' },
+              geometry: { coordinates: [-87.2164, 30.4111] },
+            },
+          ],
+        });
+      }
+      return jsonResponse({ result: { addressMatches: [] } });
+    },
+    () => verifyReservationQuote(fields({ quoted_price: String(quoted) }), routedEnv),
+  );
+  assert.equal(verification.travel.verified, true);
+  assert.equal(verification.travel.durationMinutes, null);
+  assert.equal(verification.status, 'preliminary');
+  assert.match(verification.note, /no driving duration/i);
 });

@@ -383,7 +383,9 @@ test('reservation summary carries every answer and the call/text actions work', 
     assert.match(summaryText, /Verified route/);
 
     const reference = (await page.locator('[data-reservation-reference]').textContent()) ?? '';
-    assert.match(reference, /Quote reference SS-\d{8}-[0-9A-Z]{6}/);
+    assert.match(reference, /Estimate reference SS-\d{8}-[0-9A-Z]{6}/);
+    const qualification = (await page.locator('[data-reservation-qualification]').textContent()) ?? '';
+    assert.match(qualification, /Travel-inclusive price/i);
 
     // Call and text actions are real, correctly formed links.
     const callHref = await page.locator('[data-reserve-call]').getAttribute('href');

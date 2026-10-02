@@ -37,7 +37,10 @@ Evidence bundle: `%USERPROFILE%\.config\opencode\review\sparkling-standard-estim
 | Address autocomplete (debounced, ARIA, keyboard), manual fallback, unit field, map-pin confirmation, ZIP autofill | `tests/browser/journey.test.mjs` |
 | Confirmed pin coordinates reach `/api/travel`; ZIP centroid never replaces a confirmed pin | journey + `tests/location.test.ts` |
 | Travel failure degrades to an honest preliminary estimate | journey |
-| Proposed price (Option C $42/$50), margin floor, minimum, rounding, reference, expiry | `tests/quote.test.ts`, `tests/estimator.test.ts` |
+| Proposed price (Option C $42/$50), margin floor, minimum, rounding, reference | `tests/quote.test.ts`, `tests/estimator.test.ts` |
+| Exact-match verified rule, confirmed-pin requirement, driving-duration requirement, server-issued validity (no customer expiry claims) | `tests/verify-quote.test.ts` |
+| Paid providers (Google/Mapbox) hard-disabled; only MapMap + free fallbacks can be activated | `tests/api.test.ts` |
+| Travel lookup rate-limited per IP + daily cap so the free allowance cannot be drained | `tests/api.test.ts` |
 | Extras change the price; reservation carries every answer | journey |
 | Server-side verification: match/preliminary/mismatch/unverifiable, forged price/coordinates/reference/date/config/scope | `tests/verify-quote.test.ts`, `tests/api-verification.test.ts` |
 | Moved/displaced destination pin: a manually dragged pin is never fully verified; the server computes its own address and flags `adjusted`/`divergent` pins | `tests/verify-quote.test.ts`, real marker-drag browser regression in `tests/browser/journey.test.mjs` |
@@ -46,8 +49,34 @@ Evidence bundle: `%USERPROFILE%\.config\opencode\review\sparkling-standard-estim
 | Existing contact form still works | journey |
 | Static structure (7 steps, address/reservation markup, 17 pages) | `npm run smoke`, `npm run verify` |
 
-Current counts: **165 unit tests**, **27 browser tests** (including accessibility and the moved-pin
+Current counts: **167 unit tests**, **27 browser tests** (including accessibility and the moved-pin
 drag regression), `astro check` 0 errors, `npm run verify` (build + links + SEO) green.
+
+## 1a. Production smoke-test checklist (run only after owner authorization)
+
+Preconditions: production Pages project variables match the expected configuration —
+`TRAVEL_ORIGIN` (Secret), `ROUTES_API_KEY` (Secret), optional `ROUTES_PROVIDER=mapmap`,
+`WEB3FORMS_ACCESS_KEY` (Secret), `PUBLIC_WEB3FORMS_ACCESS_KEY`, optional `TURNSTILE_SECRET_KEY`,
+`PUBLIC_TURNSTILE_SITE_KEY`, `PUBLIC_SITE_URL`. `PUBLIC_PREVIEW_MODE` must NOT be set on production.
+
+1. Functions answer on the deployed preview: `POST /api/travel` with a public ZIP returns
+   `200` with `provider`/`method`/`verified` and **no origin or key material**.
+2. `POST /api/geocode` returns suggestions (with coordinates) and resolves an address.
+3. Paid-provider guard: temporarily set `ROUTES_PROVIDER=google` on a preview deployment and
+   confirm `/api/travel` still returns `straight_line_estimate` and never calls a paid endpoint.
+4. Run the full journey on the preview (desktop + mobile): address suggestions → pin confirmation
+   → proposed price → reservation request; confirm Call/Text links and the privacy page.
+5. Submit one **marked test reservation** (subject clearly marked "TEST — internal") with a
+   synthetic name and the owner's own email. After owner authorization, verify the owner inbox
+   receives it with the server fields: `quote_verified`, `verified_price`/`client_price`,
+   `server_config_version`, `pin_check`, `quote_valid_through`, and a plain-language
+   `verification_note`.
+6. Repeat once with a deliberately different `quoted_price` (devtools) to confirm the email shows
+   `quote_verified=mismatch` and the customer receipt shows the price-check warning.
+7. Confirm the built bundle contains no `TRAVEL_ORIGIN`, `ROUTES_API_KEY`/`MAPMAP_API_KEY` names
+   or values, and no payment credentials (`npm run test:browser` security scan covers this).
+8. Only after steps 1–7 pass: request production approval. Binding instant prices remain disabled
+   (`instantQuote.binding=false`); no payment or booking endpoint may be enabled in this release.
 
 ## 2. Demonstrated with actual live providers (2026-10-01, `$0` tier)
 

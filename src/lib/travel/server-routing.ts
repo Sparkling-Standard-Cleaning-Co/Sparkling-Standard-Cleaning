@@ -44,15 +44,6 @@ export function straightLineMiles(a: LatLng, b: LatLng): number {
   return 2 * 3958.8 * Math.asin(Math.sqrt(h)) * 1.18;
 }
 
-function parseGoogleDuration(value: unknown): number | null {
-  // Google Routes returns durations like "1234s".
-  if (typeof value !== 'string') return null;
-  const match = value.match(/^(\d+(?:\.\d+)?)s$/);
-  if (!match) return null;
-  const seconds = Number(match[1]);
-  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
-}
-
 export interface ServerRoute {
   oneWayMiles: number;
   durationMinutes: number | null;
@@ -73,88 +64,38 @@ export async function resolveRoute(
   destination: LatLng,
 ): Promise<ServerRoute> {
   const apiKey = env.ROUTES_API_KEY?.trim();
-  // Explicit provider wins. When only a key is configured, default to MapMap:
-  // it is the provider this branch is built around, and a mismatched key for
-  // another provider simply errors into the labeled straight-line fallback.
-  const provider = env.ROUTES_PROVIDER?.trim().toLowerCase() || (apiKey ? 'mapmap' : '');
+  // Paid providers are explicitly disabled for this deployment: only MapMap
+  // (free tier, refuses at quota) may be activated, and only when its key is
+  // present. An accidental ROUTES_PROVIDER=google|mapbox (or any other value)
+  // is ignored and degrades to the labeled straight-line fallback — it can
+  // never reach a paid endpoint.
+  const requested = env.ROUTES_PROVIDER?.trim().toLowerCase();
+  const provider = requested === 'mapmap' ? 'mapmap' : requested ? '' : apiKey ? 'mapmap' : '';
 
-  if (provider && apiKey) {
+  if (provider === 'mapmap' && apiKey) {
     try {
-      if (provider === 'google' || provider === 'google_routes') {
-        const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': apiKey,
-            'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
-          },
-          body: JSON.stringify({
-            origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
-            destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
-            travelMode: 'DRIVE',
-            routingPreference: 'TRAFFIC_UNAWARE',
-            units: 'IMPERIAL',
-          }),
-        });
-        const data = (await response.json().catch(() => ({}))) as {
-          routes?: Array<{ distanceMeters?: number; duration?: string }>;
+      // MapMap hosted gateway — OSRM-compatible response (distance metres,
+      // duration seconds). Free tier: requests are refused at quota, so
+      // overage charges cannot occur.
+      const base = env.MAPMAP_BASE?.trim() || 'https://api.mapmap.ai';
+      const url =
+        `${base}/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
+        `?overview=false`;
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+      const data = (await response.json().catch(() => ({}))) as {
+        routes?: Array<{ distance?: number; duration?: number }>;
+      };
+      const route = data.routes?.[0];
+      const meters = route?.distance;
+      const seconds = typeof route?.duration === 'number' && route.duration > 0 ? route.duration : null;
+      if (response.ok && typeof meters === 'number' && meters > 0) {
+        return {
+          oneWayMiles: meters / 1609.344,
+          durationMinutes: seconds !== null ? seconds / 60 : null,
+          provider,
+          method: 'route',
+          verified: true,
         };
-        const route = data.routes?.[0];
-        const meters = route?.distanceMeters;
-        const seconds = parseGoogleDuration(route?.duration);
-        if (response.ok && typeof meters === 'number' && meters > 0) {
-          return {
-            oneWayMiles: meters / 1609.344,
-            durationMinutes: seconds !== null ? seconds / 60 : null,
-            provider,
-            method: 'route',
-            verified: true,
-          };
-        }
-      } else if (provider === 'mapmap') {
-        // MapMap hosted gateway — OSRM-compatible response (distance metres,
-        // duration seconds). Free tier: requests are refused at quota, so
-        // overage charges cannot occur.
-        const base = env.MAPMAP_BASE?.trim() || 'https://api.mapmap.ai';
-        const url =
-          `${base}/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
-          `?overview=false`;
-        const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
-        const data = (await response.json().catch(() => ({}))) as {
-          routes?: Array<{ distance?: number; duration?: number }>;
-        };
-        const route = data.routes?.[0];
-        const meters = route?.distance;
-        const seconds = typeof route?.duration === 'number' && route.duration > 0 ? route.duration : null;
-        if (response.ok && typeof meters === 'number' && meters > 0) {
-          return {
-            oneWayMiles: meters / 1609.344,
-            durationMinutes: seconds !== null ? seconds / 60 : null,
-            provider,
-            method: 'route',
-            verified: true,
-          };
-        }
-      } else if (provider === 'mapbox') {
-        const url =
-          `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
-          `?access_token=${encodeURIComponent(apiKey)}&overview=false`;
-        const response = await fetch(url);
-        const data = (await response.json().catch(() => ({}))) as {
-          routes?: Array<{ distance?: number; duration?: number }>;
-        };
-        const route = data.routes?.[0];
-        const meters = route?.distance;
-        const seconds = typeof route?.duration === 'number' && route.duration > 0 ? route.duration : null;
-        if (response.ok && typeof meters === 'number' && meters > 0) {
-          return {
-            oneWayMiles: meters / 1609.344,
-            durationMinutes: seconds !== null ? seconds / 60 : null,
-            provider,
-            method: 'route',
-            verified: true,
-          };
-        }
       }
     } catch {
       // Fall through to the straight-line estimate.

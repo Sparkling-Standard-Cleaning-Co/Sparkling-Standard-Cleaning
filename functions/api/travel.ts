@@ -70,6 +70,50 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+// ── Abuse protection ─────────────────────────────────────────────────────────
+// MapMap's free tier is finite (50,000 calls/month, and routing draws on it),
+// so the lookup is rate-limited per client IP and capped per isolate-day. The
+// client debounces and caches, but the server enforces its own ceiling so a
+// scripted caller cannot drain the allowance. Exceeding the limit degrades the
+// ESTIMATE only (the client falls back to zone/preliminary travel).
+const WINDOW_MS = 60_000;
+const PER_IP_PER_MINUTE = 30;
+const DAILY_CAP = 600;
+
+const hits = new Map<string, { count: number; reset: number }>();
+let dailyCount = 0;
+let dailyReset = startOfDay();
+
+function startOfDay(): number {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+}
+
+function clientIp(request: Request): string {
+  return request.headers.get('CF-Connecting-IP') ?? request.headers.get('x-forwarded-for') ?? 'unknown';
+}
+
+/** Simple per-isolate throttle + daily circuit breaker. */
+function throttled(request: Request): boolean {
+  const now = Date.now();
+  if (now > dailyReset) {
+    dailyCount = 0;
+    dailyReset = startOfDay();
+  }
+  if (dailyCount >= DAILY_CAP) return true;
+
+  const ip = clientIp(request);
+  const entry = hits.get(ip);
+  if (!entry || entry.reset < now) {
+    hits.set(ip, { count: 1, reset: now + WINDOW_MS });
+  } else {
+    entry.count += 1;
+    if (entry.count > PER_IP_PER_MINUTE) return true;
+  }
+  dailyCount += 1;
+  return false;
+}
+
 function validCoordinates(lat: unknown, lng: unknown): LatLng | null {
   if (typeof lat !== 'number' || typeof lng !== 'number') return null;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
@@ -79,6 +123,10 @@ function validCoordinates(lat: unknown, lng: unknown): LatLng | null {
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
+
+  if (throttled(request)) {
+    return json({ ok: false, error: 'rate_limited' }, 429);
+  }
 
   const origin = parseLatLng(env.TRAVEL_ORIGIN);
   if (!origin) {

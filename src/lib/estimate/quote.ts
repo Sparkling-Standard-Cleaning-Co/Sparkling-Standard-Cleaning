@@ -6,11 +6,14 @@
 //  - The offered price is selected from the model's own values and can never
 //    fall below expectedPrice × marginFloor, nor below the minimum job value.
 //  - Rounding rounds UP to the configured step so the safeguard survives it.
-//  - The quote carries the pricing configuration version and an expiry. It is
-//    a PROPOSAL on a non-binding request: binding offers stay disabled
-//    (pricing.instantQuote.binding === false) and every reservation request is
-//    recalculated server-side in functions/api/lead.ts before the owner sees
-//    it. A client-supplied price is never trusted.
+//  - The quote carries the pricing configuration version and an internal
+//    display-window marker. It is a PROPOSAL on a non-binding request: binding
+//    offers stay disabled (pricing.instantQuote.binding === false) and every
+//    reservation request is recalculated server-side in functions/api/lead.ts
+//    before the owner sees it. A client-supplied price is never trusted.
+//  - Customer-facing copy never states or implies a hold/expiry promise: the
+//    server issues its own validity timestamp when it verifies a quote, and
+//    the client-side `expiresAt` below is not presented to customers.
 
 import { pricing } from '../../config/pricing.ts';
 import type { EstimateResult } from './types.ts';
@@ -23,7 +26,10 @@ export interface InstantQuote {
   /** Offered price in USD (already rounded and margin-floored). */
   amount: number;
   laborHours: number;
-  /** ISO timestamp when the offer stops being honored. */
+  /**
+   * Internal display-window marker only. NOT a customer promise or a held
+   * offer; the server records its own validity when it verifies a quote.
+   */
   expiresAt: string;
   selection: QuoteSelection;
   travelMode: EstimateResult['travel']['mode'];

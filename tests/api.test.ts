@@ -16,10 +16,11 @@ import assert from 'node:assert/strict';
 import { onRequestPost as leadPost, onRequestGet as leadGet } from '../functions/api/lead.ts';
 import { onRequestPost as travelPost, onRequestGet as travelGet } from '../functions/api/travel.ts';
 
-const jsonRequest = (body: unknown) =>
+let requestIp = 0;
+const jsonRequest = (body: unknown, ip = `10.77.0.${++requestIp}`) =>
   new Request('https://example.test/api', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip },
     body: JSON.stringify(body),
   });
 
@@ -159,41 +160,45 @@ test('travel: with no routing provider it returns a labeled straight-line estima
   assert.ok((data.oneWayMiles as number) > 0);
 });
 
-test('travel: a configured provider route is used when it succeeds', async () => {
+test('travel: the paid Google provider is disabled and never called', async () => {
   const response = await withFetch(
-    async () => jsonResponse({ routes: [{ distanceMeters: 24140 }] }),
+    async (url) => {
+      throw new Error(`a paid provider was called: ${String(url)}`);
+    },
     () =>
       travelPost({
         request: jsonRequest({ zip: '32501' }),
         env: {
           TRAVEL_ORIGIN: '30.6100,-87.3400',
           ROUTES_PROVIDER: 'google',
-          ROUTES_API_KEY: 'dummy-routes-key',
+          ROUTES_API_KEY: 'paid-provider-key',
         },
       } as never),
   );
   assert.equal(response.status, 200);
   const data = (await response.json()) as Record<string, unknown>;
-  assert.equal(data.method, 'route');
-  assert.equal(data.provider, 'google');
+  assert.equal(data.method, 'straight_line_estimate', 'paid routing must be disabled');
+  assert.equal(data.provider, 'straight_line');
 });
 
-test('travel: a provider failure falls back to the straight-line estimate', async () => {
+test('travel: the paid Mapbox provider is disabled and never called', async () => {
   const response = await withFetch(
-    async () => jsonResponse({ error: 'boom' }, 500),
+    async (url) => {
+      throw new Error(`a paid provider was called: ${String(url)}`);
+    },
     () =>
       travelPost({
         request: jsonRequest({ zip: '32502' }),
         env: {
           TRAVEL_ORIGIN: '30.6100,-87.3400',
-          ROUTES_PROVIDER: 'google',
-          ROUTES_API_KEY: 'dummy-routes-key',
+          ROUTES_PROVIDER: 'mapbox',
+          ROUTES_API_KEY: 'paid-provider-key',
         },
       } as never),
   );
   assert.equal(response.status, 200);
   const data = (await response.json()) as Record<string, unknown>;
-  assert.equal(data.method, 'straight_line_estimate');
+  assert.equal(data.method, 'straight_line_estimate', 'paid routing must be disabled');
 });
 
 test('travel: EIA fuel feed failure falls back to the configured reference price', async () => {
@@ -356,5 +361,18 @@ test('travel: no coordinates and no ZIP is an invalid request', async () => {
     env: { TRAVEL_ORIGIN: '30.6100,-87.3400' },
   } as never);
   assert.equal(response.status, 400);
+});
+
+test('travel: a burst from one IP is throttled so the free allowance cannot be drained', async () => {
+  const ip = '203.0.113.9';
+  let lastStatus = 0;
+  for (let index = 0; index < 34; index += 1) {
+    const response = await travelPost({
+      request: jsonRequest({ zip: '32503' }, ip),
+      env: { TRAVEL_ORIGIN: '30.6100,-87.3400' },
+    } as never);
+    lastStatus = response.status;
+  }
+  assert.equal(lastStatus, 429, 'requests beyond the per-IP window must be refused');
 });
 

@@ -231,8 +231,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
       if (liveReference && latestQuote) {
         liveReference.hidden = false;
-        const expires = new Date(latestQuote.expiresAt);
-        liveReference.textContent = `Quote reference ${latestQuote.reference} · honored through ${expires.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        liveReference.textContent = `Estimate reference ${latestQuote.reference} — proposed price, subject to owner confirmation.`;
       } else if (liveReference) {
         liveReference.hidden = true;
       }
@@ -306,13 +305,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (reservationPrice) reservationPrice.textContent = `$${latestQuote.amount.toLocaleString()}`;
     if (reservationReference) {
       reservationReference.hidden = false;
-      reservationReference.textContent = `Quote reference ${latestQuote.reference}`;
+      reservationReference.textContent = `Estimate reference ${latestQuote.reference}`;
     }
     if (reservationValidity) {
-      const expires = new Date(latestQuote.expiresAt);
-      const days = Math.round(pricing.instantQuote.validityHours.value / 24);
       reservationValidity.hidden = false;
-      reservationValidity.textContent = `Honored for ${days} days — through ${expires.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}.`;
+      reservationValidity.textContent =
+        'Proposed price — not a held reservation or a binding offer. The owner confirms the final price before booking.';
     }
     if (reservationQualification) {
       reservationQualification.textContent = latestQuote.travelVerified
@@ -362,7 +360,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (reserveText) {
       reserveText.hidden = !phone || !business.flags.smsEnabled;
       if (phone) {
-        const body = `I'd like to reserve the cleaning quote ${latestQuote.reference} ($${latestQuote.amount}${location ? ` at ${formatLocationLine(location)}` : ''}).`;
+        const body = `Hi! I'd like to reserve a cleaning. My estimate reference is ${latestQuote.reference} with a proposed price of $${latestQuote.amount}${location ? ` at ${formatLocationLine(location)}` : ''}. The owner will confirm the final price.`;
         reserveText.href = `${phone.sms}?&body=${encodeURIComponent(body)}`;
       }
     }
@@ -451,17 +449,27 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return `${TRAVEL_CACHE_PREFIX}${key}`;
   }
 
+  let travelLookupSeq = 0;
+
   async function lookupTravel(): Promise<void> {
     const key = currentTravelKey();
     if (!key || key === lastTravelKey) return;
     lastTravelKey = key;
+    const seq = ++travelLookupSeq;
+
+    const applyIfCurrent = (data: RoutedTravelInfo | undefined): void => {
+      // A newer lookup (e.g. the confirmed pin superseding the ZIP lookup)
+      // must win even if this response arrives later.
+      if (seq !== travelLookupSeq) return;
+      routed = data;
+      routedKey = data ? key : null;
+      recalc();
+    };
 
     try {
       const cached = window.sessionStorage.getItem(travelCacheKey(key));
       if (cached) {
-        routed = JSON.parse(cached) as RoutedTravelInfo;
-        routedKey = key;
-        recalc();
+        applyIfCurrent(JSON.parse(cached) as RoutedTravelInfo);
         return;
       }
     } catch {
@@ -482,22 +490,18 @@ function initEstimateWizard(form: HTMLFormElement): void {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = (await response.json()) as RoutedTravelInfo;
       if (typeof data.oneWayMiles === 'number' && data.oneWayMiles > 0) {
-        routed = data;
-        routedKey = key;
+        applyIfCurrent(data);
         try {
           window.sessionStorage.setItem(travelCacheKey(key), JSON.stringify(data));
         } catch {
           // ignore
         }
       } else {
-        routed = undefined;
-        routedKey = null;
+        applyIfCurrent(undefined);
       }
     } catch {
-      routed = undefined;
-      routedKey = null;
+      applyIfCurrent(undefined);
     }
-    recalc();
   }
 
   // ── Address finder wiring ─────────────────────────────────────────────────
@@ -642,7 +646,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
       fields.quoted_price = String(latestQuote.amount);
       fields.quote_reference = latestQuote.reference;
       fields.quote_config_version = latestQuote.configVersion;
-      fields.quote_valid_through = latestQuote.expiresAt.slice(0, 10);
       fields.quoted_range =
         result.low !== null && result.high !== null ? `$${result.low}–$${result.high}` : '';
     }

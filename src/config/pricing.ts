@@ -305,8 +305,13 @@ export const pricing = {
     selection: provisional('expected' as 'expected' | 'midpoint' | 'high', 'Default protects margin: the offered price is the model price, not the low end of a range.'),
     /** Offered prices are never below expectedPrice × this margin floor. */
     marginFloor: provisional(1, 'Hard margin safeguard: selection candidates below expectedPrice are discarded.'),
-    /** Quote validity window in hours (proposed 14 days; owner approval required). */
-    validityHours: provisional(336, 'Proposed validity: 14 days. Owner must approve before binding offers are enabled.'),
+    /**
+     * Server-side review validity window recorded when the server verifies a
+     * quote (owner notification field). NOT a customer-facing hold, expiry
+     * promise or binding offer; customer copy describes a proposed price
+     * subject to owner confirmation.
+     */
+    validityHours: provisional(336, 'Server-issued verification validity window (14 days) for the owner notification only. Not shown to customers as a hold.'),
   },
 
   // ── Cancellation policy (directive §36) — PROVISIONAL, not final ──────────
