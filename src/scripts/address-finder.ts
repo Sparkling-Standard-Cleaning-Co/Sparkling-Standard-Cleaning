@@ -101,6 +101,12 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
    * "address found" state (or a later failure state).
    */
   let searchSeq = 0;
+  /**
+   * True while the resolved address is being written back into the city/state/
+   * ZIP fields. Those programmatic changes must not schedule a new autocomplete
+   * that would overwrite the "address found" state.
+   */
+  let applyingResolved = false;
 
   // MapLibre is imported lazily and only once per page.
   type MapLibreModule = typeof import('maplibre-gl');
@@ -164,6 +170,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
 
   function invalidateConfirmation(): void {
     if (!confirmed) {
+      // Editing discards an unconfirmed candidate too.
+      candidate = null;
       setState('typing');
       return;
     }
@@ -208,9 +216,14 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       return null;
     }
     // Fill authoritative city/state/ZIP from the resolved address.
-    fillField(cityInput, resolved.city);
-    fillField(stateInput, resolved.state);
-    fillField(zipInput, resolved.zip ?? zipFromLabel(label) ?? undefined);
+    applyingResolved = true;
+    try {
+      fillField(cityInput, resolved.city);
+      fillField(stateInput, resolved.state);
+      fillField(zipInput, resolved.zip ?? zipFromLabel(label) ?? undefined);
+    } finally {
+      applyingResolved = false;
+    }
     return {
       label,
       lat,
@@ -227,6 +240,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     candidate = resolved;
     clearSuggestions();
     if (resolved.zip) fillField(zipInput, resolved.zip);
+    settleDestinationValues();
     if (mapCard) mapCard.hidden = false;
     if (confirmedCard) confirmedCard.hidden = true;
     // The confirm action is available even before/without the map: the map is
@@ -458,6 +472,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         needsLocation?: boolean;
       };
       if (seq !== searchSeq) return; // a resolution superseded this lookup
+      if (candidate || confirmed) return; // never clobber a resolved choice
       if (!response.ok || !data.ok || !Array.isArray(data.suggestions)) {
         throw new Error('provider_failed');
       }
@@ -521,6 +536,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       ...(candidate.adjusted ? { adjusted: true } : {}),
       confirmedAt: new Date().toISOString(),
     };
+    settleDestinationValues();
     if (mapCard) mapCard.hidden = false;
     if (confirmedCard) confirmedCard.hidden = false;
     if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(confirmed);
@@ -583,17 +599,38 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
 
   // Changing the city, state or ZIP changes the destination: confirmation and
   // suggestions are invalidated, and autocomplete is refreshed using ALL
-  // available address information.
-  for (const field of [cityInput, stateInput, zipInput]) {
-    field?.addEventListener('change', () => {
-      invalidateConfirmation();
-      clearSuggestions();
+  // available address information. A change event that carries the same value
+  // (e.g. the native blur-change after a programmatic fill) must NOT invalidate
+  // a resolved destination.
+  const lastFieldValues = new WeakMap<HTMLInputElement | HTMLSelectElement, string>();
+  /** Records the current city/state/ZIP as settled, so the native blur-change
+   *  that follows a programmatic fill cannot invalidate a resolved address. */
+  function settleDestinationValues(): void {
+    for (const field of [cityInput, stateInput, zipInput]) {
+      if (field) lastFieldValues.set(field, field.value);
+    }
+  }
+  function watchDestinationField(field: HTMLInputElement | HTMLSelectElement | null): void {
+    if (!field) return;
+    lastFieldValues.set(field, field.value);
+    field.addEventListener('change', () => {
+      const previous = lastFieldValues.get(field) ?? '';
+      lastFieldValues.set(field, field.value);
+      if (previous === field.value) return;
+      // Only a real destination change (after a candidate/confirmation exists)
+      // invalidates. A native blur-change must never clear a suggestion the
+      // customer is about to click, or a resolved destination.
+      if (candidate || confirmed) invalidateConfirmation();
+      if (applyingResolved) return;
       if (streetField.value.trim().length >= MIN_SUGGEST_LENGTH) {
         window.clearTimeout(suggestTimer);
         suggestTimer = window.setTimeout(() => void requestSuggestions(composeQuery()), SUGGEST_DEBOUNCE_MS);
       }
     });
   }
+  watchDestinationField(cityInput);
+  watchDestinationField(stateInput);
+  watchDestinationField(zipInput);
 
   resolveButton?.addEventListener('click', () => void manualResolve());
   confirmButton?.addEventListener('click', confirmLocation);
