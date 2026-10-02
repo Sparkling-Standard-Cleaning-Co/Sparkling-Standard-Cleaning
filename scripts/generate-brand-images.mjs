@@ -1,8 +1,11 @@
-// Generates brand raster assets from the abstract floral mark:
-//   public/favicon.svg, public/favicon-48.png, public/favicon-96.png
-//   public/brand/apple-touch-icon.png (180)
-//   public/brand/icon-512.png
-//   public/brand/og-default.png (1200×630)
+// Generates the remaining brand raster assets from the abstract floral mark:
+//   public/brand/og-default.png (1200×630 social preview)
+//   public/brand/logo-mark-soft.svg (background-free mark)
+//
+// The browser favicon, Apple touch icon and Android/PWA icons are OWNER-
+// APPROVED assets installed from the Sparkling Standard favicon kit (2026-10-02)
+// and are intentionally NOT generated here: re-running this script must never
+// overwrite the approved icons.
 //
 // Run after changing the mark or the business name:
 //   node scripts/generate-brand-images.mjs
@@ -38,15 +41,6 @@ const mark = (petalColor = ROSE, centerColor = CHAMPAGNE, size = 48) => `
   <circle cx="24" cy="24" r="3.4" fill="${centerColor}"/>
 </svg>`;
 
-const circleMark = (size, bg, petalColor, centerColor) => `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="${size}" height="${size}">
-  <circle cx="24" cy="24" r="24" fill="${bg}"/>
-  <g fill="${petalColor}">
-    ${petal(0)}${petal(72)}${petal(144)}${petal(216)}${petal(288)}
-  </g>
-  <circle cx="24" cy="24" r="3.4" fill="${centerColor}"/>
-</svg>`;
-
 const esc = (value) =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -63,24 +57,6 @@ const og = `
 </svg>`;
 
 fs.mkdirSync(path.join('public', 'brand'), { recursive: true });
-
-// SVG favicon (unmodified mark on a soft cream tile)
-fs.writeFileSync(
-  path.join('public', 'favicon.svg'),
-  circleMark(48, CREAM, ROSE, CHAMPAGNE).trim() + '\n',
-);
-
-const png = (svg, size, out) =>
-  sharp(Buffer.from(svg))
-    .resize(size, size)
-    .png()
-    .toFile(out)
-    .then(() => console.log(`wrote ${out}`));
-
-await png(circleMark(48, CREAM, ROSE, CHAMPAGNE), 48, path.join('public', 'favicon-48.png'));
-await png(circleMark(48, CREAM, ROSE, CHAMPAGNE), 96, path.join('public', 'favicon-96.png'));
-await png(circleMark(48, CREAM, ROSE, CHAMPAGNE), 180, path.join('public', 'brand', 'apple-touch-icon.png'));
-await png(circleMark(48, CREAM, ROSE, CHAMPAGNE), 512, path.join('public', 'brand', 'icon-512.png'));
 
 await sharp(Buffer.from(og))
   .png()
