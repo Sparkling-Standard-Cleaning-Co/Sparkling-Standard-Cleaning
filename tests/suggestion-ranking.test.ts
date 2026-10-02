@@ -119,3 +119,45 @@ test('query variants expand directions and highway synonyms', () => {
   assert.deepEqual(suggestQueryVariants('3370 Hwy 97', 'Milton'), ['3370 Highway 97, Milton']);
   assert.deepEqual(suggestQueryVariants('', ''), []);
 });
+
+test('query variants expand common street-suffix abbreviations first', () => {
+  const cases: Array<[string, string, string]> = [
+    ['6360 Haupert Ln', 'Molino', '6360 Haupert Lane, Molino'],
+    ['100 S Baylen St', 'Pensacola', '100 South Baylen Street, Pensacola'],
+    ['55 Sunset Rd', 'Pace', '55 Sunset Road, Pace'],
+    ['9 Palafox Pl', 'Pensacola', '9 Palafox Place, Pensacola'],
+    ['7 Bay Bluff Dr', 'Gulf Breeze', '7 Bay Bluff Drive, Gulf Breeze'],
+    ['3 Oak Ct', 'Cantonment', '3 Oak Court, Cantonment'],
+    ['12 Woodland Cir', 'Milton', '12 Woodland Circle, Milton'],
+    ['44 River Ter', 'Jay', '44 River Terrace, Jay'],
+    ['88 Larkspur Ave', 'Cantonment', '88 Larkspur Avenue, Cantonment'],
+    ['100 Gulf Blvd', 'Navarre', '100 Gulf Boulevard, Navarre'],
+    ['2100 Nine Mile Pkwy', 'Pensacola', '2100 Nine Mile Parkway, Pensacola'],
+  ];
+  for (const [input, city, expected] of cases) {
+    const variants = suggestQueryVariants(input, city);
+    assert.equal(variants[0], expected, `${input} → ${variants.join(' | ')}`);
+    assert.ok(variants.length <= 2, 'conservative provider-request limit');
+  }
+});
+
+test('query variants never rewrite a leading "St" that means Saint', () => {
+  assert.deepEqual(suggestQueryVariants('400 St Andrews Dr', 'Pensacola'), ['400 St Andrews Drive, Pensacola']);
+  // Nothing useful can be offered for a base query that already expands
+  // cleanly — no provider request is wasted.
+  assert.deepEqual(suggestQueryVariants('St Michael Way', 'Milton'), []);
+});
+
+test('query variants add the common abbreviation for full suffix words', () => {
+  const lane = suggestQueryVariants('6360 Haupert Lane', 'Molino');
+  assert.deepEqual(lane, ['6360 Haupert Ln, Molino']);
+  const street = suggestQueryVariants('100 S Baylen Street', 'Pensacola');
+  assert.ok(street.includes('100 South Baylen St, Pensacola'), `abbreviation variant present: ${street.join(' | ')}`);
+});
+
+test('at most two provider variants are offered, original entry untouched', () => {
+  const variants = suggestQueryVariants('6360 Haupert Ln', 'Molino');
+  assert.ok(variants.length <= 2);
+  assert.ok(variants[0]?.includes('Haupert Lane'));
+  assert.equal('6360 Haupert Ln', '6360 Haupert Ln');
+});

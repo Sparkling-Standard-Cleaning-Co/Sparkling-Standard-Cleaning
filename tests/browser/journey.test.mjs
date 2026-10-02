@@ -311,7 +311,7 @@ test('the proposed price calculates correctly and extras change it', async () =>
     );
     assert.match(
       (await page.locator('[data-estimate-travel]').textContent()) ?? '',
-      /Travel confirmed/,
+      /proposed price includes travel based on the driving distance/i,
       'confirmed travel is labeled',
     );
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -340,8 +340,8 @@ test('a routing failure degrades to an honest preliminary estimate', async () =>
     const price = (await page.locator('[data-estimate-price]').textContent()) ?? '';
     assert.match(price, /^\$\d+/, 'the price still appears from zone travel math');
     const travel = (await page.locator('[data-estimate-travel]').textContent()) ?? '';
-    assert.match(travel, /Travel estimate/i, 'travel is labeled as an estimate');
-    assert.doesNotMatch(travel, /Travel confirmed/i, 'never claims confirmed travel');
+    assert.match(travel, /proposed price includes estimated travel/i, 'travel is labeled as an estimate');
+  assert.doesNotMatch(travel, /based on the driving distance to your selected location/i, 'never claims confirmed travel');
   } finally {
     await context.close();
   }

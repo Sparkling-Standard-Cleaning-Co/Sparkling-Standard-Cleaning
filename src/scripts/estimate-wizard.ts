@@ -205,21 +205,20 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   function travelCopy(result: EstimateResult): string {
     const travel = result.travel;
-    // A live route to a ZIP centroid is an estimate, not a confirmed
-    // destination: only a customer-confirmed address can read as confirmed.
-    if (location && travel.mode === 'routed' && travel.verified) {
-      const minutes = travel.durationMinutes !== null ? `${Math.round(travel.durationMinutes)} min` : null;
-      const miles = travel.oneWayMiles !== null ? `${Math.round(travel.oneWayMiles * 10) / 10} mi` : null;
-      const detail = [miles, minutes].filter(Boolean).join(' / ');
-      return `Travel confirmed: ${detail} of driving from our base, included in this price.`;
+    const submission = submissionAddress();
+    // Routing is only presented as distance-based certainty when the customer
+    // confirmed a street address. A GPS pin (or ZIP) keeps the preliminary
+    // wording: it is a location, not a verified postal address.
+    const streetConfirmed = submission.location !== null && submission.street.trim().length >= 5;
+    if (travel.mode === 'routed' && travel.verified && streetConfirmed) {
+      const miles =
+        travel.oneWayMiles !== null ? ` (about ${Math.round(travel.oneWayMiles)} miles one way)` : '';
+      return `Your proposed price includes travel based on the driving distance to your selected location${miles}.`;
     }
-    if (travel.mode === 'routed') {
-      return `Travel estimate: about ${travel.oneWayMiles !== null ? `${Math.round(travel.oneWayMiles)} mi` : 'your area'} by road — confirmed before booking.`;
+    if (travel.mode === 'routed' || travel.mode === 'zone') {
+      return 'Your proposed price includes estimated travel. Sparkling Standard will confirm your location and final price before booking.';
     }
-    if (travel.mode === 'zone' && (travel.zone === 'core' || travel.zone === 'surrounding')) {
-      return 'Travel estimate: based on your ZIP area. Confirm your street address above for the most accurate proposed price.';
-    }
-    return travel.reason ?? 'Travel will be confirmed personally with you.';
+    return 'Travel will be confirmed by Sparkling Standard before your appointment is booked.';
   }
 
   function renderResult(result: EstimateResult): void {
@@ -416,6 +415,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
 
     const input = gatherInput();
+    // Verified travel wording requires BOTH a live route and a confirmed
+    // street address; a bare GPS pin or ZIP keeps the preliminary copy.
+    const summarySubmission = submissionAddress();
+    const travelFullyVerified =
+      latestQuote.travelVerified &&
+      summarySubmission.location !== null &&
+      summarySubmission.street.trim().length >= 5;
     if (reservationPrice) reservationPrice.textContent = `$${latestQuote.amount.toLocaleString()}`;
     if (reservationReference) {
       reservationReference.hidden = false;
@@ -427,9 +433,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
         'Proposed price — not a held reservation or a binding offer. Sparkling Standard confirms the final price before booking.';
     }
     if (reservationQualification) {
-      reservationQualification.textContent = latestQuote.travelVerified
-        ? 'Travel-inclusive proposed price — calculated from our base to your confirmed destination.'
-        : 'Preliminary proposed price — travel is based on your area and is confirmed from your address before booking.';
+      reservationQualification.textContent = travelFullyVerified
+        ? 'Travel-inclusive proposed price — based on the driving distance to your confirmed location.'
+        : 'Preliminary proposed price — travel is estimated and Sparkling Standard confirms your location and final price before booking.';
     }
 
     if (priceBreakdown) fillLines(priceBreakdown, priceLines(result));
@@ -463,7 +469,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       addSummaryRow(
         reservationScope,
         'Travel',
-        latestQuote.travelVerified
+        travelFullyVerified
           ? `Confirmed route${result.travel.oneWayMiles !== null ? ` — ${Math.round(result.travel.oneWayMiles)} mi one way` : ''}`
           : 'Estimated — confirmed before booking',
       );

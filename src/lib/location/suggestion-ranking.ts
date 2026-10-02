@@ -222,20 +222,125 @@ export function rankSuggestions(
   };
 }
 
-/** Alternative query forms for numbered roads and directions. */
+/** Street-suffix abbreviations → the full USPS word, for QUERY expansion only. */
+const SUFFIX_EXPANSIONS: Record<string, string> = {
+  ln: 'Lane',
+  rd: 'Road',
+  st: 'Street',
+  dr: 'Drive',
+  ave: 'Avenue',
+  blvd: 'Boulevard',
+  ct: 'Court',
+  cir: 'Circle',
+  pl: 'Place',
+  ter: 'Terrace',
+  pkwy: 'Parkway',
+  hwy: 'Highway',
+  trl: 'Trail',
+  expy: 'Expressway',
+  fwy: 'Freeway',
+  cr: 'County Road',
+  hgwy: 'Highway',
+};
+
+/** Full street words → the common abbreviation, used as a fallback variant. */
+const SUFFIX_ABBREVIATIONS: Record<string, string> = {
+  lane: 'Ln',
+  road: 'Rd',
+  street: 'St',
+  drive: 'Dr',
+  avenue: 'Ave',
+  boulevard: 'Blvd',
+  court: 'Ct',
+  circle: 'Cir',
+  place: 'Pl',
+  terrace: 'Ter',
+  parkway: 'Pkwy',
+  highway: 'Hwy',
+  trail: 'Trl',
+  expressway: 'Expy',
+  freeway: 'Fwy',
+};
+
+const DIRECTION_EXPANSIONS: Record<string, string> = {
+  n: 'North',
+  s: 'South',
+  e: 'East',
+  w: 'West',
+  ne: 'Northeast',
+  nw: 'Northwest',
+  se: 'Southeast',
+  sw: 'Southwest',
+};
+
+/**
+ * Rewrites street-suffix and direction abbreviations in their legitimate
+ * positions. The suffix is only expanded when it is the FINAL token (the
+ * street-suffix position), so "St Andrews Dr" keeps "St" (Saint) while
+ * "123 Main St" becomes "123 Main Street". Directions are expanded except
+ * when a lone direction is the entire entry.
+ */
+function expandStreetWords(street: string): string {
+  const tokens = street.trim().split(/\s+/);
+  return tokens
+    .map((token, index) => {
+      const bare = token.replace(/[.,]/g, '');
+      const lower = bare.toLowerCase();
+      const isLast = index === tokens.length - 1;
+      if (isLast && index > 0 && SUFFIX_EXPANSIONS[lower] && !/\d/.test(lower)) {
+        return SUFFIX_EXPANSIONS[lower];
+      }
+      if (DIRECTION_EXPANSIONS[lower] && tokens.length > 1 && !/\d/.test(lower)) {
+        return DIRECTION_EXPANSIONS[lower];
+      }
+      return token;
+    })
+    .join(' ');
+}
+
+/** Replaces a full final suffix word with its common abbreviation. */
+function abbreviateStreetSuffix(street: string): string {
+  const tokens = street.trim().split(/\s+/);
+  const last = tokens[tokens.length - 1] ?? '';
+  const bare = last.replace(/[.,]/g, '').toLowerCase();
+  if (tokens.length > 1 && SUFFIX_ABBREVIATIONS[bare]) {
+    tokens[tokens.length - 1] = SUFFIX_ABBREVIATIONS[bare];
+    return tokens.join(' ');
+  }
+  return street;
+}
+
+/**
+ * Alternative query forms for the provider, in priority order:
+ *  1. suffix/direction expansion (Haupert Ln → Haupert Lane, S → South);
+ *  2. numbered-road expansion (Hwy 97 → Highway 97, SR 97 → State Road 97);
+ *  3. suffix abbreviation (Haupert Lane → Haupert Ln) when the input already
+ *     used the full word, for providers indexed by abbreviations.
+ * The customer's original entry is never modified — these are only alternate
+ * provider requests, and the caller stops at the first variant that returns
+ * usable rows.
+ */
 export function suggestQueryVariants(street: string, city?: string): string[] {
   if (!street.trim()) return [];
-  const variants = new Set<string>();
-  let variant = street
+  const withCity = (part: string) => (city ? `${part}, ${city}` : part);
+  const variants: string[] = [];
+  const add = (part: string) => {
+    const value = withCity(part);
+    if (part !== street.trim() && !variants.includes(value) && variants.length < 2) variants.push(value);
+  };
+
+  const expanded = expandStreetWords(street);
+  add(expanded);
+
+  const roadExpanded = expanded
     .replace(/\b(hwy|hgwy)\b/gi, 'Highway')
     .replace(/\b(sr|state route)\b/gi, 'State Road')
     .replace(/\bfl\b[\s-]*(\d+)/gi, 'State Road $1')
-    .replace(/\bs\b/gi, 'South')
-    .replace(/\bn\b/gi, 'North')
-    .replace(/\be\b/gi, 'East')
-    .replace(/\bw\b/gi, 'West');
-  if (variant !== street) variants.add(city ? `${variant}, ${city}` : variant);
-  const highway = street.replace(/\b(hwy|hgwy|sr|state route)\b/gi, 'Highway');
-  if (highway !== street) variants.add(city ? `${highway}, ${city}` : highway);
-  return [...variants].slice(0, 2);
+    .replace(/\bcr\b[\s-]*(\d+)/gi, 'County Road $1');
+  add(roadExpanded);
+
+  const abbreviated = abbreviateStreetSuffix(expanded);
+  add(abbreviated);
+
+  return variants;
 }

@@ -433,6 +433,20 @@ li + li {
   color: var(--color-rose-300);
 }
 
+/* Tiny phones (≤352px): let the brand shrink and wrap its tagline instead of
+   forcing the whole document wider than the viewport. */
+@media (max-width: 22rem) {
+  .brand {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .brand__name,
+  .brand__tagline {
+    white-space: normal;
+  }
+}
+
 .site-nav {
   display: none;
 }
@@ -1325,8 +1339,16 @@ fieldset {
   margin-bottom: var(--space-5);
 }
 
+/* The GPS action must fit a 320px phone: block-level buttons wrap instead of
+   forcing the whole layout wider than the viewport. */
+.address-gps .btn--block {
+  white-space: normal;
+}
+
 .address-suggestions {
   list-style: none;
+  position: relative;
+  z-index: 2;
   padding: var(--space-1);
   margin: 0;
   max-height: 15rem;
@@ -1343,6 +1365,9 @@ fieldset {
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   cursor: pointer;
+  /* Touch taps select immediately — no double-tap zoom, no 300ms delay. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .address-suggestions li:hover,
@@ -1705,6 +1730,8 @@ fieldset.input--invalid {
   position: relative;
   flex: 1 1 0;
   min-width: 0;
+  /* Reset inherited list margins: every indicator sits on one baseline. */
+  margin: 0;
 }
 
 .wizard-steps__item:not(:last-child)::after {
@@ -1794,14 +1821,43 @@ fieldset.input--invalid {
 }
 
 @media (max-width: 47.99rem) {
+  /* Six equal, perfectly centered indicators with one continuous connector
+     through the exact circle centers. The group fits 320px+ without any
+     horizontal page shift; no internal scrollbar is needed at phone widths. */
   .wizard-steps__list {
-    overflow-x: auto;
-    gap: var(--space-3);
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(6, 2.1rem);
+    justify-content: center;
+    align-items: center;
+    column-gap: var(--space-2);
     padding-bottom: var(--space-2);
+    overflow: visible;
   }
 
   .wizard-steps__item {
-    flex: 0 0 2.1rem;
+    flex: none;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+  }
+
+  .wizard-steps__item:not(:last-child)::after {
+    display: none;
+  }
+
+  .wizard-steps__list::before {
+    content: '';
+    position: absolute;
+    top: 1.05rem;
+    height: 2px;
+    left: calc(50% - (3 * 2.1rem + 2.5 * var(--space-2)) + 1.05rem);
+    right: calc(50% - (3 * 2.1rem + 2.5 * var(--space-2)) + 1.05rem);
+    background: var(--color-border-strong);
+  }
+
+  .wizard-steps__button {
+    line-height: 1;
   }
 
   .wizard-steps__title {
@@ -1819,6 +1875,17 @@ fieldset.input--invalid {
     font-size: var(--text-sm);
     font-weight: var(--weight-bold);
     color: var(--color-rose-800);
+  }
+}
+
+@media (max-width: 21rem) {
+  .wizard-steps__list {
+    column-gap: var(--space-1);
+  }
+
+  .wizard-steps__list::before {
+    left: calc(50% - (3 * 2.1rem + 2.5 * var(--space-1)) + 1.05rem);
+    right: calc(50% - (3 * 2.1rem + 2.5 * var(--space-1)) + 1.05rem);
   }
 }
 

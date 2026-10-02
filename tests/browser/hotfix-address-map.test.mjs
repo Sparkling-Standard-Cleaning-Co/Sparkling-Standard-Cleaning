@@ -170,7 +170,7 @@ test('a street-level suggestion never replaces the entered house number; the add
     await completeAfterAddress(page);
     // Travel stays preliminary without a confirmed destination.
     const travel = (await page.locator('[data-estimate-travel]').textContent()) ?? '';
-    assert.match(travel, /Travel estimate/i);
+    assert.match(travel, /proposed price includes estimated travel/i);
     assert.doesNotMatch(travel, /Travel confirmed/i);
 
     await page.click('[data-submit]');

@@ -183,15 +183,17 @@ async function suggestionsForAddress(env: Env, parts: SuggestParts): Promise<{
   let rows = await providerSuggest(env, providerQuery);
   let result = rankSuggestions(rows, location, houseNumber);
 
-  // One variant attempt handles road-name variations (Hwy/SR/state directions)
-  // before deciding the location is unknown.
+  // Alternate query forms handle road-name variations (Hwy/SR/state
+  // directions) and street-suffix spelling (Ln/Lane, St/Street, Rd/Road …).
+  // At most two variant requests are made, and only when the primary query
+  // returned nothing usable — the free allowance stays protected.
   if (result.ranked.length === 0) {
-    const [variant] = suggestQueryVariants(parts.street, parts.city || undefined);
-    if (variant) {
+    for (const variant of suggestQueryVariants(parts.street, parts.city || undefined)) {
       const variantRows = await providerSuggest(env, variant);
       if (variantRows.length > 0) {
         rows = variantRows;
         result = rankSuggestions(rows, location, houseNumber);
+        if (result.ranked.length > 0) break;
       }
     }
   }

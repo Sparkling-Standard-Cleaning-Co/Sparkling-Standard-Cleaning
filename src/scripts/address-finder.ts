@@ -221,8 +221,9 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       badge.className = `address-suggestions__badge ${exact ? 'address-suggestions__badge--exact' : ''}`;
       badge.textContent = exact ? 'Exact address' : 'Street match';
       item.append(label, badge);
-      item.addEventListener('mousedown', (event) => {
-        // mousedown fires before the input blurs.
+      item.addEventListener('pointerdown', (event) => {
+        // Pointer-down covers touch and mouse; firing before the input blurs
+        // means the tap reliably selects the suggestion on mobile.
         event.preventDefault();
         void chooseSuggestion(index);
       });
