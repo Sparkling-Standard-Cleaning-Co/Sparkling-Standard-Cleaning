@@ -21,7 +21,7 @@ import { zipReference } from '../../config/geography.ts';
 import { calculateEstimate, type EstimateContext } from './calculate.ts';
 import { selectInstantAmount } from './quote.ts';
 import { validateEstimateInput } from './validation.ts';
-import type { EstimateInputDraft, RoutedTravelInfo } from './types.ts';
+import type { EstimateInputDraft, PricingBreakdown, RoutedTravelInfo } from './types.ts';
 import {
   configuredReferenceGasPrice,
   gulfCoastGasPrice,
@@ -94,6 +94,12 @@ export interface QuoteVerification {
   /** Distance between the submitted pin and the geocoded address, metres. */
   pinDistanceMeters: number | null;
   travel: QuoteVerificationTravel;
+  /**
+   * The full transparent price breakdown the server recalculated. Null only
+   * when the input could not be validated. The owner notification renders
+   * these exact values.
+   */
+  breakdown: PricingBreakdown | null;
   /** Plain-language verdict for the owner notification. */
   note: string;
   verifiedAt: string;
@@ -242,6 +248,7 @@ export async function verifyReservationQuote(
   };
   let pinCheck: PinCheck = 'unknown';
   let pinDistanceMeters: number | null = null;
+  let breakdown: PricingBreakdown | null = null;
   const result = (
     status: QuoteVerificationStatus,
     verifiedPrice: number | null,
@@ -261,6 +268,7 @@ export async function verifyReservationQuote(
     pinCheck,
     pinDistanceMeters,
     travel,
+    breakdown,
     note,
     verifiedAt: new Date(now).toISOString(),
     validThrough: new Date(now + pricing.instantQuote.validityHours.value * 3_600_000).toISOString(),
@@ -326,6 +334,7 @@ export async function verifyReservationQuote(
   }
 
   const estimate = calculateEstimate(draft, buildEstimateContext(routed));
+  breakdown = estimate.pricing;
   if (estimate.status !== 'estimated') {
     return result(
       'mismatch',

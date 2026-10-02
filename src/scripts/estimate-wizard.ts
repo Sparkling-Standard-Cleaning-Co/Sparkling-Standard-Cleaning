@@ -2,15 +2,18 @@
 // the instant estimate works on a fully static page and keeps working when the
 // travel API is unavailable. Nothing is ever auto-booked.
 //
-// Journey: cleaning type → confirmed street address (map pin) → home facts →
-// condition → extras → timing → proposed price + reservation request.
+// Journey: service & address → home → condition & frequency → extras →
+// scheduling → proposed price + reservation request.
 //
-// Safety rules:
+// Behavior rules:
+//  - Every page visit starts a FRESH blank estimate at step 1. Nothing is
+//    restored from localStorage; there is no automatic draft recovery.
 //  - A confirmed street address and its coordinates are the ONLY destination
 //    source; a ZIP centroid never silently replaces a confirmed pin.
-//  - Prices shown here are proposals. The server recalculates every reservation
-//    (functions/api/lead.ts + src/lib/estimate/verify.ts); the browser price is
-//    never trusted for acceptance.
+//  - Prices shown here are proposals built by the ONE authoritative model
+//    (labor-hours × approved rate, with the add-on display and discount coming
+//    from the same breakdown). The server recalculates every reservation; the
+//    browser price is never trusted for acceptance.
 //  - Nothing analytics-related ever receives the address, ZIP, coordinates,
 //    price or form contents.
 
@@ -18,6 +21,7 @@ import { pricing } from '../config/pricing';
 import { business, contactPhone, isPending } from '../config/business';
 import { calculateEstimate, type EstimateContext } from '../lib/estimate/calculate';
 import { buildInstantQuote, type InstantQuote } from '../lib/estimate/quote';
+import { ESTIMATE_STEPS } from '../lib/estimate/steps';
 import { SERVICE_LABELS, SERVICE_SHORT, FREQUENCY_LABELS } from '../lib/estimate/labels';
 import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInfo, ServiceType } from '../lib/estimate/types';
 import { locationKey, formatLocationLine, type ConfirmedLocation } from '../lib/location/location';
@@ -28,9 +32,7 @@ import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { track } from '../lib/analytics/events';
 import { attributionFields } from '../lib/attribution';
 
-const DRAFT_KEY = 'pcc-estimate-draft';
 const TRAVEL_CACHE_PREFIX = 'pcc-travel-';
-const CONTACT_FIELD_NAMES = new Set(['name', 'phone', 'email', 'serviceAddress', 'notes', 'addressUnit']);
 
 const phone = contactPhone();
 const contact = {
@@ -39,15 +41,7 @@ const contact = {
   smsEnabled: business.flags.smsEnabled,
 };
 
-const STEP_LABELS = [
-  'Your service',
-  'Service address',
-  'Your home',
-  'Condition & rhythm',
-  'Extras',
-  'Timing',
-  'Price & reservation',
-];
+const STEP_LABELS = ESTIMATE_STEPS.map((step) => step.title);
 
 const formHost = document.querySelector<HTMLFormElement>('[data-estimate-form]');
 if (formHost) {
@@ -63,6 +57,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const progressBar = form.querySelector<HTMLElement>('[data-progress-bar]');
   const progressPercent = form.querySelector<HTMLElement>('[data-progress-percent]');
   const stepLabel = form.querySelector<HTMLElement>('[data-step-label]');
+  const mobileStepTitle = form.querySelector<HTMLElement>('[data-mobile-step-title]');
+  const stepItems = [...form.querySelectorAll<HTMLElement>('[data-step-item]')];
+  const stepJumps = [...form.querySelectorAll<HTMLButtonElement>('[data-step-jump]')];
   const livePanel = form.querySelector<HTMLElement>('[data-estimate-live]');
   const livePrice = form.querySelector<HTMLElement>('[data-estimate-price]');
   const liveRange = form.querySelector<HTMLElement>('[data-estimate-range]');
@@ -78,6 +75,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const reservationValidity = form.querySelector<HTMLElement>('[data-reservation-validity]');
   const reservationScope = form.querySelector<HTMLElement>('[data-reservation-scope]');
   const reservationQualification = form.querySelector<HTMLElement>('[data-reservation-qualification]');
+  const priceBreakdown = form.querySelector<HTMLElement>('[data-price-breakdown]');
+  const pricePreview = form.querySelector<HTMLElement>('[data-price-preview]');
+  const pricePreviewLines = form.querySelector<HTMLElement>('[data-price-preview-lines]');
+  const pricePreviewNote = form.querySelector<HTMLElement>('[data-price-preview-note]');
+  const addonIncentiveEl = form.querySelector<HTMLElement>('[data-addon-incentive]');
+  const addonIncentiveText = form.querySelector<HTMLElement>('[data-addon-incentive-text]');
   const reserveCall = document.querySelector<HTMLAnchorElement>('[data-reserve-call]');
   const reserveText = document.querySelector<HTMLAnchorElement>('[data-reserve-text]');
   const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
@@ -175,6 +178,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
           })
         : null;
     renderResult(result);
+    renderAddonPrices(result);
+    renderIncentive(result);
+    renderPricePreview(result);
     renderReservationSummary(result);
     return result;
   }
@@ -185,13 +191,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const minutes = travel.durationMinutes !== null ? `${Math.round(travel.durationMinutes)} min` : null;
       const miles = travel.oneWayMiles !== null ? `${Math.round(travel.oneWayMiles * 10) / 10} mi` : null;
       const detail = [miles, minutes].filter(Boolean).join(' / ');
-      return `Travel verified: ${detail} of driving from our base, included in this price.`;
+      return `Travel confirmed: ${detail} of driving from our base, included in this price.`;
     }
     if (travel.mode === 'routed') {
-      return `Travel preliminary: about ${travel.oneWayMiles !== null ? `${Math.round(travel.oneWayMiles)} mi` : 'your area'} by road-distance estimate — confirmed before booking.`;
+      return `Travel estimate: about ${travel.oneWayMiles !== null ? `${Math.round(travel.oneWayMiles)} mi` : 'your area'} by road — confirmed before booking.`;
     }
     if (travel.mode === 'zone' && (travel.zone === 'core' || travel.zone === 'surrounding')) {
-      return 'Travel preliminary: based on your ZIP area. Confirm your street address above for a precise route before booking.';
+      return 'Travel estimate: based on your ZIP area. Confirm your street address above for the most accurate proposed price.';
     }
     return travel.reason ?? 'Travel will be confirmed personally with you.';
   }
@@ -208,7 +214,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     // On the final step the reservation summary takes over for estimable jobs;
     // for custom-confirmation jobs the live panel stays to explain why.
-    const summaryTakesOver = currentStep === steps.length && result.status === 'estimated' && latestQuote !== null;
+    const summaryTakesOver =
+      currentStep === steps.length && result.status === 'estimated' && latestQuote !== null;
     livePanel.hidden = summaryTakesOver;
 
     if (result.status === 'estimated') {
@@ -220,7 +227,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
           : result.confidence === 'medium'
             ? 'May shift slightly after we confirm a few details.'
             : 'Early — a few more details will sharpen it.';
-      liveNote.textContent = `${confidenceCopy} This is a proposed price on a request, not a confirmed booking — the owner verifies scope and price before anything is scheduled.`;
+      liveNote.textContent = `${confidenceCopy} This is a proposed price on a request, not a confirmed booking — Sparkling Standard confirms the final scope and price with you first.`;
 
       if (liveRange) {
         liveRange.hidden = false;
@@ -231,7 +238,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
       if (liveReference && latestQuote) {
         liveReference.hidden = false;
-        liveReference.textContent = `Estimate reference ${latestQuote.reference} — proposed price, subject to owner confirmation.`;
+        liveReference.textContent = `Estimate reference ${latestQuote.reference} — proposed price, subject to confirmation.`;
       } else if (liveReference) {
         liveReference.hidden = true;
       }
@@ -276,16 +283,103 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return radioValue('serviceType');
   }
 
+  // ── Transparent add-on prices (from the SAME breakdown as the total) ──────
+  function renderAddonPrices(result: EstimateResult): void {
+    const usable = result.status !== 'invalid' && result.pricing.ratePerLaborHour > 0;
+    for (const node of form.querySelectorAll<HTMLElement>('[data-addon-price]')) {
+      const id = node.dataset.addonPrice ?? '';
+      const line = result.pricing.addonPrices.find((addon) => addon.id === id);
+      if (!usable || !line || line.charge === null) {
+        node.textContent = usable ? 'Custom quote' : '—';
+        continue;
+      }
+      node.textContent = `+$${line.charge.toFixed(2)}`;
+      if (result.pricing.minimumApplied) {
+        node.title = 'Included in the minimum visit price';
+      } else {
+        node.removeAttribute('title');
+      }
+    }
+  }
+
+  function renderIncentive(result: EstimateResult): void {
+    if (!addonIncentiveEl || !addonIncentiveText) return;
+    const discount = result.status === 'estimated' ? result.pricing.discount : null;
+    if (!discount) {
+      addonIncentiveEl.hidden = true;
+      addonIncentiveText.textContent = '';
+      return;
+    }
+    addonIncentiveEl.hidden = false;
+    addonIncentiveText.textContent = `You're saving $${discount.amount.toFixed(2)} — ${discount.label.toLowerCase()}.`;
+  }
+
+  /** Builds the reconciled price lines used by both the preview and summary. */
+  function priceLines(result: EstimateResult): Array<{ label: string; value: string; strong?: boolean }> {
+    const p = result.pricing;
+    if (result.status !== 'estimated' || p.subtotal <= 0) return [];
+    const roundStep = pricing.rounding.toNearest.value;
+    const lines: Array<{ label: string; value: string; strong?: boolean }> = [];
+    if (p.minimumApplied) {
+      lines.push({ label: 'Minimum visit price', value: `$${p.subtotal.toFixed(2)}` });
+      if (p.selectedExtras.length > 0) lines.push({ label: 'Selected extras', value: 'Included' });
+      if (p.discount) lines.push({ label: p.discount.label, value: `−$${p.discount.amount.toFixed(2)}` });
+    } else {
+      lines.push({ label: 'Base cleaning (includes travel)', value: `$${p.basePrice.toFixed(2)}` });
+      for (const extra of p.selectedExtras) {
+        lines.push({ label: extra.label, value: `+$${extra.charge.toFixed(2)}` });
+      }
+      if (p.discount) lines.push({ label: p.discount.label, value: `−$${p.discount.amount.toFixed(2)}` });
+    }
+    if (p.roundingAdjustment > 0) {
+      lines.push({ label: `Rounded up to the nearest $${roundStep}`, value: `+$${p.roundingAdjustment.toFixed(2)}` });
+    }
+    lines.push({ label: 'Proposed total', value: `$${(p.subtotal + p.roundingAdjustment).toFixed(2)}`, strong: true });
+    return lines;
+  }
+
+  function fillLines(container: HTMLElement, lines: Array<{ label: string; value: string; strong?: boolean }>): void {
+    container.innerHTML = '';
+    for (const line of lines) {
+      const item = document.createElement('li');
+      const term = document.createElement('span');
+      term.textContent = line.label;
+      const detail = document.createElement(line.strong ? 'strong' : 'span');
+      detail.textContent = line.value;
+      item.append(term, detail);
+      container.appendChild(item);
+    }
+  }
+
+  function renderPricePreview(result: EstimateResult): void {
+    if (!pricePreview || !pricePreviewLines || !pricePreviewNote) return;
+    if (result.status === 'invalid' || result.status === 'custom_confirmation_required') {
+      pricePreview.hidden = result.status === 'invalid';
+      pricePreviewLines.innerHTML = '';
+      pricePreviewNote.textContent =
+        result.status === 'custom_confirmation_required'
+          ? result.message ?? 'This one is confirmed personally with you.'
+          : '';
+      return;
+    }
+    const lines = priceLines(result);
+    pricePreview.hidden = lines.length === 0;
+    fillLines(pricePreviewLines, lines);
+    pricePreviewNote.textContent = result.pricing.minimumApplied
+      ? 'The minimum visit price applies, so selected extras are included at no additional charge.'
+      : 'Every figure above comes from the same calculation as your proposed total.';
+  }
+
   // ── Reservation summary (order-style, carries every calculator answer) ────
-  function addSummaryRow(label: string, value: string): void {
-    if (!reservationScope || !value) return;
+  function addSummaryRow(container: HTMLElement | null, label: string, value: string): void {
+    if (!container || !value) return;
     const item = document.createElement('li');
     const term = document.createElement('span');
     term.textContent = label;
     const detail = document.createElement('strong');
     detail.textContent = value;
     item.append(term, detail);
-    reservationScope.appendChild(item);
+    container.appendChild(item);
   }
 
   function renderReservationSummary(result: EstimateResult): void {
@@ -310,21 +404,24 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (reservationValidity) {
       reservationValidity.hidden = false;
       reservationValidity.textContent =
-        'Proposed price — not a held reservation or a binding offer. The owner confirms the final price before booking.';
+        'Proposed price — not a held reservation or a binding offer. Sparkling Standard confirms the final price before booking.';
     }
     if (reservationQualification) {
       reservationQualification.textContent = latestQuote.travelVerified
-        ? 'Travel-inclusive price — your route was calculated from our operating base to your confirmed destination.'
-        : 'Preliminary price — travel is based on your area and will be verified from your confirmed address before booking.';
+        ? 'Travel-inclusive proposed price — calculated from our base to your confirmed destination.'
+        : 'Preliminary proposed price — travel is based on your area and is confirmed from your address before booking.';
     }
+
+    if (priceBreakdown) fillLines(priceBreakdown, priceLines(result));
 
     if (reservationScope) {
       reservationScope.innerHTML = '';
       addSummaryRow(
+        reservationScope,
         'Cleaning',
         input.serviceType ? SERVICE_LABELS[input.serviceType as ServiceType] : '',
       );
-      addSummaryRow('Frequency', input.frequency ? FREQUENCY_LABELS[input.frequency as keyof typeof FREQUENCY_LABELS] : '');
+      addSummaryRow(reservationScope, 'Frequency', input.frequency ? FREQUENCY_LABELS[input.frequency as keyof typeof FREQUENCY_LABELS] : '');
       const homeParts = [
         input.propertyType ? input.propertyType.charAt(0).toUpperCase() + input.propertyType.slice(1) : '',
         input.squareFeet ? `${input.squareFeet.toLocaleString()} sqft` : '',
@@ -333,26 +430,28 @@ function initEstimateWizard(form: HTMLFormElement): void {
           ? `${input.fullBaths} full bath${input.fullBaths === 1 ? '' : 's'}${input.halfBaths ? ` + ${input.halfBaths} half` : ''}`
           : '',
       ].filter(Boolean);
-      addSummaryRow('Home', homeParts.join(' · '));
-      addSummaryRow('Condition', input.condition ? input.condition.replaceAll('_', ' ') : '');
-      addSummaryRow('Last professional clean', input.lastClean ? input.lastClean.replaceAll('_', ' ') : '');
-      addSummaryRow('Pets', input.pets ? input.pets.replaceAll('_', ' ') : '');
+      addSummaryRow(reservationScope, 'Home', homeParts.join(' · '));
+      addSummaryRow(reservationScope, 'Condition', input.condition ? input.condition.replaceAll('_', ' ') : '');
+      addSummaryRow(reservationScope, 'Last professional clean', input.lastClean ? input.lastClean.replaceAll('_', ' ') : '');
+      addSummaryRow(reservationScope, 'Pets', input.pets ? input.pets.replaceAll('_', ' ') : '');
       addSummaryRow(
+        reservationScope,
         'Extras',
         result.addons.length > 0 ? result.addons.map((addon) => addon.label).join(', ') : 'None',
       );
-      addSummaryRow('Destination', location ? formatLocationLine(location) : `ZIP ${input.zip ?? ''}`);
+      addSummaryRow(reservationScope, 'Destination', location ? formatLocationLine(location) : `ZIP ${input.zip ?? ''}`);
       addSummaryRow(
+        reservationScope,
         'Travel',
         latestQuote.travelVerified
-          ? `Verified route${result.travel.oneWayMiles !== null ? ` — ${Math.round(result.travel.oneWayMiles)} mi one way` : ''}`
-          : 'Preliminary — verified before booking',
+          ? `Confirmed route${result.travel.oneWayMiles !== null ? ` — ${Math.round(result.travel.oneWayMiles)} mi one way` : ''}`
+          : 'Estimated — confirmed before booking',
       );
-      addSummaryRow('Preferred date', textValue('preferredDate') ?? '');
-      addSummaryRow('Arrival', textValue('arrivalPreference')?.replaceAll('-', ' ') ?? '');
+      addSummaryRow(reservationScope, 'Preferred date', textValue('preferredDate') ?? '');
+      addSummaryRow(reservationScope, 'Arrival', textValue('arrivalPreference')?.replaceAll('-', ' ') ?? '');
     }
 
-    // Call / text actions carry the quote context the customer is looking at.
+    // Call / text actions carry the estimate context the customer is looking at.
     if (reserveCall) {
       reserveCall.hidden = !phone;
       if (phone) reserveCall.href = phone.href;
@@ -360,7 +459,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (reserveText) {
       reserveText.hidden = !phone || !business.flags.smsEnabled;
       if (phone) {
-        const body = `Hi! I'd like to reserve a cleaning. My estimate reference is ${latestQuote.reference} with a proposed price of $${latestQuote.amount}${location ? ` at ${formatLocationLine(location)}` : ''}. The owner will confirm the final price.`;
+        const body = `Hi! I'd like to reserve a cleaning. My estimate reference is ${latestQuote.reference} with a proposed price of $${latestQuote.amount}${location ? ` at ${formatLocationLine(location)}` : ''}. Sparkling Standard will confirm the final price.`;
         reserveText.href = `${phone.sms}?&body=${encodeURIComponent(body)}`;
       }
     }
@@ -372,9 +471,22 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (progressFill) progressFill.style.width = `${percent}%`;
     if (progressBar) progressBar.setAttribute('aria-valuenow', String(percent));
     if (progressPercent) progressPercent.textContent = `${percent}%`;
-    if (stepLabel) {
-      stepLabel.textContent = `Step ${currentStep} of ${steps.length} — ${STEP_LABELS[currentStep - 1]}`;
+    const title = STEP_LABELS[currentStep - 1] ?? '';
+    if (stepLabel) stepLabel.textContent = `Step ${currentStep} of ${steps.length} — ${title}`;
+    if (mobileStepTitle) mobileStepTitle.textContent = `Step ${currentStep} of ${steps.length} — ${title}`;
+
+    // Navigator: completed steps are revisitable; future steps are locked.
+    for (const item of stepItems) {
+      const stepNumber = Number(item.dataset.stepItem ?? 0);
+      item.dataset.state = stepNumber < currentStep ? 'complete' : stepNumber === currentStep ? 'current' : 'upcoming';
     }
+    for (const jump of stepJumps) {
+      const stepNumber = Number(jump.dataset.stepJump ?? 0);
+      jump.disabled = stepNumber > currentStep;
+      if (stepNumber === currentStep) jump.setAttribute('aria-current', 'step');
+      else jump.removeAttribute('aria-current');
+    }
+
     if (backButton) backButton.hidden = currentStep === 1;
     if (nextButton) nextButton.hidden = currentStep === steps.length;
     if (submitButton) {
@@ -391,7 +503,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
       element.dataset.active = String(index + 1 === currentStep);
     }
     updateChrome();
-    saveDraft();
     recalc();
   }
 
@@ -431,6 +542,26 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return valid;
   }
 
+  /** Validates every step up to `step` so the navigator cannot skip ahead. */
+  function canJumpTo(step: number): boolean {
+    for (let index = 1; index < step; index += 1) {
+      if (!validateStepQuietly(index)) return false;
+    }
+    return true;
+  }
+
+  function validateStepQuietly(step: number): boolean {
+    for (const field of stepFields(step)) {
+      if (field instanceof HTMLInputElement && field.type === 'radio') continue;
+      if (!field.checkValidity()) return false;
+    }
+    const group = steps[step - 1]?.querySelector<HTMLInputElement>('input[type="radio"][required]');
+    if (group) {
+      return Boolean(form.querySelector(`input[name="${group.name}"]:checked`));
+    }
+    return true;
+  }
+
   // ── STR-specific fields ───────────────────────────────────────────────────
   function syncConditionalFields(): void {
     const isStr = radioValue('serviceType') === 'str_turnover';
@@ -447,6 +578,19 @@ function initEstimateWizard(form: HTMLFormElement): void {
   // location the provisional zone list would have sent to manual review.
   function travelCacheKey(key: string): string {
     return `${TRAVEL_CACHE_PREFIX}${key}`;
+  }
+
+  function clearTravelCache(): void {
+    try {
+      const stale: string[] = [];
+      for (let index = 0; index < window.sessionStorage.length; index += 1) {
+        const key = window.sessionStorage.key(index);
+        if (key && key.startsWith(TRAVEL_CACHE_PREFIX)) stale.push(key);
+      }
+      for (const key of stale) window.sessionStorage.removeItem(key);
+    } catch {
+      // Best effort only.
+    }
   }
 
   let travelLookupSeq = 0;
@@ -517,78 +661,42 @@ function initEstimateWizard(form: HTMLFormElement): void {
       location = next;
       const nextKey = next ? locationKey(next.lat, next.lng) : null;
       if (previousKey !== nextKey) {
-        saveDraft();
         recalc();
         void lookupTravel();
       } else {
-        saveDraft();
         recalc();
       }
     },
   });
 
-  // ── Draft persistence (never stores contact details or the address) ───────
-  function saveDraft(): void {
-    try {
-      const draft: Record<string, unknown> = { step: currentStep, fields: {}, checked: {} };
-      const fields = draft.fields as Record<string, string>;
-      const checked = draft.checked as Record<string, string[]>;
-      for (const field of form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
-        'input[name], select[name], textarea[name]',
-      )) {
-        if (field instanceof HTMLInputElement && field.type === 'file') continue;
-        if (CONTACT_FIELD_NAMES.has(field.name)) continue;
-        if (field instanceof HTMLInputElement && field.type === 'checkbox') {
-          if (field.checked) (checked[field.name] ??= []).push(field.value);
-          continue;
-        }
-        if (field instanceof HTMLInputElement && field.type === 'radio') {
-          if (field.checked) fields[field.name] = field.value;
-          continue;
-        }
-        fields[field.name] = field.value;
-      }
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    } catch {
-      // Storage failure never blocks the estimate.
+  // ── Fresh start (no drafts are ever stored) ───────────────────────────────
+  function resetWizard(): void {
+    form.reset();
+    addressFinder?.reset();
+    location = null;
+    routed = undefined;
+    routedKey = null;
+    lastTravelKey = '';
+    travelLookupSeq += 1;
+    latestResult = null;
+    latestQuote = null;
+    estimateStarted = false;
+    estimateCompleted = false;
+    clearTravelCache();
+    if (status) {
+      status.textContent = '';
+      status.dataset.state = '';
     }
+    if (livePanel) livePanel.hidden = true;
+    if (liveFlags) liveFlags.innerHTML = '';
+    showStep(1);
   }
 
-  function restoreDraft(): void {
-    try {
-      const raw = window.localStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const draft = JSON.parse(raw) as { step?: number; fields?: Record<string, string>; checked?: Record<string, string[]> };
-      for (const [name, value] of Object.entries(draft.fields ?? {})) {
-        const field = form.elements.namedItem(name);
-        if (field instanceof RadioNodeList) {
-          const target = [...field].find((element) => element instanceof HTMLInputElement && element.value === value);
-          if (target instanceof HTMLInputElement) target.checked = true;
-        } else if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement) {
-          field.value = value;
-        }
-      }
-      for (const [name, values] of Object.entries(draft.checked ?? {})) {
-        for (const value of values) {
-          const target = [...form.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`)].find(
-            (input) => input.value === value,
-          );
-          if (target) target.checked = true;
-        }
-      }
-      if (draft.step && draft.step > 1) currentStep = Math.min(draft.step, steps.length);
-    } catch {
-      // Corrupted draft: start fresh.
-    }
-  }
-
-  function clearDraft(): void {
-    try {
-      window.localStorage.removeItem(DRAFT_KEY);
-    } catch {
-      // ignore
-    }
-  }
+  // A bfcache restore (browser Back/Forward) must never resurrect an old
+  // questionnaire: treat it exactly like a fresh visit.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) resetWizard();
+  });
 
   // ── Submission ────────────────────────────────────────────────────────────
   function buildSubmissionFields(result: EstimateResult): Record<string, string> {
@@ -695,12 +803,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
       if (submitButton) submitButton.disabled = false;
       if (status) {
         status.dataset.state = 'error';
-        status.textContent = `${failureCopy(outcome.reason as FailureReason, contact)} Your answers are still saved in this browser.`;
+        status.textContent = `${failureCopy(outcome.reason as FailureReason, contact)} Your answers are still on this page.`;
       }
       return;
     }
 
-    clearDraft();
     const payload = { service_type: fields.service_type, journey: 'residential' as const };
     recordConversion('cleaning_request_submit', payload);
     if (fields.preferred_date) {
@@ -714,7 +821,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       : {
           state: 'success' as const,
           message:
-            'Request received — not booked yet. The owner will confirm scope, date and final price with you before anything is scheduled.',
+            'Request received — not booked yet. Sparkling Standard will confirm scope, date and final price with you before anything is scheduled.',
         };
     if (status) {
       status.dataset.state = receipt.state;
@@ -744,6 +851,16 @@ function initEstimateWizard(form: HTMLFormElement): void {
     showStep(currentStep - 1);
   });
 
+  for (const jump of stepJumps) {
+    jump.addEventListener('click', () => {
+      const target = Number(jump.dataset.stepJump ?? 0);
+      if (target < 1 || target > currentStep) return;
+      if (target === currentStep) return;
+      if (!canJumpTo(target)) return;
+      showStep(target);
+    });
+  }
+
   form.addEventListener('input', () => {
     if (!estimateStarted) {
       estimateStarted = true;
@@ -751,13 +868,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
       track('estimate_start', serviceType ? { service_type: serviceType } : {});
     }
     syncConditionalFields();
-    saveDraft();
     recalc();
   });
 
   form.addEventListener('change', (event) => {
     syncConditionalFields();
-    saveDraft();
     recalc();
     const target = event.target as HTMLElement | null;
     if (target instanceof HTMLInputElement && target.name === 'zip') {
@@ -770,22 +885,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
   });
 
   resetButton?.addEventListener('click', () => {
-    clearDraft();
-    form.reset();
-    addressFinder?.reset();
-    location = null;
-    routed = undefined;
-    routedKey = null;
-    lastTravelKey = '';
-    latestQuote = null;
-    showStep(1);
-    if (status) status.textContent = '';
-    if (livePanel) livePanel.hidden = true;
+    resetWizard();
   });
 
-  restoreDraft();
-  syncConditionalFields();
-  showStep(currentStep);
+  resetWizard();
   void lookupTravel();
 
   // Debug handle — preview builds only. Never rendered publicly.

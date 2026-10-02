@@ -1,0 +1,41 @@
+---
+// One-hour response guarantee — PROPOSED and unpublished.
+//
+// This component renders ONLY when pricing.responseGuarantee.enabled is true,
+// which requires explicit owner approval plus documented receipt/response
+// timestamps in the owner notification. While disabled nothing reaches the
+// customer (no promise the operation cannot substantiate).
+import { pricing } from '../config/pricing';
+import { business } from '../config/business';
+
+const guarantee = pricing.responseGuarantee;
+const enabled = guarantee.enabled.value;
+const percent = guarantee.discountPercent.value;
+const maxDiscount = guarantee.maxDiscount.value;
+const windowHours = guarantee.windowBusinessHours.value;
+const windowCopy = windowHours === 1 ? 'one business hour' : `${windowHours} business hours`;
+---
+
+{
+  enabled && (
+    <div class="card card--guarantee" data-response-guarantee>
+      <h3 class="card__title">Our {windowCopy} response promise</h3>
+      <p class="card__text">
+        Hear from Sparkling Standard within {windowCopy} during business hours — or receive{' '}
+        <strong>{percent}% off your first eligible cleaning</strong>, up to ${maxDiscount}.
+      </p>
+      <ul class="guarantee-terms">
+        <li>A real, personal reply from our team is what counts — automatic acknowledgments do not.</li>
+        <li>
+          The clock runs during our published business hours ({business.hours.display},{' '}
+          {guarantee.businessTimezone === 'America/Chicago' ? 'Central Time' : guarantee.businessTimezone}).
+        </li>
+        <li>Requests received outside business hours start their response window when we reopen.</li>
+        <li>
+          The credit applies to your first eligible cleaning, does not combine with other
+          promotions, and is applied by Sparkling Standard after your cleaning is confirmed.
+        </li>
+      </ul>
+    </div>
+  )
+}

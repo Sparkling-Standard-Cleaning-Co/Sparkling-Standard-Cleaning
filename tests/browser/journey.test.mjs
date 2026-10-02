@@ -313,8 +313,8 @@ test('the proposed price calculates correctly and extras change it', async () =>
     );
     assert.match(
       (await page.locator('[data-estimate-travel]').textContent()) ?? '',
-      /Travel verified/,
-      'verified travel is labeled',
+      /Travel confirmed/,
+      'confirmed travel is labeled',
     );
     await page.evaluate(() => window.scrollTo(0, 0));
     await shot(page, '02-price-desktop');
@@ -342,8 +342,8 @@ test('a routing failure degrades to an honest preliminary estimate', async () =>
     const price = (await page.locator('[data-estimate-price]').textContent()) ?? '';
     assert.match(price, /^\$\d+/, 'the price still appears from zone travel math');
     const travel = (await page.locator('[data-estimate-travel]').textContent()) ?? '';
-    assert.match(travel, /preliminary/i, 'travel is labeled preliminary');
-    assert.doesNotMatch(travel, /Travel verified/i, 'never claims verified travel');
+    assert.match(travel, /Travel estimate/i, 'travel is labeled as an estimate');
+    assert.doesNotMatch(travel, /Travel confirmed/i, 'never claims confirmed travel');
   } finally {
     await context.close();
   }
@@ -380,12 +380,12 @@ test('reservation summary carries every answer and the call/text actions work', 
     assert.match(summaryText, /1,600 sqft/);
     assert.match(summaryText, /Inside oven/);
     assert.match(summaryText, /100 S Baylen St/);
-    assert.match(summaryText, /Verified route/);
+    assert.match(summaryText, /Confirmed route/);
 
     const reference = (await page.locator('[data-reservation-reference]').textContent()) ?? '';
     assert.match(reference, /Estimate reference SS-\d{8}-[0-9A-Z]{6}/);
     const qualification = (await page.locator('[data-reservation-qualification]').textContent()) ?? '';
-    assert.match(qualification, /Travel-inclusive price/i);
+    assert.match(qualification, /Travel-inclusive proposed price/i);
 
     // Call and text actions are real, correctly formed links.
     const callHref = await page.locator('[data-reserve-call]').getAttribute('href');
@@ -517,8 +517,8 @@ test('a mismatch verdict is shown honestly and never claims the price was accept
     await page.click('[data-submit]');
     await page.waitForSelector('[data-form-status][data-state="warning"]', { timeout: 15000 });
     const text = (await page.locator('[data-form-status]').textContent()) ?? '';
-    assert.match(text, /price check found a difference/i);
-    assert.match(text, /owner will confirm the correct price/i);
+    assert.match(text, /needs a personal review/i);
+    assert.match(text, /confirm the correct price/i);
     assert.doesNotMatch(text, /verified this price/i);
     assert.match(page.url(), /\/estimate\/$/, 'an unverified receipt stays on screen (no redirect away)');
   } finally {
@@ -548,7 +548,7 @@ test('a preliminary verdict names the travel uncertainty', async () => {
     await page.click('[data-submit]');
     await page.waitForSelector('[data-form-status][data-state="warning"]', { timeout: 15000 });
     const text = (await page.locator('[data-form-status]').textContent()) ?? '';
-    assert.match(text, /travel was still preliminary/i);
+    assert.match(text, /drive time still needs a final check/i);
     assert.doesNotMatch(text, /verified this price/i);
   } finally {
     await context.close();
@@ -616,8 +616,90 @@ test('a manually moved destination pin is submitted as adjusted and never receiv
     assert.notEqual(fields.pin_latitude, '30.411100', 'the adjusted pin coordinates travel with the request');
     assert.notEqual(fields.pin_longitude, '-87.216400');
     const text = (await page.locator('[data-form-status]').textContent()) ?? '';
-    assert.match(text, /travel was still preliminary/i, 'a moved pin never gets a verified receipt');
+    assert.match(text, /drive time still needs a final check/i, 'a moved pin never gets a verified receipt');
     assert.doesNotMatch(text, /verified this price/i);
+  } finally {
+    await context.close();
+  }
+});
+
+// ── Add-on pricing transparency + timeline ───────────────────────────────────
+
+test('eligible add-ons show their calculated price before selection and update with the service rhythm', async () => {
+  const { context, page } = await openEstimate(1440, 900);
+  try {
+    await step1(page);
+    await addressStep(page);
+    await homeStep(page);
+    await conditionStep(page); // one-time standard → $50/labor-hour
+    await page.waitForSelector('[data-addon-price="inside_oven"]:not(:empty)');
+    assert.equal(await page.locator('[data-addon-price="inside_oven"]').textContent(), '+$30.00');
+    assert.equal(await page.locator('[data-addon-price="laundry"]').textContent(), '+$35.00');
+    // Specialty work is labelled, never a misleading $0.
+    const custom = page.locator('label.option:has(input[value="carpet_cleaning"]) .option__price--custom');
+    assert.equal(((await custom.textContent()) ?? '').trim(), 'Custom quote');
+    assert.equal(await page.locator('[data-addon-price="carpet_cleaning"]').count(), 0);
+    await page.waitForFunction(() => document.querySelector('[data-estimate-price]')?.textContent === '$250');
+
+    // Revisit the condition step and switch to recurring → $42/labor-hour.
+    await page.click('[data-step-jump="3"]');
+    await page.selectOption('#est-frequency', 'biweekly');
+    await page.click('[data-next]');
+    await page.waitForSelector('[data-addon-price="inside_oven"]:not(:empty)');
+    assert.equal(await page.locator('[data-addon-price="inside_oven"]').textContent(), '+$25.20');
+  } finally {
+    await context.close();
+  }
+});
+
+test('the price preview reconciles base, extras, rounding and the proposed total', async () => {
+  const { context, page } = await openEstimate(1440, 900);
+  try {
+    await step1(page);
+    await addressStep(page);
+    await homeStep(page);
+    await conditionStep(page);
+    await page.click('label.option:has(input[name="addons"][value="inside_oven"])');
+    await page.click('label.option:has(input[name="addons"][value="laundry"])');
+    await page.waitForSelector('[data-price-preview]', { state: 'visible' });
+    const preview = (await page.locator('[data-price-preview-lines]').textContent()) ?? '';
+    assert.match(preview, /Base cleaning \(includes travel\)\$245\.50/);
+    assert.match(preview, /Inside oven\+\$30\.00/);
+    assert.match(preview, /Laundry\+\$35\.00/);
+    assert.match(preview, /Rounded up to the nearest \$5\+\$4\.50/);
+    assert.match(preview, /Proposed total\$315\.00/);
+    // The displayed figures agree with the offered price.
+    await page.click('[data-next]');
+    await page.fill('#est-date', '2026-12-01');
+    await page.selectOption('#est-arrival', 'morning');
+    await page.click('[data-next]');
+    assert.equal(await page.locator('[data-reservation-price]').textContent(), '$315');
+    // Neither proposed promotion is published while disabled.
+    assert.equal(await page.locator('[data-addon-incentive]').count(), 0);
+    assert.equal(await page.locator('[data-response-guarantee]').count(), 0);
+    assert.doesNotMatch(preview, /save/i);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the "After you send" timeline has three clean, separated stages', async () => {
+  const { context, page } = await openEstimate(1440, 900);
+  try {
+    const stages = page.locator('.timeline__stage');
+    assert.equal(await stages.count(), 3);
+    assert.deepEqual(await stages.locator('.timeline__title').allTextContents(), [
+      'Request received',
+      'Personal confirmation',
+      "You're booked",
+    ]);
+    const titleBox = await page.locator('.card:has(.timeline) .card__title').boundingBox();
+    const numberBox = await stages.first().locator('.timeline__number').boundingBox();
+    assert.ok(titleBox && numberBox, 'timeline elements rendered');
+    assert.ok(
+      numberBox.y >= titleBox.y + titleBox.height - 1,
+      'the card heading must be clearly separated from the first timeline marker',
+    );
   } finally {
     await context.close();
   }

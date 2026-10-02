@@ -109,6 +109,21 @@ test('lead: reservation requests are recalculated server-side and labeled for th
   assert.ok(sent.verification_note && /verified calculation/i.test(sent.verification_note));
   assert.ok(sent.quote_valid_through);
 
+  // The owner notification carries the full calculator breakdown.
+  assert.equal(sent.verification_path, 'server_relay');
+  assert.equal(sent.verification_status, 'authoritative');
+  assert.ok(sent.received_at && !Number.isNaN(Date.parse(sent.received_at)), 'server receipt timestamp');
+  assert.ok(Number(sent.base_price) > 0, 'base cleaning price');
+  assert.equal(sent.extras_subtotal, '0.00');
+  assert.equal(sent.extras_detail, 'None');
+  assert.equal(sent.addon_incentive, 'None');
+  assert.ok(Number(sent.proposed_total) > 0, 'proposed total');
+  assert.ok(Number(sent.estimated_labor_hours) > 0, 'estimated labor hours');
+  assert.ok(['recurring_maintenance', 'other_services'].includes(sent.pricing_category));
+  assert.ok(Number(sent.applied_rate_per_labor_hour) > 0, 'applied pricing category rate');
+  // The private origin and credentials never appear anywhere in the payload.
+  assert.doesNotMatch(JSON.stringify(sent), /TRAVEL_ORIGIN|ROUTES_API_KEY|30\.6100,-87\.3400/);
+
   // The browser receipt carries the verdict but never a price.
   const body = (await response.json()) as {
     ok: boolean;
@@ -128,7 +143,16 @@ test('lead: a forged client verification field never reaches the owner', async (
     leadPost({
       request: jsonRequest({
         subject: 'Reservation',
-        fields: reservationFields({ quoted_price: '1', quote_verified: 'match', verified_price: '9999' }),
+        fields: reservationFields({
+          quoted_price: '1',
+          quote_verified: 'match',
+          verified_price: '9999',
+          verification_path: 'trust-me',
+          verification_status: 'authoritative',
+          received_at: '1999-01-01T00:00:00.000Z',
+          base_price: '1.00',
+          proposed_total: '1.00',
+        }),
       }),
       env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
     } as never),
@@ -136,7 +160,29 @@ test('lead: a forged client verification field never reaches the owner', async (
   const sent = forwarded[0] as Record<string, string>;
   assert.equal(sent.quote_verified, 'mismatch', 'server verdict replaces the forged claim');
   assert.notEqual(sent.verified_price, '9999', 'server price replaces the forged price');
+  assert.equal(sent.verification_path, 'server_relay', 'the server owns the verification path');
+  assert.equal(sent.verification_status, 'authoritative');
+  assert.notEqual(sent.received_at, '1999-01-01T00:00:00.000Z', 'the server stamps receipt time');
+  assert.notEqual(sent.base_price, '1.00', 'the server recomputes the breakdown');
   assert.ok(Number(sent.verified_price) > 0);
+});
+
+test('lead: selected extras are itemized with their actual server-calculated charges', async () => {
+  const { stub, forwarded } = verificationStub();
+  await withFetch(stub, () =>
+    leadPost({
+      request: jsonRequest({
+        subject: 'Reservation',
+        fields: reservationFields({ quoted_price: '1', addon_ids: 'inside_oven' }),
+      }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
+    } as never),
+  );
+  const sent = forwarded[0] as Record<string, string>;
+  assert.equal(sent.extras_subtotal, '30.00', 'the oven charge comes from labor × rate');
+  assert.match(sent.extras_detail, /Inside oven \$30\.00/);
+  assert.equal(sent.pricing_category, 'other_services');
+  assert.equal(sent.applied_rate_per_labor_hour, '50');
 });
 
 test('lead: a non-priced request is delivered without verification fields', async () => {

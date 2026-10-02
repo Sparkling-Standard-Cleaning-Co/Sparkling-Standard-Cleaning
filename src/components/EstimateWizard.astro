@@ -1,8 +1,10 @@
 ---
 import { pricing } from '../config/pricing';
 import { business, contactPhone, isPending } from '../config/business';
+import { ESTIMATE_STEPS } from '../lib/estimate/steps';
 import Icon from './Icon.astro';
 import TurnstileWidget from './TurnstileWidget.astro';
+import ResponseGuarantee from './ResponseGuarantee.astro';
 import { isFormEnabled } from '../config/business';
 
 const configured = isFormEnabled();
@@ -11,17 +13,43 @@ const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const phone = contactPhone();
 const email = isPending(business.email) ? null : business.email;
 const smsEnabled = business.flags.smsEnabled;
+const incentiveEnabled = pricing.addonIncentive.enabled.value;
+const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 ---
 
 <div class="estimate-layout split split--sidebar">
-  <form class="wizard" id="estimate-form" data-estimate-form action="#" method="post">
+  <form class="wizard" id="estimate-form" data-estimate-form action="#" method="post" autocomplete="off">
     <div class="wizard__progress">
-      <div class="wizard__progress-bar" role="progressbar" aria-label="Estimate progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="14" data-progress-bar>
+      <nav class="wizard-steps" data-wizard-steps aria-label="Estimate steps">
+        <ol class="wizard-steps__list">
+          {
+            ESTIMATE_STEPS.map((step, index) => (
+              <li class="wizard-steps__item" data-step-item={index + 1} data-state={index === 0 ? 'current' : 'upcoming'}>
+                <button
+                  type="button"
+                  class="wizard-steps__button"
+                  data-step-jump={index + 1}
+                  aria-label={`Step ${index + 1}: ${step.title}`}
+                  aria-current={index === 0 ? 'step' : undefined}
+                  disabled={index !== 0}
+                >
+                  <span class="wizard-steps__number" aria-hidden="true">{index + 1}</span>
+                  <span class="wizard-steps__title">{step.title}</span>
+                </button>
+              </li>
+            ))
+          }
+        </ol>
+        <p class="wizard-steps__mobile-title" data-mobile-step-title>
+          Step 1 of {ESTIMATE_STEPS.length} — {stepTitle(0)}
+        </p>
+      </nav>
+      <div class="wizard__progress-bar" role="progressbar" aria-label="Estimate progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="17" data-progress-bar>
         <div class="wizard__progress-fill" data-progress-fill></div>
       </div>
       <p class="wizard__step-label">
-        <span data-step-label>Step 1 of 7 — Your service</span>
-        <span data-progress-percent>14%</span>
+        <span data-step-label>Step 1 of {ESTIMATE_STEPS.length} — {stepTitle(0)}</span>
+        <span data-progress-percent>17%</span>
       </p>
     </div>
 
@@ -45,8 +73,9 @@ const smsEnabled = business.flags.smsEnabled;
         <ul class="estimate-flags" data-estimate-flags></ul>
       </div>
 
-      <!-- Step 1 — service -->
-      <section class="wizard__step" data-step="1" data-active="true" aria-label="Your service">
+      <!-- Step 1 — service & address -->
+      <section class="wizard__step" data-step="1" data-active="true" aria-label={stepTitle(0)}>
+        <h2 class="wizard__step-heading">{stepTitle(0)}</h2>
         <fieldset class="field">
           <legend>What kind of cleaning are you looking for?</legend>
           <div class="option-grid option-grid--2">
@@ -84,10 +113,7 @@ const smsEnabled = business.flags.smsEnabled;
             </label>
           </div>
         </fieldset>
-      </section>
 
-      <!-- Step 2 — service address -->
-      <section class="wizard__step" data-step="2" aria-label="Service address">
         <div class="address-finder" data-address-finder data-state="idle">
           <div class="field-row field-row--2">
             <div class="field field--grow">
@@ -139,8 +165,8 @@ const smsEnabled = business.flags.smsEnabled;
             <div class="address-finder__manual" id="est-address-manual-panel" data-address-manual-panel hidden>
               <p class="hint">
                 Type the full street address above (and your ZIP below), then ask us to find it.
-                If the lookup still misses, your ZIP is enough to continue — the owner verifies
-                travel personally.
+                If the lookup still misses, your ZIP is enough to continue — Sparkling Standard
+                confirms travel personally.
               </p>
               <button type="button" class="btn btn--ghost btn--small" data-address-resolve>
                 Find this address
@@ -181,14 +207,15 @@ const smsEnabled = business.flags.smsEnabled;
           <label for="est-zip">Service ZIP code</label>
           <input class="input" id="est-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" placeholder="e.g. 32503" required />
           <span class="hint">
-            Used to confirm coverage and preliminary travel — never sent to analytics. Confirming
-            your exact address above improves the travel calculation.
+            Confirms coverage and preliminary travel. Confirming your exact address above gives
+            you the most accurate proposed price.
           </span>
         </div>
       </section>
 
-      <!-- Step 3 — the home -->
-      <section class="wizard__step" data-step="3" aria-label="Your home">
+      <!-- Step 2 — the home -->
+      <section class="wizard__step" data-step="2" aria-label={stepTitle(1)}>
+        <h2 class="wizard__step-heading">{stepTitle(1)}</h2>
         <div class="field">
           <label for="est-property">Property type</label>
           <select class="select" id="est-property" name="propertyType" required>
@@ -227,8 +254,9 @@ const smsEnabled = business.flags.smsEnabled;
         </div>
       </section>
 
-      <!-- Step 4 — condition + rhythm -->
-      <section class="wizard__step" data-step="4" aria-label="Condition and rhythm">
+      <!-- Step 3 — condition + frequency -->
+      <section class="wizard__step" data-step="3" aria-label={stepTitle(2)}>
+        <h2 class="wizard__step-heading">{stepTitle(2)}</h2>
         <div class="field">
           <label for="est-frequency">How often should we clean?</label>
           <select class="select" id="est-frequency" name="frequency" required>
@@ -292,33 +320,54 @@ const smsEnabled = business.flags.smsEnabled;
         </div>
       </section>
 
-      <!-- Step 5 — add-ons -->
-      <section class="wizard__step" data-step="5" aria-label="Optional extras">
+      <!-- Step 4 — add-ons -->
+      <section class="wizard__step" data-step="4" aria-label={stepTitle(3)}>
+        <h2 class="wizard__step-heading">{stepTitle(3)}</h2>
         <fieldset class="field">
           <legend>Any extras? (optional)</legend>
           <p class="hint" style="margin-bottom: var(--space-3)">
-            These add focused time to your visit. Items marked “quoted separately” need a custom price.
+            The price beside each extra is calculated from your service and current scope — it is
+            included in your proposed total when selected. Items marked “Custom quote” are priced
+            individually.
           </p>
+          {
+            incentiveEnabled && (
+              <p class="addon-incentive" data-addon-incentive>
+                <Icon name="star" size={16} /> <span data-addon-incentive-text></span>
+              </p>
+            )
+          }
           <div class="option-grid option-grid--2">
             {addons.map((addon) => (
-              <label class="option">
+              <label class="option option--addon">
                 <input type="checkbox" name="addons" value={addon.id} />
                 <span class="option__control"></span>
                 <span>
-                  <span class="option__label">{addon.label}</span>
-                  <span class="option__desc">
-                    {addon.blurb}
-                    {addon.customQuote ? ' (quoted separately)' : ''}
+                  <span class="option__label">
+                    {addon.label}
+                    {addon.customQuote ? (
+                      <span class="option__price option__price--custom">Custom quote</span>
+                    ) : (
+                      <span class="option__price" data-addon-price={addon.id}>—</span>
+                    )}
                   </span>
+                  <span class="option__desc">{addon.blurb}</span>
                 </span>
               </label>
             ))}
           </div>
         </fieldset>
+
+        <div class="price-preview" data-price-preview hidden>
+          <h3 class="price-preview__title">Your price so far</h3>
+          <ul class="summary-list" data-price-preview-lines></ul>
+          <p class="price-preview__note" data-price-preview-note></p>
+        </div>
       </section>
 
-      <!-- Step 6 — timing -->
-      <section class="wizard__step" data-step="6" aria-label="Timing">
+      <!-- Step 5 — scheduling -->
+      <section class="wizard__step" data-step="5" aria-label={stepTitle(4)}>
+        <h2 class="wizard__step-heading">{stepTitle(4)}</h2>
         <div class="field-row field-row--2">
           <div class="field">
             <label for="est-date">Preferred date</label>
@@ -341,21 +390,24 @@ const smsEnabled = business.flags.smsEnabled;
         </p>
       </section>
 
-      <!-- Step 7 — price + reservation + details -->
-      <section class="wizard__step" data-step="7" aria-label="Price and reservation">
+      <!-- Step 6 — estimate + reservation + details -->
+      <section class="wizard__step" data-step="6" aria-label={stepTitle(5)}>
+        <h2 class="wizard__step-heading">{stepTitle(5)}</h2>
         <div class="reservation-summary" data-reservation-summary hidden>
           <p class="reservation-summary__eyebrow">Your proposed cleaning price</p>
           <p class="reservation-summary__price" data-reservation-price>—</p>
           <p class="reservation-summary__meta" data-reservation-reference hidden></p>
           <p class="reservation-summary__meta" data-reservation-validity hidden></p>
 
-          <dl class="summary-list" data-reservation-scope></dl>
+          <ul class="summary-list price-breakdown" data-price-breakdown></ul>
+          <ul class="summary-list" data-reservation-scope></ul>
           <p class="reservation-summary__qualification" data-reservation-qualification></p>
 
           <div class="reservation-actions">
             <p class="reservation-actions__note">
               <strong>Reserve This Cleaning</strong> sends a reservation request with all of your
-              calculator details — it is not a confirmed appointment until the owner confirms.
+              calculator details — it is not a confirmed appointment until Sparkling Standard
+              confirms it.
             </p>
             <div class="reservation-actions__links">
               {phone && (
@@ -402,8 +454,8 @@ const smsEnabled = business.flags.smsEnabled;
           <input id="est-company-website" name="company_website" type="text" tabindex="-1" autocomplete="off" />
         </div>
         <p class="small text-muted">
-          Sending this request does not book anything. The owner reviews it, verifies the scope,
-          date and price, and only then is your cleaning booked. See our
+          Sending this request does not book anything. Sparkling Standard reviews it, confirms the
+          scope, date and final price with you, and only then is your cleaning booked. See our
           <a href="/privacy/">privacy policy</a>.
         </p>
       </section>
@@ -426,21 +478,42 @@ const smsEnabled = business.flags.smsEnabled;
     <div class="card card--muted">
       <h2 class="card__title">How the estimate works</h2>
       <p class="card__text">
-        Your confirmed address sets the destination; the owner's private starting point is used
-        only inside our server to calculate real driving time. The price is built on real
+        Your confirmed address sets the destination for travel. The price is built on real
         labor-time math for homes like yours — not a template price. It's a proposed price on a
-        request, not a confirmed booking: final scope, access and unusual circumstances are
-        confirmed personally first.
+        request, not a confirmed booking: Sparkling Standard confirms the final scope, price and
+        timing with you first.
       </p>
     </div>
+
     <div class="card">
       <h3 class="card__title">After you send</h3>
-      <ol class="steps" style="gap: var(--space-4); margin-top: var(--space-5)">
-        <li class="step" style="padding-top: var(--space-5)"><p class="step__title">Request verified</p><p class="step__text">Our server recalculates your quote — never trusted from the browser.</p></li>
-        <li class="step" style="padding-top: var(--space-5)"><p class="step__title">Scope & price confirmed</p><p class="step__text">The owner reads every request and confirms the final details.</p></li>
-        <li class="step" style="padding-top: var(--space-5)"><p class="step__title">Booking confirmed</p><p class="step__text">Only then is your cleaning on the calendar.</p></li>
+      <ol class="timeline">
+        <li class="timeline__stage">
+          <span class="timeline__number" aria-hidden="true">1</span>
+          <div class="timeline__content">
+            <p class="timeline__title">Request received</p>
+            <p class="timeline__text">Sparkling Standard receives your cleaning details and proposed estimate.</p>
+          </div>
+        </li>
+        <li class="timeline__stage">
+          <span class="timeline__number" aria-hidden="true">2</span>
+          <div class="timeline__content">
+            <p class="timeline__title">Personal confirmation</p>
+            <p class="timeline__text">We'll review your requirements, confirm your final price and arrange a convenient time.</p>
+          </div>
+        </li>
+        <li class="timeline__stage">
+          <span class="timeline__number" aria-hidden="true">3</span>
+          <div class="timeline__content">
+            <p class="timeline__title">You're booked</p>
+            <p class="timeline__text">Your appointment is confirmed, and we'll take care of the rest.</p>
+          </div>
+        </li>
       </ol>
     </div>
+
+    <ResponseGuarantee />
+
     {
       (phone || email) && (
         <div class="card">
@@ -462,8 +535,7 @@ const smsEnabled = business.flags.smsEnabled;
       )
     }
     <p class="small text-muted">
-      Your progress is saved on this device as you go — an accidental refresh won't lose your answers.
-      Contact details and your full address are never stored in the draft. You can
+      Every visit to this page starts a fresh estimate, and nothing is saved in this browser. You can
       <button type="button" class="link-button" data-estimate-reset style="background:none;border:0;padding:0;color:var(--color-rose-700);text-decoration:underline;cursor:pointer;font:inherit">start over</button>
       at any time.
     </p>

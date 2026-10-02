@@ -1,5 +1,5 @@
-// Browser tests — estimate wizard navigation, step structure, validation,
-// double-submission prevention, draft restore, and mobile overflow.
+// Browser tests — six-step wizard navigation, navigator behavior, fresh-start
+// guarantees, validation, submission failure handling and mobile overflow.
 //
 // Run with: npm run test:browser   (builds first, then serves the build on :4399)
 //
@@ -74,9 +74,6 @@ async function mockApis(page) {
 async function openWizard(width, height) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
-  await page.addStyleTag({
-    content: '.mobile-action-bar{display:none!important} .site-header{position:static!important}',
-  });
   await mockApis(page);
   await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
   return { context, page };
@@ -90,17 +87,13 @@ const activeStep = (page) =>
 
 const isVisible = (page, selector) => page.locator(selector).isVisible();
 
-async function fillStep1(page) {
+async function fillStepOne(page, zip = '32503') {
   await page.click('label.option:has(input[name="serviceType"][value="standard"])');
-  await page.click('[data-next]');
-}
-
-async function fillStep2ZipOnly(page, zip = '32503') {
   await page.fill('#est-zip', zip);
   await page.click('[data-next]');
 }
 
-async function fillStep3(page) {
+async function fillHome(page) {
   await page.selectOption('#est-property', 'house');
   await page.fill('#est-sqft', '1600');
   await page.fill('#est-bedrooms', '3');
@@ -109,7 +102,7 @@ async function fillStep3(page) {
   await page.click('[data-next]');
 }
 
-async function fillStep4(page) {
+async function fillCondition(page) {
   await page.selectOption('#est-frequency', 'biweekly');
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
@@ -117,8 +110,8 @@ async function fillStep4(page) {
   await page.click('[data-next]');
 }
 
-async function fillStep5And6(page) {
-  await page.click('[data-next]'); // step 5: no add-ons
+async function fillExtrasAndScheduling(page) {
+  await page.click('[data-next]'); // step 4: no add-ons
   await page.fill('#est-date', '2026-12-01');
   await page.selectOption('#est-arrival', 'morning');
   await page.click('[data-next]');
@@ -131,48 +124,50 @@ for (const [name, width, height] of [
   ['tablet', 768, 1024],
   ['desktop', 1440, 900],
 ]) {
-  test(`wizard navigation contract (${name})`, async () => {
+  test(`six-step navigation contract (${name})`, async () => {
     const { context, page } = await openWizard(width, height);
     try {
-      // Step 1: Back and submit hidden, Continue visible.
+      // Navigator: six items, first current, future steps locked.
+      assert.equal(await page.locator('[data-step-item]').count(), 6);
+      assert.equal(await page.locator('.wizard__step').count(), 6);
+      assert.equal(await page.locator('[data-step-item="1"]').getAttribute('data-state'), 'current');
+      assert.equal(await page.locator('[data-step-item="2"]').getAttribute('data-state'), 'upcoming');
+      assert.equal(await page.locator('[data-step-jump="2"]').isDisabled(), true, 'future steps cannot be skipped');
+      assert.equal(await page.locator('[data-step-jump="1"]').getAttribute('aria-current'), 'step');
+      assert.equal(
+        await page.locator('[data-step-jump="2"]').getAttribute('aria-label'),
+        'Step 2: Your Home',
+      );
+
       assert.equal(await activeStep(page), 1);
       assert.equal(await isVisible(page, '[data-next]'), true, 'Continue visible on step 1');
       assert.equal(await isVisible(page, '[data-back]'), false, 'Back hidden on step 1');
       assert.equal(await isVisible(page, '[data-submit]'), false, 'Submit hidden on step 1');
-      // The live result panel and the STR-only field must stay hidden until
-      // their conditions are met.
       assert.equal(await isVisible(page, '[data-estimate-live]'), false, 'live panel hidden initially');
       assert.equal(await isVisible(page, '[data-str-only]'), false, 'STR-only field hidden for standard');
+      assert.equal(await isVisible(page, '[data-address-finder]'), true, 'address finder shares step 1');
 
-      await fillStep1(page);
-      assert.equal(await activeStep(page), 2, 'address step after the service step');
-      assert.equal(await isVisible(page, '[data-address-finder]'), true, 'address finder on step 2');
-      assert.equal(await isVisible(page, '[data-address-map]'), false, 'map hidden until an address resolves');
-      assert.equal(await isVisible(page, '[data-address-confirmed]'), false, 'confirmation hidden initially');
-      await fillStep2ZipOnly(page);
+      await fillStepOne(page);
+      assert.equal(await activeStep(page), 2);
+      assert.equal(await page.locator('[data-step-item="1"]').getAttribute('data-state'), 'complete');
+      assert.equal(await page.locator('[data-step-item="2"]').getAttribute('data-state'), 'current');
+      assert.equal(await page.locator('[data-step-jump="1"]').isDisabled(), false, 'completed steps are revisitable');
+      await fillHome(page);
       assert.equal(await activeStep(page), 3);
-      await fillStep3(page);
+      await fillCondition(page);
       assert.equal(await activeStep(page), 4);
-      await fillStep4(page);
-      assert.equal(await activeStep(page), 5);
-      await fillStep5And6(page);
-      assert.equal(await activeStep(page), 7);
+      await fillExtrasAndScheduling(page);
+      assert.equal(await activeStep(page), 6);
 
-      // Final step: Back + ONE primary action labelled for the reservation.
+      // Final step: Back + ONE primary action.
       assert.equal(await isVisible(page, '[data-back]'), true, 'Back visible on final step');
       assert.equal(await isVisible(page, '[data-next]'), false, 'Continue hidden on final step');
       assert.equal(await isVisible(page, '[data-submit]'), true, 'Submit visible on final step');
-      const submitLabel = (await page.locator('[data-submit]').textContent())?.trim();
-      assert.match(submitLabel ?? '', /Reserve This Cleaning/i);
-
-      const visiblePrimary = await page
-        .locator('.wizard__nav .btn--primary:visible')
-        .count();
+      const visiblePrimary = await page.locator('.wizard__nav .btn--primary:visible').count();
       assert.equal(visiblePrimary, 1, 'exactly one primary action on the final step');
 
-      // Back navigation restores Continue and hides the final submit.
       await page.click('[data-back]');
-      assert.equal(await activeStep(page), 6);
+      assert.equal(await activeStep(page), 5);
       assert.equal(await isVisible(page, '[data-next]'), true, 'Continue visible after going back');
       assert.equal(await isVisible(page, '[data-submit]'), false, 'Submit hidden after going back');
     } finally {
@@ -181,39 +176,110 @@ for (const [name, width, height] of [
   });
 }
 
+// ── Navigator revisiting ─────────────────────────────────────────────────────
+
+test('completed steps can be revisited from the navigator without losing answers', async () => {
+  const { context, page } = await openWizard(1280, 900);
+  try {
+    await fillStepOne(page, '32571');
+    await fillHome(page);
+    assert.equal(await activeStep(page), 3);
+
+    await page.click('[data-step-jump="1"]');
+    assert.equal(await activeStep(page), 1, 'navigator jumps back to a completed step');
+    assert.equal(await page.locator('input[name="serviceType"][value="standard"]').isChecked(), true);
+    assert.equal(await page.inputValue('#est-zip'), '32571', 'answers are preserved');
+    assert.equal(await page.inputValue('#est-sqft'), '1600', 'later answers are preserved too');
+
+    // Future steps remain locked from the navigator.
+    assert.equal(await page.locator('[data-step-jump="3"]').isDisabled(), true);
+  } finally {
+    await context.close();
+  }
+});
+
 // ── Validation blocks advancement ────────────────────────────────────────────
 
-test('step 1 does not advance without a service selection', async () => {
+test('step 1 requires a service selection and a ZIP before advancing', async () => {
   const { context, page } = await openWizard(390, 900);
   try {
     await page.click('[data-next]');
-    assert.equal(await activeStep(page), 1, 'stayed on step 1 without a required choice');
+    assert.equal(await activeStep(page), 1, 'stayed without a service choice');
+
+    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+    await page.click('[data-next]');
+    assert.equal(await activeStep(page), 1, 'stayed without a ZIP');
+
+    await page.fill('#est-zip', '32503');
+    await page.click('[data-next]');
+    assert.equal(await activeStep(page), 2, 'advances once step 1 is complete');
   } finally {
     await context.close();
   }
 });
 
-test('step 2 requires a ZIP when no confirmed address exists', async () => {
+// ── Fresh start guarantees ───────────────────────────────────────────────────
+
+test('a reload starts a fresh blank questionnaire at step 1', async () => {
   const { context, page } = await openWizard(390, 900);
   try {
-    await fillStep1(page);
-    await page.click('[data-next]');
-    assert.equal(await activeStep(page), 2, 'ZIP is still the minimum coverage input');
-  } finally {
-    await context.close();
-  }
-});
-
-// ── Draft restore ────────────────────────────────────────────────────────────
-
-test('saved draft restores the step after reload', async () => {
-  const { context, page } = await openWizard(390, 900);
-  try {
-    await fillStep1(page);
-    await fillStep2ZipOnly(page);
+    await fillStepOne(page);
+    await fillHome(page);
     assert.equal(await activeStep(page), 3);
     await page.reload({ waitUntil: 'load' });
-    assert.equal(await activeStep(page), 3, 'draft restored to the saved step');
+    assert.equal(await activeStep(page), 1, 'reload returns to step 1');
+    assert.equal(await page.inputValue('#est-zip'), '', 'no answers are restored');
+    assert.equal(await page.locator('input[name="serviceType"]:checked').count(), 0);
+    assert.equal(await page.inputValue('#est-sqft'), '');
+    assert.equal(await page.locator('[data-estimate-live]').isVisible(), false, 'no stale price panel');
+  } finally {
+    await context.close();
+  }
+});
+
+test('navigating away and back through site navigation starts a fresh estimate', async () => {
+  const { context, page } = await openWizard(1280, 900);
+  try {
+    await fillStepOne(page);
+    await fillHome(page);
+    await page.goto(BASE + '/about/', { waitUntil: 'load' });
+    await page.click('[data-cta="header-estimate"]');
+    await page.waitForURL('**/estimate/');
+    assert.equal(await activeStep(page), 1, 'a fresh visit starts at step 1');
+    assert.equal(await page.inputValue('#est-zip'), '');
+  } finally {
+    await context.close();
+  }
+});
+
+test('browser back/forward never resurrects an old questionnaire', async () => {
+  const { context, page } = await openWizard(1280, 900);
+  try {
+    await fillStepOne(page);
+    await fillHome(page);
+    await page.goto(BASE + '/about/', { waitUntil: 'load' });
+    await page.goBack({ waitUntil: 'load' });
+    assert.equal(await activeStep(page), 1, 'back navigation starts fresh');
+    assert.equal(await page.inputValue('#est-zip'), '', 'no old answers from bfcache');
+    assert.equal(await page.locator('input[name="serviceType"]:checked').count(), 0);
+  } finally {
+    await context.close();
+  }
+});
+
+test('Start Over clears the questionnaire even though nothing is stored', async () => {
+  const { context, page } = await openWizard(1280, 900);
+  try {
+    await fillStepOne(page);
+    assert.equal(await activeStep(page), 2);
+    await page.click('[data-estimate-reset]');
+    assert.equal(await activeStep(page), 1);
+    assert.equal(await page.locator('input[name="serviceType"]:checked').count(), 0);
+    assert.equal(await page.inputValue('#est-zip'), '');
+    const storedKeys = await page.evaluate(() =>
+      Object.keys(window.localStorage).filter((key) => key.includes('estimate') || key.includes('draft')),
+    );
+    assert.equal(storedKeys.length, 0, 'no estimate draft is stored in localStorage');
   } finally {
     await context.close();
   }
@@ -232,11 +298,10 @@ test('final submit disables while sending and reports honest failure', async () 
         body: JSON.stringify({ ok: false, error: 'not_configured' }),
       });
     });
-    await fillStep1(page);
-    await fillStep2ZipOnly(page);
-    await fillStep3(page);
-    await fillStep4(page);
-    await fillStep5And6(page);
+    await fillStepOne(page);
+    await fillHome(page);
+    await fillCondition(page);
+    await fillExtrasAndScheduling(page);
     await page.fill('#est-name', 'Browser test (please ignore)');
     await page.fill('#est-phone', '8500000000');
     await page.fill('#est-email', 'owner@sparkling-standard.com');
@@ -262,13 +327,11 @@ test('no horizontal overflow while advancing the wizard at 360px', async () => {
     const overflow = () =>
       page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     assert.ok((await overflow()) <= 1, 'step 1 overflow');
-    await fillStep1(page);
-    assert.ok((await overflow()) <= 1, 'address step overflow');
-    await fillStep2ZipOnly(page);
+    await fillStepOne(page);
     assert.ok((await overflow()) <= 1, 'home step overflow');
-    await fillStep3(page);
-    await fillStep4(page);
-    await fillStep5And6(page);
+    await fillHome(page);
+    await fillCondition(page);
+    await fillExtrasAndScheduling(page);
     assert.ok((await overflow()) <= 1, 'final step overflow');
   } finally {
     await context.close();

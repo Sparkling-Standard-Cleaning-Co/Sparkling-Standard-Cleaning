@@ -117,7 +117,6 @@ test('the address field exposes combobox semantics and keyboard selection', asyn
   const { context, page } = await openEstimate();
   try {
     await page.click('label.option:has(input[name="serviceType"][value="standard"])');
-    await page.click('[data-next]');
 
     const field = page.locator('#est-address');
     assert.equal(await field.getAttribute('role'), 'combobox');
@@ -150,7 +149,6 @@ test('interactive controls have accessible names and no positive tabindex', asyn
   const { context, page } = await openEstimate();
   try {
     await page.click('label.option:has(input[name="serviceType"][value="standard"])');
-    await page.click('[data-next]');
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
@@ -181,6 +179,30 @@ test('the page keeps one h1 and a main landmark', async () => {
   try {
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('main#main').count(), 1);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the six-step navigator exposes state and locks future steps accessibly', async () => {
+  const { context, page } = await openEstimate();
+  try {
+    const nav = page.locator('nav[data-wizard-steps]');
+    assert.equal(await nav.getAttribute('aria-label'), 'Estimate steps');
+    assert.equal(await nav.locator('[data-step-jump]').count(), 6);
+
+    const current = page.locator('[data-step-jump="1"]');
+    assert.equal(await current.getAttribute('aria-current'), 'step');
+    assert.equal(await current.getAttribute('aria-label'), 'Step 1: Service & Address');
+    assert.equal(await page.locator('[data-step-jump="2"]').isDisabled(), true, 'future steps are disabled');
+
+    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+    await page.fill('#est-zip', '32503');
+    await page.click('[data-next]');
+
+    assert.equal(await page.locator('[data-step-jump="2"]').getAttribute('aria-current'), 'step');
+    assert.equal(await page.locator('[data-step-jump="1"]').isDisabled(), false, 'completed steps are reachable');
+    assert.equal(await page.locator('[data-step-jump="3"]').isDisabled(), true, 'future steps stay disabled');
   } finally {
     await context.close();
   }

@@ -115,3 +115,33 @@ for (const row of rows) {
 }
 
 console.log('\nThese are internal reference numbers; public pages never print rates or labor hours.');
+
+// ── Transparent add-on breakdown (ONE authoritative model) ───────────────────
+console.log('\nAdd-on breakdown — charge = labor-hours × applied rate, reconciled with the total');
+const addonScenarios = [
+  ['3/2 one-time + oven', { addonIds: ['inside_oven'] }],
+  ['3/2 one-time + oven + laundry', { addonIds: ['inside_oven', 'laundry'] }],
+  ['3/2 one-time + 3 add-ons', { addonIds: ['inside_oven', 'laundry', 'dishes'] }],
+  ['3/2 biweekly + oven + laundry', { frequency: 'biweekly', addonIds: ['inside_oven', 'laundry'] }],
+];
+for (const [label, overrides] of addonScenarios) {
+  const result = calculateEstimate({ ...base, ...overrides }, context);
+  const p = result.pricing;
+  const extras = p.selectedExtras.map((extra) => `${extra.label} $${extra.charge.toFixed(2)}`).join(', ');
+  console.log(
+    `  ${label}` +
+      `\n    base $${p.basePrice.toFixed(2)} | extras ${extras || 'none'} ($${p.extrasSubtotal.toFixed(2)})` +
+      ` | discount ${p.discount ? `-$${p.discount.amount.toFixed(2)} (${p.discount.label})` : 'none'}` +
+      ` | rounding +$${p.roundingAdjustment.toFixed(2)} | proposed $${(p.subtotal + p.roundingAdjustment).toFixed(2)}`,
+  );
+}
+console.log(
+  `\n  Multi-add-on incentive: ${pricingValue(pricing.addonIncentive.enabled) ? 'ENABLED' : 'PROPOSED — unpublished pending owner approval'}` +
+    ` | tiers: ${pricing.addonIncentive.tiers.map((tier) => `${tier.minAddons}+ -> ${Math.round(tier.percent.value * 100)}%`).join(', ')}` +
+    ` | cap $${pricingValue(pricing.addonIncentive.maxDiscount)}`,
+);
+console.log(
+  `  One-hour response guarantee: ${pricingValue(pricing.responseGuarantee.enabled) ? 'ENABLED' : 'PROPOSED — unpublished pending owner approval'}` +
+    ` | ${pricingValue(pricing.responseGuarantee.discountPercent)}% up to $${pricingValue(pricing.responseGuarantee.maxDiscount)}`,
+);
+console.log('  Full incentive impact report: npm run estimate:discount-impact');

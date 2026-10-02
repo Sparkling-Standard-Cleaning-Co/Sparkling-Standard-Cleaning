@@ -51,7 +51,7 @@ The estimate asks about condition honestly. If a home needs more than a standard
 
 ## Timing that respects your deadline
 
-Move-outs run on deadlines. Requests are reviewed personally by the owner, and confirmed dates and arrival times are set together so you know exactly when your home will be cleaned. Send the request as early as you can — the sooner we can hold your date, the less stress on moving day.
+Move-outs run on deadlines. Requests are reviewed personally by Sparkling Standard, and confirmed dates and arrival times are set together so you know exactly when your home will be cleaned. Send the request as early as you can — the sooner we can hold your date, the less stress on moving day.
 
 ## Clear scope, no surprises
 

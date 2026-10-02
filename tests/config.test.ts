@@ -86,12 +86,33 @@ test('add-on ids are unique snake_case and definitions are complete', () => {
     assert.ok(addon.label.length > 2, `add-on ${addon.id} needs a label`);
     assert.ok(addon.blurb.length > 5, `add-on ${addon.id} needs a description`);
     assert.ok(addon.category.length > 2, `add-on ${addon.id} needs a category`);
+    // ONE authoritative pricing method: eligible add-ons carry labor hours;
+    // specialty work is quoted individually and never carries a price.
     if (addon.customQuote) {
-      assert.equal(addon.price, undefined, `custom-quote add-on ${addon.id} must not carry a price`);
+      assert.equal(addon.laborHours, undefined, `custom-quote add-on ${addon.id} must not carry labor hours`);
     } else {
       assert.ok((addon.laborHours ?? 0) > 0, `add-on ${addon.id} needs labor hours`);
     }
   }
+});
+
+test('the multi-add-on incentive is proposed, bounded and single-tier', () => {
+  assert.equal(pricing.addonIncentive.enabled.value, false, 'the promotion must stay unpublished until approved');
+  assert.ok(pricing.addonIncentive.tiers.length >= 2);
+  const sorted = [...pricing.addonIncentive.tiers].sort((a, b) => a.minAddons - b.minAddons);
+  for (const tier of sorted) {
+    assert.ok(tier.minAddons >= 2, 'a tier must require at least two add-ons');
+    assert.ok(tier.percent.value > 0 && tier.percent.value < 0.25, 'tier percent must be modest');
+  }
+  assert.ok(pricing.addonIncentive.maxDiscount.value > 0, 'an internal cap is required');
+});
+
+test('the one-hour response guarantee is proposed and unpublished', () => {
+  assert.equal(pricing.responseGuarantee.enabled.value, false, 'the guarantee must stay unpublished until approved');
+  assert.equal(pricing.responseGuarantee.windowBusinessHours.value, 1);
+  assert.ok(pricing.responseGuarantee.discountPercent.value > 0);
+  assert.ok(pricing.responseGuarantee.maxDiscount.value > 0, 'a disclosed maximum is required');
+  assert.ok(pricing.responseGuarantee.eligibleServices.length > 0);
 });
 
 test('provisional prices and rates are not published by default', () => {

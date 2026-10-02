@@ -48,9 +48,18 @@ Evidence bundle: `%USERPROFILE%\.config\opencode\review\sparkling-standard-estim
 | No origin/keys/payment credentials in any built client file | journey security scan over `dist/` |
 | Existing contact form still works | journey |
 | Static structure (7 steps, address/reservation markup, 17 pages) | `npm run smoke`, `npm run verify` |
+| Six-step navigator (shared `ESTIMATE_STEPS`), revisit-completed-steps, locked future steps, fresh-start on visit/reload/back-forward | `tests/browser/wizard.test.mjs` |
+| Transparent add-on pricing from the ONE labor-hour model, reconciliation of base + extras + rounding = total, specialty “Custom quote” | `tests/pricing-breakdown.test.ts`, `tests/browser/journey.test.mjs` |
+| Multi-add-on incentive math (single tier, cap, minimum/base safeguards) | `tests/pricing-breakdown.test.ts`, `npm run estimate:discount-impact` |
+| Owner notification breakdown (base, extras with charges, discount, rounding, labor hours, category rate, receipt timestamp, verdict labels) | `tests/api-verification.test.ts` |
+| Public copy: “unique circumstances”, no “the owner” service promises, no server/algorithm language | `npm run smoke` copy guards, journey |
+| Desktop header: six aligned items + About, no overlap with logo/phone/CTA at 1024–1680 | `tests/browser/header-about.test.mjs` |
+| About page: founder story preserved, heritage section, estimate CTAs | `tests/browser/header-about.test.mjs` |
+| “After you send” timeline: three stages, heading separated from the first marker | journey timeline regression |
 
-Current counts: **167 unit tests**, **27 browser tests** (including accessibility and the moved-pin
-drag regression), `astro check` 0 errors, `npm run verify` (build + links + SEO) green.
+Current counts: **178 unit tests**, **39 browser tests** (including accessibility, header alignment,
+the moved-pin drag regression, six-step navigation, fresh-start behavior and add-on pricing),
+`astro check` 0 errors, `npm run verify` (build + links + SEO) green.
 
 ## 1a. Production smoke-test checklist (run only after owner authorization)
 
@@ -97,6 +106,25 @@ coordinates. No quota, credit or coverage blocker was found.
 
 - The 60-minute normal boundary and 15-minute manual-review band values.
 - The proposed-price formula sign-off (reference-quote impact report).
+- **Proposed multi-add-on incentive** (unpublished until approved):
+  - Two eligible add-ons: **5% off the eligible add-on subtotal**.
+  - Three or more eligible add-ons: **8% off the eligible add-on subtotal**.
+  - Single tier only, never stacked; excludes base cleaning, travel, the minimum job price
+    and custom-quoted specialty work; internal cap $75.
+  - Before/after reference quotes: `npm run estimate:discount-impact` (all safeguard checks pass).
+  - Owner must approve the tier percentages and the cap before `pricing.addonIncentive.enabled`
+    is flipped.
+- **Proposed one-hour response guarantee** (unpublished until approved):
+  - “Hear from Sparkling Standard within one business hour—or receive 25% off your first
+    eligible cleaning.”
+  - Clock: one business hour during published business hours, Central Time; requests received
+    outside business hours start when business hours resume.
+  - A substantive personal response is required; automatic acknowledgments do not count.
+  - Credit: 25% off the first eligible cleaning, maximum **$50**, no stacking with other
+    promotions, applied after the cleaning is confirmed.
+  - Requires documented receipt (`received_at` server timestamp in the owner notification) and
+    documented personal response time. Do not publish until the operation can consistently meet it.
+  - Owner must approve `pricing.responseGuarantee` terms before `enabled` is flipped.
 - Setting `ROUTES_PROVIDER=mapmap` (or relying on the key-present inference) on the production
   Pages project when this branch is approved.
 

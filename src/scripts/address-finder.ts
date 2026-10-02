@@ -497,7 +497,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       if ((error as Error).name === 'AbortError') return;
       setState('idle');
       setStatus(
-        "We couldn't find that exact address. Check the spelling, or continue with your ZIP — the owner will verify the location.",
+        "We couldn't find that exact address. Check the spelling, or continue with your ZIP — Sparkling Standard will confirm the location.",
         'error',
       );
     }

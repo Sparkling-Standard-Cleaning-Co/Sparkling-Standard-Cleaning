@@ -1,6 +1,6 @@
 ---
 metaTitle: Cleaning That Notices the Little Things | Pensacola & Cantonment
-metaDescription: Thoughtful residential and commercial cleaning for Pensacola, Cantonment and surrounding communities. Get an instant estimate range and see why the details matter.
+metaDescription: Thoughtful residential and commercial cleaning for Pensacola, Cantonment and surrounding communities. Get an proposed cleaning price and see why the details matter.
 hero:
   headline: A cleaning company that notices
   accent: the little things.
@@ -21,7 +21,7 @@ founderBand:
 estimateBand:
   eyebrow: The estimate
   heading: See your estimated range in about a minute
-  text: A few quick questions about your home, an honest range built on real labor math, and a request that the owner reviews personally before anything is confirmed.
+  text: A few quick questions about your home, an honest range built on real labor math, and a request that Sparkling Standard reviews personally before anything is confirmed.
   ctaLabel: Start my estimate
 recurringBand:
   eyebrow: Recurring cleaning
@@ -58,7 +58,7 @@ process:
     - title: Request your preferred date
       text: Pick your date and arrival preference, add notes or photos if they help, and send your request.
     - title: We confirm everything
-      text: The owner reviews scope, condition and schedule, then confirms your date and final price. Only then is it booked.
+      text: Sparkling Standard reviews scope, condition and schedule, then confirms your date and final price. Only then is it booked.
 areaBand:
   eyebrow: Service area
   heading: Serving Pensacola, Cantonment and beyond

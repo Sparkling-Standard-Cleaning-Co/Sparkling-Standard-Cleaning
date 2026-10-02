@@ -118,7 +118,7 @@ for (const form of document.querySelectorAll<HTMLFormElement>('[data-lead-form]'
       setStatus(
         form,
         'success',
-        'Request received — not booked yet. The owner reviews every request personally and will confirm scope, date and price with you before anything is scheduled.',
+        'Request received — not booked yet. Sparkling Standard reviews every request personally and will confirm scope, date and price with you before anything is scheduled.',
       );
       form.reset();
       window.setTimeout(() => {

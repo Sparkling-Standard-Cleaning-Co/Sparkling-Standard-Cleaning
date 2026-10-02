@@ -77,11 +77,6 @@ const hasEmail = !isPending(business.email);
               every visit.
             </li>
             <li>
-              <strong>Estimate progress</strong> (local storage) — so an accidental refresh doesn't
-              lose your answers. Contact details and your full service address are never stored in
-              the draft.
-            </li>
-            <li>
               <strong>Attribution touchpoints</strong> (local storage) — campaign parameters and the
               landing page, kept to attach to a future request.
             </li>
@@ -90,7 +85,11 @@ const hasEmail = !isPending(business.email);
               used, so a confirmed request can be counted once, only with your consent.
             </li>
           </ul>
-          <p>You can clear all of this at any time through your browser settings.</p>
+          <p>
+            The estimate itself is not stored: every visit to the estimate page starts fresh, and
+            the travel lookups used while you complete it are held only for that browser session.
+            You can clear all of this at any time through your browser settings.
+          </p>
         </section>
 
         <section>

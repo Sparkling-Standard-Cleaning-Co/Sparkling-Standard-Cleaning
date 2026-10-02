@@ -65,8 +65,6 @@ export interface AddonDefinition {
   laborHours?: number;
   /** Requires a custom quote (equipment / specialized work) — never instant. */
   customQuote: boolean;
-  /** Provisional internal price (not published while publication flag is off). */
-  price?: ConfigValue<number>;
   category: 'kitchen' | 'bath_laundry' | 'windows' | 'interior_detail' | 'pets' | 'organization' | 'specialty';
 }
 
@@ -171,30 +169,62 @@ export const pricing = {
   },
 
   // ── Add-ons (directive §19) ────────────────────────────────────────────────
+  // ONE authoritative add-on pricing method: an add-on's price is its
+  // configured LABOR-HOURS × the applicable gross revenue per labor-hour
+  // (Option C rates). The former per-add-on provisional menu prices were
+  // removed because they disagreed with the live calculations. Displayed
+  // add-on amounts therefore always reconcile with the proposed total.
   addons: {
     state: 'provisional' as ApprovalState,
     items: [
-      { id: 'inside_fridge', label: 'Inside refrigerator', blurb: 'Empty, wipe out and detail the refrigerator interior.', laborHours: 0.5, customQuote: false, category: 'kitchen', price: provisional(30, 'Provisional internal price.') },
-      { id: 'inside_oven', label: 'Inside oven', blurb: 'Detail the oven interior and door glass.', laborHours: 0.6, customQuote: false, category: 'kitchen', price: provisional(35, 'Provisional internal price.') },
-      { id: 'inside_cabinets', label: 'Inside cabinets', blurb: 'Wipe out cabinet interiors and shelves.', laborHours: 0.8, customQuote: false, category: 'kitchen', price: provisional(45, 'Provisional internal price.') },
-      { id: 'interior_windows', label: 'Interior windows', blurb: 'Interior glass, sills and tracks where safely reachable.', laborHours: 0.6, customQuote: false, category: 'windows', price: provisional(35, 'Provisional internal price.') },
-      { id: 'exterior_windows_ground', label: 'Ground-floor exterior windows', blurb: 'Exterior glass reachable from the ground — no ladders.', laborHours: 0.8, customQuote: false, category: 'windows', price: provisional(40, 'Provisional internal price. Unsafe height work is excluded and requires custom review.') },
-      { id: 'laundry', label: 'Laundry', blurb: 'A load of laundry — washed, dried and put away.', laborHours: 0.7, customQuote: false, category: 'bath_laundry', price: provisional(35, 'Provisional internal price.') },
-      { id: 'dishes', label: 'Dishes', blurb: 'Load and run the dishwasher or hand-wash a sink of dishes.', laborHours: 0.4, customQuote: false, category: 'kitchen', price: provisional(25, 'Provisional internal price.') },
-      { id: 'bed_linen_change', label: 'Bed linen change', blurb: 'Change linens on the beds you leave out for us.', laborHours: 0.4, customQuote: false, category: 'bath_laundry', price: provisional(20, 'Provisional internal price.') },
-      { id: 'organization_general', label: 'General organization', blurb: 'Straighten and organize a room or shared space.', laborHours: 0.8, customQuote: false, category: 'organization', price: provisional(45, 'Provisional internal price.') },
-      { id: 'pantry_organization', label: 'Pantry organization', blurb: 'Organize shelves, group items and wipe surfaces.', laborHours: 0.6, customQuote: false, category: 'organization', price: provisional(40, 'Provisional internal price.') },
-      { id: 'closet_organization', label: 'Closet organization', blurb: 'Organize one closet — hanging, folding, grouping.', laborHours: 0.6, customQuote: false, category: 'organization', price: provisional(40, 'Provisional internal price.') },
-      { id: 'pet_hair_intensive', label: 'Pet-hair intensive', blurb: 'Extra passes for embedded pet hair on floors and upholstery.', laborHours: 0.7, customQuote: false, category: 'pets', price: provisional(35, 'Provisional internal price.') },
-      { id: 'detailed_walls', label: 'Detailed wall spot-cleaning', blurb: 'Careful spot-cleaning of walls and switch plates where the finish allows.', laborHours: 0.8, customQuote: false, category: 'interior_detail', price: provisional(45, 'Provisional internal price. Paint-safe methods only; stain removal is never guaranteed.') },
-      { id: 'detailed_baseboards', label: 'Detailed baseboards', blurb: 'Hand-wipe baseboards instead of a dry dusting.', laborHours: 0.7, customQuote: false, category: 'interior_detail', price: provisional(40, 'Provisional internal price.') },
+      { id: 'inside_fridge', label: 'Inside refrigerator', blurb: 'Empty, wipe out and detail the refrigerator interior.', laborHours: 0.5, customQuote: false, category: 'kitchen' },
+      { id: 'inside_oven', label: 'Inside oven', blurb: 'Detail the oven interior and door glass.', laborHours: 0.6, customQuote: false, category: 'kitchen' },
+      { id: 'inside_cabinets', label: 'Inside cabinets', blurb: 'Wipe out cabinet interiors and shelves.', laborHours: 0.8, customQuote: false, category: 'kitchen' },
+      { id: 'interior_windows', label: 'Interior windows', blurb: 'Interior glass, sills and tracks where safely reachable.', laborHours: 0.6, customQuote: false, category: 'windows' },
+      { id: 'exterior_windows_ground', label: 'Ground-floor exterior windows', blurb: 'Exterior glass reachable from the ground — no ladders.', laborHours: 0.8, customQuote: false, category: 'windows' },
+      { id: 'laundry', label: 'Laundry', blurb: 'A load of laundry — washed, dried and put away.', laborHours: 0.7, customQuote: false, category: 'bath_laundry' },
+      { id: 'dishes', label: 'Dishes', blurb: 'Load and run the dishwasher or hand-wash a sink of dishes.', laborHours: 0.4, customQuote: false, category: 'kitchen' },
+      { id: 'bed_linen_change', label: 'Bed linen change', blurb: 'Change linens on the beds you leave out for us.', laborHours: 0.4, customQuote: false, category: 'bath_laundry' },
+      { id: 'organization_general', label: 'General organization', blurb: 'Straighten and organize a room or shared space.', laborHours: 0.8, customQuote: false, category: 'organization' },
+      { id: 'pantry_organization', label: 'Pantry organization', blurb: 'Organize shelves, group items and wipe surfaces.', laborHours: 0.6, customQuote: false, category: 'organization' },
+      { id: 'closet_organization', label: 'Closet organization', blurb: 'Organize one closet — hanging, folding, grouping.', laborHours: 0.6, customQuote: false, category: 'organization' },
+      { id: 'pet_hair_intensive', label: 'Pet-hair intensive', blurb: 'Extra passes for embedded pet hair on floors and upholstery.', laborHours: 0.7, customQuote: false, category: 'pets' },
+      { id: 'detailed_walls', label: 'Detailed wall spot-cleaning', blurb: 'Careful spot-cleaning of walls and switch plates where the finish allows.', laborHours: 0.8, customQuote: false, category: 'interior_detail' },
+      { id: 'detailed_baseboards', label: 'Detailed baseboards', blurb: 'Hand-wipe baseboards instead of a dry dusting.', laborHours: 0.7, customQuote: false, category: 'interior_detail' },
       { id: 'carpet_cleaning', label: 'Carpet cleaning', blurb: 'Quoted separately — specialty equipment is scheduled case by case.', customQuote: true, category: 'specialty' },
       { id: 'upholstery_cleaning', label: 'Upholstery cleaning', blurb: 'Quoted separately — specialty equipment is scheduled case by case.', customQuote: true, category: 'specialty' },
       { id: 'pressure_washing', label: 'Pressure washing', blurb: 'Quoted separately by scope and surface.', customQuote: true, category: 'specialty' },
       { id: 'garage_cleaning', label: 'Garage cleaning', blurb: 'Quoted separately after seeing the space and debris volume.', customQuote: true, category: 'specialty' },
       { id: 'patio_cleaning', label: 'Patio / porch cleaning', blurb: 'Quoted separately by size and condition.', customQuote: true, category: 'specialty' },
     ] satisfies AddonDefinition[],
-    note: 'Provisional prices are INTERNAL. They feed the estimate only while publication is off (business.flags.publishProvisionalAddonPricing = false).',
+    note: 'Add-on amounts are calculated from labor-hours × the applicable approved rate. Specialty items show “Custom quote” and are never priced instantly.',
+  },
+
+  // ── Multi-add-on incentive (PROPOSED — not published) ─────────────────────
+  // Owner review required before this can appear on the site. When enabled the
+  // engine applies exactly ONE tier to the eligible add-on subtotal; it never
+  // discounts base cleaning, travel, specialty work or the minimum job price.
+  addonIncentive: {
+    enabled: provisional(false, 'PROPOSED promotion — requires owner approval before publication. Off by default.'),
+    tiers: [
+      { minAddons: 2, percent: provisional(0.05, 'Proposed: 5% off the eligible add-on subtotal for two add-ons.') },
+      { minAddons: 3, percent: provisional(0.08, 'Proposed: 8% off the eligible add-on subtotal for three or more add-ons.') },
+    ],
+    maxDiscount: provisional(75, 'Internal safety cap on the incentive amount; keep below the smallest realistic add-on subtotal without owner review.'),
+    note: 'Single tier only (never stacked). Applies only to non-specialty add-ons. Requires owner approval before it can be enabled.',
+  },
+
+  // ── One-hour response guarantee (PROPOSED — not published) ────────────────
+  // Requires owner approval AND operational evidence before publication. The
+  // discount is a service-recovery credit, never an automatic booking promise.
+  responseGuarantee: {
+    enabled: provisional(false, 'PROPOSED customer-service guarantee — requires owner approval and documented response tracking before publication.'),
+    windowBusinessHours: provisional(1, 'One business hour, measured during published business hours (America/Chicago).'),
+    discountPercent: provisional(25, 'Proposed 25% off the first eligible cleaning when the personal response misses the window.'),
+    maxDiscount: provisional(50, 'Proposed $50 maximum credit.'),
+    eligibleServices: ['standard', 'deep', 'move_in_out', 'str_turnover'] as const,
+    businessTimezone: 'America/Chicago',
+    note: 'Automatic acknowledgments do not count as a response; the clock starts when a request arrives during business hours, or when the next business day begins. Does not combine with other promotions. Requires documented receipt and response timestamps.',
   },
 
   // ── Instant-estimate boundaries (directive §27) ────────────────────────────

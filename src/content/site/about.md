@@ -34,6 +34,13 @@ sections:
     paragraphs:
       - The founder studies interior design and plans to grow this business into related home services over time — because caring for a home and caring about how it feels are the same instinct.
       - For now, cleaning is the craft and the promise. The company will grow as demand justifies it — adding capacity carefully, never at the cost of the standard that customers hire it for.
+  - id: heritage
+    eyebrow: American roots, family heritage
+    heading: Traditions worth carrying forward
+    paragraphs:
+      - Sparkling Standard is proudly American, with European family heritage and a deep appreciation for the traditions passed down through generations. Hard work, faith, family, responsibility and pride in craftsmanship are more than ideas to us — they're standards worth living by.
+      - Those traditions helped shape America alongside the contributions of people from many backgrounds. We believe they're worth preserving and supporting through the next generation of American small businesses.
+      - For us, honoring our heritage means showing up, keeping our word, earning our customers' trust and taking pride in a job done right. Every home deserves that level of care, and every customer deserves to be treated with dignity and respect.
 infoTitles:
   call: Talk to a human
   hours: When we clean

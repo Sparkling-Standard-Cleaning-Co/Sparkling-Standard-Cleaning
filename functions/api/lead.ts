@@ -45,6 +45,9 @@ const SERVER_OWNED_KEYS = new Set([
   'client_price',
   'verified_range',
   'verification_note',
+  'verification_path',
+  'verification_status',
+  'received_at',
   'server_config_version',
   'config_version_match',
   'quote_reference_valid',
@@ -52,6 +55,17 @@ const SERVER_OWNED_KEYS = new Set([
   'preferred_date_note',
   'pin_check',
   'pin_distance_from_geocode_meters',
+  'base_price',
+  'extras_subtotal',
+  'extras_detail',
+  'addon_incentive',
+  'discount_amount',
+  'rounding_adjustment',
+  'proposed_total',
+  'estimated_labor_hours',
+  'applied_rate_per_labor_hour',
+  'pricing_category',
+  'minimum_job_applied',
   'travel_method',
   'travel_provider',
   'travel_distance_miles',
@@ -169,6 +183,12 @@ export async function onRequestPost(context: {
   // discarded with a note; the rest of the request is still delivered.
   sanitizePreferredDate(clean);
 
+  // Server receipt timestamp — the authoritative clock for response-time
+  // documentation (the one-hour response guarantee, when enabled).
+  clean.received_at = new Date().toISOString();
+  clean.verification_path = 'server_relay';
+  clean.verification_status = 'not_priced';
+
   // Authoritative quote verification for priced reservation requests. The
   // customer's browser price/travel values are ignored; the server resolves
   // the destination, routes from the private origin and recalculates. A
@@ -179,6 +199,7 @@ export async function onRequestPost(context: {
   if (isPricedReservation(clean)) {
     try {
       const verification = await verifyReservationQuote(clean, env);
+      clean.verification_status = 'authoritative';
       clean.quote_verified = verification.status;
       clean.client_price = verification.clientPrice !== null ? String(verification.clientPrice) : '';
       if (verification.verifiedPrice !== null) clean.verified_price = String(verification.verifiedPrice);
@@ -204,6 +225,30 @@ export async function onRequestPost(context: {
       clean.travel_verified = String(verification.travel.verified);
       clean.travel_destination_source = verification.travel.destinationSource;
       clean.verification_note = verification.note;
+
+      // The full transparent calculator breakdown the owner needs.
+      const breakdown = verification.breakdown;
+      if (breakdown) {
+        clean.base_price = breakdown.basePrice.toFixed(2);
+        clean.extras_subtotal = breakdown.extrasSubtotal.toFixed(2);
+        clean.extras_detail =
+          breakdown.selectedExtras.length > 0
+            ? breakdown.selectedExtras.map((extra) => `${extra.label} $${extra.charge.toFixed(2)}`).join('; ')
+            : 'None';
+        if (breakdown.discount) {
+          clean.addon_incentive = breakdown.discount.label;
+          clean.discount_amount = breakdown.discount.amount.toFixed(2);
+        } else {
+          clean.addon_incentive = 'None';
+        }
+        clean.rounding_adjustment = breakdown.roundingAdjustment.toFixed(2);
+        clean.proposed_total = (breakdown.subtotal + breakdown.roundingAdjustment).toFixed(2);
+        clean.estimated_labor_hours = String(breakdown.totalLaborHours);
+        clean.applied_rate_per_labor_hour = String(breakdown.ratePerLaborHour);
+        clean.pricing_category = breakdown.pricingCategory;
+        if (breakdown.minimumApplied) clean.minimum_job_applied = 'true';
+      }
+
       // The customer-facing receipt carries the verdict (no prices) so the
       // browser can never imply an unverified price was accepted.
       clientVerification = {
@@ -213,6 +258,7 @@ export async function onRequestPost(context: {
         config_match: verification.configMatch,
       };
     } catch {
+      clean.verification_status = 'authoritative_error';
       clean.quote_verified = 'unverifiable';
       clean.verification_note =
         'Server verification could not complete; review the submitted price manually before confirming anything.';

@@ -12,6 +12,7 @@ export const primaryNav: NavItem[] = [
   { label: 'Deep Cleaning', href: '/deep-cleaning/' },
   { label: 'Rentals', href: '/short-term-rental-cleaning/' },
   { label: 'Commercial', href: '/commercial-cleaning/' },
+  { label: 'About', href: '/about/' },
 ];
 
 /** Footer services column (includes the long-tail pages). */

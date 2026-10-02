@@ -112,8 +112,9 @@ export async function submitLead(
   }
 
   // 2) Static fallback: direct provider submission with the public key. This
-  //    path has no server to verify a quote, so it is labeled honestly for the
-  //    owner (verification_path) and the customer copy stays request-only.
+  //    path has no server to verify a quote, so it is labeled unmistakably for
+  //    the owner (verification_path/status/note) and the customer copy stays
+  //    request-only. The browser price is NEVER presented as a validated quote.
   if (!business.forms.web3formsAccessKey) {
     return { ok: false, reason: 'not_configured' };
   }
@@ -126,6 +127,10 @@ export async function submitLead(
         subject,
         botcheck: '',
         verification_path: 'direct_provider',
+        verification_status: 'unverified_direct_submission',
+        verification_note:
+          'UNVERIFIED: submitted directly to the form provider — no authoritative server verification was available for this estimate.',
+        submitted_at_client: new Date().toISOString(),
         ...fields,
       }),
     });

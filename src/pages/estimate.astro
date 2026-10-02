@@ -5,6 +5,7 @@ import EstimateWizard from '../components/EstimateWizard.astro';
 import FaqItem from '../components/FaqItem.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { faqNode, breadcrumbNode } from '../lib/schema';
+import { ESTIMATE_STEPS } from '../lib/estimate/steps';
 
 const entry = await getEntry('site', 'estimate');
 if (!entry) throw new Error('Missing content entry: src/content/site/estimate.md');
@@ -14,6 +15,10 @@ const faqs = await getCollection('faqs');
 const pageFaqs = faqs
   .filter((faq) => data.estimateFaqIds.includes(faq.id))
   .sort((a, b) => a.data.order - b.data.order);
+
+// The "what to expect" section derives from the ONE shared six-step
+// definition used by the wizard navigator, headings and progress bar.
+const steps = ESTIMATE_STEPS;
 
 const site = Astro.site ?? new URL('https://pending-website-url.invalid');
 const schema = [
@@ -49,13 +54,13 @@ const schema = [
     <div class="container">
       <div class="section-head">
         <p class="eyebrow">What to expect</p>
-        <h2>A few short questions, no interrogation</h2>
+        <h2>Six short steps, no interrogation</h2>
       </div>
-      <ol class="steps steps--4" style="display:grid">
-        {data.steps.map((step) => (
+      <ol class="steps steps--3" style="display:grid">
+        {steps.map((step, index) => (
           <li class="step">
-            <h3 class="step__title">{step.title}</h3>
-            <p class="step__text">{step.text}</p>
+            <h3 class="step__title">{index + 1}. {step.title}</h3>
+            <p class="step__text">{step.blurb}</p>
           </li>
         ))}
       </ol>

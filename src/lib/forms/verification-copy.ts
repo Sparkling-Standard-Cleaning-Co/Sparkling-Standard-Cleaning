@@ -21,7 +21,7 @@ export function reservationReceipt(
     return {
       state: 'warning',
       message:
-        'Request received — not booked yet. Our server was not available to verify the quote, so the owner will verify scope, travel and price with you before anything is scheduled.',
+        'Request received — not booked yet. We could not complete our usual check, so Sparkling Standard will confirm scope, travel and price with you before anything is scheduled.',
     };
   }
 
@@ -30,31 +30,31 @@ export function reservationReceipt(
       return {
         state: 'success',
         message:
-          'Reservation request received — our server verified this proposed price calculation for your confirmed address. The owner will confirm the final price, scope and date; nothing is booked yet.',
+          'Reservation request received — we checked the proposed price for your confirmed address. Sparkling Standard will confirm the final price, scope and date; nothing is booked yet.',
       };
     case 'preliminary':
       return {
         state: 'warning',
         message:
-          'Reservation request received — our calculation reproduces the proposed price, but travel was still preliminary. The owner will verify the route and confirm the final travel-inclusive price before anything is scheduled.',
+          'Reservation request received — the proposed price is confirmed, but the drive time still needs a final check. Sparkling Standard will confirm the final travel-inclusive price before anything is scheduled.',
       };
     case 'mismatch':
       return {
         state: 'warning',
         message:
-          'Reservation request received — our price check found a difference from the displayed price, so the owner will confirm the correct price with you before anything is scheduled. Nothing is booked yet.',
+          'Reservation request received — the price needs a personal review, so Sparkling Standard will confirm the correct price with you before anything is scheduled. Nothing is booked yet.',
       };
     case 'unverifiable':
       return {
         state: 'warning',
         message:
-          'Reservation request received — the owner will verify your quote personally before anything is scheduled. Nothing is booked yet.',
+          'Reservation request received — Sparkling Standard will review your estimate personally before anything is scheduled. Nothing is booked yet.',
       };
     default:
       return {
         state: 'warning',
         message:
-          'Request received — not booked yet. The owner will verify scope, travel and price with you before anything is scheduled.',
+          'Request received — not booked yet. Sparkling Standard will confirm scope, travel and price with you before anything is scheduled.',
       };
   }
 }

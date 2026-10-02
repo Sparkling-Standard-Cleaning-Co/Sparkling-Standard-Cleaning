@@ -63,19 +63,42 @@ const estimate = fs.readFileSync(path.join(DIST, 'estimate', 'index.html'), 'utf
 for (const [label, needle] of [
   ['estimate form', 'data-estimate-form'],
   ['progress indicator', 'data-progress-fill'],
+  ['step navigator', 'data-wizard-steps'],
   ['step 1', 'data-step="1"'],
-  ['step 7', 'data-step="7"'],
+  ['step 6', 'data-step="6"'],
   ['submit button', 'data-submit'],
   ['live estimate panel', 'data-estimate-live'],
   ['address finder', 'data-address-finder'],
   ['map confirmation card', 'data-address-map'],
   ['manual address fallback', 'data-address-manual-panel'],
   ['reservation summary', 'data-reservation-summary'],
+  ['price preview', 'data-price-preview'],
+  ['post-send timeline', 'timeline__stage'],
 ]) {
   if (!estimate.includes(needle)) problems.push(`estimate page: missing ${label}`);
 }
-if ((estimate.match(/data-step="/g) ?? []).length !== 7) {
-  problems.push('estimate page: expected exactly 7 steps');
+if ((estimate.match(/data-step="/g) ?? []).length !== 6) {
+  problems.push('estimate page: expected exactly 6 steps');
+}
+if ((estimate.match(/data-step-item="/g) ?? []).length !== 6) {
+  problems.push('estimate page: expected exactly 6 navigator items');
+}
+if (estimate.includes('owner review') || estimate.includes('Our server recalculates')) {
+  problems.push('estimate page: internal/technical copy leaked into the customer UI');
+}
+
+// The direct-submission fallback must ship its unmistakable UNVERIFIED marker.
+const astroDir = path.join(DIST, '_astro');
+const bundleText = fs
+  .readdirSync(astroDir)
+  .filter((file) => file.endsWith('.js'))
+  .map((file) => fs.readFileSync(path.join(astroDir, file), 'utf8'))
+  .join('\n');
+if (!bundleText.includes('unverified_direct_submission')) {
+  problems.push('built scripts: missing the unverified direct-submission marker');
+}
+if (bundleText.includes('routes.googleapis.com') || bundleText.includes('api.mapbox.com')) {
+  problems.push('built scripts: a paid routing provider was bundled');
 }
 
 // Lead forms with correct variants.

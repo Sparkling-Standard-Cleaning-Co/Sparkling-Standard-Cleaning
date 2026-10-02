@@ -73,6 +73,46 @@ export interface SelectedAddon {
   customQuote: boolean;
 }
 
+/** One priced (non-specialty) add-on for the transparency display. */
+export interface AddonPriceLine {
+  id: string;
+  label: string;
+  /** Labor-derived charge in USD, or null for specialty "custom quote" work. */
+  charge: number | null;
+  customQuote: boolean;
+  laborHours: number;
+}
+
+/**
+ * Transparent price breakdown produced by the SAME calculation that produces
+ * the estimate and the quote. The client renders these values and the server
+ * recomputes them identically for the owner notification.
+ */
+export interface PricingBreakdown {
+  /** Internal gross revenue per labor-hour actually applied (owner only). */
+  ratePerLaborHour: number;
+  /** Which approved Option C category the rate came from. */
+  pricingCategory: 'recurring_maintenance' | 'other_services';
+  baseLaborHours: number;
+  addonLaborHours: number;
+  totalLaborHours: number;
+  /** Base cleaning price including the travel adjustment, exact cents. */
+  basePrice: number;
+  /** Every add-on with its charge at the current service/scope. */
+  addonPrices: AddonPriceLine[];
+  /** Selected eligible extras (subset of addonPrices), exact cents. */
+  selectedExtras: Array<{ id: string; label: string; charge: number }>;
+  extrasSubtotal: number;
+  /** Applied incentive (single tier), or null when none is active. */
+  discount: { percent: number; amount: number; label: string } | null;
+  /** proposedTotal − (basePrice + extrasSubtotal − discountAmount); ≥ 0. */
+  roundingAdjustment: number;
+  /** The offered price before the $5 round-up (expectedPrice equivalent). */
+  subtotal: number;
+  /** True when the minimum job value raised the price. */
+  minimumApplied: boolean;
+}
+
 export interface TravelEstimate {
   /**
    * zone      — offline reference zones (no routing configured/reachable)
@@ -128,6 +168,8 @@ export interface EstimateResult {
   travel: TravelEstimate;
   addons: SelectedAddon[];
   minimumApplied: boolean;
+  /** Transparent price breakdown — the same numbers the quote is built from. */
+  pricing: PricingBreakdown;
   /** Internal calculation trace — never rendered publicly (preview debug/tests only). */
   trace: CalculationTraceEntry[];
   /** Present when status is 'invalid'. */
