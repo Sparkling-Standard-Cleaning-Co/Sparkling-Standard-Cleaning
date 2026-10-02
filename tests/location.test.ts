@@ -75,8 +75,8 @@ test('provider labels are reduced to the street line without repeating the regio
 
 test('manual geocoder queries join street, unit, city, state and ZIP', () => {
   assert.equal(
-    buildGeocodeQuery('6360 Haupert Ln', undefined, 'Molino', 'FL', '32577'),
-    '6360 Haupert Ln, Molino, FL, 32577',
+    buildGeocodeQuery('4242 Maplewood Ln', undefined, 'Molino', 'FL', '32577'),
+    '4242 Maplewood Ln, Molino, FL, 32577',
   );
   assert.equal(
     buildGeocodeQuery('100 S Baylen St', '4B', 'Pensacola', 'FL', '32502'),
@@ -87,14 +87,14 @@ test('manual geocoder queries join street, unit, city, state and ZIP', () => {
 });
 
 test('house-number helpers distinguish exact addresses from street-level results', () => {
-  assert.equal(houseNumberFromStreet('6360 Haupert Ln'), '6360');
+  assert.equal(houseNumberFromStreet('4242 Maplewood Ln'), '4242');
   assert.equal(houseNumberFromStreet('12A Palm Ave'), '12a');
-  assert.equal(houseNumberFromStreet('Haupert Lane'), null);
+  assert.equal(houseNumberFromStreet('Maplewood Lane'), null);
   assert.equal(houseNumberFromStreet(''), null);
 
-  assert.equal(labelHasHouseNumber('6360 HAUPERT LN, MOLINO, FL, 32577', '6360'), true);
-  assert.equal(labelHasHouseNumber('Haupert Lane, Molino, Florida, 32577', '6360'), false);
-  assert.equal(labelHasHouseNumber('Haupert Lane, Molino, Florida, 32577', null), true);
+  assert.equal(labelHasHouseNumber('4242 MAPLEWOOD LN, MOLINO, FL, 32577', '4242'), true);
+  assert.equal(labelHasHouseNumber('Maplewood Lane, Molino, Florida, 32577', '4242'), false);
+  assert.equal(labelHasHouseNumber('Maplewood Lane, Molino, Florida, 32577', null), true);
 });
 
 test('the state selector includes Florida and Alabama first', () => {

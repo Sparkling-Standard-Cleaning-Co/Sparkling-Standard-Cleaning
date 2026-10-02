@@ -40,7 +40,9 @@ const MAX_QUERY = 120;
 const MIN_QUERY = 3;
 const WINDOW_MS = 60_000;
 const PER_IP_PER_MINUTE = 20;
-const DAILY_CAP = 500;
+// Provider address suggestions are unbilled up to 5,000/day; this isolate-level
+// circuit breaker stays well inside that and protects against abuse.
+const DAILY_CAP = 2000;
 
 const hits = new Map<string, { count: number; reset: number }>();
 let dailyCount = 0;
@@ -169,8 +171,9 @@ interface SuggestParts {
 /**
  * Geographically intelligent suggestions: state is a hard filter, ZIP is a
  * hard filter when present, street names must match (with road-name
- * variations), and exact house numbers rank first. At most two provider calls
- * are made (primary + one variant) to conserve the free allowance.
+ * variations), and exact house numbers rank first. The primary provider call
+ * is followed by at most `MAX_SUGGEST_VARIANTS` alternates, and only while no
+ * usable rows have been found — working addresses normally cost one call.
  */
 async function suggestionsForAddress(env: Env, parts: SuggestParts): Promise<{
   suggestions: Suggestion[];
@@ -184,9 +187,9 @@ async function suggestionsForAddress(env: Env, parts: SuggestParts): Promise<{
   let result = rankSuggestions(rows, location, houseNumber);
 
   // Alternate query forms handle road-name variations (Hwy/SR/state
-  // directions) and street-suffix spelling (Ln/Lane, St/Street, Rd/Road …).
-  // At most two variant requests are made, and only when the primary query
-  // returned nothing usable — the free allowance stays protected.
+  // directions), street-suffix spelling (Ln/Lane, St/Street, Rd/Road …) and
+  // a house-numberless street-level fallback for addresses the provider only
+  // knows as streets.
   if (result.ranked.length === 0) {
     for (const variant of suggestQueryVariants(parts.street, parts.city || undefined)) {
       const variantRows = await providerSuggest(env, variant);

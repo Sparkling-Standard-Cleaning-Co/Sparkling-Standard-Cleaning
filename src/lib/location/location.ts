@@ -19,6 +19,15 @@ export interface ConfirmedLocation {
   city?: string;
   state?: string;
   source: LocationSource;
+  /**
+   * How specific the confirmed point is:
+   *  - 'exact'  — a resolver returned (or the provider carried) the house number;
+   *  - 'street' — only a street-level match was available; the customer placed
+   *               the pin and the exact property is confirmed personally;
+   *  - 'gps'    — a device location pin.
+   * The exact house number is never fabricated for a street-level match.
+   */
+  precision?: 'exact' | 'street' | 'gps';
   /** True when the customer corrected the pin after resolution. */
   adjusted?: boolean;
   confirmedAt: string;

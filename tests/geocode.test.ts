@@ -260,8 +260,8 @@ test('geocode resolve: an exact MapMap house-number match is preferred over Cens
           {
             properties: {
               id: 'osm:w10919246:addr',
-              housenumber: '6360',
-              street: 'Haupert Lane',
+              housenumber: '4242',
+              street: 'Maplewood Lane',
               city: 'Molino',
               state: 'FL',
               postcode: '32577',
@@ -273,14 +273,14 @@ test('geocode resolve: an exact MapMap house-number match is preferred over Cens
     },
     () =>
       geocodePost({
-        request: request({ action: 'resolve', query: '6360 Haupert Ln, Molino, FL, 32577' }),
+        request: request({ action: 'resolve', query: '4242 Maplewood Ln, Molino, FL, 32577' }),
         env: { MAPMAP_API_KEY: 'dummy-key' },
       } as never),
   );
   const data = (await response.json()) as { result: { source: string; label: string; precise: boolean } };
   assert.equal(response.status, 200);
   assert.equal(data.result.source, 'mapmap');
-  assert.match(data.result.label, /6360 Haupert Lane/);
+  assert.match(data.result.label, /4242 Maplewood Lane/);
   assert.equal(data.result.precise, true);
   assert.equal(censusCalls, 0, 'Census is not needed when MapMap has the exact address');
 });
@@ -293,7 +293,7 @@ test('geocode resolve: a MapMap street-level result falls through to the exact C
           result: {
             addressMatches: [
               {
-                matchedAddress: '6360 HAUPERT LN, MOLINO, FL, 32577',
+                matchedAddress: '4242 MAPLEWOOD LN, MOLINO, FL, 32577',
                 coordinates: { x: -87.339, y: 30.716 },
               },
             ],
@@ -304,7 +304,7 @@ test('geocode resolve: a MapMap street-level result falls through to the exact C
       return jsonResponse({
         features: [
           {
-            properties: { id: 'osm:w10919246:street', name: 'Haupert Lane', street: 'Haupert Lane', type: 'street' },
+            properties: { id: 'osm:w10919246:street', name: 'Maplewood Lane', street: 'Maplewood Lane', type: 'street' },
             geometry: { coordinates: [-87.34, 30.72] },
           },
         ],
@@ -312,7 +312,7 @@ test('geocode resolve: a MapMap street-level result falls through to the exact C
     },
     () =>
       geocodePost({
-        request: request({ action: 'resolve', query: '6360 Haupert Ln, Molino, FL, 32577' }),
+        request: request({ action: 'resolve', query: '4242 Maplewood Ln, Molino, FL, 32577' }),
         env: { MAPMAP_API_KEY: 'dummy-key' },
       } as never),
   );
@@ -321,7 +321,7 @@ test('geocode resolve: a MapMap street-level result falls through to the exact C
   };
   assert.equal(response.status, 200);
   assert.equal(data.result.source, 'census');
-  assert.equal(data.result.label, '6360 HAUPERT LN, MOLINO, FL, 32577');
+  assert.equal(data.result.label, '4242 MAPLEWOOD LN, MOLINO, FL, 32577');
   assert.equal(data.result.city, 'MOLINO');
   assert.equal(data.result.state, 'FL');
   assert.equal(data.result.zip, '32577');
@@ -345,7 +345,7 @@ test('geocode resolve: a MapMap POI result never replaces the requested house nu
     },
     () =>
       geocodePost({
-        request: request({ action: 'resolve', query: '6360 Haupert Ln, Molino, FL, 32577' }),
+        request: request({ action: 'resolve', query: '4242 Maplewood Ln, Molino, FL, 32577' }),
         env: { MAPMAP_API_KEY: 'dummy-key' },
       } as never),
   );
@@ -433,6 +433,107 @@ test('geocode suggest: a conflicting ZIP row is dropped for the entered ZIP', as
   assert.match(data.suggestions[0].label, /32577/);
 });
 
+test('geocode suggest: an abbreviated suffix the provider only knows in full still resolves, and Georgia is rejected', async () => {
+  const calls: string[] = [];
+  const response = await withFetch(
+    async (url) => {
+      calls.push(String(url));
+      const q = decodeURIComponent(String(url).match(/q=([^&]*)/)?.[1] ?? '');
+      if (/Maplewood Ln/.test(q)) return jsonResponse({ suggestions: [] });
+      if (/Maplewood Lane/.test(q)) {
+        return jsonResponse({
+          suggestions: [
+            { id: 'ga', name: '4242 Maplewood Lane', context: 'Atlanta, GA, 30349, United States', kind: 'address', lat: 33.58, lon: -84.48 },
+            { id: 'fl', name: 'Maplewood Lane', context: 'Molino, Florida, 32577, United States', kind: 'street', lat: 30.72, lon: -87.33 },
+          ],
+        });
+      }
+      return jsonResponse({ suggestions: [] });
+    },
+    () =>
+      geocodePost({
+        request: request({
+          action: 'suggest',
+          query: '4242 Maplewood Ln, Molino, FL, 32577',
+          street: '4242 Maplewood Ln',
+          city: 'Molino',
+          state: 'FL',
+          zip: '32577',
+        }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as { suggestions: Array<{ id: string; label: string }> };
+  assert.equal(data.suggestions.length, 1, 'only the Florida street survives');
+  assert.equal(data.suggestions[0].id, 'fl');
+  assert.match(data.suggestions[0].label, /Florida/);
+  assert.ok(calls.length >= 2, 'the canonical suffix variant was attempted');
+});
+
+test('geocode suggest: a house-number query with no provider coverage falls back to a street-level suggestion', async () => {
+  let calls = 0;
+  const response = await withFetch(
+    async (url) => {
+      calls += 1;
+      const q = decodeURIComponent(String(url).match(/q=([^&]*)/)?.[1] ?? '');
+      if (/\d/.test(q)) return jsonResponse({ suggestions: [] });
+      return jsonResponse({
+        suggestions: [
+          { id: 'fl', name: 'Maplewood Lane', context: 'Molino, Florida, 32577, United States', kind: 'street', lat: 30.72, lon: -87.33 },
+        ],
+      });
+    },
+    () =>
+      geocodePost({
+        request: request({
+          action: 'suggest',
+          query: '4242 Maplewood Lane, Molino, FL, 32577',
+          street: '4242 Maplewood Lane',
+          city: 'Molino',
+          state: 'FL',
+          zip: '32577',
+        }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  const data = (await response.json()) as { suggestions: Array<{ label: string; kind?: string }> };
+  assert.equal(data.suggestions.length, 1);
+  assert.equal(data.suggestions[0].kind, 'street');
+  assert.doesNotMatch(data.suggestions[0].label, /4242/, 'no house number is fabricated');
+  assert.ok(calls >= 2, 'a house-numberless variant was attempted');
+});
+
+test('geocode suggest: partially typed streets match by prefix, nearby results rank first, Georgia never appears', async () => {
+  const response = await withFetch(
+    async () =>
+      jsonResponse({
+        suggestions: [
+          { id: 'ga', name: '100 S Baylen St', context: 'Atlanta, Georgia, 30349, United States', kind: 'address', lat: 33.58, lon: -84.48 },
+          { id: 'miami', name: '100 S Baylen St', context: 'South Miami, Florida, 33143, United States', kind: 'address', lat: 25.7, lon: -80.29 },
+          { id: 'pensacola', name: 'South Baylen Street', context: 'Pensacola, FL, 32502, United States', kind: 'street', lat: 30.41, lon: -87.216 },
+          { id: 'other', name: '100 S Bay Street', context: 'Pensacola, Florida, 32502, United States', kind: 'address', lat: 30.41, lon: -87.21 },
+        ],
+      }),
+    () =>
+      geocodePost({
+        request: request({
+          action: 'suggest',
+          query: '100 S Bayl, Pensacola, FL',
+          street: '100 S Bayl',
+          city: 'Pensacola',
+          state: 'FL',
+        }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  const data = (await response.json()) as { suggestions: Array<{ id: string; label: string }> };
+  assert.equal(data.suggestions.length, 2, 'only the two Baylen rows match the partial street');
+  assert.equal(data.suggestions[0].id, 'pensacola', 'the nearby match ranks first');
+  assert.equal(data.suggestions.some((row) => row.id === 'ga'), false, 'Georgia is rejected');
+  assert.equal(data.suggestions.some((row) => row.id === 'other'), false, 'an unrelated Bay street is rejected');
+});
+
 test('geocode resolve-id: passes the provider document id through', async () => {
   const response = await withFetch(
     async (url) => {
@@ -480,8 +581,8 @@ test('geocode reverse: a provider house-number result is precise and carries cit
           {
             properties: {
               id: 'osm:w10919246:addr',
-              housenumber: '6360',
-              street: 'Haupert Lane',
+              housenumber: '4242',
+              street: 'Maplewood Lane',
               city: 'Molino',
               state: 'FL',
               postcode: '32577',
@@ -502,7 +603,7 @@ test('geocode reverse: a provider house-number result is precise and carries cit
   };
   assert.equal(response.status, 200);
   assert.equal(data.result.precise, true);
-  assert.match(data.result.label, /6360 Haupert Lane/);
+  assert.match(data.result.label, /4242 Maplewood Lane/);
   assert.equal(data.result.city, 'Molino');
   assert.equal(data.result.state, 'FL');
   assert.equal(data.result.zip, '32577');
@@ -514,7 +615,7 @@ test('geocode reverse: a street-level result is never marked precise', async () 
       jsonResponse({
         features: [
           {
-            properties: { id: 'osm:w10919246:street', name: 'Haupert Lane', street: 'Haupert Lane', type: 'street' },
+            properties: { id: 'osm:w10919246:street', name: 'Maplewood Lane', street: 'Maplewood Lane', type: 'street' },
             geometry: { coordinates: [-87.442, 30.719] },
           },
         ],

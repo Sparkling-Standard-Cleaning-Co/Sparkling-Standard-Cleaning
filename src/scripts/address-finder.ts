@@ -70,6 +70,12 @@ interface ResolvedCandidate {
   state?: string;
   source: 'mapmap' | 'census' | 'manual' | 'gps';
   adjusted: boolean;
+  /**
+   * True when the provider only knows the street (not the house number). The
+   * customer can still place the pin, but the exact property is confirmed
+   * personally and no house number is ever invented.
+   */
+  streetLevel?: boolean;
 }
 
 interface ResolveResult {
@@ -329,7 +335,12 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     if (mapCard) mapCard.hidden = false;
     if (confirmedCard) confirmedCard.hidden = true;
     setState('resolved');
-    setStatus('Address found — confirm your location on the map.', 'success');
+    setStatus(
+      resolved.streetLevel
+        ? 'We found the street. Drag the pin to your property, then confirm — we will verify the exact address with you.'
+        : 'Address found — confirm your location on the map.',
+      'success',
+    );
     void showMap(resolved);
     confirmButton?.focus();
   }
@@ -341,8 +352,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     if (mapCard) mapCard.hidden = true;
     setState('unresolved');
     setStatus(
-      "We couldn't pinpoint this address. You can still request your cleaning, and we'll confirm the location.",
-      'error',
+      "We couldn't pinpoint the exact address. Pick a street suggestion above and drag the pin to your home — or continue, and we'll confirm the location with you.",
+      'info',
     );
     emit();
   }
@@ -502,8 +513,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
    * Progressive enhancement: when the Permissions API is available, check the
    * CURRENT geolocation permission before asking. A browser that already
    * reports 'denied' cannot show its native prompt again, so the recovery
-   * panel is shown immediately instead of a request that is guaranteed to
-   * fail. Unsupported browsers fall back to the plain Geolocation API call,
+   * panel is shown immediately instead of a request destined to fail. Unsupported browsers fall back to the plain Geolocation API call,
    * which is the only universally supported behavior.
    */
   async function geolocationPermission(): Promise<'granted' | 'prompt' | 'denied' | 'unknown'> {
@@ -560,7 +570,12 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   // ── Manual resolution ─────────────────────────────────────────────────────
-  async function requestResolvedAddress(query: string): Promise<void> {
+  /**
+   * Authoritative exact-address lookup. Returns true when a precise candidate
+   * was shown. `quiet` is used by suggestion selection, which has its own
+   * street-level fallback and must not flash a failure state mid-flow.
+   */
+  async function requestResolvedAddress(query: string, quiet = false): Promise<boolean> {
     cancelSuggestions();
     setState('resolving');
     setStatus('Looking up that exact address…', 'info');
@@ -573,28 +588,70 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         body: JSON.stringify({ action: 'resolve', query: query.slice(0, 120) }),
         signal: confirmAbort.signal,
       });
-      if (methodIsGps()) return; // manual entry was abandoned mid-flight
+      if (methodIsGps()) return false; // manual entry was abandoned mid-flight
       if (response.status === 503) {
-        setState('unavailable');
-        setStatus(
-          'Address lookup is not connected right now — continue with your ZIP and we will confirm travel personally.',
-          'info',
-        );
-        return;
+        if (!quiet) {
+          setState('unavailable');
+          setStatus(
+            'Address lookup is not connected right now — continue with your ZIP and we will confirm travel personally.',
+            'info',
+          );
+        }
+        return false;
       }
       const data = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: ResolveResult };
       if (response.ok && data.ok && data.result) {
         const resolved = applyResolvedAddress(data.result);
         if (resolved && data.result.precise === true) {
           showManualCandidate(resolved);
-          return;
+          return true;
         }
       }
-      exactResolveFailed();
+      if (!quiet) exactResolveFailed();
+      return false;
     } catch (error) {
-      if ((error as Error).name === 'AbortError') return;
-      if (methodIsGps()) return;
-      exactResolveFailed();
+      if ((error as Error).name === 'AbortError') return false;
+      if (methodIsGps()) return false;
+      if (!quiet) exactResolveFailed();
+      return false;
+    }
+  }
+
+  /**
+   * Suggestion retrieve — authoritative coordinates for a street/POI result
+   * that arrived without embedded coordinates. A result that still lacks the
+   * requested house number stays street-level: the customer places the pin.
+   */
+  async function requestResolvedSuggestion(id: string): Promise<boolean> {
+    try {
+      const response = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ action: 'resolve-id', id }),
+      });
+      if (methodIsGps()) return true;
+      if (!response.ok) return false;
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: ResolveResult };
+      if (!data.ok || !data.result) return false;
+      const houseNumber = houseNumberFromStreet(streetField.value);
+      const precise =
+        data.result.precise === true && labelHasHouseNumber(data.result.label ?? '', houseNumber);
+      if (precise) {
+        const candidate = applyResolvedAddress(data.result);
+        if (candidate) {
+          showManualCandidate(candidate);
+          return true;
+        }
+        return false;
+      }
+      const candidate = applyResolvedAddress({ ...data.result, precise: false });
+      if (candidate) {
+        showManualCandidate({ ...candidate, streetLevel: true });
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
   }
 
@@ -607,21 +664,41 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     const exactSuggestion =
       suggestion.kind === 'address' && labelHasHouseNumber(suggestion.label, houseNumber);
 
-    if (exactSuggestion) {
-      const candidate: ResolvedCandidate = {
+    if (exactSuggestion && isPlausibleCoordinate(suggestion.lat, suggestion.lng)) {
+      showManualCandidate({
         label: suggestion.label,
-        lat: suggestion.lat ?? Number.NaN,
-        lng: suggestion.lng ?? Number.NaN,
+        lat: suggestion.lat as number,
+        lng: suggestion.lng as number,
         source: 'mapmap',
         adjusted: false,
-      };
-      if (isPlausibleCoordinate(candidate.lat, candidate.lng)) {
-        showManualCandidate(candidate);
-        return;
-      }
+      });
+      return;
     }
-    // Street-level/POI results are never precise: resolve the full address.
-    await requestResolvedAddress(composeQuery());
+
+    // Not carried as an exact address: try the authoritative resolver first
+    // (MapMap exact-only → Census), because the free Census Geocoder knows
+    // many house numbers the suggestion provider does not.
+    if (await requestResolvedAddress(composeQuery(), true)) return;
+
+    // Still nothing exact — a street/POI point becomes a pinnable street-level
+    // destination. The customer's typed house number is preserved and the
+    // exact property is confirmed personally; nothing is invented.
+    if (isPlausibleCoordinate(suggestion.lat, suggestion.lng)) {
+      showManualCandidate({
+        label: suggestion.label,
+        lat: suggestion.lat as number,
+        lng: suggestion.lng as number,
+        source: 'mapmap',
+        adjusted: false,
+        streetLevel: true,
+      });
+      return;
+    }
+
+    // Gateway without embedded coordinates: retrieve the suggestion's own
+    // point before giving up.
+    if (suggestion.id && (await requestResolvedSuggestion(suggestion.id))) return;
+    exactResolveFailed();
   }
 
   async function requestSuggestions(query: string): Promise<void> {
@@ -819,6 +896,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         ...(gpsParts.city ? { city: gpsParts.city } : {}),
         ...(gpsParts.state ? { state: gpsParts.state } : {}),
         source: 'gps',
+        precision: 'gps',
         ...(gpsCandidate.adjusted ? { adjusted: true } : {}),
         confirmedAt: new Date().toISOString(),
       };
@@ -854,6 +932,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         ? { state: manualCandidate.state ?? stateInput?.value ?? '' }
         : {}),
       source: manualCandidate.source,
+      precision: manualCandidate.streetLevel ? 'street' : 'exact',
       ...(manualCandidate.adjusted ? { adjusted: true } : {}),
       confirmedAt: new Date().toISOString(),
     };
@@ -861,9 +940,18 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     if (mapCard) mapCard.hidden = false;
     if (confirmedCard) confirmedCard.hidden = false;
     if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(manualConfirmed);
-    setTravelNote('Travel will be calculated from our base to this confirmed pin when your price is prepared.');
+    setTravelNote(
+      manualCandidate.streetLevel
+        ? 'Travel will be estimated from this street-level pin. We will confirm the exact property address with you before your cleaning.'
+        : 'Travel will be calculated from our base to this confirmed pin when your price is prepared.',
+    );
     setState('confirmed');
-    setStatus('Destination confirmed. We will calculate travel to this exact location.', 'success');
+    setStatus(
+      manualCandidate.streetLevel
+        ? 'Street-level destination confirmed. We will verify the exact address with you.'
+        : 'Destination confirmed. We will calculate travel to this exact location.',
+      'success',
+    );
     emit();
   }
 
@@ -884,6 +972,16 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   // ── Event wiring ──────────────────────────────────────────────────────────
+  /**
+   * Suggestions need a real street signal: a house number alone (e.g. "123")
+   * must not fire provider queries that can only return noise.
+   */
+  function meaningfulStreetQuery(): boolean {
+    const value = streetField.value.trim();
+    if (value.length < MIN_SUGGEST_LENGTH) return false;
+    return (value.match(/[a-z]/gi) ?? []).length >= 3;
+  }
+
   const lastFieldValues = new WeakMap<HTMLInputElement | HTMLSelectElement, string>();
   function settleDestinationValues(): void {
     for (const field of [cityInput, stateInput, zipInput]) {
@@ -903,17 +1001,13 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
           invalidateManual();
           emit();
         }
-        if (streetField.value.trim().length >= MIN_SUGGEST_LENGTH) {
-          window.clearTimeout(suggestTimer);
-          suggestTimer = window.setTimeout(() => void requestSuggestions(composeQuery()), SUGGEST_DEBOUNCE_MS);
-        }
       } else {
         // Editing manual fields while GPS is active switches back to manual.
         ensureManualMode();
-        if (streetField.value.trim().length >= MIN_SUGGEST_LENGTH) {
-          window.clearTimeout(suggestTimer);
-          suggestTimer = window.setTimeout(() => void requestSuggestions(composeQuery()), SUGGEST_DEBOUNCE_MS);
-        }
+      }
+      if (meaningfulStreetQuery()) {
+        window.clearTimeout(suggestTimer);
+        suggestTimer = window.setTimeout(() => void requestSuggestions(composeQuery()), SUGGEST_DEBOUNCE_MS);
       }
     });
   }
@@ -931,7 +1025,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     }
     window.clearTimeout(suggestTimer);
     const query = composeQuery();
-    if (streetField.value.trim().length < MIN_SUGGEST_LENGTH) {
+    if (!meaningfulStreetQuery()) {
       clearSuggestions();
       setState('idle');
       setStatus('Start typing your street address — suggestions appear as you type.', 'info');

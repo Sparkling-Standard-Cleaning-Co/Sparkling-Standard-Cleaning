@@ -232,7 +232,7 @@ test('the server composes street, city, state and ZIP for exact address lookup',
       return jsonResponse({
         result: {
           addressMatches: [
-            { matchedAddress: '6360 HAUPERT LN, MOLINO, FL, 32577', coordinates: { x: -87.339, y: 30.716 } },
+            { matchedAddress: '4242 MAPLEWOOD LN, MOLINO, FL, 32577', coordinates: { x: -87.339, y: 30.716 } },
           ],
         },
       });
@@ -240,7 +240,7 @@ test('the server composes street, city, state and ZIP for exact address lookup',
     () =>
       resolveServerDestination(
         {
-          service_address: '6360 Haupert Ln',
+          service_address: '4242 Maplewood Ln',
           address_city: 'Molino',
           address_state: 'FL',
           zip: '32577',
@@ -250,7 +250,7 @@ test('the server composes street, city, state and ZIP for exact address lookup',
   );
   assert.equal(destination?.source, 'address_geocode');
   assert.ok(
-    urls.some((url) => url.includes('6360 Haupert Ln, Molino, FL, 32577')),
+    urls.some((url) => url.includes('4242 Maplewood Ln, Molino, FL, 32577')),
     'the exact-address query includes city, state and ZIP',
   );
 });
