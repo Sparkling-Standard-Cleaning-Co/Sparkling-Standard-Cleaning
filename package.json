@@ -27,6 +27,7 @@
     "deploy:secrets": "node scripts/generate-deploy-secrets.mjs",
     "estimate:quotes": "node scripts/quote-preview.mjs",
     "live:check": "node scripts/live-check.mjs",
+    "mapmap:verify": "node scripts/test-mapmap.mjs",
     "smoke": "node scripts/smoke.mjs",
     "audit:facts": "node scripts/audit-facts.mjs"
   },
