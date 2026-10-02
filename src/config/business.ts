@@ -164,13 +164,19 @@ export const business = {
     operatingOrigin: PENDING as Fact<string>,
   },
 
-  // ── Social + review profiles — ALL PENDING until real URLs exist ──────────
+  // ── Social profiles — ONLY confirmed, owner-supplied URLs ─────────────────
+  // Confirmed 2026-10-02 (owner): Facebook + Nextdoor. Every other platform
+  // stays PENDING until the owner supplies and verifies its real profile URL;
+  // the Follow Us section never renders a PENDING platform and never invents a
+  // handle. Adding a platform later means editing only this block.
   socials: {
-    facebook: PENDING as Fact<string>,
+    facebook: 'https://www.facebook.com/profile.php?id=61595026949584',
     instagram: PENDING as Fact<string>,
     tiktok: PENDING as Fact<string>,
     youtube: PENDING as Fact<string>,
-    nextdoor: PENDING as Fact<string>,
+    nextdoor: 'https://nextdoor.com/page/sparkling-standard-cleaning-co/',
+    pinterest: PENDING as Fact<string>,
+    yelp: PENDING as Fact<string>,
     googleProfile: PENDING as Fact<string>,
     linkedin: PENDING as Fact<string>,
   },
@@ -284,11 +290,13 @@ export const business = {
 
   // ── Launch status ──────────────────────────────────────────────────────────
   launch: {
-    /** Flipped to true by the owner only after every blocker in
-     *  docs/launch/OWNER-INPUT-REQUIRED.md is resolved and verified. */
+    /** Formal pre-launch sign-off. Remains FALSE while individual owner
+     *  checklist items (legal entity spelling, insurance claims, review links)
+     *  are genuinely outstanding; it only gates scripts/validate-production-env.mjs
+     *  and does not describe deployment state — the site is live. */
     productionApproved: false,
-    /** Business is in immediate launch mode; preview is noindexed. */
-    status: 'pre-launch' as const,
+    /** The production site is LIVE (Cloudflare Pages via GitHub main). */
+    status: 'live' as const,
   },
 };
 

@@ -1,161 +1,191 @@
 # AGENTS.md — Sparkling Standard Cleaning Co. Digital Operating System
 
-Permanent instructions for AI engineering agents (OpenCode and similar) working in this
-repository. Read this file fully before making any change. Every statement below reflects the
-verified state of the codebase — if reality and this file disagree, resolve it deliberately with
-the owner; never silently work around this file.
+Authoritative operating instructions for every AI engineering agent (OpenCode and similar)
+working in this repository. Read this file fully before changing anything, then read the specific
+documentation it links for the system you are touching.
 
-## Project identity
+If reality and this file disagree, **reality wins**: verify against the repository, the deployed
+site and the owner's current instructions, then correct the documentation in the same session.
+
+## Authority hierarchy
+
+When instructions conflict, resolve them in this order:
+
+1. **The owner's current, explicit instructions and approved business requirements.**
+2. **Verified facts** from the current codebase, production configuration and actual platform state.
+3. **Current architectural documentation and operating procedures** (this file and `docs/`).
+4. **Historical instructions**, reconciled and corrected when superseded.
+
+Never let outdated documentation override verified current information. Never treat a focused
+hotfix instruction as the company's permanent engineering philosophy.
+
+## Engineering philosophy — solve the problem completely
+
+Sparkling Standard is engineered to an exceptional professional standard. The objective is the
+highest-quality finished product that competes and grows, not the smallest possible diff or the
+fastest possible completion.
+
+**Solve the underlying problem, deliver exceptional quality, and avoid unnecessary work.**
+
+Expected professional behavior:
+
+- Do not stop at a superficial fix when the underlying defect remains.
+- Do not avoid a necessary refactor merely because it touches multiple files.
+- Do not preserve a poor user experience just because it technically functions.
+- Do not reject a valuable improvement solely because it falls outside the narrowest reading of a task.
+- Do not repeatedly patch symptoms of the same architectural defect.
+- Do not claim visual quality based only on passing automated tests.
+
+When a root cause requires coordinated changes across components, shared configuration, server
+functions, tests and documentation, make those changes. When an adjacent problem materially
+undermines the requested outcome, address it within the owner's authorized scope. At the same time,
+distinguish valuable work from scope creep: do not add complexity for its own sake, do not redesign
+unrelated pages, and do not churn working systems without a concrete quality or business reason.
+
+### Quality dimensions for every meaningful change
+
+- **Design & presentation** — premium visual execution, typography, spacing, responsive layouts,
+  consistent branding, polished interaction states, finished details.
+- **Customer experience** — fewer questions, clicks, scrolls and confusing states; no dead ends;
+  conversion is exceptionally straightforward.
+- **Engineering** — cohesive architecture, maintainable modules, strict typing, appropriate
+  abstraction, minimal duplication, reliable error handling, clear responsibilities.
+- **Accessibility** — keyboard operation, visible focus, readable errors, screen-reader support,
+  properly sized mobile controls, WCAG 2.2 AA expectations.
+- **Performance** — fast loading, efficient JavaScript, lazy loading where appropriate, correctly
+  sized media, protection from layout shifts.
+- **Security & privacy** — credentials, customer data, private operating coordinates, pricing
+  integrity and analytics consent are protected; server-enforced where it matters.
+- **Commercial effectiveness** — generate legitimate inquiries, communicate trust, explain
+  differentiation honestly, remove friction from conversion.
+- **Operational maintainability** — the owner or a future developer can understand and safely
+  change the system without reverse-engineering it.
+
+Passing tests is a requirement, not proof of quality. UI changes need visual browser verification.
+
+## Project identity and current verified status
 
 - Marketing, estimate and lead-capture website for **Sparkling Standard Cleaning Co.** (public
-  brand: "Sparkling Standard"), an owner-operated residential and commercial cleaning company
-  based in Cantonment and serving Pensacola, surrounding communities within about an hour of
-  Cantonment, and select nearby areas into Alabama.
-- **Owner-confirmed facts (October 2026):** company name, domain
-  (`https://sparkling-standard.com`), phone (`(850) 246-8479`), email
-  (`owner@sparkling-standard.com`), founder (Hayli — 18-year-old founder/owner-operator, approved
-  background in `business.founder`), service territory (about one hour of actual driving time
-  from the private operating origin), Stripe as payment processor, and a dedicated Cloudflare
-  account with the domain active on Cloudflare DNS.
-- **Still PENDING (do not invent):** legal entity spelling/suffix, the private operating origin
-  (`TRAVEL_ORIGIN`), insurance/bonding/licensing claims, SMS capability (`business.flags.smsEnabled`
-  is FALSE until a real text has been received), Web3Forms access key, analytics IDs, review and
-  social profile URLs, final cancellation percentages, and owner launch approval
-  (`business.launch.productionApproved`). Until these land, the site is preview-only and
-  production deployment is blocked by validation. See `docs/launch/OWNER-INPUT-REQUIRED.md`.
+  brand "Sparkling Standard"), an owner-operated residential and commercial cleaning company based
+  in Cantonment, serving Pensacola, surrounding communities within about an hour of driving time
+  from the private operating origin, and select nearby areas into Alabama.
 - Repo: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`. **`main` is the production
-  branch.**
-- Local dev server: http://localhost:4321. Build output: `dist/`.
-- Hosting is the owner's dedicated GitHub-connected Cloudflare project (Cloudflare Pages).
-  This repository contains **no deployment configuration** — deployment settings live in the
-  Cloudflare dashboard. See `docs/deployment/DEPLOYMENT.md`.
+  branch and the site is LIVE** at `https://sparkling-standard.com` (Cloudflare Pages connected to
+  GitHub; deployment settings live in the Cloudflare dashboard, not in this repository).
+- Local dev: http://localhost:4321. Build output: `dist/`.
+- **Budget: ZERO additional spending.** Prefer free, low-cost, usage-based, low-lock-in choices.
+  Never add billable services, paid APIs, databases, CMS platforms or extra dependencies without
+  explicit owner authorization.
+- **Operational as of October 2026:** production deployment pipeline; MapMap geocoding + routing
+  with the private `TRAVEL_ORIGIN` configured in Cloudflare; Web3Forms lead delivery (owner-
+  confirmed); Cloudflare Turnstile optional; GTM container `GTM-KSQ26HMG` consent-gated; SMS
+  enabled (`business.flags.smsEnabled: true`, owner-verified); Facebook + Nextdoor profiles
+  confirmed; owner-approved 2026-10-02 favicon/PWA icon kit installed.
+- **Formal launch checklist still outstanding (owner sign-off):** legal entity spelling, insurance/
+  bonding/licensing claims, genuine review links, final cancellation percentages, and any profile
+  URLs not yet supplied. `business.launch.productionApproved` remains `false` as the formal
+  checklist gate; it does NOT reflect deployment state (the site is live).
+- Owner-confirmed facts: name, domain, phone `(850) 246-8479`, email
+  `owner@sparkling-standard.com`, founder Hayli, Stripe, Cloudflare DNS.
 
-## THE NO-FABRICATION RULE (non-negotiable)
+### THE NO-FABRICATION RULE (non-negotiable)
 
-**Do not convert a `PENDING` fact into a public claim. Ever.**
+**Never convert a `PENDING` fact into a public claim. Ever.**
 
-Never invent or "fill in" any of: company name, legal name, phone, email, domain, address,
-years in business, customer or review counts, certifications, insurance, bonding, licenses,
-employee counts, testimonials, commercial clients, guarantees, response times, exact pricing,
-social URLs, or review links.
+Never invent or "fill in" company/legal names, phone, email, addresses, years in business,
+customer/review counts, certifications, insurance, bonding, licenses, employee counts,
+testimonials, commercial clients, guarantees, response times, exact pricing, social URLs or review
+links. Unknown information must be centralized as `PENDING` in `src/config/business.ts` (or
+`.env`), excluded from public claims, and blocked by validation gates before publication.
 
-Unknown information must be:
+Never invent reviews, credentials, statistics, client testimonials or unsupported marketing claims.
+Never publish unapproved promotional promises or activate binding pricing without authorization.
 
-1. centralized as `PENDING` in `src/config/business.ts` (or `.env`),
-2. excluded from public claims, and
-3. blocked by `scripts/validate-production-env.mjs` + `scripts/check-pending-facts.mjs` before
-   any production deployment.
+## Non-negotiable constraints
 
-Do not quietly replace unknown information with plausible-looking data.
+- **No additional expenditure** or activation of billable external services without explicit owner
+  authorization.
+- **No fabricated business claims** (see rule above).
+- **No leaking** private operating coordinates, customer data, credentials, API keys, tokens or
+  session data — into code, logs, tests, commits, docs, analytics, notifications or reports.
+- **Sunshine Climate Solutions is a READ-ONLY architectural reference.** Never modify its
+  repository; adapt patterns with applicable licenses/attribution preserved.
+- **No destructive Git operations** (force push, history rewrite, reset, clean) and no undocumented
+  production changes. Never push without explicit owner approval. Never touch Cloudflare settings
+  or DNS without authorization.
+- **Publication discipline:** provisional pricing and unapproved promotions stay internal behind
+  their publication flags. Nothing customer-visible ships without the flag and the owner approval.
 
-## Verified architecture — keep it
+## Verified architecture
 
-- **Astro 5, `output: 'static'`, strict TypeScript** (`astro/tsconfigs/strictest` + explicit
-  `.ts` import extensions enabled for Node-test compatibility). No client framework, no CSS
-  framework, no CMS, no database. Do not add dependencies, databases, CMS platforms or paid
-  services without explicit owner approval. The launch budget is ~$350; prefer free, low-cost,
-  usage-based, low-lock-in choices.
-- `trailingSlash: 'always'`; canonical domain comes from `PUBLIC_SITE_URL`; the sitemap excludes
-  404, thank-you and leave-review.
-- **`src/config/business.ts` is the single source of truth for every business fact.** Components
-  and pages import from it; never hard-code business facts elsewhere. `PENDING` handling uses
-  the `Fact<T>` / `isPending()` helpers.
-- **`src/config/pricing.ts` is the single source of truth for pricing, labor model, add-ons,
-  cancellation/satisfaction policy and publication flags.** All values are marked
-  `provisional` or `approved`; provisional values are internal until the owner approves them.
-  Publication flags (`pricing.publication.*`) control what may ever be displayed.
-- **`src/config/geography.ts`** holds the provisional ZIP→zone reference and zone policy.
-- **`src/config/marketing-links.ts`** is the single source of truth for inbound UTM links and
-  QR assets. Generated docs and QR files are produced from it — never edit them by hand.
-- **Content collections** (`src/content.config.ts`, Zod-validated):
-  - `services` → the seven owning pages (house, recurring, deep, move-in/out, STR, commercial,
-    church), frontmatter-driven scope + markdown body.
-  - `faqs` → categorized Q&As; service pages reference entries by `faqIds`.
-  - `checklists` → per-service checklists with `visibility: public | internal`; **internal
-    checklists must never render on the public site** (validated by `npm run validate`).
-  - `proof` → real before/after work, **intentionally empty** until genuine photos exist.
-  - `reviews` → genuine customer reviews only, **intentionally empty** until real ones exist.
-  - `site` → editable page copy, one entry per page.
-- Pages are thin wrappers over collections/config. The estimator engine lives in
-  `src/lib/estimate/` and travel logic in `src/lib/travel/` — arithmetic never lives in pages.
-- The estimate flow collects a **confirmed street address** (`src/scripts/address-finder.ts`,
-  `src/lib/location/`) with MapMap suggestions through `/api/geocode`, a manual fallback, and a
-  lazy-loaded MapLibre GL + OpenFreeMap pin confirmation (owner-directed, free services only).
+- **Astro 5, `output: 'static'`, strict TypeScript** (`astro/tsconfigs/strictest` + explicit `.ts`
+  import extensions for Node-test compatibility). No client framework, no CSS framework, no CMS,
+  no database.
+- `trailingSlash: 'always'`; canonical domain from `PUBLIC_SITE_URL`; sitemap excludes 404,
+  thank-you and leave-review.
+- **Single sources of truth** (never hard-code these facts elsewhere):
+  - `src/config/business.ts` — every business fact, contact channel, socials, launch flags,
+    publication flags.
+  - `src/config/pricing.ts` — pricing, labor model, add-ons, promotions, discounts, policies,
+    publication flags (`provisional` / `approved`).
+  - `src/config/travel.ts` — shared client/server travel economics.
+  - `src/config/geography.ts` — ZIP→zone reference and zone policy (preliminary, not addresses).
+  - `src/config/marketing-links.ts` — inbound UTM links and QR assets.
+- **Content collections** (`src/content.config.ts`, Zod-validated): `services` (seven owning
+  pages), `faqs`, `checklists` (`public | internal`; internal must never render publicly),
+  `proof` and `reviews` (intentionally empty until genuine material exists), `site` (page copy).
+- Pages are thin wrappers. The estimator engine lives in `src/lib/estimate/`; travel logic in
+  `src/lib/travel/`; address/location logic in `src/lib/location/`. Arithmetic never lives in pages.
+- The estimate flow collects a **confirmed destination**: GPS "Use My Current Location" first, with
+  an expandable manual address section (closed by default), MapMap suggestions through
+  `/api/geocode`, a manual fallback, and a lazy-loaded MapLibre GL + OpenFreeMap pin confirmation.
   A confirmed pin is the only destination source — never let a ZIP centroid silently replace it.
+  GPS/manual modes are isolated: the selected method is the only source of the submitted address.
 - Client-side JS is minimal, bundled by Astro from `src/scripts/` (no framework). The estimator
   computes in the browser so the instant estimate works on a fully static page. A browser price is
   a PROPOSAL: every priced reservation request is recalculated server-side
-  (`src/lib/estimate/verify.ts` in `functions/api/lead.ts`), and client price/coordinate/verdict
-  fields are never trusted.
-- Serverless functions live in `functions/api/` (Cloudflare Pages Functions) for travel lookup
-  and the lead relay. **Secrets only ever live in the function environment.**
-- Styles: `src/styles/tokens.css` (design tokens), `global.css` (all component styles),
-  `fonts.css` (generated by `scripts/fetch-fonts.mjs`). Use tokens only — never raw colors,
-  spacing or font sizes.
+  (`src/lib/estimate/verify.ts` via `functions/api/lead.ts`); client price/coordinate/verdict
+  fields are never trusted. A GPS destination without a resolvable ZIP is priced from its confirmed
+  pin and stays **preliminary** — never represented as a server-verified street address.
+- Serverless functions live in `functions/api/` (Cloudflare Pages Functions) for geocoding, travel
+  lookup and the lead relay. **Secrets only ever live in the function environment** (Cloudflare).
+- Styles: `src/styles/tokens.css` (design tokens), `global.css` (component styles), `fonts.css`
+  (generated). Use tokens only — never raw colors, spacing or font sizes.
+- Analytics: nothing loads before an explicit analytics consent choice; Umami/GTM/GA4 are gated by
+  the same consent controller. Event names are a closed taxonomy
+  (`src/lib/analytics/events.ts`) with allowlisted payload keys. Never send names, emails, phones,
+  addresses, ZIPs, photos, form contents or anything you would not publish on a billboard.
+  Attribution (UTMs, referrer, ad click ids) is captured for LEAD RECORDS only.
+- Brand assets: browser/PWA icons come from the owner-approved 2026-10-02 favicon kit
+  (`public/favicon.ico`, `favicon.svg`, `favicon-16/32/48/64/96/128/256.png`,
+  `public/brand/apple-touch-icon.png`, `icon-192/512.png`, `icon-maskable-512.png`,
+  `public/site.webmanifest`). `scripts/generate-brand-images.mjs` intentionally does NOT regenerate
+  those; it only regenerates `og-default.png` and `logo-mark-soft.svg`. Do not overwrite the
+  approved icons.
 
-## Commands
+## System map — where the source of truth lives
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Dev server with hot reload |
-| `npm run build` | Production build into `dist/` |
-| `npm run preview` | Serve the production build locally |
-| `npm run check` | `astro check` — TypeScript diagnostics (must be 0 errors) |
-| `npm test` | Estimator unit tests (Node test runner, type-stripped TS) |
-| `npm run verify` | `check` + `build` + `validate` — minimum bar for any change |
-| `npm run validate` | Links, SEO, marketing registry, QR decode, checklist leak checks |
-| `npm run links` | Broken internal-link check on `dist/` |
-| `npm run seo` | SEO checks on `dist/` |
-| `npm run pending` | PENDING-fact gate — **fails pre-launch by design** |
-| `npm run testimonials` | Fake-testimonial / fixture detector |
-| `npm run audit:facts` | No-fabrication claim audit |
-| `npm run smoke` | Static smoke test over `dist/` |
-| `npm run validate:production` | Production environment gate (needs real facts) |
-| `npm run marketing:links` | Regenerate UTM docs + QR codes (decode-verified) |
-| `npm run marketing:qr` | Force-regenerate every QR asset |
-| `npm run marketing:verify` | Verify registry, docs and QRs without writing |
-| `node scripts/generate-brand-images.mjs` | Regenerate favicons/OG image after brand changes |
-| `node scripts/fetch-fonts.mjs` | Refresh self-hosted fonts |
+| System | Source of truth | Detailed docs |
+| --- | --- | --- |
+| Business facts, contact, socials, launch/publication flags | `src/config/business.ts`, `.env` | `docs/launch/OWNER-INPUT-REQUIRED.md` |
+| Pricing, labor model, add-ons, promotions, discounts | `src/config/pricing.ts` | `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/OWNER-SETTINGS-GUIDE.md` |
+| Travel economics, included miles, zone adjustments | `src/config/travel.ts`, `src/config/geography.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
+| Location selection, geocoding, GPS/manual modes | `src/scripts/address-finder.ts`, `src/lib/location/`, `functions/api/geocode.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
+| Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`) | `docs/verification/VERIFICATION.md` |
+| Lead capture, notification fields, provider relay | `functions/api/lead.ts`, `src/lib/forms/` | `docs/verification/VERIFICATION.md` |
+| Services, FAQs, checklists, page copy | `src/content/`, `src/content/site/` | `docs/CONTENT-GUIDE.md` |
+| SEO, structured data, sitemap, robots, page ownership | `src/components/BaseHead.astro`, `src/lib/schema.ts`, page files | `docs/seo/SEO-STRATEGY.md`, `docs/operations/SEARCH-CONSOLE-SETUP.md` |
+| Analytics, consent, event taxonomy, attribution | `src/scripts/consent-controller.ts`, `src/lib/analytics/`, `src/lib/attribution.ts` | `docs/analytics/ANALYTICS-SETUP.md` |
+| Visual design, tokens, images, icons, OG image | `src/styles/`, `public/brand/` | `docs/design/DESIGN-SYSTEM.md`, `docs/design/IMAGE-GUIDE.md` |
+| Photo privacy rules | `docs/privacy/PHOTO-PRIVACY-SOP.md` |
+| UTM links and QR assets | `src/config/marketing-links.ts` | `docs/marketing/UTM-MASTER-LINKS.md`, `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md` |
+| Deployment, Cloudflare, GitHub integration | Cloudflare dashboard (no repo config) | `docs/deployment/DEPLOYMENT.md` |
+| Platform status, automation inventory | — | `docs/operations/PLATFORM-STATUS.md`, `docs/operations/AUTOMATION-REGISTER.md` |
+| System overview / start here | — | `docs/OPERATIONS-HUB.md` |
 
-Build notices like "The collection 'proof' does not exist or is empty" are **expected and
-intentional** while those collections are empty — not errors.
+## Page/query ownership (SEO — preserve)
 
-## Git safety and deployment rules
-
-- **Never push without explicit owner approval** — a push to `main` triggers the production
-  deployment once the Cloudflare project exists.
-- **Line endings are LF-normalized** (`.gitattributes`: `text=auto eol=lf`). The generated
-  marketing documents are byte-compared by validation; never commit CRLF variants of them.
-  Keep the repository-local `core.autocrlf=false` setting on Windows clones.
-- Use the repository-local Git identity only (`git config --local`); never change global config.
-- Never, without explicit owner authorization: force push, rewrite history, `git reset`,
-  `git clean`, `git stash pop`/`drop`, delete branches, or touch Cloudflare settings or DNS.
-- Commit small, per approved phase, with a clear message. Review `git diff --stat` and
-  `git diff` before committing. Never stage unrelated or untracked files you did not create.
-- Do not run automatic dependency upgrades, `npm audit fix`, or unrelated "cleanup."
-
-## Content editing map
-
-| To change… | Edit |
-| --- | --- |
-| Any business fact (name, phone, email, hours, area, payments, launch flags) | `src/config/business.ts` (or the matching `.env` value) |
-| Any pricing, labor model, add-on, cancellation or satisfaction rule | `src/config/pricing.ts` |
-| Service areas / ZIP zones | `src/config/geography.ts` |
-| Home/about/contact/service-area/estimate page copy or SEO | `src/content/site/<page>.md` |
-| Service pages | `src/content/services/*.md` |
-| FAQs | `src/content/faqs/*.md` |
-| Customer-facing + operational checklists | `src/content/checklists/*.md` |
-| Real work proof (photos + story) | `src/content/proof/*.md` + images next to the entry |
-| Genuine customer reviews | `src/content/reviews/*.md` |
-| UTM links / QR assets | `src/config/marketing-links.ts`, then `npm run marketing:links` |
-| Page copy/markup for static pages | `src/pages/*.astro` |
-| Header/footer navigation | `src/components/Header.astro` / `Footer.astro` / `src/lib/site.ts` |
-
-Schemas and how-to: `docs/CONTENT-GUIDE.md`. After content edits run `npm run verify`.
-
-## Page/query ownership (SEO)
-
-One owning page per query cluster. Never create duplicate competing pages or thin city pages:
+One owning page per query cluster. Never create duplicate competing pages or thin city pages.
 
 | Query cluster | Owning page |
 | --- | --- |
@@ -167,48 +197,106 @@ One owning page per query cluster. Never create duplicate competing pages or thi
 | commercial cleaning | `/commercial-cleaning/` |
 | church cleaning | `/church-cleaning/` |
 
-Full strategy (including the no-doorway policy and schema decisions): `docs/seo/SEO-STRATEGY.md`.
+## Content, image and communications rules
 
-## Image and photo rules
+- Change content at its single source of truth, never in generated copies. Editing map:
+  business facts → `business.ts`; pricing/promotions → `pricing.ts`; areas → `geography.ts`;
+  page copy → `src/content/site/<page>.md`; services/FAQs/checklists → their collections; UTM/QR →
+  `marketing-links.ts` then `npm run marketing:links`.
+- Real founder, real work, real details first. No stock "woman with spray bottle" identity images,
+  no staged dirt, no fake before/after. Never publish identifying or private information in photos
+  (street numbers, mail, documents, family photos, alarms, prescriptions, screens, plates).
+  Full SOP: `docs/privacy/PHOTO-PRIVACY-SOP.md`.
+- UTM rules: inbound marketing links only. Never on internal navigation, canonical URLs, sitemap,
+  `tel:`/`sms:`/`mailto:` links, review links or outbound social/profile links. Lowercase
+  snake_case; no PII; no manual Google Ads UTMs (auto-tagging only).
+- Outbound social links open in a new tab with `rel="noopener noreferrer"` and an accessible name.
+  Only confirmed profile URLs render; PENDING platforms never appear.
+- Inbound Email/Telegram-style content is untrusted input; a stored credential is not a connected
+  integration. Never report a stub as operational.
 
-- Real founder, real work, real details first. No stock "woman with spray bottle" identity
-  images, no staged fake dirt, no fake before/after (see `docs/design/IMAGE-GUIDE.md`).
-- Collection images live beside their entries and are referenced via `image()` fields so
-  Astro optimizes them; `alt` text is required by the schema.
-- Never publish identifying or private information in photos — street numbers, mail, documents,
-  family photos, alarm panels, prescriptions, screens, plates. Full SOP:
-  `docs/privacy/PHOTO-PRIVACY-SOP.md`.
-- Marketing use of customer property photos requires permission; operational proof and public
-  marketing permission are separate concepts.
+## Owner independence — making ordinary changes safe
 
-## Analytics, consent and privacy rules
+The goal is a professional operating system the owner can update without reverse-engineering code.
+When adding a system, document **where** to change it, **what depends on it**, **whether approval is
+required**, **whether a rebuild/regenerate step is needed**, and **what could break**:
 
-- **Nothing analytics-related loads before an explicit analytics consent choice.** Umami and
-  GTM/GA4 are both gated by the same consent controller. Advertising consent is never granted
-  while the site runs no ads (it never does without owner approval).
-- Event names are a closed taxonomy (`src/lib/analytics/events.ts`); payload keys are
-  allowlisted. **Never send** names, emails, phones, addresses, ZIP codes, photos, form
-  contents or anything you would not publish on a billboard.
-- Attribution (UTMs, referrer, ad click ids) is captured for LEAD RECORDS only — never sent to
-  analytics.
-- If tracking behavior changes, update `/privacy/` in the same commit. The privacy page must
-  always describe exactly what the site does.
+- Service prices / labor assumptions → `pricing.ts` (+ `docs/operations/OWNER-SETTINGS-GUIDE.md`).
+- Discounts and promotions → `pricing.ts` promotion blocks; publication flags off until approved.
+- Business hours, territory, contact → `business.ts` (and `.env` where noted).
+- Website copy, images, founder info → `src/content/`, `docs/CONTENT-GUIDE.md`.
+- Social profile URLs and icons → `business.ts` socials + the shared social component.
+- Marketing campaigns / UTM links → `marketing-links.ts`, then `npm run marketing:links`.
+- Analytics configuration → `docs/analytics/ANALYTICS-SETUP.md`.
+- Operational settings and integrations → `docs/operations/`.
 
-## UTM rules
+## Working method
 
-- UTMs are for inbound marketing links only. Never add them to internal navigation, canonical
-  URLs, sitemap entries, `tel:`/`sms:`/`mailto:` links or review links.
-- Lowercase snake_case values; no PII; no manual Google Ads UTMs (auto-tagging only).
-- All links live in `src/config/marketing-links.ts`; regenerate with `npm run marketing:links`.
-- Every QR is decode-verified against the registry by `npm run marketing:verify`.
+1. Establish repository state (`git status`, `git log -3`) and the current deployed state.
+2. Read this file plus the docs for the system you are changing.
+3. Understand the affected system end-to-end (frontend → API → verification → notification →
+   tests) and identify the desired outcome before editing.
+4. Change the single source of truth. Keep reusable product code organization-neutral.
+5. Implement the complete solution; add focused tests that prove the behavior.
+6. Run focused tests, then the appropriate broader validation for the risk. UI changes require
+   real browser verification (desktop + mobile viewports); never claim physical-device testing
+   that did not occur.
+7. Investigate failures; never weaken or delete legitimate tests to get green.
+8. Update documentation in the same change when behavior, rules or status change.
+9. Review the actual diff. Commit small, coherent commits with clear messages (per-phase).
+10. Report evidence: commands run, actual results, what remains unverified.
 
-## How future AI agents should modify the project
+## Commands
 
-1. Read this file and the relevant docs before editing. The system map is
-   `docs/OPERATIONS-HUB.md`; current platform status lives only in
-   `docs/operations/PLATFORM-STATUS.md`.
-2. Establish repository state (`git status`, `git log -3`) and never overwrite unexpected work.
-3. Change the single source of truth — not the generated copies.
-4. Add/update focused tests for behavioral changes (`npm test`), update docs where rules live.
-5. Run `npm run verify` plus the relevant focused checks. Never claim a pass without running it.
-6. Do not push. Report evidence: commands run, actual results, what could not be tested.
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Dev server with hot reload |
+| `npm run build` | Production build into `dist/` |
+| `npm run preview` | Serve the production build locally |
+| `npm run check` | `astro check` — TypeScript diagnostics (must be 0 errors) |
+| `npm test` | Estimator/unit tests (Node test runner, type-stripped TS) |
+| `npm run test:browser` | Playwright browser regression suite (builds first) |
+| `npm run verify` | `check` + `build` + `validate` — minimum bar for any change |
+| `npm run validate` | Links, SEO, marketing registry, QR decode, checklist leak checks |
+| `npm run links` / `npm run seo` | Focused broken-link / SEO checks on `dist/` |
+| `npm run pending` | PENDING-fact gate (fails while genuine blockers remain) |
+| `npm run testimonials` | Fake-testimonial / fixture detector |
+| `npm run audit:facts` | No-fabrication claim audit |
+| `npm run smoke` | Static smoke test over `dist/` |
+| `npm run validate:production` | Production environment gate (formal pre-launch checklist) |
+| `npm run marketing:links` | Regenerate UTM docs + decode-verified QR codes |
+| `node scripts/generate-brand-images.mjs` | Regenerate `og-default.png` + soft mark (NOT the approved icons) |
+| `node scripts/fetch-fonts.mjs` | Refresh self-hosted fonts |
+
+Build notices like "The collection 'proof' does not exist or is empty" are expected while those
+collections are intentionally empty — not errors.
+
+## Git safety and deployment
+
+- **Never push without explicit owner authorization.** A push to `main` triggers the production
+  deployment.
+- Line endings are LF-normalized (`.gitattributes`: `text=auto eol=lf`). Generated marketing
+  documents are byte-compared by validation; never commit CRLF variants. Keep repository-local
+  `core.autocrlf=false` on Windows clones.
+- Use repository-local Git identity only (`git config --local`); never change global config.
+- Never force push, rewrite history, reset, clean, stash-pop/drop, delete branches, or touch
+  Cloudflare/DNS without explicit authorization.
+- Commit small, per approved phase. Review `git status --short`, `git diff --stat` and `git diff`
+  before committing. Never stage unrelated or untracked files you did not create.
+- Do not run automatic dependency upgrades, `npm audit fix`, or unrelated "cleanup."
+- Owner-supplied files that do not belong in the site (browser saved-page dumps, redundant
+  downloads, temp HTML) must be moved outside the repository and preserved — never committed.
+
+## Current operational / provisional / pending snapshot
+
+- **Operational:** production site and deploy pipeline, estimator (GPS + manual), MapMap geocode
+  and routing, Web3Forms delivery, GTM consent-gated analytics, SMS, Facebook + Nextdoor profiles,
+  approved favicon kit, sitemap/robots, quote verification and owner notification.
+- **Provisional (internal only, publication flags off):** add-on pricing surface, multi-add-on
+  incentive, response guarantee, appreciation discounts, founding promotion, market comparisons.
+  Each requires explicit owner approval before activation; never publish an unapproved promise.
+- **Pending owner input:** legal entity spelling/suffix, insurance/bonding/licensing claims, review
+  profile/submission links, remaining social URLs, final cancellation percentages, and any
+  marketing claim not yet supplied.
+- Current platform details: `docs/operations/PLATFORM-STATUS.md`. Owner checklist:
+  `docs/launch/OWNER-INPUT-REQUIRED.md`.
