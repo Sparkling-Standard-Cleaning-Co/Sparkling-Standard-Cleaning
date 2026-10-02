@@ -22,6 +22,8 @@ interface Env {
   TRAVEL_ORIGIN?: string;
   ROUTES_PROVIDER?: string;
   ROUTES_API_KEY?: string;
+  /** Optional MapMap gateway override (defaults to https://api.mapmap.ai). */
+  MAPMAP_BASE?: string;
   EIA_API_KEY?: string;
   REFERENCE_GAS_PRICE?: string;
   TRAVEL_CACHE_SECONDS?: string;
@@ -117,6 +119,29 @@ async function routeDistance(
         const route = data.routes?.[0];
         const meters = route?.distanceMeters;
         const seconds = parseGoogleDuration(route?.duration);
+        if (response.ok && typeof meters === 'number' && meters > 0) {
+          return {
+            oneWayMiles: meters / 1609.344,
+            durationMinutes: seconds !== null ? seconds / 60 : null,
+            provider,
+            method: 'route',
+          };
+        }
+      } else if (provider === 'mapmap') {
+        // MapMap hosted gateway — OSRM-compatible response (distance metres,
+        // duration seconds). Free tier: 2,000 direction calls/day, no overage
+        // billing possible (requests are refused at quota).
+        const base = env.MAPMAP_BASE?.trim() || 'https://api.mapmap.ai';
+        const url =
+          `${base}/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
+          `?overview=false`;
+        const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+        const data = (await response.json().catch(() => ({}))) as {
+          routes?: Array<{ distance?: number; duration?: number }>;
+        };
+        const route = data.routes?.[0];
+        const meters = route?.distance;
+        const seconds = typeof route?.duration === 'number' && route.duration > 0 ? route.duration : null;
         if (response.ok && typeof meters === 'number' && meters > 0) {
           return {
             oneWayMiles: meters / 1609.344,

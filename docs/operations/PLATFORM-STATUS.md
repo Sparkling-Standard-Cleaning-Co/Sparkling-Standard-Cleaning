@@ -24,7 +24,7 @@ Status vocabulary:
 | Indexing status | **live — owner-approved** | Owner explicitly approves public search-engine indexing (2026-10-01). `robots.txt` = `Allow: /` + sitemap; every page meta robots = `index, follow`; `PUBLIC_PREVIEW_MODE` is NOT set | Maintain. Never introduce noindex/disallow, and never enable indexing on intentionally excluded utility pages | `docs/deployment/DEPLOYMENT.md` §11 |
 | Domain registration | **owner-confirmed** | Registered via Squarespace following Google Workspace purchase | None | — |
 | Google Workspace email | **owner-confirmed** | `owner@sparkling-standard.com` operational; MX/SPF/DKIM imported. Do **not** modify or enable Email Routing | None | `docs/deployment/DEPLOYMENT.md` |
-| Web3Forms | **configured — accepting (inbox confirmation pending)** | Live verification 2026-10-01 (commit `6afe7a1`): public key present in the deployed bundle (masked check); `/api/lead` returns `200 {"ok":true}`; one marked test submitted through each of the four live funnels (residential, estimate, commercial, STR) — all returned provider acceptance and the correct success message | Owner: confirm all four test messages arrived at `owner@sparkling-standard.com` | `docs/verification/VERIFICATION.md` |
+| Web3Forms | **live (verified)** | 2026-10-01: public key present in the deployed bundle; `/api/lead` returns `200 {"ok":true}`; one marked test per funnel (residential, estimate, commercial, STR) accepted by the provider — **all four arrived in the owner inbox (owner-confirmed)**. Lead delivery is operational | Maintain; re-test after any form change | `docs/verification/VERIFICATION.md` |
 | Stripe | **owner-confirmed** | Account established; enabled payment methods **unconfirmed** (site lists cards, Apple Pay, Google Pay, ACH) | Confirm enabled methods | `docs/launch/OWNER-INPUT-REQUIRED.md` #4 |
 | GTM / GA4 | **not started** | Architecture implemented and consent-gated; no container ID configured | Provide container ID when created | `docs/analytics/ANALYTICS-SETUP.md` |
 | Umami | **not started** | Architecture implemented and consent-gated; no website ID configured | Provide website ID when created | `docs/analytics/ANALYTICS-SETUP.md` |
@@ -38,6 +38,29 @@ Status vocabulary:
 | IndexNow | **not started (post-launch)** | Script exists; no key or workflow configured | Optional after launch | `docs/launch/OWNER-INPUT-REQUIRED.md` #25 |
 | Legal entity spelling/suffix | **pending owner** | Registered as "Sparkling Standard Cleaning Co."; exact spelling/suffix unverified; unpublished | Verify with registration documents | `docs/launch/OWNER-INPUT-REQUIRED.md` #6 |
 | Insurance / bonding / licensing | **pending owner** | Never claimed until real documentation exists | Supply only when genuine | `docs/launch/OWNER-INPUT-REQUIRED.md` #21/#22 |
+
+## MapMap provider evaluation (2026-10-01) — evaluated, NOT activated
+
+Public terms verified from `mapmap.ai/pricing`, `/terms`, `/docs/quickstart`, `/docs/api`:
+
+- Free tier: **50,000 calls/month** after email verification; provisional key (1,000 calls / 72 h)
+  needs **no card**; commercial use explicitly allowed; **no post-paid overage** — requests are
+  refused (HTTP 402/429) when quota and prepaid credit are exhausted, so charges cannot occur.
+- Endpoints fit our architecture: `GET /route/v1/{profile}/{lon,lat;lon,lat}` (OSRM-compatible:
+  distance metres + duration seconds), `GET /geocode/suggest` (first 5,000/day unbilled),
+  `GET /geocode/retrieve`, `GET /geocode` (1 call each). Bearer auth. Rate limit 60 req/min.
+- Attribution required: "© OpenStreetMap contributors". Hosted calls are recorded in a
+  de-identified demand log (coordinates coarsened to ~5 km cells); exclusion available on request.
+- **Implementation on the branch:** `functions/api/travel.ts` supports `ROUTES_PROVIDER=mapmap`
+  with duration + distance parsing and quota-failure fallback (mocked tests pass). The API key is
+  planned for a Cloudflare secret only.
+- **Unverified gaps before production use:** U.S. coverage is territory-based and **not confirmed
+  for Pensacola/Cantonment/Pace/Milton/Atmore**; live endpoint behaviour cannot be tested without
+  an account (owner action); vendor is early-stage with no free-tier SLA. Keep Census Geocoder +
+  zone fallback as non-single-point-of-failure paths.
+- Privacy: once activated, customer addresses/coordinates are necessarily sent to MapMap for
+  routing; the privacy page must disclose this. The private operating origin remains a Cloudflare
+  secret and is never exposed to the client, maps or responses.
 
 ## How to update this register
 

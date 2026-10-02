@@ -95,9 +95,8 @@ Every arrow maps to an authoritative document — see §10.
 5. The owner receives the inquiry at `owner@sparkling-standard.com` and replies personally.
    There is no CRM; follow-up is manual.
 
-Funnel verification status: **live as of 2026-10-01** (commit `6afe7a1`) — all four funnels return
-provider acceptance and show the honest request-received confirmation; owner inbox confirmation
-of the four marked test messages is still pending. Details:
+Funnel verification status: **live and owner-confirmed (2026-10-01)** — all four funnels deliver to
+the owner inbox (four marked tests confirmed). Details:
 `docs/verification/VERIFICATION.md`.
 
 ## 6. Analytics, consent and attribution
@@ -163,8 +162,8 @@ Truthful snapshot; the register in `docs/operations/PLATFORM-STATUS.md` is autho
 
 - `TRAVEL_ORIGIN` (private `"lat,lng"`) — routed travel stays off until set; the estimator runs
   in offline zone mode meanwhile (verified 2026-10-01).
-- Analytics IDs; Stripe enabled-method confirmation; SMS capability; legal entity spelling;
-  review/social profiles; confirmation that the four marked test inquiries reached the inbox.
+- Analytics IDs; Stripe enabled-method confirmation; legal entity spelling; review/social
+  profiles. (SMS is verified and enabled; Web3Forms delivery is owner-confirmed.)
 
 ## 10. Documentation directory
 

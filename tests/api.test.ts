@@ -225,6 +225,46 @@ test('travel: live EIA price is used when the feed succeeds', async () => {
   assert.equal(data.gasPrice, 3.42);
 });
 
+test('travel: a configured MapMap route returns distance and driving duration', async () => {
+  const response = await withFetch(
+    async () => jsonResponse({ code: 'Ok', routes: [{ distance: 24140.2, duration: 1800.5 }] }),
+    () =>
+      travelPost({
+        request: jsonRequest({ zip: '32506' }),
+        env: {
+          TRAVEL_ORIGIN: '30.6100,-87.3400',
+          ROUTES_PROVIDER: 'mapmap',
+          ROUTES_API_KEY: 'dummy-mapmap-key',
+        },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as Record<string, unknown>;
+  assert.equal(data.method, 'route');
+  assert.equal(data.provider, 'mapmap');
+  assert.equal(data.durationMinutes, 30);
+  assert.ok(typeof data.oneWayMiles === 'number' && (data.oneWayMiles as number) > 0);
+});
+
+test('travel: a MapMap quota refusal falls back to the straight-line estimate', async () => {
+  const response = await withFetch(
+    async () => jsonResponse({ code: 'quota-exceeded' }, 429),
+    () =>
+      travelPost({
+        request: jsonRequest({ zip: '32507' }),
+        env: {
+          TRAVEL_ORIGIN: '30.6100,-87.3400',
+          ROUTES_PROVIDER: 'mapmap',
+          ROUTES_API_KEY: 'dummy-mapmap-key',
+        },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as Record<string, unknown>;
+  assert.equal(data.method, 'straight_line_estimate');
+  assert.equal(data.durationMinutes, null);
+});
+
 test('travel: GET is method-not-allowed', async () => {
   const response = await travelGet();
   assert.equal(response.status, 405);
