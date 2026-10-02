@@ -82,9 +82,9 @@ Lighthouse scores.
 | Live form delivery | Requires the Web3Forms key and inbox | Owner-authorized test submission per form category after configuring `WEB3FORMS_*`; confirm it arrives at `owner@sparkling-standard.com` |
 | Live Turnstile | Requires Cloudflare keys | Enable, submit, confirm challenge appears server-side |
 | Real route distance / EIA price | Requires `TRAVEL_ORIGIN` + provider keys | `POST /api/travel` after deployment with keys |
-| Cloudflare preview deployment | Requires the owner to enable preview branches in the Cloudflare dashboard (Settings → Builds → Branch control); the repo cannot change that setting. Preview submissions are auto-marked as tests by the function | Enable branch previews, push a non-main branch, then verify the preview hostname is NOT the production domain and that a test submission arrives with `[PREVIEW TEST — NOT A REAL BOOKING]` |
+| Cloudflare preview environments | **Not used by owner decision (2026-10-02).** Production deploys from `main` only; no preview branches, Preview environment variables, preview secrets or Cloudflare Access are configured or required | No action; a temporary `PUBLIC_PREVIEW_MODE=true` staging deploy remains available if ever needed |
 | Real-device mobile smoke | Playwright emulation only (no physical device) | Manual pass on a phone: estimate flow, sticky bar, tap-to-call |
-| Visual review (founder eye) | Screenshots prepared for review; automated checks cannot judge taste | Owner reviews the preview and screenshots; change requests tracked in git |
+| Visual review (founder eye) | Screenshots prepared for review; automated checks cannot judge taste | Owner reviews the live site and provided screenshots; change requests tracked in git |
 | Lighthouse lab metrics | Needs a deployed URL and Chrome | Run PageSpeed Insights on the production site |
 | Genuine photography | No real Sparkling Standard project photos exist yet; representative licensed interiors are registered in `docs/design/IMAGE-SOURCE-REGISTER.md` | Replace stock files with permissioned real photos, then verify `astro:assets` output and update the register |
 | Search indexing | Post-launch | Search Console coverage after sitemap submission |

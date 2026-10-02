@@ -23,7 +23,7 @@ production deployment: treat every commit to `main` as publishing.
 | --- | --- |
 | Git provider / repository | GitHub, `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning` only |
 | Production branch | `main` |
-| Preview deployments | Owner choice in the dashboard. If branch previews are enabled, pushing a non-`main` branch produces an isolated `*.pages.dev` preview; if branch control is set to **None**, no preview URL is created (documented in section 6). A preview can never deploy production — only `main` does |
+| Preview deployments | **Not used by owner decision (2026-10-02).** Production deploys from `main` only; no preview environment variables, preview secrets, Cloudflare Access or preview infrastructure are configured or required. A temporary `PUBLIC_PREVIEW_MODE=true` staging deploy remains available if ever needed (section 6) |
 | Framework preset | Astro (if offered) or None |
 | Build command | `npm run build` |
 | Build output directory | `dist` |
@@ -97,8 +97,7 @@ Do these in order, stopping when the branch list appears.
 - Three Pages Functions (all configured on production as of 2026-10-02):
   - `POST /api/lead` — validates and relays form submissions to Web3Forms using the runtime
     `WEB3FORMS_ACCESS_KEY`; returns `503 not_configured` when the key is missing so the client can
-    use its static fallback instead of showing a false success. A submission from any non-`main`
-    deployment is automatically marked as a preview test in subject and body (section 6).
+    use its static fallback instead of showing a false success.
   - `POST /api/travel` — route distance/duration + Gulf Coast gasoline reference; live and verified
     on production. Returns `503 origin_not_configured` only when `TRAVEL_ORIGIN` is missing; the
     estimator keeps working in offline zone mode either way.
@@ -179,36 +178,22 @@ them in Cloudflare currently has no effect.
 Never commit `.env`, `deploy/secrets.env`, `deploy/secrets*.json`, or `.dev.vars`; all are
 git-ignored.
 
-## 6. Isolated preview deployments (owner review before production)
+## 6. Staging and previews (owner decision: not used)
 
-Preview deployments build from a non-`main` branch and **can never deploy production** — only
-`main` is the production branch. This is the supported way to let the owner review changes before
-they go live.
+**The owner does not use Cloudflare preview environments.** No preview branches, preview
+environment variables, preview secrets or Cloudflare Access applications are configured or
+required. Production deploys from `main` only; a non-`main` branch is a normal Git branch, not a
+deployment target.
 
-1. **Enable branch previews (owner, Cloudflare dashboard).** Workers & Pages → project →
-   Settings → Builds → Branch control → enable preview branches (or set Preview branch to
-   **All non-Production branches**). If this is set to **None**, pushing a branch produces no
-   build and no preview URL — the repo cannot change that setting.
-2. **Preview environment variables.** Build-time `PUBLIC_*` values and runtime secrets for the
-   Preview environment are managed separately from Production in the dashboard. If
-   `PUBLIC_PREVIEW_MODE=true` is set for Preview, preview pages are `noindex, nofollow` with
-   `robots.txt Disallow: /`. Preview can safely reuse the production secrets because:
-   - every preview lead is **automatically marked** `[PREVIEW TEST — NOT A REAL BOOKING]` in the
-     subject plus a `preview_test` body banner by `functions/api/lead.ts` (it detects
-     `CF_PAGES_BRANCH !== main`); and
-   - the static direct-submit fallback adds the same markers when built with
-     `PUBLIC_PREVIEW_MODE=true`, so a preview submission can never be mistaken for a customer.
-3. **Verify isolation before sharing the URL:** the preview hostname must not be
-   `sparkling-standard.com`; production must still serve the last `main` deployment.
-4. `noindex` is **not** access control — anyone with the preview URL can view it. For genuinely
-   restricted access, add Cloudflare Access (section 12) on the preview hostname only.
-5. **Never** set a preview environment's variables to bypass the test markers, and never merge a
-   preview branch into `main` without the owner's explicit approval (section 11).
+Reviewing a change before it reaches customers is done with:
 
-If branch previews cannot be enabled, the fallback is a direct Wrangler upload to a temporary
-project name (`npx wrangler pages deploy dist --project-name sparkling-standard-preview`) — this
-does not touch the production project or DNS, but it bypasses the Git integration and must be
-deleted/replaced by the real review flow once branch control is fixed.
+1. `npm run check && npm test && npm run test:browser` locally, and
+2. `npm run build && npm run preview` for a local copy of the production build.
+
+If a temporary, noindexed staging URL is ever needed, build with `PUBLIC_PREVIEW_MODE=true`
+(that single pre-existing mechanism forces `noindex, nofollow` plus `robots.txt Disallow: /`) and
+deploy it deliberately rather than enabling preview infrastructure. Never leave
+`PUBLIC_PREVIEW_MODE` set on the production environment.
 
 ## 7. Validation gates
 
@@ -278,8 +263,8 @@ requires ALL of the following:
    remaining profile URLs, final cancellation percentages).
 2. Confirm live: `robots.txt` = `Allow: /`; meta robots = `index, follow`; canonical = the
    production domain with trailing slash; `PUBLIC_PREVIEW_MODE` is NOT set in Production.
-3. Live form delivery confirmed for every category (section 8), including the automatic preview
-   test markers working only on preview deployments.
+3. Live form delivery confirmed for every category (section 8), with any test submission clearly
+   marked as a test in its subject and body.
 4. Owner approves the remaining business claims in writing.
 5. Set `business.launch.productionApproved = true` in `src/config/business.ts` (a deliberate,
    reviewable commit) and run the production gate:
@@ -288,12 +273,12 @@ requires ALL of the following:
    regenerate marketing QR assets if the domain changes (`npm run marketing:qr`; every QR is
    decode-verified).
 
-## 12. Optional — Cloudflare Access for the staging URL
+## 12. Cloudflare Access — not used
 
-`noindex` keeps search engines away; it does not restrict visitors. For genuine access control on
-the `*.pages.dev` staging URL, use Zero Trust → Access → Applications → **Self-hosted and
-private** → add the pages.dev hostname with an email one-time-PIN policy. Remove or bypass the
-Access application before the public launch so real customers are not challenged.
+The owner does not use Cloudflare Access. Production is the public website; there is no
+access-controlled staging surface to manage. If an isolated environment is ever genuinely
+required, treat it as a separate, explicitly approved project rather than adding Access to this
+one.
 
 ## 13. Reference files
 
