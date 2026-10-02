@@ -553,6 +553,74 @@ test('a preliminary verdict names the travel uncertainty', async () => {
   }
 });
 
+test('a manually moved destination pin is submitted as adjusted and never receives a verified receipt', async () => {
+  const { context, page } = await openEstimate(1440, 900);
+  const captured = {};
+  await page.route('**/api/lead', (route) => {
+    captured.payload = route.request().postDataJSON();
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        verification: {
+          status: 'preliminary',
+          travel_verified: false,
+          travel_method: 'route',
+          config_match: 'match',
+        },
+      }),
+    });
+  });
+  try {
+    await step1(page);
+    await page.fill('#est-address', '100 S Baylen');
+    await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
+    await page.click('#est-address-suggestions li');
+    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
+    await page.click('[data-address-confirm]');
+    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
+
+    // Manually move the confirmed pin away from the geocoded street location.
+    const marker = page.locator('.maplibregl-marker').first();
+    await marker.waitFor({ state: 'visible', timeout: 10000 });
+    await marker.scrollIntoViewIfNeeded();
+    await delay(200);
+    const box = await marker.boundingBox();
+    assert.ok(box, 'map marker rendered');
+    assert.ok(box.y >= 0 && box.y <= 900, `marker must be inside the viewport (y=${box.y})`);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 70, box.y + box.height / 2 + 45, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForFunction(
+      () => /Pin moved/.test(document.querySelector('[data-address-confirmed-travel]')?.textContent ?? ''),
+      undefined,
+      { timeout: 10000 },
+    );
+
+    await page.click('[data-next]');
+    await homeStep(page);
+    await conditionStep(page);
+    await extrasStep(page);
+    await timingStep(page);
+    await contactFields(page);
+    await page.click('[data-submit]');
+    await page.waitForSelector('[data-form-status][data-state="warning"]', { timeout: 15000 });
+
+    assert.ok(captured.payload, 'the reservation request was sent');
+    const fields = captured.payload.fields;
+    assert.equal(fields.pin_adjusted, 'yes', 'the moved pin is reported as adjusted');
+    assert.notEqual(fields.pin_latitude, '30.411100', 'the adjusted pin coordinates travel with the request');
+    assert.notEqual(fields.pin_longitude, '-87.216400');
+    const text = (await page.locator('[data-form-status]').textContent()) ?? '';
+    assert.match(text, /travel was still preliminary/i, 'a moved pin never gets a verified receipt');
+    assert.doesNotMatch(text, /verified this price/i);
+  } finally {
+    await context.close();
+  }
+});
+
 // ── Mobile complete journey ──────────────────────────────────────────────────
 
 test('the complete journey works on mobile without overflow', async () => {

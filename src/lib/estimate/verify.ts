@@ -49,6 +49,20 @@ export type QuoteVerificationStatus = 'verified' | 'preliminary' | 'mismatch' | 
 
 export type QuoteConfigMatch = 'match' | 'mismatch' | 'unknown';
 
+/**
+ * What the server could establish about the customer-confirmed pin:
+ *  - ok        — the submitted pin matches the server-geocoded destination;
+ *  - adjusted  — the customer reported moving the pin (or it clearly moved);
+ *  - divergent — the submitted pin is far from the server-geocoded address;
+ *  - unknown   — no pin coordinates were submitted.
+ * Only 'ok' can accompany a fully verified verdict: travel to a moved pin can
+ * never be verified against the original geocoded street location.
+ */
+export type PinCheck = 'ok' | 'adjusted' | 'divergent' | 'unknown';
+
+/** Distance above which a submitted pin is treated as divergent (metres). */
+export const PIN_DIVERGENCE_METERS = 500;
+
 export interface QuoteVerificationTravel {
   method: 'route' | 'straight_line_estimate' | 'zone';
   provider: string;
@@ -75,6 +89,10 @@ export interface QuoteVerification {
   referenceValid: boolean;
   /** True only when travel was routed to a server-geocoded street address. */
   destinationPrecise: boolean;
+  /** What the server could establish about the customer-confirmed pin. */
+  pinCheck: PinCheck;
+  /** Distance between the submitted pin and the geocoded address, metres. */
+  pinDistanceMeters: number | null;
   travel: QuoteVerificationTravel;
   /** Plain-language verdict for the owner notification. */
   note: string;
@@ -87,6 +105,25 @@ export const QUOTE_MATCH_TOLERANCE = 10;
 
 /** Display reference shape (see quote.ts createQuoteReference). */
 const QUOTE_REFERENCE_PATTERN = /^SS-\d{8}-[0-9A-Z]{6}$/;
+
+function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
+}
+
+/** Parses the client-submitted pin, but only for divergence checking — never
+ *  as a trusted calculation input. */
+function parseSubmittedPin(fields: Record<string, string>): { lat: number; lng: number } | null {
+  const lat = Number(fields.pin_latitude);
+  const lng = Number(fields.pin_longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return { lat, lng };
+}
 
 function numberFrom(fields: Record<string, string>, key: string): number | undefined {
   const raw = fields[key];
@@ -203,6 +240,8 @@ export async function verifyReservationQuote(
     verified: false,
     destinationSource: 'none',
   };
+  let pinCheck: PinCheck = 'unknown';
+  let pinDistanceMeters: number | null = null;
   const result = (
     status: QuoteVerificationStatus,
     verifiedPrice: number | null,
@@ -219,6 +258,8 @@ export async function verifyReservationQuote(
     clientReference,
     referenceValid,
     destinationPrecise: travel.destinationSource === 'address_geocode',
+    pinCheck,
+    pinDistanceMeters,
     travel,
     note,
     verifiedAt: new Date(now).toISOString(),
@@ -261,6 +302,27 @@ export async function verifyReservationQuote(
     }
   } else if (destination) {
     travel.destinationSource = destination.source;
+  }
+
+  // Pin integrity: a customer-moved pin is a real destination change. The
+  // server still calculates from its OWN geocoded address (untrusted client
+  // coordinates never drive the price), but it must never call travel to the
+  // original address "verified" when the customer's confirmed pin sits
+  // somewhere else — that would treat the original location and price as
+  // verified for a different destination.
+  const submittedPin = parseSubmittedPin(fields);
+  if (destination && submittedPin) {
+    pinDistanceMeters = Math.round(haversineMeters(submittedPin, destination));
+  }
+  const pinReportedAdjusted = fields.pin_adjusted === 'yes';
+  if (pinReportedAdjusted) {
+    pinCheck = 'adjusted';
+  } else if (pinDistanceMeters !== null && pinDistanceMeters > PIN_DIVERGENCE_METERS) {
+    pinCheck = 'divergent';
+  } else if (submittedPin) {
+    pinCheck = 'ok';
+  } else {
+    pinCheck = 'unknown';
   }
 
   const estimate = calculateEstimate(draft, buildEstimateContext(routed));
@@ -317,6 +379,15 @@ export async function verifyReservationQuote(
     uncertainties.push('the submitted quote carried no configuration version');
   } else if (configMatch === 'mismatch') {
     uncertainties.push('the quote was built on a different configuration version');
+  }
+  if (pinCheck === 'adjusted') {
+    uncertainties.push(
+      'the customer moved the confirmed pin away from the geocoded address, so travel must be confirmed against the corrected point',
+    );
+  } else if (pinCheck === 'divergent') {
+    uncertainties.push(
+      `the submitted pin is about ${pinDistanceMeters} m from the server-geocoded address, so travel must be confirmed against the corrected point`,
+    );
   }
 
   if (uncertainties.length === 0) {

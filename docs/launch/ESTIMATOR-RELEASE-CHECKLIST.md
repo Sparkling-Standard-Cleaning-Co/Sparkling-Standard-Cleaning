@@ -40,13 +40,14 @@ Evidence bundle: `%USERPROFILE%\.config\opencode\review\sparkling-standard-estim
 | Proposed price (Option C $42/$50), margin floor, minimum, rounding, reference, expiry | `tests/quote.test.ts`, `tests/estimator.test.ts` |
 | Extras change the price; reservation carries every answer | journey |
 | Server-side verification: match/preliminary/mismatch/unverifiable, forged price/coordinates/reference/date/config/scope | `tests/verify-quote.test.ts`, `tests/api-verification.test.ts` |
+| Moved/displaced destination pin: a manually dragged pin is never fully verified; the server computes its own address and flags `adjusted`/`divergent` pins | `tests/verify-quote.test.ts`, real marker-drag browser regression in `tests/browser/journey.test.mjs` |
 | Call/Text hrefs, receipt honesty (no implied acceptance), no redirect on unverified receipts | journey, `tests/verification-copy.test.ts` |
 | No origin/keys/payment credentials in any built client file | journey security scan over `dist/` |
 | Existing contact form still works | journey |
 | Static structure (7 steps, address/reservation markup, 17 pages) | `npm run smoke`, `npm run verify` |
 
-Current counts: **159 unit tests**, **22 browser tests**, `astro check` 0 errors,
-`npm run verify` (build + links + SEO) green.
+Current counts: **165 unit tests**, **27 browser tests** (including accessibility and the moved-pin
+drag regression), `astro check` 0 errors, `npm run verify` (build + links + SEO) green.
 
 ## 2. Demonstrated with actual live providers (2026-10-01, `$0` tier)
 

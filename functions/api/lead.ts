@@ -50,6 +50,8 @@ const SERVER_OWNED_KEYS = new Set([
   'quote_reference_valid',
   'quote_valid_through',
   'preferred_date_note',
+  'pin_check',
+  'pin_distance_from_geocode_meters',
   'travel_method',
   'travel_provider',
   'travel_distance_miles',
@@ -186,6 +188,10 @@ export async function onRequestPost(context: {
       clean.server_config_version = verification.configVersion;
       clean.config_version_match = verification.configMatch;
       clean.quote_reference_valid = String(verification.referenceValid);
+      clean.pin_check = verification.pinCheck;
+      if (verification.pinDistanceMeters !== null) {
+        clean.pin_distance_from_geocode_meters = String(verification.pinDistanceMeters);
+      }
       clean.quote_valid_through = verification.validThrough;
       clean.travel_method = verification.travel.method;
       clean.travel_provider = verification.travel.provider;

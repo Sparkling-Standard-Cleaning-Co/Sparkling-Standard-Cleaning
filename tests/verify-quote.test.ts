@@ -279,7 +279,7 @@ test('a small variance within the stated tolerance still matches', async () => {
   assert.equal(verification.status, 'verified');
 });
 
-test('browser-submitted coordinates cannot redirect the verified destination', async () => {
+test('browser-submitted coordinates cannot redirect the route — and a divergent pin is flagged', async () => {
   const tampered = fields({
     quoted_price: String(browserPrice()),
     // Coordinates the browser might try to inject (e.g. next door to the origin).
@@ -287,10 +287,13 @@ test('browser-submitted coordinates cannot redirect the verified destination', a
     pin_longitude: '-87.3405',
   });
   const verification = await withFetch(providerStub(), () => verifyReservationQuote(tampered, routedEnv));
-  assert.equal(verification.status, 'verified');
-  // The travel distance reflects the geocoded address, not the injected pin.
+  // The travel distance still reflects the geocoded address, not the injected pin.
   assert.equal(verification.travel.destinationSource, 'address_geocode');
   assert.equal(verification.travel.oneWayMiles, ROUNDED_ONE_WAY_MILES);
+  // The injected pin no longer matches the address, so the quote cannot verify.
+  assert.equal(verification.pinCheck, 'divergent');
+  assert.equal(verification.status, 'preliminary');
+  assert.notEqual(verification.status, 'verified');
 });
 
 test('tampered client fields that break the model are a mismatch, never a verified price', async () => {
@@ -446,4 +449,70 @@ test("a fabricated price that differs by a cent beyond tolerance is a mismatch, 
     verifyReservationQuote(fields({ quoted_price: String(quoted + QUOTE_MATCH_TOLERANCE + 0.01) }), routedEnv),
   );
   assert.equal(verification.status, 'mismatch');
+});
+
+// ── Pin integrity: a moved pin is a different destination ───────────────────
+
+test('a customer-moved pin is never verified even when price, route and config all match', async () => {
+  const quoted = browserPrice();
+  // The pin sits ~5 m from the address (jitter), but the customer reports a drag.
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(
+      fields({
+        quoted_price: String(quoted),
+        pin_latitude: '30.41114',
+        pin_longitude: '-87.21644',
+        pin_adjusted: 'yes',
+      }),
+      routedEnv,
+    ),
+  );
+  assert.equal(verification.pinCheck, 'adjusted');
+  assert.equal(verification.status, 'preliminary', 'a moved pin must never be fully verified');
+  assert.match(verification.note, /moved the confirmed pin/i);
+});
+
+test('a divergent pin is never verified even when the adjusted flag is omitted', async () => {
+  const quoted = browserPrice();
+  // ~2 km away from the geocoded address, with no pin_adjusted claim.
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(
+      fields({
+        quoted_price: String(quoted),
+        pin_latitude: '30.4291',
+        pin_longitude: '-87.2164',
+      }),
+      routedEnv,
+    ),
+  );
+  assert.equal(verification.pinCheck, 'divergent');
+  assert.ok(verification.pinDistanceMeters !== null && verification.pinDistanceMeters > 500);
+  assert.equal(verification.status, 'preliminary', 'travel to the original address cannot verify a moved pin');
+  assert.match(verification.note, /submitted pin is about/i);
+});
+
+test('a small pin jitter with no reported move does not degrade a verified quote', async () => {
+  const quoted = browserPrice();
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(
+      fields({
+        quoted_price: String(quoted),
+        pin_latitude: '30.41110',
+        pin_longitude: '-87.21640',
+        pin_adjusted: 'no',
+      }),
+      routedEnv,
+    ),
+  );
+  assert.equal(verification.pinCheck, 'ok');
+  assert.equal(verification.status, 'verified');
+});
+
+test('reservations without pin coordinates keep the previous verified behavior', async () => {
+  const quoted = browserPrice();
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(fields({ quoted_price: String(quoted) }), routedEnv),
+  );
+  assert.equal(verification.pinCheck, 'unknown');
+  assert.equal(verification.status, 'verified');
 });

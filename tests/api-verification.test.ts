@@ -254,3 +254,48 @@ test('lead: a mis-formatted quote reference is flagged to the owner but never bl
   assert.equal(sent.quote_reference_valid, 'false');
   assert.equal(sent.quote_verified, 'mismatch', 'the reference flag does not replace the price verdict');
 });
+
+test('lead: a moved pin is flagged for the owner and can never be fully verified', async () => {
+  const { stub, forwarded } = verificationStub();
+  const response = await withFetch(stub, () =>
+    leadPost({
+      request: jsonRequest({
+        subject: 'Reservation',
+        fields: reservationFields({
+          quoted_price: '1',
+          pin_latitude: '30.41114',
+          pin_longitude: '-87.21644',
+          pin_adjusted: 'yes',
+          // A hostile client pretending the pin was untouched:
+          pin_check: 'ok',
+        }),
+      }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
+    } as never),
+  );
+  assert.equal(response.status, 200);
+  const sent = forwarded[0] as Record<string, string>;
+  assert.equal(sent.pin_check, 'adjusted', 'the server check replaces the forged client claim');
+  assert.notEqual(sent.quote_verified, 'verified');
+});
+
+test('lead: a divergent pin without an adjusted claim is still flagged as divergent', async () => {
+  const { stub, forwarded } = verificationStub();
+  await withFetch(stub, () =>
+    leadPost({
+      request: jsonRequest({
+        subject: 'Reservation',
+        fields: reservationFields({
+          quoted_price: '1',
+          pin_latitude: '30.4291',
+          pin_longitude: '-87.2164',
+        }),
+      }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
+    } as never),
+  );
+  const sent = forwarded[0] as Record<string, string>;
+  assert.equal(sent.pin_check, 'divergent');
+  assert.ok(Number(sent.pin_distance_from_geocode_meters) > 500);
+  assert.notEqual(sent.quote_verified, 'verified');
+});
