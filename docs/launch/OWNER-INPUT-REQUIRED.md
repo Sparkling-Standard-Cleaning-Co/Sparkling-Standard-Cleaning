@@ -41,7 +41,7 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | 9 | Review link (Google profile) | `business.reviews.submissionUrl` | Needed for the review system; create the Google Business Profile, then supply the links. |
 | 10 | Real social profile URLs | `business.socials` | Footer/schema render only configured profiles. |
 | 11 | Analytics IDs | `PUBLIC_UMAMI_WEBSITE_ID`, `PUBLIC_GTM_CONTAINER_ID` | Consent UI appears only when configured. Accounts must be unique to this business — never reuse another company's IDs. |
-| 12 | SMS capability | `business.flags.smsEnabled` | Text CTAs stay hidden until a real text message has been sent to and received from (850) 246-8479. A mobile-style number is not proof. |
+| 12 | SMS capability | `business.flags.smsEnabled` | **Done 2026-10-01.** Owner-confirmed: the business number receives SMS and text contact is authorized; `business.flags.smsEnabled` is true and the Call/Text reservation actions are live. |
 | 13 | Final cancellation percentages | `src/config/pricing.ts` cancellation | Currently provisional; public copy intentionally avoids numbers until approved. |
 | 14 | Turnstile keys (recommended) | `PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Otherwise forms rely on honeypot + timing. |
 | 15 | EIA API key (optional) | `EIA_API_KEY` | Live Gulf Coast gas reference; fallback price works without it. |
