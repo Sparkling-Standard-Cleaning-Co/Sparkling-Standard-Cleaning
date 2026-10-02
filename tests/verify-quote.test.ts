@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  isGpsPinDestination,
   isPricedReservation,
   mapReservationFields,
   resolveServerDestination,
@@ -252,6 +253,51 @@ test('the server composes street, city, state and ZIP for exact address lookup',
     urls.some((url) => url.includes('6360 Haupert Ln, Molino, FL, 32577')),
     'the exact-address query includes city, state and ZIP',
   );
+});
+
+// ── GPS destinations without a ZIP ───────────────────────────────────────────
+
+test('a confirmed GPS pin without a ZIP resolves from the customer pin, never a fabricated ZIP', async () => {
+  const gpsFields = fields({
+    address_method: 'gps',
+    address_confirmed: 'yes',
+    service_address: '',
+    address_city: '',
+    address_state: '',
+    zip: '',
+    pin_latitude: '30.525600',
+    pin_longitude: '-87.316500',
+  });
+  assert.equal(isGpsPinDestination(gpsFields), true);
+  const destination = await withFetch(providerStub(), () =>
+    resolveServerDestination(gpsFields, routedEnv),
+  );
+  assert.equal(destination?.source, 'customer_pin');
+  assert.equal(destination?.lat, 30.5256);
+  assert.equal(destination?.lng, -87.3165);
+});
+
+test('a GPS pin destination without a ZIP can only ever verify as preliminary', async () => {
+  const now = Date.UTC(2026, 9, 2, 12, 0, 0);
+  const quoted = browserPrice({ zip: '', destinationConfirmed: true });
+  const gpsFields = fields({
+    address_method: 'gps',
+    address_confirmed: 'yes',
+    service_address: '',
+    address_city: '',
+    address_state: '',
+    zip: '',
+    pin_latitude: '30.525600',
+    pin_longitude: '-87.316500',
+    quoted_price: String(quoted),
+  });
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(gpsFields, routedEnv, now),
+  );
+  assert.equal(verification.status, 'preliminary');
+  assert.equal(verification.destinationPrecise, false);
+  assert.equal(verification.travel.destinationSource, 'customer_pin');
+  assert.match(verification.note, /device pin/i);
 });
 
 // ── Match / mismatch verdicts ────────────────────────────────────────────────
