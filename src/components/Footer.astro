@@ -2,15 +2,14 @@
 import { business, isPending, siteName } from '../config/business';
 import { footerServicesNav, footerCompanyNav, footerResourcesNav } from '../lib/site';
 import Logo from './Logo.astro';
-import SocialIcon from './SocialIcon.astro';
-import type { SocialName } from '../lib/icons';
+import SocialLinks from './SocialLinks.astro';
 
 const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const year = new Date().getFullYear();
 
-const socialEntries = (
-  Object.entries(business.socials) as Array<[SocialName, string | 'PENDING']>
-).filter(([, url]) => url !== 'PENDING');
+const socialEntries = Object.values(business.socials).filter(
+  (url) => typeof url === 'string' && url.length > 0 && !isPending(url),
+);
 ---
 
 <footer class="site-footer">
@@ -84,21 +83,22 @@ const socialEntries = (
           }
           <li>{business.hours.display}</li>
         </ul>
-        {
-          socialEntries.length > 0 && (
-            <ul style="display:flex; gap: var(--space-3); margin-top: var(--space-4); list-style:none">
-              {socialEntries.map(([platform, url]) => (
-                <li>
-                  <a href={url} aria-label={`${siteName()} on ${platform}`} rel="me noopener" target="_blank">
-                    <SocialIcon name={platform} />
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )
-        }
       </div>
     </div>
+
+    {
+      socialEntries.length > 0 && (
+        <section class="social-follow" data-social-follow aria-labelledby="social-follow-heading">
+          <div class="social-follow__intro">
+            <h2 class="social-follow__title" id="social-follow-heading">Follow Us</h2>
+            <p class="social-follow__copy">
+              Follow along for updates and a closer look at our work.
+            </p>
+          </div>
+          <SocialLinks />
+        </section>
+      )
+    }
 
     <div class="site-footer__bottom">
       <span>© {year} {siteName()}. All rights reserved.</span>

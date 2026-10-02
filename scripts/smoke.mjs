@@ -48,6 +48,7 @@ for (const page of REQUIRED_PAGES) {
   for (const [label, needle] of [
     ['header shell', 'class="site-header"'],
     ['footer shell', 'class="site-footer"'],
+    ['follow-us section', 'data-social-follow'],
     ['mobile action bar', 'class="mobile-action-bar"'],
     ['skip link', 'class="skip-link"'],
     ['main landmark', 'id="main"'],

@@ -1,0 +1,69 @@
+---
+// Follow Us links — the ONLY place social profile URLs render from.
+//
+// Rules (see AGENTS.md and the owner directive):
+//  - URLs come from src/config/business.ts; never hard-code a profile URL here.
+//  - A platform renders ONLY when its confirmed URL is configured. PENDING
+//    platforms are filtered out, so adding a real URL later is a one-line
+//    config change and nothing else.
+//  - Outbound links open in a new tab with rel="noopener noreferrer" and an
+//    accessible name; the glyph is decorative.
+//  - These are outbound profile links: never append UTM/campaign parameters.
+//    UTMs belong on inbound links that point visitors TO this website.
+
+import { business, siteName, isPending } from '../config/business';
+import type { SocialName } from '../lib/icons';
+import SocialIcon from './SocialIcon.astro';
+
+interface ProfileDefinition {
+  /** Key in business.socials. */
+  key: keyof typeof business.socials;
+  label: string;
+  icon: SocialName;
+}
+
+// Presentation order and labels. Update here only when a platform is added.
+const PROFILE_ORDER: ProfileDefinition[] = [
+  { key: 'facebook', label: 'Facebook', icon: 'facebook' },
+  { key: 'instagram', label: 'Instagram', icon: 'instagram' },
+  { key: 'tiktok', label: 'TikTok', icon: 'tiktok' },
+  { key: 'youtube', label: 'YouTube', icon: 'youtube' },
+  { key: 'nextdoor', label: 'Nextdoor', icon: 'nextdoor' },
+  { key: 'pinterest', label: 'Pinterest', icon: 'pinterest' },
+  { key: 'yelp', label: 'Yelp', icon: 'yelp' },
+  { key: 'linkedin', label: 'LinkedIn', icon: 'linkedin' },
+  { key: 'googleProfile', label: 'Google Business Profile', icon: 'google' },
+];
+
+const profiles = PROFILE_ORDER.flatMap((profile) => {
+  const url = business.socials[profile.key];
+  if (isPending(url) || typeof url !== 'string') return [];
+  return [{ ...profile, url }];
+});
+---
+
+{
+  profiles.length > 0 && (
+    <ul class="social-links" data-social-links>
+      {profiles.map((profile) => (
+        <li>
+          <a
+            class="social-links__link"
+            href={profile.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-cta={`social-${profile.key.toLowerCase()}`}
+          >
+            <span class="social-links__tile">
+              <SocialIcon name={profile.icon} size={22} />
+            </span>
+            <span class="social-links__label">{profile.label}</span>
+            <span class="visually-hidden">
+              {' '}({siteName()} on {profile.label} — opens in a new tab)
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}

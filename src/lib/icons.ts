@@ -46,5 +46,7 @@ export type SocialName =
   | 'tiktok'
   | 'youtube'
   | 'nextdoor'
+  | 'pinterest'
+  | 'yelp'
   | 'linkedin'
   | 'google';
