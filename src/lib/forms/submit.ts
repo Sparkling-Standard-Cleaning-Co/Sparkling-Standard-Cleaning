@@ -14,8 +14,34 @@ import type { AnalyticsEventName } from '../analytics/events';
 import { track } from '../analytics/events';
 
 export type SubmitOutcome =
-  | { ok: true; via: 'relay' | 'provider' }
+  | { ok: true; via: 'relay' | 'provider'; verification?: LeadVerification }
   | { ok: false; reason: 'not_configured' | 'provider_error' | 'network_error' | 'server_error' | 'spam_rejected' };
+
+/**
+ * The server's verdict for a priced reservation. There is deliberately no
+ * price here: the browser must never present an unverified price as accepted.
+ */
+export interface LeadVerification {
+  status: 'verified' | 'preliminary' | 'mismatch' | 'unverifiable';
+  travel_verified: boolean;
+  travel_method: string;
+  config_match: string;
+}
+
+function parseVerification(value: unknown): LeadVerification | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  const status = record.status;
+  if (status !== 'verified' && status !== 'preliminary' && status !== 'mismatch' && status !== 'unverifiable') {
+    return undefined;
+  }
+  return {
+    status,
+    travel_verified: record.travel_verified === true,
+    travel_method: typeof record.travel_method === 'string' ? record.travel_method : 'none',
+    config_match: typeof record.config_match === 'string' ? record.config_match : 'unknown',
+  };
+}
 
 function turnstileToken(): string | undefined {
   const input = document.querySelector<HTMLInputElement>('input[name="cf-turnstile-response"]');
@@ -64,7 +90,11 @@ export async function submitLead(
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (response.ok) return { ok: true, via: 'relay' };
+    if (response.ok) {
+      const data = (await response.json().catch(() => ({}))) as { verification?: unknown };
+      const verification = parseVerification(data.verification);
+      return { ok: true, via: 'relay', ...(verification ? { verification } : {}) };
+    }
     if (response.status === 503) {
       // The relay is deployed but its server key is not configured. It tells
       // the client to use the static fallback — do exactly that instead of

@@ -104,6 +104,8 @@ function fields(overrides: Record<string, string> = {}): Record<string, string> 
     pets: 'none',
     addon_ids: '',
     service_address: '100 S Baylen St',
+    quote_reference: 'SS-20261001-ABC123',
+    quote_config_version: pricing.instantQuote.configVersion.value,
     ...overrides,
   };
 }
@@ -217,19 +219,22 @@ test('an unresolvable address falls back to the provisional ZIP centroid', async
 
 // ── Match / mismatch verdicts ────────────────────────────────────────────────
 
-test('a matching reservation verifies with the server-recalculated price', async () => {
+test('a matching reservation with live travel, precise address and current config is fully verified', async () => {
   const now = Date.UTC(2026, 9, 1, 12, 0, 0);
   const quoted = browserPrice();
   const verification = await withFetch(providerStub(), () =>
     verifyReservationQuote(fields({ quoted_price: String(quoted) }), routedEnv, now),
   );
-  assert.equal(verification.status, 'match');
+  assert.equal(verification.status, 'verified', verification.note);
   assert.equal(verification.verifiedPrice, quoted);
   assert.equal(verification.clientPrice, quoted);
   assert.equal(verification.travel.verified, true);
   assert.equal(verification.travel.method, 'route');
   assert.equal(verification.travel.oneWayMiles, ROUNDED_ONE_WAY_MILES);
   assert.equal(verification.travel.durationMinutes, ROUNDED_DURATION_MINUTES);
+  assert.equal(verification.configMatch, 'match');
+  assert.equal(verification.destinationPrecise, true);
+  assert.equal(verification.referenceValid, true);
   assert.match(verification.note, /Verified/);
 });
 
@@ -238,7 +243,9 @@ test('the config version and expiration policy are recorded on every verdict', a
   const verification = await withFetch(providerStub(), () =>
     verifyReservationQuote(fields({ quoted_price: String(browserPrice()) }), routedEnv, now),
   );
+  assert.equal(verification.status, 'verified');
   assert.equal(verification.configVersion, pricing.instantQuote.configVersion.value);
+  assert.equal(verification.configMatch, 'match');
   assert.equal(
     new Date(verification.validThrough).getTime(),
     now + pricing.instantQuote.validityHours.value * 3_600_000,
@@ -269,7 +276,7 @@ test('a small variance within the stated tolerance still matches', async () => {
   const verification = await withFetch(providerStub(), () =>
     verifyReservationQuote(fields({ quoted_price: String(quoted + QUOTE_MATCH_TOLERANCE) }), routedEnv),
   );
-  assert.equal(verification.status, 'match');
+  assert.equal(verification.status, 'verified');
 });
 
 test('browser-submitted coordinates cannot redirect the verified destination', async () => {
@@ -280,7 +287,7 @@ test('browser-submitted coordinates cannot redirect the verified destination', a
     pin_longitude: '-87.3405',
   });
   const verification = await withFetch(providerStub(), () => verifyReservationQuote(tampered, routedEnv));
-  assert.equal(verification.status, 'match');
+  assert.equal(verification.status, 'verified');
   // The travel distance reflects the geocoded address, not the injected pin.
   assert.equal(verification.travel.destinationSource, 'address_geocode');
   assert.equal(verification.travel.oneWayMiles, ROUNDED_ONE_WAY_MILES);
@@ -315,17 +322,18 @@ test('a reservation without a submitted price is unverifiable but still reports 
 
 // ── Offline / degradation paths ──────────────────────────────────────────────
 
-test('without TRAVEL_ORIGIN verification still recalculates in offline zone mode', async () => {
+test('without TRAVEL_ORIGIN verification still recalculates, but never as verified', async () => {
   const quoted = browserPrice({}, false, false);
   const verification = await withFetch(providerStub(), () =>
     verifyReservationQuote(fields({ quoted_price: String(quoted) }), zoneEnv),
   );
-  assert.equal(verification.status, 'match');
+  assert.equal(verification.status, 'preliminary');
   assert.equal(verification.travel.method, 'zone');
   assert.equal(verification.travel.verified, false);
   // The address is still resolved server-side for the owner's records even
   // when no private origin exists to route from.
   assert.equal(verification.travel.destinationSource, 'address_geocode');
+  assert.match(verification.note, /Preliminary/);
 });
 
 test('a routing quota refusal degrades to preliminary travel but still verifies the price model', async () => {
@@ -352,5 +360,90 @@ test('a total network outage still recomputes from the ZIP reference and stays h
   assert.equal(verification.travel.destinationSource, 'zip_centroid');
   assert.equal(verification.travel.method, 'straight_line_estimate');
   assert.ok(verification.verifiedPrice !== null && verification.verifiedPrice > 0);
-  assert.ok(['match', 'mismatch'].includes(verification.status));
+  assert.ok(['preliminary', 'mismatch'].includes(verification.status));
+  assert.notEqual(verification.status, 'verified');
+});
+
+// ── Integrity: uncertainty is preserved, never rounded down ─────────────────
+
+test('a matching price routed only to the ZIP centre is preliminary, never verified', async () => {
+  // The address cannot be geocoded (both provider and Census return nothing),
+  // so the server falls back to the ZIP centroid even though routing is live.
+  const quoted = browserPrice();
+  const verification = await withFetch(
+    async (url) => {
+      const href = String(url);
+      if (href.includes('geocoding.geo.census.gov')) {
+        return jsonResponse({ result: { addressMatches: [] } });
+      }
+      if (href.includes('api.mapmap.ai/geocode?')) {
+        return jsonResponse({ features: [] });
+      }
+      if (href.includes('/route/v1/')) {
+        return jsonResponse({ code: 'Ok', routes: [{ distance: 19000, duration: 900 }] });
+      }
+      return jsonResponse({}, 500);
+    },
+    () => verifyReservationQuote(fields({ quoted_price: String(quoted) }), routedEnv),
+  );
+  assert.equal(verification.travel.destinationSource, 'zip_centroid');
+  assert.equal(verification.travel.verified, true, 'the route itself is live');
+  assert.equal(verification.destinationPrecise, false);
+  assert.equal(verification.status, 'preliminary');
+  assert.match(verification.note, /ZIP-centre/);
+});
+
+test('a match with an unknown configuration version is preliminary', async () => {
+  const quoted = browserPrice();
+  const withoutVersion = fields({ quoted_price: String(quoted) });
+  delete withoutVersion.quote_config_version;
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(withoutVersion, routedEnv),
+  );
+  assert.equal(verification.status, 'preliminary');
+  assert.equal(verification.configMatch, 'unknown');
+  assert.match(verification.note, /no configuration version/);
+});
+
+test('a match built on a stale configuration version is preliminary', async () => {
+  const quoted = browserPrice();
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(
+      fields({ quoted_price: String(quoted), quote_config_version: '2026-09-01.option-c.v0' }),
+      routedEnv,
+    ),
+  );
+  assert.equal(verification.status, 'preliminary');
+  assert.equal(verification.configMatch, 'mismatch');
+  assert.match(verification.note, /different configuration version/);
+});
+
+test('a forged quote reference is flagged but is never treated as authorization', async () => {
+  const quoted = browserPrice();
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(
+      fields({ quoted_price: String(quoted), quote_reference: 'FORGED-REFERENCE' }),
+      routedEnv,
+    ),
+  );
+  assert.equal(verification.referenceValid, false, 'the forged reference is recorded as invalid');
+  // The reference is display data: it neither verifies nor invalidates the price.
+  assert.equal(verification.status, 'verified');
+});
+
+test('scope tampering is caught: a small-home price submitted for a large home mismatches', async () => {
+  const smallHomePrice = browserPrice({ squareFeet: 300, bedrooms: 0, fullBaths: 1 });
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(fields({ quoted_price: String(smallHomePrice) }), routedEnv),
+  );
+  assert.equal(verification.status, 'mismatch');
+  assert.ok(verification.verifiedPrice !== null && verification.verifiedPrice > smallHomePrice);
+});
+
+test("a fabricated price that differs by a cent beyond tolerance is a mismatch, not 'close enough'", async () => {
+  const quoted = browserPrice();
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(fields({ quoted_price: String(quoted + QUOTE_MATCH_TOLERANCE + 0.01) }), routedEnv),
+  );
+  assert.equal(verification.status, 'mismatch');
 });

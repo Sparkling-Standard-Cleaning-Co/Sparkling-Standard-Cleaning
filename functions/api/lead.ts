@@ -46,7 +46,10 @@ const SERVER_OWNED_KEYS = new Set([
   'verified_range',
   'verification_note',
   'server_config_version',
+  'config_version_match',
+  'quote_reference_valid',
   'quote_valid_through',
+  'preferred_date_note',
   'travel_method',
   'travel_provider',
   'travel_distance_miles',
@@ -54,6 +57,30 @@ const SERVER_OWNED_KEYS = new Set([
   'travel_verified',
   'travel_destination_source',
 ]);
+
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Drops a preferred date that is malformed, in the past (beyond a one-day
+ * grace) or more than a year ahead, and records why. Never rejects the lead.
+ */
+function sanitizePreferredDate(fields: Record<string, string>): void {
+  const raw = fields.preferred_date;
+  if (!raw) return;
+  const match = ISO_DATE.exec(raw);
+  const parsed = match ? Date.parse(`${raw}T12:00:00Z`) : Number.NaN;
+  const now = Date.now();
+  const oneDayMs = 86_400_000;
+  const valid =
+    Boolean(match) &&
+    Number.isFinite(parsed) &&
+    parsed >= now - oneDayMs &&
+    parsed <= now + 366 * oneDayMs;
+  if (!valid) {
+    delete fields.preferred_date;
+    fields.preferred_date_note = 'submitted preferred date was invalid or out of range and was discarded';
+  }
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -135,11 +162,18 @@ export async function onRequestPost(context: {
     return json({ ok: false, error: 'not_configured' }, 503);
   }
 
+  // Sanitize the preferred date: a hostile/typo date must never reach the
+  // owner as a real scheduling request. Invalid or out-of-range dates are
+  // discarded with a note; the rest of the request is still delivered.
+  sanitizePreferredDate(clean);
+
   // Authoritative quote verification for priced reservation requests. The
   // customer's browser price/travel values are ignored; the server resolves
   // the destination, routes from the private origin and recalculates. A
   // verification failure never discards the request — it is marked so the
   // owner reviews it manually.
+  let clientVerification: { status: string; travel_verified: boolean; travel_method: string; config_match: string } | null =
+    null;
   if (isPricedReservation(clean)) {
     try {
       const verification = await verifyReservationQuote(clean, env);
@@ -150,6 +184,8 @@ export async function onRequestPost(context: {
         clean.verified_range = `$${verification.verifiedRange.low}–$${verification.verifiedRange.high}`;
       }
       clean.server_config_version = verification.configVersion;
+      clean.config_version_match = verification.configMatch;
+      clean.quote_reference_valid = String(verification.referenceValid);
       clean.quote_valid_through = verification.validThrough;
       clean.travel_method = verification.travel.method;
       clean.travel_provider = verification.travel.provider;
@@ -162,10 +198,24 @@ export async function onRequestPost(context: {
       clean.travel_verified = String(verification.travel.verified);
       clean.travel_destination_source = verification.travel.destinationSource;
       clean.verification_note = verification.note;
+      // The customer-facing receipt carries the verdict (no prices) so the
+      // browser can never imply an unverified price was accepted.
+      clientVerification = {
+        status: verification.status,
+        travel_verified: verification.travel.verified,
+        travel_method: verification.travel.method,
+        config_match: verification.configMatch,
+      };
     } catch {
       clean.quote_verified = 'unverifiable';
       clean.verification_note =
         'Server verification could not complete; review the submitted price manually before confirming anything.';
+      clientVerification = {
+        status: 'unverifiable',
+        travel_verified: false,
+        travel_method: 'none',
+        config_match: 'unknown',
+      };
     }
   }
 
@@ -183,7 +233,10 @@ export async function onRequestPost(context: {
     });
     const data = (await response.json().catch(() => ({}))) as { success?: boolean };
     if (response.ok && data.success === true) {
-      return json({ ok: true });
+      return json({
+        ok: true,
+        ...(clientVerification ? { verification: clientVerification } : {}),
+      });
     }
     return json({ ok: false, error: 'provider_failed' }, 502);
   } catch {

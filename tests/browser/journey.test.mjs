@@ -356,7 +356,14 @@ test('reservation summary carries every answer and the call/text actions work', 
   const captured = {};
   await page.route('**/api/lead', async (route) => {
     captured.payload = route.request().postDataJSON();
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        verification: { status: 'verified', travel_verified: true, travel_method: 'route', config_match: 'match' },
+      }),
+    });
   });
   try {
     await step1(page);
@@ -444,7 +451,14 @@ test('client-side price manipulation does not change the submitted price', async
   const captured = {};
   await page.route('**/api/lead', async (route) => {
     captured.payload = route.request().postDataJSON();
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        verification: { status: 'verified', travel_verified: true, travel_method: 'route', config_match: 'match' },
+      }),
+    });
   });
   try {
     await step1(page);
@@ -467,6 +481,73 @@ test('client-side price manipulation does not change the submitted price', async
     await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'success');
     await delay(150);
     assert.equal(captured.payload.fields.quoted_price, '250', 'the real calculated price is submitted');
+  } finally {
+    await context.close();
+  }
+});
+
+// ── Honest server verdicts on the receipt ───────────────────────────────────
+
+async function completeReservation(page) {
+  await step1(page);
+  await addressStep(page);
+  await homeStep(page);
+  await conditionStep(page);
+  await extrasStep(page);
+  await timingStep(page);
+  await contactFields(page);
+}
+
+test('a mismatch verdict is shown honestly and never claims the price was accepted', async () => {
+  const { context, page } = await openEstimate(1440, 900);
+  await page.route('**/api/lead', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        verification: { status: 'mismatch', travel_verified: true, travel_method: 'route', config_match: 'match' },
+      }),
+    }),
+  );
+  try {
+    await completeReservation(page);
+    await page.click('[data-submit]');
+    await page.waitForSelector('[data-form-status][data-state="warning"]', { timeout: 15000 });
+    const text = (await page.locator('[data-form-status]').textContent()) ?? '';
+    assert.match(text, /price check found a difference/i);
+    assert.match(text, /owner will confirm the correct price/i);
+    assert.doesNotMatch(text, /verified this price/i);
+    assert.match(page.url(), /\/estimate\/$/, 'an unverified receipt stays on screen (no redirect away)');
+  } finally {
+    await context.close();
+  }
+});
+
+test('a preliminary verdict names the travel uncertainty', async () => {
+  const { context, page } = await openEstimate(1440, 900);
+  await page.route('**/api/lead', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        verification: {
+          status: 'preliminary',
+          travel_verified: false,
+          travel_method: 'straight_line_estimate',
+          config_match: 'match',
+        },
+      }),
+    }),
+  );
+  try {
+    await completeReservation(page);
+    await page.click('[data-submit]');
+    await page.waitForSelector('[data-form-status][data-state="warning"]', { timeout: 15000 });
+    const text = (await page.locator('[data-form-status]').textContent()) ?? '';
+    assert.match(text, /travel was still preliminary/i);
+    assert.doesNotMatch(text, /verified this price/i);
   } finally {
     await context.close();
   }

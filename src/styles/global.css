@@ -1062,6 +1062,13 @@ fieldset {
   border: 1px solid var(--color-champagne-500);
 }
 
+.form-status[data-state='warning'] {
+  display: block;
+  background: var(--color-warning-100);
+  color: var(--color-warning-700);
+  border: 1px solid var(--color-warning-700);
+}
+
 .contact-fallback {
   border-top: 1px dashed var(--color-border-strong);
   margin-top: var(--space-5);

@@ -23,6 +23,7 @@ import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInf
 import { locationKey, formatLocationLine, type ConfirmedLocation } from '../lib/location/location';
 import { initAddressFinder, type AddressFinderHandle } from './address-finder';
 import { submitLead, recordConversion } from '../lib/forms/submit';
+import { reservationReceipt } from '../lib/forms/verification-copy';
 import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { track } from '../lib/analytics/events';
 import { attributionFields } from '../lib/attribution';
@@ -702,16 +703,27 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (fields.preferred_date) {
       recordConversion('booking_request', { service_type: fields.service_type });
     }
+
+    // The receipt reflects the server's actual verdict. A mismatch or
+    // preliminary travel result is never presented as an accepted price.
+    const receipt = isReservation
+      ? reservationReceipt(outcome.verification, outcome.via)
+      : {
+          state: 'success' as const,
+          message:
+            'Request received — not booked yet. The owner will confirm scope, date and final price with you before anything is scheduled.',
+        };
     if (status) {
-      status.dataset.state = 'success';
-      status.textContent =
-        outcome.via === 'relay'
-          ? 'Reservation request received — not booked yet. Our server verified your quote and the owner will confirm scope, date and price with you.'
-          : 'Request received — not booked yet. The owner will verify your quote and confirm scope, date and price with you.';
+      status.dataset.state = receipt.state;
+      status.textContent = receipt.message;
     }
-    window.setTimeout(() => {
-      window.location.assign('/thank-you/');
-    }, 900);
+    // Only a verified/success receipt navigates away; an unverified receipt
+    // stays on screen so the customer actually reads the uncertainty.
+    if (receipt.state === 'success') {
+      window.setTimeout(() => {
+        window.location.assign('/thank-you/');
+      }, 900);
+    }
   }
 
   // ── Wiring ────────────────────────────────────────────────────────────────

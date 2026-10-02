@@ -33,7 +33,21 @@ import { resolveAddress, type GeocodeEnv } from '../location/server-geocode.ts';
 
 export interface QuoteVerificationEnv extends RoutingEnv, GeocodeEnv {}
 
-export type QuoteVerificationStatus = 'match' | 'mismatch' | 'unverifiable';
+/**
+ * Verdict vocabulary:
+ *  - verified     — price matches, travel is a live route to the geocoded
+ *                   street address, and the quote's configuration version
+ *                   matches the server's. The only verdict that may be
+ *                   described as fully verified.
+ *  - preliminary  — price matches, but at least one certainty is missing
+ *                   (approximate/ZIP-centre travel, or unknown/stale config
+ *                   version). Never a guaranteed travel-inclusive price.
+ *  - mismatch     — the server calculation does not substantiate the price.
+ *  - unverifiable — the request could not be checked at all.
+ */
+export type QuoteVerificationStatus = 'verified' | 'preliminary' | 'mismatch' | 'unverifiable';
+
+export type QuoteConfigMatch = 'match' | 'mismatch' | 'unknown';
 
 export interface QuoteVerificationTravel {
   method: 'route' | 'straight_line_estimate' | 'zone';
@@ -54,7 +68,13 @@ export interface QuoteVerification {
   /** Server configuration version that produced the verified price. */
   configVersion: string;
   clientConfigVersion: string | null;
+  /** Whether the submitted quote was built on the current configuration. */
+  configMatch: QuoteConfigMatch;
   clientReference: string | null;
+  /** Format check only — the reference is display data, never authorization. */
+  referenceValid: boolean;
+  /** True only when travel was routed to a server-geocoded street address. */
+  destinationPrecise: boolean;
   travel: QuoteVerificationTravel;
   /** Plain-language verdict for the owner notification. */
   note: string;
@@ -64,6 +84,9 @@ export interface QuoteVerification {
 
 /** Price agreement tolerance (USD): covers provider/rounding variance. */
 export const QUOTE_MATCH_TOLERANCE = 10;
+
+/** Display reference shape (see quote.ts createQuoteReference). */
+const QUOTE_REFERENCE_PATTERN = /^SS-\d{8}-[0-9A-Z]{6}$/;
 
 function numberFrom(fields: Record<string, string>, key: string): number | undefined {
   const raw = fields[key];
@@ -163,7 +186,14 @@ export async function verifyReservationQuote(
 ): Promise<QuoteVerification> {
   const configVersion = pricing.instantQuote.configVersion.value;
   const clientConfigVersion = fields.quote_config_version?.trim() || null;
+  const configMatch: QuoteConfigMatch =
+    clientConfigVersion === null
+      ? 'unknown'
+      : clientConfigVersion === configVersion
+        ? 'match'
+        : 'mismatch';
   const clientReference = fields.quote_reference?.trim() || null;
+  const referenceValid = clientReference !== null && QUOTE_REFERENCE_PATTERN.test(clientReference);
   const clientPrice = numberFrom(fields, 'quoted_price') ?? null;
   const travel: QuoteVerificationTravel = {
     method: 'zone',
@@ -185,7 +215,10 @@ export async function verifyReservationQuote(
     verifiedRange,
     configVersion,
     clientConfigVersion,
+    configMatch,
     clientReference,
+    referenceValid,
+    destinationPrecise: travel.destinationSource === 'address_geocode',
     travel,
     note,
     verifiedAt: new Date(now).toISOString(),
@@ -257,19 +290,55 @@ export async function verifyReservationQuote(
   }
 
   const difference = Math.round((clientPrice - amount) * 100) / 100;
-  if (Math.abs(difference) <= QUOTE_MATCH_TOLERANCE) {
-    const travelCopy = travel.verified
-      ? `live route ${travel.oneWayMiles ?? '—'} mi / ${travel.durationMinutes ?? '—'} min via ${travel.provider}`
-      : `preliminary travel (${travel.destinationSource === 'address_geocode' ? 'geocoded address' : 'ZIP reference'}, ${travel.oneWayMiles ?? '—'} mi)`;
-    return result('match', amount, range, `Verified: $${amount} matches our calculation (${travelCopy}).`);
+  if (Math.abs(difference) > QUOTE_MATCH_TOLERANCE) {
+    const direction = difference > 0 ? 'higher than' : 'different from';
+    return result(
+      'mismatch',
+      amount,
+      range,
+      `The submitted price $${clientPrice} is ${direction} our verified calculation $${amount}. Do not confirm without reviewing the scope.`,
+    );
   }
 
-  const direction = difference > 0 ? 'higher than' : 'different from';
+  // The price reproduces — but a reproduced number alone is not "verified".
+  // Full verification requires live travel to the customer's geocoded street
+  // address AND a quote built on the current configuration.
+  const uncertainties: string[] = [];
+  if (travel.verified && travel.destinationSource === 'address_geocode') {
+    // Live route to the precise address: certainty about travel.
+  } else if (travel.verified) {
+    uncertainties.push('travel was routed to the ZIP-centre reference, not the street address');
+  } else if (travel.method === 'straight_line_estimate') {
+    uncertainties.push('travel is an approximate road-distance estimate, not a live route');
+  } else {
+    uncertainties.push('travel could not be measured (no live route)');
+  }
+  if (configMatch === 'unknown') {
+    uncertainties.push('the submitted quote carried no configuration version');
+  } else if (configMatch === 'mismatch') {
+    uncertainties.push('the quote was built on a different configuration version');
+  }
+
+  if (uncertainties.length === 0) {
+    const travelCopy = `live route ${travel.oneWayMiles ?? '—'} mi / ${travel.durationMinutes ?? '—'} min via ${travel.provider}`;
+    return result(
+      'verified',
+      amount,
+      range,
+      `Verified: $${amount} matches our calculation, travel is a ${travelCopy} to the confirmed address, and the configuration version matches.`,
+    );
+  }
+
+  const travelSummary = travel.verified
+    ? `live route ${travel.oneWayMiles ?? '—'} mi / ${travel.durationMinutes ?? '—'} min via ${travel.provider}`
+    : travel.method === 'straight_line_estimate'
+      ? `approximate ${travel.oneWayMiles ?? '—'} mi road-distance estimate`
+      : 'zone-based travel';
   return result(
-    'mismatch',
+    'preliminary',
     amount,
     range,
-    `The submitted price $${clientPrice} is ${direction} our verified calculation $${amount}. Do not confirm without reviewing the scope.`,
+    `Preliminary: $${amount} matches our calculation, but ${uncertainties.join('; ')} (${travelSummary}). Travel must be confirmed before treating this as travel-inclusive.`,
   );
 }
 

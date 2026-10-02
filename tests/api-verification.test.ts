@@ -104,8 +104,22 @@ test('lead: reservation requests are recalculated server-side and labeled for th
   assert.equal(sent.travel_method, 'straight_line_estimate');
   assert.equal(sent.travel_destination_source, 'address_geocode');
   assert.equal(sent.server_config_version, '2026-10-01.option-c.v1');
+  assert.equal(sent.config_version_match, 'match');
+  assert.equal(sent.quote_reference_valid, 'true');
   assert.ok(sent.verification_note && /verified calculation/i.test(sent.verification_note));
   assert.ok(sent.quote_valid_through);
+
+  // The browser receipt carries the verdict but never a price.
+  const body = (await response.json()) as {
+    ok: boolean;
+    verification?: Record<string, unknown>;
+  };
+  assert.equal(body.verification?.status, 'mismatch');
+  assert.equal(body.verification?.travel_verified, false);
+  assert.equal(body.verification?.travel_method, 'straight_line_estimate');
+  assert.equal(body.verification?.config_match, 'match');
+  assert.equal(body.verification?.verified_price, undefined);
+  assert.equal(body.verification?.price, undefined);
 });
 
 test('lead: a forged client verification field never reaches the owner', async () => {
@@ -164,4 +178,79 @@ test('lead: a provider outage still delivers the reservation with an honest verd
   assert.equal(sent.quote_verified, 'mismatch');
   assert.equal(sent.travel_destination_source, 'zip_centroid');
   assert.ok(Number(sent.verified_price) > 0);
+});
+
+// ── Malicious or malformed submitted values ──────────────────────────────────
+
+test('lead: invalid, past and far-future preferred dates are discarded with a note', async () => {
+  const cases = ['not-a-date', '2020-01-01', '2099-01-01', '2026-02-31'];
+  for (const preferredDate of cases) {
+    const { stub, forwarded } = verificationStub();
+    await withFetch(stub, () =>
+      leadPost({
+        request: jsonRequest({
+          subject: 'Reservation',
+          fields: reservationFields({ quoted_price: '1', preferred_date: preferredDate }),
+        }),
+        env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
+      } as never),
+    );
+    const sent = forwarded[0] as Record<string, string>;
+    assert.equal(sent.preferred_date, undefined, `date ${preferredDate} must not be forwarded`);
+    assert.match(sent.preferred_date_note ?? '', /invalid or out of range/);
+  }
+});
+
+test('lead: a valid future preferred date is forwarded untouched', async () => {
+  const { stub, forwarded } = verificationStub();
+  const valid = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+  await withFetch(stub, () =>
+    leadPost({
+      request: jsonRequest({
+        subject: 'Reservation',
+        fields: reservationFields({ quoted_price: '1', preferred_date: valid }),
+      }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
+    } as never),
+  );
+  const sent = forwarded[0] as Record<string, string>;
+  assert.equal(sent.preferred_date, valid);
+  assert.equal(sent.preferred_date_note, undefined);
+});
+
+test('lead: a client-forged preferred_date_note never reaches the owner', async () => {
+  const { stub, forwarded } = verificationStub();
+  await withFetch(stub, () =>
+    leadPost({
+      request: jsonRequest({
+        subject: 'Reservation',
+        fields: reservationFields({
+          quoted_price: '1',
+          preferred_date: '2026-12-01',
+          preferred_date_note: 'forged note from the client',
+        }),
+      }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
+    } as never),
+  );
+  const sent = forwarded[0] as Record<string, string>;
+  assert.equal(sent.preferred_date_note, undefined);
+  assert.equal(sent.preferred_date, '2026-12-01');
+});
+
+test('lead: a mis-formatted quote reference is flagged to the owner but never blocks the lead', async () => {
+  const { stub, forwarded } = verificationStub();
+  const response = await withFetch(stub, () =>
+    leadPost({
+      request: jsonRequest({
+        subject: 'Reservation',
+        fields: reservationFields({ quoted_price: '1', quote_reference: 'NOT-A-QUOTE-REF' }),
+      }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
+    } as never),
+  );
+  assert.equal(response.status, 200);
+  const sent = forwarded[0] as Record<string, string>;
+  assert.equal(sent.quote_reference_valid, 'false');
+  assert.equal(sent.quote_verified, 'mismatch', 'the reference flag does not replace the price verdict');
 });
