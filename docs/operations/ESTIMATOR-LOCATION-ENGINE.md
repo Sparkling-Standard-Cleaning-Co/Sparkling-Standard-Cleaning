@@ -11,35 +11,55 @@ the current source on 2026-10-01.
 - Shared travel economics + driving policy: `src/config/travel.ts` (single source for client and
   the Pages Function; pricing re-exports it, removing the duplicated constants).
 - Real driving duration: `functions/api/travel.ts` requests `routes.duration` (Google) and reads
-  Mapbox `duration`; both return rounded `durationMinutes`.
+  MapMap/Mapbox `duration`; all return rounded `durationMinutes`. The function also accepts
+  confirmed destination coordinates (`lat`/`lng`) from the address finder and labels live routes
+  `method: 'route', verified: true` versus `straight_line_estimate` fallbacks.
 - ZIP data deduplicated: the function imports `zipReference` from `src/config/geography.ts`.
-- Client routing gate removed: every valid ZIP now calls `/api/travel`, so a routed duration can
-  qualify locations the provisional zone list would have sent to manual review.
+- Client routing gate removed: every valid ZIP (and every confirmed pin) now calls `/api/travel`.
 - Driving-time policy: `maxDrivingMinutes` (60) + `reviewBandMinutes` (15, pending approval);
   `within` = ordinary estimate, `review_band` = estimate flagged for personal confirmation,
   `beyond` = manual confirmation with honest "send a request anyway" copy. Routed trips without a
-  duration keep the hard distance safety cap. Tests: `tests/travel-policy.test.ts` (9 cases,
-  mocked route data).
-- Instant single price (feature disabled by default): `src/lib/estimate/quote.ts` selects the
-  offered price from the same calculation (`expected` by default), enforces the margin floor and
-  minimum, rounds up to the configured step, and produces a display reference + expiry. Tests:
-  `tests/quote.test.ts` (12 cases). Enablement awaits owner approval.
+  duration keep the hard distance safety cap. Tests: `tests/travel-policy.test.ts`.
+- **Street-address experience** (`src/components/EstimateWizard.astro`,
+  `src/scripts/address-finder.ts`, `src/lib/location/`): debounced (350 ms) MapMap suggestions
+  through `/api/geocode`, keyboard/ARIA suggestion selection, a separate apartment/unit field, a
+  manual-entry fallback, and lazy-loaded MapLibre GL + OpenFreeMap pin confirmation (the heavy map
+  JS/CSS loads only when an address is looked up). A confirmed pin is the only destination source;
+  editing the address invalidates the route instantly.
+- **Immediate price experience**: `src/lib/estimate/quote.ts` selects the offered price from the
+  same calculation (`expected`, margin floor + minimum + round-up), carries the pricing
+  configuration version and expiry. `pricing.instantQuote.enabled` is owner-directed ON for the
+  proposed-price display; `pricing.instantQuote.binding` remains OFF.
+- **Reservation experience**: order-style summary carrying every calculator answer, quote
+  reference, call/text actions (SMS prefill behind `business.flags.smsEnabled`), and one primary
+  "Reserve This Cleaning" request action. Reservations are requests, never confirmed bookings.
+- **Authoritative server verification** (`src/lib/estimate/verify.ts` +
+  `functions/api/lead.ts`): priced reservation requests are re-priced server-side from the
+  structured fields; the server resolves the address itself (MapMap → Census → ZIP centroid),
+  routes from the private origin, and emits `quote_verified: match | mismatch | unverifiable`
+  plus the verified price, range, travel method and validity to the owner notification. Client
+  price/coordinates/verification claims are ignored. Tests: `tests/verify-quote.test.ts`,
+  `tests/api.test.ts`.
+- Privacy policy updated for address processing, geocoding, maps and server verification.
 
-**Designed but not yet implemented (next increment):**
+**Live local check (2026-10-01, `wrangler pages dev` with the branch `.env`):**
 
-- Server-verified quotes: the browser price is not trusted. The planned mechanism is stateless
-  re-pricing inside the lead relay — the Function imports the same estimator + configuration,
-  recomputes the price from the submitted structured fields in offline mode, and marks the owner
-  notification `quote_verified: match | mismatch | unverifiable` (tolerance for routed-travel
-  variance). No database needed for verification. Persistent quote retrieval or real timeslot
-  reservations would require storage and will be proposed separately rather than faked with
-  stateless tokens.
-- Reservation journey UI (Reserve / Call / Text actions, order-style summary, "Request This
-  Cleaning" submission carrying the quote), SMS prefill behind the existing `smsEnabled` gate,
-  and quote fields in owner notifications. The call/SMS actions depend on the SMS verification
-  the owner still owes; the text action stays hidden until then.
-- Live routing validation (requires `TRAVEL_ORIGIN` + a provider key) — mocked thresholds are
-  covered; live results will be documented separately when credentials exist.
+- `/api/travel` with a ZIP returned a labeled `straight_line_estimate` (the live MapMap route call
+  failed over to the safe fallback); the response contains no origin or credentials.
+- `/api/geocode` `resolve` returned a real MapMap result with coordinates + ZIP/city/state; the
+  `suggest` endpoint returned no features for the test address (MapMap coverage for Pensacola
+  remains unverified — see `PLATFORM-STATUS.md`).
+- The full customer journey ran against the real functions: manual address lookup → pin
+  confirmation → `$280` proposed price → quote reference → call/text actions. Local submission
+  correctly reported "message service is not connected" because the local `.env` carries no
+  Web3Forms key; production has it configured.
+
+**Still awaiting owner approval before binding offers:**
+
+- The 60-minute boundary and 15-minute review band values.
+- The proposed-price formula sign-off (reference-quote impact report).
+- MapMap coverage confirmation for the Pensacola/Cantonment territory (live route calls currently
+  fall back to the labeled straight-line estimate; no charges are possible on the free tier).
 
 ## 1. Reproduced behavior (offline zone mode, `TRAVEL_ORIGIN` unset)
 

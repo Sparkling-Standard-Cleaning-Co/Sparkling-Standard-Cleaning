@@ -78,8 +78,15 @@ Do not quietly replace unknown information with plausible-looking data.
   - `site` → editable page copy, one entry per page.
 - Pages are thin wrappers over collections/config. The estimator engine lives in
   `src/lib/estimate/` and travel logic in `src/lib/travel/` — arithmetic never lives in pages.
+- The estimate flow collects a **confirmed street address** (`src/scripts/address-finder.ts`,
+  `src/lib/location/`) with MapMap suggestions through `/api/geocode`, a manual fallback, and a
+  lazy-loaded MapLibre GL + OpenFreeMap pin confirmation (owner-directed, free services only).
+  A confirmed pin is the only destination source — never let a ZIP centroid silently replace it.
 - Client-side JS is minimal, bundled by Astro from `src/scripts/` (no framework). The estimator
-  computes in the browser so the instant estimate works on a fully static page.
+  computes in the browser so the instant estimate works on a fully static page. A browser price is
+  a PROPOSAL: every priced reservation request is recalculated server-side
+  (`src/lib/estimate/verify.ts` in `functions/api/lead.ts`), and client price/coordinate/verdict
+  fields are never trusted.
 - Serverless functions live in `functions/api/` (Cloudflare Pages Functions) for travel lookup
   and the lead relay. **Secrets only ever live in the function environment.**
 - Styles: `src/styles/tokens.css` (design tokens), `global.css` (all component styles),

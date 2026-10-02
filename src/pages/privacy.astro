@@ -34,7 +34,7 @@ const hasEmail = !isPending(business.email);
         Clear rules, plainly written. This policy describes what this website actually does — not
         what it might do someday.
       </p>
-      <p class="small text-muted">Last updated: September 30, 2026.</p>
+      <p class="small text-muted">Last updated: October 1, 2026.</p>
 
       <div class="prose stack mt-6">
         <section>
@@ -78,7 +78,8 @@ const hasEmail = !isPending(business.email);
             </li>
             <li>
               <strong>Estimate progress</strong> (local storage) — so an accidental refresh doesn't
-              lose your answers. Contact details are never stored in the draft.
+              lose your answers. Contact details and your full service address are never stored in
+              the draft.
             </li>
             <li>
               <strong>Attribution touchpoints</strong> (local storage) — campaign parameters and the
@@ -136,6 +137,33 @@ const hasEmail = !isPending(business.email);
             <strong>Change your mind anytime:</strong> clear this site's data in your browser (or
             contact us) and the consent prompt returns. Withdrawal stops further collection
             immediately.
+          </p>
+        </section>
+
+        <section>
+          <h2>Address lookup, maps and travel estimates</h2>
+          <p>
+            When you type your service address in the estimate, the text you type is sent to our
+            own website server, which asks a geocoding service to turn it into map coordinates.
+            Our server uses MapMap (an OpenStreetMap-based provider) when it is configured and the
+            free U.S. Census Geocoder as a fallback; these services receive the address text needed
+            to answer the lookup and do not receive your name, phone number or email from us. To
+            let you confirm the destination, your browser may load map tiles directly from
+            OpenFreeMap, which receives the map area being viewed. No map or geocoding request is
+            made until you enter or look up an address.
+          </p>
+          <p>
+            To calculate driving time for your estimate, our server sends your destination
+            coordinates together with our private operating location to the configured routing
+            provider. Our starting location and any API credentials remain on our servers and are
+            never sent to your browser or included in the map. A confirmed price is recalculated on
+            our server when you send a reservation request — a price or coordinates supplied by
+            your browser are never trusted.
+          </p>
+          <p>
+            Your address is used only to prepare your estimate, verify travel and provide services.
+            It is never sent to analytics, and the estimate draft stored in your browser never
+            includes your address or unit number.
           </p>
         </section>
 

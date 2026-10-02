@@ -33,7 +33,7 @@ Status vocabulary:
 | Social profiles (Facebook, Instagram, Nextdoor, etc.) | **not started** | All profile URLs are `PENDING` in `business.ts`; footer renders none | Create profiles, supply URLs | `docs/marketing/CONTENT-OPERATING-SYSTEM.md` |
 | SMS (text messaging) | **pending owner** | `business.flags.smsEnabled=false`; text CTAs hidden until a real text is sent and received | Verify SMS capability | `docs/launch/OWNER-INPUT-REQUIRED.md` #12 |
 | Cloudflare Turnstile | **not started (optional)** | Forms rely on honeypot + timing until configured | Optional | `docs/deployment/DEPLOYMENT.md` §4 |
-| Routing provider (Google Routes / Mapbox) | **not started (optional)** | Live `/api/travel` returns `503 origin_not_configured` (verified 2026-10-01); estimator uses offline zone mode | Optional after `TRAVEL_ORIGIN` | `docs/operations/ESTIMATOR-CALIBRATION.md` |
+| Routing provider (Google Routes / Mapbox / MapMap) | **configured, unverified (branch)** | Production `main` still returns `503 origin_not_configured` (verified 2026-10-01); estimator uses offline zone mode. Branch `feat/estimator-location-config` adds the MapMap adapter + address geocoding proxy (`ROUTES_PROVIDER=mapmap`), both server-side only. Live local check: `/api/geocode` resolve works, `suggest` returned no features, route calls fell back to labeled straight-line | Confirm MapMap coverage for the territory, then enable on production | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | EIA fuel price feed | **not started (optional)** | Configured reference price used until an EIA key is set | Optional | `docs/operations/ESTIMATOR-CALIBRATION.md` |
 | IndexNow | **not started (post-launch)** | Script exists; no key or workflow configured | Optional after launch | `docs/launch/OWNER-INPUT-REQUIRED.md` #25 |
 | Legal entity spelling/suffix | **pending owner** | Registered as "Sparkling Standard Cleaning Co."; exact spelling/suffix unverified; unpublished | Verify with registration documents | `docs/launch/OWNER-INPUT-REQUIRED.md` #6 |
@@ -59,8 +59,17 @@ Public terms verified from `mapmap.ai/pricing`, `/terms`, `/docs/quickstart`, `/
   an account (owner action); vendor is early-stage with no free-tier SLA. Keep Census Geocoder +
   zone fallback as non-single-point-of-failure paths.
 - Privacy: once activated, customer addresses/coordinates are necessarily sent to MapMap for
-  routing; the privacy page must disclose this. The private operating origin remains a Cloudflare
-  secret and is never exposed to the client, maps or responses.
+  routing; the privacy page must disclose this (done on the branch). The private operating origin
+  remains a Cloudflare secret and is never exposed to the client, maps or responses.
+
+**Live local verification on branch `feat/estimator-location-config` (2026-10-01):** running
+`wrangler pages dev` with the branch-local secrets, MapMap `/geocode` `resolve` returned a real
+result with coordinates and ZIP/city/state; `/geocode/suggest` returned no features for a
+Pensacola test address; `/route/v1` failed over to the labeled `straight_line_estimate`. The full
+address → pin → price → reservation journey worked against the real functions. Conclusion:
+MapMap coverage for this territory remains unverified; the safe fallback and honest labeling
+paths work, and no origin or credential appeared in any response or client bundle. No charges
+are possible on the free tier.
 
 ## How to update this register
 
