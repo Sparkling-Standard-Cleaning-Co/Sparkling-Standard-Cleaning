@@ -61,6 +61,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const stepItems = [...form.querySelectorAll<HTMLElement>('[data-step-item]')];
   const stepJumps = [...form.querySelectorAll<HTMLButtonElement>('[data-step-jump]')];
   const livePanel = form.querySelector<HTMLElement>('[data-estimate-live]');
+  const liveLabel = form.querySelector<HTMLElement>('[data-estimate-label]');
   const livePrice = form.querySelector<HTMLElement>('[data-estimate-price]');
   const liveRange = form.querySelector<HTMLElement>('[data-estimate-range]');
   const liveNote = form.querySelector<HTMLElement>('[data-estimate-note]');
@@ -70,6 +71,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const status = form.querySelector<HTMLElement>('[data-form-status]');
   const resetButton = document.querySelector<HTMLButtonElement>('[data-estimate-reset]');
   const reservationSummary = form.querySelector<HTMLElement>('[data-reservation-summary]');
+  const reservationEyebrow = form.querySelector<HTMLElement>('[data-reservation-eyebrow]');
   const reservationPrice = form.querySelector<HTMLElement>('[data-reservation-price]');
   const reservationReference = form.querySelector<HTMLElement>('[data-reservation-reference]');
   const reservationValidity = form.querySelector<HTMLElement>('[data-reservation-validity]');
@@ -181,8 +183,22 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   // ── Live calculation + rendering ──────────────────────────────────────────
+  const RECURRING_FREQUENCIES = new Set(['weekly', 'biweekly', 'monthly']);
+
+  /**
+   * Recurring customers are quoted per visit; labeling every price "cleaning
+   * price" hides the value story that drives the recurring business.
+   */
+  function syncPriceLabels(): void {
+    const recurring = RECURRING_FREQUENCIES.has(textValue('frequency') ?? '');
+    const label = recurring ? 'Your proposed price per visit' : 'Your proposed cleaning price';
+    if (liveLabel) liveLabel.textContent = label;
+    if (reservationEyebrow) reservationEyebrow.textContent = label;
+  }
+
   function recalc(): EstimateResult {
     const input = gatherInput();
+    syncPriceLabels();
     const result = calculateEstimate(input, buildContext());
     latestResult = result;
     latestQuote =
@@ -207,9 +223,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
     const travel = result.travel;
     const submission = submissionAddress();
     // Routing is only presented as distance-based certainty when the customer
-    // confirmed a street address. A GPS pin (or ZIP) keeps the preliminary
-    // wording: it is a location, not a verified postal address.
-    const streetConfirmed = submission.location !== null && submission.street.trim().length >= 5;
+    // confirmed a street address. A GPS pin, a street-level pin or a ZIP keeps
+    // the preliminary wording: they are locations, not verified postal
+    // addresses.
+    const streetConfirmed =
+      submission.location !== null &&
+      submission.street.trim().length >= 5 &&
+      submission.location.precision !== 'street';
     if (travel.mode === 'routed' && travel.verified && streetConfirmed) {
       const miles =
         travel.oneWayMiles !== null ? ` (about ${Math.round(travel.oneWayMiles)} miles one way)` : '';
@@ -241,11 +261,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const amount = latestQuote ? `$${latestQuote.amount.toLocaleString()}` : '—';
       livePrice.textContent = amount;
       const confidenceCopy =
-        result.confidence === 'high'
-          ? 'Based on your confirmed address and complete details.'
-          : result.confidence === 'medium'
-            ? 'May shift slightly after we confirm a few details.'
-            : 'Early — a few more details will sharpen it.';
+        submissionAddress().location?.precision === 'street'
+          ? 'Based on the street-level pin you placed — we will verify the exact property with you.'
+          : result.confidence === 'high'
+            ? 'Based on your confirmed address and complete details.'
+            : result.confidence === 'medium'
+              ? 'May shift slightly after we confirm a few details.'
+              : 'Early — a few more details will sharpen it.';
       liveNote.textContent = `${confidenceCopy} This is a proposed price on a request, not a confirmed booking — Sparkling Standard confirms the final scope and price with you first.`;
 
       if (liveRange) {
@@ -991,6 +1013,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
             pin_latitude: confirmedLocation.lat.toFixed(6),
             pin_longitude: confirmedLocation.lng.toFixed(6),
             pin_source: confirmedLocation.source,
+            pin_precision: confirmedLocation.precision ?? 'exact',
             pin_adjusted: confirmedLocation.adjusted ? 'yes' : 'no',
           }
         : {}),
@@ -1203,6 +1226,37 @@ function initEstimateWizard(form: HTMLFormElement): void {
   });
 
   resetWizard();
+
+  // Deep links from marketing pages: /estimate/?frequency=biweekly preselects
+  // the recurring rhythm (and ?service=deep preselects the service), so a
+  // campaign CTA lands one step closer to conversion. Values are validated
+  // against the known vocabulary and never trusted for anything else.
+  function applyDeepLinkSelections(): void {
+    let params: URLSearchParams;
+    try {
+      params = new URLSearchParams(window.location.search);
+    } catch {
+      return;
+    }
+    const service = params.get('service');
+    if (service && ['standard', 'deep', 'move_in_out', 'str_turnover'].includes(service)) {
+      const radio = form.querySelector<HTMLInputElement>(`input[name="serviceType"][value="${service}"]`);
+      if (radio) {
+        radio.checked = true;
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    const frequency = params.get('frequency');
+    if (frequency && ['weekly', 'biweekly', 'monthly', 'one_time'].includes(frequency)) {
+      const select = form.querySelector<HTMLSelectElement>('#est-frequency');
+      if (select) {
+        select.value = frequency;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+  }
+  applyDeepLinkSelections();
+  recalc();
   void lookupTravel();
 
   // Debug handle — preview builds only. Never rendered publicly.

@@ -443,7 +443,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       <section class="wizard__step" data-step="6" aria-label={stepTitle(5)}>
         <h2 class="wizard__step-heading">{stepTitle(5)}</h2>
         <div class="reservation-summary" data-reservation-summary hidden>
-          <p class="reservation-summary__eyebrow">Your proposed cleaning price</p>
+          <p class="reservation-summary__eyebrow" data-reservation-eyebrow>Your proposed cleaning price</p>
           <p class="reservation-summary__price" data-reservation-price>—</p>
           <p class="reservation-summary__meta" data-reservation-reference hidden></p>
           <p class="reservation-summary__meta" data-reservation-validity hidden></p>

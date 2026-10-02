@@ -1,6 +1,6 @@
 ---
 metaTitle: Cleaning That Notices the Little Things | Pensacola & Cantonment
-metaDescription: Thoughtful residential and commercial cleaning for Pensacola, Cantonment and surrounding communities. Get an proposed cleaning price and see why the details matter.
+metaDescription: Thoughtful residential and commercial cleaning for Pensacola, Cantonment and surrounding communities. Get a proposed cleaning price and see why the details matter.
 hero:
   headline: A cleaning company that notices
   accent: the little things.
@@ -9,7 +9,22 @@ hero:
 servicesIntro:
   eyebrow: What we clean
   heading: A service for every kind of space
-  lead: Six core services, each with its own owning page and its own honest scope — no buried details, no one-size-fits-all promises.
+  lead: Seven services, each with its own owning page and its own honest scope — no buried details, no one-size-fits-all promises.
+recurringPlans:
+  eyebrow: Recurring cleaning
+  heading: Pick a rhythm that keeps your home consistently fresh
+  text: The longer a home stays maintained, the less time each visit takes — so recurring pricing reflects real labor efficiency, not a one-time reset. Choose a rhythm below and the estimate starts there.
+  linkLabel: How recurring cleaning works
+  items:
+    - title: Weekly
+      frequency: weekly
+      text: The most consistent result for busy homes and pets — and the strongest per-visit value.
+    - title: Every two weeks
+      frequency: biweekly
+      text: A dependable balance of a fresh home and a sensible budget for family homes.
+    - title: Monthly
+      frequency: monthly
+      text: For lighter homes and smaller spaces that need a consistent touch.
 founderBand:
   eyebrow: The difference
   heading: Built around noticing what rushed cleaning walks past

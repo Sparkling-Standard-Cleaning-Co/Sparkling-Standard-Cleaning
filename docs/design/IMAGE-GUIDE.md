@@ -51,7 +51,17 @@ doubt, publish a crop or don't publish.
 
 ## Current state
 
-No real photos exist yet by design: the `proof` collection is empty and the homepage shows an
-honest explainer of the proof standard instead of fabricated images. When the owner supplies
-photos, run the guardrails, place them beside the proof entry, and wire them with honest alt
-text and captions.
+No genuine Sparkling Standard project photos exist yet: the `proof` collection stays empty and the
+homepage shows an honest explainer of the proof standard instead of fabricated images.
+
+To strengthen presentation without fabricating proof, the site now uses a small set of **licensed
+representative interior photographs** (Pexels License — free commercial use, attribution not
+required) on the homepage and about page. Every one is:
+
+- recorded in `docs/design/IMAGE-SOURCE-REGISTER.md` with source, photographer and licence;
+- labeled with a visible “representative photograph” caption where it could be mistaken for a
+  specific job;
+- replaced by genuine, permissioned photography as soon as the owner supplies it.
+
+When the owner supplies photos: run the guardrails, place them beside the proof entry, wire them
+with honest alt text and captions, and delete the matching stock file and register row.
