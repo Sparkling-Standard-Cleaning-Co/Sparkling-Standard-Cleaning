@@ -18,7 +18,7 @@ export type FailureReason =
   | 'spam_rejected';
 
 export interface ContactFacts {
-  /** Human-formatted phone, e.g. "(850) 246-8479". */
+  /** Human-formatted phone, e.g. "(850) 426-8479". */
   phoneDisplay?: string | undefined;
   /** Public email address. */
   email?: string | undefined;

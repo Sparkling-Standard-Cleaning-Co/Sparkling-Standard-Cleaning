@@ -387,9 +387,9 @@ test('reservation summary carries every answer and the call/text actions work', 
 
     // Call and text actions are real, correctly formed links.
     const callHref = await page.locator('[data-reserve-call]').getAttribute('href');
-    assert.equal(callHref, 'tel:+18502468479');
+    assert.equal(callHref, 'tel:+18504268479');
     const textHref = await page.locator('[data-reserve-text]').getAttribute('href');
-    assert.match(textHref ?? '', /^sms:\+18502468479\?&body=/);
+    assert.match(textHref ?? '', /^sms:\+18504268479\?&body=/);
     assert.match(decodeURIComponent(textHref ?? ''), /SS-\d{8}-[0-9A-Z]{6}/, 'text prefill carries the quote reference');
 
     // One primary action: the reservation submit.

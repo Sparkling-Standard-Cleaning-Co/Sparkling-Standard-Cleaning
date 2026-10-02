@@ -40,7 +40,7 @@ This is the single highest-value local visibility step for a cleaning company.
      appears only as a general service region.
    - Service area: Pensacola, Cantonment, and the surrounding communities within about an hour's
      drive; add nearby Alabama communities you will serve. Do not list fake locations.
-   - Phone: `(850) 246-8479`; Website: use the tracked Google Business Profile link from
+   - Phone: `(850) 426-8479`; Website: use the tracked Google Business Profile link from
      `docs/marketing/UTM-MASTER-LINKS.md` (the `gbp_*` entries) so GBP visits are attributed.
    - Hours: Seven days a week, 8:00 AM – 6:00 PM.
 3. Verify the business with Google's chosen method (video or postcard — for service-area

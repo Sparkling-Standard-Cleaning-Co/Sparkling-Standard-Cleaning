@@ -85,7 +85,8 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   bonding/licensing claims, genuine review links, final cancellation percentages, and any profile
   URLs not yet supplied. `business.launch.productionApproved` remains `false` as the formal
   checklist gate; it does NOT reflect deployment state (the site is live).
-- Owner-confirmed facts: name, domain, phone `(850) 246-8479`, email
+- Owner-confirmed facts: name, domain, phone `(850) 426-8479` (corrected 2026-10-02 — the
+  earlier `(850) 246-8479` was a typo and must never be reintroduced), email
   `owner@sparkling-standard.com`, founder Hayli, Stripe, Cloudflare DNS.
 
 ### THE NO-FABRICATION RULE (non-negotiable)

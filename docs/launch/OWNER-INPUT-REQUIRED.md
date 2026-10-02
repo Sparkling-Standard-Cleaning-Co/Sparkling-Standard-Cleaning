@@ -13,7 +13,7 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | --- | --- |
 | Final company name | **Sparkling Standard Cleaning Co.** (public brand: "Sparkling Standard") — in `src/config/business.ts` |
 | Final domain | **https://sparkling-standard.com** — in `src/config/business.ts` + `astro.config.mjs` default |
-| Public phone | **(850) 246-8479** — in `src/config/business.ts` |
+| Public phone | **(850) 426-8479** — in `src/config/business.ts` (owner-corrected 2026-10-02; the earlier `(850) 246-8479` was a typo) |
 | Public email | **owner@sparkling-standard.com** — in `src/config/business.ts` |
 | Founder identity | **Hayli** — approved founder background in `business.founder` |
 | Service territory (broad) | About one hour of actual driving time from the Cantonment-area origin |

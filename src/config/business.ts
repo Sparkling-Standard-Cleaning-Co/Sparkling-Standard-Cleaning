@@ -87,8 +87,13 @@ export const business = {
   /** Production origin without trailing slash — owner-confirmed domain. */
   url: envFact(import.meta.env.PUBLIC_SITE_URL) ?? 'https://sparkling-standard.com',
 
-  /** Public contact phone — owner-confirmed number. */
-  phone: phoneEnv ?? formatPhone('850-246-8479') ?? PENDING,
+  /**
+   * Public contact phone — owner-confirmed number.
+   * Corrected 2026-10-02: the previously published (850) 246-8479 was a typo.
+   * The owner-confirmed number is (850) 426-8479. The PUBLIC_BUSINESS_PHONE
+   * environment override, when set, must also carry the corrected digits.
+   */
+  phone: phoneEnv ?? formatPhone('850-426-8479') ?? PENDING,
 
   /** Public contact email — owner-confirmed address. */
   email: envFact(import.meta.env.PUBLIC_BUSINESS_EMAIL) ?? 'owner@sparkling-standard.com',

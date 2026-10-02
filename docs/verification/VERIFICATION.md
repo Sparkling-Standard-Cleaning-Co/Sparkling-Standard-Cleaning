@@ -29,7 +29,7 @@ generated marketing documents are byte-compared by validation.
 | Production robots behavior | default build | verified: `Allow: /` + sitemap at the real domain |
 | Brand asset regeneration | `node scripts/generate-brand-images.mjs` | favicons, apple-touch-icon, icon-512, OG image regenerated with the confirmed name and tagline |
 | Design tokens applied | `src/styles/global.css` imports `tokens.css` | **fixed a pre-existing defect**: tokens were never imported, so the whole design system was undefined in every previous build. Verified in the built CSS and in computed styles (footer background `rgb(48,36,41)`, body font "Nunito Sans"). |
-| Browser layout pass (Playwright, real Chromium) | 15 pages × 360/768/1440 = 45 combinations | 0 horizontal overflow, 0 console errors, 0 missing H1s, no PENDING text; sticky mobile action bar visible; `tel:+18502468479` present; 0 `sms:` links while SMS is unverified |
+| Browser layout pass (Playwright, real Chromium) | 15 pages × 360/768/1440 = 45 combinations | 0 horizontal overflow, 0 console errors, 0 missing H1s, no PENDING text; sticky mobile action bar visible; `tel:+18504268479` present; 0 `sms:` links while SMS is unverified |
 | Accessibility scan (axe-core, WCAG 2.0/2.1/2.2 A+AA) | 15 pages at 360 px | **0 violations**. Fixed: touch-target sizes in footer/standalone links and footer-tagline color contrast found in earlier scans. |
 | Estimator flow (real browser) | 3/2 1600 sq ft, maintained, biweekly, ZIP 32503 | completes the wizard; live range `$235 – $285` shown before submission; matches the internal labor model |
 | Estimator out-of-area behavior | same flow with ZIP 90210 | "Custom confirmation required" with an honest explanation — never a fake price |
@@ -49,7 +49,7 @@ commit check-runs and deployed bundle hashes verified).
 | Page availability | HTTP + Playwright over 15 pages | all `200`; no console errors; no horizontal overflow at 360 px |
 | Canonicals + robots | live HTML inspection | every page `index, follow` with self-referencing canonical; `robots.txt` `Allow: /` + sitemap. `PUBLIC_PREVIEW_MODE` is NOT set |
 | Accessibility | axe-core WCAG 2.0/2.1/2.2 A+AA at 360 px | 0 violations on home, estimate, contact |
-| Mobile action bar + contact | Playwright | sticky bar visible; `tel:+18502468479` correct; 0 `sms:` links (gate off) |
+| Mobile action bar + contact | Playwright | sticky bar visible; `tel:+18504268479` correct; 0 `sms:` links (gate off) |
 | Consent behavior | Playwright | consent banner hidden and no analytics requests while no IDs are configured |
 | Core Web Vitals (lab) | Chromium, 1.6 Mbps / 150 ms RTT / 4× CPU | home LCP 1.65 s / CLS 0.038; estimate LCP 1.37 s / CLS 0; contact LCP 1.26 s / CLS 0 (targets: LCP ≤ 2.5 s, CLS ≤ 0.1 — met). INP not measurable without interaction; recorded as unreported |
 | `/api/travel` | live POST | deployed and responding `503 origin_not_configured` (function works; configuration pending) |
