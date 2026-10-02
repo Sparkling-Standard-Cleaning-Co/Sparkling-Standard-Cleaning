@@ -1,11 +1,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Central pricing configuration — SINGLE SOURCE OF TRUTH for every number
-// the estimator uses and every price/policy decision the site presents.
+// Central pricing configuration — the TYPED CONFIG consumed by the estimator
+// and every price/policy decision the site presents.
+//
+// RAW OWNER-EDITABLE VALUES live in `src/config/owner-pricing.ts` and are
+// imported below, wrapped here with their approval state and explanation.
+// Edit pricing values in owner-pricing.ts; edit this file only to add a new
+// policy or change an approval state/note.
 //
 // Travel economics are shared with the serverless function via
 // `src/config/travel.ts` (imported below) — do not duplicate those numbers.
 
 import { travelConfig } from './travel.ts';
+import { ownerPricing } from './owner-pricing.ts';
 
 // ── WHAT IS PUBLIC vs INTERNAL ───────────────────────────────────────────────
 // PUBLIC (may be shown to customers):
@@ -63,6 +69,13 @@ export interface AddonDefinition {
   blurb: string;
   /** Labor-hours this add-on adds when included in the same visit. */
   laborHours?: number;
+  /**
+   * Optional fixed charge in USD (owner-set in owner-pricing.ts). When a
+   * positive finite number, it replaces `laborHours × rate` for the CHARGE
+   * only; the add-on's labor-hours still count toward scheduled labor time.
+   * Leave unset for the standard labor-based pricing.
+   */
+  fixedPriceUsd?: number;
   /** Requires a custom quote (equipment / specialized work) — never instant. */
   customQuote: boolean;
   category: 'kitchen' | 'bath_laundry' | 'windows' | 'interior_detail' | 'pets' | 'organization' | 'specialty';
@@ -82,11 +95,11 @@ export const pricing = {
      * The model must still cover real operating costs and margin.
      */
     targetGrossRevenuePerLaborHour: approved(
-      50,
+      ownerPricing.hourlyRates.otherServices,
       'Option C — other service categories rate (one-time, deep, move-in/out, STR). Owner-approved 2026-10-01. Never displayed publicly.',
     ),
     recurringGrossRevenuePerLaborHour: approved(
-      42,
+      ownerPricing.hourlyRates.recurring,
       'Option C — applicable recurring maintenance rate (weekly/biweekly/monthly standard cleans). Owner-approved 2026-10-01. Never displayed publicly.',
     ),
     /**
@@ -94,14 +107,14 @@ export const pricing = {
      * INTERNAL ONLY.
      */
     ownerLaborTargetPerHour: provisional(
-      35,
+      ownerPricing.hourlyRates.ownerLaborTarget,
       'Directive §21 owner labor target floor. The estimate engine must keep even small jobs economically rational against this floor.',
     ),
   },
 
   // ── Minimum job value (directive §22) ──────────────────────────────────────
   minimumJob: provisional(
-    125,
+    ownerPricing.minimumJob,
     'Directive §22 initial provisional minimum. One setting only. Applied silently to the estimate range; the number is not advertised unless the owner approves.',
   ),
 
@@ -111,38 +124,38 @@ export const pricing = {
   // below reproduces those anchors and is intended for recalibration.
   laborModel: {
     baseHours: {
-      standard: provisional(2.0, 'Chosen so a maintained ~1600 sqft 3/2 standard clean lands at ≈4.8–4.9 labor-hours (directive §20 anchor).'),
-      deep: provisional(3.2, 'Deep cleaning adds baseboard/trim/door/frame/wall-detail time on top of the standard scope.'),
-      move_in_out: provisional(3.4, 'Move-in/move-out assumes an empty or nearly empty home with inside-cabinet and appliance attention.'),
-      str_turnover: provisional(1.2, 'STR turnover base excludes size/beds; a 2/2 with 2 beds lands at ≈3.0–3.2 labor-hours including linen reset.'),
+      standard: provisional(ownerPricing.baseLaborHours.standard, 'Chosen so a maintained ~1600 sqft 3/2 standard clean lands at ≈4.8–4.9 labor-hours (directive §20 anchor).'),
+      deep: provisional(ownerPricing.baseLaborHours.deep, 'Deep cleaning adds baseboard/trim/door/frame/wall-detail time on top of the standard scope.'),
+      move_in_out: provisional(ownerPricing.baseLaborHours.move_in_out, 'Move-in/move-out assumes an empty or nearly empty home with inside-cabinet and appliance attention.'),
+      str_turnover: provisional(ownerPricing.baseLaborHours.str_turnover, 'STR turnover base excludes size/beds; a 2/2 with 2 beds lands at ≈3.0–3.2 labor-hours including linen reset.'),
     } satisfies Record<PricingServiceType, ConfigValue<number>>,
-    sqftHoursPerThousand: provisional(1.1, 'Square footage matters more than bedroom count (directive §27). 1000 sqft ≈ 1.1 labor-hours at standard condition.'),
-    fullBathHours: provisional(0.5, 'Bathrooms are the most labor-dense rooms in the home.'),
-    halfBathHours: provisional(0.25, 'Half baths take roughly half a full bath.'),
-    bedroomHours: provisional(0.15, 'Bedrooms beyond the first two add light time; deliberately small so the model does not overfit bedroom count (directive §27).'),
-    bedroomsIncludedInBase: provisional(2, 'First two bedrooms are already inside baseHours.'),
-    strBathHours: provisional(0.35, 'STR bathroom reset per full bath.'),
-    strBedHours: provisional(0.2, 'STR bed reset (linens, presentation) per bed.'),
-    strSqftHoursPerThousand: provisional(0.8, 'STR turnover is a reset, not a deep clean; square footage contributes less than residential cleaning.'),
+    sqftHoursPerThousand: provisional(ownerPricing.laborUnits.sqftHoursPerThousand, 'Square footage matters more than bedroom count (directive §27). 1000 sqft ≈ 1.1 labor-hours at standard condition.'),
+    fullBathHours: provisional(ownerPricing.laborUnits.fullBathHours, 'Bathrooms are the most labor-dense rooms in the home.'),
+    halfBathHours: provisional(ownerPricing.laborUnits.halfBathHours, 'Half baths take roughly half a full bath.'),
+    bedroomHours: provisional(ownerPricing.laborUnits.bedroomHours, 'Bedrooms beyond the first two add light time; deliberately small so the model does not overfit bedroom count (directive §27).'),
+    bedroomsIncludedInBase: provisional(ownerPricing.laborUnits.bedroomsIncludedInBase, 'First two bedrooms are already inside baseHours.'),
+    strBathHours: provisional(ownerPricing.laborUnits.strBathHours, 'STR bathroom reset per full bath.'),
+    strBedHours: provisional(ownerPricing.laborUnits.strBedHours, 'STR bed reset (linens, presentation) per bed.'),
+    strSqftHoursPerThousand: provisional(ownerPricing.laborUnits.strSqftHoursPerThousand, 'STR turnover is a reset, not a deep clean; square footage contributes less than residential cleaning.'),
   },
 
   /** Condition multiplier applied to total labor (directive §25 step 3). */
   conditionFactors: {
-    maintained: provisional(1.0, 'Recently and regularly cleaned home in good shape.'),
-    average: provisional(1.1, 'Lived-in home with normal buildup.'),
-    needs_attention: provisional(1.25, 'Noticeably overdue cleaning; extra attention throughout.'),
-    heavy: provisional(1.45, 'Heavy buildup; multiple areas need detail work.'),
-    severe: provisional(2.0, 'Severe condition — always routed to custom confirmation, never an instant estimate.'),
+    maintained: provisional(ownerPricing.conditionFactors.maintained, 'Recently and regularly cleaned home in good shape.'),
+    average: provisional(ownerPricing.conditionFactors.average, 'Lived-in home with normal buildup.'),
+    needs_attention: provisional(ownerPricing.conditionFactors.needs_attention, 'Noticeably overdue cleaning; extra attention throughout.'),
+    heavy: provisional(ownerPricing.conditionFactors.heavy, 'Heavy buildup; multiple areas need detail work.'),
+    severe: provisional(ownerPricing.conditionFactors.severe, 'Severe condition — always routed to custom confirmation, never an instant estimate.'),
   } satisfies Record<Condition, ConfigValue<number>>,
 
   /** How long since the last professional clean (directive §25 step 3). */
   lastCleanFactors: {
-    within_month: provisional(1.0, 'Home maintained recently; recurring service is realistic.'),
-    one_to_three_months: provisional(1.03, 'Small additional detail time expected.'),
-    three_to_twelve_months: provisional(1.08, 'Noticeable buildup in neglected areas.'),
-    over_a_year: provisional(1.15, 'Extended gap; first visit behaves close to a first professional clean.'),
-    never_professional: provisional(1.2, 'First professional clean — matches the directive §20 ≈6 labor-hour anchor for a maintained 3/2.'),
-    not_sure: provisional(1.05, 'Conservative middle value when the customer is unsure; flagged for review.'),
+    within_month: provisional(ownerPricing.lastCleanFactors.within_month, 'Home maintained recently; recurring service is realistic.'),
+    one_to_three_months: provisional(ownerPricing.lastCleanFactors.one_to_three_months, 'Small additional detail time expected.'),
+    three_to_twelve_months: provisional(ownerPricing.lastCleanFactors.three_to_twelve_months, 'Noticeable buildup in neglected areas.'),
+    over_a_year: provisional(ownerPricing.lastCleanFactors.over_a_year, 'Extended gap; first visit behaves close to a first professional clean.'),
+    never_professional: provisional(ownerPricing.lastCleanFactors.never_professional, 'First professional clean — matches the directive §20 ≈6 labor-hour anchor for a maintained 3/2.'),
+    not_sure: provisional(ownerPricing.lastCleanFactors.not_sure, 'Conservative middle value when the customer is unsure; flagged for review.'),
   } satisfies Record<LastProfessionalClean, ConfigValue<number>>,
 
   /**
@@ -151,10 +164,10 @@ export const pricing = {
    * not a marketing discount (directive §28).
    */
   frequencyFactors: {
-    weekly: provisional(0.92, 'Weekly homes are the most maintainable; best per-visit value follows from labor efficiency.'),
-    biweekly: provisional(0.95, 'Biweekly homes remain close to maintenance level.'),
-    monthly: provisional(0.98, 'Monthly homes drift; smaller efficiency benefit.'),
-    one_time: provisional(1.0, 'One-time baseline — no maintenance benefit.'),
+    weekly: provisional(ownerPricing.frequencyFactors.weekly, 'Weekly homes are the most maintainable; best per-visit value follows from labor efficiency.'),
+    biweekly: provisional(ownerPricing.frequencyFactors.biweekly, 'Biweekly homes remain close to maintenance level.'),
+    monthly: provisional(ownerPricing.frequencyFactors.monthly, 'Monthly homes drift; smaller efficiency benefit.'),
+    one_time: provisional(ownerPricing.frequencyFactors.one_time, 'One-time baseline — no maintenance benefit.'),
   } satisfies Record<Frequency, ConfigValue<number>>,
 
   /**
@@ -176,28 +189,9 @@ export const pricing = {
   // add-on amounts therefore always reconcile with the proposed total.
   addons: {
     state: 'provisional' as ApprovalState,
-    items: [
-      { id: 'inside_fridge', label: 'Inside refrigerator', blurb: 'Empty, wipe out and detail the refrigerator interior.', laborHours: 0.5, customQuote: false, category: 'kitchen' },
-      { id: 'inside_oven', label: 'Inside oven', blurb: 'Detail the oven interior and door glass.', laborHours: 0.6, customQuote: false, category: 'kitchen' },
-      { id: 'inside_cabinets', label: 'Inside cabinets', blurb: 'Wipe out cabinet interiors and shelves.', laborHours: 0.8, customQuote: false, category: 'kitchen' },
-      { id: 'interior_windows', label: 'Interior windows', blurb: 'Interior glass, sills and tracks where safely reachable.', laborHours: 0.6, customQuote: false, category: 'windows' },
-      { id: 'exterior_windows_ground', label: 'Ground-floor exterior windows', blurb: 'Exterior glass reachable from the ground — no ladders.', laborHours: 0.8, customQuote: false, category: 'windows' },
-      { id: 'laundry', label: 'Laundry', blurb: 'A load of laundry — washed, dried and put away.', laborHours: 0.7, customQuote: false, category: 'bath_laundry' },
-      { id: 'dishes', label: 'Dishes', blurb: 'Load and run the dishwasher or hand-wash a sink of dishes.', laborHours: 0.4, customQuote: false, category: 'kitchen' },
-      { id: 'bed_linen_change', label: 'Bed linen change', blurb: 'Change linens on the beds you leave out for us.', laborHours: 0.4, customQuote: false, category: 'bath_laundry' },
-      { id: 'organization_general', label: 'General organization', blurb: 'Straighten and organize a room or shared space.', laborHours: 0.8, customQuote: false, category: 'organization' },
-      { id: 'pantry_organization', label: 'Pantry organization', blurb: 'Organize shelves, group items and wipe surfaces.', laborHours: 0.6, customQuote: false, category: 'organization' },
-      { id: 'closet_organization', label: 'Closet organization', blurb: 'Organize one closet — hanging, folding, grouping.', laborHours: 0.6, customQuote: false, category: 'organization' },
-      { id: 'pet_hair_intensive', label: 'Pet-hair intensive', blurb: 'Extra passes for embedded pet hair on floors and upholstery.', laborHours: 0.7, customQuote: false, category: 'pets' },
-      { id: 'detailed_walls', label: 'Detailed wall spot-cleaning', blurb: 'Careful spot-cleaning of walls and switch plates where the finish allows.', laborHours: 0.8, customQuote: false, category: 'interior_detail' },
-      { id: 'detailed_baseboards', label: 'Detailed baseboards', blurb: 'Hand-wipe baseboards instead of a dry dusting.', laborHours: 0.7, customQuote: false, category: 'interior_detail' },
-      { id: 'carpet_cleaning', label: 'Carpet cleaning', blurb: 'Quoted separately — specialty equipment is scheduled case by case.', customQuote: true, category: 'specialty' },
-      { id: 'upholstery_cleaning', label: 'Upholstery cleaning', blurb: 'Quoted separately — specialty equipment is scheduled case by case.', customQuote: true, category: 'specialty' },
-      { id: 'pressure_washing', label: 'Pressure washing', blurb: 'Quoted separately by scope and surface.', customQuote: true, category: 'specialty' },
-      { id: 'garage_cleaning', label: 'Garage cleaning', blurb: 'Quoted separately after seeing the space and debris volume.', customQuote: true, category: 'specialty' },
-      { id: 'patio_cleaning', label: 'Patio / porch cleaning', blurb: 'Quoted separately by size and condition.', customQuote: true, category: 'specialty' },
-    ] satisfies AddonDefinition[],
-    note: 'Add-on amounts are calculated from labor-hours × the applicable approved rate. Specialty items show “Custom quote” and are never priced instantly.',
+    // Raw items (including any optional fixedPriceUsd) live in owner-pricing.ts.
+    items: ownerPricing.addons,
+    note: 'Add-on amounts are calculated from labor-hours × the applicable approved rate (or the owner-set fixed price when one exists). Specialty items show “Custom quote” and are never priced instantly.',
   },
 
   // ── Multi-add-on incentive (PROPOSED — not published) ─────────────────────
@@ -205,12 +199,18 @@ export const pricing = {
   // engine applies exactly ONE tier to the eligible add-on subtotal; it never
   // discounts base cleaning, travel, specialty work or the minimum job price.
   addonIncentive: {
-    enabled: provisional(false, 'PROPOSED promotion — requires owner approval before publication. Off by default.'),
+    enabled: provisional(ownerPricing.promotions.addonIncentive.enabled, 'PROPOSED promotion — requires owner approval before publication. Off by default.'),
     tiers: [
-      { minAddons: 2, percent: provisional(0.05, 'Proposed: 5% off the eligible add-on subtotal for two add-ons.') },
-      { minAddons: 3, percent: provisional(0.08, 'Proposed: 8% off the eligible add-on subtotal for three or more add-ons.') },
+      {
+        minAddons: ownerPricing.promotions.addonIncentive.twoAddons.minAddons,
+        percent: provisional(ownerPricing.promotions.addonIncentive.twoAddons.percent, 'Proposed: 5% off the eligible add-on subtotal for two add-ons.'),
+      },
+      {
+        minAddons: ownerPricing.promotions.addonIncentive.threeOrMoreAddons.minAddons,
+        percent: provisional(ownerPricing.promotions.addonIncentive.threeOrMoreAddons.percent, 'Proposed: 8% off the eligible add-on subtotal for three or more add-ons.'),
+      },
     ],
-    maxDiscount: provisional(75, 'Internal safety cap on the incentive amount; keep below the smallest realistic add-on subtotal without owner review.'),
+    maxDiscount: provisional(ownerPricing.promotions.addonIncentive.maxDiscount, 'Internal safety cap on the incentive amount; keep below the smallest realistic add-on subtotal without owner review.'),
     note: 'Single tier only (never stacked). Applies only to non-specialty add-ons. Requires owner approval before it can be enabled.',
   },
 
@@ -218,12 +218,12 @@ export const pricing = {
   // Requires owner approval AND operational evidence before publication. The
   // discount is a service-recovery credit, never an automatic booking promise.
   responseGuarantee: {
-    enabled: provisional(false, 'PROPOSED customer-service guarantee — requires owner approval and documented response tracking before publication.'),
-    windowBusinessHours: provisional(1, 'One business hour, measured during published business hours (America/Chicago).'),
-    discountPercent: provisional(25, 'Proposed 25% off the first eligible cleaning when the personal response misses the window.'),
-    maxDiscount: provisional(50, 'Proposed $50 maximum credit.'),
-    eligibleServices: ['standard', 'deep', 'move_in_out', 'str_turnover'] as const,
-    businessTimezone: 'America/Chicago',
+    enabled: provisional(ownerPricing.promotions.responseGuarantee.enabled, 'PROPOSED customer-service guarantee — requires owner approval and documented response tracking before publication.'),
+    windowBusinessHours: provisional(ownerPricing.promotions.responseGuarantee.windowBusinessHours, 'One business hour, measured during published business hours (America/Chicago).'),
+    discountPercent: provisional(ownerPricing.promotions.responseGuarantee.discountPercent, 'Proposed 25% off the first eligible cleaning when the personal response misses the window.'),
+    maxDiscount: provisional(ownerPricing.promotions.responseGuarantee.maxDiscount, 'Proposed $50 maximum credit.'),
+    eligibleServices: ownerPricing.promotions.responseGuarantee.eligibleServices,
+    businessTimezone: ownerPricing.promotions.responseGuarantee.businessTimezone,
     note: 'Automatic acknowledgments do not count as a response; the clock starts when a request arrives during business hours, or when the next business day begins. Does not combine with other promotions. Requires documented receipt and response timestamps.',
   },
 
@@ -240,11 +240,11 @@ export const pricing = {
 
   // ── Estimate range presentation (directive §23) ────────────────────────────
   range: {
-    lowFactor: provisional(0.92, 'Low end of the presented range.'),
-    highFactor: provisional(1.12, 'High end of the presented range.'),
+    lowFactor: provisional(ownerPricing.range.lowFactor, 'Low end of the presented range.'),
+    highFactor: provisional(ownerPricing.range.highFactor, 'High end of the presented range.'),
   },
   rounding: {
-    toNearest: provisional(5, 'Round estimates to the nearest $5 to avoid false precision.'),
+    toNearest: provisional(ownerPricing.rounding.roundToNearest, 'Round estimates to the nearest $5 to avoid false precision.'),
   },
 
   // ── Travel policy (directive §31, §34) ─────────────────────────────────────

@@ -169,7 +169,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | System | Source of truth | Detailed docs |
 | --- | --- | --- |
 | Business facts, contact, socials, launch/publication flags | `src/config/business.ts`, `.env` | `docs/launch/OWNER-INPUT-REQUIRED.md` |
-| Pricing, labor model, add-ons, promotions, discounts | `src/config/pricing.ts` | `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/OWNER-SETTINGS-GUIDE.md` |
+| Pricing, labor model, add-ons, promotions, discounts | `src/config/owner-pricing.ts` (owner-editable values) + `src/config/pricing.ts` (typed config/flags) | `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/OWNER-SETTINGS-GUIDE.md` |
 | Travel economics, included miles, zone adjustments | `src/config/travel.ts`, `src/config/geography.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Location selection, geocoding, GPS/manual modes | `src/scripts/address-finder.ts`, `src/lib/location/`, `functions/api/geocode.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`) | `docs/verification/VERIFICATION.md` |

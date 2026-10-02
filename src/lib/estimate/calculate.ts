@@ -11,7 +11,7 @@
 import { pricing } from '../../config/pricing.ts';
 import { zoneForZip } from '../../config/geography.ts';
 import { calculateTravelAdjustment } from '../travel/calculateTravelAdjustment.ts';
-import { selectAddons } from './addons.ts';
+import { resolveAddonCharge, selectAddons } from './addons.ts';
 import { computeLaborHours } from './labor.ts';
 import { recurringResetSuggested } from './frequency.ts';
 import { validateEstimateInput } from './validation.ts';
@@ -211,23 +211,29 @@ export function calculateEstimate(
   const minimumJob = pricing.minimumJob.value;
   const step = pricing.rounding.toNearest.value;
   const baseRaw = labor.baseHours * rate;
-  const addonRaw = round2(labor.addonHours * rate);
-  const rawPrice = round2(baseRaw + addonRaw);
-  const gross = Math.max(minimumJob, rawPrice);
-  const minimumApplied = gross > rawPrice;
 
+  // Every non-specialty add-on charge resolves through ONE helper: the
+  // owner-set fixed price when present, otherwise labor-hours × rate. The
+  // add-on subtotal is the sum of those resolved charges, so a fixed-price
+  // item feeds the total exactly as displayed. Labor-hours (including a
+  // fixed-price item's hours) still come from the labor model for scheduling.
   const addonPrices: AddonPriceLine[] = pricing.addons.items.map((item) => ({
     id: item.id,
     label: item.label,
     laborHours: item.laborHours ?? 0,
     customQuote: item.customQuote,
-    charge: item.customQuote ? null : round2((item.laborHours ?? 0) * rate),
+    charge: resolveAddonCharge(item, rate),
   }));
   const selectedExtras = addonSelection.selected
     .filter((addon) => !addon.customQuote)
-    .map((addon) => ({ id: addon.id, label: addon.label, charge: round2(addon.laborHours * rate) }));
+    .map((addon) => ({ id: addon.id, label: addon.label, charge: resolveAddonCharge(addon, rate) ?? 0 }));
   const extrasSubtotal = round2(selectedExtras.reduce((sum, addon) => sum + addon.charge, 0));
+  const addonRaw = extrasSubtotal;
   const eligibleAddonCount = selectedExtras.length;
+
+  const rawPrice = round2(baseRaw + addonRaw);
+  const gross = Math.max(minimumJob, rawPrice);
+  const minimumApplied = gross > rawPrice;
 
   const incentive = context.addonIncentive ?? {
     enabled: pricing.addonIncentive.enabled.value,

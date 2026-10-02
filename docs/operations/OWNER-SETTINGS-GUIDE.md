@@ -1,195 +1,177 @@
-# Owner settings guide — what you can change and how
+# Owner Settings Guide — changing your prices safely
 
-This guide covers every owner-editable business and estimating setting: what it controls, where it
-lives, whether it is public or internal, whether it needs approval, and whether changing it
-requires a rebuild. It is written for editing directly through GitHub (no local setup needed).
+This guide is for the business owner. It explains where every price lives, how to change it from a
+phone or computer using GitHub, and how to check the result before customers see it. No coding
+knowledge is required beyond editing numbers in one file.
 
-Read the safety rules in §0 first. All prices in this document are the **current provisional
-values**; nothing here approves a price change.
+Everything on the website is calculated from **one settings file**:
 
-## 0. How configuration works (read this first)
+> **`src/config/owner-pricing.ts`**
+> Open it: https://github.com/Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning/blob/main/src/config/owner-pricing.ts
+> Edit it directly: https://github.com/Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning/edit/main/src/config/owner-pricing.ts
 
-- **One source of truth per area.** Business facts live in `src/config/business.ts`, pricing and
-  estimating in `src/config/pricing.ts`, service geography in `src/config/geography.ts`, campaign
-  links in `src/config/marketing-links.ts`. Never edit component code or content files to change a
-  business fact.
-- **Everything here is version-controlled.** Every change is a commit; GitHub keeps the history,
-  and the previous state can always be restored (revert).
-- **The repository is public.** These files are readable by anyone. Internal pricing and
-  estimating assumptions are **not confidential** just because the website does not display them.
-  If genuine confidentiality is required (e.g. rate card vs competitors), that needs a separate
-  server-side configuration design — not a promise that a public file stays secret.
-- **Editing through GitHub:** open the file → pencil icon → change the value → "Commit changes"
-  with a short message → the CI checks run and Cloudflare rebuilds the site. Wait for the
-  Cloudflare deployment check to go green before assuming the change is live.
-- **Before you change a number:** run `npm run estimate:quotes` locally (or ask an engineer to
-  paste its output) to see the economic impact on representative homes. The command prints the
-  current quotes with the active settings; run it again after the change to compare.
-- **Configuration tests protect you.** `npm test` validates the structure (unique add-on ids,
-  ordered multipliers, valid zones). A typo that would break quoting fails the tests instead of
-  reaching customers.
-- **Approval states.** Values are `provisional` (starting point, can change freely) or `approved`
-  (owner-approved; do not change without a new approval). Every value carries a note explaining
-  it. **Publication flags** (`pricing.publication.*`) decide whether a value may ever be shown
-  publicly; they are off until the owner approves.
-- **Rebuild rule.** All settings in these config files are compiled into the site — a change takes
-  effect only after a new build (commit → push → Cloudflare deploy). Environment variables in
-  Cloudflare follow the same rule; sending the change requires a redeployment.
+**This repository is public.** Internal rates and assumptions are visible to anyone who looks. Never
+put passwords, customer information or genuinely confidential business data in the file.
 
-## A. Labor and pricing — `src/config/pricing.ts`
+---
 
-| Setting (path) | Controls | Current value | Permitted range / notes | Public? | Approval to change | Affects |
-| --- | --- | --- | --- | --- | --- | --- |
-| `laborEconomics.targetGrossRevenuePerLaborHour` | Gross rate for other service categories (one-time, deep, move-out, STR) | **$50** (approved) | Any number > owner target; internal math only | Never displayed | Owner decision | One-time/deep/move-out/STR estimates |
-| `laborEconomics.recurringGrossRevenuePerLaborHour` | Gross rate for applicable recurring maintenance (recurring standard cleans) | **$42** (approved) | Must not exceed the other-services rate; internal math only | Never displayed | Owner decision | Weekly/biweekly/monthly estimates |
-| `laborEconomics.ownerLaborTargetPerHour` | Founder pay floor before overhead | **$35** | Must stay below the gross rate | Never displayed | Owner decision | Margin sanity tests |
-| `minimumJob` | Smallest job value applied silently | **$125** | > 0; not advertised while publication flag is off | Internal | Owner approval | Small jobs, add-on-only visits |
-| `laborModel.baseHours.standard / deep / move_in_out / str_turnover` | Base labor hours per service type | 2.0 / 3.2 / 3.4 / 1.2 | > 0 | Internal | Owner approval | Labor hours, price |
-| `laborModel.sqftHoursPerThousand` | Labor per 1,000 sq ft | 1.1 | > 0 | Internal | Owner approval | Size scaling |
-| `laborModel.fullBathHours` / `halfBathHours` | Bathroom labor | 0.5 / 0.25 | > 0 | Internal | Owner approval | Bathroom scaling |
-| `laborModel.bedroomHours` / `bedroomsIncludedInBase` | Bedroom labor beyond the first two | 0.15 / 2 | ≥ 0 / ≥ 0 | Internal | Owner approval | Bedroom scaling |
-| `laborModel.strBathHours` / `strBedHours` / `strSqftHoursPerThousand` | STR turnover resets | 0.35 / 0.2 / 0.8 | > 0 | Internal | Owner approval | STR estimates |
-| `conditionFactors.*` | Multiplier by home condition (maintained → severe) | 1.0 / 1.1 / 1.25 / 1.45 / 2.0 | ≥ 1, strictly increasing | Internal | Owner approval | Condition adjustment |
-| `lastCleanFactors.*` | Multiplier by time since last professional clean | 1.0 → 1.2 | ≥ 1 | Internal | Owner approval | First-clean pricing |
-| `frequencyFactors.weekly / biweekly / monthly / one_time` | Labor efficiency by frequency | 0.92 / 0.95 / 0.98 / 1.0 | (0, 1] | Internal | Owner approval | Recurring pricing |
-| `recurringReset.flagWhenLastCleanIn` | Flags first recurring visits that may need a detailed reset | over_a_year, never_professional | Any of the last-clean values | Customer sees the flag message | Owner approval | Recurring onboarding |
-| `range.lowFactor` / `highFactor` | The ± spread of the public range | 0.92 / 1.12 | low < 1 < high | Public (the range) | Owner approval | Displayed ranges |
-| `rounding.toNearest` | Estimate rounding | **$5** | > 0 | Public effect | Owner approval | Displayed ranges |
-| `customQuoteThresholds.*` | When a job routes to personal confirmation (size, baths, bedrooms, severe, custom add-ons, outside zone, unknown location) | 4500 sq ft / 4 baths / 5 beds | > 0 | Customer sees a confirmation message | Owner approval | Estimate eligibility |
-| `publication.publishHourlyRates / publishAddonPrices / publishMinimumJob` | Whether internal numbers may ever be shown publicly | **all false** | Keep false unless owner explicitly approves publication | Public if ever true | Owner approval + code change | Website claims |
+## 1. The two files and what each one does
 
-The founder's real-world anchors are encoded as tests (`tests/estimator.test.ts`): a maintained
-3/2 lands at ≈4.5–5.0 labor-hours and a first clean ≈6. Changing the labor model must keep those
-tests (or update them with owner approval).
+| File | What it is | Who edits it |
+| --- | --- | --- |
+| `src/config/owner-pricing.ts` | The raw numbers: hourly rates, labor times, add-ons, rounding. One clearly grouped block per topic. | **You (the owner)** |
+| `src/config/pricing.ts` | The same values wearing their "approval badge" — `provisional` (a starting point) or `approved` (owner-approved) — plus the notes explaining each one. | A developer; change only the approval state or a note |
 
-## B. Service options and upsells — `src/config/pricing.ts` → `addons.items`
+You only ever need `owner-pricing.ts`. The website's calculator, the customer's instant price, the
+server's independent re-check and the owner notification all read the same values through
+`pricing.ts`, so there is nothing to keep in sync by hand.
 
-Current add-ons: inside refrigerator, inside oven, inside cabinets, interior windows,
-ground-floor exterior windows, laundry, dishes, bed linen change, general/pantry/closet
-organization, pet-hair intensive, detailed wall spot-cleaning, detailed baseboards, plus
-custom-quote-only: carpet, upholstery, pressure washing, garage, patio.
+---
 
-Each entry supports: `id` (stable snake_case), `label`, `blurb`, `laborHours`, `customQuote`
-(must have no price), `price` (internal, provisional), `category`.
+## 2. Editing on GitHub (step by step)
 
-| To do this | Edit |
+1. Sign in to GitHub and open the **edit link** above (or open the file and tap the pencil icon).
+2. Find the section you want (each has a numbered banner comment, e.g. `── 1. Hourly rates ──`).
+3. Change **only the number** after the colon. Keep the commas and the structure exactly as they
+   are — the file is machine-checked and a missing comma stops the website from building.
+4. Scroll to the bottom and press **Commit changes…**
+5. Write a short message, e.g. `Raise recurring rate to $45`, and commit to the `main` branch.
+6. **Saving is not publishing.** The commit starts an automatic rebuild. The live site updates in
+   roughly **2–4 minutes**. If the file has an error, the build fails and the live site simply keeps
+   the previous prices — nothing breaks for customers, but your change does not go live. The next
+   section shows how to check before that happens.
+
+---
+
+## 3. Check your change before you publish it
+
+Run these on your computer from the project folder (a developer can set this up once):
+
+| Command | What it tells you |
 | --- | --- |
-| Change an add-on's labor hours | `laborHours` on that item (approval: owner) |
-| Change an internal add-on price | `price` (stays invisible while `publishAddonPrices` is false) |
-| Add a new instant add-on | Copy a similar item; give it a new unique `id`, a category, labor hours, a price, `customQuote: false` |
-| Add a custom-quote add-on | Same, but `customQuote: true` and **no** `price` |
-| Retire an add-on | Delete the item (takes effect at the next build) |
+| `npm run estimate:quotes` | A table of representative homes (studio, 2BR, 3BR, deep clean, STR…) showing labor hours, the proposed price, the range and the rounded customer price — exactly what the current numbers produce. |
+| `npm run estimate:discount-impact` | How any enabled discount affects the modelled contribution. |
+| `npm test` | Runs the pricing and calculator tests. If a number breaks the model, it fails here. |
+| `npm run check` | Catches typos and invalid values before the site rebuilds. |
 
-Structural rules enforced by tests: unique ids, snake_case, all fields present, custom-quote
-items carry no price, instant items carry labor hours.
+Always run `npm run estimate:quotes` **before and after** a change and compare the rows. If a row
+moved by more than you intended, adjust the number and run it again.
 
-**Honest limitation:** availability windows, eligible-service-type filters and quantity limits are
-**not implemented yet**; every listed add-on is offered for every service. Treat adding such
-filters as a future extension, not a current setting. Until then, do not advertise an option that
-should not be available — remove it from the list instead.
+---
 
-## C. Travel and vehicle economics
+## 4. What each setting changes (plain English)
 
-| Setting | Controls | Current value | Where | Public? | Notes |
-| --- | --- | --- | --- | --- | --- |
-| `pricing.travel.includedOneWayMiles` | Miles included before a travel adjustment | 15 | pricing.ts | Internal | Mirrors the server default; update together |
-| `pricing.travel.perMileWearCost` | Vehicle wear allowance per mile | $0.12 | pricing.ts | Internal | Tires/oil/depreciation |
-| `pricing.travel.fallbackGasPrice` | Fuel price used when the live feed is unavailable | $3.10 | pricing.ts | Internal | Gulf Coast reference |
-| `pricing.travel.zoneAdjustments.core / surrounding` | Flat zone adjustments in offline mode | $0 / $15 | pricing.ts | Never itemized | Silently inside the total |
-| `pricing.travel.clientDefaults.mpg / maxInstantDistanceMiles` | Client mirror of vehicle economics | 24 / 45 mi | pricing.ts | Internal | Mirrors Cloudflare values |
-| `TRAVEL_ORIGIN` | Private operating coordinates | **not set** | Cloudflare secret | Never published | Required for routed travel |
-| `ROUTES_PROVIDER` / `ROUTES_API_KEY` | Routing provider | not set | Cloudflare | Never published | Optional |
-| `EIA_API_KEY` | Live fuel price feed | not set | Cloudflare secret | Never published | Optional |
-| `REFERENCE_GAS_PRICE` / `TRAVEL_CACHE_SECONDS` | Runtime fuel fallback / cache | 3.1 / 21600 s | Cloudflare text vars | Internal | Optional |
-| `VEHICLE_MPG`, `INCLUDED_ONE_WAY_MILES`, `MAX_INSTANT_ESTIMATE_DISTANCE` | Documented planning values | — | `.env.example` | Internal | **Currently not consumed by code** — informational only until the shared-config refactor (`ESTIMATOR-LOCATION-ENGINE.md`) wires or removes them |
+### 1. Hourly rates
+- `recurring` — what one labor-hour earns on **recurring** maintenance cleans (weekly, biweekly,
+  monthly standard). Raising it raises every recurring quote.
+- `otherServices` — the rate for one-time, deep, move-in/move-out and STR work.
+- `ownerLaborTarget` — the founder's pay floor per hour. It must stay **below both rates** or the
+  tests fail; it is a safety rail, not customer-facing.
 
-The travel economics and driving policy now live in **one shared file** —
-`src/config/travel.ts` — imported by both the website estimator and the serverless travel
-function. Edit that file to change mpg, wear per mile, included miles, the fallback fuel price,
-the **maximum automatic-estimate driving time** (`maxDrivingMinutes`, currently 60) and the
-**review band** (`reviewBandMinutes`, currently 15). Cloudflare environment values still override
-the fuel price and cache duration at runtime.
+### 2. Minimum job
+The smallest amount any visit can be priced at. A small job is quoted at this number even when the
+labor math comes out lower.
 
-### Instant quoting — `src/config/pricing.ts` → `instantQuote`
+### 3. Base labor-hours per service
+The starting time for each service **before** size and rooms are added: `standard`, `deep`,
+`move_in_out`, `str_turnover`.
 
-| Setting | Controls | Current value | Notes |
-| --- | --- | --- | --- |
-| `instantQuote.enabled` | Shows one offered price instead of the estimate range | **false** | Requires owner approval of the impact report before enabling |
-| `instantQuote.selection` | Which model value becomes the offered price | `expected` | `expected` is the model price (never the low end); `midpoint`/`high` are alternatives |
-| `instantQuote.marginFloor` | Hard floor as a multiple of the model price | 1.0 | The offered price can never fall below the model price |
-| `instantQuote.validityHours` | How long an instant quote is honored | 336 h (14 days) | Proposed; owner approval required |
+### 4. Labor per property unit
+- `sqftHoursPerThousand` — extra hours for each 1,000 sq ft (the biggest driver of larger-home
+  prices).
+- `fullBathHours` / `halfBathHours` — time per bathroom.
+- `bedroomHours` / `bedroomsIncludedInBase` — time per bedroom **beyond** the first
+  `bedroomsIncludedInBase`.
+- `strBathHours`, `strBedHours`, `strSqftHoursPerThousand` — the separate STR turnover model.
 
-Before enabling: run `npm run estimate:quotes` for the before/after impact report, confirm the
-formula, then flip `instantQuote.enabled` in a reviewed change (rebuild required). The quoted
-price comes from the same labor/risk calculation as the range — there is no second pricing
-engine. Unrouted locations still show the range or a personal-confirmation message, and never a
-refused customer.
+### 5. Condition multipliers
+Multiplies total labor by how the home is kept: maintained → severe. **Severe always goes to a
+custom quote** rather than an instant price.
 
-## D. Business hours and scheduling — `src/config/business.ts` → `hours`
+### 6. Last-clean multipliers
+Multiplies labor by how long since the last professional clean. `not_sure` uses a conservative
+middle value.
 
-| Setting | Controls | Current value | Customer-facing? |
-| --- | --- | --- | --- |
-| `residentialWindow` | Booking window | 8:00 AM – 6:00 PM | Yes, on contact/about/footer |
-| `days` | Operating days | Seven days a week | Yes |
-| `commercialNote` | Commercial after-hours availability | "day or evening… overnight when the facility needs it" | Commercial page |
-| `firstAppointmentNote` | First-of-day exact arrival promise | exact arrival time | Contact/FAQ |
-| `arrivalWindowNote` | Later appointments use a window | — | Contact/FAQ |
-| `timezone` | Business timezone | America/Chicago | Internal/schema |
-| `schema.opens / closes` | Structured data hours | 08:00 / 18:00 | Schema (public) |
+### 7. Frequency factors
+The per-visit efficiency of recurring service (weekly is the best value, one-time is the baseline).
+These are a labor-efficiency model, **not** a marketing discount.
 
-Notes: a normal day may hold one substantial cleaning plus a smaller job. **Total labor-hours are
-never reduced by bringing a helper** — a helper shortens elapsed time, not the labor cost used for
-pricing. There is no confirmed-booking backend; the site only takes requests. Future-booking
-restrictions, holiday exceptions, scheduling buffers, workload caps and helper-availability
-assumptions are **not implemented**; add them to the roadmap rather than pretending they exist.
+### 8. Range and rounding
+- `lowFactor` / `highFactor` — the range shown around the estimate.
+- `roundToNearest` — estimates round **up** to the nearest multiple (default $5) so the site never
+  shows false precision.
 
-## E. Business policies
+### 9. Add-ons
+Each add-on normally charges `laborHours × the applicable rate`. To charge a **flat dollar price**
+for one add-on instead, add a line to that add-on:
 
-| Setting | Controls | Current value | Where | Public? | Approval |
-| --- | --- | --- | --- | --- | --- |
-| `pricing.cancellation.noticeHours / underNoticePercent / sameDayPercent` | Cancellation policy | 24 h / 25% / 50% — **provisional** | pricing.ts | Public copy avoids the numbers until approved | Owner must approve before publishing |
-| `pricing.cancellation.discretionNote` | Founder discretion | — | pricing.ts | Yes | Owner approval |
-| `pricing.satisfaction.statement` | Satisfaction process wording | "contact us promptly…" | pricing.ts | Yes | Owner approval |
-| `pricing.satisfaction.notificationWindowHours` | Response window | not set | pricing.ts | Deliberately omitted | Owner approval |
-| `business.payments.accepted / alternate` | Accepted payment methods | cards/Apple Pay/Google Pay/ACH + others | business.ts | Yes (terms) | Confirm what Stripe actually enables |
-| `business.payments.residentialTiming` | Payment timing | after completion | business.ts | Yes | Owner approval |
-| `business.products.*` | Supplies philosophy | our supplies; preferences accommodated | business.ts | Yes | Owner approval |
-| `business.flags.publishProvisionalAddonPricing` | Show add-on prices | false | business.ts | Public if true | Owner approval + code change |
-| `business.flags.instantBooking` | Booking promise | false | business.ts | Public if true | Requires a real booking backend |
+```ts
+{ id: 'inside_oven', label: 'Inside oven', laborHours: 0.6, customQuote: false, category: 'kitchen', fixedPriceUsd: 35 },
+```
 
-Unapproved policy values must stay unapproved and must not become public promises. Promotion and
-travel-exception settings do not exist yet; until they do, offers are communicated manually and
-never advertised by the site.
+- `laborHours` still counts toward the scheduled time (how long the visit takes).
+- `fixedPriceUsd` replaces the **charge** everywhere: the price shown beside the checkbox, the
+  total, the reservation quote and the server's re-check.
+- Specialty items (`customQuote: true`) are never given an instant price — leave them alone.
+- Remove the `fixedPriceUsd` line to return to labor-based pricing.
 
-## F. Configuration management
+### 10. Promotions and discounts
+The `promotions` section holds the proposals (multi-add-on incentive, response guarantee, loyalty /
+appreciation discounts, founding offer). **Every proposal is disabled and its percent is `null`
+until the owner approves exact terms in writing.** Enabling a proposal changes what customers are
+promised — do not turn one on without the owner's explicit approval of the final numbers and
+conditions.
 
-- **Files:** `src/config/business.ts`, `src/config/pricing.ts`, `src/config/geography.ts`,
-  `src/config/marketing-links.ts`. Nothing else should contain business facts.
-- **Generated documents are never hand-edited:** `docs/marketing/UTM-MASTER-LINKS.*` and the QR
-  files come from `npm run marketing:links`.
-- **Validation:** `npm test` (65 tests) checks structure, ranges and zone data;
-  `npm run estimate:quotes` prints representative quotes for before/after comparison;
-  `npm run verify` is the full pre-deploy bar.
-- **Types and tests are the guardrails.** Every pricing value must carry a state and a note; the
-  configuration tests fail a broken edit rather than letting it reach customers.
-- **Rebuild requirements:** config files → rebuild (commit + push). `PUBLIC_*` Cloudflare
-  variables → rebuild. Runtime secrets (`WEB3FORMS_ACCESS_KEY`, `TRAVEL_ORIGIN`, routing/EIA
-  keys) → next deployment attaches them.
-- **Confidentiality:** the repository is public. If the owner wants rate assumptions private,
-  the proposal is a server-side configuration (estimator pricing computed/stored server-side, or
-  a private repository for the economics module) — that requires a separate architecture
-  decision. Do not treat today's public files as secret.
-- **No admin portal** is planned at this stage; GitHub file editing is the maintenance surface.
+---
 
-## G. Common tasks, step by step
+## 5. Provisional vs approved vs disabled
 
-| Task | Steps |
+Alphabetical next to each value in `src/config/pricing.ts` you will see one of:
+
+- **`approved(...)`** — the owner approved this number. Do not change it without a new owner decision.
+- **`provisional(...)`** — a working starting point that may still change. Expect it to be tuned.
+- **`enabled: false`** — a proposed promotion that is **not published**. The website never shows it
+  while it is false.
+
+Public pages never print hourly rates or labor hours — only the proposed customer prices.
+
+---
+
+## 6. When the quote version must change
+
+`pricing.instantQuote.configVersion` is the marker the server uses to prove a quote was built on the
+current rules. **Any change that moves a customer price requires bumping it.** A typo fix, a comment,
+or adding fixed-price support without changing a price does not. When in doubt, ask a developer
+before changing it.
+
+---
+
+## 7. Rollback — undo a change safely
+
+1. Open the repository's **Commits** page: https://github.com/Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning/commits/main
+2. Find the commit with the pricing change you want to undo.
+3. Easiest and safest: open the file again, put the previous number back, and commit that as a new
+   change ("Revert recurring rate to $42"). This keeps a clear history and deploys in 2–4 minutes.
+4. A developer can alternatively use **Revert** on the commit from the GitHub interface.
+5. Never force-push, reset or delete history. If the site is broken, revert the commit — the live
+   site stays on the last good build until the new one succeeds.
+
+---
+
+## 8. Quick reference — where to change common things
+
+| I want to change… | Edit in `owner-pricing.ts` |
 | --- | --- |
-| Change an estimate multiplier | GitHub → `src/config/pricing.ts` → edit the value → commit → wait for the Cloudflare check → run `npm run estimate:quotes` comparison (locally) |
-| Change travel economics or the driving boundary | GitHub → `src/config/travel.ts` → edit → commit (this updates both the website and the travel function) |
-| Enable instant single-price quoting | Review `npm run estimate:quotes` output → approve the formula → flip `instantQuote.enabled` to `true` in `src/config/pricing.ts` → commit |
-| Add an add-on | Add an item under `addons.items` with a new id → commit → tests must pass |
-| Change business hours | `src/config/business.ts` → `hours` → commit |
-| Add a service-area ZIP (temporary, until the location engine ships) | `src/config/geography.ts` → add `{ city, state, zone, lat, lng }` → commit |
-| Turn on the live fuel feed | Add `EIA_API_KEY` in Cloudflare → redeploy |
-| Approve a published price | Requires an explicit decision; then flip the matching `pricing.publication` flag in a reviewed change |
+| Recurring cleaning price level | `hourlyRates.recurring` |
+| One-time / deep price level | `hourlyRates.otherServices` |
+| Smallest possible job | `minimumJob` |
+| Big-home pricing | `laborUnits.sqftHoursPerThousand` |
+| Bathroom / bedroom time | `laborUnits.fullBathHours`, `bedroomHours` |
+| Deep-clean starting time | `baseLaborHours.deep` |
+| Overdue-home surcharge | `conditionFactors`, `lastCleanFactors` |
+| One add-on to a flat price | that add-on's `fixedPriceUsd` |
+| Estimate range / rounding | `range`, `rounding` |
+| A promotion | `promotions` — **owner approval required first** |
+
+Related documents: `docs/launch/PRICING-PROPOSAL.md` (pricing rationale),
+`docs/verification/VERIFICATION.md` (how quotes are verified), `AGENTS.md` (developer rules).

@@ -76,6 +76,11 @@ export interface SelectedAddon {
   id: string;
   label: string;
   laborHours: number;
+  /**
+   * Owner-set fixed charge in USD, when one exists. The charge resolver uses
+   * it instead of laborHours × rate; laborHours still count toward labor time.
+   */
+  fixedPriceUsd?: number;
   customQuote: boolean;
 }
 
