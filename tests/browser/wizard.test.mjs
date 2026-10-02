@@ -297,6 +297,35 @@ test('Start Over clears the questionnaire even though nothing is stored', async 
   }
 });
 
+// ── Stable step transitions ─────────────────────────────────────────────────
+
+test('step transitions keep the questionnaire in a stable viewport across widths', async () => {
+  for (const [width, height] of [[390, 844], [768, 1024], [1280, 900]]) {
+    const { context, page } = await openWizard(width, height);
+    try {
+      await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+      await page.fill('#est-address', '100 S Baylen St');
+      await page.fill('#est-zip', '32503');
+      // Simulate reaching the Continue button at the bottom of the page.
+      await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+      await page.click('[data-next]');
+      assert.equal(await activeStep(page), 2, `${width}px: Next advances`);
+      const top = await page.evaluate(
+        () => document.querySelector('[data-estimate-form]').getBoundingClientRect().top,
+      );
+      assert.ok(top >= -2 && top <= 220, `${width}px: form visible after Next (top=${Math.round(top)})`);
+      await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+      await page.click('[data-back]');
+      const backTop = await page.evaluate(
+        () => document.querySelector('[data-estimate-form]').getBoundingClientRect().top,
+      );
+      assert.ok(backTop >= -2 && backTop <= 220, `${width}px: form visible after Back (top=${Math.round(backTop)})`);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 // ── Double-submission prevention + honest failure ────────────────────────────
 
 test('final submit disables while sending and reports honest failure', async () => {

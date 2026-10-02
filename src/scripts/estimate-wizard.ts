@@ -520,9 +520,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
   function showStep(step: number): void {
     const next = Math.min(Math.max(step, 1), steps.length);
     const changed = next !== currentStep;
-    // Anchor the questionnaire: record where the steps container sits in the
-    // viewport before the height changes, then compensate exactly.
-    const anchor = form.getBoundingClientRect().top;
     currentStep = next;
     for (const [index, element] of steps.entries()) {
       element.dataset.active = String(index + 1 === currentStep);
@@ -531,17 +528,26 @@ function initEstimateWizard(form: HTMLFormElement): void {
     recalc();
     if (!changed) return;
 
-    // Switching steps must never move the page unexpectedly: any layout shift
-    // (taller/shorter step, scroll anchoring) is compensated so the wizard
-    // stays visually anchored where the customer was reading.
-    const shift = form.getBoundingClientRect().top - anchor;
-    if (Math.abs(shift) > 1) window.scrollBy({ top: shift, left: 0, behavior: 'auto' });
-
     // Accessible focus management without scrolling the document.
     const heading = steps[currentStep - 1]?.querySelector<HTMLElement>('.wizard__step-heading');
     if (heading) {
       heading.tabIndex = -1;
       heading.focus({ preventScroll: true });
+    }
+
+    // Stable viewport: the new step must never leave the customer at the
+    // bottom of the page or scrolled past the questionnaire. When the form top
+    // is already in a comfortable band we do not move the page at all; when a
+    // shorter/taller step would move it out of view, we place the form top
+    // just below the sticky header. This is deterministic at every width and
+    // cannot be clamped the way relative scroll compensation can.
+    const header = document.querySelector<HTMLElement>('.site-header');
+    const headerOffset =
+      header && window.getComputedStyle(header).display !== 'none' ? header.getBoundingClientRect().height : 0;
+    const comfortableTop = headerOffset + 12;
+    const rect = form.getBoundingClientRect();
+    if (rect.top < headerOffset + 4 || rect.top > window.innerHeight * 0.35) {
+      window.scrollTo({ top: Math.max(0, rect.top + window.scrollY - comfortableTop), behavior: 'instant' });
     }
 
     // Scroll the horizontal step navigator internally (never the page) so the
