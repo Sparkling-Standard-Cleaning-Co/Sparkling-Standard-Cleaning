@@ -23,7 +23,23 @@ const CONFIRMED = [
 ];
 
 // Platforms that must NEVER render while business.ts carries PENDING URLs.
-const PENDING_LABELS = ['Instagram', 'TikTok', 'YouTube', 'Pinterest', 'Yelp', 'LinkedIn', 'Google Business Profile'];
+const PENDING_LABELS = [
+  'Google Business Profile',
+  'Bing Places',
+  'Yelp',
+  'Instagram',
+  'TikTok',
+  'YouTube',
+  'Pinterest',
+  'Rumble',
+  'Gab',
+  'Parler',
+  'X',
+  'Threads',
+  'LinkedIn',
+  'Alignable',
+  'Reddit',
+];
 
 let server;
 let browser;
@@ -82,7 +98,8 @@ test('the footer shows a distinct Follow Us section with only confirmed platform
     }
     const text = (await section.textContent()) ?? '';
     for (const pending of PENDING_LABELS) {
-      assert.doesNotMatch(text, new RegExp(pending), `${pending} must not render while PENDING`);
+      const escaped = pending.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      assert.doesNotMatch(text, new RegExp(`\\b${escaped}\\b`), `${pending} must not render while PENDING`);
     }
   } finally {
     await context.close();

@@ -49,4 +49,12 @@ export type SocialName =
   | 'pinterest'
   | 'yelp'
   | 'linkedin'
-  | 'google';
+  | 'google'
+  | 'bing'
+  | 'x'
+  | 'threads'
+  | 'rumble'
+  | 'reddit'
+  | 'gab'
+  | 'parler'
+  | 'alignable';

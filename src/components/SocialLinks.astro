@@ -22,17 +22,33 @@ interface ProfileDefinition {
   icon: SocialName;
 }
 
-// Presentation order and labels. Update here only when a platform is added.
+// Presentation order and labels for the COMPLETE platform inventory (see
+// docs/marketing/PLATFORM-REGISTER.md). A platform renders only when its
+// confirmed URL is configured, so this list grows safely ahead of the owner
+// supplying each profile.
 const PROFILE_ORDER: ProfileDefinition[] = [
+  // Local discovery
+  { key: 'googleProfile', label: 'Google Business Profile', icon: 'google' },
+  { key: 'bingPlaces', label: 'Bing Places', icon: 'bing' },
   { key: 'facebook', label: 'Facebook', icon: 'facebook' },
+  { key: 'nextdoor', label: 'Nextdoor', icon: 'nextdoor' },
+  { key: 'yelp', label: 'Yelp', icon: 'yelp' },
+  // Visual and video
   { key: 'instagram', label: 'Instagram', icon: 'instagram' },
   { key: 'tiktok', label: 'TikTok', icon: 'tiktok' },
   { key: 'youtube', label: 'YouTube', icon: 'youtube' },
-  { key: 'nextdoor', label: 'Nextdoor', icon: 'nextdoor' },
   { key: 'pinterest', label: 'Pinterest', icon: 'pinterest' },
-  { key: 'yelp', label: 'Yelp', icon: 'yelp' },
+  { key: 'rumble', label: 'Rumble', icon: 'rumble' },
+  // Additional social distribution
+  { key: 'gab', label: 'Gab', icon: 'gab' },
+  { key: 'parler', label: 'Parler', icon: 'parler' },
+  { key: 'x', label: 'X', icon: 'x' },
+  { key: 'threads', label: 'Threads', icon: 'threads' },
+  // Professional networking
   { key: 'linkedin', label: 'LinkedIn', icon: 'linkedin' },
-  { key: 'googleProfile', label: 'Google Business Profile', icon: 'google' },
+  { key: 'alignable', label: 'Alignable', icon: 'alignable' },
+  // Community engagement
+  { key: 'reddit', label: 'Reddit', icon: 'reddit' },
 ];
 
 const profiles = PROFILE_ORDER.flatMap((profile) => {
