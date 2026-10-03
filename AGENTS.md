@@ -83,11 +83,12 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   verified); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); eight confirmed
   social profiles rendering (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals);
   owner-approved 2026-10-02 favicon/PWA icon kit installed.
-- **Release status:** the five-commit release (`8b8dde4`, `03d6ba8`, `53a85aa`, `0f3c38c`, `5a4a024`)
-  was owner-authorized and **deployed to production on 2026-10-03** (`origin/main` = `5a4a024`);
+- **Release status:** the 2026-10-03 release is **deployed to production** — `origin/main` =
+  `cdc4971` (the five-commit release `8b8dde4`/`03d6ba8`/`53a85aa`/`0f3c38c`/`5a4a024`, the
+  documentation closeout `7a51efa`, and the social integration `cdc4971`), owner-authorized with
   live acceptance checks passed (see `docs/verification/VERIFICATION.md`). Any new local work —
-  including the post-release documentation follow-up — stays unpublished until the owner
-  authorizes another push.
+  including later documentation follow-ups — stays unpublished until the owner authorizes another
+  push.
 - **Marketing phase (2026-10-03):** the business is transitioning from development into active
   marketing. Two growth engines (audience growth vs. local customer acquisition), priority content
   platforms (Instagram, TikTok, YouTube), the proposed "30 Days. 30 Details." content plan, the

@@ -21,9 +21,9 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
   page views, `estimate_start` and all three inquiry key events verified; Enhanced Measurement
   form interactions disabled).
 - **Release status:** the 2026-10-03 release (GTM import package + Brand A2, UTM count correction,
-  GTM doc cleanup, attribution repair, marketing documentation) is **deployed** — `origin/main` =
-  `5a4a024`, owner-authorized, live acceptance checks passed. See
-  `docs/verification/VERIFICATION.md`.
+  GTM doc cleanup, attribution repair, marketing documentation, and the six-profile social
+  integration with the upgraded Follow Us section) is **deployed** — `origin/main` = `cdc4971`,
+  owner-authorized, live acceptance checks passed. See `docs/verification/VERIFICATION.md`.
 - **Remaining owner items:** formal launch checklist (legal entity spelling, insurance/bonding/
   licensing claims, genuine review link, final cancellation percentages), Instagram + YouTube
   account creation, pasting the confirmed profiles' tracked website links, Google Business Profile

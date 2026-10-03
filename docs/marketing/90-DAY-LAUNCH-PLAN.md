@@ -30,10 +30,10 @@ main open setup items (`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`).
 
 ### Week 1 — Release and setup
 
-- [x] **Done 2026-10-03** — the software release was owner-authorized and deployed
-      (`origin/main` = `5a4a024`, GTM import package + Brand A2, UTM count correction, GTM doc
-      cleanup, attribution repair, marketing documentation); live acceptance checks passed
-      (`docs/verification/VERIFICATION.md`).
+- [x] **Done 2026-10-03** — the software release and the six-profile social integration were
+      owner-authorized and deployed (`origin/main` = `cdc4971`: GTM import package + Brand A2, UTM
+      count correction, GTM doc cleanup, attribution repair, marketing documentation, eight-profile
+      Follow Us section); live acceptance checks passed (`docs/verification/VERIFICATION.md`).
 - [ ] Confirm the Google Business Profile verification result.
 - [ ] Create the priority social accounts (Instagram, TikTok, YouTube) with approved branding,
       consistent contact facts and the tracked website links; update

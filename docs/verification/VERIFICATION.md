@@ -160,13 +160,14 @@ delivered are unchanged; the corrections apply to future attribution and notific
 
 ## Release status — deployed (2026-10-03)
 
-- **Owner-authorized release deployed:** `origin/main` = **`5a4a024`** (pushed 2026-10-03; GitHub
-  Actions `validate` run green; Cloudflare Pages served the new build — the removed
-  `/brand-preview/` now returns 404 and the deployed client chunks include the repaired
-  attribution logic).
-- The five release commits: `8b8dde4` (GTM import package + Brand A2), `03d6ba8` (UTM counts),
+- **Owner-authorized release deployed:** `origin/main` = **`cdc4971`** (2026-10-03; GitHub Actions
+  `validate` runs green; Cloudflare Pages served each build).
+- The deployed commit set: `8b8dde4` (GTM import package + Brand A2), `03d6ba8` (UTM counts),
   `53a85aa` (GTM doc cleanup), `0f3c38c` (attribution repair + first/latest labels), `5a4a024`
-  (marketing documentation consolidation).
+  (marketing documentation consolidation), `7a51efa` (release closeout documentation) and
+  `cdc4971` (six-profile social integration + Follow Us upgrade).
+- The earlier five-commit build (`5a4a024`) removed `/brand-preview/` (now 404) and deployed the
+  repaired attribution logic; `cdc4971` added the eight confirmed Follow Us profiles.
 - **Limitations:** the GA4 account results are owner-confirmed external verification, not
   repository tests. The attribution fix cannot retroactively repair previously clobbered `latest`
   records; it applies to future attribution (existing delivered emails are unchanged). Any
@@ -203,6 +204,17 @@ HTTP 200 on 2026-10-03 (destination reachable; not independent identity verifica
 | Locals link registry | `npm run marketing:links` + `npm run marketing:verify` | Locals profile link generated from the registry (`?utm_source=locals&utm_medium=organic_social&utm_campaign=profile`); registry now 51 links (23 active, 28 prepared); documents regenerated and byte-identical on check; QR assets unchanged |
 | Scope safety | Git diff + full suites | No changes to GA4/GTM, consent, estimator pricing, customer forms, reservations or payment systems; `functions/` untouched |
 | Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (78 pass), `npm run build` (21 pages), `npm run validate`, `pending`, `smoke`, `testimonials`, `audit:facts` | All pass |
+
+### Social integration deployment acceptance (2026-10-03, `cdc4971`)
+
+| Check | Method | Result |
+| --- | --- | --- |
+| CI | GitHub Actions | `validate` run `37139504672` completed successfully on the pushed SHA |
+| Deployed build | Live production fetch | The Locals profile link is live; the deployed Follow Us section contains all eight platforms |
+| Eight links + destinations | Live Playwright + HTTP checks | Exact owner-supplied hrefs, `target="_blank"`, `rel="noopener noreferrer"`, accessible labels, no UTMs. Seven destinations returned HTTP 200 to the scripted check; Facebook returned HTTP 400 (typical anti-bot response — the owner-confirmed URL is unchanged and was already rendering) |
+| Official marks | Live DOM inspection + production screenshots | Nextdoor renders the official house-"n" favicon geometry in `#1B8751`; Gab, Parler and Locals render their official assets; no monogram placeholders among the eight |
+| Layout | Production screenshots at 1280/768/390/320 | 4-column desktop/tablet, 2-column phone, single column at 320px; zero horizontal overflow; no truncated labels at any width |
+| Consent + unrelated functionality | Live Playwright | 0 Google requests before consent/after refusal; after acceptance exactly 1 GTM + 1 container-injected GA4 tag; home/estimate/contact/gift/about/recurring all `200`; gift certificates still request-only; reservation window still 60 days (`2026-12-02`). No form submissions were made |
 
 ## Pending (cannot be verified in this environment — owner or tooling required)
 

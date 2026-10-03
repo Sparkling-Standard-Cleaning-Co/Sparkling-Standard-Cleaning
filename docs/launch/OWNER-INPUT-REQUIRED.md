@@ -64,7 +64,7 @@ The full schedule is `docs/marketing/90-DAY-LAUNCH-PLAN.md`; account setup is
 
 | # | Action | Notes |
 | --- | --- | --- |
-| M1 | ~~Review and authorize the software release~~ **Done 2026-10-03** | Owner-authorized push deployed `5a4a024`; live acceptance checks passed (`docs/verification/VERIFICATION.md`). The post-release documentation follow-up stays local until separately authorized |
+| M1 | ~~Review and authorize the software release~~ **Done 2026-10-03** | Owner-authorized pushes deployed `5a4a024` and then `cdc4971` (social integration); live acceptance checks passed (`docs/verification/VERIFICATION.md`). Later documentation follow-ups stay local until separately authorized |
 | M2 | Confirm the Google Business Profile verification result | Created, verification pending; never claim verified or publish the URL early |
 | M3 | Priority social accounts | **Done 2026-10-03 for TikTok, Pinterest, Rumble, Gab, Parler and Locals** (owner-supplied URLs, rendering; tracked links still to paste). **Remaining:** create Instagram and YouTube with the owner checklist (`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`); then paste each profile's tracked website link |
 | M4 | Approve the content concepts and schedule | The "30 Days. 30 Details." title, the four-week plan and the founder introduction are proposals until approved; owner approves the facts the founder content may state |

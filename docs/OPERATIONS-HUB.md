@@ -172,10 +172,11 @@ Truthful snapshot; the register in `docs/operations/PLATFORM-STATUS.md` is autho
 - Accessibility: axe WCAG 2.0/2.1/2.2 A+AA 0 violations; layout passes at 360/768/1440 with no
   overflow.
 
-**Released:** the five-commit release (`8b8dde4`, `03d6ba8`, `53a85aa`, `0f3c38c`, `5a4a024`) was
-owner-authorized and **deployed on 2026-10-03**; `origin/main` = `5a4a024`; live acceptance checks
-passed (`docs/verification/VERIFICATION.md`). Any post-release local documentation follow-up stays
-unpublished until the owner authorizes another push.
+**Released:** the owner-authorized 2026-10-03 release set — `8b8dde4`, `03d6ba8`, `53a85aa`,
+`0f3c38c`, `5a4a024`, `7a51efa` and `cdc4971` — is **deployed**; `origin/main` = `cdc4971`; live
+acceptance checks passed (`docs/verification/VERIFICATION.md`), including the eight-profile Follow
+Us section. Any later local documentation follow-up stays unpublished until the owner authorizes
+another push.
 
 **Pending (owner):** marketing launch actions M2–M7 in
 `docs/launch/OWNER-INPUT-REQUIRED.md` — confirm Google Business Profile verification, create the
