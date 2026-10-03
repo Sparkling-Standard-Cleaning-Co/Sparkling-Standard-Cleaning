@@ -172,16 +172,16 @@ Truthful snapshot; the register in `docs/operations/PLATFORM-STATUS.md` is autho
 - Accessibility: axe WCAG 2.0/2.1/2.2 A+AA 0 violations; layout passes at 360/768/1440 with no
   overflow.
 
-**Local but not yet deployed:** four verified commits on local `main` (`8b8dde4`, `03d6ba8`,
-`53a85aa`, `0f3c38c` — GTM import package + Brand A2, UTM counts, GTM doc cleanup, attribution
-repair). `origin/main` is `61c30ae`. A push requires explicit owner authorization.
+**Released:** the five-commit release (`8b8dde4`, `03d6ba8`, `53a85aa`, `0f3c38c`, `5a4a024`) was
+owner-authorized and **deployed on 2026-10-03**; `origin/main` = `5a4a024`; live acceptance checks
+passed (`docs/verification/VERIFICATION.md`). Any post-release local documentation follow-up stays
+unpublished until the owner authorizes another push.
 
-**Pending (owner):** marketing launch actions M1–M7 in
-`docs/launch/OWNER-INPUT-REQUIRED.md` — authorize the release push, confirm Google Business
-Profile verification, create the priority social accounts, approve the proposed content plan and
-film/publish the opening content. Formal launch checklist items (legal entity spelling, claims,
-genuine review link, final cancellation percentages) and Stripe enabled-method confirmation also
-remain open.
+**Pending (owner):** marketing launch actions M2–M7 in
+`docs/launch/OWNER-INPUT-REQUIRED.md` — confirm Google Business Profile verification, create the
+priority social accounts, approve the proposed content plan and film/publish the opening content.
+Formal launch checklist items (legal entity spelling, claims, genuine review link, final
+cancellation percentages) and Stripe enabled-method confirmation also remain open.
 
 ## 10. Documentation directory
 

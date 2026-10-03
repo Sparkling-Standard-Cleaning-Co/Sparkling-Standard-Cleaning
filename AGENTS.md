@@ -82,15 +82,18 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   (`GTM-KSQ26HMG` / `G-LG222LQRQ2`, GTM Version 3 published, all three inquiry key events
   verified); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Facebook + Nextdoor
   profiles confirmed; owner-approved 2026-10-02 favicon/PWA icon kit installed.
-- **Release status:** `origin/main` is `61c30ae` (deployed). Local `main` is ahead by four verified
-  but **unpublished** commits (`8b8dde4`, `03d6ba8`, `53a85aa`, `0f3c38c`); they deploy only when
-  the owner authorizes a push. Never describe unpublished work as deployed.
+- **Release status:** the five-commit release (`8b8dde4`, `03d6ba8`, `53a85aa`, `0f3c38c`, `5a4a024`)
+  was owner-authorized and **deployed to production on 2026-10-03** (`origin/main` = `5a4a024`);
+  live acceptance checks passed (see `docs/verification/VERIFICATION.md`). Any new local work —
+  including the post-release documentation follow-up — stays unpublished until the owner
+  authorizes another push.
 - **Marketing phase (2026-10-03):** the business is transitioning from development into active
   marketing. Two growth engines (audience growth vs. local customer acquisition), priority content
   platforms (Instagram, TikTok, YouTube), the proposed "30 Days. 30 Details." content plan, the
   30-day launch schedule and the owner account checklist are documented under `docs/marketing/`.
   The primary business objective is dependable weekly/biweekly residential customers. The owner's
-  pending marketing actions live in `docs/launch/OWNER-INPUT-REQUIRED.md` (M1–M7).
+  pending marketing actions live in `docs/launch/OWNER-INPUT-REQUIRED.md` (M2–M7; M1 — the
+  software release — was deployed 2026-10-03).
 - **Formal launch checklist still outstanding (owner sign-off):** legal entity spelling, insurance/
   bonding/licensing claims, genuine review links, final cancellation percentages, and any profile
   URLs not yet supplied. `business.launch.productionApproved` remains `false` as the formal
@@ -382,7 +385,7 @@ collections are intentionally empty — not errors.
   `docs/launch/PROMOTION-PROPOSALS.md`; regenerate with `npm run promotions:impact`.
 - **Pending owner input:** legal entity spelling/suffix, insurance/bonding/licensing claims, review
   profile/submission links, priority social account creation (Instagram, TikTok, YouTube),
-  Umami website ID, final cancellation percentages, marketing-launch approvals (M1–M7) and any
-  marketing claim not yet supplied.
+  Umami website ID, final cancellation percentages, marketing-launch approvals (M2–M7; M1 deployed
+  2026-10-03) and any marketing claim not yet supplied.
 - Current platform details: `docs/operations/PLATFORM-STATUS.md`. Owner checklist:
-  `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals are grouped there as M1–M7).
+  `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals are grouped there as M2–M7).

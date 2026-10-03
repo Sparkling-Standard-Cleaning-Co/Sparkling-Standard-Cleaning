@@ -19,14 +19,15 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
   SMS, Facebook + Nextdoor profiles, and **GA4 analytics** (`GTM-KSQ26HMG` / `G-LG222LQRQ2` —
   page views, `estimate_start` and all three inquiry key events verified; Enhanced Measurement
   form interactions disabled).
-- **Release status:** `origin/main` is `61c30ae` (deployed). Local `main` is ahead by four verified
-  but unpublished commits (GTM import package + Brand A2, UTM count correction, GTM doc cleanup,
-  attribution repair); they deploy only when the owner authorizes a push. See
+- **Release status:** the 2026-10-03 release (GTM import package + Brand A2, UTM count correction,
+  GTM doc cleanup, attribution repair, marketing documentation) is **deployed** — `origin/main` =
+  `5a4a024`, owner-authorized, live acceptance checks passed. See
   `docs/verification/VERIFICATION.md`.
 - **Remaining owner items:** formal launch checklist (legal entity spelling, insurance/bonding/
   licensing claims, genuine review link, final cancellation percentages), priority social account
   creation (Instagram, TikTok, YouTube), Google Business Profile verification, genuine photography
-  and reviews. See `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals M1–M7).
+  and reviews. See `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals M2–M7; M1 — the
+  software release — was deployed 2026-10-03).
 - **We are now in the marketing phase.** Two growth engines (audience growth vs. local customer
   acquisition), the proposed "30 Days. 30 Details." content plan and the 30-day launch schedule
   live under `docs/marketing/`.

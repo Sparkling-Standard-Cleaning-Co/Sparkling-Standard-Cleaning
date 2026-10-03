@@ -158,21 +158,35 @@ delivered are unchanged; the corrections apply to future attribution and notific
 | Analytics/consent untouched | `tests/browser/analytics-events.test.mjs`, `gps-gtm.test.mjs` re-run | No change to event names, payloads or consent loading behavior; no customer data added to analytics |
 | Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (77 pass), `npm run build` (21 pages), `npm run validate`, `pending`, `testimonials`, `audit:facts`, `smoke` | All pass |
 
-## Release status (2026-10-03)
+## Release status — deployed (2026-10-03)
 
-- **Deployed production:** `origin/main` `61c30ae` (last reported push; Cloudflare Pages deploys
-  from `main`).
-- **Local `main`: `0f3c38c`** — **four unpublished commits** ahead of origin, all verified
-  locally but **not deployed**:
-  - `8b8dde4` — importable GTM GA4 package + Brand A2 finalization;
-  - `03d6ba8` — UTM registry counts correction in the verification record;
-  - `53a85aa` — GTM import duplicate-tag cleanup note;
-  - `0f3c38c` — attribution repair + first/latest lead-notification labels.
+- **Owner-authorized release deployed:** `origin/main` = **`5a4a024`** (pushed 2026-10-03; GitHub
+  Actions `validate` run green; Cloudflare Pages served the new build — the removed
+  `/brand-preview/` now returns 404 and the deployed client chunks include the repaired
+  attribution logic).
+- The five release commits: `8b8dde4` (GTM import package + Brand A2), `03d6ba8` (UTM counts),
+  `53a85aa` (GTM doc cleanup), `0f3c38c` (attribution repair + first/latest labels), `5a4a024`
+  (marketing documentation consolidation).
 - **Limitations:** the GA4 account results are owner-confirmed external verification, not
-  repository tests; the locally completed work only reaches production when the owner authorizes a
-  push. The attribution fix cannot retroactively repair previously clobbered `latest` records; it
-  applies to future attribution (existing delivered emails are unchanged).
-- No work is described as deployed until the owner authorizes the push.
+  repository tests. The attribution fix cannot retroactively repair previously clobbered `latest`
+  records; it applies to future attribution (existing delivered emails are unchanged). Any
+  post-release local documentation follow-up is unpublished until the owner authorizes another
+  push.
+
+### Live production acceptance (2026-10-03)
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Pages + navigation | Live HTTPS + Playwright | Home, estimate, contact, gift certificates, about, recurring and service-area all `200`; header/footer links present; no `brand-preview` links; removed page returns `404` |
+| Sitemap | Live fetch | 16 URLs, correct domain, no `brand-preview`/thank-you/leave-review/gift-utility pages |
+| GA consent control | Playwright, fresh profiles | 0 Google requests before consent; 0 after refusal; after acceptance exactly **1** GTM container (`gtm.js?id=GTM-KSQ26HMG`) and **1** GA4 tag (`gtag/js?id=G-LG222LQRQ2`, injected by the container) — no duplicate tag, no site-installed `gtag.js` |
+| Gift certificates | Live page | Request mode only (`data-gift-status="request"`), no purchase element, page text confirms no payment is taken |
+| Reservation window | Live estimator | Preferred-date maximum exactly 60 days out (`2026-12-02` on 2026-10-03) |
+| Attribution + notification (one labeled submission) | UTM arrival → internal navigation to `/contact/` → single submission labeled "RELEASE ACCEPTANCE TEST (please ignore)" | Campaign preserved after navigation (`first_utm_source=facebook`, `latest_utm_source=facebook`, `latest_utm_campaign=profile`, `landing_page=/`, no same-origin referrer recorded); `/api/lead` returned `ok:true`; the built notification shows `Attribution — First-touch source: facebook`, `Attribution — Latest-touch source: facebook`, `Attribution — Latest-touch campaign: profile`, `Attribution — Latest-touch landing page: /`, with no attribution leakage into "More details" |
+| CI | GitHub Actions | `validate` run `37132056171` completed successfully on the pushed SHA |
+
+One labeled acceptance inquiry was sent (no repeats). Inbox confirmation by the owner remains the
+final external check.
 
 ## Pending (cannot be verified in this environment — owner or tooling required)
 

@@ -4,14 +4,17 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-03** (GA4 completion, attribution repair, marketing consolidation).
+Last reviewed: **2026-10-03** (production release deployed, GA4 completion, attribution repair,
+marketing consolidation).
 
-**Release status:** production serves GitHub `main`. `origin/main` is `61c30ae` (last reported
-push). The local `main` has **four unpublished commits** ahead of it — `8b8dde4` (GTM import
-package + Brand A2 finalization), `03d6ba8` (UTM counts doc), `53a85aa` (GTM import doc cleanup),
-`0f3c38c` (attribution repair + first/latest lead labels). They are verified locally but **not
-deployed**; they deploy only when the owner authorizes a push. Details:
-`docs/verification/VERIFICATION.md`.
+**Release status:** production serves GitHub `main`. `origin/main` is **`5a4a024`** — the
+owner-authorized 2026-10-03 release (GTM import package + Brand A2, UTM counts correction, GTM doc
+cleanup, attribution repair, marketing documentation) deployed through Cloudflare Pages after a
+green GitHub Actions run. Live acceptance checks passed: pages load, `/brand-preview/` removed,
+GA4 consent-controlled with one Google tag, gift-certificate/reservation behavior unchanged,
+sitemap and navigation correct, and a labeled attribution acceptance submission delivered with
+correct first/latest fields. Evidence: `docs/verification/VERIFICATION.md`. Any post-release local
+documentation follow-up stays unpublished until the owner authorizes another push.
 
 Status vocabulary:
 
@@ -28,7 +31,7 @@ Status vocabulary:
 | Cloudflare DNS for the domain | **owner-confirmed** | Domain active on Cloudflare nameservers (owner screenshots, Oct 2026) | None | `docs/deployment/DEPLOYMENT.md` |
 | Cloudflare Pages project | **live (verified)** | `sparkling-standard-cleaning` is Git-connected: every `main` push produces a Cloudflare Pages deployment; custom domain serving. Production commit at the start of the 2026-10-02 review was `1287a763` (owner-stated) | None | `docs/deployment/DEPLOYMENT.md` |
 | Production website | **live (verified)** | `https://sparkling-standard.com` — all 18 pages return 200 with correct canonicals; mobile-throttled LCP 1.26–1.65 s, CLS ≤ 0.038; axe 0 violations (2026-10-01) | None | `docs/verification/VERIFICATION.md` |
-| Production release (deployed) | **live — `origin/main` `61c30ae`** | The deployed production tree includes the address-reliability rebuild, recurring-conversion homepage sections, licensed representative imagery, the prepared-disabled promotion engine, and the advance-reservation + gift-certificate (request-only) experience. Preview environments, Preview secrets and Cloudflare Access are **not used** by owner decision; production deploys from `main` only. Four newer local commits are **verified but unpublished** (see Release status above) | Owner reviews and authorizes the push when ready; decisions outstanding in `docs/launch/PROMOTION-PROPOSALS.md` and `docs/launch/OWNER-INPUT-REQUIRED.md` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md`, `docs/verification/VERIFICATION.md` |
+| Production release (deployed) | **live — `origin/main` `5a4a024`** | The deployed production tree includes the address-reliability rebuild, recurring-conversion homepage sections, licensed representative imagery, the prepared-disabled promotion engine, the advance-reservation + gift-certificate (request-only) experience, the owner-published GTM/GA4 configuration (account-side), and the attribution repair with first/latest lead-notification labels. Live acceptance checks passed 2026-10-03. Preview environments, Preview secrets and Cloudflare Access are **not used** by owner decision; production deploys from `main` only | Maintain; decisions outstanding in `docs/launch/PROMOTION-PROPOSALS.md` and `docs/launch/OWNER-INPUT-REQUIRED.md` (M2–M7) | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md`, `docs/verification/VERIFICATION.md` |
 | Indexing status | **live — owner-approved** | Owner explicitly approves public search-engine indexing (2026-10-01). `robots.txt` = `Allow: /` + sitemap; every page meta robots = `index, follow`; `PUBLIC_PREVIEW_MODE` is NOT set | Maintain. Never introduce noindex/disallow, and never enable indexing on intentionally excluded utility pages | `docs/deployment/DEPLOYMENT.md` §11 |
 | Domain registration | **owner-confirmed** | Registered via Squarespace following Google Workspace purchase | None | — |
 | Google Workspace email | **owner-confirmed** | `owner@sparkling-standard.com` operational; MX/SPF/DKIM imported. Do **not** modify or enable Email Routing | None | `docs/deployment/DEPLOYMENT.md` |

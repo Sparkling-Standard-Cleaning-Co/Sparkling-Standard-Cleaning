@@ -64,7 +64,7 @@ The full schedule is `docs/marketing/90-DAY-LAUNCH-PLAN.md`; account setup is
 
 | # | Action | Notes |
 | --- | --- | --- |
-| M1 | Review and authorize the current local software release (push to `main`) | Four verified but unpublished commits; production changes only when the owner authorizes the push (`docs/verification/VERIFICATION.md` release status) |
+| M1 | ~~Review and authorize the software release~~ **Done 2026-10-03** | Owner-authorized push deployed `5a4a024`; live acceptance checks passed (`docs/verification/VERIFICATION.md`). The post-release documentation follow-up stays local until separately authorized |
 | M2 | Confirm the Google Business Profile verification result | Created, verification pending; never claim verified or publish the URL early |
 | M3 | Create the priority content accounts (Instagram, TikTok, YouTube) | Use the owner checklist with approved branding, consistent contact facts and tracked links; update the register as each exists |
 | M4 | Approve the content concepts and schedule | The "30 Days. 30 Details." title, the four-week plan and the founder introduction are proposals until approved; owner approves the facts the founder content may state |
