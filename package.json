@@ -28,6 +28,7 @@
     "estimate:quotes": "node scripts/quote-preview.mjs",
     "estimate:discount-impact": "node scripts/discount-impact.mjs",
     "promotions:impact": "node scripts/promotions-impact.mjs",
+    "gift:certificate": "node scripts/gift-certificate.mjs",
     "live:check": "node scripts/live-check.mjs",
     "mapmap:verify": "node scripts/test-mapmap.mjs",
     "address:check": "node scripts/address-live-check.mjs",

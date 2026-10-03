@@ -1,0 +1,70 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { business, contactPhone, isPending } from '../../config/business';
+import { breadcrumbNode } from '../../lib/schema';
+
+const phone = contactPhone();
+const hasEmail = !isPending(business.email);
+const site = Astro.site ?? new URL('https://sparkling-standard.com');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Gift Certificates', path: '/gift-certificates/' },
+    { name: 'Checkout', path: '/gift-certificates/success/' },
+  ]),
+];
+---
+
+<BaseLayout
+  title="Gift Certificate Checkout | Sparkling Standard Cleaning Co."
+  description="Gift certificate checkout confirmation."
+  schema={schema}
+  noindex
+>
+  <section class="section section--tight estimate-intro">
+    <div class="container container--narrow">
+      <Breadcrumbs
+        trail={[
+          { name: 'Home', path: '/' },
+          { name: 'Gift Certificates', path: '/gift-certificates/' },
+          { name: 'Checkout', path: '/gift-certificates/success/' },
+        ]}
+      />
+      <div class="section-head mt-4">
+        <p class="eyebrow">Gift certificate</p>
+        <h1>Thank you — your payment is being confirmed.</h1>
+        <p class="lead">
+          Stripe will email you a payment receipt. Once the payment is confirmed by the payment
+          provider, we issue your gift certificate and arrange delivery to you or your recipient.
+        </p>
+      </div>
+
+      <div class="card card--muted">
+        <h2 class="card__title">What happens next</h2>
+        <ol class="steps">
+          <li class="step">
+            <h3 class="step__title">1. Payment confirmation</h3>
+            <p class="step__text">This page does not issue a certificate by itself — the payment provider's verified confirmation does.</p>
+          </li>
+          <li class="step">
+            <h3 class="step__title">2. Certificate issued</h3>
+            <p class="step__text">We prepare the printable certificate with its unique code and send it to the delivery details you gave us.</p>
+          </li>
+          <li class="step">
+            <h3 class="step__title">3. Redemption</h3>
+            <p class="step__text">The recipient contacts us with the code and we apply the value to the agreed service.</p>
+          </li>
+        </ol>
+      </div>
+
+      <div class="card mt-5">
+        <h2 class="card__title">Questions about your purchase?</h2>
+        <p class="card__text">
+          {phone ? <>Call or text <a href={phone.href}>{phone.display}</a>{hasEmail ? ' or ' : '.'}</> : null}
+          {hasEmail ? <> email <a href={`mailto:${business.email}`}>{business.email}</a>.</> : null}
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

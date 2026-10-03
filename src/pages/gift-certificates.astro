@@ -1,0 +1,277 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import Icon from '../components/Icon.astro';
+import { giftCertificateConfig } from '../config/gift-certificates';
+import { business, contactPhone, isPending } from '../config/business';
+import { breadcrumbNode } from '../lib/schema';
+
+const enabled = giftCertificateConfig.enabled;
+const phone = contactPhone();
+const hasEmail = !isPending(business.email);
+const site = Astro.site ?? new URL('https://sparkling-standard.com');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Gift Certificates', path: '/gift-certificates/' },
+  ]),
+];
+const sampleCode = 'SSGC-SAMP-LE42';
+---
+
+<BaseLayout
+  title="Gift Certificates | Sparkling Standard Cleaning Co."
+  description="Give a Sparkling Standard gift certificate: a monetary value toward professional cleaning services, delivered as a printable certificate and redeemed by code."
+  schema={schema}
+>
+  <section class="section section--tight estimate-intro">
+    <div class="container">
+      <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Gift Certificates', path: '/gift-certificates/' }]} />
+      <div class="section-head mt-4">
+        <p class="eyebrow">Gift certificates</p>
+        <h1>Give the gift of a <span class="hero__accent">beautifully kept home.</span></h1>
+        <p class="lead">
+          A Sparkling Standard gift certificate puts a chosen value toward professional cleaning
+          services for someone you love — a new home, a busy season, a helping hand. The recipient
+          chooses the service and the date, and we apply the certificate to the agreed price.
+        </p>
+        <div class="btn-row mt-4">
+          <a class="btn btn--primary btn--large" href="#request" data-cta="gift-request">
+            {enabled ? 'Buy a Gift Certificate' : 'Request a Gift Certificate'}
+          </a>
+          <a class="btn btn--ghost" href="#how-it-works">How it works</a>
+        </div>
+        {
+          !enabled && (
+            <p class="small text-muted mt-3" data-gift-status="request">
+              Online purchase is not open yet. Request a certificate and we will confirm the amount
+              and details with you, then send a secure payment link. <strong>No payment is taken on
+              this page.</strong>
+            </p>
+          )
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="container split">
+      <div class="stack">
+        <h2>What the certificate covers</h2>
+        <p>{giftCertificateConfig.coverageNote}</p>
+        <div class="card card--muted">
+          <p class="eyebrow mb-0">Honest gifting</p>
+          <p class="card__text mt-2">
+            A certificate value goes toward cleaning services — it is not a promise that any specific
+            amount covers an entire home. Every property is different, so we confirm the service,
+            scope and price with the recipient before the cleaning, exactly as we do for every
+            customer.
+          </p>
+        </div>
+      </div>
+      <div class="card card--feature" aria-label="Sample gift certificate">
+        <p class="eyebrow">Sample certificate</p>
+        <div class="gift-sample">
+          <p class="gift-sample__brand-script">Sparkling</p>
+          <p class="gift-sample__brand-caps">Standard</p>
+          <p class="gift-sample__descriptor">Cleaning Co. · The Details Are Our Standard.</p>
+          <p class="gift-sample__title">Gift Certificate</p>
+          <p class="gift-sample__value">$100</p>
+          <p class="gift-sample__label">Toward cleaning services</p>
+          <p class="gift-sample__recipient">For: <strong>Someone Special</strong></p>
+          <p class="gift-sample__code">Certificate code <strong>{sampleCode}</strong></p>
+          <p class="gift-sample__note">Sample only — a real certificate carries a unique code and a working QR.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="how-it-works">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <p class="eyebrow">How it works</p>
+        <h2>Three simple steps</h2>
+      </div>
+      <ol class="steps">
+        <li class="step">
+          <h3 class="step__title">1. Choose the value</h3>
+          <p class="step__text">Pick a monetary value and tell us about the recipient and any personal message.</p>
+        </li>
+        <li class="step">
+          <h3 class="step__title">2. Receive the certificate</h3>
+          <p class="step__text">After payment is verified we issue a printable certificate with a unique code and a QR that opens the redemption instructions.</p>
+        </li>
+        <li class="step">
+          <h3 class="step__title">3. Redeem and clean</h3>
+          <p class="step__text">The recipient contacts us with the code, chooses a service and date, and the certificate value is applied to the agreed price.</p>
+        </li>
+      </ol>
+      <ul class="checklist mt-5">
+        {giftCertificateConfig.redemptionSteps.map((step) => <li><span>{step}</span></li>)}
+      </ul>
+    </div>
+  </section>
+
+  <section class="section section--alt" id="request">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <p class="eyebrow">{enabled ? 'Purchase' : 'Request'}</p>
+        <h2>{enabled ? 'Buy a gift certificate' : 'Request a gift certificate'}</h2>
+        <p class="lead">
+          {
+            enabled
+              ? 'Choose an amount and continue to secure checkout. Payment is handled entirely by Stripe — this site never sees or stores card details.'
+              : 'Tell us what you have in mind. We will confirm the amount and details with you and send a secure payment link. This request does not charge anything.'
+          }
+        </p>
+      </div>
+
+      {
+        enabled && giftCertificateConfig.denominations.length > 0 && (
+          <div class="field">
+            <label for="gift-denomination">Gift value</label>
+            <select class="select" id="gift-denomination" name="denominationUsd">
+              {giftCertificateConfig.denominations.map((amount) => (
+                <option value={String(amount)}>${amount}</option>
+              ))}
+            </select>
+          </div>
+        )
+      }
+
+      <form
+        class="stack"
+        data-lead-form={!enabled ? true : undefined}
+        data-gift-purchase={enabled ? true : undefined}
+        data-variant="gift"
+        action="#"
+        method="post"
+      >
+        <div class="field-row field-row--2">
+          <div class="field">
+            <label for="gift-purchaser-name">Your name</label>
+            <input class="input" id="gift-purchaser-name" name="name" type="text" autocomplete="name" required />
+          </div>
+          <div class="field">
+            <label for="gift-purchaser-email">Your email</label>
+            <input class="input" id="gift-purchaser-email" name="email" type="email" autocomplete="email" required />
+          </div>
+        </div>
+        <div class="field-row field-row--2">
+          <div class="field">
+            <label for="gift-recipient-name">Recipient's name</label>
+            <input class="input" id="gift-recipient-name" name="recipient_name" type="text" required />
+          </div>
+          <div class="field">
+            <label for="gift-recipient-email">Recipient's email <span class="text-muted">(optional)</span></label>
+            <input class="input" id="gift-recipient-email" name="recipient_email" type="email" autocomplete="off" />
+          </div>
+        </div>
+        <div class="field-row field-row--2">
+          <div class="field">
+            <label for="gift-value">Preferred gift value (USD)</label>
+            <input
+              class="input"
+              id="gift-value"
+              name="gift_value"
+              type="number"
+              inputmode="numeric"
+              min={giftCertificateConfig.customAmountMinUsd}
+              max={giftCertificateConfig.customAmountMaxUsd}
+              step="5"
+              placeholder={`$${giftCertificateConfig.customAmountMinUsd}–$${giftCertificateConfig.customAmountMaxUsd}`}
+              required={!enabled || giftCertificateConfig.denominations.length === 0}
+            />
+            <span class="hint">
+              Suggested range ${giftCertificateConfig.customAmountMinUsd}–${giftCertificateConfig.customAmountMaxUsd};
+              we confirm the amount with you before any payment.
+            </span>
+          </div>
+          <div class="field">
+            <label for="gift-delivery-date">Delivery date <span class="text-muted">(optional)</span></label>
+            <input class="input" id="gift-delivery-date" name="delivery_date" type="date" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="gift-message">Personal message <span class="text-muted">(optional)</span></label>
+          <textarea
+            class="textarea"
+            id="gift-message"
+            name="gift_message"
+            rows="3"
+            maxlength={giftCertificateConfig.maxMessageLength}
+            placeholder="A short note to include on the certificate."
+          ></textarea>
+        </div>
+        <div class="honeypot" aria-hidden="true">
+          <input
+            id="gift-extra-ref"
+            name="extra_ref"
+            type="text"
+            tabindex="-1"
+            autocomplete="off"
+            data-lpignore="true"
+            data-1p-ignore
+            data-bwignore
+            data-protonpass-ignore
+          />
+        </div>
+        <p class="form-status" data-form-status role="status" aria-live="polite"></p>
+        <div>
+          <button class="btn btn--primary btn--large" type="submit">
+            <Icon name="send" size={18} /> {enabled ? 'Continue to Secure Checkout' : 'Send Gift Certificate Request'}
+          </button>
+        </div>
+        <p class="small text-muted">
+          {enabled
+            ? 'Payment is completed on Stripe’s secure hosted page. A certificate is issued only after the payment provider confirms the payment.'
+            : 'This request does not charge anything. We will confirm the amount first, then send a secure Stripe payment link.'}
+        </p>
+      </form>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <p class="eyebrow">Good to know</p>
+        <h2>Terms and questions</h2>
+      </div>
+      <div class="stack">
+        <div class="card card--muted">
+          <p class="eyebrow mb-0">Terms status</p>
+          <p class="card__text mt-2">
+            Final redemption terms, validity and refund wording are being reviewed by the owner
+            (including Florida and Alabama gift-certificate requirements) before public sales open.
+            Nothing on this page limits a recipient’s statutory rights.
+          </p>
+        </div>
+        <div class="card">
+          <h3 class="card__title">Can a certificate cover a whole cleaning?</h3>
+          <p class="card__text">
+            A certificate contributes its value toward a cleaning. Because homes differ, we confirm
+            the service and price with the recipient first — we never promise that a given value
+            covers a complete clean without knowing the property.
+          </p>
+        </div>
+        <div class="card">
+          <h3 class="card__title">Who do I contact about a certificate?</h3>
+          <p class="card__text">
+            {phone ? <>Call or text <a href={phone.href}>{phone.display}</a>{hasEmail ? ' or ' : '.'}</> : null}
+            {hasEmail ? <> email <a href={`mailto:${business.email}`}>{business.email}</a>.</> : null}
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  // The form handler matches the current mode: the request form uses the
+  // shared lead handler; the future purchase mode uses the checkout client.
+  if (document.querySelector('[data-gift-purchase]')) {
+    import('../scripts/gift-checkout');
+  } else {
+    import('../scripts/lead-forms');
+  }
+</script>

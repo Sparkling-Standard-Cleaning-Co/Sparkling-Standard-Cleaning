@@ -33,3 +33,6 @@ Thumbs.db
 
 # local scratch (never commit)
 /tmp/
+
+# owner-generated gift certificates / confirmations (contain customer data)
+gift-out/
