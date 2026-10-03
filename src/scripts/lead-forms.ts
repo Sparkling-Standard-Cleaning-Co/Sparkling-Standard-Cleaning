@@ -8,7 +8,7 @@ import { submitLead, recordConversion, type SubmitOutcome } from '../lib/forms/s
 import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { track, type AnalyticsEventName } from '../lib/analytics/events';
 
-type Variant = 'contact' | 'commercial' | 'str';
+type Variant = 'contact' | 'commercial' | 'str' | 'gift';
 
 const phone = contactPhone();
 const contact = {
@@ -45,12 +45,16 @@ function collectFields(form: HTMLFormElement): Record<string, string> {
   return { ...fields, ...attributionFields() };
 }
 
-function variantEvent(variant: Variant): AnalyticsEventName {
+function variantEvent(variant: Variant): AnalyticsEventName | null {
   switch (variant) {
     case 'commercial':
       return 'commercial_quote_submit';
     case 'str':
       return 'str_request_submit';
+    case 'gift':
+      // Gift requests are not cleaning conversions and no purchase has
+      // happened; they must not be counted as successful conversions.
+      return null;
     default:
       return 'cleaning_request_submit';
   }
@@ -109,16 +113,21 @@ for (const form of document.querySelectorAll<HTMLFormElement>('[data-lead-form]'
         ? `Commercial walkthrough request — ${fields.organization ?? 'facility'}`
         : variant === 'str'
           ? 'Short-term rental turnover request'
-          : 'Website message';
+          : variant === 'gift'
+            ? `Gift certificate request — ${fields.recipient_name ?? 'recipient'}`
+            : 'Website message';
 
     const outcome = await submitLead(fields, subject);
 
     if (outcome.ok) {
-      recordConversion(variantEvent(variant), variantEventPayload(variant, fields));
+      const event = variantEvent(variant);
+      if (event) recordConversion(event, variantEventPayload(variant, fields));
       setStatus(
         form,
         'success',
-        'Request received — not booked yet. Sparkling Standard reviews every request personally and will confirm scope, date and price with you before anything is scheduled.',
+        variant === 'gift'
+          ? 'Gift certificate request received. We will confirm the amount and details with you, then send a secure payment link. No payment has been taken and nothing is charged by this form.'
+          : 'Request received — not booked yet. Sparkling Standard reviews every request personally and will confirm scope, date and price with you before anything is scheduled.',
       );
       form.reset();
       window.setTimeout(() => {

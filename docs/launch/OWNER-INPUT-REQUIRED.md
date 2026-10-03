@@ -56,6 +56,19 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | 16 | Browser/device QA + Lighthouse + accessibility scan | local preview / production preview | **Partially done:** browser regression suites and axe WCAG 2.2 AA scans pass in Chromium and are recorded in `docs/verification/VERIFICATION.md`. Physical-device smoke and a Lighthouse/PSI run remain owner-side. |
 | 17 | Owner legal review of `/terms/` and `/privacy/` | site pages | Drafted as honest operating terms, not legal advice. |
 
+## GIFT CERTIFICATES — owner decisions before sales activate
+
+Online sales are **disabled** (`src/config/gift-certificates.ts` `enabled: false`); the page takes
+requests only. Full workflow: `docs/operations/GIFT-CERTIFICATES.md`.
+
+| # | Item | Where | Notes |
+| --- | --- | --- | --- |
+| G1 | Approved denominations (or custom-only) | `giftCertificateConfig.denominations`, `allowCustomAmount`, bounds | No amount may be advertised until approved. |
+| G2 | Public terms: coverage wording, redemption steps, expiry (or none), refunds | `giftCertificateConfig` + the certificate template | Do **not** invent restrictive expiry periods or fees. |
+| G3 | Florida (and Alabama where relevant) gift-certificate requirement review | owner/advisor | Required before public sales. The 60-day reservation window is NOT a certificate validity period. |
+| G4 | Stripe activation | Cloudflare production secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`; webhook endpoint `/api/stripe-webhook` for `checkout.session.completed`; Stripe email receipts on | Confirm enabled payment methods before advertising them. |
+| G5 | One live end-to-end test purchase (smallest denomination) | Stripe + owner inbox | Verify webhook alert, certificate generation, delivery, redemption, ledger. |
+
 ## CAN WAIT
 
 | # | Item | Notes |

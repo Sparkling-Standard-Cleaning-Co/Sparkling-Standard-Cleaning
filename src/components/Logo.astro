@@ -1,15 +1,33 @@
 ---
 import { business, isPending } from '../config/business';
 
+export type WordmarkTreatment = 'soft-serif' | 'romantic-script';
+export type WordmarkScript = 'great-vibes' | 'parisienne';
+
+/** Owner-selectable header treatment. Change this one line after approval. */
+export const DEFAULT_WORDMARK_TREATMENT: WordmarkTreatment = 'romantic-script';
+/** Script face used by the romantic-script treatment (owner choice pending). */
+export const DEFAULT_WORDMARK_SCRIPT: WordmarkScript = 'great-vibes';
+
 interface Props {
   class?: string;
   /** Show the small descriptor/tagline line under the wordmark. */
   tagline?: boolean;
-  /** Accepted for call-site compatibility; the responsive CSS handles sizing. */
+  /** Accepted for call-site compatibility; responsive CSS handles sizing. */
   compact?: boolean;
+  /** Typographic treatment; defaults to the owner-selectable constant above. */
+  treatment?: WordmarkTreatment;
+  /** Script face for the romantic-script treatment (preview/approval only). */
+  script?: WordmarkScript;
 }
 
-const { class: className = '', tagline = true, compact = false } = Astro.props;
+const {
+  class: className = '',
+  tagline = true,
+  compact = false,
+  treatment = DEFAULT_WORDMARK_TREATMENT,
+  script = DEFAULT_WORDMARK_SCRIPT,
+} = Astro.props;
 
 const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const pendingName = isPending(business.displayName);
@@ -66,14 +84,20 @@ const ariaLabel = pendingName
     </svg>
   </span>
 
-  <span class="brand__text">
-    <span class="brand__line brand__line--primary">
-      <span class="brand__script">{pendingName ? 'PENDING' : scriptWord}</span>
-      <span class="brand__caps">{pendingName ? 'BRAND' : capsWord}</span>
+  <span
+    class:list={[
+      'brand__text',
+      `brand__text--${treatment}`,
+      treatment === 'romantic-script' && `brand__text--script-${script}`,
+    ]}
+  >
+    <span class="brand__wordmark">
+      <span class="brand__sparkling">{pendingName ? 'PENDING' : scriptWord}</span>
+      <span class="brand__standard">{pendingName ? 'BRAND' : capsWord}</span>
     </span>
     {
       tagline && (
-        <span class="brand__line brand__line--secondary">
+        <span class="brand__line--secondary">
           <span class="brand__descriptor">{descriptor}</span>
           <span class="brand__tagline">{taglineText}</span>
         </span>

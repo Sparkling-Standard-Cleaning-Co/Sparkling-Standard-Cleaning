@@ -14,6 +14,8 @@ import { chromium } from 'playwright';
 
 const PORT = 4399;
 const BASE = `http://localhost:${PORT}`;
+// Dynamic booking date: the 60-day advance window makes fixed dates stale.
+const BOOKING_DATE = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
 
 let server;
 let browser;
@@ -115,7 +117,7 @@ async function fillCondition(page) {
 
 async function fillExtrasAndScheduling(page) {
   await page.click('[data-next]'); // step 4: no add-ons
-  await page.fill('#est-date', '2026-12-01');
+  await page.fill('#est-date', BOOKING_DATE);
   await page.selectOption('#est-arrival', 'morning');
   await page.click('[data-next]');
 }
@@ -454,6 +456,38 @@ test('relay rejection causes produce distinct, recoverable copy and preserve ans
     );
     assert.equal(await page.inputValue('#est-email'), 'owner@sparkling-standard.com', 'answers kept after every rejection');
     assert.equal(await page.locator('[data-submit]').isDisabled(), false, 'retry stays available');
+  } finally {
+    await context.close();
+  }
+});
+
+// ── Advance-reservation window (60 days, no priority tier) ───────────────────
+
+test('the preferred date is bounded to the configured advance-reservation window', async () => {
+  const { context, page } = await openWizard(1280, 900);
+  try {
+    await fillStepOne(page);
+    await fillHome(page);
+    await fillCondition(page);
+    await page.click('[data-next]'); // step 4 (extras) → step 5 (scheduling)
+    const bounds = await page.$eval('#est-date', (input) => ({
+      min: input.min,
+      max: input.max,
+    }));
+    assert.match(bounds.min, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(bounds.max, /^\d{4}-\d{2}-\d{2}$/);
+    const days = (Date.parse(bounds.max) - Date.parse(bounds.min)) / 86_400_000;
+    assert.equal(days, 60, 'the window is exactly 60 days');
+
+    // A date beyond the window is rejected with a clear message.
+    const beyond = new Date(Date.parse(bounds.max) + 86_400_000).toISOString().slice(0, 10);
+    await page.$eval('#est-date', (input, value) => {
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }, beyond);
+    await page.click('[data-next]');
+    const message = (await page.locator('[data-error-for="est-date"]').textContent()) ?? '';
+    assert.match(message, /60 days ahead/i, `window message: "${message}"`);
   } finally {
     await context.close();
   }

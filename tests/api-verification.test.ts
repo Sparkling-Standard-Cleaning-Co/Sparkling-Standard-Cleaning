@@ -271,6 +271,23 @@ test('lead: a valid future preferred date is forwarded untouched', async () => {
   assert.equal(sent['Scheduling — Date note'], undefined);
 });
 
+test('lead: a preferred date beyond the 60-day window is discarded with a note', async () => {
+  const { stub, forwarded } = verificationStub();
+  const beyond = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+  await withFetch(stub, () =>
+    leadPost({
+      request: jsonRequest({
+        subject: 'Reservation',
+        fields: reservationFields({ quoted_price: '1', preferred_date: beyond }),
+      }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
+    } as never),
+  );
+  const sent = forwarded[0] as Record<string, string>;
+  assert.equal(sent['Inquiry — Preferred date'], undefined, 'a date beyond the window is never forwarded');
+  assert.match(sent['Scheduling — Date note'] ?? '', /invalid or out of range/);
+});
+
 test('lead: a client-forged preferred_date_note never reaches the owner', async () => {
   const { stub, forwarded } = verificationStub();
   await withFetch(stub, () =>

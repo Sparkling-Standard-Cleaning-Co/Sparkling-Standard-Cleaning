@@ -1,0 +1,1 @@
+reservation_reference,received_date,requested_date,confirmed_date,status,customer_name,phone,email,service_address,city,state,zip,service_type,frequency,scope_notes,quoted_price,agreed_price,payment_status,gift_certificate_code,gift_amount_applied,first_visit_confirmed,future_visits_proposed,communication_log,estimate_reference

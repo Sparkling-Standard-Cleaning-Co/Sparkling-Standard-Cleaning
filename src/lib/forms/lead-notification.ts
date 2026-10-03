@@ -156,6 +156,9 @@ function money(value: string): string {
 function requestType(fields: Record<string, string>): string {
   const explicit = text(fields, 'request_type');
   if (explicit && REQUEST_LABELS[explicit]) return REQUEST_LABELS[explicit] as string;
+  if (text(fields, 'recipient_name')) {
+    return 'Gift certificate request — confirm details and send a payment link (no payment taken yet)';
+  }
   if (text(fields, 'facility_type') || text(fields, 'organization')) {
     return 'Commercial walkthrough request';
   }
@@ -337,6 +340,13 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Contact — Organization', text(fields, 'organization'), 'organization');
   add('Contact — Phone', text(fields, 'phone'), 'phone');
   add('Contact — Email', text(fields, 'email'), 'email');
+
+  // ── Gift certificate request (no payment has been taken) ────────────────
+  add('Gift — Recipient name', text(fields, 'recipient_name'), 'recipient_name');
+  add('Gift — Recipient email', text(fields, 'recipient_email'), 'recipient_email');
+  add('Gift — Preferred value', text(fields, 'gift_value'), 'gift_value');
+  add('Gift — Requested delivery date', text(fields, 'delivery_date'), 'delivery_date');
+  add('Gift — Personal message', text(fields, 'gift_message'), 'gift_message');
 
   // ── C. Job location ─────────────────────────────────────────────────────
   addLines(locationLines(fields), [

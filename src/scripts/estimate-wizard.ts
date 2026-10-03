@@ -19,6 +19,7 @@
 
 import { pricing } from '../config/pricing';
 import { business, contactPhone, isPending } from '../config/business';
+import { schedulingConfig } from '../config/scheduling';
 import { calculateEstimate, type EstimateContext } from '../lib/estimate/calculate';
 import { buildInstantQuote, type InstantQuote } from '../lib/estimate/quote';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
@@ -699,8 +700,15 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (field instanceof HTMLInputElement && field.type === 'number' && !field.validity.valid) {
       return field.dataset.errorRange ?? 'Please enter a valid number.';
     }
-    if (field instanceof HTMLInputElement && field.type === 'date' && !field.validity.valid) {
-      return 'Please choose a preferred date.';
+    if (field instanceof HTMLInputElement && field.type === 'date') {
+      // The configurable advance-reservation window (no priority pricing —
+      // every customer sees the same window).
+      const min = field.min;
+      const max = field.max;
+      if (value && ((min && value < min) || (max && value > max))) {
+        return `Please choose a date from today up to ${schedulingConfig.advanceReservationDays} days ahead.`;
+      }
+      if (!field.validity.valid) return 'Please choose a preferred date.';
     }
     if (!field.validity.valid) return field.dataset.errorInvalid ?? 'Please check this field.';
     return null;
@@ -1225,7 +1233,33 @@ function initEstimateWizard(form: HTMLFormElement): void {
     resetWizard();
   });
 
+  /**
+   * The advance-reservation window: requests may be made from today up to the
+   * configured number of days ahead. Attributes are set at runtime so a long-
+   * lived build can never carry a stale maximum, and the server enforces the
+   * same window independently.
+   */
+  function applyDateWindow(): void {
+    const dateInput = form.querySelector<HTMLInputElement>('#est-date');
+    if (!dateInput) return;
+    const localIsoDate = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const today = new Date();
+    const latest = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() + schedulingConfig.advanceReservationDays,
+    );
+    dateInput.min = localIsoDate(today);
+    dateInput.max = localIsoDate(latest);
+  }
+
   resetWizard();
+  applyDateWindow();
 
   // Deep links from marketing pages: /estimate/?frequency=biweekly preselects
   // the recurring rhythm (and ?service=deep preselects the service), so a

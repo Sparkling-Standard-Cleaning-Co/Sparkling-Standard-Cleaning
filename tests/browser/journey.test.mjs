@@ -17,6 +17,8 @@ import { chromium } from 'playwright';
 
 const PORT = 4400;
 const BASE = `http://localhost:${PORT}`;
+// Dynamic booking date: the 60-day advance window makes fixed dates stale.
+const BOOKING_DATE = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
 
 const ADDRESS = {
   label: '100 S Baylen St, Pensacola, FL 32502',
@@ -191,7 +193,7 @@ async function extrasStep(page, addons = []) {
 }
 
 async function timingStep(page) {
-  await page.fill('#est-date', '2026-12-01');
+  await page.fill('#est-date', BOOKING_DATE);
   await page.selectOption('#est-arrival', 'morning');
   await page.click('[data-next]');
 }
@@ -415,7 +417,7 @@ test('reservation summary carries every answer and the call/text actions work', 
     assert.equal(fields.pin_longitude, '-87.216400');
     assert.equal(fields.pin_source, 'mapmap');
     assert.equal(fields.addon_ids, 'inside_oven');
-    assert.equal(fields.preferred_date, '2026-12-01');
+    assert.equal(fields.preferred_date, BOOKING_DATE);
     assert.equal(fields.arrival_preference, 'morning');
     assert.equal(fields.travel_verified, 'true');
     assert.equal(fields.travel_qualification, 'verified_route');
@@ -668,7 +670,7 @@ test('the price preview reconciles base, extras, rounding and the proposed total
     assert.match(preview, /Proposed total\$315\.00/);
     // The displayed figures agree with the offered price.
     await page.click('[data-next]');
-    await page.fill('#est-date', '2026-12-01');
+    await page.fill('#est-date', BOOKING_DATE);
     await page.selectOption('#est-arrival', 'morning');
     await page.click('[data-next]');
     assert.equal(await page.locator('[data-reservation-price]').textContent(), '$315');

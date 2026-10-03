@@ -1,0 +1,82 @@
+---
+// Internal wordmark comparison page — noindex, not linked, excluded from the
+// sitemap. Presents the two approved-direction treatments for the owner to
+// choose from before the font choice is finalized. Remove after the decision.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Logo from '../components/Logo.astro';
+---
+
+<BaseLayout
+  title="Brand wordmark review"
+  description="Internal review page for the Sparkling Standard header wordmark treatments."
+  noindex
+>
+  <section class="section section--tight">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">Internal review</p>
+        <h1>Header wordmark treatments</h1>
+        <p class="lead">
+          The gold crest stays exactly as approved. Both options use the true Fraunces italic (no
+          synthetic slant). Choose one and the live header switches with a one-line change.
+        </p>
+      </div>
+
+      <div class="stack" style="gap: var(--space-7)">
+        <article class="card">
+          <p class="eyebrow">Option 1 — Soft serif</p>
+          <h2 class="card__title">One family, calm hierarchy</h2>
+          <p class="card__text" style="margin-bottom: var(--space-5)">
+            Everything is set in the site's own display serif: “Sparkling” in true italic, “Standard”
+            beside it at a smaller size with gentle tracking, “Cleaning Co.” beneath. No competing
+            typefaces, quiet and timeless.
+          </p>
+          <div style="background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5)">
+            <Logo treatment="soft-serif" />
+          </div>
+          <div style="background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); margin-top: var(--space-4); max-width: 24rem">
+            <Logo treatment="soft-serif" />
+            <p class="small text-muted" style="margin: var(--space-3) 0 0">Compact mobile width (tagline hidden)</p>
+          </div>
+        </article>
+
+        <article class="card" style="border-top: 3px solid var(--color-champagne-500)">
+          <p class="eyebrow">Option 2 — Romantic script (current default)</p>
+          <h2 class="card__title">Charming script, classic companion</h2>
+          <p class="card__text" style="margin-bottom: var(--space-5)">
+            “Sparkling” in an elegant script with “STANDARD” in the serif directly beside it — same
+            rose tone, restrained tracking, no competing colors. “Cleaning Co.” and the tagline sit
+            quietly beneath. Feminine, warm and unmistakably the same brand as the crest.
+          </p>
+          <div style="background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5)">
+            <Logo treatment="romantic-script" script="great-vibes" />
+            <p class="small text-muted" style="margin: var(--space-4) 0 0">
+              Script candidate 2a — Great Vibes (elegant, high-contrast flourishes)
+            </p>
+          </div>
+          <div style="background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); margin-top: var(--space-4)">
+            <Logo treatment="romantic-script" script="parisienne" />
+            <p class="small text-muted" style="margin: var(--space-4) 0 0">
+              Script candidate 2b — Parisienne (softer, friendlier, smaller file)
+            </p>
+          </div>
+          <div style="background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); margin-top: var(--space-4); max-width: 24rem">
+            <Logo treatment="romantic-script" script="great-vibes" />
+            <p class="small text-muted" style="margin: var(--space-3) 0 0">Compact mobile width (tagline hidden)</p>
+          </div>
+        </article>
+
+        <article class="card card--muted">
+          <h2 class="card__title">What stays the same</h2>
+          <ul class="checklist">
+            <li><span>The gold “S” crest, sparkles and pink blossom — unchanged</span></li>
+            <li><span>The entire lockup links to the homepage</span></li>
+            <li><span>Navigation, phone number and estimate CTA — unchanged</span></li>
+            <li><span>Responsive behaviour and accessibility — unchanged</span></li>
+            <li><span>Both fonts are free (SIL Open Font License) and self-hosted</span></li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -23,7 +23,7 @@ Source of truth: `src/config/marketing-links.ts`. Site: https://sparkling-standa
 | Nextdoor | Business page website field | https://sparkling-standard.com/?utm_source=nextdoor&utm_medium=organic_social&utm_campaign=profile | Attribute Nextdoor neighborhood traffic. |
 | Print material | Business card website line | https://sparkling-standard.com/?utm_source=business_card&utm_medium=print&utm_campaign=business_card&utm_content=website_line | Track typed card visits. |
 
-## Pending — prepared, do NOT publish yet (24)
+## Pending — prepared, do NOT publish yet (27)
 
 These URLs are prepared for when the public profiles exist. Do **not** paste them anywhere yet.
 
@@ -53,8 +53,11 @@ These URLs are prepared for when the public profiles exist. Do **not** paste the
 | X | Recurring-cleaning post | https://sparkling-standard.com/recurring-cleaning/?utm_source=x&utm_medium=organic_social&utm_campaign=recurring&utm_content=post | Track recurring-cleaning interest from X posts. |
 | Rumble | Video description link | https://sparkling-standard.com/house-cleaning/?utm_source=rumble&utm_medium=organic_social&utm_campaign=proof&utm_content=video_description | Track house-cleaning interest from Rumble video descriptions. |
 | YouTube | Video description link | https://sparkling-standard.com/house-cleaning/?utm_source=youtube&utm_medium=organic_social&utm_campaign=proof&utm_content=detail_video | Track house-cleaning interest from YouTube video descriptions. |
+| Google Business Profile | Business profile post | https://sparkling-standard.com/gift-certificates/?utm_source=google&utm_medium=organic&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from Google Business Profile posts. |
+| Instagram | Gift-certificate post / story | https://sparkling-standard.com/gift-certificates/?utm_source=instagram&utm_medium=organic_social&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from Instagram. |
+| X | Gift-certificate post | https://sparkling-standard.com/gift-certificates/?utm_source=x&utm_medium=organic_social&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from X. |
 
-## Campaign & outreach links (16)
+## Campaign & outreach links (20)
 
 | Channel | Placement | Final URL | Purpose |
 | --- | --- | --- | --- |
@@ -74,8 +77,12 @@ These URLs are prepared for when the public profiles exist. Do **not** paste the
 | Referral card | Referral card QR | https://sparkling-standard.com/estimate/?utm_source=referral&utm_medium=referral&utm_campaign=referral&utm_content=qr | Track referral-card scans (referral program details are configured separately; no discounts are promised until approved). |
 | Yard sign | Yard sign QR | https://sparkling-standard.com/estimate/?utm_source=yard_sign&utm_medium=print&utm_campaign=yard_sign&utm_content=qr | Track scans from yard signs placed at active job sites (only with customer permission). |
 | Nextdoor | Neighborhood post link | https://sparkling-standard.com/house-cleaning/?utm_source=nextdoor&utm_medium=organic_social&utm_campaign=neighborhood&utm_content=post | Track neighborhood recommendation-post traffic. |
+| Facebook | Gift-certificate posts | https://sparkling-standard.com/gift-certificates/?utm_source=facebook&utm_medium=organic_social&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from Facebook posts. |
+| Nextdoor | Neighborhood gift posts | https://sparkling-standard.com/gift-certificates/?utm_source=nextdoor&utm_medium=organic_social&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from Nextdoor neighborhood posts. |
+| Email | Email signature (gift link) | https://sparkling-standard.com/gift-certificates/?utm_source=email&utm_medium=email&utm_campaign=signature&utm_content=gift | Track gift-certificate interest from the owner’s email signature. |
+| Print material | Printed gift card / certificate holder | https://sparkling-standard.com/gift-certificates/?utm_source=gift_card&utm_medium=print&utm_campaign=gift_certificate&utm_content=qr | Track scans from a printed gift card that leads to the gift-certificate page. |
 
-## QR assets (13)
+## QR assets (14)
 
 | Asset | Resolves to | Placement | File |
 | --- | --- | --- | --- |
@@ -92,3 +99,4 @@ These URLs are prepared for when the public profiles exist. Do **not** paste the
 | Recurring campaign (social/email). | https://sparkling-standard.com/recurring-cleaning/?utm_source=door_hanger&utm_medium=print&utm_campaign=door_hanger&utm_content=recurring | Anywhere the recurring campaign link is needed. | `public/marketing/qr/recurring-campaign.svg` |
 | Move-out campaign (social/email). | https://sparkling-standard.com/move-in-move-out-cleaning/?utm_source=flyer&utm_medium=print&utm_campaign=flyer&utm_content=moveout | Anywhere the move-out campaign link is needed. | `public/marketing/qr/move-out-campaign.svg` |
 | STR campaign (social/email). | https://sparkling-standard.com/short-term-rental-cleaning/?utm_source=str_host&utm_medium=outreach&utm_campaign=str_turnover&utm_content=packet | Anywhere the STR campaign link is needed. | `public/marketing/qr/str-campaign.svg` |
+| Printed gift card scanning to the gift-certificate page. | https://sparkling-standard.com/gift-certificates/?utm_source=gift_card&utm_medium=print&utm_campaign=gift_certificate&utm_content=qr | Gift card or certificate holder print run. | `public/marketing/qr/gift-card.svg` |

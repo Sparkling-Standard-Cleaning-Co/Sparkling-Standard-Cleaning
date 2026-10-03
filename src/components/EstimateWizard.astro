@@ -418,10 +418,14 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       <section class="wizard__step" data-step="5" aria-label={stepTitle(4)}>
         <h2 class="wizard__step-heading">{stepTitle(4)}</h2>
         <div class="field-row field-row--2">
-          <div class="field">
-            <label for="est-date">Preferred date</label>
-            <input class="input" id="est-date" name="preferredDate" type="date" required />
-          </div>
+            <div class="field">
+              <label for="est-date">Preferred date</label>
+              <input class="input" id="est-date" name="preferredDate" type="date" required />
+              <span class="hint">
+                Requests can be made up to {business.scheduling.advanceReservationDays} days ahead.
+                Hayli confirms availability before any appointment is booked.
+              </span>
+            </div>
           <div class="field">
             <label for="est-arrival">Arrival preference</label>
             <select class="select" id="est-arrival" name="arrivalPreference" required>

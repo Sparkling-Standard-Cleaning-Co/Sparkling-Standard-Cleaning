@@ -10,6 +10,8 @@ import { chromium } from 'playwright';
 
 const PORT = 4405;
 const BASE = `http://localhost:${PORT}`;
+// Dynamic booking date: the 60-day advance window makes fixed dates stale.
+const BOOKING_DATE = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
 const MOLINO = { latitude: 30.72, longitude: -87.31 };
 
 const MOLINO_RESULT = {
@@ -144,7 +146,7 @@ async function completeRemainingSteps(page) {
   await page.selectOption('#est-pets', 'none');
   await page.click('[data-next]');
   await page.click('[data-next]'); // extras
-  await page.fill('#est-date', '2026-12-01');
+  await page.fill('#est-date', BOOKING_DATE);
   await page.selectOption('#est-arrival', 'morning');
   await page.click('[data-next]');
   await page.fill('#est-name', 'UX test (please ignore)');

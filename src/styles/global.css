@@ -397,9 +397,11 @@ li + li {
 }
 
 /* ── Brand lockup ─────────────────────────────────────────────────────────────
-   Premium identity from the owner-approved crest and banner: gold "S" badge
-   with sparkles and a pink blossom, script "Sparkling", spaced "STANDARD",
-   the "Cleaning Co." descriptor and the tagline. The whole lockup links home. */
+   Owner-approved gold "S" crest with sparkles and a pink blossom. Two
+   typographic treatments share the crest; the live one is chosen by
+   DEFAULT_WORDMARK_TREATMENT in src/components/Logo.astro (one-line switch):
+     • soft-serif      — one display family, hierarchy by size/weight;
+     • romantic-script — elegant script + classic serif in one rose tone. */
 .brand {
   display: inline-flex;
   align-items: center;
@@ -427,12 +429,20 @@ li + li {
 .brand__text {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.16rem;
   line-height: 1;
   min-width: 0;
 }
 
-.brand__line {
+.brand__wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.brand__line--secondary {
   display: flex;
   align-items: baseline;
   gap: 0.45rem;
@@ -440,39 +450,12 @@ li + li {
   min-width: 0;
 }
 
-.brand__script {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: var(--weight-semibold);
-  font-size: 1.45rem;
-  line-height: 1;
-  letter-spacing: -0.01em;
-  color: var(--color-rose-700);
-}
-
-.brand__caps {
-  font-family: var(--font-display);
-  font-weight: var(--weight-semibold);
-  font-size: 0.9rem;
-  line-height: 1;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--color-ink-900);
-}
-
 .brand__descriptor {
-  font-size: 0.625rem;
-  font-weight: var(--weight-bold);
-  letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--color-champagne-700);
   white-space: nowrap;
 }
 
 .brand__tagline {
-  font-size: 0.625rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--color-text-muted);
   white-space: nowrap;
 }
@@ -483,20 +466,100 @@ li + li {
   color: var(--color-border-strong);
 }
 
+/* ── Treatment A — Soft serif (single family) ───────────────────────────────── */
+.brand__text--soft-serif .brand__sparkling {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: var(--weight-semibold);
+  font-size: 1.5rem;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--color-rose-700);
+}
+
+.brand__text--soft-serif .brand__standard {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.02rem;
+  line-height: 1;
+  letter-spacing: 0.07em;
+  color: var(--color-ink-800);
+}
+
+.brand__text--soft-serif .brand__descriptor {
+  font-family: var(--font-display);
+  font-weight: var(--weight-semibold);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: var(--color-champagne-700);
+}
+
+.brand__text--soft-serif .brand__tagline {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+}
+
+/* ── Treatment B — Romantic script (script + classic serif) ─────────────────── */
+.brand__text--romantic-script .brand__sparkling {
+  font-family: 'Great Vibes', 'Parisienne', var(--font-display), cursive;
+  font-weight: 400;
+  font-size: 2rem;
+  line-height: 0.92;
+  letter-spacing: 0.005em;
+  padding-right: 0.1em;
+  color: var(--color-rose-700);
+}
+
+.brand__text--script-parisienne .brand__sparkling {
+  font-family: 'Parisienne', 'Great Vibes', var(--font-display), cursive;
+  font-size: 1.85rem;
+}
+
+.brand__text--romantic-script .brand__standard {
+  font-family: var(--font-display);
+  font-weight: var(--weight-semibold);
+  font-size: 0.84rem;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-rose-600);
+}
+
+.brand__text--romantic-script .brand__descriptor {
+  font-family: var(--font-body);
+  font-weight: var(--weight-bold);
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  color: var(--color-champagne-700);
+}
+
+.brand__text--romantic-script .brand__tagline {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+}
+
 /* Dark footer surfaces need the light brand tones. */
-.site-footer .brand__script {
+.site-footer .brand__text--soft-serif .brand__sparkling,
+.site-footer .brand__text--romantic-script .brand__sparkling {
   color: var(--color-rose-300);
 }
 
-.site-footer .brand__caps {
+.site-footer .brand__text--soft-serif .brand__standard,
+.site-footer .brand__text--romantic-script .brand__standard {
   color: var(--color-cream-100);
 }
 
-.site-footer .brand__descriptor {
+.site-footer .brand__text--soft-serif .brand__descriptor,
+.site-footer .brand__text--romantic-script .brand__descriptor {
   color: var(--color-champagne-300);
 }
 
-.site-footer .brand__tagline {
+.site-footer .brand__text--soft-serif .brand__tagline,
+.site-footer .brand__text--romantic-script .brand__tagline {
   color: var(--color-ink-muted);
 }
 
@@ -520,13 +583,30 @@ li + li {
     height: 2.5rem;
   }
 
-  .brand__script {
-    font-size: 1.25rem;
+  .brand__wordmark {
+    gap: 0.38rem;
   }
 
-  .brand__caps {
-    font-size: 0.8rem;
-    letter-spacing: 0.22em;
+  .brand__text--soft-serif .brand__sparkling {
+    font-size: 1.3rem;
+  }
+
+  .brand__text--soft-serif .brand__standard {
+    font-size: 0.9rem;
+    letter-spacing: 0.06em;
+  }
+
+  .brand__text--romantic-script .brand__sparkling {
+    font-size: 1.7rem;
+  }
+
+  .brand__text--script-parisienne .brand__sparkling {
+    font-size: 1.55rem;
+  }
+
+  .brand__text--romantic-script .brand__standard {
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
   }
 
   .brand__tagline {
@@ -541,12 +621,17 @@ li + li {
     min-width: 0;
   }
 
-  .brand__line {
+  .brand__wordmark {
     flex-wrap: wrap;
   }
 
-  .brand__script,
-  .brand__caps,
+  .brand__text--soft-serif .brand__sparkling,
+  .brand__text--romantic-script .brand__sparkling {
+    font-size: 1.55rem;
+  }
+
+  .brand__text--soft-serif .brand__standard,
+  .brand__text--romantic-script .brand__standard,
   .brand__descriptor {
     white-space: normal;
   }
@@ -887,6 +972,90 @@ li + li {
 .card--muted {
   background: var(--color-bg-alt);
   box-shadow: none;
+}
+
+/* ── Gift certificate sample + redemption code ─────────────────────────────── */
+.gift-sample {
+  margin-top: var(--space-4);
+  padding: var(--space-6) var(--space-5);
+  border: 1px solid var(--color-champagne-300);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, var(--color-cream-50), var(--color-cream-100));
+  text-align: center;
+}
+
+.gift-sample__brand-script {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: var(--weight-semibold);
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--color-rose-700);
+  margin: 0;
+}
+
+.gift-sample__brand-caps {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--color-rose-600);
+  margin: 0.2rem 0 0;
+}
+
+.gift-sample__descriptor {
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-champagne-700);
+  margin: 0.35rem 0 var(--space-4);
+}
+
+.gift-sample__title {
+  font-size: 0.8rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--color-ink-800);
+  margin: 0 0 var(--space-2);
+}
+
+.gift-sample__value {
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  color: var(--color-rose-700);
+  margin: 0;
+}
+
+.gift-sample__label {
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-champagne-700);
+  margin: 0.2rem 0 var(--space-4);
+}
+
+.gift-sample__recipient {
+  margin: 0 0 var(--space-2);
+}
+
+.gift-sample__code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+}
+
+.gift-sample__note {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin: var(--space-3) 0 0;
+}
+
+.gift-redeem-code {
+  font-family: 'Courier New', monospace;
+  font-size: var(--text-xl);
+  letter-spacing: 0.08em;
+  color: var(--color-ink-900);
+  margin: var(--space-2) 0 0;
 }
 
 /* ── Steps ─────────────────────────────────────────────────────────────────── */

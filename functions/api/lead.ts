@@ -26,6 +26,7 @@ import {
   type QuoteVerificationEnv,
 } from '../../src/lib/estimate/verify.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
+import { schedulingConfig } from '../../src/config/scheduling.ts';
 
 interface Env extends QuoteVerificationEnv {
   WEB3FORMS_ACCESS_KEY?: string;
@@ -93,10 +94,11 @@ function sanitizePreferredDate(fields: Record<string, string>): void {
     Boolean(match) &&
     Number.isFinite(parsed) &&
     parsed >= now - oneDayMs &&
-    parsed <= now + 366 * oneDayMs;
+    parsed <= now + (schedulingConfig.advanceReservationDays + 1) * oneDayMs;
   if (!valid) {
     delete fields.preferred_date;
-    fields.preferred_date_note = 'submitted preferred date was invalid or out of range and was discarded';
+    fields.preferred_date_note =
+      'submitted preferred date was invalid or out of range (beyond the 60-day scheduling window) and was discarded';
   }
 }
 

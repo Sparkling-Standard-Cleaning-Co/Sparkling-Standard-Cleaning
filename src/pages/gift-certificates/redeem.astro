@@ -1,0 +1,107 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { giftCertificateConfig } from '../../config/gift-certificates';
+import { business, contactPhone, isPending } from '../../config/business';
+import { breadcrumbNode } from '../../lib/schema';
+
+const phone = contactPhone();
+const hasEmail = !isPending(business.email);
+const site = Astro.site ?? new URL('https://sparkling-standard.com');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Gift Certificates', path: '/gift-certificates/' },
+    { name: 'Redeem', path: '/gift-certificates/redeem/' },
+  ]),
+];
+---
+
+<BaseLayout
+  title="Redeem a Gift Certificate | Sparkling Standard Cleaning Co."
+  description="How to redeem a Sparkling Standard gift certificate: bring your certificate code when you contact us and we will apply it to the agreed service."
+  schema={schema}
+  noindex
+>
+  <section class="section section--tight estimate-intro">
+    <div class="container container--narrow">
+      <Breadcrumbs
+        trail={[
+          { name: 'Home', path: '/' },
+          { name: 'Gift Certificates', path: '/gift-certificates/' },
+          { name: 'Redeem', path: '/gift-certificates/redeem/' },
+        ]}
+      />
+      <div class="section-head mt-4">
+        <p class="eyebrow">Gift certificate</p>
+        <h1>Redeeming your certificate</h1>
+        <p class="lead">
+          Thank you for a thoughtful gift. Redemption is simple — contact Sparkling Standard with
+          the certificate code and we will take care of the rest.
+        </p>
+      </div>
+
+      <div class="card card--feature">
+        <p class="eyebrow mb-0">Certificate code</p>
+        <p class="gift-redeem-code" data-gift-ref aria-live="polite">Checking the link…</p>
+        <p class="small text-muted" data-gift-ref-note></p>
+      </div>
+
+      <div class="stack mt-5">
+        <h2>What to do</h2>
+        <ol class="steps">
+          {
+            giftCertificateConfig.redemptionSteps.map((step, index) => (
+              <li class="step">
+                <h3 class="step__title">{index + 1}. {index === 0 ? 'Contact us' : index === 1 ? 'We confirm and apply it' : 'Any balance stays simple'}</h3>
+                <p class="step__text">{step}</p>
+              </li>
+            ))
+          }
+        </ol>
+      </div>
+
+      <div class="card card--muted mt-5">
+        <h2 class="card__title">Keep it safe</h2>
+        <p class="card__text">
+          Treat the code like a gift card: we will never ask for payment-card details, passwords or
+          online banking information to redeem a certificate. If someone contacts you claiming
+          otherwise, stop and call us directly.
+        </p>
+      </div>
+
+      <div class="card mt-5">
+        <h2 class="card__title">Contact</h2>
+        <p class="card__text">
+          {phone ? <>Call or text <a href={phone.href}>{phone.display}</a>{hasEmail ? ' or ' : '.'}</> : null}
+          {hasEmail ? <> email <a href={`mailto:${business.email}`}>{business.email}</a>.</> : null}
+        </p>
+        <p class="small text-muted">
+          This page only explains the redemption steps. It does not look up, change or transfer a
+          certificate, and it stores no personal information.
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  // Static page: read and validate the code client-side. No lookup, no data
+  // mutation, no PII — the code is only echoed back for the recipient.
+  const target = document.querySelector('[data-gift-ref]');
+  const note = document.querySelector('[data-gift-ref-note]');
+  if (target) {
+    const raw = new URLSearchParams(window.location.search).get('ref') ?? '';
+    const code = raw.trim().toUpperCase();
+    if (/^SSGC-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(code)) {
+      target.textContent = code;
+      if (note) note.textContent = 'Quote this code when you contact us so we can apply it to your service.';
+    } else {
+      target.textContent = 'No certificate code found';
+      if (note) {
+        note.textContent =
+          'Open this page using the QR code or link printed on the certificate, or contact us and we will find your gift.';
+      }
+    }
+  }
+</script>
