@@ -26,6 +26,12 @@ but they do not replace the recurring residential focus.
 the marketing, supported by authentic demonstrations of her work, her professional experience,
 her standards and her entrepreneurial story. Zero additional spending is the default.
 
+**Immediate execution priorities (owner direction, 2026-10-03):** (1) film Hayli's founder
+introduction, (2) produce the first cleaning videos, (3) acquire local recurring customers.
+Account setup is complete for the eight live profiles; production and local acquisition are the
+focus now. Instagram verification and the deferred YouTube channel are tracked in
+`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
+
 Two complementary engines (do not confuse them):
 
 | Engine | Purpose | Channels | Primary outcome |
@@ -40,7 +46,7 @@ weekly client is worth more than a viral clip that produces none.
 
 | Tier | Platforms | Why | Effort |
 | --- | --- | --- | --- |
-| **1 — Primary content** | Instagram (pending), TikTok, YouTube (pending) | The three channels where short-form cleaning content is discovered and shared. One filmed detail can be cut for all three. TikTok was created 2026-10-03; Instagram and YouTube remain pending. | One shoot → three publications |
+| **1 — Primary content** | TikTok (live), Instagram (verification in progress), YouTube (deferred — Google Workspace eligibility) | The three channels where short-form cleaning content is discovered and shared. One filmed detail can be cut for all three. TikTok is live with its tracked link placed; Instagram awaits verification; YouTube is deferred, not abandoned. | One shoot → three publications |
 | **1 — Local acquisition** | Google Business Profile (verification pending), Facebook, Nextdoor, the website's estimate flow, direct outreach | Where Pensacola/Cantonment homeowners actually look, ask and refer. Google Business Profile receives authentic photos, accurate services, updates and genuine reviews once verification is confirmed. | Highest care |
 | **2 — Adapted distribution** | Pinterest, Rumble, Gab, Parler, Locals (all created 2026-10-03), plus X and Threads when supplied | Adapted reposts of Tier-1 assets. Locals is a secondary distribution/community channel for the same master content — never a separate production line. No separate production. | Minutes per post |
 | **3 — Professional** | LinkedIn, Alignable | Commercial, property-manager and B2B relationships. | Weekly touch |
@@ -111,7 +117,7 @@ until the owner confirms it.
 | Step | Action |
 | --- | --- |
 | 1 | Confirm the Google Business Profile verification result (pending); do not claim verification early. |
-| 2 | Priority content accounts: TikTok is created (2026-10-03); Instagram and YouTube remain to be created. Paste each account's tracked website link from `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`; the six confirmed distribution accounts (TikTok, Pinterest, Rumble, Gab, Parler, Locals) only need their tracked links pasted. |
+| 2 | Accounts and placements are set: the eight live profiles have their tracked UTM links placed (owner-confirmed). Instagram is in verification (URL not published); YouTube is deferred by Google Workspace eligibility. **Move directly to filming the founder introduction and the first cleaning videos.** |
 | 3 | Keep Facebook and Nextdoor contact details and tracked links consistent; prepare a genuine welcome/local update. |
 | 4 | Film the founder introduction (long + short edit) and the first 2–3 detail clips. |
 | 5 | Publish the opening content across the three primary channels; post the local update to Facebook/Nextdoor. |

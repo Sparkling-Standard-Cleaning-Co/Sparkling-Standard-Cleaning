@@ -22,24 +22,30 @@ main open setup items (`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`).
       page views, `estimate_start` and the three inquiry key events verified end-to-end
 - [x] SMS enabled; Facebook and Nextdoor profiles confirmed; UTM/QR registry and lead attribution
       in place; review-request system designed (`REVIEW-GROWTH-SYSTEM.md`)
-- [ ] Google Business Profile verification result (created; Google review pending — do not claim
+- [ ] Google Business Profile verification result (verification in progress — do not claim
       verified or publish its URL early)
-- [ ] Priority social accounts (Instagram, TikTok, YouTube) — not yet created
+- [x] Social profiles — eight integrated and live with tracked UTM links placed (owner-confirmed
+      2026-10-03)
+- [ ] Instagram verification (in progress; URL not published)
+- [ ] YouTube channel — deferred by new Google Workspace account eligibility (not abandoned; no
+      paid workarounds)
 
 ## 30-day launch plan (owner approval required)
 
 ### Week 1 — Release and setup
 
-- [x] **Done 2026-10-03** — the software release and the six-profile social integration were
-      owner-authorized and deployed (`origin/main` = `cdc4971`: GTM import package + Brand A2, UTM
-      count correction, GTM doc cleanup, attribution repair, marketing documentation, eight-profile
-      Follow Us section); live acceptance checks passed (`docs/verification/VERIFICATION.md`).
-- [ ] Confirm the Google Business Profile verification result.
-- [ ] Create the priority social accounts (Instagram, TikTok, YouTube) with approved branding,
-      consistent contact facts and the tracked website links; update
-      `docs/marketing/PLATFORM-REGISTER.md` as each actually exists.
-- [ ] Film the initial content: founder introduction (long + short edit) and 2–3 real detail
-      clips (permission required).
+- [x] **Done 2026-10-03** — the software release, the six-profile social integration and the
+      logo-only Follow Us redesign were owner-authorized and deployed (`origin/main` = `62a1a46`:
+      GTM import package + Brand A2, UTM count correction, GTM doc cleanup, attribution repair,
+      marketing documentation, eight-profile circular Follow Us buttons); live acceptance checks
+      passed (`docs/verification/VERIFICATION.md`).
+- [ ] **Priority: film Hayli's founder introduction** (long + short edit) and 2–3 real detail
+      clips (permission required) — the immediate execution focus.
+- [ ] Confirm the Google Business Profile verification result and the Instagram verification
+      (do not publish either URL before confirmation).
+- [ ] YouTube stays deferred while Google Workspace eligibility is blocked; no paid workarounds.
+- [ ] Tracked UTM links are already placed on the eight live profiles — no further account setup
+      is blocking production.
 
 ### Week 2 — Open for business
 

@@ -193,7 +193,8 @@ export const marketingLinks: MarketingLink[] = [
     purpose: 'Attribute TikTok bio-link traffic.',
     manual: true,
     whereToPaste: 'TikTok → Edit profile → Website.',
-    pending: true,
+    // Owner-confirmed placed 2026-10-03.
+    pending: false,
   },
   {
     id: 'youtube_profile',
@@ -265,7 +266,8 @@ export const marketingLinks: MarketingLink[] = [
     purpose: 'Attribute Pinterest profile visitors.',
     manual: true,
     whereToPaste: 'Pinterest business profile → Claim → Website.',
-    pending: true,
+    // Owner-confirmed placed 2026-10-03.
+    pending: false,
   },
   {
     id: 'rumble_profile',
@@ -277,7 +279,8 @@ export const marketingLinks: MarketingLink[] = [
     purpose: 'Attribute Rumble channel visitors.',
     manual: true,
     whereToPaste: 'Rumble channel → About → Website.',
-    pending: true,
+    // Owner-confirmed placed 2026-10-03.
+    pending: false,
   },
   {
     id: 'gab_profile',
@@ -289,7 +292,8 @@ export const marketingLinks: MarketingLink[] = [
     purpose: 'Attribute Gab profile visitors.',
     manual: true,
     whereToPaste: 'Gab profile → Website.',
-    pending: true,
+    // Owner-confirmed placed 2026-10-03.
+    pending: false,
   },
   {
     id: 'parler_profile',
@@ -301,7 +305,8 @@ export const marketingLinks: MarketingLink[] = [
     purpose: 'Attribute Parler profile visitors.',
     manual: true,
     whereToPaste: 'Parler profile → Website.',
-    pending: true,
+    // Owner-confirmed placed 2026-10-03.
+    pending: false,
   },
   {
     id: 'locals_profile',
@@ -313,7 +318,8 @@ export const marketingLinks: MarketingLink[] = [
     purpose: 'Attribute Locals profile visitors.',
     manual: true,
     whereToPaste: 'Locals profile → Website.',
-    pending: true,
+    // Owner-confirmed placed 2026-10-03.
+    pending: false,
   },
   {
     id: 'x_profile',

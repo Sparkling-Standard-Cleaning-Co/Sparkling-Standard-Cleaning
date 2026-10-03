@@ -21,19 +21,21 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
   page views, `estimate_start` and all three inquiry key events verified; Enhanced Measurement
   form interactions disabled).
 - **Release status:** the 2026-10-03 release (GTM import package + Brand A2, UTM count correction,
-  GTM doc cleanup, attribution repair, marketing documentation, and the six-profile social
-  integration with the upgraded Follow Us section) is **deployed** — `origin/main` = `cdc4971`,
-  owner-authorized, live acceptance checks passed. See `docs/verification/VERIFICATION.md`.
+  GTM doc cleanup, attribution repair, marketing documentation, the six-profile social
+  integration, and the compact logo-only Follow Us redesign) is **deployed** — `origin/main` =
+  `62a1a46`, owner-authorized, live acceptance checks passed. See
+  `docs/verification/VERIFICATION.md`.
 - **Remaining owner items:** formal launch checklist (legal entity spelling, insurance/bonding/
-  licensing claims, genuine review link, final cancellation percentages), Instagram + YouTube
-  account creation, pasting the confirmed profiles' tracked website links, Google Business Profile
-  verification, genuine photography and reviews. Eight confirmed profiles render in the Follow Us
-  section (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals). See
-  `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals M2–M7; M1 — the software release —
-  was deployed 2026-10-03).
-- **We are now in the marketing phase.** Two growth engines (audience growth vs. local customer
-  acquisition), the proposed "30 Days. 30 Details." content plan and the 30-day launch schedule
-  live under `docs/marketing/`.
+  licensing claims, genuine review link, final cancellation percentages), Instagram and Google
+  Business Profile verification results, the deferred YouTube channel (Google Workspace
+  eligibility — no paid workarounds), genuine photography and reviews. Eight profiles are live in
+  the Follow Us section (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals) with
+  their basic tracked UTM links placed. See `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing
+  approvals M2–M7; M1 — the software release — was deployed 2026-10-03).
+- **We are now in the marketing phase. Immediate priorities: film Hayli's founder introduction,
+  produce the first cleaning videos and acquire local recurring customers.** Two growth engines
+  (audience growth vs. local customer acquisition), the proposed "30 Days. 30 Details." content
+  plan and the 30-day launch schedule live under `docs/marketing/`.
 - **Start with `docs/OPERATIONS-HUB.md`** — the single entry point for the whole system. Platform
   status: `docs/operations/PLATFORM-STATUS.md`. Deployment: `docs/deployment/DEPLOYMENT.md`.
 
@@ -126,14 +128,14 @@ All optional for local development; all documented in `.env.example`.
 
 - Campaign links and QR codes generate from `src/config/marketing-links.ts`
   (`npm run marketing:links`); every QR is independently decode-verified. Current registry:
-  51 inbound links (23 ready, 28 prepared) across the platform inventory.
+  51 inbound links (29 ready, 22 prepared) across the platform inventory.
 - Strategy and priorities: `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` (two growth engines:
   audience growth vs. local customer acquisition).
 - Content: `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (pillars/roles) and
   `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` (proposed "30 Days. 30 Details." series, four-week
   plan, founder brief, iPhone + DaVinci Resolve workflow).
 - Accounts: `docs/marketing/PLATFORM-REGISTER.md` (status) and
-  `docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (owner checklist for Instagram, TikTok, YouTube).
+  `docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (owner checklist and placement record).
 - Measurement: `docs/marketing/LEAD-MEASUREMENT-MODEL.md` (reporting hierarchy) and
   `docs/marketing/WEEKLY-SCORECARD.md`; schedule: `docs/marketing/90-DAY-LAUNCH-PLAN.md`.
 - More: UTM master registry, "where to paste" cheat sheet, review growth, referral, commercial and

@@ -84,16 +84,19 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   social profiles rendering (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals);
   owner-approved 2026-10-02 favicon/PWA icon kit installed.
 - **Release status:** the 2026-10-03 release is **deployed to production** — `origin/main` =
-  `cdc4971` (the five-commit release `8b8dde4`/`03d6ba8`/`53a85aa`/`0f3c38c`/`5a4a024`, the
-  documentation closeout `7a51efa`, and the social integration `cdc4971`), owner-authorized with
-  live acceptance checks passed (see `docs/verification/VERIFICATION.md`). Any new local work —
+  `62a1a46` (the five-commit release `8b8dde4`/`03d6ba8`/`53a85aa`/`0f3c38c`/`5a4a024`, the
+  documentation closeout `7a51efa`, the social integration `cdc4971`, the deployment-closeout
+  `6ebc3fb` and the logo-only Follow Us redesign `62a1a46`), owner-authorized with live
+  acceptance checks passed (see `docs/verification/VERIFICATION.md`). Any new local work —
   including later documentation follow-ups — stays unpublished until the owner authorizes another
   push.
 - **Marketing phase (2026-10-03):** the business is transitioning from development into active
-  marketing. Two growth engines (audience growth vs. local customer acquisition), priority content
-  platforms (Instagram, TikTok, YouTube), the proposed "30 Days. 30 Details." content plan, the
-  30-day launch schedule and the owner account checklist are documented under `docs/marketing/`.
-  The primary business objective is dependable weekly/biweekly residential customers. The owner's
+  marketing. **Immediate execution priorities: film Hayli's founder introduction, produce the
+  first cleaning videos and acquire local recurring customers.** Two growth engines (audience
+  growth vs. local customer acquisition), priority content platforms (TikTok live; Instagram in
+  verification; YouTube deferred), the proposed "30 Days. 30 Details." content plan, the 30-day
+  launch schedule and the owner account checklist are documented under `docs/marketing/`. The
+  primary business objective is dependable weekly/biweekly residential customers. The owner's
   pending marketing actions live in `docs/launch/OWNER-INPUT-REQUIRED.md` (M2–M7; M1 — the
   software release — was deployed 2026-10-03).
 - **Formal launch checklist still outstanding (owner sign-off):** legal entity spelling, insurance/
@@ -346,14 +349,16 @@ collections are intentionally empty — not errors.
   a confirmed URL exists, and documented in `docs/marketing/PLATFORM-REGISTER.md`. Google Business
   Profile is created with verification pending — never mark it verified or publish its URL early.
 - **Social profiles + Follow Us icons (2026-10-03):** the owner supplied six additional profile
-  URLs (TikTok, Pinterest, Rumble, Gab, Parler, Locals) — eight confirmed profiles render in the
-  Follow Us section as **logo-only 52px circular buttons** (one tidy row on desktop/tablet, two
-  balanced rows of four on phones, natural wrapping for future profiles). Platform names are
-  visually hidden but remain each link's explicit accessible name. Icons use official marks,
-  including Nextdoor's house-"n" favicon, the official Gab and Parler marks and the official
-  Locals logo (`src/components/SocialIcon.astro` documents each source). Instagram and YouTube
-  remain pending; never render a PENDING platform. Tracked profile links and the paste checklist:
-  `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
+  URLs (TikTok, Pinterest, Rumble, Gab, Parler, Locals) — eight profiles render in the Follow Us
+  section as **logo-only 52px circular buttons** (one tidy row on desktop/tablet, two balanced
+  rows of four on phones, natural wrapping for future profiles). Platform names are visually
+  hidden but remain each link's explicit accessible name. Icons use official marks, including
+  Nextdoor's house-"n" favicon, the official Gab and Parler marks and the official Locals logo
+  (`src/components/SocialIcon.astro` documents each source). **The owner confirms the basic
+  tracked UTM links are placed on all eight** (registry entries active). **Instagram is
+  undergoing verification** and **YouTube is deferred** by new Google Workspace account
+  eligibility (not abandoned; no paid workarounds); never render a PENDING platform or publish an
+  unconfirmed URL. Tracked links and the checklist: `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
 - **Brand A2 selected (2026-10-03):** the owner chose the romantic-script wordmark — Great Vibes
   "Sparkling" + spaced serif "STANDARD", existing gold S crest, sparkles and pink blossom.
   `DEFAULT_WORDMARK_TREATMENT`/`DEFAULT_WORDMARK_SCRIPT` in `src/components/Logo.astro` already
@@ -396,8 +401,9 @@ collections are intentionally empty — not errors.
   job, and always fails closed without owner-approved terms. Financial review:
   `docs/launch/PROMOTION-PROPOSALS.md`; regenerate with `npm run promotions:impact`.
 - **Pending owner input:** legal entity spelling/suffix, insurance/bonding/licensing claims, review
-  profile/submission links, Instagram + YouTube account creation, pasting the confirmed profiles'
-  tracked website links, Umami website ID, final cancellation percentages, marketing-launch
-  approvals (M2–M7; M1 deployed 2026-10-03) and any marketing claim not yet supplied.
+  profile/submission links, Instagram + Google Business Profile verification results, the deferred
+  YouTube channel (Google Workspace eligibility), Umami website ID, final cancellation
+  percentages, marketing-launch approvals (M2–M7; M1 deployed 2026-10-03) and any marketing claim
+  not yet supplied.
 - Current platform details: `docs/operations/PLATFORM-STATUS.md`. Owner checklist:
   `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals are grouped there as M2–M7).

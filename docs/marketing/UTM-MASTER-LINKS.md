@@ -15,15 +15,21 @@ Source of truth: `src/config/marketing-links.ts`. Site: https://sparkling-standa
   gad_*) — the site preserves those parameters untouched.
 - `utm_term` is not used (no paid-keyword campaigns).
 
-## Base channel links (3)
+## Base channel links (9)
 
 | Channel | Placement | Final URL | Purpose |
 | --- | --- | --- | --- |
 | Facebook | Page website field | https://sparkling-standard.com/?utm_source=facebook&utm_medium=organic_social&utm_campaign=profile | Attribute Facebook page visitors arriving through the website link. |
+| TikTok | Bio link | https://sparkling-standard.com/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=profile | Attribute TikTok bio-link traffic. |
 | Nextdoor | Business page website field | https://sparkling-standard.com/?utm_source=nextdoor&utm_medium=organic_social&utm_campaign=profile | Attribute Nextdoor neighborhood traffic. |
+| Pinterest | Profile website field | https://sparkling-standard.com/?utm_source=pinterest&utm_medium=organic_social&utm_campaign=profile | Attribute Pinterest profile visitors. |
+| Rumble | Channel about link | https://sparkling-standard.com/?utm_source=rumble&utm_medium=organic_social&utm_campaign=profile | Attribute Rumble channel visitors. |
+| Gab | Profile website field | https://sparkling-standard.com/?utm_source=gab&utm_medium=organic_social&utm_campaign=profile | Attribute Gab profile visitors. |
+| Parler | Profile website field | https://sparkling-standard.com/?utm_source=parler&utm_medium=organic_social&utm_campaign=profile | Attribute Parler profile visitors. |
+| Locals | Profile website field | https://sparkling-standard.com/?utm_source=locals&utm_medium=organic_social&utm_campaign=profile | Attribute Locals profile visitors. |
 | Print material | Business card website line | https://sparkling-standard.com/?utm_source=business_card&utm_medium=print&utm_campaign=business_card&utm_content=website_line | Track typed card visits. |
 
-## Pending — prepared, do NOT publish yet (28)
+## Pending — prepared, do NOT publish yet (22)
 
 These URLs are prepared for when the public profiles exist. Do **not** paste them anywhere yet.
 
@@ -33,16 +39,10 @@ These URLs are prepared for when the public profiles exist. Do **not** paste the
 | Google Business Profile | Business profile → appointment link | https://sparkling-standard.com/estimate/?utm_source=google&utm_medium=organic&utm_campaign=gbp&utm_content=estimate | Attribute GBP appointment-link clicks that go straight to the estimate flow. |
 | Instagram | Bio link | https://sparkling-standard.com/?utm_source=instagram&utm_medium=organic_social&utm_campaign=profile | Attribute Instagram bio-link traffic. |
 | Instagram | Story / link sticker when pushing estimates | https://sparkling-standard.com/estimate/?utm_source=instagram&utm_medium=organic_social&utm_campaign=profile&utm_content=story_estimate | Track estimate starts from Instagram stories. |
-| TikTok | Bio link | https://sparkling-standard.com/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=profile | Attribute TikTok bio-link traffic. |
 | YouTube | Channel links | https://sparkling-standard.com/?utm_source=youtube&utm_medium=organic_social&utm_campaign=profile | Attribute YouTube channel description traffic. |
 | LinkedIn | Company page website field | https://sparkling-standard.com/commercial-cleaning/?utm_source=linkedin&utm_medium=organic_social&utm_campaign=profile&utm_content=commercial | Attribute commercial enquiries arriving from LinkedIn. |
 | Bing Places | Business listing website field | https://sparkling-standard.com/?utm_source=bing&utm_medium=organic&utm_campaign=profile | Attribute Bing local-listing visitors. |
 | Yelp | Business page website field | https://sparkling-standard.com/?utm_source=yelp&utm_medium=organic&utm_campaign=profile | Attribute Yelp business-page visitors. |
-| Pinterest | Profile website field | https://sparkling-standard.com/?utm_source=pinterest&utm_medium=organic_social&utm_campaign=profile | Attribute Pinterest profile visitors. |
-| Rumble | Channel about link | https://sparkling-standard.com/?utm_source=rumble&utm_medium=organic_social&utm_campaign=profile | Attribute Rumble channel visitors. |
-| Gab | Profile website field | https://sparkling-standard.com/?utm_source=gab&utm_medium=organic_social&utm_campaign=profile | Attribute Gab profile visitors. |
-| Parler | Profile website field | https://sparkling-standard.com/?utm_source=parler&utm_medium=organic_social&utm_campaign=profile | Attribute Parler profile visitors. |
-| Locals | Profile website field | https://sparkling-standard.com/?utm_source=locals&utm_medium=organic_social&utm_campaign=profile | Attribute Locals profile visitors. |
 | X | Profile bio link | https://sparkling-standard.com/?utm_source=x&utm_medium=organic_social&utm_campaign=profile | Attribute X profile visitors. |
 | Threads | Bio link | https://sparkling-standard.com/?utm_source=threads&utm_medium=organic_social&utm_campaign=profile | Attribute Threads bio-link visitors. |
 | Alignable | Business profile website field | https://sparkling-standard.com/commercial-cleaning/?utm_source=alignable&utm_medium=organic_social&utm_campaign=profile&utm_content=commercial | Attribute local-business-network commercial enquiries. |

@@ -5,11 +5,16 @@ does it and the account status is updated in `docs/marketing/PLATFORM-REGISTER.m
 creation, profile publishing and verification are all **pending** unless that register says
 otherwise; never mark an account created, verified or linked before the owner confirms it.
 
-**Status 2026-10-03:** the owner supplied six additional profile URLs (TikTok, Pinterest, Rumble,
-Gab, Parler, Locals) and they are now rendering in the Follow Us section
-(`docs/marketing/PLATFORM-REGISTER.md`). Account creation is complete for those six; **pasting the
-tracked website link into each profile is still an owner action** and is tracked separately below.
-Instagram and YouTube remain pending.
+**Status 2026-10-03:** eight profiles are integrated and live (Facebook, Nextdoor, TikTok,
+Pinterest, Rumble, Gab, Parler, Locals). The owner confirms the **basic tracked UTM website/bio
+links are placed** on all eight, so their registry entries are active (`pending: false`) and their
+tracked URLs are recorded below. **Instagram is undergoing verification** (do not mark verified or
+publish an unconfirmed URL). **YouTube creation is deferred** — temporarily blocked by new Google
+Workspace account eligibility, not abandoned; do not add paid services to work around it.
+
+**Immediate execution priority (owner direction):** film Hayli's founder introduction, produce the
+first cleaning videos and acquire local recurring customers. Account setup is no longer the
+bottleneck; production and local acquisition are.
 
 Authoritative status: `docs/marketing/PLATFORM-REGISTER.md`. Distribution plan:
 `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`. Content: `docs/marketing/CONTENT-OPERATING-SYSTEM.md`
@@ -20,13 +25,13 @@ and `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`. Tracked links: generated
 
 | Order | Platform | Current status | Role |
 | --- | --- | --- | --- |
-| 1 | Google Business Profile | **Created — verification pending** | Local discovery; reviews; high-intent search |
-| 2 | Instagram | **Pending — not created** | Primary content channel (Reels) |
-| 3 | TikTok | **Confirmed — account created 2026-10-03** | Primary content channel (short-form reach) |
-| 4 | YouTube | **Pending — not created** | Primary content channel (Shorts + founder/process long-form) |
-| — | Facebook | Confirmed | Local communication and community visibility |
-| — | Nextdoor | Confirmed | Neighborhood credibility and local posts |
-| — | Pinterest, Rumble, Gab, Parler, Locals | **Confirmed — accounts created 2026-10-03** | Adapted distribution of the same master content; not a separate production line |
+| 1 | Google Business Profile | **Created — verification in progress (2026-10-03)** | Local discovery; reviews; high-intent search |
+| 2 | Instagram | **Verification in progress (2026-10-03) — URL not published** | Primary content channel (Reels) |
+| 3 | TikTok | **Confirmed — account created; tracked bio link placed** | Primary content channel (short-form reach) |
+| 4 | YouTube | **Deferred — Google Workspace account eligibility (not abandoned)** | Primary content channel (Shorts + founder/process long-form) |
+| — | Facebook | Confirmed — tracked website link placed | Local communication and community visibility |
+| — | Nextdoor | Confirmed — tracked website link placed | Neighborhood credibility and local posts |
+| — | Pinterest, Rumble, Gab, Parler, Locals | **Confirmed — accounts created; tracked links placed (2026-10-03)** | Adapted distribution of the same master content; not a separate production line |
 
 ## Contact facts to keep identical everywhere (single source: `src/config/business.ts`)
 
@@ -66,76 +71,74 @@ Do **not** publish the URL or claim verification until Google confirms. Status:
       `business.reviews.submissionUrl` — never hand-build a review URL.
 - [ ] Record the verified status and (when the owner chooses to publish) the URL in the register.
 
-### Instagram (priority 2 — creation pending)
+### Instagram (priority 2 — verification in progress)
 
-- [ ] Create the account and switch it to a professional/business account; category "House
-      cleaning service".
-- [ ] Choose an available handle that matches the brand; record it only after it exists.
-- [ ] Profile photo: approved crest; name field: "Sparkling Standard Cleaning Co.".
-- [ ] Bio: premium, warm, service area and slogan — e.g. "Sparkling Standard Cleaning Co.
-      Cantonment & Pensacola · owner-operated · The Details Are Our Standard." No unapproved
-      claims (no "licensed/bonded/insured", no invented years or client counts).
-- [ ] Contact: business phone and email from `business.ts`; never a street address.
-- [ ] Website field: the tracked **Instagram → Bio link** (`instagram_profile`).
+- [x] Account exists and is undergoing verification (owner-confirmed 2026-10-03).
+- [ ] **Do not mark verified and do not publish a URL** until the owner supplies the verified
+      profile; it stays PENDING in `business.ts` and never renders.
+- [ ] When verification completes: confirm the professional/business account settings, approved
+      crest photo, consistent name, contact facts (no street address) and bio positioning.
+- [ ] Website field: the tracked **Instagram → Bio link** (`instagram_profile`, currently
+      prepared).
 - [ ] Story/link-sticker estimate pushes: tracked **Instagram → estimate** link
       (`instagram_estimate`).
 - [ ] Content: vertical 9:16 Reels (see the production system); captions on; highlights for real
       series ("Details", "Founder", "Reviews" only when genuine reviews exist).
-- [ ] Verification: complete phone/email verification; no purchase of verification.
-- [ ] Update `PLATFORM-REGISTER.md` with the real URL, then (with owner approval) add it to
+- [ ] Then update `PLATFORM-REGISTER.md` with the real URL and (with owner approval) add it to
       `business.socials` so it renders on the site.
 
-### TikTok (priority 3 — account created 2026-10-03)
+### TikTok (priority 3 — account created; tracked bio link placed)
 
 - [x] Account created: `https://www.tiktok.com/@sparkling_standard?lang=en` (owner-supplied).
+- [x] Tracked bio link placed (owner-confirmed 2026-10-03).
 - [ ] Confirm the profile photo (approved crest), display name and contact information.
 - [ ] Bio: short positioning plus service area; no unapproved claims.
-- [ ] Website field: paste the tracked TikTok bio link from the checklist below when the field is
-      available; otherwise direct viewers to the website in captions until it is.
 - [ ] Content: vertical 9:16; use the tracked TikTok detail-video link in descriptions where a
       link is placed.
 - [ ] Verification: complete whatever email/phone verification the platform requires.
 
-### YouTube (priority 4 — creation pending)
+### YouTube (priority 4 — deferred, not abandoned)
 
-- [ ] Create the channel (brand account owned by the business email), not a personal channel.
-- [ ] Channel identity: approved crest avatar, consistent name, description with the slogan and
-      service area.
-- [ ] Links section: the tracked **YouTube → channel link** (`youtube_profile`).
-- [ ] Video descriptions: use the tracked **YouTube → detail video** link (`youtube_detail_video`)
-      on marketing uploads; never invent a URL.
+- [ ] **Deferred:** channel creation is temporarily blocked by new Google Workspace account
+      eligibility. Revisit when eligible; do not purchase or add paid services to work around it.
+- [ ] When unblocked: create the brand channel owned by the business email (not personal);
+      approved crest avatar, consistent name, slogan and service area.
+- [ ] Links section: the tracked **YouTube → channel link** (`youtube_profile`, prepared).
+- [ ] Video descriptions: the tracked **YouTube → detail video** link (`youtube_detail_video`) on
+      marketing uploads; never invent a URL.
 - [ ] Content: vertical Shorts from the master short-form edit; a longer founder/process cut when
       available; 16:9 for long-form.
-- [ ] Verification: complete the platform's channel verification steps; never buy subscribers or
-      views.
-- [ ] Update `PLATFORM-REGISTER.md` with the real channel URL after creation.
+- [ ] Never buy subscribers or views.
 
-## Confirmed distribution accounts — tracked website links to paste
+## Confirmed placements — tracked website links (placed 2026-10-03)
 
-The six accounts below exist (owner-supplied 2026-10-03). Paste the exact tracked URL for each
-profile into its website field; the URLs are generated from `src/config/marketing-links.ts` and
-also listed in `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md`. Mark the corresponding registry
-`pending` flag `false` (and regenerate the docs) only after the owner confirms each paste.
+The owner confirms the basic tracked UTM links are placed on the eight existing profiles. Their
+registry entries are now **active** (`pending: false`). The URLs below are generated from
+`src/config/marketing-links.ts` and listed in `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md`; use
+this table as the record when auditing each profile.
 
-| Platform | Where to paste | Tracked website URL |
+| Platform | Placement | Tracked website URL |
 | --- | --- | --- |
-| TikTok | TikTok → Edit profile → Website | `https://sparkling-standard.com/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=profile` |
-| Pinterest | Pinterest business profile → Claim → Website | `https://sparkling-standard.com/?utm_source=pinterest&utm_medium=organic_social&utm_campaign=profile` |
-| Rumble | Rumble channel → About → Website | `https://sparkling-standard.com/?utm_source=rumble&utm_medium=organic_social&utm_campaign=profile` |
-| Gab | Gab profile → Website | `https://sparkling-standard.com/?utm_source=gab&utm_medium=organic_social&utm_campaign=profile` |
-| Parler | Parler profile → Website | `https://sparkling-standard.com/?utm_source=parler&utm_medium=organic_social&utm_campaign=profile` |
-| Locals | Locals profile → Website | `https://sparkling-standard.com/?utm_source=locals&utm_medium=organic_social&utm_campaign=profile` |
+| Facebook | Page website field | `https://sparkling-standard.com/?utm_source=facebook&utm_medium=organic_social&utm_campaign=profile` |
+| Nextdoor | Business page website field | `https://sparkling-standard.com/?utm_source=nextdoor&utm_medium=organic_social&utm_campaign=profile` |
+| TikTok | Edit profile → Website | `https://sparkling-standard.com/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=profile` |
+| Pinterest | Business profile → Claim → Website | `https://sparkling-standard.com/?utm_source=pinterest&utm_medium=organic_social&utm_campaign=profile` |
+| Rumble | Channel → About → Website | `https://sparkling-standard.com/?utm_source=rumble&utm_medium=organic_social&utm_campaign=profile` |
+| Gab | Profile → Website | `https://sparkling-standard.com/?utm_source=gab&utm_medium=organic_social&utm_campaign=profile` |
+| Parler | Profile → Website | `https://sparkling-standard.com/?utm_source=parler&utm_medium=organic_social&utm_campaign=profile` |
+| Locals | Profile → Website | `https://sparkling-standard.com/?utm_source=locals&utm_medium=organic_social&utm_campaign=profile` |
 
 Never add these UTMs to internal site navigation or to the outbound profile links on the website —
-they belong only on the inbound campaign links pasted into the platforms.
+they belong only on the inbound campaign links placed inside the platforms. Instagram, YouTube and
+GBP links remain **prepared, not placed**.
 
-### Facebook and Nextdoor (confirmed — no creation needed)
+### Facebook and Nextdoor (confirmed — tracked links placed)
 
+- [x] Tracked website links placed (owner-confirmed 2026-10-03): `facebook_profile`,
+      `nextdoor_profile`.
 - [ ] Keep contact details and the website field consistent with `business.ts`.
-- [ ] Facebook page website field: tracked **Facebook → profile** link (`facebook_profile`);
-      recurring community posts use `facebook_recurring`.
-- [ ] Nextdoor business page: tracked **Nextdoor → profile** link (`nextdoor_profile`);
-      recommendation/neighborhood posts use `nextdoor_recommendation`.
+- [ ] Recurring community posts use `facebook_recurring`; recommendation/neighborhood posts use
+      `nextdoor_recommendation`.
 - [ ] Local communication first: availability notes, helpful answers and genuine updates —
       not indiscriminate reposts of every video.
 

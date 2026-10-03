@@ -173,10 +173,10 @@ Truthful snapshot; the register in `docs/operations/PLATFORM-STATUS.md` is autho
   overflow.
 
 **Released:** the owner-authorized 2026-10-03 release set — `8b8dde4`, `03d6ba8`, `53a85aa`,
-`0f3c38c`, `5a4a024`, `7a51efa` and `cdc4971` — is **deployed**; `origin/main` = `cdc4971`; live
-acceptance checks passed (`docs/verification/VERIFICATION.md`), including the eight-profile Follow
-Us section. Any later local documentation follow-up stays unpublished until the owner authorizes
-another push.
+`0f3c38c`, `5a4a024`, `7a51efa`, `cdc4971`, `6ebc3fb` and `62a1a46` — is **deployed**;
+`origin/main` = `62a1a46`; live acceptance checks passed (`docs/verification/VERIFICATION.md`),
+including the eight-profile logo-only Follow Us section. Any later local documentation follow-up
+stays unpublished until the owner authorizes another push.
 
 **Pending (owner):** marketing launch actions M2–M7 in
 `docs/launch/OWNER-INPUT-REQUIRED.md` — confirm Google Business Profile verification, create the

@@ -101,7 +101,7 @@ owner confirmation.
 | Premium header lockup | Real Chromium at 320/390/768/1024/1280/1440 px; screenshots inspected | Crest + script “Sparkling” + spaced “STANDARD” + “Cleaning Co.” + tagline; mobile drops the tagline to stay legible; no overflow; `/estimate/` intro spacing reduced |
 | Header/nav contract | `npm run test:browser` | 7/7 header-about tests (fit/alignment at four widths, brand identity, mobile lockup, About page) |
 | Platform registry | Unit/config + browser tests | 19 platforms prepared; only confirmed profiles render; pending platforms never appear. **Superseded (2026-10-03):** eight confirmed profiles now render — see the social Follow Us section below |
-| UTM expansion | `npm run marketing:links` + `npm run marketing:verify` | 51 tracked inbound links (23 ready, 28 prepared and not yet placed — refreshed 2026-10-03); all committed QR assets decode-verified; docs byte-identical on check |
+| UTM expansion | `npm run marketing:links` + `npm run marketing:verify` | 51 tracked inbound links (29 ready, 22 prepared — refreshed 2026-10-03); all committed QR assets decode-verified; docs byte-identical on check |
 | GA4 mapping | Documentation | Event→key-event mapping added; website **generation** verified. 2026-10-03 discovery: the GTM container had **zero tags**, so GA4 receipt was never possible. Import files + exact dashboard steps prepared (`docs/analytics/GTM-CONTAINER-SETUP.md`). **Superseded:** the owner later published GTM Version 3 and GA4 receipt is now owner-confirmed — see the GA4 section below |
 | Lead notification format | `tests/lead-notification.test.ts` (11 cases) + `tests/api-verification.test.ts` | Ordered sections, exact figures, verbatim notes, mismatch ACTION REQUIRED, raw codes separated, no credentials/origin |
 | Full suites | `npm run check`, `npm test` (252), `npm run test:browser` (64), `npm run validate`, `pending`, `audit:facts`, `smoke` | All pass |
@@ -160,14 +160,16 @@ delivered are unchanged; the corrections apply to future attribution and notific
 
 ## Release status — deployed (2026-10-03)
 
-- **Owner-authorized release deployed:** `origin/main` = **`cdc4971`** (2026-10-03; GitHub Actions
+- **Owner-authorized release deployed:** `origin/main` = **`62a1a46`** (2026-10-03; GitHub Actions
   `validate` runs green; Cloudflare Pages served each build).
 - The deployed commit set: `8b8dde4` (GTM import package + Brand A2), `03d6ba8` (UTM counts),
   `53a85aa` (GTM doc cleanup), `0f3c38c` (attribution repair + first/latest labels), `5a4a024`
-  (marketing documentation consolidation), `7a51efa` (release closeout documentation) and
-  `cdc4971` (six-profile social integration + Follow Us upgrade).
+  (marketing documentation consolidation), `7a51efa` (release closeout documentation),
+  `cdc4971` (six-profile social integration + Follow Us upgrade), `6ebc3fb` (social deployment
+  closeout) and `62a1a46` (compact logo-only Follow Us redesign).
 - The earlier five-commit build (`5a4a024`) removed `/brand-preview/` (now 404) and deployed the
-  repaired attribution logic; `cdc4971` added the eight confirmed Follow Us profiles.
+  repaired attribution logic; `cdc4971` added the eight confirmed Follow Us profiles; `62a1a46`
+  replaced the pill links with 52px circular logo-only buttons (verified live at 1280/390/320).
 - **Limitations:** the GA4 account results are owner-confirmed external verification, not
   repository tests. The attribution fix cannot retroactively repair previously clobbered `latest`
   records; it applies to future attribution (existing delivered emails are unchanged). Any
@@ -201,7 +203,8 @@ HTTP 200 on 2026-10-03 (destination reachable; not independent identity verifica
 | Official brand marks | Browser test + screenshot inspection | Every confirmed profile uses a real mark, never a monogram placeholder; Nextdoor is the official house-"n" favicon geometry in official brand green (`#1B8751`); Gab, Parler and Locals use their official assets (`src/components/SocialIcon.astro` records each source); no counterfeit hand-drawn logos |
 | UTMs | Browser test | Outbound profile URLs never carry UTM parameters |
 | Responsive layout (pill design, later superseded) | Screenshots at 1280/768/390/320 + browser tests | 4-column grid on tablet/desktop (two tidy rows), 2-column on phones, single column under 26rem; zero horizontal overflow at every width; no label truncation at 320px; ≥44px touch targets. **Superseded by the logo-only redesign below** |
-| Locals link registry | `npm run marketing:links` + `npm run marketing:verify` | Locals profile link generated from the registry (`?utm_source=locals&utm_medium=organic_social&utm_campaign=profile`); registry now 51 links (23 active, 28 prepared); documents regenerated and byte-identical on check; QR assets unchanged |
+| Locals link registry | `npm run marketing:links` + `npm run marketing:verify` | Locals profile link generated from the registry (`?utm_source=locals&utm_medium=organic_social&utm_campaign=profile`); registry now 51 links (29 active, 22 prepared); documents regenerated and byte-identical on check; QR assets unchanged |
+| Tracked-link placement reconciliation (owner-confirmed 2026-10-03) | Registry flags + `npm run marketing:verify` | The owner confirms the basic tracked UTM website/bio links are placed on the eight live profiles (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals); their registry entries flipped to active (`pending: false`) and the generated docs regenerated. Instagram, YouTube, GBP and the other platforms remain prepared, not placed — account existence, placement and verification stay distinct |
 | Scope safety | Git diff + full suites | No changes to GA4/GTM, consent, estimator pricing, customer forms, reservations or payment systems; `functions/` untouched |
 | Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (78 pass), `npm run build` (21 pages), `npm run validate`, `pending`, `smoke`, `testimonials`, `audit:facts` | All pass |
 
