@@ -109,6 +109,19 @@ owner confirmation.
 One clearly labeled production format-review submission is sent after deploy; inbox receipt awaits
 owner confirmation.
 
+## Verified — header typography, advance reservations and gift certificates (2026-10-03)
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Two wordmark treatments | Real Chromium at 320–1440 px + `/brand-preview/`; screenshots inspected | Crest unchanged; `romantic-script` (default) and `soft-serif` both polished and cohesive; true Fraunces italic now self-hosted; no overflow |
+| 60-day advance window | Browser test (attributes + out-of-window rejection) and server test (+90-day date discarded with a note) | Exactly 60 days client-side; server never forwards an out-of-window date |
+| Reservation tracking | Documentation + ledger CSV | Six statuses, unique references, Google Sheet setup, gift-redemption accounting |
+| Gift page + request flow | Browser tests (desktop/mobile) | Request mode only; honeypot trap works; no checkout attempt; success copy states no payment was taken |
+| Redemption + checkout-return pages | Browser tests | Redeem page echoes a valid code and refuses malformed refs with zero API calls; success page is noindex and never claims issuance |
+| Certificate artwork + QR | `npm run gift:certificate --sample` + screenshot + jsQR self-check | Printable certificate renders correctly; QR decodes to the exact redeem URL; `gift-out/` git-ignored |
+| Stripe security | Unit tests (signature valid/tampered/wrong secret/expired/multi-signature; amount allowlist; disabled/unconfigured/paid-without-notifier gates) | All pass; paid purchase with no notifier returns 500 so Stripe retries |
+| Full suites | `npm run check`, `npm test` (274), `npm run test:browser` (69), `npm run validate`, `pending`, `audit:facts`, `smoke` | All pass |
+
 ## Pending (cannot be verified in this environment — owner or tooling required)
 
 | Item | Why pending | How to verify |

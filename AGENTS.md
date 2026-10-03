@@ -182,6 +182,8 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`) | `docs/verification/VERIFICATION.md` |
 | Promotions, bundles, Founding-10 (all disabled) | `src/lib/estimate/promotions.ts` + `src/config/owner-pricing.ts` | `docs/launch/PROMOTION-PROPOSALS.md` |
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
+| Reservation window, statuses, ledger | `src/config/scheduling.ts` + `src/scripts/estimate-wizard.ts` | `docs/operations/RESERVATION-TRACKING.md` |
+| Gift certificates (sales disabled pending approval) | `src/config/gift-certificates.ts`, `src/lib/gift/`, `src/pages/gift-certificates/`, `functions/api/gift-checkout.ts`, `functions/api/stripe-webhook.ts` | `docs/operations/GIFT-CERTIFICATES.md`, `docs/operations/COMMUNICATION-TEMPLATES.md` |
 | Platform accounts, status, owner actions | `src/config/business.ts` `socials` + `src/components/SocialLinks.astro` | `docs/marketing/PLATFORM-REGISTER.md`, `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` |
 | Lead capture, notification fields, provider relay | `functions/api/lead.ts`, `src/lib/forms/` | `docs/verification/VERIFICATION.md` |
 | Services, FAQs, checklists, page copy | `src/content/`, `src/content/site/` | `docs/CONTENT-GUIDE.md` |
@@ -316,6 +318,18 @@ collections are intentionally empty — not errors.
   complete platform inventory (19 platforms) is prepared in `business.socials`, rendered only when
   a confirmed URL exists, and documented in `docs/marketing/PLATFORM-REGISTER.md`. Google Business
   Profile is created with verification pending — never mark it verified or publish its URL early.
+- **Header wordmark options (2026-10-03):** the crest is unchanged; two typographic treatments
+  are prepared in `src/components/Logo.astro` (`DEFAULT_WORDMARK_TREATMENT` — one-line switch):
+  `soft-serif` (Fraunces only) and `romantic-script` (Great Vibes/Parisienne + Fraunces, default).
+  The comparison page `/brand-preview/` is noindex and must be removed after the owner chooses.
+- **Advance reservations and gift certificates (2026-10-03):** requests are bounded to a
+  configurable 60-day window (`src/config/scheduling.ts`) with no priority tier; reservation
+  statuses and the private ledger workflow live in `docs/operations/RESERVATION-TRACKING.md`.
+  Gift certificates are live in **request mode only** (`enabled: false`): Stripe Checkout and the
+  signature-verified webhook exist but are dormant until the owner approves terms/denominations
+  and configures the secrets; the printable certificate tool is `npm run gift:certificate`
+  (output in git-ignored `gift-out/`). Never enable sales or advertise amounts without the written
+  owner decisions in `docs/launch/OWNER-INPUT-REQUIRED.md` (G1–G5).
 - **Lead-notification format (2026-10-02):** owner emails are built by
   `src/lib/forms/lead-notification.ts` (ordered sections, customer email as reply-to, mismatch
   action warning, raw technical codes separated). Format and testing:
