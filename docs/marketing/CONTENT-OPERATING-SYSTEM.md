@@ -22,14 +22,15 @@ placement's tracked link is in `WHERE-TO-PASTE-UTM-LINKS.md`.
 | --- | --- | --- |
 | **Google Business Profile** | High-intent discovery, local trust, reviews | **Created — verification pending** (highest local priority) |
 | **Google organic (site)** | Owning pages for every service cluster | #1 foundation |
-| **Instagram** | Primary content channel — visual brand, reels, founder, transformations | Primary content |
-| **TikTok** | Primary content channel — reach, founder journey, satisfying detail videos | Primary content |
-| **YouTube** | Primary content channel — Search/Shorts discovery plus founder/process long-form | Primary content |
+| **Instagram** | Primary content channel — visual brand, reels, founder, transformations | Primary content — account pending |
+| **TikTok** | Primary content channel — reach, founder journey, satisfying detail videos | Primary content — created 2026-10-03 |
+| **YouTube** | Primary content channel — Search/Shorts discovery plus founder/process long-form | Primary content — account pending |
 | **Facebook** | Confirmed local platform — communities, families, genuine local updates, referrals | High (local communication) |
 | **Nextdoor** | Confirmed local platform — neighborhood credibility, recommendations | High (cheap, local) |
 | **Email/SMS** | Follow-up, recurring, quote nurturing | High (owned audience) |
 | **Direct outreach** | Realtors, property managers, Airbnb hosts, churches, commercial | Highest immediate ROI |
-| **Pinterest, Rumble, X, Threads, Gab, Parler** | Adapted distribution of primary-channel assets | Low effort |
+| **Pinterest, Rumble, Gab, Parler, Locals** | Adapted distribution of primary-channel assets (all created 2026-10-03); Locals doubles as a secondary community channel | Low effort |
+| **X, Threads** | Adapted distribution when the accounts are supplied | Low effort |
 | **LinkedIn, Alignable** | Secondary — commercial/property relationships | Low effort |
 | **Paid media** | Not used — zero additional spending without explicit owner authorization | Not authorized |
 

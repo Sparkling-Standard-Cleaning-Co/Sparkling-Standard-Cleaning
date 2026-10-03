@@ -100,8 +100,8 @@ owner confirmation.
 | --- | --- | --- |
 | Premium header lockup | Real Chromium at 320/390/768/1024/1280/1440 px; screenshots inspected | Crest + script “Sparkling” + spaced “STANDARD” + “Cleaning Co.” + tagline; mobile drops the tagline to stay legible; no overflow; `/estimate/` intro spacing reduced |
 | Header/nav contract | `npm run test:browser` | 7/7 header-about tests (fit/alignment at four widths, brand identity, mobile lockup, About page) |
-| Platform registry | Unit/config + browser tests | 19 platforms prepared; only the two confirmed profiles render; pending platforms never appear; monogram tiles for platforms without official glyphs |
-| UTM expansion | `npm run marketing:links` + `npm run marketing:verify` | 50 tracked inbound links (23 ready, 27 prepared and not yet placed — refreshed 2026-10-03); all committed QR assets decode-verified; docs byte-identical on check |
+| Platform registry | Unit/config + browser tests | 19 platforms prepared; only confirmed profiles render; pending platforms never appear. **Superseded (2026-10-03):** eight confirmed profiles now render — see the social Follow Us section below |
+| UTM expansion | `npm run marketing:links` + `npm run marketing:verify` | 51 tracked inbound links (23 ready, 28 prepared and not yet placed — refreshed 2026-10-03); all committed QR assets decode-verified; docs byte-identical on check |
 | GA4 mapping | Documentation | Event→key-event mapping added; website **generation** verified. 2026-10-03 discovery: the GTM container had **zero tags**, so GA4 receipt was never possible. Import files + exact dashboard steps prepared (`docs/analytics/GTM-CONTAINER-SETUP.md`). **Superseded:** the owner later published GTM Version 3 and GA4 receipt is now owner-confirmed — see the GA4 section below |
 | Lead notification format | `tests/lead-notification.test.ts` (11 cases) + `tests/api-verification.test.ts` | Ordered sections, exact figures, verbatim notes, mismatch ACTION REQUIRED, raw codes separated, no credentials/origin |
 | Full suites | `npm run check`, `npm test` (252), `npm run test:browser` (64), `npm run validate`, `pending`, `audit:facts`, `smoke` | All pass |
@@ -187,6 +187,22 @@ delivered are unchanged; the corrections apply to future attribution and notific
 
 One labeled acceptance inquiry was sent (no repeats). Inbox confirmation by the owner remains the
 final external check.
+
+## Verified — six new social profiles and the Follow Us upgrade (2026-10-03)
+
+Owner-supplied profiles added: TikTok, Pinterest, Rumble, Gab, Parler and Locals (plus the
+existing Facebook and Nextdoor) — **eight confirmed profiles render**. Each supplied URL returned
+HTTP 200 on 2026-10-03 (destination reachable; not independent identity verification).
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Eight confirmed profiles | `tests/browser/social-links.test.mjs` (4 cases) | Correct labels, exact URLs, `target="_blank"`, `rel="noopener noreferrer"`, accessible new-tab text; pending platforms (GBP, Bing Places, Yelp, Instagram, YouTube, X, Threads, LinkedIn, Alignable, Reddit) never render |
+| Official brand marks | Browser test + screenshot inspection | Every confirmed profile uses a real mark, never a monogram placeholder; Nextdoor is the official house-"n" favicon geometry in official brand green (`#1B8751`); Gab, Parler and Locals use their official assets (`src/components/SocialIcon.astro` records each source); no counterfeit hand-drawn logos |
+| UTMs | Browser test | Outbound profile URLs never carry UTM parameters |
+| Responsive layout | Screenshots at 1280/768/390/320 + browser tests | 4-column grid on tablet/desktop (two tidy rows), 2-column on phones, single column under 26rem; zero horizontal overflow at every width; no label truncation at 320px; ≥44px touch targets |
+| Locals link registry | `npm run marketing:links` + `npm run marketing:verify` | Locals profile link generated from the registry (`?utm_source=locals&utm_medium=organic_social&utm_campaign=profile`); registry now 51 links (23 active, 28 prepared); documents regenerated and byte-identical on check; QR assets unchanged |
+| Scope safety | Git diff + full suites | No changes to GA4/GTM, consent, estimator pricing, customer forms, reservations or payment systems; `functions/` untouched |
+| Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (78 pass), `npm run build` (21 pages), `npm run validate`, `pending`, `smoke`, `testimonials`, `audit:facts` | All pass |
 
 ## Pending (cannot be verified in this environment — owner or tooling required)
 

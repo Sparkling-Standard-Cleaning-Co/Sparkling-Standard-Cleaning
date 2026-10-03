@@ -23,7 +23,7 @@ Source of truth: `src/config/marketing-links.ts`. Site: https://sparkling-standa
 | Nextdoor | Business page website field | https://sparkling-standard.com/?utm_source=nextdoor&utm_medium=organic_social&utm_campaign=profile | Attribute Nextdoor neighborhood traffic. |
 | Print material | Business card website line | https://sparkling-standard.com/?utm_source=business_card&utm_medium=print&utm_campaign=business_card&utm_content=website_line | Track typed card visits. |
 
-## Pending — prepared, do NOT publish yet (27)
+## Pending — prepared, do NOT publish yet (28)
 
 These URLs are prepared for when the public profiles exist. Do **not** paste them anywhere yet.
 
@@ -42,6 +42,7 @@ These URLs are prepared for when the public profiles exist. Do **not** paste the
 | Rumble | Channel about link | https://sparkling-standard.com/?utm_source=rumble&utm_medium=organic_social&utm_campaign=profile | Attribute Rumble channel visitors. |
 | Gab | Profile website field | https://sparkling-standard.com/?utm_source=gab&utm_medium=organic_social&utm_campaign=profile | Attribute Gab profile visitors. |
 | Parler | Profile website field | https://sparkling-standard.com/?utm_source=parler&utm_medium=organic_social&utm_campaign=profile | Attribute Parler profile visitors. |
+| Locals | Profile website field | https://sparkling-standard.com/?utm_source=locals&utm_medium=organic_social&utm_campaign=profile | Attribute Locals profile visitors. |
 | X | Profile bio link | https://sparkling-standard.com/?utm_source=x&utm_medium=organic_social&utm_campaign=profile | Attribute X profile visitors. |
 | Threads | Bio link | https://sparkling-standard.com/?utm_source=threads&utm_medium=organic_social&utm_campaign=profile | Attribute Threads bio-link visitors. |
 | Alignable | Business profile website field | https://sparkling-standard.com/commercial-cleaning/?utm_source=alignable&utm_medium=organic_social&utm_campaign=profile&utm_content=commercial | Attribute local-business-network commercial enquiries. |

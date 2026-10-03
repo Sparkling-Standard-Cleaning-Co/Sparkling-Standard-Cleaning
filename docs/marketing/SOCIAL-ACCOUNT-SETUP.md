@@ -1,9 +1,15 @@
-# Social account setup — owner checklist (pending)
+# Social account setup — owner checklist
 
 Owner-action guide for establishing the priority accounts. **Nothing here is done until the owner
 does it and the account status is updated in `docs/marketing/PLATFORM-REGISTER.md`.** Account
 creation, profile publishing and verification are all **pending** unless that register says
 otherwise; never mark an account created, verified or linked before the owner confirms it.
+
+**Status 2026-10-03:** the owner supplied six additional profile URLs (TikTok, Pinterest, Rumble,
+Gab, Parler, Locals) and they are now rendering in the Follow Us section
+(`docs/marketing/PLATFORM-REGISTER.md`). Account creation is complete for those six; **pasting the
+tracked website link into each profile is still an owner action** and is tracked separately below.
+Instagram and YouTube remain pending.
 
 Authoritative status: `docs/marketing/PLATFORM-REGISTER.md`. Distribution plan:
 `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`. Content: `docs/marketing/CONTENT-OPERATING-SYSTEM.md`
@@ -15,11 +21,12 @@ and `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`. Tracked links: generated
 | Order | Platform | Current status | Role |
 | --- | --- | --- | --- |
 | 1 | Google Business Profile | **Created — verification pending** | Local discovery; reviews; high-intent search |
-| 2 | Instagram | **Pending** | Primary content channel (Reels) |
-| 3 | TikTok | **Pending** | Primary content channel (short-form reach) |
-| 4 | YouTube | **Pending** | Primary content channel (Shorts + founder/process long-form) |
+| 2 | Instagram | **Pending — not created** | Primary content channel (Reels) |
+| 3 | TikTok | **Confirmed — account created 2026-10-03** | Primary content channel (short-form reach) |
+| 4 | YouTube | **Pending — not created** | Primary content channel (Shorts + founder/process long-form) |
 | — | Facebook | Confirmed | Local communication and community visibility |
 | — | Nextdoor | Confirmed | Neighborhood credibility and local posts |
+| — | Pinterest, Rumble, Gab, Parler, Locals | **Confirmed — accounts created 2026-10-03** | Adapted distribution of the same master content; not a separate production line |
 
 ## Contact facts to keep identical everywhere (single source: `src/config/business.ts`)
 
@@ -78,18 +85,16 @@ Do **not** publish the URL or claim verification until Google confirms. Status:
 - [ ] Update `PLATFORM-REGISTER.md` with the real URL, then (with owner approval) add it to
       `business.socials` so it renders on the site.
 
-### TikTok (priority 3 — creation pending)
+### TikTok (priority 3 — account created 2026-10-03)
 
-- [ ] Create the account and switch to a business account if the business tools are wanted.
-- [ ] Choose an available handle matching the brand; record it only after it exists.
-- [ ] Profile photo: approved crest; consistent name and contact information.
+- [x] Account created: `https://www.tiktok.com/@sparkling_standard?lang=en` (owner-supplied).
+- [ ] Confirm the profile photo (approved crest), display name and contact information.
 - [ ] Bio: short positioning plus service area; no unapproved claims.
-- [ ] Website field: the tracked **TikTok → Bio link** (`tiktok_profile`) when the field is
-      available on the account; otherwise direct viewers to the website in captions until it is.
-- [ ] Content: vertical 9:16; use the tracked **TikTok → detail video** link (`tiktok_detail_video`)
-      in descriptions where a link is placed.
+- [ ] Website field: paste the tracked TikTok bio link from the checklist below when the field is
+      available; otherwise direct viewers to the website in captions until it is.
+- [ ] Content: vertical 9:16; use the tracked TikTok detail-video link in descriptions where a
+      link is placed.
 - [ ] Verification: complete whatever email/phone verification the platform requires.
-- [ ] Update `PLATFORM-REGISTER.md` with the real URL after creation; do not publish early.
 
 ### YouTube (priority 4 — creation pending)
 
@@ -104,6 +109,25 @@ Do **not** publish the URL or claim verification until Google confirms. Status:
 - [ ] Verification: complete the platform's channel verification steps; never buy subscribers or
       views.
 - [ ] Update `PLATFORM-REGISTER.md` with the real channel URL after creation.
+
+## Confirmed distribution accounts — tracked website links to paste
+
+The six accounts below exist (owner-supplied 2026-10-03). Paste the exact tracked URL for each
+profile into its website field; the URLs are generated from `src/config/marketing-links.ts` and
+also listed in `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md`. Mark the corresponding registry
+`pending` flag `false` (and regenerate the docs) only after the owner confirms each paste.
+
+| Platform | Where to paste | Tracked website URL |
+| --- | --- | --- |
+| TikTok | TikTok → Edit profile → Website | `https://sparkling-standard.com/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=profile` |
+| Pinterest | Pinterest business profile → Claim → Website | `https://sparkling-standard.com/?utm_source=pinterest&utm_medium=organic_social&utm_campaign=profile` |
+| Rumble | Rumble channel → About → Website | `https://sparkling-standard.com/?utm_source=rumble&utm_medium=organic_social&utm_campaign=profile` |
+| Gab | Gab profile → Website | `https://sparkling-standard.com/?utm_source=gab&utm_medium=organic_social&utm_campaign=profile` |
+| Parler | Parler profile → Website | `https://sparkling-standard.com/?utm_source=parler&utm_medium=organic_social&utm_campaign=profile` |
+| Locals | Locals profile → Website | `https://sparkling-standard.com/?utm_source=locals&utm_medium=organic_social&utm_campaign=profile` |
+
+Never add these UTMs to internal site navigation or to the outbound profile links on the website —
+they belong only on the inbound campaign links pasted into the platforms.
 
 ### Facebook and Nextdoor (confirmed — no creation needed)
 

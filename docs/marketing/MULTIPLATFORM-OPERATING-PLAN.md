@@ -40,9 +40,9 @@ weekly client is worth more than a viral clip that produces none.
 
 | Tier | Platforms | Why | Effort |
 | --- | --- | --- | --- |
-| **1 — Primary content** | Instagram, TikTok, YouTube | The three channels where short-form cleaning content is discovered and shared. One filmed detail can be cut for all three. | One shoot → three publications |
+| **1 — Primary content** | Instagram (pending), TikTok, YouTube (pending) | The three channels where short-form cleaning content is discovered and shared. One filmed detail can be cut for all three. TikTok was created 2026-10-03; Instagram and YouTube remain pending. | One shoot → three publications |
 | **1 — Local acquisition** | Google Business Profile (verification pending), Facebook, Nextdoor, the website's estimate flow, direct outreach | Where Pensacola/Cantonment homeowners actually look, ask and refer. Google Business Profile receives authentic photos, accurate services, updates and genuine reviews once verification is confirmed. | Highest care |
-| **2 — Adapted distribution** | Pinterest, Rumble, X, Threads, Gab, Parler | Adapted reposts of Tier-1 assets. No separate production. | Minutes per post |
+| **2 — Adapted distribution** | Pinterest, Rumble, Gab, Parler, Locals (all created 2026-10-03), plus X and Threads when supplied | Adapted reposts of Tier-1 assets. Locals is a secondary distribution/community channel for the same master content — never a separate production line. No separate production. | Minutes per post |
 | **3 — Professional** | LinkedIn, Alignable | Commercial, property-manager and B2B relationships. | Weekly touch |
 | **4 — Directories & community** | Yelp, Bing Places, Reddit | Citations/trust plus genuine local conversation; Bing Places imports from Google Business after verification. | Setup + occasional |
 | **Paid** | Not used | Zero-additional-spending preference. | — |
@@ -111,7 +111,7 @@ until the owner confirms it.
 | Step | Action |
 | --- | --- |
 | 1 | Confirm the Google Business Profile verification result (pending); do not claim verification early. |
-| 2 | Create the priority content accounts (Instagram, TikTok, YouTube) with the approved branding and tracked website links; update the register as each exists. |
+| 2 | Priority content accounts: TikTok is created (2026-10-03); Instagram and YouTube remain to be created. Paste each account's tracked website link from `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`; the six confirmed distribution accounts (TikTok, Pinterest, Rumble, Gab, Parler, Locals) only need their tracked links pasted. |
 | 3 | Keep Facebook and Nextdoor contact details and tracked links consistent; prepare a genuine welcome/local update. |
 | 4 | Film the founder introduction (long + short edit) and the first 2–3 detail clips. |
 | 5 | Publish the opening content across the three primary channels; post the local update to Facebook/Nextdoor. |

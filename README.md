@@ -16,7 +16,8 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
 
 - **Live.** `https://sparkling-standard.com` is deployed from GitHub `main` via Cloudflare Pages.
   Operational and owner-confirmed: lead delivery in all four funnels, MapMap geocoding/routing,
-  SMS, Facebook + Nextdoor profiles, and **GA4 analytics** (`GTM-KSQ26HMG` / `G-LG222LQRQ2` —
+  SMS, eight confirmed social profiles (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab,
+  Parler, Locals), and **GA4 analytics** (`GTM-KSQ26HMG` / `G-LG222LQRQ2` —
   page views, `estimate_start` and all three inquiry key events verified; Enhanced Measurement
   form interactions disabled).
 - **Release status:** the 2026-10-03 release (GTM import package + Brand A2, UTM count correction,
@@ -24,10 +25,12 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
   `5a4a024`, owner-authorized, live acceptance checks passed. See
   `docs/verification/VERIFICATION.md`.
 - **Remaining owner items:** formal launch checklist (legal entity spelling, insurance/bonding/
-  licensing claims, genuine review link, final cancellation percentages), priority social account
-  creation (Instagram, TikTok, YouTube), Google Business Profile verification, genuine photography
-  and reviews. See `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals M2–M7; M1 — the
-  software release — was deployed 2026-10-03).
+  licensing claims, genuine review link, final cancellation percentages), Instagram + YouTube
+  account creation, pasting the confirmed profiles' tracked website links, Google Business Profile
+  verification, genuine photography and reviews. Eight confirmed profiles render in the Follow Us
+  section (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals). See
+  `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals M2–M7; M1 — the software release —
+  was deployed 2026-10-03).
 - **We are now in the marketing phase.** Two growth engines (audience growth vs. local customer
   acquisition), the proposed "30 Days. 30 Details." content plan and the 30-day launch schedule
   live under `docs/marketing/`.
@@ -123,7 +126,7 @@ All optional for local development; all documented in `.env.example`.
 
 - Campaign links and QR codes generate from `src/config/marketing-links.ts`
   (`npm run marketing:links`); every QR is independently decode-verified. Current registry:
-  50 inbound links (23 ready, 27 prepared) across the platform inventory.
+  51 inbound links (23 ready, 28 prepared) across the platform inventory.
 - Strategy and priorities: `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` (two growth engines:
   audience growth vs. local customer acquisition).
 - Content: `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (pillars/roles) and

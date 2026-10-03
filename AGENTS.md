@@ -80,8 +80,9 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   with the private `TRAVEL_ORIGIN` configured in Cloudflare; Web3Forms lead delivery (owner-
   confirmed); Cloudflare Turnstile optional; **GA4 analytics owner-confirmed operational**
   (`GTM-KSQ26HMG` / `G-LG222LQRQ2`, GTM Version 3 published, all three inquiry key events
-  verified); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Facebook + Nextdoor
-  profiles confirmed; owner-approved 2026-10-02 favicon/PWA icon kit installed.
+  verified); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); eight confirmed
+  social profiles rendering (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals);
+  owner-approved 2026-10-02 favicon/PWA icon kit installed.
 - **Release status:** the five-commit release (`8b8dde4`, `03d6ba8`, `53a85aa`, `0f3c38c`, `5a4a024`)
   was owner-authorized and **deployed to production on 2026-10-03** (`origin/main` = `5a4a024`);
   live acceptance checks passed (see `docs/verification/VERIFICATION.md`). Any new local work —
@@ -330,8 +331,9 @@ collections are intentionally empty — not errors.
 - **Operational:** production site and deploy pipeline, estimator (GPS + manual + street-level
   pin confirmation for streets the provider only knows by name), MapMap geocode and routing,
   Web3Forms delivery, consent-gated GTM container installation with verified website event
-  generation, SMS, Facebook + Nextdoor profiles, approved favicon kit, sitemap/robots, quote
-  verification and owner notification.
+  generation, SMS, eight confirmed social profiles (Facebook, Nextdoor, TikTok, Pinterest,
+  Rumble, Gab, Parler, Locals), approved favicon kit, sitemap/robots, quote verification and owner
+  notification.
 - **Address reliability (2026-10-02):** state matching parses both full names and USPS codes;
   partially typed street names match by safe prefix; same-state results rank by proximity to the
   public Pensacola centre; provider alternates include suffix expansion and a house-numberless
@@ -342,6 +344,13 @@ collections are intentionally empty — not errors.
   complete platform inventory (19 platforms) is prepared in `business.socials`, rendered only when
   a confirmed URL exists, and documented in `docs/marketing/PLATFORM-REGISTER.md`. Google Business
   Profile is created with verification pending — never mark it verified or publish its URL early.
+- **Social profiles + Follow Us icons (2026-10-03):** the owner supplied six additional profile
+  URLs (TikTok, Pinterest, Rumble, Gab, Parler, Locals) — eight confirmed profiles render in the
+  Follow Us section (2-column mobile grid, 4-column tablet/desktop, single column under 26rem).
+  Icons use official marks, including Nextdoor's house-"n" favicon, the official Gab and Parler
+  marks and the official Locals logo (`src/components/SocialIcon.astro` documents each source).
+  Instagram and YouTube remain pending; never render a PENDING platform. Tracked profile links
+  and the paste checklist: `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
 - **Brand A2 selected (2026-10-03):** the owner chose the romantic-script wordmark — Great Vibes
   "Sparkling" + spaced serif "STANDARD", existing gold S crest, sparkles and pink blossom.
   `DEFAULT_WORDMARK_TREATMENT`/`DEFAULT_WORDMARK_SCRIPT` in `src/components/Logo.astro` already
@@ -384,8 +393,8 @@ collections are intentionally empty — not errors.
   job, and always fails closed without owner-approved terms. Financial review:
   `docs/launch/PROMOTION-PROPOSALS.md`; regenerate with `npm run promotions:impact`.
 - **Pending owner input:** legal entity spelling/suffix, insurance/bonding/licensing claims, review
-  profile/submission links, priority social account creation (Instagram, TikTok, YouTube),
-  Umami website ID, final cancellation percentages, marketing-launch approvals (M2–M7; M1 deployed
-  2026-10-03) and any marketing claim not yet supplied.
+  profile/submission links, Instagram + YouTube account creation, pasting the confirmed profiles'
+  tracked website links, Umami website ID, final cancellation percentages, marketing-launch
+  approvals (M2–M7; M1 deployed 2026-10-03) and any marketing claim not yet supplied.
 - Current platform details: `docs/operations/PLATFORM-STATUS.md`. Owner checklist:
   `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals are grouped there as M2–M7).

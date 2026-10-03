@@ -143,7 +143,7 @@
 - Purpose: Track scans from a printed gift card that leads to the gift-certificate page.
 
 
-## Not yet — waiting on profiles or final domain (27)
+## Not yet — waiting on profiles or final domain (28)
 
 ### Google Business Profile — Business profile → website field
 
@@ -209,6 +209,11 @@
 
 - Do NOT paste yet: Attribute Parler profile visitors.
 - Prepared link: https://sparkling-standard.com/?utm_source=parler&utm_medium=organic_social&utm_campaign=profile
+
+### Locals — Profile website field
+
+- Do NOT paste yet: Attribute Locals profile visitors.
+- Prepared link: https://sparkling-standard.com/?utm_source=locals&utm_medium=organic_social&utm_campaign=profile
 
 ### X — Profile bio link
 

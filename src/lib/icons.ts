@@ -57,4 +57,5 @@ export type SocialName =
   | 'reddit'
   | 'gab'
   | 'parler'
+  | 'locals'
   | 'alignable';

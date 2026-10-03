@@ -188,29 +188,33 @@ export const business = {
   },
 
   // ── Social profiles — ONLY confirmed, owner-supplied URLs ─────────────────
-  // Confirmed 2026-10-02 (owner): Facebook + Nextdoor. Google Business Profile
-  // is CREATED but verification is still processing and it is not publicly
-  // visible, so its URL stays PENDING. Every other platform stays PENDING until
-  // the owner supplies and verifies its real profile URL; the Follow Us section
-  // never renders a PENDING platform and never invents a handle. Adding a
-  // platform later means editing only this block (the platform register is
-  // docs/marketing/PLATFORM-REGISTER.md).
+  // Confirmed 2026-10-02 (owner): Facebook + Nextdoor. Confirmed 2026-10-03
+  // (owner-supplied, reachable; not independently authenticated): TikTok,
+  // Pinterest, Rumble, Gab, Parler and Locals. Google Business Profile is
+  // CREATED but verification is still processing and it is not publicly
+  // visible, so its URL stays PENDING. Instagram, YouTube and every other
+  // platform stay PENDING until the owner supplies a real profile URL; the
+  // Follow Us section never renders a PENDING platform and never invents a
+  // handle. Adding a platform later means editing only this block (the platform
+  // register is docs/marketing/PLATFORM-REGISTER.md).
   socials: {
     // Local discovery
     googleProfile: PENDING as Fact<string>,
     bingPlaces: PENDING as Fact<string>,
+    // Confirmed (owner-supplied 2026-10-02)
     facebook: 'https://www.facebook.com/profile.php?id=61595026949584',
     nextdoor: 'https://nextdoor.com/page/sparkling-standard-cleaning-co/',
     yelp: PENDING as Fact<string>,
-    // Visual and video
+    // Visual and video — confirmed 2026-10-03 except Instagram/YouTube
     instagram: PENDING as Fact<string>,
-    tiktok: PENDING as Fact<string>,
+    tiktok: 'https://www.tiktok.com/@sparkling_standard?lang=en',
     youtube: PENDING as Fact<string>,
-    pinterest: PENDING as Fact<string>,
-    rumble: PENDING as Fact<string>,
-    // Additional social distribution
-    gab: PENDING as Fact<string>,
-    parler: PENDING as Fact<string>,
+    pinterest: 'https://www.pinterest.com/SparklingStandard/',
+    rumble: 'https://rumble.com/user/SparklingStandard',
+    // Additional social distribution — all confirmed 2026-10-03
+    gab: 'https://gab.com/Sparkling_Standard',
+    parler: 'https://app.parler.com/Sparkling-Standard',
+    locals: 'https://sparkling-standards.locals.com',
     x: PENDING as Fact<string>,
     threads: PENDING as Fact<string>,
     // Professional networking

@@ -5,11 +5,17 @@ a platform is **confirmed** only when the owner has supplied its real profile UR
 configured in `src/config/business.ts`. Nothing pending ever renders on the website, and no handle,
 profile URL or account is ever invented.
 
-**Registry links are not accounts.** The marketing-link registry (23 ready / 27 prepared) records
+**Registry links are not accounts.** The marketing-link registry (23 ready / 28 prepared) records
 *links*, not platform presence — a "ready" link does not mean the account exists or the placement
 is live. The owner checklist for creating the priority accounts is
 `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`; distribution priorities are in
 `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`.
+
+**Owner-supplied profiles (2026-10-03):** the owner supplied six additional profile URLs
+(Gab, Pinterest, Locals, Rumble, TikTok, Parler). They are classified **Confirmed (owner-supplied)**
+— configured in `business.ts` and rendering publicly. Each URL returned HTTP 200 when checked on
+2026-10-03; this confirms the destination resolves but is **not** independent identity
+verification and does not confirm that the platform's tracked website link has been pasted yet.
 
 Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/components/SocialLinks.astro`
 (public rendering order), `docs/marketing/UTM-MASTER-LINKS.md` (tracked inbound links).
@@ -29,23 +35,30 @@ Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/compone
 | --- | --- | --- | --- | --- | --- |
 | Google Business Profile | Local discovery | **1 — local acquisition** | **Created — verification pending** | Not published | Google management shows verification being reviewed. Do **not** mark verified or publish a URL until Google confirms. Then complete the GBP checklist in `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`. |
 | Instagram | Primary content | **2 — primary content** | Pending | — | Create the business/profile account, approved branding, tracked bio link. Checklist: `SOCIAL-ACCOUNT-SETUP.md`. Also feeds Threads. |
-| TikTok | Primary content | **3 — primary content** | Pending | — | Create the account, tracked bio link, vertical detail videos. Checklist: `SOCIAL-ACCOUNT-SETUP.md`. |
+| TikTok | Primary content | **3 — primary content** | **Confirmed (owner-supplied 2026-10-03)** | `https://www.tiktok.com/@sparkling_standard?lang=en` | Account created. Paste the tracked TikTok bio link when ready (checklist in `SOCIAL-ACCOUNT-SETUP.md`); vertical detail videos. |
 | YouTube | Primary content | **4 — primary content** | Pending | — | Create a brand channel; tracked links section; Shorts + founder/process long-form. Checklist: `SOCIAL-ACCOUNT-SETUP.md`. |
 | Facebook | Local discovery | Confirmed | **Confirmed** | `https://www.facebook.com/profile.php?id=61595026949584` | Locally relevant posts and selected videos; tracked Facebook links from the UTM master. |
 | Nextdoor | Local discovery | Confirmed | **Confirmed** | `https://nextdoor.com/page/sparkling-standard-cleaning-co/` | Neighborhood posting is area-limited; local communication rather than every video; tracked Nextdoor link. |
+| Pinterest | Adapted distribution | Later | **Confirmed (owner-supplied 2026-10-03)** | `https://www.pinterest.com/SparklingStandard/` | Created; stills/pins from the weekly asset. Paste the tracked Pinterest profile link (checklist). |
+| Rumble | Adapted distribution | Later | **Confirmed (owner-supplied 2026-10-03)** | `https://rumble.com/user/SparklingStandard` | Created; video mirror for YouTube uploads. Paste the tracked Rumble channel link (checklist). |
+| Gab | Adapted distribution | Later | **Confirmed (owner-supplied 2026-10-03)** | `https://gab.com/Sparkling_Standard` | Created; adapted reposts. Paste the tracked Gab profile link (checklist). |
+| Parler | Adapted distribution | Later | **Confirmed (owner-supplied 2026-10-03)** | `https://app.parler.com/Sparkling-Standard` | Created; adapted reposts. Paste the tracked Parler profile link (checklist). |
+| Locals | Additional distribution / community | Later | **Confirmed (owner-supplied 2026-10-03)** | `https://sparkling-standards.locals.com` | Created; proposed role: a secondary distribution/community channel for the same master content (adapted posts, not a separate production line). Paste the tracked Locals profile link (checklist). |
 | Bing Places | Local discovery | Later | Pending | — | Create/import from Google Business after GBP verifies; paste the tracked Bing Places UTM link as the website. |
-| Pinterest | Adapted distribution | Later | Pending | — | Business profile with website claim; stills/pins from the weekly asset with tracked links. |
-| Rumble | Adapted distribution | Later | Pending | — | Video mirror for YouTube uploads; channel link only. |
 | X | Adapted distribution | Later | Pending | — | Profile bio link; reposts of short tips. |
 | Threads | Adapted distribution | Later | Pending | — | Tied to the Instagram account; link in bio. |
-| Gab | Adapted distribution | Later | Pending | — | Profile with a website field. No ad platform required. |
-| Parler | Adapted distribution | Later | Pending | — | Profile with a website field. No ad platform required. |
 | LinkedIn | Professional | Later | Pending | — | Company page; commercial/office outreach. |
 | Alignable | Professional | Later | Pending | — | Local business network profile (business email required). |
 | Reddit | Community | Later | Pending | — | Not a conventional business page: an account plus genuine participation in local subreddits. Follow each subreddit's self-promotion rules; never drop links without context. |
 | Yelp | Directories | Later | Pending | — | Free business page; beware of paid upsells — zero-spend policy. |
 | Apple Business Connect | Local discovery | Not used | Not used | — | Revisit only if iPhone/Maps discovery becomes a priority. |
 | Advertising platforms (Google Ads, Meta Ads, etc.) | Paid | Not used | Not used | — | Zero additional spending; not authorized. |
+
+Priority note: creating more accounts must not dilute production effort. Instagram, TikTok and
+YouTube remain the primary content channels; Pinterest, Rumble, Gab, Parler and Locals receive
+adapted reposts of the same master content, and Facebook/Nextdoor receive locally relevant
+communication. The weekly cadence and production plan are unchanged
+(`docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`, `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`).
 
 ## Rendering rules (enforced in code)
 
