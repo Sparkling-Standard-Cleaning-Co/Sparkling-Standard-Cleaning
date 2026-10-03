@@ -16,6 +16,7 @@
 // Returns:
 //   200 { ok: true }
 //   400 { ok: false, error: 'invalid_request' | 'verification_failed' }
+//   403 { ok: false, error: 'spam_rejected' }
 //   502 { ok: false, error: 'provider_failed' }
 //   503 { ok: false, error: 'not_configured' }   → client uses the fallback
 
@@ -156,8 +157,12 @@ export async function onRequestPost(context: {
     count += 1;
   }
 
-  // Honeypot must remain empty (defense in depth — the client strips it too).
-  if (clean.company_website) return json({ ok: false, error: 'invalid_request' }, 400);
+  // Honeypot: a hidden off-screen trap field no human sees or fills. Bots fill
+  // it and are rejected with the distinct spam error. The field name avoids
+  // autofill heuristics (no "company"/"website"/"url") and the client never
+  // sends it; a browser autofilling a normal field can no longer cost a real
+  // customer their submission.
+  if (clean.extra_ref) return json({ ok: false, error: 'spam_rejected' }, 403);
 
   // Require at least one contact channel.
   if (!clean.phone && !clean.email) {

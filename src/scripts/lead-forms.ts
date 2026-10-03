@@ -38,7 +38,7 @@ function collectFields(form: HTMLFormElement): Record<string, string> {
   const data = new FormData(form);
   for (const [key, value] of data.entries()) {
     if (typeof value !== 'string') continue;
-    if (key === 'company_website') continue; // honeypot never travels
+    if (key === 'extra_ref') continue; // honeypot never travels
     const trimmed = value.trim();
     if (trimmed) fields[key] = trimmed;
   }
@@ -87,8 +87,8 @@ for (const form of document.querySelectorAll<HTMLFormElement>('[data-lead-form]'
     event.preventDefault();
     if (!form.reportValidity()) return;
 
-    // Honeypot: humans never fill a hidden "company_website" field.
-    const honeypot = form.querySelector<HTMLInputElement>('input[name="company_website"]');
+    // Honeypot: humans never fill the hidden "extra_ref" trap field.
+    const honeypot = form.querySelector<HTMLInputElement>('input[name="extra_ref"]');
     if (honeypot && honeypot.value.trim() !== '') {
       setStatus(form, 'error', failureCopy('spam_rejected', contact));
       return;

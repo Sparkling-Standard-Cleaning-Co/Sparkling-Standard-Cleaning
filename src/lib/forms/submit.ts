@@ -12,10 +12,11 @@
 import { business } from '../../config/business';
 import type { AnalyticsEventName } from '../analytics/events';
 import { track } from '../analytics/events';
+import type { FailureReason } from './failure-copy';
 
 export type SubmitOutcome =
   | { ok: true; via: 'relay' | 'provider'; verification?: LeadVerification }
-  | { ok: false; reason: 'not_configured' | 'provider_error' | 'network_error' | 'server_error' | 'spam_rejected' };
+  | { ok: false; reason: FailureReason };
 
 /**
  * The server's verdict for a priced reservation. There is deliberately no
@@ -46,6 +47,52 @@ function parseVerification(value: unknown): LeadVerification | undefined {
 function turnstileToken(): string | undefined {
   const input = document.querySelector<HTMLInputElement>('input[name="cf-turnstile-response"]');
   return input?.value || undefined;
+}
+
+/** True only when the build configured a Turnstile site key. */
+function turnstileConfigured(): boolean {
+  return (import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? '') !== '';
+}
+
+/**
+ * A Turnstile token is single-use and expires (~5 minutes). After any failed
+ * attempt the widget is reset so the customer's retry receives a fresh token
+ * instead of reusing a consumed/expired one.
+ */
+function resetTurnstile(): void {
+  try {
+    const widget = (window as unknown as { turnstile?: { reset?: () => void } }).turnstile;
+    widget?.reset?.();
+  } catch {
+    // Best effort — the retry path still works with a fresh page load.
+  }
+}
+
+/**
+ * Waits briefly for the Turnstile widget to produce a token before sending.
+ * Never bypasses verification: when a site key is configured but no token
+ * appears, the submission is reported as a verification failure so the
+ * customer can retry with honest copy.
+ */
+async function waitForTurnstileToken(timeoutMs = 10_000): Promise<string | undefined> {
+  const existing = turnstileToken();
+  if (existing) return existing;
+  if (!turnstileConfigured()) return undefined;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const token = turnstileToken();
+    if (token) return token;
+  }
+  return undefined;
+}
+
+/** Maps a relay error body/status to a distinct, actionable failure reason. */
+function relayFailureReason(status: number, error: string): FailureReason {
+  if (error === 'verification_failed') return 'verification_failed';
+  if (error === 'spam_rejected' || status === 403) return 'spam_rejected';
+  if (error === 'invalid_request' || status === 400 || status === 422) return 'invalid_request';
+  return 'server_error';
 }
 
 /** Records a conversion honestly: fires now with consent, is replayed only
@@ -80,7 +127,14 @@ export async function submitLead(
   fields: Record<string, string>,
   subject: string,
 ): Promise<SubmitOutcome> {
-  const payload = { subject, fields, turnstileToken: turnstileToken() };
+  // A configured Turnstile widget must produce a token first; submitting
+  // without one would just be rejected by the server and confuse the customer.
+  const token = await waitForTurnstileToken();
+  if (turnstileConfigured() && !token) {
+    resetTurnstile();
+    return { ok: false, reason: 'verification_failed' };
+  }
+  const payload = { subject, fields, turnstileToken: token };
 
   // 1) Preferred path: serverless relay with server-side validation and
   //    authoritative quote verification for priced reservations.
@@ -95,20 +149,24 @@ export async function submitLead(
       const verification = parseVerification(data.verification);
       return { ok: true, via: 'relay', ...(verification ? { verification } : {}) };
     }
-    if (response.status === 503) {
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    const error = typeof data.error === 'string' ? data.error : '';
+    if (response.status === 503 && error === 'not_configured') {
       // The relay is deployed but its server key is not configured. It tells
       // the client to use the static fallback — do exactly that instead of
       // reporting a server error.
-      const data = (await response.json().catch(() => ({}))) as { error?: string };
-      if (data.error !== 'not_configured') return { ok: false, reason: 'server_error' };
       // fall through to the direct provider path
-    } else if (![404, 405, 501].includes(response.status)) {
-      if (response.status === 400 || response.status === 422) return { ok: false, reason: 'spam_rejected' };
-      return { ok: false, reason: 'server_error' };
+    } else if ([404, 405, 501].includes(response.status)) {
+      // The function is not deployed here; fall through to the direct provider.
+    } else {
+      // Distinguish real rejection causes so the customer gets honest,
+      // actionable copy instead of a blanket "could not be verified".
+      if (token) resetTurnstile();
+      return { ok: false, reason: relayFailureReason(response.status, error) };
     }
-    // 404/405/501 → the function is not deployed here; fall through.
   } catch {
     // Network failure → fall through to the direct provider.
+    if (token) resetTurnstile();
   }
 
   // 2) Static fallback: direct provider submission with the public key. This

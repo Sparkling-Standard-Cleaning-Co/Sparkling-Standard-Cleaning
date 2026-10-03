@@ -1,7 +1,8 @@
 ---
 // Cloudflare Turnstile widget — rendered only when a site key is configured.
 // The matching secret lives server-side (functions/api/lead.ts). When no key
-// is configured, spam protection relies on the honeypot + timing checks.
+// is configured, spam protection relies on the hidden honeypot trap plus the
+// per-form timing guard where implemented (contact/commercial/STR forms).
 
 interface Props {
   class?: string;

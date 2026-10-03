@@ -1038,7 +1038,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     event.preventDefault();
     if (!validateStep(currentStep)) return;
 
-    const honeypot = form.querySelector<HTMLInputElement>('input[name="company_website"]');
+    const honeypot = form.querySelector<HTMLInputElement>('input[name="extra_ref"]');
     if (honeypot && honeypot.value.trim() !== '') {
       if (status) {
         status.dataset.state = 'error';

@@ -75,6 +75,25 @@ Lighthouse scores.
 | Four live funnels (owner-authorized, clearly marked tests) | real browser submissions | residential, instant estimate, commercial, STR: each `/api/lead` → `200`; correct success message; redirect to `/thank-you/`; estimate final step showed range `$235 – $285` and one primary action |
 | Inbox delivery | owner inbox | **pending owner confirmation** — API acceptance is not inbox delivery |
 
+## Verified — lead-submission autofill defect (2026-10-02, commit `fix/lead-submission`)
+
+Owner report: the six-step estimator answered “Your request could not be verified. Please try
+again…” and stayed on the form.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Root cause reproduction | Real-browser run against production with the honeypot populated | Exact owner message reproduced with **zero `/api/lead` requests**: the client rejected locally. With the trap empty, the request was complete and valid (40 fields, contact present, no honeypot, no Turnstile token) |
+| Relay health | Live `POST /api/lead` with a clearly labeled synthetic probe | `HTTP 200 {ok:true}` — the relay and provider delivery work; the probe also proved the server has no Turnstile secret configured (no token was required) |
+| Turnstile state | Production HTML inspection | No Turnstile widget/site key in the build, so the failure could not be a Turnstile rejection |
+| Root cause resolution | Hidden trap renamed from the autofill-magnet `company_website`/“Company website” to an unintelligible `extra_ref` with password-manager ignore attributes and no label; the old field is no longer a trap so a cached bundle or autofill can never cost a customer their submission | Verified in the built DOM and unit tests |
+| Error classification | New distinct reasons: `verification_failed` (security-check copy + widget reset), `spam_rejected`, `invalid_request` (fix-the-form copy); unknown 400/422 no longer masquerades as spam | Browser regression tests |
+| Answers preserved | Every failure path leaves all entered values on the page and re-enables retry | Browser regression tests |
+| Full suites | `npm run check`, `npm test` (241), `npm run test:browser` (62), `npm run validate`, `audit:facts` | Pass |
+
+One clearly labeled synthetic probe was delivered during diagnosis
+(`[TEST - ENGINEERING] Turnstile configuration probe - do not schedule`); inbox receipt awaits
+owner confirmation.
+
 ## Pending (cannot be verified in this environment — owner or tooling required)
 
 | Item | Why pending | How to verify |

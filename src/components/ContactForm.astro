@@ -52,8 +52,17 @@ const { class: className = '' } = Astro.props;
   </div>
 
   <div class="honeypot" aria-hidden="true">
-    <label for="contact-company-website">Company website</label>
-    <input id="contact-company-website" name="company_website" type="text" tabindex="-1" autocomplete="off" />
+    <input
+      id="contact-extra-ref"
+      name="extra_ref"
+      type="text"
+      tabindex="-1"
+      autocomplete="off"
+      data-lpignore="true"
+      data-1p-ignore
+      data-bwignore
+      data-protonpass-ignore
+    />
   </div>
 
   <p class="small text-muted">

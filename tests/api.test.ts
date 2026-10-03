@@ -56,12 +56,32 @@ test('lead: missing fields are rejected', async () => {
   assert.equal(response.status, 400);
 });
 
-test('lead: honeypot submissions are rejected', async () => {
+test('lead: honeypot submissions are rejected with a distinct spam error', async () => {
   const response = await leadPost({
-    request: jsonRequest({ subject: 'x', fields: { phone: '5551234567', company_website: 'bot' } }),
+    request: jsonRequest({ subject: 'x', fields: { phone: '5551234567', extra_ref: 'bot' } }),
     env: {},
   } as never);
-  assert.equal(response.status, 400);
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { ok: false, error: 'spam_rejected' });
+});
+
+test('lead: a legacy autofilled company_website value no longer rejects a customer', async () => {
+  // The old honeypot name was an autofill magnet. It is no longer a trap, so a
+  // cached old bundle that still sends it (or a browser autofilling a normal
+  // field) can never cost a legitimate customer their submission.
+  const response = await withFetch(
+    async () => jsonResponse({ success: true }),
+    () =>
+      leadPost({
+        request: jsonRequest({
+          subject: 'x',
+          fields: { phone: '5551234567', company_website: 'autofilled by the browser' },
+        }),
+        env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key' },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
 });
 
 test('lead: a submission without phone or email is rejected', async () => {

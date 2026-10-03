@@ -41,8 +41,31 @@ test('spam rejection never claims success and offers alternatives', () => {
   assert.match(text, /owner@sparkling-standard\.com/);
 });
 
+test('verification failure is distinct from a spam rejection and promises answers are kept', () => {
+  const text = failureCopy('verification_failed', confirmed);
+  assert.match(text, /security check/i);
+  assert.match(text, /your answers are still here/i);
+  assert.doesNotMatch(text, /could not be verified/i);
+});
+
+test('invalid form data gets a fix-the-form message, never a spam accusation', () => {
+  const text = failureCopy('invalid_request', confirmed);
+  assert.match(text, /didn't come through/i);
+  assert.match(text, /check the form/i);
+  assert.doesNotMatch(text, /could not be verified/i);
+});
+
 test('every failure reason produces an honest message with alternatives', () => {
-  for (const reason of ['not_configured', 'provider_error', 'network_error', 'server_error', 'spam_rejected'] as const) {
+  const reasons = [
+    'not_configured',
+    'provider_error',
+    'network_error',
+    'server_error',
+    'spam_rejected',
+    'verification_failed',
+    'invalid_request',
+  ] as const;
+  for (const reason of reasons) {
     const text = failureCopy(reason, confirmed);
     assert.ok(text.length > 20, reason);
     assert.match(text, /\(850\) 426-8479/, reason);
@@ -50,7 +73,16 @@ test('every failure reason produces an honest message with alternatives', () => 
 });
 
 test('SMS never appears in failure copy while the gate is off', () => {
-  for (const reason of ['not_configured', 'provider_error', 'network_error', 'server_error', 'spam_rejected'] as const) {
+  const reasons = [
+    'not_configured',
+    'provider_error',
+    'network_error',
+    'server_error',
+    'spam_rejected',
+    'verification_failed',
+    'invalid_request',
+  ] as const;
+  for (const reason of reasons) {
     assert.doesNotMatch(failureCopy(reason, confirmed), /text \(850\)/, reason);
   }
 });
