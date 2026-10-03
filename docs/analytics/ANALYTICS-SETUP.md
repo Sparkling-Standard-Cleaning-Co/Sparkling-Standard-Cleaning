@@ -4,7 +4,7 @@ Analytics are **consent-gated, PII-free, and optional**. Empty IDs disable each 
 completely (no banner, no requests, no storage). This document covers dashboard setup; the
 privacy page must stay in sync with whatever is actually enabled.
 
-## 0. Current verified state (2026-10-03)
+## 0. Current verified state (2026-10-03, updated)
 
 - **GTM container `GTM-KSQ26HMG`** is installed on the site and live. Production browser
   verification: zero Google requests before a consent choice, zero after declining, and **exactly
@@ -12,13 +12,15 @@ privacy page must stay in sync with whatever is actually enabled.
 - **Website event generation is verified** in code and browser tests: after consent the site
   pushes the fixed events (section 3) into `window.dataLayer`; submit events fire only after the
   provider acknowledges a request.
-- **The GTM container itself had ZERO tags** when the owner opened it on 2026-10-03. Earlier
-  "GTM/GA4 verified" statements covered the website installation only — they did not prove GA4
-  receipt. The GA4 measurement ID is `G-LG222LQRQ2` (web stream "Sparkling Standard Cleaning Co.").
-  Prepared import files and exact dashboard steps: `docs/analytics/GTM-CONTAINER-SETUP.md`.
-- **GA4 receipt (event appearing in the property) remains unverified** until the owner imports,
-  verifies in DebugView and publishes the container configuration. Do not claim GA4 is receiving
-  data before that evidence exists.
+- **GA4 `G-LG222LQRQ2` is operational (owner-confirmed 2026-10-03).** The container initially had
+  zero tags; the owner then published their reviewed GTM configuration (Version 3, managed in the
+  GTM account — not in this repository). GA4 now receives page views, estimator starts and all
+  three successful inquiry events (`cleaning_request_submit`, `commercial_quote_submit`,
+  `str_request_submit`); the residential, commercial and STR submission tests and the analytics
+  consent tests passed; the three primary key events are configured.
+- The prepared import files remain in the repository as a rebuild reference
+  (`docs/analytics/GTM-CONTAINER-SETUP.md`); the live account configuration is authoritative.
+  Never republish or overwrite the owner's container without authorization.
 - **Umami** has no website ID; it does not load and is not named on the privacy page.
 - **UTMs** are captured client-side for lead records; internal links/canonicals never carry them
   (enforced by `npm run validate`). Advertising features remain off; no paid analytics.

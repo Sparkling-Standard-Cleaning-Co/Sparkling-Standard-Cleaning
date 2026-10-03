@@ -21,7 +21,7 @@ readable summary. Every collected value is preserved — unmapped fields appear 
 | **Scheduling** | Arrival preference, days/time preferences, STR turnover details, date note |
 | **Notes** | The customer's notes verbatim, website message, current situation |
 | **Internal** | Raw verdict code, quote reference, config versions/match, verification path/status/note, pin check + distance, labor hours, rate, travel codes |
-| **Attribution** | UTM source/medium/campaign/content, click ids, landing page, referrer — lead records only |
+| **Attribution** | First-touch and latest-touch source/medium/campaign/content, ad click id, latest-touch landing page/referrer — lead records only |
 
 Rules: success/verdict language is honest (a delivered request is never called “booked”); a price
 mismatch never hides the lead — it is delivered with an explicit review warning; no private
@@ -85,12 +85,30 @@ Internal — Estimated labor hours: 5.82
 Internal — Rate per labor hour: $42
 Internal — Travel zone: core
 Internal — Travel mode: routed
-Attribution — Source: facebook
-Attribution — Medium: organic_social
-Attribution — Campaign: recurring
-Attribution — Landing page: /recurring-cleaning/
+Attribution — First-touch source: facebook
+Attribution — First-touch medium: organic_social
+Attribution — First-touch campaign: recurring
+Attribution — First-touch content: feed
+Attribution — Latest-touch source: facebook
+Attribution — Latest-touch medium: organic_social
+Attribution — Latest-touch campaign: recurring
+Attribution — Latest-touch content: feed
+Attribution — Latest-touch landing page: /recurring-cleaning/
 More details — Address method: manual
 ```
+
+## Attribution rules (lead records only)
+
+- **First-touch is captured once and never overwritten**; **latest-touch** is the most recent
+  meaningful touch. A new campaign or ad click updates it; internal navigation, refreshes and
+  ordinary direct views never erase it.
+- Landing page and referrer describe the latest meaningful touch. A same-domain referrer
+  (internal navigation) is never recorded as a referral.
+- An ad click id (`gclid` / `gbraid` / `wbraid`) is preserved even when a later campaign touch
+  replaced the latest record: the collector prefers the latest touch and falls back to the first.
+- Field names are stable (`first_utm_*`, `latest_utm_*`, `landing_page`, `referrer_origin`,
+  `gclid`/`gbraid`/`wbraid`). Plain `utm_*` keys are still accepted as a legacy fallback for the
+  latest-touch labels. Rules and implementation: `src/lib/attribution.ts`.
 
 A `MISMATCH` verdict adds:
 
@@ -102,7 +120,14 @@ Pricing — ACTION REQUIRED: The submitted price differs from the server recalcu
 
 - Unit: `tests/lead-notification.test.ts` covers residential, recurring, preliminary, mismatch,
   out-of-area, commercial, STR, many add-ons, long notes, missing optionals, unmapped-field
-  preservation and the no-credentials invariant.
+  preservation and the no-credentials invariant, plus first/latest attribution labeling and the
+  legacy `utm_*` fallback.
+- Unit: `tests/attribution.test.ts` locks the collector rules (first-touch preservation, new
+  campaigns updating latest-touch, internal/direct views never erasing a campaign, external
+  referrals vs same-domain navigation, ad click id survival).
+- Browser: `tests/browser/attribution.test.mjs` proves the full chain — a Facebook campaign
+  arrival, internal navigation to the estimator, and the first/latest fields in the submitted
+  lead payload.
 - Server contract: `tests/api-verification.test.ts` asserts the server verdict replaces forged
   claims and that the origin/credentials never appear in the forwarded payload.
 - Live: after an owner-authorized, clearly labeled test submission, confirm the inbox shows the

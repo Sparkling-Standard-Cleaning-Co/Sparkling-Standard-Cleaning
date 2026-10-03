@@ -134,10 +134,29 @@ owner confirmation.
 | Gift-certificate pause | Code inspection + full suites | `enabled: false`, no checkout attempt in request mode, page states no payment is taken; Stripe code dormant |
 | Full suites | `npm run check` (0 errors), `npm test` (280 pass), `npm run test:browser` (73 pass), `npm run build` (21 pages), `npm run validate` (incl. new GTM artifact check) | All pass |
 
-**Not verified here (owner dashboard required):** the owner's GTM container had zero tags on
-2026-10-03; whether a Google tag was later created/published is unknown until the owner checks.
-GA4 receipt, DebugView visibility and key-event marking cannot be verified from the repository.
-Follow `docs/analytics/GTM-CONTAINER-SETUP.md`; do not mark GA4 "live" without that evidence.
+**Later confirmed (owner, 2026-10-03):** after importing the prepared configuration, the owner
+published their reviewed GTM container (Version 3). GA4 `G-LG222LQRQ2` now receives page views,
+estimator starts and all three successful inquiry submit events; the residential, commercial and
+STR submission tests and the analytics consent tests passed; the three primary key events are
+configured. The live account configuration is authoritative and must not be republished or
+overwritten without authorization.
+
+## Verified — attribution preservation and lead-notification mapping (2026-10-03)
+
+**Root cause:** `captureAttribution()` ran on every page and unconditionally overwrote the
+`latest` touch, so any internal navigation, refresh or direct view replaced a campaign with a
+blank touch (and recorded the same-domain referrer as a referral). The lead notification also
+mapped plain `utm_*` keys that the collector never emits (`first_utm_*`/`latest_utm_*`), so the
+email lost the campaign and leaked `latest_utm_*` into "More details". Existing leads already
+delivered are unchanged; the corrections apply to future attribution and notifications.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Collector rules | `tests/attribution.test.ts` (8 cases) | Facebook arrival + estimator navigation keeps the campaign; multiple Nextdoor internal visits never erase it; a new campaign updates latest-touch but not first-touch; direct visits seed once and never overwrite; external referrals recorded only without a campaign (same-domain referrers ignored); ad click ids survive navigation and a later campaign; identical-campaign refresh is a no-op; long ids clipped, malformed referrers ignored |
+| Notification mapping | `tests/lead-notification.test.ts` (+3 cases; 14 total) | Clear first-touch and latest-touch source/medium/campaign/content labels; landing page/referrer labeled latest-touch; click id appears exactly once; no `More details — *utm*` leakage; legacy plain `utm_*` fallback still maps |
+| End-to-end chain | `tests/browser/attribution.test.mjs` (4 cases) | Facebook campaign page → real internal navigation to the estimator → completed request carries `first_utm_source=facebook`, `latest_utm_*`, and the campaign landing page; new campaign vs first-touch; external referral recorded; same-domain navigation never becomes a referral |
+| Analytics/consent untouched | `tests/browser/analytics-events.test.mjs`, `gps-gtm.test.mjs` re-run | No change to event names, payloads or consent loading behavior; no customer data added to analytics |
+| Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (77 pass), `npm run build` (21 pages), `npm run validate`, `pending`, `testimonials`, `audit:facts`, `smoke` | All pass |
 
 ## Pending (cannot be verified in this environment — owner or tooling required)
 

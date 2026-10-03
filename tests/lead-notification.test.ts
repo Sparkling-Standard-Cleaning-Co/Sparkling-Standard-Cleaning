@@ -67,9 +67,16 @@ const estimatorBase: Record<string, string> = {
   estimated_labor_hours: '4.66',
   applied_rate_per_labor_hour: '42',
   pricing_category: 'recurring_maintenance',
-  utm_source: 'facebook',
-  utm_medium: 'organic_social',
+  first_utm_source: 'facebook',
+  first_utm_medium: 'organic_social',
+  first_utm_campaign: 'recurring',
+  first_utm_content: 'feed',
+  latest_utm_source: 'facebook',
+  latest_utm_medium: 'organic_social',
+  latest_utm_campaign: 'recurring',
+  latest_utm_content: 'feed',
   landing_page: '/recurring-cleaning/',
+  referrer_origin: 'https://www.facebook.com',
 };
 
 test('a recurring reservation reads as an ordered business summary', () => {
@@ -271,4 +278,65 @@ test('no private infrastructure or credential material is ever introduced', () =
   const notification = buildLeadNotification(estimatorBase);
   const serialized = JSON.stringify(notification);
   assert.doesNotMatch(serialized, /TRAVEL_ORIGIN|ROUTES_API_KEY|MAPMAP_API_KEY|WEB3FORMS_ACCESS_KEY/);
+});
+
+test('first-touch and latest-touch attribution are clearly labeled without duplication', () => {
+  const notification = buildLeadNotification(estimatorBase);
+  assert.equal(notification['Attribution — First-touch source'], 'facebook');
+  assert.equal(notification['Attribution — First-touch medium'], 'organic_social');
+  assert.equal(notification['Attribution — First-touch campaign'], 'recurring');
+  assert.equal(notification['Attribution — First-touch content'], 'feed');
+  assert.equal(notification['Attribution — Latest-touch source'], 'facebook');
+  assert.equal(notification['Attribution — Latest-touch medium'], 'organic_social');
+  assert.equal(notification['Attribution — Latest-touch campaign'], 'recurring');
+  assert.equal(notification['Attribution — Latest-touch content'], 'feed');
+  assert.equal(notification['Attribution — Latest-touch landing page'], '/recurring-cleaning/');
+  assert.equal(notification['Attribution — Latest-touch referrer'], 'https://www.facebook.com');
+
+  const labels = Object.keys(notification);
+  assert.ok(
+    !labels.some((label) => /More details — .*(utm|attribution)/i.test(label)),
+    'attribution fields never fall through to More details',
+  );
+  assert.equal(labels.filter((label) => /Attribution — .*source/.test(label)).length, 2);
+});
+
+test('a different latest-touch campaign is shown beside the preserved first touch', () => {
+  const base = { ...estimatorBase };
+  delete base.referrer_origin;
+  base.first_utm_source = 'facebook';
+  base.first_utm_campaign = 'facebook_page';
+  base.latest_utm_source = 'nextdoor';
+  base.latest_utm_campaign = 'neighborhood';
+  base.latest_utm_content = 'sponsored';
+  base.gclid = 'gclid-123';
+
+  const notification = buildLeadNotification(base);
+  assert.equal(notification['Attribution — First-touch source'], 'facebook');
+  assert.equal(notification['Attribution — First-touch campaign'], 'facebook_page');
+  assert.equal(notification['Attribution — Latest-touch source'], 'nextdoor');
+  assert.equal(notification['Attribution — Latest-touch campaign'], 'neighborhood');
+  assert.equal(notification['Attribution — Latest-touch content'], 'sponsored');
+  assert.equal(notification['Attribution — Google click id'], 'gclid-123');
+  assert.equal(notification['Attribution — Google click id']?.includes('gclid-123'), true);
+  const serialized = JSON.stringify(notification);
+  assert.equal(serialized.match(/gclid-123/g)?.length, 1, 'the click id appears exactly once');
+});
+
+test('legacy plain UTM fields still map to latest-touch labels', () => {
+  const notification = buildLeadNotification({
+    request_type: 'contact',
+    name: 'Synthetic Customer',
+    phone: '8500000000',
+    email: 'synthetic@example.com',
+    utm_source: 'facebook',
+    utm_medium: 'organic_social',
+    utm_campaign: 'legacy_campaign',
+    utm_content: 'ad',
+  });
+  assert.equal(notification['Attribution — Latest-touch source'], 'facebook');
+  assert.equal(notification['Attribution — Latest-touch medium'], 'organic_social');
+  assert.equal(notification['Attribution — Latest-touch campaign'], 'legacy_campaign');
+  assert.equal(notification['Attribution — Latest-touch content'], 'ad');
+  assert.equal(notification['More details — Utm source'], undefined);
 });

@@ -463,18 +463,20 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Internal — Travel mode', text(fields, 'travel_mode'), 'travel_mode');
 
   // ── Attribution (lead records only; never sent to analytics) ────────────
-  add('Attribution — Source', text(fields, 'utm_source'), 'utm_source');
-  add('Attribution — Medium', text(fields, 'utm_medium'), 'utm_medium');
-  add('Attribution — Campaign', text(fields, 'utm_campaign'), 'utm_campaign');
-  add('Attribution — Content', text(fields, 'utm_content'), 'utm_content');
+  // The website stores first-touch and latest-touch context separately
+  // (src/lib/attribution.ts); both are shown with unambiguous labels. Plain
+  // utm_* keys remain accepted as a fallback for legacy direct submissions.
+  add('Attribution — First-touch source', text(fields, 'first_utm_source'), 'first_utm_source');
+  add('Attribution — First-touch medium', text(fields, 'first_utm_medium'), 'first_utm_medium');
+  add('Attribution — First-touch campaign', text(fields, 'first_utm_campaign'), 'first_utm_campaign');
+  add('Attribution — First-touch content', text(fields, 'first_utm_content'), 'first_utm_content');
+  add('Attribution — Latest-touch source', text(fields, 'latest_utm_source', 'utm_source'), 'latest_utm_source', 'utm_source');
+  add('Attribution — Latest-touch medium', text(fields, 'latest_utm_medium', 'utm_medium'), 'latest_utm_medium', 'utm_medium');
+  add('Attribution — Latest-touch campaign', text(fields, 'latest_utm_campaign', 'utm_campaign'), 'latest_utm_campaign', 'utm_campaign');
+  add('Attribution — Latest-touch content', text(fields, 'latest_utm_content', 'utm_content'), 'latest_utm_content', 'utm_content');
   add('Attribution — Google click id', text(fields, 'gclid', 'gbraid', 'wbraid'), 'gclid', 'gbraid', 'wbraid');
-  add('Attribution — Landing page', text(fields, 'landing_page'), 'landing_page');
-  add('Attribution — Referrer', text(fields, 'referrer_origin'), 'referrer_origin');
-  for (const key of Object.keys(fields)) {
-    if (/^first_utm_/.test(key)) {
-      add(`Attribution — First ${humanizeKey(key.replace(/^first_utm_/, ''))}`, fields[key] ?? '', key);
-    }
-  }
+  add('Attribution — Latest-touch landing page', text(fields, 'landing_page'), 'landing_page');
+  add('Attribution — Latest-touch referrer', text(fields, 'referrer_origin'), 'referrer_origin');
 
   // ── Anything not mapped above is preserved verbatim ─────────────────────
   for (const [key, value] of Object.entries(fields)) {
