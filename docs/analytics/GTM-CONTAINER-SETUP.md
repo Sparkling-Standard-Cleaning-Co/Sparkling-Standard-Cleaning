@@ -89,8 +89,11 @@ Import steps (owner action, browser):
 5. **Continue** → open **View Detailed Changes**. Expected: full setup adds/updates **13 tags,
    12 triggers, 7 variables**; events-only adds/updates **12 tags, 12 triggers, 7 variables**.
 6. **Confirm**. The items appear in the workspace — **do not publish yet**.
-7. In **Tags**, check there is exactly **one** Google tag. If an earlier attempt left a second
-   Google tag (different name), delete the extra one so page views are never sent twice.
+7. In **Tags**, compare against the section 3 table:
+   - exactly **one** Google tag (if an earlier attempt left a second, differently named Google
+     tag, delete the extra one so page views are never sent twice);
+   - exactly one `GA4 - Event - <name>` tag per event and one `CE - <name>` trigger per event —
+     delete any earlier attempts with different names so nothing fires twice.
 8. Verify (section 5), then **Submit → Publish** with a version name such as
    `GA4 website event tracking (verified)`.
 
