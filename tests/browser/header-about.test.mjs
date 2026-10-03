@@ -104,6 +104,37 @@ for (const width of [1024, 1280, 1440, 1680]) {
   });
 }
 
+test('the brand lockup carries the full identity and links home', async () => {
+  const { context, page } = await open('/', 1280, 900);
+  try {
+    const brand = page.locator('.site-header .brand');
+    assert.equal(await brand.getAttribute('href'), '/');
+    assert.equal(await brand.locator('.brand__crest svg').count(), 1, 'crest mark present');
+    assert.equal((await brand.locator('.brand__script').textContent())?.trim(), 'Sparkling');
+    assert.equal((await brand.locator('.brand__caps').textContent())?.trim(), 'Standard');
+    assert.match((await brand.locator('.brand__descriptor').textContent()) ?? '', /Cleaning Co\./);
+    assert.match((await brand.locator('.brand__tagline').textContent()) ?? '', /Details Are Our Standard/i);
+    assert.match((await brand.getAttribute('aria-label')) ?? '', /home/i);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the compact mobile brand stays readable without the header tagline', async () => {
+  const { context, page } = await open('/', 390, 844);
+  try {
+    assert.equal(await page.locator('.site-header .brand__tagline').isVisible(), false, 'tagline hides on compact phones');
+    assert.equal(await page.locator('.site-header .brand__descriptor').isVisible(), true, 'Cleaning Co. stays visible');
+    assert.equal(await page.locator('.site-header .brand__crest svg').isVisible(), true, 'crest stays visible');
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    assert.ok(overflow <= 1, `no horizontal overflow on mobile (${overflow})`);
+  } finally {
+    await context.close();
+  }
+});
+
 test('the About page keeps the founder story and adds the heritage section', async () => {
   const { context, page } = await open('/about/', 1280, 900);
   try {
