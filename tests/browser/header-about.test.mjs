@@ -110,11 +110,16 @@ test('the brand lockup carries the full identity and links home', async () => {
     const brand = page.locator('.site-header .brand');
     assert.equal(await brand.getAttribute('href'), '/');
     assert.equal(await brand.locator('.brand__crest svg').count(), 1, 'crest mark present');
-    assert.equal((await brand.locator('.brand__script').textContent())?.trim(), 'Sparkling');
-    assert.equal((await brand.locator('.brand__caps').textContent())?.trim(), 'Standard');
+    assert.equal((await brand.locator('.brand__sparkling').textContent())?.trim(), 'Sparkling');
+    assert.equal((await brand.locator('.brand__standard').textContent())?.trim(), 'Standard');
     assert.match((await brand.locator('.brand__descriptor').textContent()) ?? '', /Cleaning Co\./);
     assert.match((await brand.locator('.brand__tagline').textContent()) ?? '', /Details Are Our Standard/i);
     assert.match((await brand.getAttribute('aria-label')) ?? '', /home/i);
+    // One of the two prepared treatments is applied (romantic script is default).
+    assert.match(
+      (await brand.locator('.brand__text').getAttribute('class')) ?? '',
+      /brand__text--(soft-serif|romantic-script)/,
+    );
   } finally {
     await context.close();
   }

@@ -14,8 +14,10 @@ const UA =
 const REQUESTS = [
   {
     family: 'Fraunces',
+    // Italic is part of the approved display voice (the brand wordmark uses the
+    // true italic, never a synthesized slant).
     cssUrl:
-      'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&display=swap',
+      'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&display=swap',
     fileBase: 'fraunces',
   },
   {
@@ -23,6 +25,18 @@ const REQUESTS = [
     cssUrl:
       'https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,wght@0,200..1000;1,200..1000&display=swap',
     fileBase: 'nunito-sans',
+  },
+  {
+    // Wordmark candidate (owner approval pending): elegant script.
+    family: 'Great Vibes',
+    cssUrl: 'https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap',
+    fileBase: 'great-vibes',
+  },
+  {
+    // Wordmark candidate (owner approval pending): soft, charming script.
+    family: 'Parisienne',
+    cssUrl: 'https://fonts.googleapis.com/css2?family=Parisienne&display=swap',
+    fileBase: 'parisienne',
   },
 ];
 
