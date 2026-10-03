@@ -5,6 +5,12 @@ a platform is **confirmed** only when the owner has supplied its real profile UR
 configured in `src/config/business.ts`. Nothing pending ever renders on the website, and no handle,
 profile URL or account is ever invented.
 
+**Registry links are not accounts.** The marketing-link registry (23 ready / 27 prepared) records
+*links*, not platform presence — a "ready" link does not mean the account exists or the placement
+is live. The owner checklist for creating the priority accounts is
+`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`; distribution priorities are in
+`docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`.
+
 Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/components/SocialLinks.astro`
 (public rendering order), `docs/marketing/UTM-MASTER-LINKS.md` (tracked inbound links).
 
@@ -19,27 +25,27 @@ Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/compone
 
 ## Inventory
 
-| Platform | Category | Status | Public URL | Owner action / notes |
-| --- | --- | --- | --- | --- |
-| Google Business Profile | Local discovery | **Created — verification pending** | Not published | Google management shows verification being reviewed. Do **not** mark verified or publish a URL until Google confirms. Review-link integration stays prepared (see `docs/launch/OWNER-INPUT-REQUIRED.md`). |
-| Bing Places | Local discovery | Pending | — | Create/import from Google Business after GBP verifies; paste the tracked Bing Places UTM link as the website. |
-| Facebook | Local discovery | **Confirmed** | `https://www.facebook.com/profile.php?id=61595026949584` | Maintain posting cadence; use the tracked Facebook links from the UTM master. |
-| Nextdoor | Local discovery | **Confirmed** | `https://nextdoor.com/page/sparkling-standard-cleaning-co/` | Neighborhood posting is area-limited; use the Nextdoor tracked link on the business page. |
-| Yelp | Local discovery | Pending | — | Free business page; beware of paid upsells — zero-spend policy. |
-| Instagram | Visual/video | Pending | — | Business profile with a website field; also feeds Threads. |
-| TikTok | Visual/video | Pending | — | Bio website field; short detail videos. |
-| YouTube | Visual/video | Pending | — | Channel with a links section; long-form/process video. |
-| Pinterest | Visual/video | Pending | — | Business profile with website claim; cleaning-education pins with tracked links. |
-| Rumble | Visual/video | Pending | — | Video mirror for YouTube uploads; channel link only. |
-| Gab | Social distribution | Pending | — | Profile with a website field. No ad platform required. |
-| Parler | Social distribution | Pending | — | Profile with a website field. No ad platform required. |
-| X | Social distribution | Pending | — | Profile bio link; reposts of short tips. |
-| Threads | Social distribution | Pending | — | Tied to the Instagram account; link in bio. |
-| LinkedIn | Professional | Pending | — | Company page; commercial/office outreach. |
-| Alignable | Professional | Pending | — | Local business network profile (business email required). |
-| Reddit | Community | Pending | — | Not a conventional business page: an account plus genuine participation in local subreddits. Follow each subreddit's self-promotion rules; never drop links without context. |
-| Apple Business Connect | Local discovery | Not used | — | Revisit only if iPhone/Maps discovery becomes a priority. |
-| Advertising platforms (Google Ads, Meta Ads, etc.) | Paid | Not used | — | Zero additional spending; not authorized. |
+| Platform | Category | Priority | Status | Public URL | Owner action / notes |
+| --- | --- | --- | --- | --- | --- |
+| Google Business Profile | Local discovery | **1 — local acquisition** | **Created — verification pending** | Not published | Google management shows verification being reviewed. Do **not** mark verified or publish a URL until Google confirms. Then complete the GBP checklist in `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`. |
+| Instagram | Primary content | **2 — primary content** | Pending | — | Create the business/profile account, approved branding, tracked bio link. Checklist: `SOCIAL-ACCOUNT-SETUP.md`. Also feeds Threads. |
+| TikTok | Primary content | **3 — primary content** | Pending | — | Create the account, tracked bio link, vertical detail videos. Checklist: `SOCIAL-ACCOUNT-SETUP.md`. |
+| YouTube | Primary content | **4 — primary content** | Pending | — | Create a brand channel; tracked links section; Shorts + founder/process long-form. Checklist: `SOCIAL-ACCOUNT-SETUP.md`. |
+| Facebook | Local discovery | Confirmed | **Confirmed** | `https://www.facebook.com/profile.php?id=61595026949584` | Locally relevant posts and selected videos; tracked Facebook links from the UTM master. |
+| Nextdoor | Local discovery | Confirmed | **Confirmed** | `https://nextdoor.com/page/sparkling-standard-cleaning-co/` | Neighborhood posting is area-limited; local communication rather than every video; tracked Nextdoor link. |
+| Bing Places | Local discovery | Later | Pending | — | Create/import from Google Business after GBP verifies; paste the tracked Bing Places UTM link as the website. |
+| Pinterest | Adapted distribution | Later | Pending | — | Business profile with website claim; stills/pins from the weekly asset with tracked links. |
+| Rumble | Adapted distribution | Later | Pending | — | Video mirror for YouTube uploads; channel link only. |
+| X | Adapted distribution | Later | Pending | — | Profile bio link; reposts of short tips. |
+| Threads | Adapted distribution | Later | Pending | — | Tied to the Instagram account; link in bio. |
+| Gab | Adapted distribution | Later | Pending | — | Profile with a website field. No ad platform required. |
+| Parler | Adapted distribution | Later | Pending | — | Profile with a website field. No ad platform required. |
+| LinkedIn | Professional | Later | Pending | — | Company page; commercial/office outreach. |
+| Alignable | Professional | Later | Pending | — | Local business network profile (business email required). |
+| Reddit | Community | Later | Pending | — | Not a conventional business page: an account plus genuine participation in local subreddits. Follow each subreddit's self-promotion rules; never drop links without context. |
+| Yelp | Directories | Later | Pending | — | Free business page; beware of paid upsells — zero-spend policy. |
+| Apple Business Connect | Local discovery | Not used | Not used | — | Revisit only if iPhone/Maps discovery becomes a priority. |
+| Advertising platforms (Google Ads, Meta Ads, etc.) | Paid | Not used | Not used | — | Zero additional spending; not authorized. |
 
 ## Rendering rules (enforced in code)
 
@@ -60,3 +66,6 @@ Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/compone
    `npm run marketing:links`.
 4. Update this register and the test's confirmed list (`tests/browser/social-links.test.mjs`).
 5. Run `npm run verify` and the browser suite; publish through the normal production workflow.
+
+Never publish an account before it exists, and never mark verification complete before the
+platform confirms it.

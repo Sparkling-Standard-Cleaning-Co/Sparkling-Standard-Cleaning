@@ -26,7 +26,7 @@ Date: **2026-10-01**.
 | Visual evidence archive in-repo | Screenshot folders under `docs/verification/` | ⚠️ screenshots produced but kept outside the repo | ⏳ optional — add curated before/after screenshots when the owner reviews the staging site |
 | Marketing operating system | 90-day plan, weekly workflow, calendar, scorecard, review system | ✅ exists | done — `docs/marketing/` |
 | UTM/QR attribution system | Central registry, generated docs, decode-verified QR | ✅ exists | done — `src/config/marketing-links.ts` + generated docs |
-| Consent-gated analytics | Nothing loads before consent; fixed event names; no PII | ✅ site side live (GTM `GTM-KSQ26HMG` loads after consent; generation verified). The container was found empty 2026-10-03; GA4 receipt awaits the owner import/publish (`docs/analytics/GTM-CONTAINER-SETUP.md`); Umami awaits an ID | Owner: import → Preview/DebugView → publish → mark key events |
+| Consent-gated analytics | Nothing loads before consent; fixed event names; no PII | ✅ live (owner-confirmed 2026-10-03): GTM `GTM-KSQ26HMG` loads after consent and GA4 `G-LG222LQRQ2` receives page views, `estimate_start` and all three inquiry key events; Enhanced Measurement form interactions disabled; Umami awaits an ID | Optional: add an internal-traffic filter |
 | SEO organization | Page ownership map, strategy, audits | ✅ core exists | maintained — `docs/seo/SEO-STRATEGY.md` |
 | Role onboarding | Separate developer/marketer/owner start-here documents | ⚠️ hub section only | acceptable for a solo owner; split only when a second operator joins |
 | Maintenance schedule | Recurring operational cadence document | ❌ does not exist | ⏳ small addition, see backlog |
@@ -54,11 +54,13 @@ Date: **2026-10-01**.
    axe WCAG scan — the exact checks already run during recovery, made repeatable in CI.
 2. **Maintenance schedule** — monthly/quarterly cadence: dependency health, estimator
    recalibration, marketing registry refresh, platform-status review, backup/export checks.
-3. **Analytics activation** — website-side done and the import package exists
-   (`docs/analytics/GTM-CONTAINER-SETUP.md`). Remaining: owner imports/publishes the container,
-   confirms DebugView receipt and marks GA4 key events. Umami still needs a website ID.
-4. **Search/local launch package** — GBP creation checklist, Search Console verification steps,
-   sitemap submission, citation list; only after the production domain is attached.
+3. **Analytics activation — complete (owner-confirmed 2026-10-03).** GTM Version 3 published; GA4
+   receives page views, `estimate_start` and the three inquiry key events; Enhanced Measurement
+   form interactions disabled. Optional remaining: internal-traffic filter; Umami still needs a
+   website ID. Reference: `docs/analytics/GTM-CONTAINER-SETUP.md`.
+4. **Search/local launch package** — Google Business Profile created (verification pending;
+   checklist in `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`), Search Console configured, sitemap
+   submitted, citation list prepared.
 5. **Curated visual evidence** — store owner-approved staging screenshots under
    `docs/verification/` for future regressions.
 

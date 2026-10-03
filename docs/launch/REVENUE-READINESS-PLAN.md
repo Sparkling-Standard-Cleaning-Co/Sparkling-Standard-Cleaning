@@ -1,24 +1,27 @@
-# Revenue-readiness plan and implementation queue
+# Revenue-readiness plan and implementation queue (historical)
+
+> **Historical document (2026-10-01).** The activation queue below was executed; the site is live
+> with working form delivery, routing and owner-confirmed GA4. For current status use
+> `docs/operations/PLATFORM-STATUS.md`; for the active marketing schedule use
+> `docs/marketing/90-DAY-LAUNCH-PLAN.md`. Keep this document as the record of how the activation
+> was sequenced.
 
 Prepared 2026-10-01 after the live production audit. This is an execution plan, not a rebuild:
 the site is deployed and technically sound; the blockers below are configuration, accounts and
 genuine content. Nothing here changes pricing, indexing or public claims without owner approval.
 
-## 1. Current state (verified 2026-10-01)
+## 1. State at preparation time (2026-10-01) — since resolved
 
 - Production: `https://sparkling-standard.com` serving from the Git-connected Cloudflare Pages
   project; every push to `main` deploys (Cloudflare Pages check-run verified).
 - All 18 pages return 200 with correct canonicals; **the site is indexable** (`index, follow`,
-  `Allow: /`). The owner has not yet recorded final launch authorization — nothing in this plan
-  changes indexing.
-- Forms: **cannot deliver a lead yet.** `/api/lead` returns `503 not_configured` (server key
-  absent) and the client key is empty in the build (verified in the deployed bundle). The
-  corrected honest failure message is live (deployed 2026-10-01).
-- Travel: `/api/travel` returns `503 origin_not_configured`; the estimator works in offline zone
-  mode meanwhile.
-- Analytics: architecture active; GTM `GTM-KSQ26HMG` is installed and consent-gated (no analytics
-  request before consent). The container was found empty on 2026-10-03; GA4 tags await the owner's
-  import/publish (`docs/analytics/GTM-CONTAINER-SETUP.md`). Umami has no ID.
+  `Allow: /`).
+- Forms at the time could not deliver a lead (`503 not_configured`); **resolved** — all four
+  funnels are owner-confirmed delivering to the inbox (2026-10-01/02).
+- Travel at the time returned `503 origin_not_configured`; **resolved** — MapMap routing is live
+  (`method: route, verified: true`, 2026-10-02).
+- Analytics: **resolved 2026-10-03** — GTM `GTM-KSQ26HMG` / GA4 `G-LG222LQRQ2` owner-confirmed
+  operational with all three inquiry key events. Umami has no ID (optional).
 - Performance (mobile-throttled Chromium, 4× CPU): LCP 1.26–1.65 s, CLS ≤ 0.038, ~96 KB/page.
 - Accessibility: axe WCAG 2.0/2.1/2.2 A+AA, 0 violations across representative pages.
 
@@ -93,10 +96,10 @@ Order matters: delivery → local presence → measurement → content.
    `business.reviews.submissionUrl` and update the footer/schema on the next deploy.
 3. **Google Search Console** — verify the domain property, submit
    `https://sparkling-standard.com/sitemap-index.xml`, confirm coverage.
-4. **GTM + GA4** — container `GTM-KSQ26HMG` and GA4 property `G-LG222LQRQ2` already exist and the
-   site loads GTM only after consent. **Remaining owner work:** import
-   `docs/analytics/gtm-import/*.json`, verify in Preview/DebugView, publish, then mark key events
-   (`docs/analytics/GTM-CONTAINER-SETUP.md`).
+4. **GTM + GA4 — done (owner-confirmed 2026-10-03).** Container `GTM-KSQ26HMG` (GTM Version 3) and
+   GA4 `G-LG222LQRQ2` are operational: page views, `estimate_start` and the three inquiry key
+   events verified end-to-end; Enhanced Measurement form interactions disabled; consent tests
+   passed. Rebuild reference: `docs/analytics/GTM-CONTAINER-SETUP.md`.
 5. **Umami** — create the site; set `PUBLIC_UMAMI_WEBSITE_ID`.
 6. **Cloudflare Turnstile** — create the widget; set `PUBLIC_TURNSTILE_SITE_KEY` (build) and
    `TURNSTILE_SECRET_KEY` (runtime secret).

@@ -12,15 +12,24 @@ privacy page must stay in sync with whatever is actually enabled.
 - **Website event generation is verified** in code and browser tests: after consent the site
   pushes the fixed events (section 3) into `window.dataLayer`; submit events fire only after the
   provider acknowledges a request.
-- **GA4 `G-LG222LQRQ2` is operational (owner-confirmed 2026-10-03).** The container initially had
-  zero tags; the owner then published their reviewed GTM configuration (Version 3, managed in the
-  GTM account — not in this repository). GA4 now receives page views, estimator starts and all
+- **GA4 `G-LG222LQRQ2` is operational (owner-confirmed external verification, 2026-10-03).** The
+  container initially had zero tags; the owner then published their reviewed GTM configuration —
+  **GTM Version 3**, containing **one Google tag, twelve custom event tags, twelve custom event
+  triggers and seven data-layer variables**. GA4 receives page views, `estimate_start` and all
   three successful inquiry events (`cleaning_request_submit`, `commercial_quote_submit`,
-  `str_request_submit`); the residential, commercial and STR submission tests and the analytics
-  consent tests passed; the three primary key events are configured.
+  `str_request_submit`). For each inquiry event the owner confirmed the full chain: the website
+  showed the success confirmation, the owner inbox received the email, and GA4 registered the
+  event. The three primary key events are configured; automatic Enhanced Measurement **form
+  interactions were disabled** so the site's explicit, honest submit events are the only form
+  signal. Analytics consent testing passed (no Google requests before consent or after refusal;
+  requests appear after acceptance).
+- These are **owner-confirmed external results**, not automated tests performed by this
+  repository. The repository-side generation tests and the owner-confirmed dashboard results
+  together form the evidence.
 - The prepared import files remain in the repository as a rebuild reference
   (`docs/analytics/GTM-CONTAINER-SETUP.md`); the live account configuration is authoritative.
-  Never republish or overwrite the owner's container without authorization.
+  Never republish or overwrite the owner's container without authorization, and never add a second
+  Google tag or Google's manual `gtag.js` snippet.
 - **Umami** has no website ID; it does not load and is not named on the privacy page.
 - **UTMs** are captured client-side for lead records; internal links/canonicals never carry them
   (enforced by `npm run validate`). Advertising features remain off; no paid analytics.
@@ -64,21 +73,25 @@ privacy page must stay in sync with whatever is actually enabled.
 **Never sent to analytics:** names, emails, phones, addresses, ZIP codes, photos, freeform
 notes, or any form content. Lead details live only in the owner's inbox/records.
 
-## 4. GTM / GA4 dashboard setup
+## 4. GTM / GA4 dashboard setup — completed (owner-confirmed)
 
-The complete, exact procedure lives in **`docs/analytics/GTM-CONTAINER-SETUP.md`** (tag/trigger
-names, parameters, import files, verification and key events). Summary:
+The owner completed this setup on 2026-10-03 (GTM Version 3 published; see section 0). The exact
+procedure is retained in **`docs/analytics/GTM-CONTAINER-SETUP.md`** (tag/trigger names,
+parameters, import files, verification and key events) as the rebuild reference. Summary of what
+was done:
 
-1. Import the prepared container files from `docs/analytics/gtm-import/` (or create the Google tag
-   and the custom-event tags manually — names must match exactly).
-2. Verify in GTM Preview and GA4 DebugView **before** publishing; publish only after the owner
-   authorizes it.
-3. Mark `cleaning_request_submit` / `commercial_quote_submit` / `str_request_submit` as GA4 key
-   events. `estimate_start`, `estimate_complete` and `booking_request` are secondary.
-4. Add an internal-traffic filter (owner IPs) so testing doesn't pollute data.
-5. In the GA4 web stream, turn **off** "Form interactions" under Enhanced Measurement; the site
-   sends explicit, consent-gated events only after provider acknowledgment, and the automatic
-   form tracking can record rejected/failed submissions as if they succeeded.
+1. The prepared container configuration was imported/created in GTM (`GTM-KSQ26HMG`): one Google
+   tag (`G-LG222LQRQ2`), twelve custom-event triggers, twelve GA4 event tags, seven data-layer
+   variables.
+2. Verified in GTM Preview and GA4 DebugView before publishing; published as Version 3 with owner
+   authorization.
+3. Marked `cleaning_request_submit` / `commercial_quote_submit` / `str_request_submit` as GA4 key
+   events. `estimate_start`, `estimate_complete` and `booking_request` remain secondary.
+4. In the GA4 web stream, **"Form interactions" under Enhanced Measurement is disabled**; the
+   site's explicit, consent-gated submit events (fired only after provider acknowledgment) are
+   the only form signal.
+5. Recommended still-open housekeeping (owner action): add an internal-traffic filter for owner
+   devices so testing does not pollute reports.
 
 ## 4b. Website event → GA4 key-event mapping (owner dashboard)
 

@@ -1,15 +1,20 @@
 # GTM container setup for GA4 (owner guide)
 
-**Status 2026-10-03:** the website side is complete and verified — it loads the GTM container
-`GTM-KSQ26HMG` only after an explicit analytics consent choice and pushes the fixed events below
-into `window.dataLayer`. The **container side was found empty** (the owner's GTM workspace showed
-zero tags on 2026-10-03), which is why the GA4 property appeared to receive nothing. This document
-closes that gap.
+**Status 2026-10-03 — COMPLETED by the owner (owner-confirmed).** The website side loads the GTM
+container `GTM-KSQ26HMG` only after an explicit analytics consent choice and pushes the fixed
+events below into `window.dataLayer`. The container initially held zero tags, so GA4 received
+nothing; the owner then published **GTM Version 3** (one Google tag, twelve event tags, twelve
+triggers, seven data-layer variables) and confirmed GA4 receipt of page views, `estimate_start`
+and all three inquiry key events, plus the three key-event settings.
+
+This document is retained as the **rebuild reference** (exact mapping, manual steps and
+verification procedure). The live account configuration is authoritative — never republish or
+overwrite it, and never add a second Google tag.
 
 > **Distinguish two layers**
 > **Generation** = the website sent the event (verifiable in GTM Preview / browser tests).
-> **Receipt** = the event arrived in the GA4 property (verifiable only in the owner's GA4
-> dashboard). Nothing in this repository can confirm receipt.
+> **Receipt** = the event arrived in the GA4 property (owner-confirmed for the events above;
+> any future change still requires dashboard verification).
 
 ## 1. Confirmed identifiers (use these — never create new ones)
 
@@ -69,7 +74,7 @@ these events as a scheduled or completed job, and never rename or repurpose them
 Each parameter needs a Data Layer Variable in GTM: `DLV - cta_slot`, `DLV - service_type`,
 `DLV - step`, `DLV - outcome`, `DLV - journey`, `DLV - facility_type`, `DLV - platform`.
 
-## 4. Import the prepared configuration (recommended)
+## 4. Import the prepared configuration (completed 2026-10-03; retained for rebuilds)
 
 Two import files are generated from this repository by `scripts/generate-gtm-import.mjs` and kept
 in sync by `npm run validate`:
@@ -97,7 +102,7 @@ Import steps (owner action, browser):
 8. Verify (section 5), then **Submit → Publish** with a version name such as
    `GA4 website event tracking (verified)`.
 
-## 5. Verify before publishing (owner action)
+## 5. Verify before publishing (the procedure that was used; keep for future changes)
 
 Use GTM **Preview** (Tag Assistant) and GA4 **DebugView**:
 
@@ -116,28 +121,28 @@ Use GTM **Preview** (Tag Assistant) and GA4 **DebugView**:
 9. Publish. Then have a real visitor (or owner device, after publishing) consent and watch GA4
    **Realtime** — `page_view` plus any triggered events.
 
-## 6. GA4 property settings (owner action)
+## 6. GA4 property settings (completed; retained for rebuilds)
 
 1. **Key events:** GA4 → **Admin → Events**. Mark as key events:
    - **Primary:** `cleaning_request_submit`, `commercial_quote_submit`, `str_request_submit`
    - **Secondary:** `estimate_start`, `estimate_complete`, `booking_request`
    - Counting method: **once per event** for the six above.
 2. **Enhanced Measurement:** GA4 → **Admin → Data streams → web stream → Enhanced measurement**.
-   - **Turn OFF "Form interactions."** The site sends its own honest submit events only after the
-     provider confirms; GA4's automatic form tracking can fire on a submit that failed or was
-     rejected, creating misleading duplicate data.
+   - **"Form interactions" is OFF** (owner-confirmed). The site sends its own honest submit events
+     only after the provider confirms; GA4's automatic form tracking could fire on a submit that
+     failed or was rejected, creating misleading duplicate data.
    - Page views, scrolls, outbound clicks and file downloads may stay on; on this static site the
      page-view setting does not duplicate the Google tag's `page_view`.
    - "Site search" is unused by this website.
-3. **Internal traffic:** add an internal-traffic rule for owner devices before heavy testing so
+3. **Internal traffic (still open, optional):** add an internal-traffic rule for owner devices so
    test visits do not pollute reports.
 4. **Attribution:** see section 7.
 
 ## 7. Marketing attribution (UTMs)
 
 - Campaign links are generated from `src/config/marketing-links.ts`
-  (`npm run marketing:links`); generated lists: `docs/marketing/UTM-MASTER-LINKS.md/.csv` and
-  `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md`.
+  (`npm run marketing:links`); generated lists: `docs/marketing/UTM-MASTER-LINKS.md`, its `.csv`
+  companion and `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md`.
 - GA4 attributes a visit to a campaign when the landing URL carries the UTM parameters and the
   visitor has consented. UTMs are **never** placed on internal navigation, canonical URLs, the
   sitemap, `tel:`/`sms:`/`mailto:` links or outbound social/profile links.
@@ -148,9 +153,11 @@ Use GTM **Preview** (Tag Assistant) and GA4 **DebugView**:
 - Google Ads auto-tagging (`gclid`/`gbraid`/`wbraid`) is preserved on lead records; never add
   manual Google Ads UTMs.
 
-## 8. What still needs owner confirmation
+## 8. Status (owner-confirmed 2026-10-03)
 
-- The import was completed and the container published (nothing here can do it for you).
-- GA4 DebugView / Realtime shows the events (receipt, not just generation).
-- Key events and Enhanced Measurement changes in section 6 are saved.
-- Google Business Profile verification result (independent of analytics).
+- ✅ Import completed and GTM Version 3 published.
+- ✅ GA4 receives page views, `estimate_start` and all three inquiry events end-to-end.
+- ✅ The three primary key events are configured; Enhanced Measurement form interactions are off;
+  consent tests passed.
+- ⏳ Optional and open: internal-traffic filter for owner devices.
+- ⏳ Google Business Profile verification result (independent of analytics).

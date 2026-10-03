@@ -140,8 +140,9 @@ Generated with the live engine (`npm run estimate:quotes`, 3/2 maintained baseli
 | 30301 | Atlanta (valid, distant) | outside | "outside the current service area" → manual confirmation | zone, API never called |
 | 99999 | unassigned ZIP | outside | same "outside" message | zone, API never called |
 
-`/api/travel` returns `503 origin_not_configured` live, so even core/surrounding ZIPs use the
-provisional zone math.
+At the time of this analysis, `/api/travel` returned `503 origin_not_configured`, so even
+core/surrounding ZIPs used the provisional zone math. **Since resolved:** MapMap routing is live
+(`method: route, verified: true`, 2026-10-02) — see `docs/operations/PLATFORM-STATUS.md`.
 
 ## 2. Root causes
 

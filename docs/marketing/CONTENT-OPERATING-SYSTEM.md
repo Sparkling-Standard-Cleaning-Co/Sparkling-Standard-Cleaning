@@ -1,29 +1,37 @@
 # Content operating system (canonical)
 
 One marketing operating system. Channel roles, content pillars, the weekly rhythm, and the
-budget reality. Launch capital is approximately **$350** with supplies already owned — the plan
-weights organic/local execution, direct outreach and proof content over paid ads.
+budget reality. The plan weights organic/local execution, direct outreach and proof content over
+paid ads.
 
-**Expanded platform presence (2026-10-02):** the complete inventory, tiering, one-asset-many-
-publications matrix, sustainable cadence, first-week sequence and outreach rhythm now live in
-`MULTIPLATFORM-OPERATING-PLAN.md`. Account status and owner actions are in
-`PLATFORM-REGISTER.md`; every placement's tracked link is in `WHERE-TO-PASTE-UTM-LINKS.md`.
+**Production layer (2026-10-03, proposed):** how an idea becomes a published video — the proposed
+"30 Days. 30 Details." series, the four-week plan, the founder introduction brief, the repeatable
+video structure, the iPhone 16 Pro Max + DaVinci Resolve workflow and the publishing/measurement
+instructions — lives in `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`. That document is proposed
+until the owner approves it.
+
+**Expanded platform presence:** the complete inventory, priority tiers, the two growth engines
+(audience growth vs. local customer acquisition), the one-asset-many-publications matrix,
+sustainable cadence and outreach rhythm live in `MULTIPLATFORM-OPERATING-PLAN.md`. Account status
+and the creation checklist are in `PLATFORM-REGISTER.md` and `SOCIAL-ACCOUNT-SETUP.md`; every
+placement's tracked link is in `WHERE-TO-PASTE-UTM-LINKS.md`.
 
 ## Channel roles (don't spend equal effort everywhere)
 
 | Channel | Role | Priority |
 | --- | --- | --- |
-| **Google Business Profile** | High-intent discovery, local trust, reviews | #1 setup priority |
+| **Google Business Profile** | High-intent discovery, local trust, reviews | **Created — verification pending** (highest local priority) |
 | **Google organic (site)** | Owning pages for every service cluster | #1 foundation |
-| **Facebook** | Local communities, families, before/after, referrals | High |
-| **Instagram** | Visual brand, reels, founder, transformations | High |
-| **TikTok** | Reach, founder journey, satisfying detail videos | High |
-| **YouTube Shorts** | Search/discovery + repurposed verticals | Medium (repurpose) |
-| **Nextdoor** | Neighborhood credibility, recommendations | High (cheap, local) |
+| **Instagram** | Primary content channel — visual brand, reels, founder, transformations | Primary content |
+| **TikTok** | Primary content channel — reach, founder journey, satisfying detail videos | Primary content |
+| **YouTube** | Primary content channel — Search/Shorts discovery plus founder/process long-form | Primary content |
+| **Facebook** | Confirmed local platform — communities, families, genuine local updates, referrals | High (local communication) |
+| **Nextdoor** | Confirmed local platform — neighborhood credibility, recommendations | High (cheap, local) |
 | **Email/SMS** | Follow-up, recurring, quote nurturing | High (owned audience) |
 | **Direct outreach** | Realtors, property managers, Airbnb hosts, churches, commercial | Highest immediate ROI |
-| **LinkedIn** | Secondary — commercial/property relationships | Low effort |
-| **Paid media** | Only after the funnel + attribution are measured | Deferred (30–90 days) |
+| **Pinterest, Rumble, X, Threads, Gab, Parler** | Adapted distribution of primary-channel assets | Low effort |
+| **LinkedIn, Alignable** | Secondary — commercial/property relationships | Low effort |
+| **Paid media** | Not used — zero additional spending without explicit owner authorization | Not authorized |
 
 ## Content pillars (12)
 
@@ -44,18 +52,12 @@ Rule: not every post is an advertisement. 4 value posts : 1 offer post.
 
 ## The weekly rhythm (sustainable minimum)
 
-| Day | Action |
-| --- | --- |
-| Mon | 1 short video (detail demo or founder clip) → TikTok + Reels + Shorts |
-| Tue | 1 before/after carousel (Facebook + Instagram) |
-| Wed | Nextdoor post or comment in a local group (value-first) |
-| Thu | 1 outreach block (5 realtors / 3 property managers / 2 STR hosts / 2 churches / 2 businesses) |
-| Fri | 1 GBP post (service highlight or proof) + reply to every review/question |
-| Sat | 1 longer story post (founder journey / education) |
-| Sun | Weekly scorecard (`WEEKLY-SCORECARD.md`) + plan next week |
+The single current cadence is maintained in `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` §4
+(~4 short videos per week, batch-filmed, plus light local posts), with the production workflow in
+`docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`. Do not keep competing schedules in this document.
 
-Minimum viable cadence if life happens: **video + GBP post + outreach block + review asks**.
-Everything else compounds but these four are the engine.
+Minimum viable week if life happens: **one video + one local/GBP post + one outreach block + one
+review ask**. Everything else compounds but these four are the engine.
 
 ## Proof system (Detail Proof)
 
@@ -64,16 +66,12 @@ No staged dirt, no fake customers, no invented results. Customer permission is r
 property photos (see `docs/privacy/PHOTO-PRIVACY-SOP.md`). This system is the marketing
 equivalent of the founder's philosophy — prove the detail, don't claim it.
 
-## GBP setup checklist (Week 1)
+## GBP setup checklist
 
-- Category: House cleaning service (primary); add secondary categories honestly
-- Service area business: hide the street address; set the approved service area
-- Hours: seven days, 8 AM – 6 PM (residential window), note commercial flexibility
-- Website link: tracked GBP link from `docs/marketing/UTM-MASTER-LINKS.md`
-- Services: mirror the seven site services with honest descriptions
-- Photos: real work only, privacy-checked; no stock
-- Reviews: request after every job (`REVIEW-GROWTH-SYSTEM.md`); never buy or gate
-- Q&A: seed honest answers after setup (never fake customer questions)
+The current, maintained Google Business Profile checklist lives in
+`docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (status: created — verification pending). Use that
+document rather than duplicating the steps here. Remember: never claim verification, publish the
+profile URL or build a review link until Google confirms and the owner supplies the real links.
 
 ## Local groups & Nextdoor
 
@@ -81,16 +79,21 @@ equivalent of the founder's philosophy — prove the detail, don't claim it.
 - Nextdoor: introductions post once, then answer cleaning questions as the helpful expert.
 - Never post the same flyer image to ten groups on the same day; platform spam rules punish it.
 
-## Budget guidance ($350)
+## Budget guidance (zero additional spending)
+
+The standing preference is **zero additional spending**. No paid tools, advertising commitments,
+growth services or subscriptions are authorized. The published website, GA4 analytics, UTM/QR
+generation, forms and the content workflow all run on what already exists.
 
 | Item | Guidance |
 | --- | --- |
 | GBP/Listings | $0 (owner-managed) |
 | Domain + hosting | Owned via the Cloudflare project |
-| Print (door hangers/flyers/cards) | ~$80–120 start small, regenerate QR after the final domain |
-| Vehicle magnets | Optional; useful, but a clean sign is fine |
-| Paid ads | $0 until the funnel and attribution are measured; then $5–10/day capped tests only |
-| Tools | Free tiers only at launch (scheduling, forms, QR generation are built in) |
+| Content production | iPhone 16 Pro Max + DaVinci Resolve Studio already owned; no new gear or software |
+| Publishing/scheduling | Native, free platform tools only |
+| Print (door hangers/flyers/cards) | Optional and **owner-funded only**; regenerate QR only if the owner orders a print run |
+| Vehicle magnets | Optional; a clean sign is acceptable |
+| Paid ads | Not authorized. The default remains $0; any future test requires explicit owner authorization after the funnel and attribution are proven |
 
-Do not burn the launch budget on Meta ads. The first customers come from direct outreach and
-neighborhood presence; ads amplify what already converts.
+The first customers come from direct outreach and neighborhood presence; content is the
+multiplier, not a paid campaign.

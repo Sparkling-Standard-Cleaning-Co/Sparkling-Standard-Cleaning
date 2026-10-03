@@ -102,7 +102,7 @@ owner confirmation.
 | Header/nav contract | `npm run test:browser` | 7/7 header-about tests (fit/alignment at four widths, brand identity, mobile lockup, About page) |
 | Platform registry | Unit/config + browser tests | 19 platforms prepared; only the two confirmed profiles render; pending platforms never appear; monogram tiles for platforms without official glyphs |
 | UTM expansion | `npm run marketing:links` + `npm run marketing:verify` | 50 tracked inbound links (23 ready, 27 prepared and not yet placed — refreshed 2026-10-03); all committed QR assets decode-verified; docs byte-identical on check |
-| GA4 mapping | Documentation | Event→key-event mapping added; website **generation** verified. 2026-10-03 discovery: the GTM container had **zero tags**, so GA4 receipt was never possible. Import files + exact dashboard steps prepared (`docs/analytics/GTM-CONTAINER-SETUP.md`); property receipt awaits the owner's import/publish and DebugView confirmation |
+| GA4 mapping | Documentation | Event→key-event mapping added; website **generation** verified. 2026-10-03 discovery: the GTM container had **zero tags**, so GA4 receipt was never possible. Import files + exact dashboard steps prepared (`docs/analytics/GTM-CONTAINER-SETUP.md`). **Superseded:** the owner later published GTM Version 3 and GA4 receipt is now owner-confirmed — see the GA4 section below |
 | Lead notification format | `tests/lead-notification.test.ts` (11 cases) + `tests/api-verification.test.ts` | Ordered sections, exact figures, verbatim notes, mismatch ACTION REQUIRED, raw codes separated, no credentials/origin |
 | Full suites | `npm run check`, `npm test` (252), `npm run test:browser` (64), `npm run validate`, `pending`, `audit:facts`, `smoke` | All pass |
 
@@ -157,6 +157,22 @@ delivered are unchanged; the corrections apply to future attribution and notific
 | End-to-end chain | `tests/browser/attribution.test.mjs` (4 cases) | Facebook campaign page → real internal navigation to the estimator → completed request carries `first_utm_source=facebook`, `latest_utm_*`, and the campaign landing page; new campaign vs first-touch; external referral recorded; same-domain navigation never becomes a referral |
 | Analytics/consent untouched | `tests/browser/analytics-events.test.mjs`, `gps-gtm.test.mjs` re-run | No change to event names, payloads or consent loading behavior; no customer data added to analytics |
 | Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (77 pass), `npm run build` (21 pages), `npm run validate`, `pending`, `testimonials`, `audit:facts`, `smoke` | All pass |
+
+## Release status (2026-10-03)
+
+- **Deployed production:** `origin/main` `61c30ae` (last reported push; Cloudflare Pages deploys
+  from `main`).
+- **Local `main`: `0f3c38c`** — **four unpublished commits** ahead of origin, all verified
+  locally but **not deployed**:
+  - `8b8dde4` — importable GTM GA4 package + Brand A2 finalization;
+  - `03d6ba8` — UTM registry counts correction in the verification record;
+  - `53a85aa` — GTM import duplicate-tag cleanup note;
+  - `0f3c38c` — attribution repair + first/latest lead-notification labels.
+- **Limitations:** the GA4 account results are owner-confirmed external verification, not
+  repository tests; the locally completed work only reaches production when the owner authorizes a
+  push. The attribution fix cannot retroactively repair previously clobbered `latest` records; it
+  applies to future attribution (existing delivered emails are unchanged).
+- No work is described as deployed until the owner authorizes the push.
 
 ## Pending (cannot be verified in this environment — owner or tooling required)
 

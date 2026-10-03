@@ -1,32 +1,63 @@
 # Multiplatform operating plan
 
-How Sparkling Standard runs its expanded platform presence **sustainably**. The goal is weekly and
-biweekly residential clients — not maximum posting volume. One genuine original asset should
-produce several adapted publications; low-priority channels receive adapted versions, never
-separate content factories.
+How Sparkling Standard runs its platform presence **sustainably**. The business objective is
+**weekly and biweekly residential cleaning customers** — not maximum posting volume. One genuine
+original asset should produce several adapted publications; low-priority channels receive adapted
+versions, never separate content factories.
 
-Companion documents: `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (content sources and rules),
-`docs/marketing/PLATFORM-REGISTER.md` (accounts and status), `docs/marketing/UTM-MASTER-LINKS.md`
-(tracked links), `docs/privacy/PHOTO-PRIVACY-SOP.md` (photo rules), `docs/marketing/REVIEW-GROWTH-SYSTEM.md`.
+Companion documents: `docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (owner account checklist),
+`docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` (production workflow and the proposed series),
+`docs/marketing/CONTENT-OPERATING-SYSTEM.md` (channel roles and pillars),
+`docs/marketing/PLATFORM-REGISTER.md` (accounts and status),
+`docs/marketing/UTM-MASTER-LINKS.md` / `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md` (tracked
+links), `docs/privacy/PHOTO-PRIVACY-SOP.md` (photo rules),
+`docs/marketing/REVIEW-GROWTH-SYSTEM.md` and `docs/marketing/LEAD-MEASUREMENT-MODEL.md`
+(measurement).
+
+## 0. Business objective and growth engines
+
+**Primary objective: dependable weekly and biweekly residential cleaning customers.** Everything
+in this plan serves that. Secondary markets (deep cleaning, move-in/move-out, short-term rentals,
+commercial properties and churches) are supported through the same content and outreach system,
+but they do not replace the recurring residential focus.
+
+**Brand:** premium, feminine, elegant, warm and trustworthy; pink and gold; approved slogan
+**The Details Are Our Standard.** Hayli — founder and owner-operator — is the recognizable face of
+the marketing, supported by authentic demonstrations of her work, her professional experience,
+her standards and her entrepreneurial story. Zero additional spending is the default.
+
+Two complementary engines (do not confuse them):
+
+| Engine | Purpose | Channels | Primary outcome |
+| --- | --- | --- | --- |
+| **Audience growth** | Discovery, reach and sharing through original, entertaining, educational and visually satisfying cleaning content | Instagram, TikTok, YouTube (primary content); Pinterest, Rumble and distribution channels as adaptations | Qualified attention that can convert later — **not** the business result by itself |
+| **Local customer acquisition** | Turn local attention and trust into actual inquiries and recurring customers | Google Business Profile (verification pending), Facebook, Nextdoor, the website's estimate flow, direct outreach, genuine reviews and referrals | **Inquiries, confirmed bookings and recurring customers** |
+
+Audience growth is not the primary business outcome. A video with modest views that produces a
+weekly client is worth more than a viral clip that produces none.
 
 ## 1. Priority tiers (where effort goes)
 
 | Tier | Platforms | Why | Effort |
 | --- | --- | --- | --- |
-| **1 — Local acquisition** | Google Business Profile, Facebook, Nextdoor, the website's estimate flow | Where Pensacola-area homeowners actually look and refer. GBP posts, local Facebook/Nextdoor visibility, website SEO. | Highest care |
-| **2 — Visual proof** | Instagram, TikTok, YouTube, Pinterest, Rumble | Show the detail standard. One filmed detail demo can be cut for four video/short channels. | One shoot → many cuts |
-| **3 — Distribution** | X, Threads, Gab, Parler | Adapted reposts of Tier 1/2 assets. No separate production. | Minutes per post |
-| **4 — Professional** | LinkedIn, Alignable | Commercial, property-manager and B2B relationships. | Weekly touch |
-| **5 — Directories & community** | Yelp, Bing Places, Reddit | Citations/trust plus genuine local conversation. | Setup + occasional |
-| **Paid** | Not used | Zero-spend policy. | — |
+| **1 — Primary content** | Instagram, TikTok, YouTube | The three channels where short-form cleaning content is discovered and shared. One filmed detail can be cut for all three. | One shoot → three publications |
+| **1 — Local acquisition** | Google Business Profile (verification pending), Facebook, Nextdoor, the website's estimate flow, direct outreach | Where Pensacola/Cantonment homeowners actually look, ask and refer. Google Business Profile receives authentic photos, accurate services, updates and genuine reviews once verification is confirmed. | Highest care |
+| **2 — Adapted distribution** | Pinterest, Rumble, X, Threads, Gab, Parler | Adapted reposts of Tier-1 assets. No separate production. | Minutes per post |
+| **3 — Professional** | LinkedIn, Alignable | Commercial, property-manager and B2B relationships. | Weekly touch |
+| **4 — Directories & community** | Yelp, Bing Places, Reddit | Citations/trust plus genuine local conversation; Bing Places imports from Google Business after verification. | Setup + occasional |
+| **Paid** | Not used | Zero-additional-spending preference. | — |
+
+The full prepared inventory (19 platforms) stays in `docs/marketing/PLATFORM-REGISTER.md`; the
+lower tiers are retained, not equal production obligations. Account creation status and the exact
+owner checklist live in `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
 
 ## 2. Content pillars (what we make)
 
 1. **Recurring-cleaning value** — weekly/biweekly rhythms, what stays easier, the per-visit story.
 2. **Detail demonstrations** — 15–45 second real clips of one detail (faucet base, switch plate,
-   baseboard, oven glass). The highest-converting organic content.
-3. **Founder story** — Hayli's real background (only already-approved facts). Faces on camera are
-   optional; the story matters.
+   baseboard, oven glass). The signature format and the highest-converting organic content.
+3. **Founder story** — Hayli's real background and standards (only owner-approved facts); she is
+   the face of the marketing. Faces on camera are encouraged but not mandatory in every video.
 4. **Practical education** — how to keep a kitchen fresh between visits, pet-hair realities,
    move-out timelines, STR turnover checklists.
 5. **Service explanations** — deep vs standard, first recurring clean, what is not included.
@@ -38,40 +69,54 @@ Companion documents: `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (content sourc
 **Never:** invented results, fake testimonials, staged dirt, stock photos presented as our work,
 or unapproved promotional promises/prices.
 
+The proposed signature series, four-week plan, founder introduction brief and production workflow
+are in `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` (proposed until the owner approves).
+
 ## 3. One asset → many publications
 
 | Original asset | Adaptations |
 | --- | --- |
-| 30–60 s detail-cleaning video (phone, landscape + vertical) | TikTok/Reels/Shorts cut (vertical), Instagram feed (square crop), Pinterest idea pin, YouTube Short, Rumble mirror, X/Threads/Gab/Parler post with one-line caption |
-| 5–8 photo detail set (permissioned) | Instagram carousel, Facebook post, Pinterest board, GBP photo update |
+| 20–45 s detail-cleaning video (shot vertical 9:16) | Instagram Reel, TikTok, YouTube Short; still frame → Pinterest pin; one-line tip → X/Threads/Gab/Parler post; Rumble mirror |
+| Longer founder/process cut | YouTube long-form; 60–90 s cut for Facebook and Instagram feed |
+| 5–8 photo detail set (permissioned) | Instagram carousel, Facebook post, Nextdoor-friendly local post, Google Business Profile photo update |
 | Text tip (150–250 words) | Facebook post, Nextdoor post, X post, LinkedIn post (commercial angle), Reddit comment where genuinely helpful (respect each community's rules) |
 | Customer review (real) | Instagram story highlight, Facebook recommendation reply, GBP reply, website reviews collection when enough exist |
 | Service page update | Educational post linking the page with its tracked link |
 
-## 4. Weekly cadence (sustainable)
+## 4. Weekly cadence (sustainable, owner-operated)
+
+The proposed content pace is **~4 short videos per week** plus light local posts; batch filming
+and one editing block keep it realistic.
 
 | Day | Action | Time |
 | --- | --- | --- |
-| Monday | GBP post (offer/update) + reply to any reviews | 15 min |
-| Tuesday | Detail video shoot (one 10-minute session, 1–2 clips) | 20 min |
-| Wednesday | Publish the video: TikTok + Instagram Reels + YouTube Short | 20 min |
-| Thursday | Facebook + Nextdoor local post (tip or availability, with its tracked link) | 15 min |
-| Friday | Pinterest pin from the week's asset + X/Threads repost | 10 min |
-| Saturday | Optional: Rumble mirror + Reddit/Alignable/LinkedIn engagement | 15 min |
-| Whenever | Reply to every comment/DM within a day | — |
+| Monday | Google Business Profile post + reply to any reviews (once verified) | 15 min |
+| Tuesday | Batch film 2–4 detail clips at a real job (permission logged) | 30 min |
+| Wednesday | Publish video 1: Instagram Reel + TikTok + YouTube Short | 25 min |
+| Thursday | Facebook + Nextdoor local post (tip, availability or answer) with its tracked link | 15 min |
+| Friday | Publish video 2 (adapted cut); Pinterest pin + X/Threads repost | 20 min |
+| Saturday | Batch-edit the week's remaining videos in DaVinci Resolve | 45 min |
+| Sunday | Weekly scorecard (`WEEKLY-SCORECARD.md`) + next week's shot list | 15 min |
 
-Realistic total: **1.5–2 hours per week**. If a week is short, GBP + Facebook/Nextdoor + one video
-is the minimum.
+Publish the remaining weekly videos on a simple alternating schedule (for example Tuesday/
+Thursday/Saturday) without requiring a separate shoot for each platform. Realistic total:
+**2–3 hours per week**. If a week is short, the minimum is **one video + a GBP or local post +
+one review request**.
 
-## 5. First week (launch sequence)
+## 5. First two weeks (launch sequence — owner actions)
 
-| Day 1 | Confirm/repair the Tier-1 profiles: Google Business Profile (awaiting verification), Facebook, Nextdoor. Paste each platform's tracked website link from `WHERE-TO-PASTE-UTM-LINKS.md`. |
-| Day 2 | Welcome post on Facebook + Nextdoor: who we are, what we clean, one honest differentiator, tracked estimate link. |
-| Day 3 | Film one detail demo at any job (permission for filming the detail, no identifying info). |
-| Day 4 | Publish the detail demo to TikTok + Instagram; write one educational caption. |
-| Day 5 | Create the remaining pending accounts needed for Tier 2 (Instagram, TikTok, YouTube, Pinterest) and paste their bio links; keep Gab/Parler/Threads/X/LinkedIn/Alignable/Yelp for week 2 if time is short. |
-| Day 6 | Google Business Profile post + first GBP photo upload once verification completes. |
-| Day 7 | Review the week's numbers in the lead ledger; set next week's single video topic. |
+Account creation is tracked in `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`; nothing below is done
+until the owner confirms it.
+
+| Step | Action |
+| --- | --- |
+| 1 | Confirm the Google Business Profile verification result (pending); do not claim verification early. |
+| 2 | Create the priority content accounts (Instagram, TikTok, YouTube) with the approved branding and tracked website links; update the register as each exists. |
+| 3 | Keep Facebook and Nextdoor contact details and tracked links consistent; prepare a genuine welcome/local update. |
+| 4 | Film the founder introduction (long + short edit) and the first 2–3 detail clips. |
+| 5 | Publish the opening content across the three primary channels; post the local update to Facebook/Nextdoor. |
+| 6 | Add GBP photos/updates once verification completes; begin genuine review requests after completed jobs. |
+| 7 | Review the week's numbers in the scorecard; set next week's shot list. |
 
 ## 6. Direct outreach cadence (recurring pipeline)
 
@@ -95,13 +140,18 @@ The tracked link/QR for each packet is in `UTM-MASTER-LINKS.md`.
 - Reviews: no gating, no incentives, no fabricated counts.
 - Promotions: disabled until the owner approves exact terms (see `docs/launch/PROMOTION-PROPOSALS.md`).
 - Any test content published during setup is labeled as a test or kept private.
+- Zero additional spending: no paid ads, growth services, schedulers or verification.
 
-## 8. Measure (five numbers, weekly)
+## 8. Measure by business outcome
+
+Use the reporting hierarchy in `docs/marketing/LEAD-MEASUREMENT-MODEL.md` and the weekly record in
+`docs/marketing/WEEKLY-SCORECARD.md`. The five weekly business numbers:
 
 1. Leads by source (from the lead ledger/attribution).
-2. Estimate starts and completions (GA4 once confirmed in the property).
+2. Estimate starts, completions and successful inquiry key events (GA4 is owner-confirmed
+   operational; owner inbox remains the authoritative delivery record).
 3. Recurring requests (weekly/biweekly) vs one-time.
-4. Booked jobs and revenue.
+4. Confirmed bookings and completed-job revenue (owner records).
 5. Reviews received/replied — plus profile views once GBP is live.
 
 Do not chase vanity metrics (likes/followers); a single weekly/biweekly client is worth more than

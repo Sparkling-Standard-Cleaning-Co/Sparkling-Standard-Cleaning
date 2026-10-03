@@ -26,7 +26,7 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | MapMap address/routing key | Configured as a Cloudflare secret; `/api/geocode` suggest/resolve/reverse live and verified (2026-10-02) |
 | SMS | `business.flags.smsEnabled: true` (owner-verified); Call/Text actions live |
 | Facebook + Nextdoor | Confirmed profile URLs in `business.socials`; other platforms remain PENDING |
-| GTM / GA4 analytics | `GTM-KSQ26HMG` consent-gated and installed; GA4 measurement ID `G-LG222LQRQ2` confirmed. The container was found empty (zero tags) 2026-10-03 — owner must import the prepared files and publish (`docs/analytics/GTM-CONTAINER-SETUP.md`). Umami still has no ID |
+| GTM / GA4 analytics | **Resolved 2026-10-03 (owner-confirmed):** `GTM-KSQ26HMG` consent-gated and installed; GA4 `G-LG222LQRQ2` operational via published GTM Version 3 (1 Google tag, 12 event tags, 12 triggers, 7 variables). Page views, `estimate_start` and the three inquiry key events verified end-to-end; Enhanced Measurement form interactions disabled. Umami still has no ID (optional) |
 | Brand icons | Owner-approved favicon/PWA icon kit installed (2026-10-02) |
 
 ## BLOCKS PRODUCTION
@@ -47,14 +47,30 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | 7 | Exact service-zone review | `src/config/geography.ts` | Zones are provisional ZIP centroids around the one-hour driving boundary. Confirm the final list after the origin coordinates are entered. |
 | 8 | Pricing matrix approval | `docs/launch/PRICING-PROPOSAL.md` | Market research + proposed rates. Production rates do NOT change until the owner approves. |
 | 9 | Review link (Google profile) | `business.reviews.submissionUrl` | Needed for the review system; create the Google Business Profile, then supply the links. |
-| 10 | Remaining platform profile URLs | `business.socials` | **Partially done:** Facebook and Nextdoor confirmed and rendering. Google Business Profile is created with verification processing and its URL intentionally unpublished. Bing Places, Yelp, Instagram, TikTok, YouTube, Pinterest, Rumble, Gab, Parler, X, Threads, LinkedIn, Alignable and Reddit are prepared as PENDING and never render until supplied. Full actions: `docs/marketing/PLATFORM-REGISTER.md`. |
-| 11 | Analytics IDs | `PUBLIC_UMAMI_WEBSITE_ID`, `PUBLIC_GTM_CONTAINER_ID` | **Partially done.** `GTM-KSQ26HMG` is consent-gated and installed; GA4 stream confirmed (`G-LG222LQRQ2`). The owner's GTM workspace showed **zero tags** on 2026-10-03 — import `docs/analytics/gtm-import/*.json`, verify in Preview/DebugView and publish (`docs/analytics/GTM-CONTAINER-SETUP.md`). Umami still has no website ID; the privacy page names only configured services. Accounts must be unique to this business. |
+| 10 | Remaining platform profile URLs | `business.socials` | **Partially done:** Facebook and Nextdoor confirmed and rendering. **Priority:** create Instagram, TikTok and YouTube using the step-by-step checklist (`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`), then supply their verified URLs. Google Business Profile is created with verification processing and its URL intentionally unpublished. Bing Places, Yelp, Pinterest, Rumble, Gab, Parler, X, Threads, LinkedIn, Alignable and Reddit are prepared as PENDING and never render until supplied. Full actions: `docs/marketing/PLATFORM-REGISTER.md`. |
+| 11 | Analytics IDs | `PUBLIC_UMAMI_WEBSITE_ID`, `PUBLIC_GTM_CONTAINER_ID` | **GA4 done (owner-confirmed 2026-10-03):** `GTM-KSQ26HMG` / `G-LG222LQRQ2` operational with all three key events verified. Umami remains optional with no website ID; the privacy page names only configured services. Accounts must be unique to this business. |
 | 12 | SMS capability | `business.flags.smsEnabled` | **Done 2026-10-01.** Owner-confirmed: the business number receives SMS and text contact is authorized; `business.flags.smsEnabled` is true and the Call/Text reservation actions are live. |
 | 13 | Final cancellation percentages | `src/config/pricing.ts` cancellation | Currently provisional; public copy intentionally avoids numbers until approved. |
 | 14 | Turnstile keys (recommended) | `PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Otherwise forms rely on honeypot + timing. |
 | 15 | EIA API key (optional) | `EIA_API_KEY` | Live Gulf Coast gas reference; fallback price works without it. |
 | 16 | Browser/device QA + Lighthouse + accessibility scan | local preview / production preview | **Partially done:** browser regression suites and axe WCAG 2.2 AA scans pass in Chromium and are recorded in `docs/verification/VERIFICATION.md`. Physical-device smoke and a Lighthouse/PSI run remain owner-side. |
 | 17 | Owner legal review of `/terms/` and `/privacy/` | site pages | Drafted as honest operating terms, not legal advice. |
+
+## MARKETING LAUNCH — owner approvals and actions (grouped in execution order)
+
+The full schedule is `docs/marketing/90-DAY-LAUNCH-PLAN.md`; account setup is
+`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`; content concepts are
+`docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` (proposed until approved).
+
+| # | Action | Notes |
+| --- | --- | --- |
+| M1 | Review and authorize the current local software release (push to `main`) | Four verified but unpublished commits; production changes only when the owner authorizes the push (`docs/verification/VERIFICATION.md` release status) |
+| M2 | Confirm the Google Business Profile verification result | Created, verification pending; never claim verified or publish the URL early |
+| M3 | Create the priority content accounts (Instagram, TikTok, YouTube) | Use the owner checklist with approved branding, consistent contact facts and tracked links; update the register as each exists |
+| M4 | Approve the content concepts and schedule | The "30 Days. 30 Details." title, the four-week plan and the founder introduction are proposals until approved; owner approves the facts the founder content may state |
+| M5 | Film the opening content | Founder introduction (long + short edit) and initial detail clips; customer footage requires permission |
+| M6 | Optional: add a GA4 internal-traffic filter for owner devices | Keeps test visits out of reports |
+| M7 | 30-day review (end of week 4) | Compare channels by inquiries, confirmed bookings, completed jobs and recurring customers — not views |
 
 ## GIFT CERTIFICATES — owner decisions before sales activate
 

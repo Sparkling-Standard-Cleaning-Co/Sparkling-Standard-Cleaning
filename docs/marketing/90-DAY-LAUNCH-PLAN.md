@@ -1,54 +1,105 @@
 # 90-day launch plan
 
 Goal: **customers quickly while building sustainable recurring business.** No revenue forecasts
-are promises — this is an operating plan, not a projection.
+are promises — this is an operating plan, not a projection. The first 30 days are the current
+focus; the owner approves the final schedule and content concepts before they become obligations.
+Zero additional spending remains the default: no paid ads, tools or services without explicit
+owner authorization.
 
-## First 7 days — stand up identity and start selling
+Current state (2026-10-03): the website is **live** with working lead delivery and owner-confirmed
+GA4 analytics. The foundations listed below are complete; the active plan is the **four-week
+launch** that follows. Platform accounts and the Google Business Profile verification are the
+main open setup items (`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`).
 
-- [ ] Finalize company name + domain; set `PUBLIC_SITE_URL`, name, phone, email (owner)
-- [ ] Configure `TRAVEL_ORIGIN` and form provider; run `npm run validate:production`
-- [ ] Deploy the site (see `docs/deployment/DEPLOYMENT.md`); verify indexable in production
-- [ ] Create the Google Business Profile (checklist in `CONTENT-OPERATING-SYSTEM.md`)
-- [ ] Create Facebook, Instagram, TikTok, YouTube, Nextdoor profiles; use tracked links
-- [ ] Film the first 3 vertical videos (detail demo, founder intro, first before/after)
-- [ ] Start the review system: request after every completed job (`REVIEW-GROWTH-SYSTEM.md`)
-- [ ] Reproduce outreach kits: realtor packet, property-manager packet, STR host packet,
-      church card, commercial packet — use generated QRs (`public/marketing/qr/`)
-- [ ] Order small print run: business cards + door hangers (regenerate QR with the real domain)
-- [ ] Set up the weekly scorecard spreadsheet (`WEEKLY-SCORECARD.md`)
+## Completed foundations (historical checklist — done)
 
-## First 30 days — first customers and the recurring base
+- [x] Company name, domain, phone, email, founder identity, service territory, Cloudflare account
+- [x] Travel origin + MapMap routing configured and verified; `/api/lead` form delivery
+      owner-confirmed in all four funnels
+- [x] Site deployed to production (`https://sparkling-standard.com`), indexable, sitemap + Search
+      Console configured
+- [x] GA4 configured and owner-confirmed operational (`G-LG222LQRQ2` via GTM `GTM-KSQ26HMG`):
+      page views, `estimate_start` and the three inquiry key events verified end-to-end
+- [x] SMS enabled; Facebook and Nextdoor profiles confirmed; UTM/QR registry and lead attribution
+      in place; review-request system designed (`REVIEW-GROWTH-SYSTEM.md`)
+- [ ] Google Business Profile verification result (created; Google review pending — do not claim
+      verified or publish its URL early)
+- [ ] Priority social accounts (Instagram, TikTok, YouTube) — not yet created
 
-- [ ] Deliver excellent first jobs; photograph detail proof with permission
-- [ ] Convert every happy one-time customer to a recurring conversation (weekly/biweekly)
-- [ ] Acquire the first STR hosts: 2+ property managers or direct hosts
-- [ ] Move-out / realtor relationships: visit 5+ offices, leave packets, follow up once
-- [ ] Commercial: request 3+ walkthroughs (offices, churches, salons, gyms)
-- [ ] Post 12+ pieces of proof content (video or before/after)
-- [ ] Collect the first 5+ genuine reviews; reply to every one
-- [ ] Weekly scorecard every Sunday without fail
+## 30-day launch plan (owner approval required)
+
+### Week 1 — Release and setup
+
+- [ ] Owner reviews and approves the current local software release (four unpublished commits:
+      GTM import package + Brand A2, UTM count correction, GTM doc cleanup, attribution repair);
+      push to `main` only with explicit owner authorization (`docs/verification/VERIFICATION.md`
+      has the release status).
+- [ ] Confirm the Google Business Profile verification result.
+- [ ] Create the priority social accounts (Instagram, TikTok, YouTube) with approved branding,
+      consistent contact facts and the tracked website links; update
+      `docs/marketing/PLATFORM-REGISTER.md` as each actually exists.
+- [ ] Film the initial content: founder introduction (long + short edit) and 2–3 real detail
+      clips (permission required).
+
+### Week 2 — Open for business
+
+- [ ] Publish the opening content across the three primary channels.
+- [ ] Begin neighborhood engagement on Facebook and Nextdoor (genuine local updates and answers,
+      not indiscriminate reposts).
+- [ ] Initiate local referral outreach: realtors, STR hosts, property managers, churches and
+      commercial prospects using the prepared packets and tracked links.
+- [ ] Post the first Google Business Profile update/photos if verification has completed.
+
+### Week 3 — Proof and process
+
+- [ ] Continue content distribution at the ~4 short videos/week pace.
+- [ ] Publish authentic work examples (real results with permission; nothing staged).
+- [ ] Establish the repeatable genuine-review process: request after every completed job, one
+      reminder, no gating or incentives (`docs/marketing/REVIEW-GROWTH-SYSTEM.md`).
+- [ ] Keep the weekly direct-outreach block running.
+
+### Week 4 — Measure and decide
+
+- [ ] Evaluate content performance, GA4 website attribution and successful inquiry key events,
+      owner inbox inquiries, confirmed bookings and completed jobs against the reporting
+      hierarchy (`docs/marketing/LEAD-MEASUREMENT-MODEL.md`).
+- [ ] Compare channels by **actual business outcomes**, not views.
+- [ ] Set next month's priorities: keep the two best content formats, retire weak ones, focus
+      effort on the channels producing inquiries and recurring customers.
+- [ ] Complete the weekly scorecard every Sunday without fail (`WEEKLY-SCORECARD.md`).
+
+**Owner-operated production reality:** approximately 4 short videos per week, 2–3 hours total,
+using batch filming and one editing block (`docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`). The
+weeks above are the committed cadence only after the owner approves them; the content concepts
+are proposals until then.
 
 ## Days 30–60 — refine what works
 
-- [ ] Identify the best channel by attributed bookings; double effort there
-- [ ] Calibrate pricing with actual labor-hours (`ESTIMATOR-CALIBRATION.md`)
-- [ ] Increase recurring density: route-aware scheduling, same-day grouping
+- [ ] Identify the best channel by attributed bookings; double effort there.
+- [ ] Convert one-time customers to recurring conversations (weekly/biweekly) at every
+      opportunity.
+- [ ] Calibrate pricing with actual labor-hours (`ESTIMATOR-CALIBRATION.md`).
+- [ ] Increase recurring density: route-aware scheduling, same-day grouping.
 - [ ] Add helper capacity when workload triggers it (near-capacity weeks, declined profitable
-      leads, recurring obligations blocking desirable jobs) — not by a fixed customer number
-- [ ] Deep clean + move-out campaigns around month-end/lease cycles
-- [ ] Second review push; referral cards handed to every happy customer
+      leads, recurring obligations blocking desirable jobs) — not by a fixed customer number.
+- [ ] Deep clean + move-out campaigns around month-end/lease cycles.
+- [ ] Second review push; referral cards handed to every happy customer (program terms remain
+      owner-approval gated).
 
 ## Days 60–90 — controlled scale
 
-- [ ] Paid-media testing ONLY if funnel + attribution are working: $5–10/day single-channel
-      tests, measured against booked revenue, stopped fast if unprofitable
-- [ ] Geographic expansion only if profitable in the core area
-- [ ] Commercial follow-up cycle: revisit every walkthrough that didn't convert
-- [ ] Referral program live if the owner approved terms (`REFERRAL-PROGRAM.md`)
-- [ ] Seasonal deep-clean push (spring/fall) and holiday turnover push
+- [ ] Geographic expansion only if profitable in the core area.
+- [ ] Commercial follow-up cycle: revisit every walkthrough that didn't convert.
+- [ ] Referral program live only if the owner approved its terms (`REFERRAL-PROGRAM.md`).
+- [ ] Seasonal deep-clean push (spring/fall) and holiday turnover push.
+- [ ] Any paid-media test requires **explicit owner authorization**; the default remains zero
+      additional spending, and a test may only run after the funnel and attribution are proven
+      and only while measured against booked revenue.
 
 ## Guardrails
 
 - Never trade detail quality for volume — the brand is the detail.
 - Never publish fabricated results, reviews or client lists under growth pressure.
-- Every new channel must be attributable before it gets money.
+- Every new channel must be attributable before it gets money — and it does not get money
+  without explicit owner authorization.
+- Owner approval precedes any committed schedule, campaign name or content concept.

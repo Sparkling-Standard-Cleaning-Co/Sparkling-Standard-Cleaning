@@ -78,9 +78,19 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   explicit owner authorization.
 - **Operational as of October 2026:** production deployment pipeline; MapMap geocoding + routing
   with the private `TRAVEL_ORIGIN` configured in Cloudflare; Web3Forms lead delivery (owner-
-  confirmed); Cloudflare Turnstile optional; GTM container `GTM-KSQ26HMG` consent-gated; SMS
-  enabled (`business.flags.smsEnabled: true`, owner-verified); Facebook + Nextdoor profiles
-  confirmed; owner-approved 2026-10-02 favicon/PWA icon kit installed.
+  confirmed); Cloudflare Turnstile optional; **GA4 analytics owner-confirmed operational**
+  (`GTM-KSQ26HMG` / `G-LG222LQRQ2`, GTM Version 3 published, all three inquiry key events
+  verified); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Facebook + Nextdoor
+  profiles confirmed; owner-approved 2026-10-02 favicon/PWA icon kit installed.
+- **Release status:** `origin/main` is `61c30ae` (deployed). Local `main` is ahead by four verified
+  but **unpublished** commits (`8b8dde4`, `03d6ba8`, `53a85aa`, `0f3c38c`); they deploy only when
+  the owner authorizes a push. Never describe unpublished work as deployed.
+- **Marketing phase (2026-10-03):** the business is transitioning from development into active
+  marketing. Two growth engines (audience growth vs. local customer acquisition), priority content
+  platforms (Instagram, TikTok, YouTube), the proposed "30 Days. 30 Details." content plan, the
+  30-day launch schedule and the owner account checklist are documented under `docs/marketing/`.
+  The primary business objective is dependable weekly/biweekly residential customers. The owner's
+  pending marketing actions live in `docs/launch/OWNER-INPUT-REQUIRED.md` (M1–M7).
 - **Formal launch checklist still outstanding (owner sign-off):** legal entity spelling, insurance/
   bonding/licensing claims, genuine review links, final cancellation percentages, and any profile
   URLs not yet supplied. `business.launch.productionApproved` remains `false` as the formal
@@ -192,7 +202,14 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Visual design, tokens, images, icons, OG image | `src/styles/`, `public/brand/`, `src/assets/images/` | `docs/design/DESIGN-SYSTEM.md`, `docs/design/IMAGE-GUIDE.md`, `docs/design/IMAGE-SOURCE-REGISTER.md` |
 | Photo privacy rules | `docs/privacy/PHOTO-PRIVACY-SOP.md` |
 | UTM links and QR assets | `src/config/marketing-links.ts` | `docs/marketing/UTM-MASTER-LINKS.md`, `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md` |
+| Marketing strategy, growth engines, platform priorities | — | `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`, `docs/marketing/CONTENT-OPERATING-SYSTEM.md` |
+| Social account setup (owner checklist) | `src/config/business.ts` `socials` | `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`, `docs/marketing/PLATFORM-REGISTER.md` |
+| Content production, proposed series, video workflow | — | `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` |
+| Marketing → business reporting hierarchy | `docs/marketing/LEAD-MEASUREMENT-MODEL.md` | `docs/marketing/WEEKLY-SCORECARD.md` |
+| Launch schedule and owner approvals | — | `docs/marketing/90-DAY-LAUNCH-PLAN.md`, `docs/launch/OWNER-INPUT-REQUIRED.md` |
+| Owner-confirmed decisions and outstanding approvals | `src/config/business.ts`, `.env` | `docs/launch/OWNER-INPUT-REQUIRED.md`, `docs/operations/PLATFORM-STATUS.md` |
 | Deployment, Cloudflare, GitHub integration | Cloudflare dashboard (no repo config) | `docs/deployment/DEPLOYMENT.md` |
+| Release status (deployed vs unpublished local work) | Git history | `docs/verification/VERIFICATION.md` (Release status), `docs/operations/PLATFORM-STATUS.md` |
 | Platform status, automation inventory | — | `docs/operations/PLATFORM-STATUS.md`, `docs/operations/AUTOMATION-REGISTER.md` |
 | System overview / start here | — | `docs/OPERATIONS-HUB.md` |
 
@@ -240,6 +257,8 @@ required**, **whether a rebuild/regenerate step is needed**, and **what could br
 - Website copy, images, founder info → `src/content/`, `docs/CONTENT-GUIDE.md`.
 - Social profile URLs and icons → `business.ts` socials + the shared social component.
 - Marketing campaigns / UTM links → `marketing-links.ts`, then `npm run marketing:links`.
+- Marketing strategy, platform priorities, content production and account setup →
+  `docs/marketing/` (start with `MULTIPLATFORM-OPERATING-PLAN.md`).
 - Analytics configuration → `docs/analytics/ANALYTICS-SETUP.md`.
 - Operational settings and integrations → `docs/operations/`.
 
@@ -325,12 +344,20 @@ collections are intentionally empty — not errors.
   `DEFAULT_WORDMARK_TREATMENT`/`DEFAULT_WORDMARK_SCRIPT` in `src/components/Logo.astro` already
   apply it (`romantic-script` / `great-vibes`); the temporary `/brand-preview/` comparison page
   has been removed. Do not switch the treatment without a new owner decision.
-- **GA4 delivery gap (2026-10-03):** the GTM container `GTM-KSQ26HMG` was installed and
-  consent-gated, but the owner's workspace showed **zero tags**, so GA4 received nothing. GA4
-  measurement ID is `G-LG222LQRQ2`. Prepared import files (`docs/analytics/gtm-import/*.json`,
-  generated by `scripts/generate-gtm-import.mjs`, checked by `npm run validate`) plus exact owner
-  steps live in `docs/analytics/GTM-CONTAINER-SETUP.md`. Never claim GA4 is receiving events until
-  the owner imports, verifies in DebugView, publishes and marks key events.
+- **GA4 operational (owner-confirmed 2026-10-03):** after the container was found empty, the owner
+  published GTM Version 3 (`GTM-KSQ26HMG`) with one Google tag, 12 event tags, 12 triggers and 7
+  data-layer variables. GA4 `G-LG222LQRQ2` receives page views, `estimate_start` and all three
+  inquiry events end-to-end (site confirmation + owner email + GA4 event); all three are key
+  events; Enhanced Measurement form interactions are disabled; consent tests passed. The prepared
+  import files (`docs/analytics/gtm-import/*.json`, generated by `scripts/generate-gtm-import.mjs`,
+  checked by `npm run validate`) remain a rebuild reference. The live account configuration is
+  authoritative — never republish/overwrite it or add a second Google tag.
+- **Attribution repair (2026-10-03):** first-touch is captured once; latest-touch updates only for
+  a genuinely new campaign/ad click. Internal navigation, refreshes and direct views never erase
+  campaign context, and same-domain referrers are never referrals. Lead emails label first-touch
+  and latest-touch source/medium/campaign/content separately
+  (`docs/operations/LEAD-NOTIFICATION-FORMAT.md`). The fix applies to future attribution only;
+  already-delivered emails are unchanged.
 - **Advance reservations and gift certificates (2026-10-03):** requests are bounded to a
   configurable 60-day window (`src/config/scheduling.ts`) with no priority tier; reservation
   statuses and the private ledger workflow live in `docs/operations/RESERVATION-TRACKING.md`.
@@ -354,7 +381,8 @@ collections are intentionally empty — not errors.
   job, and always fails closed without owner-approved terms. Financial review:
   `docs/launch/PROMOTION-PROPOSALS.md`; regenerate with `npm run promotions:impact`.
 - **Pending owner input:** legal entity spelling/suffix, insurance/bonding/licensing claims, review
-  profile/submission links, remaining social URLs, Umami website ID, final cancellation
-  percentages, and any marketing claim not yet supplied.
+  profile/submission links, priority social account creation (Instagram, TikTok, YouTube),
+  Umami website ID, final cancellation percentages, marketing-launch approvals (M1–M7) and any
+  marketing claim not yet supplied.
 - Current platform details: `docs/operations/PLATFORM-STATUS.md`. Owner checklist:
-  `docs/launch/OWNER-INPUT-REQUIRED.md`.
+  `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals are grouped there as M1–M7).

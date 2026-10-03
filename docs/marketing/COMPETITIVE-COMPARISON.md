@@ -26,7 +26,7 @@ Properties examined:
 | Gift certificates | Not offered (Phase 7 assessment) | **Yes** — $200, purchased via Venmo/CashApp/PayPal | Not offered |
 | Payments | Stripe confirmed; method list pending owner confirmation | Venmo, CashApp, PayPal | Card/ACH etc. |
 | Booking semantics | Honest: requests confirmed personally; no instant-booking claim | "Book Today!" button leads to Facebook | Request form |
-| Analytics/consent | Consent-gated architecture; GTM container installed (`GTM-KSQ26HMG`) and site-side event generation verified; GA4 event tags prepared for owner import (`G-LG222LQRQ2`); Umami awaiting an ID | None observable | Full GTM/GA4 + Umami, consent-gated |
+| Analytics/consent | Consent-gated architecture; GA4 owner-confirmed operational via GTM Version 3 (`GTM-KSQ26HMG` / `G-LG222LQRQ2`) — page views, `estimate_start` and all three inquiry key events verified; Umami awaiting an ID | None observable | Full GTM/GA4 + Umami, consent-gated |
 | Attribution/QR system | Registry + 13 decode-verified QR groups | None | Full UTM/QR registry + verification |
 | SEO infrastructure | Canonicals, sitemap, JSON-LD, page ownership, verify scripts | Basic (Mobirise builder; little structure observable) | Extensive SEO documentation + verification |
 | Accessibility (measured) | axe WCAG 2.0/2.1/2.2 A+AA: **0 violations** across 15 pages (2026-10-01) | Not measured here | Documented target |
@@ -66,7 +66,7 @@ conversion data after launch.
 | --- | --- | --- |
 | Form delivery (residential, estimate, commercial, STR) | `WEB3FORMS_ACCESS_KEY` runtime secret + `PUBLIC_WEB3FORMS_ACCESS_KEY` build variable not set | Add both (same key) in Cloudflare → redeploy → authorized live test |
 | Real travel routing + live fuel price | `TRAVEL_ORIGIN`, optional `ROUTES_PROVIDER`/`ROUTES_API_KEY`, `EIA_API_KEY` not set | Add secrets → redeploy |
-| Analytics (GTM/GA4, Umami) | Site side live and consent-gated; the GTM container's GA4 tags await owner import/publish; Umami has no ID | Owner: import, Preview/DebugView, publish (`docs/analytics/GTM-CONTAINER-SETUP.md`); create Umami only if wanted |
+| Analytics (GTM/GA4, Umami) | Live and consent-gated; GA4 owner-confirmed operational with all three inquiry key events; Umami has no ID | Optional: create Umami only if wanted; add an internal-traffic filter |
 | Turnstile spam protection | Optional keys not set | Enable in Cloudflare |
 | Review system | No Google Business Profile / review link | Create GBP, then activate the documented review workflow |
 | Indexing accelerators | IndexNow key not set (site is already indexable) | Optional post-launch |

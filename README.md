@@ -14,13 +14,22 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
 
 ## Status (October 2026)
 
-- **Pre-launch.** Owner-confirmed: company name, domain (`https://sparkling-standard.com`),
-  phone, email, founder background, service territory, Stripe and the Cloudflare account. Still
-  pending before production: legal entity spelling, Web3Forms access key, travel origin, analytics
-  IDs, review/social profiles and owner launch approval. Preview builds are `noindex, nofollow`,
-  and production deployment is blocked by validation until the remaining facts land. See
-  `docs/launch/OWNER-INPUT-REQUIRED.md`.
-- Everything below works today and is verified by the committed test/validation suite.
+- **Live.** `https://sparkling-standard.com` is deployed from GitHub `main` via Cloudflare Pages.
+  Operational and owner-confirmed: lead delivery in all four funnels, MapMap geocoding/routing,
+  SMS, Facebook + Nextdoor profiles, and **GA4 analytics** (`GTM-KSQ26HMG` / `G-LG222LQRQ2` —
+  page views, `estimate_start` and all three inquiry key events verified; Enhanced Measurement
+  form interactions disabled).
+- **Release status:** `origin/main` is `61c30ae` (deployed). Local `main` is ahead by four verified
+  but unpublished commits (GTM import package + Brand A2, UTM count correction, GTM doc cleanup,
+  attribution repair); they deploy only when the owner authorizes a push. See
+  `docs/verification/VERIFICATION.md`.
+- **Remaining owner items:** formal launch checklist (legal entity spelling, insurance/bonding/
+  licensing claims, genuine review link, final cancellation percentages), priority social account
+  creation (Instagram, TikTok, YouTube), Google Business Profile verification, genuine photography
+  and reviews. See `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals M1–M7).
+- **We are now in the marketing phase.** Two growth engines (audience growth vs. local customer
+  acquisition), the proposed "30 Days. 30 Details." content plan and the 30-day launch schedule
+  live under `docs/marketing/`.
 - **Start with `docs/OPERATIONS-HUB.md`** — the single entry point for the whole system. Platform
   status: `docs/operations/PLATFORM-STATUS.md`. Deployment: `docs/deployment/DEPLOYMENT.md`.
 
@@ -68,14 +77,16 @@ All optional for local development; all documented in `.env.example`.
 | `npm run build` | Production build into `dist/` |
 | `npm run preview` | Serve the production build |
 | `npm run check` | TypeScript/Astro diagnostics (0 errors required) |
-| `npm test` | Estimator + Pages Function fail-safe tests (45 total) |
+| `npm test` | Full unit suite — estimator, quote verification, attribution, promotions, Page Functions (291 tests) |
+| `npm run test:browser` | Playwright browser regression suite incl. analytics/attribution (77 tests; builds first) |
 | `npm run verify` | `check` + `build` + `validate` (minimum bar) |
-| `npm run validate` | Links, SEO, marketing registry, QR decode verification, checklist leak check |
+| `npm run validate` | Links, SEO, marketing registry, QR decode, GTM import artifacts, checklist leak check |
 | `npm run pending` | PENDING-fact gate (passes on the branded build) |
 | `npm run validate:production` | Production environment gate (needs real facts) |
 | `npm run smoke` | Static smoke test of the built output |
 | `npm run audit:facts` | No-fabrication audit of claims |
 | `npm run marketing:links` / `marketing:qr` / `marketing:verify` | UTM docs + QR assets |
+| `npm run analytics:gtm` / `analytics:gtm:verify` | GTM import artifacts for the website event taxonomy |
 | `npm run deploy:secrets` | Build `deploy/secrets.env` for `wrangler pages secret bulk` |
 | `node scripts/photo.mjs <path>` | Photo guardrail (dimensions/size/format) |
 | `node scripts/indexnow.mjs` | Submit changed URLs to IndexNow (post-launch) |
@@ -110,18 +121,27 @@ All optional for local development; all documented in `.env.example`.
 ## Marketing infrastructure
 
 - Campaign links and QR codes generate from `src/config/marketing-links.ts`
-  (`npm run marketing:links`); every QR is independently decode-verified.
-- Docs: UTM master registry, "where to paste" cheat sheet, content operating system, 90-day
-  launch plan, weekly scorecard, review growth, referral, commercial and STR outreach playbooks
-  (all under `docs/marketing/`).
+  (`npm run marketing:links`); every QR is independently decode-verified. Current registry:
+  50 inbound links (23 ready, 27 prepared) across the platform inventory.
+- Strategy and priorities: `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` (two growth engines:
+  audience growth vs. local customer acquisition).
+- Content: `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (pillars/roles) and
+  `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` (proposed "30 Days. 30 Details." series, four-week
+  plan, founder brief, iPhone + DaVinci Resolve workflow).
+- Accounts: `docs/marketing/PLATFORM-REGISTER.md` (status) and
+  `docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (owner checklist for Instagram, TikTok, YouTube).
+- Measurement: `docs/marketing/LEAD-MEASUREMENT-MODEL.md` (reporting hierarchy) and
+  `docs/marketing/WEEKLY-SCORECARD.md`; schedule: `docs/marketing/90-DAY-LAUNCH-PLAN.md`.
+- More: UTM master registry, "where to paste" cheat sheet, review growth, referral, commercial and
+  STR outreach playbooks (all under `docs/marketing/`).
 
 ## Deployment
 
 GitHub (`main`) → the company's dedicated Cloudflare Pages project → production. The domain
-(`sparkling-standard.com`) is registered, active on Cloudflare DNS, and will be attached as the
-Pages custom domain. There is **no wrangler configuration in this repository** — deployment
-settings live in the Cloudflare dashboard. The full checklist, including the production gates,
-lives in `docs/deployment/DEPLOYMENT.md`:
+(`sparkling-standard.com`) is active on Cloudflare DNS and serving as the Pages custom domain.
+There is **no wrangler configuration in this repository** — deployment settings live in the
+Cloudflare dashboard. The full checklist, including the production gates, lives in
+`docs/deployment/DEPLOYMENT.md`:
 
 ```
 npm run verify
