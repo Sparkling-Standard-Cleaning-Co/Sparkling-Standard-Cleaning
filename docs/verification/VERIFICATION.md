@@ -49,7 +49,7 @@ commit check-runs and deployed bundle hashes verified).
 | Canonicals + robots | live HTML inspection | every page `index, follow` with self-referencing canonical; `robots.txt` `Allow: /` + sitemap. `PUBLIC_PREVIEW_MODE` is NOT set |
 | Accessibility | axe-core WCAG 2.0/2.1/2.2 A+AA at 360 px | 0 violations on home, estimate, contact |
 | Mobile action bar + contact | Playwright | sticky bar visible; `tel:+18504268479` correct; SMS enabled (`business.flags.smsEnabled: true`, owner-verified) so the text link is present |
-| Consent behavior | Playwright | consent banner shown until a choice is made; GTM (`GTM-KSQ26HMG`) loads only after explicit analytics consent; no analytics request before it. Umami has no ID configured and does not load |
+| Consent behavior | Playwright | consent banner shown until a choice is made; GTM (`GTM-KSQ26HMG`) loads only after explicit analytics consent; no analytics request before it. Umami has no ID configured and does not load. The container's GA4 tags are prepared for owner import (`docs/analytics/GTM-CONTAINER-SETUP.md`) |
 | Core Web Vitals (lab) | Chromium, 1.6 Mbps / 150 ms RTT / 4× CPU | home LCP 1.65 s / CLS 0.038; estimate LCP 1.37 s / CLS 0; contact LCP 1.26 s / CLS 0 (targets: LCP ≤ 2.5 s, CLS ≤ 0.1 — met). INP not measurable without interaction; recorded as unreported |
 | `/api/travel` | live POST | deployed and verified (`method: route, verified: true` with the configured origin) |
 | `/api/lead` | live POST (invalid payload, then valid test) | deployed, validating (`400` on bad input), and delivering via the server relay; owner-confirmed inbox delivery (2026-10-02) |
@@ -102,7 +102,7 @@ owner confirmation.
 | Header/nav contract | `npm run test:browser` | 7/7 header-about tests (fit/alignment at four widths, brand identity, mobile lockup, About page) |
 | Platform registry | Unit/config + browser tests | 19 platforms prepared; only the two confirmed profiles render; pending platforms never appear; monogram tiles for platforms without official glyphs |
 | UTM expansion | `npm run marketing:links` + `npm run marketing:verify` | 43 tracked links (3 base-ready, 24 pending, 16 campaign/outreach); 13 QR assets decode-verified; docs byte-identical on check |
-| GA4 mapping | Documentation | Event→key-event mapping added; generation verified on the site; property receipt awaits owner dashboard confirmation |
+| GA4 mapping | Documentation | Event→key-event mapping added; website **generation** verified. 2026-10-03 discovery: the GTM container had **zero tags**, so GA4 receipt was never possible. Import files + exact dashboard steps prepared (`docs/analytics/GTM-CONTAINER-SETUP.md`); property receipt awaits the owner's import/publish and DebugView confirmation |
 | Lead notification format | `tests/lead-notification.test.ts` (11 cases) + `tests/api-verification.test.ts` | Ordered sections, exact figures, verbatim notes, mismatch ACTION REQUIRED, raw codes separated, no credentials/origin |
 | Full suites | `npm run check`, `npm test` (252), `npm run test:browser` (64), `npm run validate`, `pending`, `audit:facts`, `smoke` | All pass |
 
@@ -113,7 +113,7 @@ owner confirmation.
 
 | Check | Method | Result |
 | --- | --- | --- |
-| Two wordmark treatments | Real Chromium at 320–1440 px + `/brand-preview/`; screenshots inspected | Crest unchanged; `romantic-script` (default) and `soft-serif` both polished and cohesive; true Fraunces italic now self-hosted; no overflow |
+| Wordmark treatment | Real Chromium at 320–1440 px + `/brand-preview/` (before removal); screenshots inspected | Owner selected **Brand A2** (`romantic-script` + Great Vibes, already the default); crest unchanged; true Fraunces italic self-hosted; no overflow. The temporary `/brand-preview/` page was removed after the decision |
 | 60-day advance window | Browser test (attributes + out-of-window rejection) and server test (+90-day date discarded with a note) | Exactly 60 days client-side; server never forwards an out-of-window date |
 | Reservation tracking | Documentation + ledger CSV | Six statuses, unique references, Google Sheet setup, gift-redemption accounting |
 | Gift page + request flow | Browser tests (desktop/mobile) | Request mode only; honeypot trap works; no checkout attempt; success copy states no payment was taken |
@@ -121,6 +121,23 @@ owner confirmation.
 | Certificate artwork + QR | `npm run gift:certificate --sample` + screenshot + jsQR self-check | Printable certificate renders correctly; QR decodes to the exact redeem URL; `gift-out/` git-ignored |
 | Stripe security | Unit tests (signature valid/tampered/wrong secret/expired/multi-signature; amount allowlist; disabled/unconfigured/paid-without-notifier gates) | All pass; paid purchase with no notifier returns 500 so Stripe retries |
 | Full suites | `npm run check`, `npm test` (274), `npm run test:browser` (69), `npm run validate`, `pending`, `audit:facts`, `smoke` | All pass |
+
+## Verified — GA4 tracking completion package and Brand A2 finalization (2026-10-03)
+
+| Check | Method | Result |
+| --- | --- | --- |
+| GTM import artifacts | `npm run analytics:gtm` / `analytics:gtm:verify` + JSON parse (13 tags/12 triggers/7 variables full setup; 12/12/7 events-only) | Generated and byte-stable; unique IDs; every event has an exact-match `{{_event}}` trigger, a GA4 event tag and only allowlisted parameters |
+| Taxonomy ↔ GTM mapping lock | `tests/gtm-import.test.ts` (6 cases) | Parses `src/lib/analytics/events.ts` and the generated JSON: names, parameters, Data Layer Variables and the Google tag all match; no unexpected parameter keys |
+| Website event generation | `tests/browser/analytics-events.test.mjs` (4 cases) | No Google script and no event before consent; one GTM load after consent; `call_click`/`text_click` fire with allowlisted `cta_slot`; `estimate_start`/`estimate_step`/`estimate_complete` fire in the funnel; `cleaning_request_submit` + `booking_request` fire only after provider acknowledgment; a failed submission emits nothing |
+| Consent protection preserved | Same browser tests + existing `gps-gtm` consent test | Zero Google requests before a choice; exactly one GTM script after accepting; failed submissions never counted |
+| Brand A2 finalization | `npm run check`; header browser tests; build output | `romantic-script` + Great Vibes already the default; temporary `/brand-preview/` page and its sitemap exclusion removed; 7/7 header-about tests pass at 1024–1680 px |
+| Gift-certificate pause | Code inspection + full suites | `enabled: false`, no checkout attempt in request mode, page states no payment is taken; Stripe code dormant |
+| Full suites | `npm run check` (0 errors), `npm test` (280 pass), `npm run test:browser` (73 pass), `npm run build` (21 pages), `npm run validate` (incl. new GTM artifact check) | All pass |
+
+**Not verified here (owner dashboard required):** the owner's GTM container had zero tags on
+2026-10-03; whether a Google tag was later created/published is unknown until the owner checks.
+GA4 receipt, DebugView visibility and key-event marking cannot be verified from the repository.
+Follow `docs/analytics/GTM-CONTAINER-SETUP.md`; do not mark GA4 "live" without that evidence.
 
 ## Pending (cannot be verified in this environment — owner or tooling required)
 
@@ -135,6 +152,8 @@ owner confirmation.
 | Lighthouse lab metrics | Needs a deployed URL and Chrome | Run PageSpeed Insights on the production site |
 | Genuine photography | No real Sparkling Standard project photos exist yet; representative licensed interiors are registered in `docs/design/IMAGE-SOURCE-REGISTER.md` | Replace stock files with permissioned real photos, then verify `astro:assets` output and update the register |
 | Search indexing | Post-launch | Search Console coverage after sitemap submission |
+| GTM container tags | Requires the owner's GTM dashboard | Import `docs/analytics/gtm-import/gtm-ga4-full-setup.json` (or events-only), verify in Preview, publish |
+| GA4 event receipt + key events | Requires the owner's GA4 dashboard | DebugView/Realtime while running the documented test journey; mark the three primary key events; turn off Enhanced Measurement form interactions |
 
 ## How to re-run everything
 
@@ -142,6 +161,7 @@ owner confirmation.
 npm install
 npm run verify           # check + build + validate
 npm test
+npm run analytics:gtm:verify
 npm run smoke
 npm run testimonials
 npm run audit:facts

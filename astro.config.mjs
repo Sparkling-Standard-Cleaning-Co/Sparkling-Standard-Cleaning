@@ -23,7 +23,6 @@ export default defineConfig({
         !page.includes('/404') &&
         !page.includes('/thank-you') &&
         !page.includes('/leave-review') &&
-        !page.includes('/brand-preview') &&
         !page.includes('/gift-certificates/success') &&
         !page.includes('/gift-certificates/redeem'),
     }),

@@ -4,24 +4,31 @@ Analytics are **consent-gated, PII-free, and optional**. Empty IDs disable each 
 completely (no banner, no requests, no storage). This document covers dashboard setup; the
 privacy page must stay in sync with whatever is actually enabled.
 
-## 0. Current verified state (2026-10-02)
+## 0. Current verified state (2026-10-03)
 
-- **GTM container `GTM-KSQ26HMG`** is configured and live. Production browser verification: zero
-  Google requests before a consent choice, zero after declining, and **exactly one** GTM load
-  after accepting analytics. No duplicate Google tags were observed.
-- **GA4** is configured inside the container. Event **generation** is verified on the site;
-  **receipt inside the GA4 property cannot be verified without dashboard access** — the owner
-  should confirm events appear (see section 4b).
+- **GTM container `GTM-KSQ26HMG`** is installed on the site and live. Production browser
+  verification: zero Google requests before a consent choice, zero after declining, and **exactly
+  one** GTM load after accepting analytics.
+- **Website event generation is verified** in code and browser tests: after consent the site
+  pushes the fixed events (section 3) into `window.dataLayer`; submit events fire only after the
+  provider acknowledges a request.
+- **The GTM container itself had ZERO tags** when the owner opened it on 2026-10-03. Earlier
+  "GTM/GA4 verified" statements covered the website installation only — they did not prove GA4
+  receipt. The GA4 measurement ID is `G-LG222LQRQ2` (web stream "Sparkling Standard Cleaning Co.").
+  Prepared import files and exact dashboard steps: `docs/analytics/GTM-CONTAINER-SETUP.md`.
+- **GA4 receipt (event appearing in the property) remains unverified** until the owner imports,
+  verifies in DebugView and publishes the container configuration. Do not claim GA4 is receiving
+  data before that evidence exists.
 - **Umami** has no website ID; it does not load and is not named on the privacy page.
-- **UTMs** are captured client-side for lead records only; internal links/canonicals never carry
-  them (enforced by `npm run validate`). Advertising features remain off; no paid analytics.
+- **UTMs** are captured client-side for lead records; internal links/canonicals never carry them
+  (enforced by `npm run validate`). Advertising features remain off; no paid analytics.
 
 ## 1. IDs
 
 | Service | Variable | Where |
 | --- | --- | --- |
 | Umami Cloud (cookieless aggregate) | `PUBLIC_UMAMI_WEBSITE_ID` | `.env` / Cloudflare dashboard |
-| Google Tag Manager (GA4 inside) | `PUBLIC_GTM_CONTAINER_ID` | `.env` / Cloudflare dashboard |
+| Google Tag Manager (GA4 event tags live in the container) | `PUBLIC_GTM_CONTAINER_ID` | `.env` / Cloudflare dashboard |
 
 `gtag.js` is **never loaded directly** — GA4 lives inside the GTM container.
 
@@ -57,14 +64,19 @@ notes, or any form content. Lead details live only in the owner's inbox/records.
 
 ## 4. GTM / GA4 dashboard setup
 
-1. GTM container: set up Consent Mode v2 (the site already pushes consent signals).
-2. Create GA4 configuration tag inside GTM.
-3. Create event tags/triggers for the taxonomy above (Custom Event triggers use exact names).
-4. Mark `cleaning_request_submit` / `commercial_quote_submit` / `str_request_submit` as
-   conversions in GA4 (import key events). `booking_request` can be a secondary conversion.
-5. Add an internal-traffic filter (owner IPs) so testing doesn't pollute data.
-6. Never send enhanced-measurement form data — turn off "form interactions" text capture;
-   the site sends explicit events only.
+The complete, exact procedure lives in **`docs/analytics/GTM-CONTAINER-SETUP.md`** (tag/trigger
+names, parameters, import files, verification and key events). Summary:
+
+1. Import the prepared container files from `docs/analytics/gtm-import/` (or create the Google tag
+   and the custom-event tags manually — names must match exactly).
+2. Verify in GTM Preview and GA4 DebugView **before** publishing; publish only after the owner
+   authorizes it.
+3. Mark `cleaning_request_submit` / `commercial_quote_submit` / `str_request_submit` as GA4 key
+   events. `estimate_start`, `estimate_complete` and `booking_request` are secondary.
+4. Add an internal-traffic filter (owner IPs) so testing doesn't pollute data.
+5. In the GA4 web stream, turn **off** "Form interactions" under Enhanced Measurement; the site
+   sends explicit, consent-gated events only after provider acknowledgment, and the automatic
+   form tracking can record rejected/failed submissions as if they succeeded.
 
 ## 4b. Website event → GA4 key-event mapping (owner dashboard)
 
@@ -110,8 +122,11 @@ Notes:
 
 1. Load any page with DevTools Network open and consent undecided → expect **zero** requests to
    Google or Umami.
-2. Allow analytics → GTM + Umami load once; dataLayer receives `consent update`.
-3. Trigger a `tel:` click → `call_click` appears in GTM preview; Umami shows the event.
+2. Allow analytics → GTM loads once (Umami only once a website ID exists); dataLayer receives
+   `consent update`.
+3. Trigger a `tel:` click → `call_click` appears in GTM Preview with its tag firing.
 4. Submit a form (test mode) → confirmation event fires only after provider success.
 5. Refuse/withdraw → no further collection; queued conversion receipts are dropped.
 6. Verify the privacy page matches the enabled services before launch.
+7. `npm run analytics:gtm:verify` confirms the import artifacts still match the event taxonomy;
+   `npm run validate` runs it with the other static checks.

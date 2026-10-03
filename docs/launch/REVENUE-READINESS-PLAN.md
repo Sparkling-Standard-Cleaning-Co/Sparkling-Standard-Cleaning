@@ -16,8 +16,9 @@ genuine content. Nothing here changes pricing, indexing or public claims without
   corrected honest failure message is live (deployed 2026-10-01).
 - Travel: `/api/travel` returns `503 origin_not_configured`; the estimator works in offline zone
   mode meanwhile.
-- Analytics: architecture active; GTM `GTM-KSQ26HMG` is configured and consent-gated, Umami has no ID (no analytics request is made before consent;
-  banner hidden).
+- Analytics: architecture active; GTM `GTM-KSQ26HMG` is installed and consent-gated (no analytics
+  request before consent). The container was found empty on 2026-10-03; GA4 tags await the owner's
+  import/publish (`docs/analytics/GTM-CONTAINER-SETUP.md`). Umami has no ID.
 - Performance (mobile-throttled Chromium, 4× CPU): LCP 1.26–1.65 s, CLS ≤ 0.038, ~96 KB/page.
 - Accessibility: axe WCAG 2.0/2.1/2.2 A+AA, 0 violations across representative pages.
 
@@ -92,9 +93,10 @@ Order matters: delivery → local presence → measurement → content.
    `business.reviews.submissionUrl` and update the footer/schema on the next deploy.
 3. **Google Search Console** — verify the domain property, submit
    `https://sparkling-standard.com/sitemap-index.xml`, confirm coverage.
-4. **GTM + GA4** — create the container and property; load only after consent (the site already
-   implements Basic Consent Mode). Set `PUBLIC_GTM_CONTAINER_ID`; configure the events listed in
-   `docs/analytics/ANALYTICS-SETUP.md`; mark the lead event as a key event.
+4. **GTM + GA4** — container `GTM-KSQ26HMG` and GA4 property `G-LG222LQRQ2` already exist and the
+   site loads GTM only after consent. **Remaining owner work:** import
+   `docs/analytics/gtm-import/*.json`, verify in Preview/DebugView, publish, then mark key events
+   (`docs/analytics/GTM-CONTAINER-SETUP.md`).
 5. **Umami** — create the site; set `PUBLIC_UMAMI_WEBSITE_ID`.
 6. **Cloudflare Turnstile** — create the widget; set `PUBLIC_TURNSTILE_SITE_KEY` (build) and
    `TURNSTILE_SECRET_KEY` (runtime secret).

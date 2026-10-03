@@ -23,6 +23,8 @@
     "marketing:links": "node scripts/generate-marketing-links.mjs",
     "marketing:qr": "node scripts/generate-marketing-links.mjs --qr",
     "marketing:verify": "node scripts/generate-marketing-links.mjs --check",
+    "analytics:gtm": "node scripts/generate-gtm-import.mjs",
+    "analytics:gtm:verify": "node scripts/generate-gtm-import.mjs --check",
     "validate:production": "node scripts/validate-production-env.mjs",
     "deploy:secrets": "node scripts/generate-deploy-secrets.mjs",
     "estimate:quotes": "node scripts/quote-preview.mjs",

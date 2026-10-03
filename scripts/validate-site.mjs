@@ -2,7 +2,8 @@
 //   1. broken internal links
 //   2. SEO checks (titles, canonicals, robots, schema, sitemap)
 //   3. marketing registry + generated-doc + QR decode verification
-//   4. internal-checklist leak check (operational docs must not publish)
+//   4. GTM import artifact verification (GA4 event mapping stays in sync)
+//   5. internal-checklist leak check (operational docs must not publish)
 //
 // Usage: npm run validate   (after npm run build)
 // The PENDING-fact gate is intentionally separate: npm run pending.
@@ -24,6 +25,7 @@ function run(label, script, scriptArgs = []) {
 run('internal links', 'scripts/links.mjs');
 run('SEO', 'scripts/verify-seo.mjs');
 run('marketing registry + QR verification', 'scripts/generate-marketing-links.mjs', ['--check']);
+run('GTM import artifacts', 'scripts/generate-gtm-import.mjs', ['--check']);
 
 // ── Internal-checklist leak check ────────────────────────────────────────────
 process.stdout.write('\n── internal checklist leak check ──\n');

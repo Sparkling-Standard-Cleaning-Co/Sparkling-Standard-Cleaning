@@ -26,7 +26,7 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | MapMap address/routing key | Configured as a Cloudflare secret; `/api/geocode` suggest/resolve/reverse live and verified (2026-10-02) |
 | SMS | `business.flags.smsEnabled: true` (owner-verified); Call/Text actions live |
 | Facebook + Nextdoor | Confirmed profile URLs in `business.socials`; other platforms remain PENDING |
-| Twitter/GTM analytics | `GTM-KSQ26HMG` consent-gated and live; Umami still has no ID |
+| GTM / GA4 analytics | `GTM-KSQ26HMG` consent-gated and installed; GA4 measurement ID `G-LG222LQRQ2` confirmed. The container was found empty (zero tags) 2026-10-03 — owner must import the prepared files and publish (`docs/analytics/GTM-CONTAINER-SETUP.md`). Umami still has no ID |
 | Brand icons | Owner-approved favicon/PWA icon kit installed (2026-10-02) |
 
 ## BLOCKS PRODUCTION
@@ -48,7 +48,7 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | 8 | Pricing matrix approval | `docs/launch/PRICING-PROPOSAL.md` | Market research + proposed rates. Production rates do NOT change until the owner approves. |
 | 9 | Review link (Google profile) | `business.reviews.submissionUrl` | Needed for the review system; create the Google Business Profile, then supply the links. |
 | 10 | Remaining platform profile URLs | `business.socials` | **Partially done:** Facebook and Nextdoor confirmed and rendering. Google Business Profile is created with verification processing and its URL intentionally unpublished. Bing Places, Yelp, Instagram, TikTok, YouTube, Pinterest, Rumble, Gab, Parler, X, Threads, LinkedIn, Alignable and Reddit are prepared as PENDING and never render until supplied. Full actions: `docs/marketing/PLATFORM-REGISTER.md`. |
-| 11 | Analytics IDs | `PUBLIC_UMAMI_WEBSITE_ID`, `PUBLIC_GTM_CONTAINER_ID` | **GTM done 2026-10-02:** `GTM-KSQ26HMG` consent-gated and live. Umami still has no website ID; the privacy page names only configured services. Accounts must be unique to this business. |
+| 11 | Analytics IDs | `PUBLIC_UMAMI_WEBSITE_ID`, `PUBLIC_GTM_CONTAINER_ID` | **Partially done.** `GTM-KSQ26HMG` is consent-gated and installed; GA4 stream confirmed (`G-LG222LQRQ2`). The owner's GTM workspace showed **zero tags** on 2026-10-03 — import `docs/analytics/gtm-import/*.json`, verify in Preview/DebugView and publish (`docs/analytics/GTM-CONTAINER-SETUP.md`). Umami still has no website ID; the privacy page names only configured services. Accounts must be unique to this business. |
 | 12 | SMS capability | `business.flags.smsEnabled` | **Done 2026-10-01.** Owner-confirmed: the business number receives SMS and text contact is authorized; `business.flags.smsEnabled` is true and the Call/Text reservation actions are live. |
 | 13 | Final cancellation percentages | `src/config/pricing.ts` cancellation | Currently provisional; public copy intentionally avoids numbers until approved. |
 | 14 | Turnstile keys (recommended) | `PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Otherwise forms rely on honeypot + timing. |

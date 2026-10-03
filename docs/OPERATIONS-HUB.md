@@ -25,7 +25,9 @@ This repository is the company's marketing and lead system:
   contact, privacy, terms, thank-you, leave-review, 404.
 - A six-step instant estimate engine with travel/fuel architecture and fail-safe behavior.
 - Pages Functions for lead relay (`/api/lead`) and travel lookup (`/api/travel`).
-- Consent-gated analytics (GTM → GA4 is configured and live with `GTM-KSQ26HMG`; Umami is implemented but has no website ID yet).
+- Consent-gated analytics (GTM container `GTM-KSQ26HMG` is installed and loads only after consent;
+  the GA4 event tags inside it are prepared for import — see `docs/analytics/GTM-CONTAINER-SETUP.md`.
+  Umami is implemented but has no website ID yet).
 - A UTM/QR attribution system with a central registry and decode-verified assets.
 - Owner-facing launch, pricing, marketing and verification documentation.
 
@@ -103,8 +105,12 @@ the owner inbox (four marked tests confirmed). Details:
 
 - Nothing analytics-related loads before an explicit analytics consent choice; advertising
   consent is never granted. Both services are gated by the same consent controller.
-- GTM (with GA4 inside) is configured (`GTM-KSQ26HMG`) and loads only after an explicit
-  analytics choice; Umami is implemented but **has no website ID yet**, so only GTM loads. Never reuse another business's IDs.
+- The GTM container (`GTM-KSQ26HMG`) loads only after an explicit analytics choice. The container
+  was found empty on 2026-10-03; the Google tag and event tags for GA4 `G-LG222LQRQ2` are prepared
+  as import files (`docs/analytics/gtm-import/`) and require the owner to import, verify and
+  publish before GA4 receives anything. Do not claim GA4 delivery until DebugView/Realtime shows
+  it. Umami is implemented but **has no website ID yet**, so only GTM loads. Never reuse another
+  business's IDs.
 - Event names are a closed, fixed taxonomy (`src/lib/analytics/events.ts`); payloads are
   allowlisted. **Never send names, emails, phones, addresses, form contents or any PII to
   analytics.**
@@ -222,7 +228,7 @@ Truthful snapshot; the register in `docs/operations/PLATFORM-STATUS.md` is autho
 | Build fails | Build log commit SHA vs `git ls-remote origin refs/heads/main`; Node version | Developer |
 | Forms show fallback/no delivery | `PUBLIC_WEB3FORMS_ACCESS_KEY` and `WEB3FORMS_ACCESS_KEY` set for the deployed environment; then a live test | Owner (Web3Forms) |
 | Travel stays in zone mode | `TRAVEL_ORIGIN` set and `"lat,lng"` formatted | Owner |
-| No analytics events | Consent first; GTM `GTM-KSQ26HMG` is configured and consent-gated; Umami awaits a website ID | Owner (GA4 property inside GTM; Umami ID optional) |
+| No analytics events | Consent first; GTM `GTM-KSQ26HMG` loads, but the container tags may still be empty — follow `docs/analytics/GTM-CONTAINER-SETUP.md` (import, Preview/DebugView, publish); Umami awaits a website ID | Owner (GTM container + GA4 property; Umami ID optional) |
 | SEO regression / broken links | `npm run verify`, `node scripts/verify-seo.mjs` after build | Developer |
 | QR or UTM doc mismatch | `npm run marketing:verify`; regenerate with `npm run marketing:links` | Developer |
 | Site `noindex` after launch | `PUBLIC_PREVIEW_MODE` still set | Owner/developer |

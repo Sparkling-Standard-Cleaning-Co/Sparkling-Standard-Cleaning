@@ -26,7 +26,7 @@ Properties examined:
 | Gift certificates | Not offered (Phase 7 assessment) | **Yes** — $200, purchased via Venmo/CashApp/PayPal | Not offered |
 | Payments | Stripe confirmed; method list pending owner confirmation | Venmo, CashApp, PayPal | Card/ACH etc. |
 | Booking semantics | Honest: requests confirmed personally; no instant-booking claim | "Book Today!" button leads to Facebook | Request form |
-| Analytics/consent | Consent-gated architecture; GTM/GA4 live (`GTM-KSQ26HMG`), Umami awaiting an ID | None observable | Full GTM/GA4 + Umami, consent-gated |
+| Analytics/consent | Consent-gated architecture; GTM container installed (`GTM-KSQ26HMG`) and site-side event generation verified; GA4 event tags prepared for owner import (`G-LG222LQRQ2`); Umami awaiting an ID | None observable | Full GTM/GA4 + Umami, consent-gated |
 | Attribution/QR system | Registry + 13 decode-verified QR groups | None | Full UTM/QR registry + verification |
 | SEO infrastructure | Canonicals, sitemap, JSON-LD, page ownership, verify scripts | Basic (Mobirise builder; little structure observable) | Extensive SEO documentation + verification |
 | Accessibility (measured) | axe WCAG 2.0/2.1/2.2 A+AA: **0 violations** across 15 pages (2026-10-01) | Not measured here | Documented target |
@@ -66,7 +66,7 @@ conversion data after launch.
 | --- | --- | --- |
 | Form delivery (residential, estimate, commercial, STR) | `WEB3FORMS_ACCESS_KEY` runtime secret + `PUBLIC_WEB3FORMS_ACCESS_KEY` build variable not set | Add both (same key) in Cloudflare → redeploy → authorized live test |
 | Real travel routing + live fuel price | `TRAVEL_ORIGIN`, optional `ROUTES_PROVIDER`/`ROUTES_API_KEY`, `EIA_API_KEY` not set | Add secrets → redeploy |
-| Analytics (GTM/GA4, Umami) | GTM/GA4 live; Umami has no ID | Verify consent behavior; create Umami only if wanted |
+| Analytics (GTM/GA4, Umami) | Site side live and consent-gated; the GTM container's GA4 tags await owner import/publish; Umami has no ID | Owner: import, Preview/DebugView, publish (`docs/analytics/GTM-CONTAINER-SETUP.md`); create Umami only if wanted |
 | Turnstile spam protection | Optional keys not set | Enable in Cloudflare |
 | Review system | No Google Business Profile / review link | Create GBP, then activate the documented review workflow |
 | Indexing accelerators | IndexNow key not set (site is already indexable) | Optional post-launch |
@@ -84,8 +84,9 @@ conversion data after launch.
 5. **Lead ledger + follow-up cadence** — a CSV template using the existing lead-measurement
    model is ready (`docs/marketing/LEAD-LEDGER-TEMPLATE.csv`); the estimate follow-up sequence
    already exists in the content operating system.
-6. **Analytics activation** — no conversion measurement is possible until IDs exist; required to
-   judge any future design change.
+6. **Analytics activation** — the website emits the events and the GTM import files are ready;
+   conversion measurement begins once the owner imports/publishes the container and confirms
+   DebugView (`docs/analytics/GTM-CONTAINER-SETUP.md`).
 7. **Gift certificates** — competitor offers them; viable only with a real payment + redemption
    process (owner decision; Stripe supports this).
 8. **Repeat-customer request convenience** — a short "request your usual clean" path for
@@ -112,8 +113,8 @@ The full plan, exact owner actions and the implementation sequence live in
    precisely.
 3. Create the Google Business Profile (service-area, private address) and wire the review link +
    review-request workflow.
-4. Activate analytics in the order GTM → GA4 → Umami, verify consent first, then confirm the
-   conversion events.
+4. Finish analytics: import the prepared GTM files, verify consent first, confirm the conversion
+   events in DebugView/Realtime, publish, mark key events; add Umami only if wanted.
 5. Collect and publish genuine founder/work photos and the first genuine reviews.
 6. Begin the documented marketing cadence (90-day plan, weekly scorecard, lead ledger).
 
