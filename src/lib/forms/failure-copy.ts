@@ -15,7 +15,9 @@ export type FailureReason =
   | 'provider_error'
   | 'network_error'
   | 'server_error'
-  | 'spam_rejected';
+  | 'spam_rejected'
+  | 'verification_failed'
+  | 'invalid_request';
 
 export interface ContactFacts {
   /** Human-formatted phone, e.g. "(850) 426-8479". */
@@ -45,6 +47,10 @@ export function failureCopy(reason: FailureReason, contact: ContactFacts): strin
       return `Our message service is not connected yet — please ${alternatives} so we do not lose your request.`;
     case 'spam_rejected':
       return `Your request could not be verified. Please try again, or ${alternatives}.`;
+    case 'verification_failed':
+      return `We couldn't complete the security check before sending. Please try again — your answers are still here — or ${alternatives}.`;
+    case 'invalid_request':
+      return `Some of your details didn't come through. Please check the form and try again, or ${alternatives}.`;
     case 'network_error':
       return `We could not reach the message service. Check your connection and try again, or ${alternatives}.`;
     case 'server_error':

@@ -97,7 +97,14 @@ test('every estimable form control has an accessible name', async () => {
     const controls = await page.evaluate(() => {
       const form = document.querySelector('[data-estimate-form]');
       return [...form.querySelectorAll('input, select, textarea')]
-        .filter((element) => element.type !== 'hidden' && !element.closest('[hidden]'))
+        .filter(
+          (element) =>
+            element.type !== 'hidden' &&
+            !element.closest('[hidden]') &&
+            // Elements removed from the accessibility tree (the hidden anti-spam
+            // trap) do not need an accessible name.
+            !element.closest('[aria-hidden="true"]'),
+        )
         .map((element) => ({
           name: element.name || element.id,
           label:

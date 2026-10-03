@@ -360,6 +360,105 @@ test('final submit disables while sending and reports honest failure', async () 
   }
 });
 
+// ── Lead submission regression: autofill honeypot + error classification ─────
+
+test('the estimator has no autofill-magnet honeypot and keeps a hidden trap', async () => {
+  const { context, page } = await openWizard(1280, 900);
+  try {
+    assert.equal(await page.locator('input[name="company_website"]').count(), 0, 'the old autofillable trap is gone');
+    assert.equal(await page.locator('label:has-text("Company website")').count(), 0, 'no Company website label remains');
+    const trap = page.locator('input[name="extra_ref"]');
+    assert.equal(await trap.count(), 1, 'the hardened trap field is present');
+    assert.equal(await trap.getAttribute('autocomplete'), 'off');
+    assert.equal(await trap.getAttribute('data-lpignore'), 'true');
+    assert.equal(await trap.getAttribute('tabindex'), '-1');
+  } finally {
+    await context.close();
+  }
+});
+
+test('a filled trap field is rejected locally without losing the customer answers', async () => {
+  const { context, page } = await openWizard(390, 900);
+  try {
+    const requests = [];
+    await page.route('**/api/lead', async (route) => {
+      requests.push(route.request().postData());
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+    });
+    await fillStepOne(page);
+    await fillHome(page);
+    await fillCondition(page);
+    await fillExtrasAndScheduling(page);
+    await page.fill('#est-name', 'Browser test (please ignore)');
+    await page.fill('#est-phone', '8500000000');
+    await page.fill('#est-email', 'owner@sparkling-standard.com');
+
+    // Simulate a bot (or anything else) populating the hidden trap.
+    await page.evaluate(() => {
+      const trap = document.querySelector('input[name="extra_ref"]');
+      if (trap) trap.value = 'https://spam.example';
+    });
+    await page.click('[data-submit]');
+    await page.waitForSelector('[data-form-status][data-state="error"]', { timeout: 20000 });
+    const status = (await page.locator('[data-form-status]').textContent()) ?? '';
+    assert.match(status, /could not be verified/i, `trap rejection copy: "${status}"`);
+    assert.equal(requests.length, 0, 'a trapped submission is never sent');
+    assert.equal(await page.inputValue('#est-name'), 'Browser test (please ignore)', 'answers are preserved');
+    assert.equal(await page.locator('[data-submit]').isDisabled(), false, 'the customer can try again');
+  } finally {
+    await context.close();
+  }
+});
+
+test('relay rejection causes produce distinct, recoverable copy and preserve answers', async () => {
+  const { context, page } = await openWizard(390, 900);
+  try {
+    let mode = 'verification';
+    await page.route('**/api/lead', async (route) => {
+      const responses = {
+        verification: { status: 400, body: { ok: false, error: 'verification_failed' } },
+        spam: { status: 403, body: { ok: false, error: 'spam_rejected' } },
+        invalid: { status: 400, body: { ok: false, error: 'invalid_request' } },
+      };
+      const pick = responses[mode];
+      await route.fulfill({
+        status: pick.status,
+        contentType: 'application/json',
+        body: JSON.stringify(pick.body),
+      });
+    });
+    await fillStepOne(page);
+    await fillHome(page);
+    await fillCondition(page);
+    await fillExtrasAndScheduling(page);
+    await page.fill('#est-name', 'Browser test (please ignore)');
+    await page.fill('#est-phone', '8500000000');
+    await page.fill('#est-email', 'owner@sparkling-standard.com');
+
+    await page.click('[data-submit]');
+    await page.waitForFunction(() =>
+      /security check/i.test(document.querySelector('[data-form-status]')?.textContent ?? ''),
+    );
+    assert.equal(await page.inputValue('#est-name'), 'Browser test (please ignore)', 'answers kept after verification failure');
+
+    mode = 'spam';
+    await page.click('[data-submit]');
+    await page.waitForFunction(() =>
+      /could not be verified/i.test(document.querySelector('[data-form-status]')?.textContent ?? ''),
+    );
+
+    mode = 'invalid';
+    await page.click('[data-submit]');
+    await page.waitForFunction(() =>
+      /didn't come through/i.test(document.querySelector('[data-form-status]')?.textContent ?? ''),
+    );
+    assert.equal(await page.inputValue('#est-email'), 'owner@sparkling-standard.com', 'answers kept after every rejection');
+    assert.equal(await page.locator('[data-submit]').isDisabled(), false, 'retry stays available');
+  } finally {
+    await context.close();
+  }
+});
+
 // ── Overflow across the wizard ───────────────────────────────────────────────
 
 test('no horizontal overflow while advancing the wizard at 360px', async () => {
