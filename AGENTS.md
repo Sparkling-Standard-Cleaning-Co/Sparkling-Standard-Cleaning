@@ -181,6 +181,8 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Location selection, geocoding, GPS/manual modes | `src/scripts/address-finder.ts`, `src/lib/location/`, `functions/api/geocode.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`) | `docs/verification/VERIFICATION.md` |
 | Promotions, bundles, Founding-10 (all disabled) | `src/lib/estimate/promotions.ts` + `src/config/owner-pricing.ts` | `docs/launch/PROMOTION-PROPOSALS.md` |
+| Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
+| Platform accounts, status, owner actions | `src/config/business.ts` `socials` + `src/components/SocialLinks.astro` | `docs/marketing/PLATFORM-REGISTER.md`, `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` |
 | Lead capture, notification fields, provider relay | `functions/api/lead.ts`, `src/lib/forms/` | `docs/verification/VERIFICATION.md` |
 | Services, FAQs, checklists, page copy | `src/content/`, `src/content/site/` | `docs/CONTENT-GUIDE.md` |
 | SEO, structured data, sitemap, robots, page ownership | `src/components/BaseHead.astro`, `src/lib/schema.ts`, page files | `docs/seo/SEO-STRATEGY.md`, `docs/operations/SEARCH-CONSOLE-SETUP.md` |
@@ -309,6 +311,16 @@ collections are intentionally empty — not errors.
   public Pensacola centre; provider alternates include suffix expansion and a house-numberless
   street-level fallback. Exact house numbers are never fabricated. Live checks:
   `npm run address:check`. Rules and evidence: `docs/operations/ESTIMATOR-LOCATION-ENGINE.md`.
+- **Premium header + platform registry (2026-10-02):** the header/footer brand lockup uses the
+  approved crest with script "Sparkling", spaced "STANDARD", "Cleaning Co." and the tagline; the
+  complete platform inventory (19 platforms) is prepared in `business.socials`, rendered only when
+  a confirmed URL exists, and documented in `docs/marketing/PLATFORM-REGISTER.md`. Google Business
+  Profile is created with verification pending — never mark it verified or publish its URL early.
+- **Lead-notification format (2026-10-02):** owner emails are built by
+  `src/lib/forms/lead-notification.ts` (ordered sections, customer email as reply-to, mismatch
+  action warning, raw technical codes separated). Format and testing:
+  `docs/operations/LEAD-NOTIFICATION-FORMAT.md`. Never weaken the `extra_ref` trap, error
+  classification or Turnstile retry handling from the submission fix.
 - **Representative imagery (2026-10-02):** licensed stock interiors (Pexels License, no cost) on
   the homepage and about page, each labeled representative — never presented as our work.
   Source/licence register: `docs/design/IMAGE-SOURCE-REGISTER.md`. Replace with genuine,

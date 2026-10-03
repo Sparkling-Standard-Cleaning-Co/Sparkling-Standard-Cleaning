@@ -48,6 +48,12 @@ The review link is an owner-provided fact: `business.reviews.submissionUrl` (cur
 links and do not create a review QR**. The site's `/leave-review/` utility page renders only
 when the link is configured.
 
+**Google Business Profile status (2026-10-02):** the profile has been **created**, but Google is
+still reviewing verification and the listing is **not publicly visible**. Review requests and the
+review QR stay blocked until (a) Google confirms verification and (b) the owner copies the real
+"Ask for reviews" short link into `business.reviews.submissionUrl`. Do not claim the listing is
+verified and do not construct a review URL by hand.
+
 ## Follow-up after a review
 
 - Reply to every review (public, short, human). Negative reviews: acknowledge, take
