@@ -913,6 +913,43 @@ li + li {
   display: block;
 }
 
+/* Founder portrait — editorial presentation with natural proportions (About).
+   The supplied portrait is never cropped to a stock aspect ratio. */
+.founder-card__media {
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-sand-300);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-alt);
+}
+
+.founder-card__media img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.founder-card__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: var(--color-ink-900);
+}
+
+.founder-card__role {
+  margin: var(--space-1) 0 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* Phones: lead with the portrait so the founder is immediately recognizable. */
+@media (max-width: 55.99rem) {
+  .founder-card {
+    order: -1;
+  }
+}
+
 .hero__panel--media {
   padding: var(--space-4);
 }

@@ -391,10 +391,14 @@ collections are intentionally empty — not errors.
   action warning, raw technical codes separated). Format and testing:
   `docs/operations/LEAD-NOTIFICATION-FORMAT.md`. Never weaken the `extra_ref` trap, error
   classification or Turnstile retry handling from the submission fix.
-- **Representative imagery (2026-10-02):** licensed stock interiors (Pexels License, no cost) on
-  the homepage and about page, each labeled representative — never presented as our work.
-  Source/licence register: `docs/design/IMAGE-SOURCE-REGISTER.md`. Replace with genuine,
-  permissioned photography when it exists.
+- **Founder portrait + representative imagery (2026-10-03):** the About page presents the
+  owner-supplied portrait of Hayli (`src/assets/images/hayli-founder.webp`, converted from the
+  owner's `public/Headshot.jpg`) with the visible identification "Hayli, Founder & Owner-Operator"
+  and natural portrait proportions — genuine owner material, never cropped to a stock ratio and
+  not reused on unrelated pages. Licensed stock interiors (Pexels License, no cost) remain on the
+  homepage, labeled representative — never presented as our work. Source/licence register:
+  `docs/design/IMAGE-SOURCE-REGISTER.md`. Replace remaining stock with genuine, permissioned
+  photography when it exists.
 - **Provisional (internal only, publication flags off):** add-on pricing surface, multi-add-on
   incentive, response guarantee, appreciation discounts, add-on bundles, Founding-10 program and
   market comparisons. The promotion engine applies at most one discount, never below the minimum

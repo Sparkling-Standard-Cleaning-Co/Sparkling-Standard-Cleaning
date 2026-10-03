@@ -169,3 +169,54 @@ test('the About page keeps the founder story and adds the heritage section', asy
     await context.close();
   }
 });
+
+test('the About page presents Hayli’s official founder portrait with identification', async () => {
+  const { context, page } = await open('/about/', 1280, 900);
+  try {
+    const portrait = page.locator('.founder-card img');
+    assert.equal(await portrait.count(), 1, 'exactly one founder portrait');
+    await portrait.scrollIntoViewIfNeeded();
+    const loaded = await portrait.evaluate((image) => ({
+      complete: image.complete,
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      alt: image.getAttribute('alt') ?? '',
+      src: image.getAttribute('src') ?? '',
+    }));
+    assert.ok(loaded.complete && loaded.naturalWidth > 0, 'portrait loads');
+    assert.match(loaded.alt, /Hayli/, 'alt names the founder');
+    assert.match(loaded.alt, /founder and owner-operator/i, 'alt states the role');
+    assert.match(loaded.src, /hayli-founder/, 'the owner-supplied portrait asset is used');
+    // Natural portrait proportions (≈0.86), never cropped to a stock ratio.
+    const ratio = loaded.naturalWidth / loaded.naturalHeight;
+    assert.ok(ratio > 0.8 && ratio < 0.95, `natural portrait ratio preserved (${ratio.toFixed(3)})`);
+
+    // Visible identification beside the portrait.
+    assert.equal((await page.locator('.founder-card__name').textContent())?.trim(), 'Hayli');
+    assert.equal(
+      (await page.locator('.founder-card__role').textContent())?.trim(),
+      'Founder & Owner-Operator',
+    );
+
+    // The detail-first checklist content is preserved in its own block.
+    const details = page.locator('text=Why “detail-first” is not a slogan');
+    assert.equal(await details.count(), 1, 'detail-first content preserved');
+
+    // Desktop: portrait sits beside the story (to its right).
+    const storyBox = await page.locator('#story').boundingBox();
+    const cardBox = await page.locator('.founder-card').boundingBox();
+    assert.ok(cardBox && storyBox && cardBox.x > storyBox.x, 'portrait is beside the story on desktop');
+  } finally {
+    await context.close();
+  }
+
+  // Mobile: the portrait leads the founder section so Hayli is immediately recognizable.
+  const mobile = await open('/about/', 390, 900);
+  try {
+    const cardBox = await mobile.page.locator('.founder-card').boundingBox();
+    const storyBox = await mobile.page.locator('#story').boundingBox();
+    assert.ok(cardBox && storyBox && cardBox.y < storyBox.y, 'portrait leads on mobile');
+  } finally {
+    await mobile.context.close();
+  }
+});

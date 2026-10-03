@@ -8,7 +8,7 @@ import CtaBand from '../components/CtaBand.astro';
 import Icon from '../components/Icon.astro';
 import { business, contactPhone, isPending } from '../config/business';
 import { breadcrumbNode } from '../lib/schema';
-import glovesPhoto from '../assets/images/cleaning-gloves-detail.jpg';
+import hayliPortrait from '../assets/images/hayli-founder.webp';
 
 const entry = await getEntry('site', 'about');
 if (!entry) throw new Error('Missing content entry: src/content/site/about.md');
@@ -17,6 +17,7 @@ const { data } = entry;
 const phone = contactPhone();
 const hasEmail = !isPending(business.email);
 const details = [...business.founder.detailExamples];
+const founderName = isPending(business.founder.firstName) ? 'The founder' : business.founder.firstName;
 
 const site = Astro.site ?? new URL('https://pending-website-url.invalid');
 const schema = [
@@ -57,22 +58,30 @@ const schema = [
           ))
         }
       </div>
-      <div class="card">
-        <div class="card__media">
+      <div class="card founder-card">
+        <div class="founder-card__media">
           <Image
-            src={glovesPhoto}
-            alt="A gloved hand wiping a clean white surface with a cloth beside a sink."
-            widths={[360, 560, 800]}
+            src={hayliPortrait}
+            alt={`Portrait of ${founderName}, founder and owner-operator of ${business.displayName}.`}
+            widths={[420, 640, 900]}
             sizes="(min-width: 56rem) 30rem, 92vw"
             loading="lazy"
             decoding="async"
-            class="card__media-image"
           />
         </div>
+        <p class="eyebrow">Meet the founder</p>
+        <p class="founder-card__name">{founderName}</p>
+        <p class="founder-card__role">{business.founder.role}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container container--narrow">
+      <div class="card">
         <p class="eyebrow">The details she noticed</p>
         <h2 class="card__title">Why “detail-first” is not a slogan</h2>
         <Checklist items={details} />
-        <p class="media-caption">Representative photograph of the process — not a specific client home.</p>
       </div>
     </div>
   </section>
@@ -92,9 +101,7 @@ const schema = [
         <p style="font-family: var(--font-display); font-size: var(--text-lg); margin-bottom: var(--space-3)">
           “{business.founder.coreStory}”
         </p>
-        <p class="small text-muted mb-0">
-          — {isPending(business.founder.firstName) ? 'The founder' : business.founder.firstName}, {business.founder.role}
-        </p>
+        <p class="small text-muted mb-0">— {founderName}, {business.founder.role}</p>
       </blockquote>
     </div>
   </section>
