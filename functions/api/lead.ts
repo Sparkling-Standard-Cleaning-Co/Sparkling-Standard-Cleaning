@@ -25,6 +25,7 @@ import {
   verifyReservationQuote,
   type QuoteVerificationEnv,
 } from '../../src/lib/estimate/verify.ts';
+import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
 
 interface Env extends QuoteVerificationEnv {
   WEB3FORMS_ACCESS_KEY?: string;
@@ -276,6 +277,13 @@ export async function onRequestPost(context: {
     }
   }
 
+  // Owner notification presentation: the flat field map becomes an ordered,
+  // readable summary. The customer's email is set as the provider reply-to and
+  // is also shown in the Contact section; every other collected value is
+  // preserved (mapped or under "More details").
+  const notification = buildLeadNotification(clean);
+  const replyTo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean.email ?? '') ? clean.email : undefined;
+
   const endpoint = env.WEB3FORMS_ENDPOINT ?? 'https://api.web3forms.com/submit';
   try {
     const response = await fetch(endpoint, {
@@ -284,8 +292,10 @@ export async function onRequestPost(context: {
       body: JSON.stringify({
         access_key: env.WEB3FORMS_ACCESS_KEY,
         subject,
+        from_name: 'Sparkling Standard Website',
+        ...(replyTo ? { replyto: replyTo } : {}),
         botcheck: '',
-        ...clean,
+        ...notification,
       }),
     });
     const data = (await response.json().catch(() => ({}))) as { success?: boolean };

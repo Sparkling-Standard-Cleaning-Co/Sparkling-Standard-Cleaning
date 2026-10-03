@@ -97,30 +97,34 @@ test('lead: reservation requests are recalculated server-side and labeled for th
   assert.equal(response.status, 200);
   assert.equal(forwarded.length, 1);
   const sent = forwarded[0] as Record<string, string>;
+  const numeric = (value: string | undefined): number => Number(String(value ?? '').replace(/[^0-9.]/g, ''));
   // Client claims are discarded; the server verdict wins.
-  assert.equal(sent.quote_verified, 'mismatch', 'a $1 claim cannot verify');
-  assert.equal(sent.client_price, '1');
-  assert.ok(Number(sent.verified_price) > 0, 'the server price is a real number');
-  assert.equal(sent.travel_method, 'straight_line_estimate');
-  assert.equal(sent.travel_destination_source, 'address_geocode');
-  assert.equal(sent.server_config_version, '2026-10-01.option-c.v1');
-  assert.equal(sent.config_version_match, 'match');
-  assert.equal(sent.quote_reference_valid, 'true');
-  assert.ok(sent.verification_note && /verified calculation/i.test(sent.verification_note));
-  assert.ok(sent.quote_valid_through);
+  assert.match(sent['Pricing — Verification result'] ?? '', /MISMATCH/);
+  assert.equal(sent['Internal — Verdict code'], 'mismatch', 'a $1 claim cannot verify');
+  assert.equal(sent['Pricing — Customer-proposed price'], '$1');
+  assert.ok(numeric(sent['Pricing — Server recalculated price']) > 0, 'the server price is a real number');
+  assert.match(sent['Travel — Method'] ?? '', /straight_line_estimate/);
+  assert.equal(sent['Internal — Destination source code'], 'address_geocode');
+  assert.match(sent['Travel — Destination source'] ?? '', /Server-geocoded address/);
+  assert.equal(sent['Internal — Config version (server)'], '2026-10-01.option-c.v1');
+  assert.equal(sent['Internal — Config match'], 'match');
+  assert.equal(sent['Internal — Reference format valid'], 'true');
+  assert.match(sent['Internal — Verification note'] ?? '', /verified calculation/i);
+  assert.ok(sent['Internal — Quote review valid through']);
 
   // The owner notification carries the full calculator breakdown.
-  assert.equal(sent.verification_path, 'server_relay');
-  assert.equal(sent.verification_status, 'authoritative');
-  assert.ok(sent.received_at && !Number.isNaN(Date.parse(sent.received_at)), 'server receipt timestamp');
-  assert.ok(Number(sent.base_price) > 0, 'base cleaning price');
-  assert.equal(sent.extras_subtotal, '0.00');
-  assert.equal(sent.extras_detail, 'None');
-  assert.equal(sent.addon_incentive, 'None');
-  assert.ok(Number(sent.proposed_total) > 0, 'proposed total');
-  assert.ok(Number(sent.estimated_labor_hours) > 0, 'estimated labor hours');
-  assert.ok(['recurring_maintenance', 'other_services'].includes(sent.pricing_category));
-  assert.ok(Number(sent.applied_rate_per_labor_hour) > 0, 'applied pricing category rate');
+  assert.equal(sent['Internal — Verification path'], 'server_relay');
+  assert.equal(sent['Internal — Verification status'], 'authoritative');
+  const received = sent['Internal — Received at (ISO)'];
+  assert.ok(received && !Number.isNaN(Date.parse(received)), 'server receipt timestamp');
+  assert.ok(numeric(sent['Pricing — Base cleaning price']) > 0, 'base cleaning price');
+  assert.equal(sent['Pricing — Extras subtotal'], '$0');
+  assert.equal(sent['Extras — Priced detail'], 'None');
+  // The breakdown total is deduplicated with the recalibrated price line.
+  assert.ok(numeric(sent['Pricing — Server recalculated price']) > 0, 'proposed total');
+  assert.ok(Number(sent['Internal — Estimated labor hours']) > 0, 'estimated labor hours');
+  assert.ok(['recurring_maintenance', 'other_services'].includes(sent['Internal — Pricing category'] ?? ''));
+  assert.ok(numeric(sent['Internal — Rate per labor hour']) > 0, 'applied pricing category rate');
   // The private origin and credentials never appear anywhere in the payload.
   assert.doesNotMatch(JSON.stringify(sent), /TRAVEL_ORIGIN|ROUTES_API_KEY|30\.6100,-87\.3400/);
 
@@ -158,13 +162,13 @@ test('lead: a forged client verification field never reaches the owner', async (
     } as never),
   );
   const sent = forwarded[0] as Record<string, string>;
-  assert.equal(sent.quote_verified, 'mismatch', 'server verdict replaces the forged claim');
-  assert.notEqual(sent.verified_price, '9999', 'server price replaces the forged price');
-  assert.equal(sent.verification_path, 'server_relay', 'the server owns the verification path');
-  assert.equal(sent.verification_status, 'authoritative');
-  assert.notEqual(sent.received_at, '1999-01-01T00:00:00.000Z', 'the server stamps receipt time');
-  assert.notEqual(sent.base_price, '1.00', 'the server recomputes the breakdown');
-  assert.ok(Number(sent.verified_price) > 0);
+  assert.equal(sent['Internal — Verdict code'], 'mismatch', 'server verdict replaces the forged claim');
+  assert.notEqual(sent['Pricing — Server recalculated price'], '$9999', 'server price replaces the forged price');
+  assert.equal(sent['Internal — Verification path'], 'server_relay', 'the server owns the verification path');
+  assert.equal(sent['Internal — Verification status'], 'authoritative');
+  assert.notEqual(sent['Internal — Received at (ISO)'], '1999-01-01T00:00:00.000Z', 'the server stamps receipt time');
+  assert.notEqual(sent['Pricing — Base cleaning price'], '$1', 'the server recomputes the breakdown');
+  assert.ok(Number(String(sent['Pricing — Server recalculated price']).replace(/[^0-9.]/g, '')) > 0);
 });
 
 test('lead: selected extras are itemized with their actual server-calculated charges', async () => {
@@ -173,16 +177,17 @@ test('lead: selected extras are itemized with their actual server-calculated cha
     leadPost({
       request: jsonRequest({
         subject: 'Reservation',
-        fields: reservationFields({ quoted_price: '1', addon_ids: 'inside_oven' }),
+        fields: reservationFields({ quoted_price: '1', addon_ids: 'inside_oven', addons: 'Inside oven' }),
       }),
       env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
     } as never),
   );
   const sent = forwarded[0] as Record<string, string>;
-  assert.equal(sent.extras_subtotal, '30.00', 'the oven charge comes from labor × rate');
-  assert.match(sent.extras_detail, /Inside oven \$30\.00/);
-  assert.equal(sent.pricing_category, 'other_services');
-  assert.equal(sent.applied_rate_per_labor_hour, '50');
+  assert.equal(sent['Pricing — Extras subtotal'], '$30', 'the oven charge comes from labor × rate');
+  assert.match(sent['Extras — Priced detail'] ?? '', /Inside oven \$30\.00/);
+  assert.equal(sent['Extras — Selected'], 'Inside oven');
+  assert.equal(sent['Internal — Pricing category'], 'other_services');
+  assert.equal(sent['Internal — Rate per labor hour'], '$50');
 });
 
 test('lead: a non-priced request is delivered without verification fields', async () => {
@@ -195,8 +200,9 @@ test('lead: a non-priced request is delivered without verification fields', asyn
   );
   assert.equal(response.status, 200);
   const sent = forwarded[0] as Record<string, string>;
-  assert.equal(sent.quote_verified, undefined);
-  assert.equal(sent.verified_price, undefined);
+  assert.equal(sent['Internal — Verdict code'], undefined);
+  assert.equal(sent['Pricing — Server recalculated price'], undefined);
+  assert.equal(sent['Pricing — Verification result'], undefined);
 });
 
 test('lead: a provider outage still delivers the reservation with an honest verdict', async () => {
@@ -221,9 +227,10 @@ test('lead: a provider outage still delivers the reservation with an honest verd
   const sent = forwarded[0] as Record<string, string>;
   // Geocoding and routing are down; the server still recomputes from the ZIP
   // reference and labels the $0 claim honestly.
-  assert.equal(sent.quote_verified, 'mismatch');
-  assert.equal(sent.travel_destination_source, 'zip_centroid');
-  assert.ok(Number(sent.verified_price) > 0);
+  assert.equal(sent['Internal — Verdict code'], 'mismatch');
+  assert.equal(sent['Internal — Destination source code'], 'zip_centroid');
+  assert.match(sent['Travel — Destination source'] ?? '', /ZIP centroid/);
+  assert.ok(Number(String(sent['Pricing — Server recalculated price']).replace(/[^0-9.]/g, '')) > 0);
 });
 
 // ── Malicious or malformed submitted values ──────────────────────────────────
@@ -242,8 +249,8 @@ test('lead: invalid, past and far-future preferred dates are discarded with a no
       } as never),
     );
     const sent = forwarded[0] as Record<string, string>;
-    assert.equal(sent.preferred_date, undefined, `date ${preferredDate} must not be forwarded`);
-    assert.match(sent.preferred_date_note ?? '', /invalid or out of range/);
+    assert.equal(sent['Inquiry — Preferred date'], undefined, `date ${preferredDate} must not be forwarded`);
+    assert.match(sent['Scheduling — Date note'] ?? '', /invalid or out of range/);
   }
 });
 
@@ -260,8 +267,8 @@ test('lead: a valid future preferred date is forwarded untouched', async () => {
     } as never),
   );
   const sent = forwarded[0] as Record<string, string>;
-  assert.equal(sent.preferred_date, valid);
-  assert.equal(sent.preferred_date_note, undefined);
+  assert.equal(sent['Inquiry — Preferred date'], valid);
+  assert.equal(sent['Scheduling — Date note'], undefined);
 });
 
 test('lead: a client-forged preferred_date_note never reaches the owner', async () => {
@@ -280,8 +287,8 @@ test('lead: a client-forged preferred_date_note never reaches the owner', async 
     } as never),
   );
   const sent = forwarded[0] as Record<string, string>;
-  assert.equal(sent.preferred_date_note, undefined);
-  assert.equal(sent.preferred_date, '2026-12-01');
+  assert.equal(sent['Scheduling — Date note'], undefined);
+  assert.equal(sent['Inquiry — Preferred date'], '2026-12-01');
 });
 
 test('lead: a mis-formatted quote reference is flagged to the owner but never blocks the lead', async () => {
@@ -297,8 +304,8 @@ test('lead: a mis-formatted quote reference is flagged to the owner but never bl
   );
   assert.equal(response.status, 200);
   const sent = forwarded[0] as Record<string, string>;
-  assert.equal(sent.quote_reference_valid, 'false');
-  assert.equal(sent.quote_verified, 'mismatch', 'the reference flag does not replace the price verdict');
+  assert.equal(sent['Internal — Reference format valid'], 'false');
+  assert.equal(sent['Internal — Verdict code'], 'mismatch', 'the reference flag does not replace the price verdict');
 });
 
 test('lead: a moved pin is flagged for the owner and can never be fully verified', async () => {
@@ -321,8 +328,8 @@ test('lead: a moved pin is flagged for the owner and can never be fully verified
   );
   assert.equal(response.status, 200);
   const sent = forwarded[0] as Record<string, string>;
-  assert.equal(sent.pin_check, 'adjusted', 'the server check replaces the forged client claim');
-  assert.notEqual(sent.quote_verified, 'verified');
+  assert.equal(sent['Internal — Pin check'], 'adjusted', 'the server check replaces the forged client claim');
+  assert.notEqual(sent['Internal — Verdict code'], 'verified');
 });
 
 test('lead: a divergent pin without an adjusted claim is still flagged as divergent', async () => {
@@ -341,7 +348,7 @@ test('lead: a divergent pin without an adjusted claim is still flagged as diverg
     } as never),
   );
   const sent = forwarded[0] as Record<string, string>;
-  assert.equal(sent.pin_check, 'divergent');
-  assert.ok(Number(sent.pin_distance_from_geocode_meters) > 500);
-  assert.notEqual(sent.quote_verified, 'verified');
+  assert.equal(sent['Internal — Pin check'], 'divergent');
+  assert.ok(Number(sent['Internal — Pin distance from geocode (m)']) > 500);
+  assert.notEqual(sent['Internal — Verdict code'], 'verified');
 });
