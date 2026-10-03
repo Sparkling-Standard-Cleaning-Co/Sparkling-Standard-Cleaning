@@ -118,10 +118,24 @@ test('the footer shows a distinct Follow Us section with only confirmed platform
       assert.doesNotMatch(profile.href, /[?&]utm_/, 'outbound profile URLs never carry UTMs');
     }
 
+    // Logo-only presentation: no visible platform labels, but every link keeps
+    // an explicit, descriptive accessible name.
+    assert.equal(
+      await page.locator('[data-social-links] .social-links__label').count(),
+      0,
+      'no visible platform labels in the logo-only design',
+    );
+    for (const profile of CONFIRMED) {
+      const named = page.getByRole('link', {
+        name: new RegExp(`^${profile.label} — Sparkling Standard Cleaning Co\\. \\(opens in a new tab\\)$`),
+      });
+      assert.equal(await named.count(), 1, `${profile.label} has a descriptive accessible name`);
+    }
+
     // Every confirmed profile carries a real platform mark — never a monogram
     // placeholder — and the Nextdoor glyph is the official house-"n" favicon.
     for (let index = 0; index < CONFIRMED.length; index += 1) {
-      const svg = links.nth(index).locator('.social-links__tile svg');
+      const svg = links.nth(index).locator('svg');
       assert.equal(await svg.count(), 1, `${CONFIRMED[index].label} has an icon`);
       assert.equal(await svg.locator('text').count(), 0, `${CONFIRMED[index].label} uses no monogram placeholder`);
       assert.ok(
@@ -129,9 +143,19 @@ test('the footer shows a distinct Follow Us section with only confirmed platform
         `${CONFIRMED[index].label} icon has drawn geometry`,
       );
     }
-    const nextdoorSvg = await links.nth(1).locator('.social-links__tile svg').innerHTML();
+    const nextdoorSvg = await links.nth(1).locator('svg').innerHTML();
     assert.match(nextdoorSvg, /M71\.2012 60\.1136/, 'Nextdoor uses the official house-n favicon geometry');
     assert.match(nextdoorSvg, /#1B8751/i, 'Nextdoor uses the official brand green');
+
+    // Each profile is one 52px circular button.
+    for (let index = 0; index < CONFIRMED.length; index += 1) {
+      const box = await links.nth(index).boundingBox();
+      assert.ok(box && box.width >= 44 && box.height >= 44, `${CONFIRMED[index].label} is a ≥44px target`);
+      assert.ok(
+        box && Math.abs(box.width - box.height) <= 1 && box.width <= 56,
+        `${CONFIRMED[index].label} is a compact circular button (52px)`,
+      );
+    }
 
     const text = (await section.textContent()) ?? '';
     for (const pending of PENDING_LABELS) {
@@ -160,12 +184,18 @@ test('the Follow Us section adapts to mobile without horizontal overflow', async
       const box = await links.nth(index).boundingBox();
       assert.ok(box && box.height >= 44, `link ${index} target height ${box?.height}`);
     }
+    // Phones: two balanced rows of four.
+    const rows = await links.evaluateAll((nodes) => {
+      const tops = nodes.map((node) => Math.round(node.getBoundingClientRect().top));
+      return [...new Set(tops)].map((top) => tops.filter((value) => value === top).length);
+    });
+    assert.deepEqual(rows, [4, 4], 'icons form two balanced rows of four');
   } finally {
     await context.close();
   }
 });
 
-test('very narrow phones list every platform without truncating labels', async () => {
+test('very narrow phones show eight circular buttons without overflow', async () => {
   const { context, page } = await open('/', 320, 780);
   try {
     const section = page.locator('[data-social-follow]');
@@ -173,9 +203,9 @@ test('very narrow phones list every platform without truncating labels', async (
     const links = page.locator('[data-social-links] a');
     assert.equal(await links.count(), CONFIRMED.length);
     for (let index = 0; index < CONFIRMED.length; index += 1) {
-      const label = links.nth(index).locator('.social-links__label');
-      const clipped = await label.evaluate((element) => element.scrollWidth > element.clientWidth + 1);
-      assert.equal(clipped, false, `${CONFIRMED[index].label} label is not truncated`);
+      const box = await links.nth(index).boundingBox();
+      assert.ok(box && box.width >= 44 && box.height >= 44, `button ${index} is a ≥44px target`);
+      assert.ok(Math.abs((box?.width ?? 0) - (box?.height ?? 0)) <= 1, `button ${index} is circular`);
     }
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

@@ -200,7 +200,7 @@ HTTP 200 on 2026-10-03 (destination reachable; not independent identity verifica
 | Eight confirmed profiles | `tests/browser/social-links.test.mjs` (4 cases) | Correct labels, exact URLs, `target="_blank"`, `rel="noopener noreferrer"`, accessible new-tab text; pending platforms (GBP, Bing Places, Yelp, Instagram, YouTube, X, Threads, LinkedIn, Alignable, Reddit) never render |
 | Official brand marks | Browser test + screenshot inspection | Every confirmed profile uses a real mark, never a monogram placeholder; Nextdoor is the official house-"n" favicon geometry in official brand green (`#1B8751`); Gab, Parler and Locals use their official assets (`src/components/SocialIcon.astro` records each source); no counterfeit hand-drawn logos |
 | UTMs | Browser test | Outbound profile URLs never carry UTM parameters |
-| Responsive layout | Screenshots at 1280/768/390/320 + browser tests | 4-column grid on tablet/desktop (two tidy rows), 2-column on phones, single column under 26rem; zero horizontal overflow at every width; no label truncation at 320px; ≥44px touch targets |
+| Responsive layout (pill design, later superseded) | Screenshots at 1280/768/390/320 + browser tests | 4-column grid on tablet/desktop (two tidy rows), 2-column on phones, single column under 26rem; zero horizontal overflow at every width; no label truncation at 320px; ≥44px touch targets. **Superseded by the logo-only redesign below** |
 | Locals link registry | `npm run marketing:links` + `npm run marketing:verify` | Locals profile link generated from the registry (`?utm_source=locals&utm_medium=organic_social&utm_campaign=profile`); registry now 51 links (23 active, 28 prepared); documents regenerated and byte-identical on check; QR assets unchanged |
 | Scope safety | Git diff + full suites | No changes to GA4/GTM, consent, estimator pricing, customer forms, reservations or payment systems; `functions/` untouched |
 | Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (78 pass), `npm run build` (21 pages), `npm run validate`, `pending`, `smoke`, `testimonials`, `audit:facts` | All pass |
@@ -215,6 +215,25 @@ HTTP 200 on 2026-10-03 (destination reachable; not independent identity verifica
 | Official marks | Live DOM inspection + production screenshots | Nextdoor renders the official house-"n" favicon geometry in `#1B8751`; Gab, Parler and Locals render their official assets; no monogram placeholders among the eight |
 | Layout | Production screenshots at 1280/768/390/320 | 4-column desktop/tablet, 2-column phone, single column at 320px; zero horizontal overflow; no truncated labels at any width |
 | Consent + unrelated functionality | Live Playwright | 0 Google requests before consent/after refusal; after acceptance exactly 1 GTM + 1 container-injected GA4 tag; home/estimate/contact/gift/about/recurring all `200`; gift certificates still request-only; reservation window still 60 days (`2026-12-02`). No form submissions were made |
+
+## Verified — Follow Us logo-only redesign (2026-10-03)
+
+The owner rejected the large white pill-shaped links. The approved direction — compact,
+logo-only circular buttons — was implemented directly (no alternative layouts).
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Appearance | Real Chromium + screenshots | Eight official marks in single 52px warm off-white circles (1px sand border, 12px gaps), no visible labels, no nested circles, no heavy shadows; plum background, Follow Us heading and gold panel border unchanged; compact padding |
+| Interaction | Screenshots + CSS | Restrained hover (gold border, 1px lift) and a clearly visible gold keyboard-focus ring (`outline: 3px solid var(--color-champagne-300)`); reduced-motion support retained |
+| Accessible names | Browser test via role query | Every link exposes `<platform> — Sparkling Standard Cleaning Co. (opens in a new tab)`; no visible label element remains |
+| Links/security | Browser test | All eight exact owner-supplied URLs, `target="_blank"`, `rel="noopener noreferrer"`, no UTM parameters, ≥44px targets |
+| Layout | Screenshots at 1280/768/390/320 + browser tests | Desktop: heading left + one row of eight right (section 124px tall); tablet: stacked naturally (189px); phones: two balanced rows of four (247px); 320px no horizontal overflow, no clipped icons |
+| Icons preserved | Browser test | Official Nextdoor house-"n" (`#1B8751`), Gab, Parler and Locals marks unchanged; no monogram placeholders among the eight |
+| Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (78 pass), `npm run build` (21 pages), `npm run validate`, `pending`, `smoke`, `testimonials`, `audit:facts` | All pass |
+
+Screenshots (kept outside the repository): `%TEMP%\opencode\social-redesign-shots\` —
+`desktop-1280-follow.png`, `tablet-768-follow.png`, `mobile-390-follow.png`,
+`mobile-320-follow.png`, `desktop-focus.png`.
 
 ## Pending (cannot be verified in this environment — owner or tooling required)
 

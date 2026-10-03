@@ -347,11 +347,13 @@ collections are intentionally empty — not errors.
   Profile is created with verification pending — never mark it verified or publish its URL early.
 - **Social profiles + Follow Us icons (2026-10-03):** the owner supplied six additional profile
   URLs (TikTok, Pinterest, Rumble, Gab, Parler, Locals) — eight confirmed profiles render in the
-  Follow Us section (2-column mobile grid, 4-column tablet/desktop, single column under 26rem).
-  Icons use official marks, including Nextdoor's house-"n" favicon, the official Gab and Parler
-  marks and the official Locals logo (`src/components/SocialIcon.astro` documents each source).
-  Instagram and YouTube remain pending; never render a PENDING platform. Tracked profile links
-  and the paste checklist: `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
+  Follow Us section as **logo-only 52px circular buttons** (one tidy row on desktop/tablet, two
+  balanced rows of four on phones, natural wrapping for future profiles). Platform names are
+  visually hidden but remain each link's explicit accessible name. Icons use official marks,
+  including Nextdoor's house-"n" favicon, the official Gab and Parler marks and the official
+  Locals logo (`src/components/SocialIcon.astro` documents each source). Instagram and YouTube
+  remain pending; never render a PENDING platform. Tracked profile links and the paste checklist:
+  `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
 - **Brand A2 selected (2026-10-03):** the owner chose the romantic-script wordmark — Great Vibes
   "Sparkling" + spaced serif "STANDARD", existing gold S crest, sparkles and pink blossom.
   `DEFAULT_WORDMARK_TREATMENT`/`DEFAULT_WORDMARK_SCRIPT` in `src/components/Logo.astro` already
