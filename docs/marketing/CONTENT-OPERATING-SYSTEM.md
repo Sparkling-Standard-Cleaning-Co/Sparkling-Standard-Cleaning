@@ -4,6 +4,11 @@ One marketing operating system. Channel roles, content pillars, the weekly rhyth
 budget reality. Launch capital is approximately **$350** with supplies already owned — the plan
 weights organic/local execution, direct outreach and proof content over paid ads.
 
+**Expanded platform presence (2026-10-02):** the complete inventory, tiering, one-asset-many-
+publications matrix, sustainable cadence, first-week sequence and outreach rhythm now live in
+`MULTIPLATFORM-OPERATING-PLAN.md`. Account status and owner actions are in
+`PLATFORM-REGISTER.md`; every placement's tracked link is in `WHERE-TO-PASTE-UTM-LINKS.md`.
+
 ## Channel roles (don't spend equal effort everywhere)
 
 | Channel | Role | Priority |

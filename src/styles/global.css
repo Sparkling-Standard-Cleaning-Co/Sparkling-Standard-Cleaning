@@ -132,6 +132,16 @@ li + li {
   padding-block: clamp(2.25rem, 5vw, 3.5rem);
 }
 
+/* /estimate/: the estimator is the page, so the intro sits close to the
+   header and the wizard follows immediately beneath it. */
+.estimate-intro {
+  padding-block: var(--space-5) var(--space-3);
+}
+
+.estimate-intro .section-head {
+  margin-bottom: 0;
+}
+
 .section--alt {
   background: var(--color-bg-alt);
 }
@@ -386,6 +396,10 @@ li + li {
   min-height: var(--header-height);
 }
 
+/* ── Brand lockup ─────────────────────────────────────────────────────────────
+   Premium identity from the owner-approved crest and banner: gold "S" badge
+   with sparkles and a pink blossom, script "Sparkling", spaced "STANDARD",
+   the "Cleaning Co." descriptor and the tagline. The whole lockup links home. */
 .brand {
   display: inline-flex;
   align-items: center;
@@ -393,56 +407,147 @@ li + li {
   text-decoration: none;
   color: var(--color-ink-900);
   min-width: 0;
-  /* The wordmark is never squeezed; navigation reflows around it instead. */
+  /* The lockup is never squeezed; navigation reflows around it instead. */
   flex: none;
 }
 
-.brand__mark {
-  width: 2.5rem;
-  height: 2.5rem;
+.brand__crest {
+  display: block;
+  width: 2.9rem;
+  height: 2.9rem;
   flex: none;
+}
+
+.brand__crest svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .brand__text {
   display: flex;
   flex-direction: column;
-  line-height: 1.05;
+  gap: 0.2rem;
+  line-height: 1;
   min-width: 0;
 }
 
-.brand__name {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: var(--weight-semibold);
-  color: var(--color-ink-900);
+.brand__line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.brand__script {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: var(--weight-semibold);
+  font-size: 1.45rem;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--color-rose-700);
+}
+
+.brand__caps {
+  font-family: var(--font-display);
+  font-weight: var(--weight-semibold);
+  font-size: 0.9rem;
+  line-height: 1;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--color-ink-900);
+}
+
+.brand__descriptor {
+  font-size: 0.625rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--color-champagne-700);
+  white-space: nowrap;
 }
 
 .brand__tagline {
-  font-size: 0.6875rem;
-  letter-spacing: var(--tracking-wide);
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--color-rose-700);
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 
-/* On dark footer surfaces the primary rose is too dark for small text. */
-.site-footer .brand__tagline {
+.brand__tagline::before {
+  content: '·';
+  margin-right: 0.45rem;
+  color: var(--color-border-strong);
+}
+
+/* Dark footer surfaces need the light brand tones. */
+.site-footer .brand__script {
   color: var(--color-rose-300);
 }
 
-/* Tiny phones (≤352px): let the brand shrink and wrap its tagline instead of
-   forcing the whole document wider than the viewport. */
+.site-footer .brand__caps {
+  color: var(--color-cream-100);
+}
+
+.site-footer .brand__descriptor {
+  color: var(--color-champagne-300);
+}
+
+.site-footer .brand__tagline {
+  color: var(--color-ink-muted);
+}
+
+/* Mid-size desktop: the nav, phone button and CTA need the room, so the
+   header lockup drops the tagline (kept in the footer) until wide desktop. */
+@media (min-width: 62rem) and (max-width: 82rem) {
+  .site-header .brand__tagline {
+    display: none;
+  }
+}
+
+/* Compact phones: keep the lockup legible — the tagline stays in the footer
+   instead of shrinking to microscopic type in the header. */
+@media (max-width: 30rem) {
+  .brand {
+    gap: var(--space-2);
+  }
+
+  .brand__crest {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .brand__script {
+    font-size: 1.25rem;
+  }
+
+  .brand__caps {
+    font-size: 0.8rem;
+    letter-spacing: 0.22em;
+  }
+
+  .brand__tagline {
+    display: none;
+  }
+}
+
+/* Very small phones: wrap the lockup rather than forcing horizontal scroll. */
 @media (max-width: 22rem) {
   .brand {
     flex: 0 1 auto;
     min-width: 0;
   }
 
-  .brand__name,
-  .brand__tagline {
+  .brand__line {
+    flex-wrap: wrap;
+  }
+
+  .brand__script,
+  .brand__caps,
+  .brand__descriptor {
     white-space: normal;
   }
 }

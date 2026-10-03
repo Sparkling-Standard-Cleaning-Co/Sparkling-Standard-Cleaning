@@ -170,20 +170,36 @@ export const business = {
   },
 
   // ── Social profiles — ONLY confirmed, owner-supplied URLs ─────────────────
-  // Confirmed 2026-10-02 (owner): Facebook + Nextdoor. Every other platform
-  // stays PENDING until the owner supplies and verifies its real profile URL;
-  // the Follow Us section never renders a PENDING platform and never invents a
-  // handle. Adding a platform later means editing only this block.
+  // Confirmed 2026-10-02 (owner): Facebook + Nextdoor. Google Business Profile
+  // is CREATED but verification is still processing and it is not publicly
+  // visible, so its URL stays PENDING. Every other platform stays PENDING until
+  // the owner supplies and verifies its real profile URL; the Follow Us section
+  // never renders a PENDING platform and never invents a handle. Adding a
+  // platform later means editing only this block (the platform register is
+  // docs/marketing/PLATFORM-REGISTER.md).
   socials: {
+    // Local discovery
+    googleProfile: PENDING as Fact<string>,
+    bingPlaces: PENDING as Fact<string>,
     facebook: 'https://www.facebook.com/profile.php?id=61595026949584',
+    nextdoor: 'https://nextdoor.com/page/sparkling-standard-cleaning-co/',
+    yelp: PENDING as Fact<string>,
+    // Visual and video
     instagram: PENDING as Fact<string>,
     tiktok: PENDING as Fact<string>,
     youtube: PENDING as Fact<string>,
-    nextdoor: 'https://nextdoor.com/page/sparkling-standard-cleaning-co/',
     pinterest: PENDING as Fact<string>,
-    yelp: PENDING as Fact<string>,
-    googleProfile: PENDING as Fact<string>,
+    rumble: PENDING as Fact<string>,
+    // Additional social distribution
+    gab: PENDING as Fact<string>,
+    parler: PENDING as Fact<string>,
+    x: PENDING as Fact<string>,
+    threads: PENDING as Fact<string>,
+    // Professional networking
     linkedin: PENDING as Fact<string>,
+    alignable: PENDING as Fact<string>,
+    // Community engagement
+    reddit: PENDING as Fact<string>,
   },
   reviews: {
     /** Link that READS existing reviews. PENDING until a profile exists. */

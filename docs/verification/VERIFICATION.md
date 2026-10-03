@@ -94,6 +94,21 @@ One clearly labeled synthetic probe was delivered during diagnosis
 (`[TEST - ENGINEERING] Turnstile configuration probe - do not schedule`); inbox receipt awaits
 owner confirmation.
 
+## Verified — branding, marketing and lead-notification release (2026-10-02)
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Premium header lockup | Real Chromium at 320/390/768/1024/1280/1440 px; screenshots inspected | Crest + script “Sparkling” + spaced “STANDARD” + “Cleaning Co.” + tagline; mobile drops the tagline to stay legible; no overflow; `/estimate/` intro spacing reduced |
+| Header/nav contract | `npm run test:browser` | 7/7 header-about tests (fit/alignment at four widths, brand identity, mobile lockup, About page) |
+| Platform registry | Unit/config + browser tests | 19 platforms prepared; only the two confirmed profiles render; pending platforms never appear; monogram tiles for platforms without official glyphs |
+| UTM expansion | `npm run marketing:links` + `npm run marketing:verify` | 43 tracked links (3 base-ready, 24 pending, 16 campaign/outreach); 13 QR assets decode-verified; docs byte-identical on check |
+| GA4 mapping | Documentation | Event→key-event mapping added; generation verified on the site; property receipt awaits owner dashboard confirmation |
+| Lead notification format | `tests/lead-notification.test.ts` (11 cases) + `tests/api-verification.test.ts` | Ordered sections, exact figures, verbatim notes, mismatch ACTION REQUIRED, raw codes separated, no credentials/origin |
+| Full suites | `npm run check`, `npm test` (252), `npm run test:browser` (64), `npm run validate`, `pending`, `audit:facts`, `smoke` | All pass |
+
+One clearly labeled production format-review submission is sent after deploy; inbox receipt awaits
+owner confirmation.
+
 ## Pending (cannot be verified in this environment — owner or tooling required)
 
 | Item | Why pending | How to verify |

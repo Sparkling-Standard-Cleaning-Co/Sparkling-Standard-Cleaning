@@ -4,6 +4,18 @@ Analytics are **consent-gated, PII-free, and optional**. Empty IDs disable each 
 completely (no banner, no requests, no storage). This document covers dashboard setup; the
 privacy page must stay in sync with whatever is actually enabled.
 
+## 0. Current verified state (2026-10-02)
+
+- **GTM container `GTM-KSQ26HMG`** is configured and live. Production browser verification: zero
+  Google requests before a consent choice, zero after declining, and **exactly one** GTM load
+  after accepting analytics. No duplicate Google tags were observed.
+- **GA4** is configured inside the container. Event **generation** is verified on the site;
+  **receipt inside the GA4 property cannot be verified without dashboard access** — the owner
+  should confirm events appear (see section 4b).
+- **Umami** has no website ID; it does not load and is not named on the privacy page.
+- **UTMs** are captured client-side for lead records only; internal links/canonicals never carry
+  them (enforced by `npm run validate`). Advertising features remain off; no paid analytics.
+
 ## 1. IDs
 
 | Service | Variable | Where |
@@ -53,6 +65,40 @@ notes, or any form content. Lead details live only in the owner's inbox/records.
 5. Add an internal-traffic filter (owner IPs) so testing doesn't pollute data.
 6. Never send enhanced-measurement form data — turn off "form interactions" text capture;
    the site sends explicit events only.
+
+## 4b. Website event → GA4 key-event mapping (owner dashboard)
+
+The website emits **fixed event names**; GA4 receives them through GTM. "Key event" is a GA4
+dashboard setting — marking an event here never changes the site. Distinguish the two:
+**generation** = the site sent the event (visible in GTM Preview); **receipt** = the event appears
+in GA4 Realtime/Reports (requires the owner's dashboard).
+
+| Website event | Recommended GA4 key event | Why |
+| --- | --- | --- |
+| `call_click` | no (engagement signal) | Phone intent; useful as an audience/segment. |
+| `text_click` | no (engagement signal) | Text intent. |
+| `estimate_start` | **yes (secondary)** | Flow entry volume. |
+| `estimate_step` | no | Funnel diagnostics only. |
+| `estimate_complete` | **yes (secondary)** | A usable price was shown. |
+| `cleaning_request_submit` | **yes (primary)** | A residential inquiry was *delivered*. |
+| `booking_request` | **yes (secondary)** | Request included a preferred date. |
+| `commercial_quote_start` | no | Top of the commercial funnel. |
+| `commercial_quote_submit` | **yes (primary)** | Commercial inquiry delivered. |
+| `str_request_start` | no | Top of the STR funnel. |
+| `str_request_submit` | **yes (primary)** | STR inquiry delivered. |
+| `review_link_click` | no (engagement signal) | Review funnel interest. |
+
+Notes:
+
+- Submit events fire **only after provider acknowledgment** (the same code path that shows the
+  success message), so a key event means "delivered", not "button pressed".
+- Key events should use a counting method of **once per event** for submits (a customer can send
+  one request); engagement signals can count once per session.
+- Event payload keys are allowlisted (`src/lib/analytics/events.ts`); no names, contact details,
+  addresses, ZIPs, notes or form content are ever included.
+- After marking key events, verify with GA4 **Realtime** while doing one synthetic in-house
+  journey (accept consent, open the estimator, click call/text, submit nothing), then confirm the
+  submit events when a real (or owner-authorized test) inquiry is sent.
 
 ## 5. Umami
 
