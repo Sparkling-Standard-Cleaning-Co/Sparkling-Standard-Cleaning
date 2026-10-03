@@ -18,6 +18,8 @@
 // even before this file is edited. Env values win when present.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { schedulingConfig } from './scheduling.ts';
+
 export const PENDING = 'PENDING' as const;
 export type Pending = typeof PENDING;
 /** A business fact that is either owner-approved or explicitly PENDING. */
@@ -153,6 +155,22 @@ export const business = {
       'Later appointments use an arrival window — a home takes as long as it takes, and we will not rush yours to hit a clock.',
     timezone: 'America/Chicago',
     schema: { opens: '08:00', closes: '18:00' },
+  },
+
+  // ── Reservation scheduling (advance requests, no priority pricing) ────────
+  // Single source shared with the Pages Functions via src/config/scheduling.ts.
+  scheduling: {
+    /** Customers may request a preferred date up to this many days ahead. */
+    advanceReservationDays: schedulingConfig.advanceReservationDays,
+    /** Requests never confirm an appointment by themselves. */
+    statuses: [
+      'request_received',
+      'availability_confirmation',
+      'appointment_confirmed',
+      'completed',
+      'rescheduled',
+      'canceled',
+    ] as const,
   },
 
   // ── Service area (directive §9 — approved broad language only) ────────────
