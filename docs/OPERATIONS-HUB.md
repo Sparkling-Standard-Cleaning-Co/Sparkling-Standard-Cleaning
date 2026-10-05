@@ -210,6 +210,11 @@ engines, priorities). Then `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (pillars
 `docs/marketing/REFERRAL-PROGRAM.md`, `docs/marketing/COMMERCIAL-OUTREACH.md`,
 `docs/marketing/STR-HOST-OUTREACH.md`, `docs/marketing/COMPETITIVE-COMPARISON.md`,
 `docs/marketing/LEAD-LEDGER-TEMPLATE.csv`, generated UTM docs.
+Canvassing intelligence: `docs/marketing/CANVASSING-SYSTEM.md` (methodology and pipeline),
+`docs/marketing/CANVASSING-TOP-NEIGHBORHOODS.md` (objective ranking),
+`docs/marketing/CANVASSING-ROUTES-OVERVIEW.md` (route totals and strategic analysis); the
+address-level database, workbook, route sheets and map are generated locally into git-ignored
+`canvass-out/` by `scripts/canvass/`.
 
 **SEO:** `docs/seo/SEO-STRATEGY.md`.
 
