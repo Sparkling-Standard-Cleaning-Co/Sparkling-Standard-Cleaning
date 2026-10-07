@@ -1,5 +1,6 @@
 ---
 import { business, isPending } from '../config/business';
+import { brandWords, crestSvg } from '../config/brand';
 
 export type WordmarkTreatment = 'soft-serif' | 'romantic-script';
 export type WordmarkScript = 'great-vibes' | 'parisienne';
@@ -32,10 +33,10 @@ const {
 const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const pendingName = isPending(business.displayName);
 
-const scriptWord = 'Sparkling';
-const capsWord = 'Standard';
-const descriptor = 'Cleaning Co.';
-const taglineText = 'The Details Are Our Standard.';
+const scriptWord = brandWords.script;
+const capsWord = brandWords.caps;
+const descriptor = brandWords.descriptor;
+const taglineText = brandWords.tagline;
 
 // Unique gradient id per instance (the header and footer both render a logo).
 const gradientId = `brand-gold-${Math.random().toString(36).slice(2, 9)}`;
@@ -46,43 +47,7 @@ const ariaLabel = pendingName
 ---
 
 <a href="/" class:list={['brand', compact && 'brand--compact', className]} aria-label={ariaLabel}>
-  <span class="brand__crest" aria-hidden="true">
-    <svg viewBox="0 0 64 64" focusable="false">
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0.85" y2="1">
-          <stop offset="0" stop-color="#e2c07c"></stop>
-          <stop offset="0.55" stop-color="#c6a369"></stop>
-          <stop offset="1" stop-color="#9d7736"></stop>
-        </linearGradient>
-      </defs>
-      <g fill="none" stroke={`url(#${gradientId})`}>
-        <circle cx="32" cy="32" r="26.5" stroke-width="1.5"></circle>
-        <path d="M24.6 55.4c-6.1-2.5-11-7.4-13.4-13.6" stroke-width="3.4" stroke-linecap="round"></path>
-      </g>
-      <g fill={`url(#${gradientId})`}>
-        <path d="M17.5 9.5 19 15l5.5 1.5L19 18l-1.5 5.5L16 18l-5.5-1.5L16 15z"></path>
-        <path d="M12.5 22.5 13.4 26l3.6.9-3.6.9-.9 3.6-.9-3.6-3.6-.9 3.6-.9z"></path>
-        <path d="M50.5 16.5 52 22l5.5 1.5L52 25l-1.5 5.5L49 25l-5.5-1.5L49 22z"></path>
-      </g>
-      <text
-        x="33.5"
-        y="43.5"
-        text-anchor="middle"
-        font-family="Fraunces, Georgia, serif"
-        font-style="italic"
-        font-weight="600"
-        font-size="34"
-        fill={`url(#${gradientId})`}>S</text>
-      <g>
-        <circle cx="47.2" cy="46.6" r="2.9" fill="var(--color-rose-300)"></circle>
-        <circle cx="51.9" cy="50.3" r="2.9" fill="var(--color-rose-500)"></circle>
-        <circle cx="49.6" cy="55.8" r="2.9" fill="var(--color-rose-300)"></circle>
-        <circle cx="43.9" cy="55.6" r="2.9" fill="var(--color-rose-500)"></circle>
-        <circle cx="41.7" cy="50.1" r="2.9" fill="var(--color-rose-300)"></circle>
-        <circle cx="46.9" cy="51.4" r="2.4" fill="var(--color-champagne-500)"></circle>
-      </g>
-    </svg>
-  </span>
+  <span class="brand__crest" aria-hidden="true" set:html={crestSvg(gradientId)} />
 
   <span
     class:list={[

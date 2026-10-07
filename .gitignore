@@ -39,3 +39,7 @@ gift-out/
 
 # canvassing intelligence data (address-level operational data; local only)
 canvass-out/
+
+# python bytecode (route/print scripts)
+__pycache__/
+*.pyc
