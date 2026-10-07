@@ -41,3 +41,11 @@ The default output root is `~/Downloads/Door Knocking - Stage 2 Review`; overrid
 
 The build fails if print facts drift from `business.ts`/`brand.ts`, if a QR no longer resolves through
 the registry, or if any verification check fails. Do not print a failed run.
+
+## Prerequisites
+
+- Node 20+ and `npm ci` (Playwright Chromium is used for rendering).
+- Python 3 with **PyMuPDF** (`pip install pymupdf`) for `scripts/print/pdf-boxes.py` and
+  `scripts/print/verify-crop-marks.py` — TrimBox/BleedBox and crop-mark geometry are set and
+  verified from the real PDFs, not from canvas metadata.
+- PowerPoint (desktop) is required only for `npm run pptx:verify` and owner editing of the masters.
