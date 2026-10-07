@@ -26,6 +26,7 @@
     "print:build": "node scripts/print/print-system.mjs",
     "print:verify": "node scripts/print/verify-print.mjs",
     "print:pptx": "node scripts/print/build-pptx.mjs",
+    "print:determinism": "node scripts/print/verify-determinism.mjs",
     "pptx:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/print/verify-pptx.ps1",
     "routes:build": "python scripts/canvass/build_routes.py",
     "routes:outputs": "python scripts/canvass/build_outputs.py",
