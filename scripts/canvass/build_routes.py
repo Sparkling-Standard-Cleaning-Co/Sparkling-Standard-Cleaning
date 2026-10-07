@@ -5,10 +5,11 @@ Inputs:
   canvass-out/neighborhood_scores.json   ranked subdivisions
   canvass-out/cache/unmatched_centroids.json
 
-Outputs (git-ignored):
-  canvass-out/master_addresses.csv
-  canvass-out/routes.csv
-  canvass-out/routes.geojson
+Outputs (git-ignored, local-only):
+  canvass-out/route_object.json     canonical ordered routes (sequence/metrics)
+  canvass-out/master_addresses.csv  addresses in canonical route order
+  canvass-out/routes.csv            route summary
+  canvass-out/routes.geojson        line + numbered points (canonical order)
   canvass-out/routes_summary.json
 
 Rules:
@@ -16,7 +17,8 @@ Rules:
   - Single-family parcels (DOR 0100) with a situs address and coordinates.
   - Owner names and mailing addresses are never written to outputs; they are
     used only to flag owner-occupied homes.
-  - Routes target 50-100 homes, ordered as a greedy nearest-neighbour walk.
+  - Ordering/optimization lives in scripts/canvass/route_engine.py (Method B);
+    every downstream output must derive from the canonical route object.
 
 Usage: python scripts/canvass/build_routes.py [--neighborhoods 20] [--homes-per-route 75]
 """
@@ -24,11 +26,12 @@ Usage: python scripts/canvass/build_routes.py [--neighborhoods 20] [--homes-per-
 import argparse
 import csv
 import json
-import math
 import os
 import time
 import urllib.parse
 import urllib.request
+
+import route_engine
 
 SERVICE = "https://gismaps.myescambia.com/arcgis/rest/services/Individual_Layers/parcels/MapServer/0/query"
 CACHE = os.path.join("canvass-out", "cache")
@@ -72,15 +75,6 @@ def polygon_point(geometry):
     return sum(point[0] for point in points) / len(points), sum(point[1] for point in points) / len(points)
 
 
-def haversine_miles(lat1, lon1, lat2, lon2):
-    radius = 3958.8
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return 2 * radius * math.asin(math.sqrt(a))
-
-
 def read_origin():
     if not os.path.exists(".env"):
         return None
@@ -120,25 +114,6 @@ def collect_addresses(key):
             print(f"    {offset} parcels", flush=True)
         time.sleep(0.15)
     return features
-
-
-def route_order(points):
-    """Greedy nearest-neighbour ordering starting from the south-west point."""
-    remaining = list(range(len(points)))
-    current = min(remaining, key=lambda index: (points[index]["Latitude"], points[index]["Longitude"]))
-    order = [current]
-    remaining.remove(current)
-    while remaining:
-        last = points[current]
-        current = min(
-            remaining,
-            key=lambda index: haversine_miles(
-                last["Latitude"], last["Longitude"], points[index]["Latitude"], points[index]["Longitude"]
-            ),
-        )
-        order.append(current)
-        remaining.remove(current)
-    return order
 
 
 def main():
@@ -194,15 +169,17 @@ def main():
                     "ZIP_Code": (attributes.get("ZIP") or "")[:5],
                     "Latitude": round(point[1], 6),
                     "Longitude": round(point[0], 6),
+                    "Coordinate_Precision": "parcel_polygon_vertex_mean",
                     "Property_Type": "single_family",
                     "Owner_Occupied": "yes" if owner_occupied else "no",
                     "Homestead": "yes" if homestead else "no",
                     "Route_ID": "",
+                    "Sequence": "",
                 }
             )
         print(f"    {len(addresses)} addresses collected so far", flush=True)
 
-    # Group by neighborhood and build routes.
+    # Canonical routing: cluster -> orient -> sequence -> improve -> complete.
     routes = []
     route_counter = 0
     for neighborhood in selected:
@@ -210,48 +187,43 @@ def main():
         group = [address for address in addresses if address["Neighborhood"] == name]
         if not group:
             continue
-        order = route_order(group)
-        ordered = [group[index] for index in order]
-        chunks = [ordered[index : index + args.homes_per_route] for index in range(0, len(ordered), args.homes_per_route)]
         priority = "A" if neighborhood["score"] >= 70 else "B" if neighborhood["score"] >= 60 else "C"
-        for chunk in chunks:
+        built = route_engine.build_neighborhood_routes(
+            group,
+            name,
+            origin=origin,
+            target_size=args.homes_per_route,
+            priority=priority,
+        )
+        by_id = {address["Address_ID"]: address for address in group}
+        for route in built:
             route_counter += 1
             route_id = f"{priority}-{route_counter:02d}"
-            for address in chunk:
+            route["route_id"] = route_id
+            route["neighborhood_score"] = neighborhood["score"]
+            for stop in route["stops"]:
+                address = by_id[stop["address_id"]]
                 address["Route_ID"] = route_id
-            walking = 0.0
-            for index in range(len(chunk) - 1):
-                walking += haversine_miles(
-                    chunk[index]["Latitude"], chunk[index]["Longitude"], chunk[index + 1]["Latitude"], chunk[index + 1]["Longitude"]
-                )
-            walking *= 1.25
-            start = chunk[0]
-            end = chunk[-1]
-            driving = 0.0
-            if origin:
-                driving = haversine_miles(origin[0], origin[1], start["Latitude"], start["Longitude"]) * 1.3
-            streets = []
-            for address in chunk:
-                if address["Street_Name"] not in streets:
-                    streets.append(address["Street_Name"])
-            routes.append(
-                {
-                    "Route_ID": route_id,
-                    "Priority": priority,
-                    "Neighborhood": name,
-                    "Neighborhood_Score": neighborhood["score"],
-                    "Estimated_Home_Count": len(chunk),
-                    "Street_Sequence": " > ".join(streets),
-                    "Estimated_Walking_Distance_Miles": round(walking, 2),
-                    "Estimated_Driving_Distance_Miles": round(driving, 1),
-                    "Start_Point": f"{start['Latitude']},{start['Longitude']}",
-                    "End_Point": f"{end['Latitude']},{end['Longitude']}",
-                    "Start_Address": start["Full_Address"],
-                    "End_Address": end["Full_Address"],
-                }
-            )
+                address["Sequence"] = stop["seq"]
+                stop["address"] = address["Full_Address"]
+            route["start_address"] = by_id[route["stops"][0]["address_id"]]["Full_Address"]
+            route["end_address"] = by_id[route["stops"][-1]["address_id"]]["Full_Address"]
+            routes.append(route)
 
     os.makedirs(OUT, exist_ok=True)
+
+    # Canonical route object (local-only; contains addresses/coordinates).
+    with open(os.path.join(OUT, "route_object.json"), "w", encoding="utf-8") as handle:
+        json.dump(
+            {
+                "method_version": route_engine.METHOD_VERSION,
+                "model": route_engine.route_metrics([])["model"],
+                "routes": routes,
+            },
+            handle,
+        )
+
+    # Master address list in canonical route order (one row per stop).
     address_fields = [
         "Address_ID",
         "Neighborhood",
@@ -262,70 +234,70 @@ def main():
         "ZIP_Code",
         "Latitude",
         "Longitude",
+        "Coordinate_Precision",
         "Property_Type",
         "Owner_Occupied",
         "Homestead",
         "Route_ID",
+        "Sequence",
     ]
+    address_by_id = {address["Address_ID"]: address for address in addresses}
     with open(os.path.join(OUT, "master_addresses.csv"), "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=address_fields)
         writer.writeheader()
-        writer.writerows(addresses)
+        for route in routes:
+            for stop in route["stops"]:
+                writer.writerow({field: address_by_id[stop["address_id"]][field] for field in address_fields})
 
-    route_fields = list(routes[0].keys()) if routes else []
-    with open(os.path.join(OUT, "routes.csv"), "w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=route_fields)
-        writer.writeheader()
-        writer.writerows(routes)
-
-    # GeoJSON: route points coloured by priority.
-    colors = {"A": "#c6a369", "B": "#e3cda4", "C": "#9aa0a6"}
-    features = []
+    # Route summary.
+    route_rows = []
     for route in routes:
-        points = [address for address in addresses if address["Route_ID"] == route["Route_ID"]]
-        features.append(
+        metrics = route["metrics"]
+        streets = []
+        for stop in route["stops"]:
+            if stop["street"] not in streets:
+                streets.append(stop["street"])
+        route_rows.append(
             {
-                "type": "Feature",
-                "properties": {
-                    "Route_ID": route["Route_ID"],
-                    "Priority": route["Priority"],
-                    "Neighborhood": route["Neighborhood"],
-                    "Homes": route["Estimated_Home_Count"],
-                    "Score": route["Neighborhood_Score"],
-                    "color": colors[route["Priority"]],
-                },
-                "geometry": {
-                    "type": "LineString",
-                    "coordinates": [[point["Longitude"], point["Latitude"]] for point in points],
-                },
+                "Route_ID": route["route_id"],
+                "Priority": route["priority"],
+                "Neighborhood": route["neighborhood"],
+                "Neighborhood_Score": route["neighborhood_score"],
+                "Estimated_Home_Count": metrics["stop_count"],
+                "Street_Sequence": " > ".join(streets),
+                "Estimated_Walking_Distance_Miles": metrics["walking_mi_est"],
+                "Estimated_Driving_Distance_Miles": metrics["driving_mi_est"],
+                "Start_Point": f"{route['stops'][0]['lat']},{route['stops'][0]['lon']}",
+                "End_Point": f"{route['stops'][-1]['lat']},{route['stops'][-1]['lon']}",
+                "Start_Address": route["start_address"],
+                "End_Address": route["end_address"],
+                "Method_Version": route["method_version"],
             }
         )
-        for point in points:
-            features.append(
-                {
-                    "type": "Feature",
-                    "properties": {
-                        "Route_ID": route["Route_ID"],
-                        "Priority": route["Priority"],
-                        "Address": point["Full_Address"],
-                        "Owner_Occupied": point["Owner_Occupied"],
-                        "color": colors[route["Priority"]],
-                    },
-                    "geometry": {"type": "Point", "coordinates": [point["Longitude"], point["Latitude"]]},
-                }
-            )
+    with open(os.path.join(OUT, "routes.csv"), "w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(route_rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(route_rows)
+
+    # GeoJSON line + numbered points from the same ordered stops.
+    geojson = route_engine.routes_geojson(routes)
     with open(os.path.join(OUT, "routes.geojson"), "w", encoding="utf-8") as handle:
-        json.dump({"type": "FeatureCollection", "features": features}, handle)
+        json.dump(geojson, handle)
 
     summary = {
+        "method_version": route_engine.METHOD_VERSION,
         "neighborhoods": len(selected),
         "addresses": len(addresses),
         "owner_occupied": sum(1 for address in addresses if address["Owner_Occupied"] == "yes"),
         "routes": len(routes),
-        "priority_a_routes": sum(1 for route in routes if route["Priority"] == "A"),
-        "priority_b_routes": sum(1 for route in routes if route["Priority"] == "B"),
-        "priority_c_routes": sum(1 for route in routes if route["Priority"] == "C"),
-        "estimated_hours": round(sum(route["Estimated_Home_Count"] / 30 for route in routes), 1),
+        "priority_a_routes": sum(1 for route in routes if route["priority"] == "A"),
+        "priority_b_routes": sum(1 for route in routes if route["priority"] == "B"),
+        "priority_c_routes": sum(1 for route in routes if route["priority"] == "C"),
+        "estimated_hours": round(sum(route["metrics"]["stop_count"] / 30 for route in routes), 1),
+        "straight_mi": round(sum(route["metrics"]["straight_mi"] for route in routes), 1),
+        "walking_mi_est": round(sum(route["metrics"]["walking_mi_est"] for route in routes), 1),
+        "long_edges_over_0_15mi": sum(route["metrics"]["long_edges_over_0_15mi"] for route in routes),
+        "street_reentries": sum(route["metrics"]["street_reentries"] for route in routes),
     }
     with open(os.path.join(OUT, "routes_summary.json"), "w", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=1)

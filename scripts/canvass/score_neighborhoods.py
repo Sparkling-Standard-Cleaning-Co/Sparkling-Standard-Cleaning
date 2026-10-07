@@ -437,7 +437,7 @@ def main():
         "travel band is measured from the private operating origin and is reported only as a band.",
         "",
     ]
-    with open(REPORT, "w", encoding="utf-8") as handle:
+    with open(REPORT, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(lines))
 
     print(f"scored {len(rows)} subdivisions; top 5:")

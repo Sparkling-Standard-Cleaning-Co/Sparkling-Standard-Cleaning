@@ -60,12 +60,20 @@ Full_Address, ZIP_Code, Latitude, Longitude, Property_Type, Owner_Occupied, Home
 
 ## 4. Route engineering
 
-- Target **50–100 homes per route** (default 75).
-- Addresses are ordered by a greedy nearest-neighbour walk starting from the south-west point of
-  the neighborhood; walking distance is the sum of consecutive straight-line distances × 1.25
-  (street detour factor).
-- Driving distance is an estimate from the private origin to the route start (× 1.3 road factor),
-  written only to local outputs.
+The canonical engine is `scripts/canvass/route_engine.py` (Method B); its objective, data contract,
+benchmark and limitations are documented in
+`docs/marketing/field-acquisition/ROUTE-PLANNING.md`.
+
+- Target **50–100 homes per route** (default 75), balanced: `k = ceil(stops / target)` routes of
+  `ceil(stops / k)` stops; undersized clusters merge so no tiny tail chunks survive.
+- Clusters are geographically contiguous (walk-based growth from deterministic seeds).
+- Each cluster is oriented from the private operating origin, then sequenced by greedy
+  nearest-neighbour with a strong same-street preference, improved by deterministic 2-opt, and
+  street-completed where the detour is cheap.
+- One ordered route object (`canvass-out/route_object.json`) drives the sequence, geometry, route
+  sheets, workbook rows, tracking CSV and the map's lines and numbered markers.
+- Walking distance is the sum of consecutive straight-line distances × 1.25 (planning estimate);
+  driving is the origin-to-start straight-line × 1.3. No road-network claim is made.
 - Priority: **A** (neighborhood score ≥ 70), **B** (60–69), **C** (< 60). Route IDs are
   `A-01`, `B-07`, … in neighborhood-score order.
 
@@ -85,13 +93,18 @@ python scripts/canvass/fetch_subdivisions.py  # published subdivision boundaries
 python scripts/canvass/fetch_acs.py           # ACS block-group data + boundaries (cache)
 python scripts/canvass/fetch_unmatched.py     # centroids for unplatted tract areas (cache)
 python scripts/canvass/score_neighborhoods.py # ranking + committed top-neighborhoods report
-python scripts/canvass/build_routes.py        # address collection + routes (default top 20)
+python scripts/canvass/build_routes.py        # address collection + canonical routes (default top 20)
 python scripts/canvass/build_outputs.py       # workbook, print sheets, map, tracking template
 python scripts/canvass/build_report.py        # committed route overview report
+python scripts/canvass/verify_routes.py       # coverage/order/consistency/workload checks
+npm run test:routes                           # synthetic engine tests
 ```
 
-Rerun order matters: fetch → score → routes → outputs → report. Parcel data refreshes monthly, so
-a quarterly rerun keeps the targeting current; ACS estimates refresh annually.
+Rerun order matters: fetch → score → routes → outputs → report → verify. Parcel data refreshes
+monthly, so a quarterly rerun keeps the targeting current; ACS estimates refresh annually.
+
+`canvass-out/route_object.json` is the canonical ordered route object; every downstream output must
+derive from it (never re-derive order). It is git-ignored like the rest of `canvass-out/`.
 
 ## 7. Caveats (do not over-trust)
 
