@@ -94,13 +94,14 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   marketing. **Immediate execution priorities: film Hayli's founder introduction, produce the
   first cleaning videos and acquire local recurring customers.** Two growth engines (audience
   growth vs. local customer acquisition), priority content platforms (TikTok live; Instagram in
-  verification; YouTube deferred), the proposed "30 Days. 30 Details." content plan, the 30-day
+  verification; YouTube deferred; Google Business Profile verified with its profile + review links
+  captured), the proposed "30 Days. 30 Details." content plan, the 30-day
   launch schedule and the owner account checklist are documented under `docs/marketing/`. The
   primary business objective is dependable weekly/biweekly residential customers. The owner's
   pending marketing actions live in `docs/launch/OWNER-INPUT-REQUIRED.md` (M2–M7; M1 — the
   software release — was deployed 2026-10-03).
 - **Formal launch checklist still outstanding (owner sign-off):** legal entity spelling, insurance/
-  bonding/licensing claims, genuine review links, final cancellation percentages, and any profile
+  bonding/licensing claims, genuine reviews, final cancellation percentages, and any profile
   URLs not yet supplied. `business.launch.productionApproved` remains `false` as the formal
   checklist gate; it does NOT reflect deployment state (the site is live).
 - Owner-confirmed facts: name, domain, phone `(850) 426-8479` (corrected 2026-10-02 — the
@@ -210,7 +211,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Visual design, tokens, images, icons, OG image | `src/styles/`, `public/brand/`, `src/assets/images/` | `docs/design/DESIGN-SYSTEM.md`, `docs/design/IMAGE-GUIDE.md`, `docs/design/IMAGE-SOURCE-REGISTER.md` |
 | Photo privacy rules | `docs/privacy/PHOTO-PRIVACY-SOP.md` |
 | UTM links and QR assets | `src/config/marketing-links.ts` | `docs/marketing/UTM-MASTER-LINKS.md`, `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md` |
-| Marketing strategy, growth engines, platform priorities | — | `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`, `docs/marketing/CONTENT-OPERATING-SYSTEM.md` |
+| Marketing strategy, growth engines, platform priorities | — | `docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md` (execution front door), `docs/marketing/GROWTH-SYSTEM.md` (spine: flywheel, weekly loop, roadmap; subsystems `COMPETITIVE-STRATEGY.md`, `CONTENT-ENGINE.md`, `FIELD-CONTENT-CAPTURE.md`, `VIDEO-DIRECTING-SHEETS.md`, `CUSTOMER-LIFECYCLE.md`, `ACQUISITION-CHANNELS.md`, `LOCAL-AUTHORITY.md`, `ECONOMIC-MODEL.md`), `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`, `docs/marketing/CONTENT-OPERATING-SYSTEM.md` |
 | Social account setup (owner checklist) | `src/config/business.ts` `socials` | `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`, `docs/marketing/PLATFORM-REGISTER.md` |
 | Content production, proposed series, video workflow | — | `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` |
 | Marketing → business reporting hierarchy | `docs/marketing/LEAD-MEASUREMENT-MODEL.md` | `docs/marketing/WEEKLY-SCORECARD.md` |
@@ -349,11 +350,14 @@ collections are intentionally empty — not errors.
   approved crest with script "Sparkling", spaced "STANDARD", "Cleaning Co." and the tagline; the
   complete platform inventory (19 platforms) is prepared in `business.socials`, rendered only when
   a confirmed URL exists, and documented in `docs/marketing/PLATFORM-REGISTER.md`. Google Business
-  Profile is created with verification pending — never mark it verified or publish its URL early.
-- **Social profiles + Follow Us icons (2026-10-03):** the owner supplied six additional profile
-  URLs (TikTok, Pinterest, Rumble, Gab, Parler, Locals) — eight profiles render in the Follow Us
-  section as **logo-only 52px circular buttons** (one tidy row on desktop/tablet, two balanced
-  rows of four on phones, natural wrapping for future profiles). Platform names are visually
+  Profile is **verified with its profile + review links captured (owner-supplied 2026-10-08)** —
+  use the exact supplied URLs, never modify or construct them.
+- **Social profiles + Follow Us icons (2026-10-03; GBP added 2026-10-08):** the owner supplied six
+  additional profile
+  URLs (TikTok, Pinterest, Rumble, Gab, Parler, Locals) — eight social profiles render in the
+  Follow Us section (plus the verified Google Business Profile, 2026-10-08) as **logo-only 52px
+  circular buttons** (one tidy row on desktop/tablet, rows capped at four on phones — nine
+  profiles wrap as 4 + 4 + 1 — natural wrapping for future profiles). Platform names are visually
   hidden but remain each link's explicit accessible name. Icons use official marks, including
   Nextdoor's house-"n" favicon, the official Gab and Parler marks and the official Locals logo
   (`src/components/SocialIcon.astro` documents each source). **The owner confirms the basic
@@ -406,10 +410,11 @@ collections are intentionally empty — not errors.
   market comparisons. The promotion engine applies at most one discount, never below the minimum
   job, and always fails closed without owner-approved terms. Financial review:
   `docs/launch/PROMOTION-PROPOSALS.md`; regenerate with `npm run promotions:impact`.
-- **Pending owner input:** legal entity spelling/suffix, insurance/bonding/licensing claims, review
-  profile/submission links, Instagram + Google Business Profile verification results, the deferred
+- **Pending owner input:** legal entity spelling/suffix, insurance/bonding/licensing claims,
+  Instagram verification, the deferred
   YouTube channel (Google Workspace eligibility), Umami website ID, final cancellation
   percentages, marketing-launch approvals (M2–M7; M1 deployed 2026-10-03) and any marketing claim
-  not yet supplied.
+  not yet supplied. (Google Business Profile is **verified with its profile + review links
+  captured**, owner-supplied 2026-10-08.)
 - Current platform details: `docs/operations/PLATFORM-STATUS.md`. Owner checklist:
   `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals are grouped there as M2–M7).

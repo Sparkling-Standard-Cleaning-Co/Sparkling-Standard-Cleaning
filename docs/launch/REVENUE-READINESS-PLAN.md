@@ -81,7 +81,7 @@ existing content operating system):
 | Within 24 h | Send the quote; move to `quoted`; schedule the follow-up reminder |
 | Day 3 / Day 7 | Follow up once per the documented estimate sequence |
 | After the job | Mark `completed`, record revenue/labor hours (feeds estimator calibration) |
-| +1–2 days | Request a review via the documented workflow (GBP link once it exists) |
+| +1–2 days | Request a review via the documented workflow (review link captured 2026-10-08) |
 | Monthly | Review the weekly scorecard; flag recurring conversions and referral sources |
 
 ## 5. Activation runbook (use this company's own accounts only)
@@ -89,11 +89,12 @@ existing content operating system):
 Order matters: delivery → local presence → measurement → content.
 
 1. **Web3Forms** — section 2 above. Blocking.
-2. **Google Business Profile** — create as a **service-area business** (private address hidden),
-   categories: house cleaning / commercial cleaning; service area: Pensacola, Cantonment,
-   surrounding communities; add the tracked GBP links from
-   `docs/marketing/UTM-MASTER-LINKS.md`; then set `business.reviews.profileUrl` and
-   `business.reviews.submissionUrl` and update the footer/schema on the next deploy.
+2. **Google Business Profile — verified with profile + review links captured (owner-supplied
+   2026-10-08).** The exact URLs are configured in `business.ts`
+   (`reviews.profileUrl`/`socials.googleProfile` and `reviews.submissionUrl`); the `/leave-review/`
+   page is live. Remaining: paste the tracked GBP links from `docs/marketing/UTM-MASTER-LINKS.md`
+   and begin the weekly GBP rhythm (`docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md`). Never modify,
+   shorten or hand-build the URLs.
 3. **Google Search Console** — verify the domain property, submit
    `https://sparkling-standard.com/sitemap-index.xml`, confirm coverage.
 4. **GTM + GA4 — done (owner-confirmed 2026-10-03).** Container `GTM-KSQ26HMG` (GTM Version 3) and
@@ -107,7 +108,8 @@ Order matters: delivery → local presence → measurement → content.
 8. After each step: record the status and date in `docs/operations/PLATFORM-STATUS.md`; never
    claim "live" without a verification step.
 
-Paid advertising stays off until delivery, measurement and GBP are active.
+Paid advertising stays off — zero additional spending without explicit owner authorization — even
+now that delivery, measurement and GBP are active.
 
 ## 6. Visual upgrade proposals (owner review required before implementation)
 

@@ -15,6 +15,11 @@ const BASE = `http://localhost:${PORT}`;
 // visual/video, then additional social distribution.
 const CONFIRMED = [
   {
+    label: 'Google Business Profile',
+    href: 'https://www.google.com/search?kgmid=/g/11zz5t1059&hl=en-US&q=Sparkling+Standard+Cleaning+Co.',
+    cta: 'social-googleprofile',
+  },
+  {
     label: 'Facebook',
     href: 'https://www.facebook.com/profile.php?id=61595026949584',
   },
@@ -50,7 +55,6 @@ const CONFIRMED = [
 
 // Platforms that must NEVER render while business.ts carries PENDING URLs.
 const PENDING_LABELS = [
-  'Google Business Profile',
   'Bing Places',
   'Yelp',
   'Instagram',
@@ -108,11 +112,12 @@ test('the footer shows a distinct Follow Us section with only confirmed platform
     assert.equal(await links.count(), CONFIRMED.length, 'only confirmed profiles render');
     for (const [index, profile] of CONFIRMED.entries()) {
       const link = links.nth(index);
+      const expectedCta = profile.cta ?? `social-${profile.label.toLowerCase()}`;
       assert.equal(await link.getAttribute('href'), profile.href, `${profile.label} href`);
       assert.equal(await link.getAttribute('target'), '_blank', `${profile.label} opens in a new tab`);
       assert.match(await link.getAttribute('rel'), /noopener/, `${profile.label} rel noopener`);
       assert.match(await link.getAttribute('rel'), /noreferrer/, `${profile.label} rel noreferrer`);
-      assert.equal(await link.getAttribute('data-cta'), `social-${profile.label.toLowerCase()}`);
+      assert.equal(await link.getAttribute('data-cta'), expectedCta);
       assert.match((await link.textContent()) ?? '', new RegExp(profile.label));
       assert.match((await link.textContent()) ?? '', /opens in a new tab/, 'new-tab affordance for screen readers');
       assert.doesNotMatch(profile.href, /[?&]utm_/, 'outbound profile URLs never carry UTMs');
@@ -143,7 +148,7 @@ test('the footer shows a distinct Follow Us section with only confirmed platform
         `${CONFIRMED[index].label} icon has drawn geometry`,
       );
     }
-    const nextdoorSvg = await links.nth(1).locator('svg').innerHTML();
+    const nextdoorSvg = await links.nth(2).locator('svg').innerHTML();
     assert.match(nextdoorSvg, /M71\.2012 60\.1136/, 'Nextdoor uses the official house-n favicon geometry');
     assert.match(nextdoorSvg, /#1B8751/i, 'Nextdoor uses the official brand green');
 
@@ -184,18 +189,18 @@ test('the Follow Us section adapts to mobile without horizontal overflow', async
       const box = await links.nth(index).boundingBox();
       assert.ok(box && box.height >= 44, `link ${index} target height ${box?.height}`);
     }
-    // Phones: two balanced rows of four.
+    // Phones: rows capped at four buttons (nine profiles wrap as 4 + 4 + 1).
     const rows = await links.evaluateAll((nodes) => {
       const tops = nodes.map((node) => Math.round(node.getBoundingClientRect().top));
       return [...new Set(tops)].map((top) => tops.filter((value) => value === top).length);
     });
-    assert.deepEqual(rows, [4, 4], 'icons form two balanced rows of four');
+    assert.deepEqual(rows, [4, 4, 1], 'icons wrap as four per row');
   } finally {
     await context.close();
   }
 });
 
-test('very narrow phones show eight circular buttons without overflow', async () => {
+test('very narrow phones show nine circular buttons without overflow', async () => {
   const { context, page } = await open('/', 320, 780);
   try {
     const section = page.locator('[data-social-follow]');

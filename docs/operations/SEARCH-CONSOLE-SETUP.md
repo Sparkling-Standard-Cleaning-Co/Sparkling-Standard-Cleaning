@@ -28,6 +28,11 @@ What to expect: a new domain can take days to weeks to index; service pages inde
 
 ## 2. Google Business Profile (about 20 minutes)
 
+**Status: VERIFIED with profile + review links captured (owner-supplied 2026-10-08).** The profile
+is publicly visible and the exact URLs are configured in `src/config/business.ts` (§3 is complete).
+The setup steps below are retained for reference and future maintenance; the ongoing GBP rhythm is
+in `docs/marketing/LOCAL-AUTHORITY.md`.
+
 This is the single highest-value local visibility step for a cleaning company.
 
 1. Go to `https://business.google.com` with the company Google account.
@@ -45,23 +50,24 @@ This is the single highest-value local visibility step for a cleaning company.
    - Hours: Seven days a week, 8:00 AM – 6:00 PM.
 3. Verify the business with Google's chosen method (video or postcard — for service-area
    businesses, video verification is common; have the cleaning supplies and vehicle ready).
-4. After verification:
+4. Now that verification is complete:
    - Add the business description and services from the approved site copy (no invented claims).
    - Upload genuine photos only (owner-provided; see `docs/design/IMAGE-GUIDE.md`).
-   - Replace the placeholder review links in configuration as described in §3.
+   - Profile URL and review link are captured and configured (§3).
 5. Do not use "review gating" or review incentives; ask every customer genuinely.
 
-## 3. Connect reviews to the website
+## 3. Reviews connected to the website (complete — URLs captured 2026-10-08)
 
-1. In the GBP dashboard, copy:
-   - the **review link** (the short "ask for reviews" link), and
-   - the public profile URL.
-2. Update `src/config/business.ts`:
-   - `reviews.submissionUrl` = review link (used by the leave-review page/QR)
-   - `reviews.profileUrl` = public profile URL
-   - `socials.googleProfile` = public profile URL
-3. Commit → Cloudflare rebuilds. Then follow `docs/marketing/REVIEW-GROWTH-SYSTEM.md` for the
-   request workflow. Reviews display automatically once genuine entries exist.
+The owner-supplied URLs are configured in `src/config/business.ts` (never modify, shorten or
+substitute them):
+
+- `reviews.submissionUrl` = `https://g.page/r/CXAcv1Pp7OI2ECE/review` (the exact "ask for
+  reviews" short link; used by the live `/leave-review/` page)
+- `reviews.profileUrl` = `https://www.google.com/search?kgmid=/g/11zz5t1059&hl=en-US&q=Sparkling+Standard+Cleaning+Co.`
+- `socials.googleProfile` = the same public profile URL
+
+Follow `docs/marketing/REVIEW-GROWTH-SYSTEM.md` for the request workflow (ask after satisfaction,
+one reminder, then stop). Reviews display automatically once genuine entries exist.
 
 ## 4. Bing and other channels (optional, after Google)
 

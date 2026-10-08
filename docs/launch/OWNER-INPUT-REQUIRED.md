@@ -1,10 +1,10 @@
 # Owner input required
 
 **The site is live at `https://sparkling-standard.com`** and its pipeline is verified operational.
-The formal owner checklist below — legal entity spelling, claims, review/profile links, final
-cancellation percentages — is still outstanding and keeps
-`business.launch.productionApproved = false`. That flag is the formal sign-off gate; it does **not**
-describe deployment state. This is the single authoritative list — do not scatter TODOs elsewhere.
+The formal owner checklist below — legal entity spelling, claims, final cancellation percentages —
+is still outstanding and keeps `business.launch.productionApproved = false`. That flag is the formal
+sign-off gate; it does **not** describe deployment state. This is the single authoritative list —
+do not scatter TODOs elsewhere.
 
 **How to resolve:** facts are entered in `src/config/business.ts` (or the matching `.env` /
 Cloudflare environment value), then run `npm run verify` and `npm run validate:production`.
@@ -25,9 +25,10 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | Travel origin + routing | Private Cantonment-area origin configured as a Cloudflare secret; `/api/travel` verified live `method: route, verified: true` (2026-10-02) |
 | MapMap address/routing key | Configured as a Cloudflare secret; `/api/geocode` suggest/resolve/reverse live and verified (2026-10-02) |
 | SMS | `business.flags.smsEnabled: true` (owner-verified); Call/Text actions live |
-| Social profiles | Eight profile URLs in `business.socials` — Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals (2026-10-03), all live with their tracked UTM links placed (owner-confirmed). Instagram verification is in progress; YouTube is deferred by Google Workspace eligibility; the remaining platforms stay PENDING |
+| Social profiles | Nine profile URLs in `business.socials` — Google Business Profile (verified, owner-supplied 2026-10-08), Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals (2026-10-03), all live; the eight social profiles have their tracked UTM links placed (owner-confirmed). Instagram verification is in progress; YouTube is deferred by Google Workspace eligibility; the remaining platforms stay PENDING |
 | GTM / GA4 analytics | **Resolved 2026-10-03 (owner-confirmed):** `GTM-KSQ26HMG` consent-gated and installed; GA4 `G-LG222LQRQ2` operational via published GTM Version 3 (1 Google tag, 12 event tags, 12 triggers, 7 variables). Page views, `estimate_start` and the three inquiry key events verified end-to-end; Enhanced Measurement form interactions disabled. Umami still has no ID (optional) |
 | Brand icons | Owner-approved favicon/PWA icon kit installed (2026-10-02) |
+| Google Business Profile | **Verified — profile + review links captured (owner-supplied 2026-10-08)** — the profile is publicly visible and the exact URLs are configured in `business.ts` (see #9). Remaining: paste the four tracked GBP links |
 
 ## BLOCKS PRODUCTION
 
@@ -46,8 +47,8 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | 6 | Legal entity spelling / suffix | `PUBLIC_BUSINESS_LEGAL_NAME` | Registered as "Sparkling Standard Cleaning Co."; verify the precise legal spelling and entity suffix before publishing. Stays unpublished (and omitted from schema) until confirmed. |
 | 7 | Exact service-zone review | `src/config/geography.ts` | Zones are provisional ZIP centroids around the one-hour driving boundary. Confirm the final list after the origin coordinates are entered. |
 | 8 | Pricing matrix approval | `docs/launch/PRICING-PROPOSAL.md` | Market research + proposed rates. Production rates do NOT change until the owner approves. |
-| 9 | Review link (Google profile) | `business.reviews.submissionUrl` | Needed for the review system; create the Google Business Profile, then supply the links. |
-| 10 | Remaining platform profile URLs | `business.socials` | **Mostly done (2026-10-03):** eight profiles live and rendering — Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler and Locals — with their basic tracked UTM links placed (owner-confirmed). **Instagram is undergoing verification** (do not publish an unconfirmed URL). **YouTube is deferred** by new Google Workspace account eligibility — not abandoned, no paid workarounds. Google Business Profile verification is in progress. Bing Places, Yelp, X, Threads, LinkedIn, Alignable and Reddit are prepared as PENDING and never render until supplied. Full actions: `docs/marketing/PLATFORM-REGISTER.md`. |
+| 9 | ~~Review link + profile URL (Google)~~ **Done 2026-10-08** | `business.reviews.submissionUrl`, `business.reviews.profileUrl`, `business.socials.googleProfile` | **Resolved:** the exact owner-supplied URLs are configured (see the Resolved table); the `/leave-review/` page is live and review requests are unblocked. Never modify, shorten or hand-build the URLs. |
+| 10 | Remaining platform profile URLs | `business.socials` | **Mostly done (2026-10-03):** eight social profiles live and rendering — Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler and Locals — with their basic tracked UTM links placed (owner-confirmed). **Google Business Profile is verified with its profile + review links captured (owner-supplied 2026-10-08).** **Instagram is undergoing verification** (do not publish an unconfirmed URL). **YouTube is deferred** by new Google Workspace account eligibility — not abandoned, no paid workarounds. Bing Places, Yelp, X, Threads, LinkedIn, Alignable and Reddit are prepared as PENDING and never render until supplied. Full actions: `docs/marketing/PLATFORM-REGISTER.md`. |
 | 11 | Analytics IDs | `PUBLIC_UMAMI_WEBSITE_ID`, `PUBLIC_GTM_CONTAINER_ID` | **GA4 done (owner-confirmed 2026-10-03):** `GTM-KSQ26HMG` / `G-LG222LQRQ2` operational with all three key events verified. Umami remains optional with no website ID; the privacy page names only configured services. Accounts must be unique to this business. |
 | 12 | SMS capability | `business.flags.smsEnabled` | **Done 2026-10-01.** Owner-confirmed: the business number receives SMS and text contact is authorized; `business.flags.smsEnabled` is true and the Call/Text reservation actions are live. |
 | 13 | Final cancellation percentages | `src/config/pricing.ts` cancellation | Currently provisional; public copy intentionally avoids numbers until approved. |
@@ -65,7 +66,7 @@ The full schedule is `docs/marketing/90-DAY-LAUNCH-PLAN.md`; account setup is
 | # | Action | Notes |
 | --- | --- | --- |
 | M1 | ~~Review and authorize the software release~~ **Done 2026-10-03** | Owner-authorized pushes deployed `5a4a024`, `cdc4971` (social integration) and `62a1a46` (logo-only Follow Us redesign); live acceptance checks passed (`docs/verification/VERIFICATION.md`). Later documentation follow-ups stay local until separately authorized |
-| M2 | Confirm the Google Business Profile and Instagram verification results | Both are in verification (2026-10-03); never claim verified or publish either URL before confirmation |
+| M2 | ~~Confirm the Google Business Profile verification result~~ **Done 2026-10-08** — GBP is verified; the exact profile/review links are captured (#9) and review requests are unblocked. **Instagram verification remains in progress** — never claim it or publish its URL before confirmation |
 | M3 | Priority social accounts and placements | **Done 2026-10-03:** eight profiles live; the owner confirms the basic tracked UTM links are placed on all eight (registry active). **Remaining:** wait for Instagram verification (URL not published); YouTube deferred by Google Workspace eligibility — no paid workarounds |
 | M4 | Approve the content concepts and schedule | The "30 Days. 30 Details." title, the four-week plan and the founder introduction are proposals until approved; owner approves the facts the founder content may state. **Immediate priority: filming.** |
 | M5 | Film the opening content (immediate priority) | Hayli's founder introduction (long + short edit) and the first cleaning videos; customer footage requires permission. Acquiring local recurring customers is the business outcome this content serves |
@@ -101,7 +102,7 @@ requests only. Full workflow: `docs/operations/GIFT-CERTIFICATES.md`.
 ## What was deliberately NOT decided by engineering
 
 Legal entity suffix, insurance, bonding, licensing, price approval, final cancellation fees, the
-remaining social and review links, the Umami analytics ID, genuine photography and public business
-claim wording. None of these appear as invented facts anywhere in the codebase. The private
-operating coordinates exist only as a Cloudflare secret — supplied by the owner, never committed,
-never rendered and never logged.
+remaining social profile links (Instagram/YouTube and the lower-priority platforms), the Umami
+analytics ID, genuine photography and public business claim wording. None of these appear as
+invented facts anywhere in the codebase. The private operating coordinates exist only as a
+Cloudflare secret — supplied by the owner, never committed, never rendered and never logged.

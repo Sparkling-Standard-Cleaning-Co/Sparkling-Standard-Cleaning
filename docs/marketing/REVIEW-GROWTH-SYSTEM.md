@@ -43,16 +43,16 @@ job complete
 
 ## Where the review link comes from
 
-The review link is an owner-provided fact: `business.reviews.submissionUrl` (currently
-`PENDING`). Until a real Google review link exists, **do not send review requests with invented
-links and do not create a review QR**. The site's `/leave-review/` utility page renders only
-when the link is configured.
+The review link is an owner-provided fact, captured and configured (2026-10-08):
+`business.reviews.submissionUrl` = `https://g.page/r/CXAcv1Pp7OI2ECE/review` — the exact Google
+"Ask for reviews" short link. **Google Business Profile is VERIFIED (owner-confirmed 2026-10-08)**
+and its public profile URL is also captured in `business.reviews.profileUrl` and
+`business.socials.googleProfile` (both the exact owner-supplied URL). The site's `/leave-review/`
+utility page is live with the real CTA.
 
-**Google Business Profile status (2026-10-02):** the profile has been **created**, but Google is
-still reviewing verification and the listing is **not publicly visible**. Review requests and the
-review QR stay blocked until (a) Google confirms verification and (b) the owner copies the real
-"Ask for reviews" short link into `business.reviews.submissionUrl`. Do not claim the listing is
-verified and do not construct a review URL by hand.
+Use the configured link exactly as supplied — never modify, shorten, reconstruct or hand-build it.
+Review requests are **unblocked**: ask after satisfaction (in person or same-day message), one
+reminder after ~3 days, then stop.
 
 ## Follow-up after a review
 

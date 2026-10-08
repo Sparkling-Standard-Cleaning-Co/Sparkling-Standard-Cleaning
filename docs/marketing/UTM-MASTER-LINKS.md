@@ -15,10 +15,11 @@ Source of truth: `src/config/marketing-links.ts`. Site: https://sparkling-standa
   gad_*) — the site preserves those parameters untouched.
 - `utm_term` is not used (no paid-keyword campaigns).
 
-## Base channel links (9)
+## Base channel links (10)
 
 | Channel | Placement | Final URL | Purpose |
 | --- | --- | --- | --- |
+| Google Business Profile | Business profile → website field | https://sparkling-standard.com/?utm_source=google&utm_medium=organic&utm_campaign=gbp | Identify visits that start from the Google Business Profile listing. |
 | Facebook | Page website field | https://sparkling-standard.com/?utm_source=facebook&utm_medium=organic_social&utm_campaign=profile | Attribute Facebook page visitors arriving through the website link. |
 | TikTok | Bio link | https://sparkling-standard.com/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=profile | Attribute TikTok bio-link traffic. |
 | Nextdoor | Business page website field | https://sparkling-standard.com/?utm_source=nextdoor&utm_medium=organic_social&utm_campaign=profile | Attribute Nextdoor neighborhood traffic. |
@@ -29,14 +30,12 @@ Source of truth: `src/config/marketing-links.ts`. Site: https://sparkling-standa
 | Locals | Profile website field | https://sparkling-standard.com/?utm_source=locals&utm_medium=organic_social&utm_campaign=profile | Attribute Locals profile visitors. |
 | Print material | Business card website line | https://sparkling-standard.com/?utm_source=business_card&utm_medium=print&utm_campaign=business_card&utm_content=website_line | Track typed card visits. |
 
-## Pending — prepared, do NOT publish yet (22)
+## Pending — prepared, do NOT publish yet (18)
 
 These URLs are prepared for when the public profiles exist. Do **not** paste them anywhere yet.
 
 | Channel | Placement | Prepared URL (not active) | Why pending |
 | --- | --- | --- | --- |
-| Google Business Profile | Business profile → website field | https://sparkling-standard.com/?utm_source=google&utm_medium=organic&utm_campaign=gbp | Identify visits that start from the Google Business Profile listing. |
-| Google Business Profile | Business profile → appointment link | https://sparkling-standard.com/estimate/?utm_source=google&utm_medium=organic&utm_campaign=gbp&utm_content=estimate | Attribute GBP appointment-link clicks that go straight to the estimate flow. |
 | Instagram | Bio link | https://sparkling-standard.com/?utm_source=instagram&utm_medium=organic_social&utm_campaign=profile | Attribute Instagram bio-link traffic. |
 | Instagram | Story / link sticker when pushing estimates | https://sparkling-standard.com/estimate/?utm_source=instagram&utm_medium=organic_social&utm_campaign=profile&utm_content=story_estimate | Track estimate starts from Instagram stories. |
 | YouTube | Channel links | https://sparkling-standard.com/?utm_source=youtube&utm_medium=organic_social&utm_campaign=profile | Attribute YouTube channel description traffic. |
@@ -47,21 +46,20 @@ These URLs are prepared for when the public profiles exist. Do **not** paste the
 | Threads | Bio link | https://sparkling-standard.com/?utm_source=threads&utm_medium=organic_social&utm_campaign=profile | Attribute Threads bio-link visitors. |
 | Alignable | Business profile website field | https://sparkling-standard.com/commercial-cleaning/?utm_source=alignable&utm_medium=organic_social&utm_campaign=profile&utm_content=commercial | Attribute local-business-network commercial enquiries. |
 | Reddit | Local subreddit participation | https://sparkling-standard.com/?utm_source=reddit&utm_medium=organic_social&utm_campaign=community&utm_content=local_thread | Attribute visits from genuine local subreddit participation (follow each community’s self-promotion rules). |
-| Google Business Profile | GBP post link | https://sparkling-standard.com/deep-cleaning/?utm_source=google&utm_medium=organic&utm_campaign=deep_clean&utm_content=gbp_post | Track deep-clean interest from GBP posts. |
 | Instagram | Before/after post link | https://sparkling-standard.com/deep-cleaning/?utm_source=instagram&utm_medium=organic_social&utm_campaign=proof&utm_content=before_after | Track profile visits converting from before/after content. |
 | TikTok | Detail-video bio link | https://sparkling-standard.com/house-cleaning/?utm_source=tiktok&utm_medium=organic_social&utm_campaign=proof&utm_content=detail_video | Track house-cleaning interest from detail demonstration videos. |
 | Pinterest | Recurring-cleaning pin | https://sparkling-standard.com/recurring-cleaning/?utm_source=pinterest&utm_medium=organic_social&utm_campaign=recurring&utm_content=pin | Track recurring-cleaning interest from pinned checklists and tips. |
 | X | Recurring-cleaning post | https://sparkling-standard.com/recurring-cleaning/?utm_source=x&utm_medium=organic_social&utm_campaign=recurring&utm_content=post | Track recurring-cleaning interest from X posts. |
 | Rumble | Video description link | https://sparkling-standard.com/house-cleaning/?utm_source=rumble&utm_medium=organic_social&utm_campaign=proof&utm_content=video_description | Track house-cleaning interest from Rumble video descriptions. |
 | YouTube | Video description link | https://sparkling-standard.com/house-cleaning/?utm_source=youtube&utm_medium=organic_social&utm_campaign=proof&utm_content=detail_video | Track house-cleaning interest from YouTube video descriptions. |
-| Google Business Profile | Business profile post | https://sparkling-standard.com/gift-certificates/?utm_source=google&utm_medium=organic&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from Google Business Profile posts. |
 | Instagram | Gift-certificate post / story | https://sparkling-standard.com/gift-certificates/?utm_source=instagram&utm_medium=organic_social&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from Instagram. |
 | X | Gift-certificate post | https://sparkling-standard.com/gift-certificates/?utm_source=x&utm_medium=organic_social&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from X. |
 
-## Campaign & outreach links (25)
+## Campaign & outreach links (28)
 
 | Channel | Placement | Final URL | Purpose |
 | --- | --- | --- | --- |
+| Google Business Profile | Business profile → appointment link | https://sparkling-standard.com/estimate/?utm_source=google&utm_medium=organic&utm_campaign=gbp&utm_content=estimate | Attribute GBP appointment-link clicks that go straight to the estimate flow. |
 | Facebook | Recurring-cleaning community posts | https://sparkling-standard.com/recurring-cleaning/?utm_source=facebook&utm_medium=organic_social&utm_campaign=recurring&utm_content=community_post | Track recurring-cleaning interest from neighborhood and community group posts. |
 | Email | Email signature | https://sparkling-standard.com/estimate/?utm_source=email&utm_medium=email&utm_campaign=signature&utm_content=estimate | Track estimate starts from the owner’s email signature link. |
 | SMS | Text-message follow-up template | https://sparkling-standard.com/estimate/?utm_source=sms&utm_medium=sms&utm_campaign=followup&utm_content=estimate | Track estimate starts from follow-up texts about a quote. |
@@ -82,10 +80,12 @@ These URLs are prepared for when the public profiles exist. Do **not** paste the
 | Print material | Event poster QR | https://sparkling-standard.com/estimate/?utm_source=event_poster&utm_medium=print&utm_campaign=community_event&utm_content=qr | Track estimate scans from event posters. |
 | Print material | Foam board QR | https://sparkling-standard.com/estimate/?utm_source=foam_board&utm_medium=print&utm_campaign=community_event&utm_content=qr | Track estimate scans from foam-board displays at events. |
 | Print material | Community leave-behind QR | https://sparkling-standard.com/estimate/?utm_source=community_leave_behind&utm_medium=print&utm_campaign=community&utm_content=qr | Track estimate scans from community outreach leave-behinds. |
+| Google Business Profile | GBP post link | https://sparkling-standard.com/deep-cleaning/?utm_source=google&utm_medium=organic&utm_campaign=deep_clean&utm_content=gbp_post | Track deep-clean interest from GBP posts. |
 | Nextdoor | Neighborhood post link | https://sparkling-standard.com/house-cleaning/?utm_source=nextdoor&utm_medium=organic_social&utm_campaign=neighborhood&utm_content=post | Track neighborhood recommendation-post traffic. |
 | Facebook | Gift-certificate posts | https://sparkling-standard.com/gift-certificates/?utm_source=facebook&utm_medium=organic_social&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from Facebook posts. |
 | Nextdoor | Neighborhood gift posts | https://sparkling-standard.com/gift-certificates/?utm_source=nextdoor&utm_medium=organic_social&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from Nextdoor neighborhood posts. |
 | Email | Email signature (gift link) | https://sparkling-standard.com/gift-certificates/?utm_source=email&utm_medium=email&utm_campaign=signature&utm_content=gift | Track gift-certificate interest from the owner’s email signature. |
+| Google Business Profile | Business profile post | https://sparkling-standard.com/gift-certificates/?utm_source=google&utm_medium=organic&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from Google Business Profile posts. |
 | Print material | Printed gift card / certificate holder | https://sparkling-standard.com/gift-certificates/?utm_source=gift_card&utm_medium=print&utm_campaign=gift_certificate&utm_content=qr | Track scans from a printed gift card that leads to the gift-certificate page. |
 
 ## QR assets (19)

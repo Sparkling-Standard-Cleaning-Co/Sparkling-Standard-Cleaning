@@ -191,15 +191,16 @@ export const business = {
   // Confirmed 2026-10-02 (owner): Facebook + Nextdoor. Confirmed 2026-10-03
   // (owner-supplied, reachable; not independently authenticated): TikTok,
   // Pinterest, Rumble, Gab, Parler and Locals. Google Business Profile is
-  // CREATED but verification is still processing and it is not publicly
-  // visible, so its URL stays PENDING. Instagram, YouTube and every other
-  // platform stay PENDING until the owner supplies a real profile URL; the
-  // Follow Us section never renders a PENDING platform and never invents a
-  // handle. Adding a platform later means editing only this block (the platform
-  // register is docs/marketing/PLATFORM-REGISTER.md).
+  // VERIFIED and its public profile URL was supplied by the owner
+  // (2026-10-08); use the exact URL — never modify, shorten or reconstruct it.
+  // Instagram, YouTube and every other platform stay PENDING until the owner
+  // supplies a real profile URL; the Follow Us section never renders a PENDING
+  // platform and never invents a handle. Adding a platform later means editing
+  // only this block (the platform register is docs/marketing/PLATFORM-REGISTER.md).
   socials: {
-    // Local discovery
-    googleProfile: PENDING as Fact<string>,
+    // Local discovery — exact owner-supplied Google Business Profile URL.
+    googleProfile:
+      'https://www.google.com/search?kgmid=/g/11zz5t1059&hl=en-US&q=Sparkling+Standard+Cleaning+Co.',
     bingPlaces: PENDING as Fact<string>,
     // Confirmed (owner-supplied 2026-10-02)
     facebook: 'https://www.facebook.com/profile.php?id=61595026949584',
@@ -224,10 +225,18 @@ export const business = {
     reddit: PENDING as Fact<string>,
   },
   reviews: {
-    /** Link that READS existing reviews. PENDING until a profile exists. */
-    profileUrl: PENDING as Fact<string>,
-    /** Direct review-submission link (future QR destination). PENDING. */
-    submissionUrl: PENDING as Fact<string>,
+    /**
+     * Link that READS existing reviews — the exact owner-supplied public
+     * Google Business Profile URL (2026-10-08). Never modify or reconstruct it.
+     */
+    profileUrl:
+      'https://www.google.com/search?kgmid=/g/11zz5t1059&hl=en-US&q=Sparkling+Standard+Cleaning+Co.',
+    /**
+     * Direct review-submission link (leave-review page / QR destination) — the
+     * exact owner-supplied "Ask for reviews" short link (2026-10-08). Never
+     * modify, shorten or hand-build this URL.
+     */
+    submissionUrl: 'https://g.page/r/CXAcv1Pp7OI2ECE/review',
     /**
      * No review counts are ever displayed unless the owner supplies a verified
      * figure AND real reviews exist in the reviews collection. Never invent.

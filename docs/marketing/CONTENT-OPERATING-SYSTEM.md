@@ -20,7 +20,7 @@ placement's tracked link is in `WHERE-TO-PASTE-UTM-LINKS.md`.
 
 | Channel | Role | Priority |
 | --- | --- | --- |
-| **Google Business Profile** | High-intent discovery, local trust, reviews | **Created — verification pending** (highest local priority) |
+| **Google Business Profile** | High-intent discovery, local trust, reviews | **Verified — active** (owner-confirmed 2026-10-08; highest local priority) |
 | **Google organic (site)** | Owning pages for every service cluster | #1 foundation |
 | **Instagram** | Primary content channel — visual brand, reels, founder, transformations | Primary content — verification in progress (URL not published) |
 | **TikTok** | Primary content channel — reach, founder journey, satisfying detail videos | Primary content — live; tracked link placed |
@@ -67,12 +67,14 @@ No staged dirt, no fake customers, no invented results. Customer permission is r
 property photos (see `docs/privacy/PHOTO-PRIVACY-SOP.md`). This system is the marketing
 equivalent of the founder's philosophy — prove the detail, don't claim it.
 
-## GBP setup checklist
+## GBP operating checklist
 
 The current, maintained Google Business Profile checklist lives in
-`docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (status: created — verification pending). Use that
-document rather than duplicating the steps here. Remember: never claim verification, publish the
-profile URL or build a review link until Google confirms and the owner supplies the real links.
+`docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (**status: verified; exact profile + review links
+captured, owner-supplied 2026-10-08**). Use that document rather than duplicating the steps here.
+The remaining owner action is pasting the tracked GBP links into the live profile; never modify,
+shorten or hand-build the supplied URLs. Weekly GBP rhythm:
+`docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md`.
 
 ## Local groups & Nextdoor
 

@@ -2513,8 +2513,9 @@ fieldset.input--invalid {
   padding: 0;
 }
 
-/* Phones: cap the row at four buttons so the eight profiles form two balanced
-   rows of four (4 × 52px + 3 × 12px = 244px, which still fits at 320px). */
+/* Phones: cap the row at four buttons so the profiles wrap tidily
+   (4 × 52px + 3 × 12px = 244px, which still fits at 320px; nine profiles
+   wrap as 4 + 4 + 1). */
 @media (max-width: 47.99rem) {
   .site-footer .social-links {
     max-width: 15.25rem;

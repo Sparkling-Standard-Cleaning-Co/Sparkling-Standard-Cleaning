@@ -58,9 +58,10 @@ Date: **2026-10-01**.
    receives page views, `estimate_start` and the three inquiry key events; Enhanced Measurement
    form interactions disabled. Optional remaining: internal-traffic filter; Umami still needs a
    website ID. Reference: `docs/analytics/GTM-CONTAINER-SETUP.md`.
-4. **Search/local launch package** — Google Business Profile created (verification pending;
-   checklist in `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`), Search Console configured, sitemap
-   submitted, citation list prepared.
+4. **Search/local launch package** — Google Business Profile **verified with its profile + review
+   links captured (owner-supplied 2026-10-08)**; checklist in
+   `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`. Search Console configured, sitemap submitted,
+   citation list prepared.
 5. **Curated visual evidence** — store owner-approved staging screenshots under
    `docs/verification/` for future regressions.
 

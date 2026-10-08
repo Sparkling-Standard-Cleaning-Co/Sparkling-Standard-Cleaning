@@ -62,7 +62,7 @@ shows policy changes; this file shows what was actually measured.
 | TikTok views / profile visits | | |
 | YouTube views / watch time | | |
 | Facebook + Nextdoor reach / engagement | | |
-| GBP posts / profile views (once verified) | | |
+| GBP posts / profile views (verified; live) | | |
 | Website visits (GA4, consenting visitors only) | | |
 | Tracked-link clicks by campaign (from GA4 traffic acquisition) | | |
 

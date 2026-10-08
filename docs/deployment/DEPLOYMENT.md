@@ -13,7 +13,7 @@ dashboard, stop and reconcile before deploying. Owner-confirmed facts live in
 - Runtime: Cloudflare Pages + Pages Functions (`functions/`), Astro 5 static build
 
 The site is live. `business.launch.productionApproved` is still `false` as the formal
-owner-checklist gate (legal name, insurance/licensing wording, review links, final cancellation
+owner-checklist gate (legal name, insurance/licensing wording, final cancellation
 percentages) — it does **not** describe deployment state. Any push to `main` triggers a live
 production deployment: treat every commit to `main` as publishing.
 
@@ -256,10 +256,10 @@ deployment as successful from the dashboard status alone.
 
 The live site and pipeline are verified operational. `business.launch.productionApproved` remains
 `false` as the **formal owner checklist gate** (legal entity spelling, insurance/bonding/licensing
-claims, genuine review links, final cancellation percentages, remaining profile URLs). Closing it
+claims, genuine reviews, final cancellation percentages, remaining profile URLs). Closing it
 requires ALL of the following:
 
-1. `docs/launch/OWNER-INPUT-REQUIRED.md` items resolved (legal name, claims, review links,
+1. `docs/launch/OWNER-INPUT-REQUIRED.md` items resolved (legal name, claims, genuine reviews,
    remaining profile URLs, final cancellation percentages).
 2. Confirm live: `robots.txt` = `Allow: /`; meta robots = `index, follow`; canonical = the
    production domain with trailing slash; `PUBLIC_PREVIEW_MODE` is NOT set in Production.

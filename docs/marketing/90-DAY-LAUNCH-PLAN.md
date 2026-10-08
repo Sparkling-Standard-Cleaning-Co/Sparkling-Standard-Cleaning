@@ -6,10 +6,11 @@ focus; the owner approves the final schedule and content concepts before they be
 Zero additional spending remains the default: no paid ads, tools or services without explicit
 owner authorization.
 
-Current state (2026-10-03): the website is **live** with working lead delivery and owner-confirmed
-GA4 analytics. The foundations listed below are complete; the active plan is the **four-week
-launch** that follows. Platform accounts and the Google Business Profile verification are the
-main open setup items (`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`).
+Current state (2026-10-08): the website is **live** with working lead delivery and owner-confirmed
+GA4 analytics. **The Google Business Profile is verified (owner-confirmed 2026-10-08)** and moves
+into active operation. The foundations listed below are complete; the active plan is the
+**four-week launch** that follows. Instagram verification is the main open account item
+(`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`).
 
 ## Completed foundations (historical checklist — done)
 
@@ -22,8 +23,9 @@ main open setup items (`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`).
       page views, `estimate_start` and the three inquiry key events verified end-to-end
 - [x] SMS enabled; Facebook and Nextdoor profiles confirmed; UTM/QR registry and lead attribution
       in place; review-request system designed (`REVIEW-GROWTH-SYSTEM.md`)
-- [ ] Google Business Profile verification result (verification in progress — do not claim
-      verified or publish its URL early)
+- [x] **Done 2026-10-08** — Google Business Profile **verified with its exact public profile URL
+      and review link captured** (owner-supplied); `/leave-review/` is live. Never modify or
+      substitute the supplied URLs.
 - [x] Social profiles — eight integrated and live with tracked UTM links placed (owner-confirmed
       2026-10-03)
 - [ ] Instagram verification (in progress; URL not published)
@@ -41,11 +43,12 @@ main open setup items (`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`).
       passed (`docs/verification/VERIFICATION.md`).
 - [ ] **Priority: film Hayli's founder introduction** (long + short edit) and 2–3 real detail
       clips (permission required) — the immediate execution focus.
-- [ ] Confirm the Google Business Profile verification result and the Instagram verification
-      (do not publish either URL before confirmation).
+- [x] GBP profile + review links captured (owner-supplied 2026-10-08); confirm the Instagram
+      verification (do not publish its URL before it is supplied).
 - [ ] YouTube stays deferred while Google Workspace eligibility is blocked; no paid workarounds.
-- [ ] Tracked UTM links are already placed on the eight live profiles — no further account setup
-      is blocking production.
+- [ ] Tracked UTM links are already placed on the eight live social profiles — no further account
+      setup is blocking production (Google Business Profile is verified with its profile + review
+      links captured; its four tracked links are ready to paste).
 
 ### Week 2 — Open for business
 
@@ -54,7 +57,7 @@ main open setup items (`docs/marketing/SOCIAL-ACCOUNT-SETUP.md`).
       not indiscriminate reposts).
 - [ ] Initiate local referral outreach: realtors, STR hosts, property managers, churches and
       commercial prospects using the prepared packets and tracked links.
-- [ ] Post the first Google Business Profile update/photos if verification has completed.
+- [ ] Post the first Google Business Profile update/photos (GBP is verified and active).
 
 ### Week 3 — Proof and process
 

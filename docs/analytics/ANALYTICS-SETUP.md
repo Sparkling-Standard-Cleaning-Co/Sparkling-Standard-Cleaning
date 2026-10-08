@@ -68,7 +68,7 @@ privacy page must stay in sync with whatever is actually enabled.
 | `str_request_start` | First interaction with the STR form | — |
 | `str_request_submit` | STR request confirmed | — |
 | `booking_request` | Estimate request sent with a preferred date | `service_type` |
-| `review_link_click` | Review link clicked (once a real link exists) | `platform` |
+| `review_link_click` | Review link clicked (link captured 2026-10-08) | `platform` |
 
 **Never sent to analytics:** names, emails, phones, addresses, ZIP codes, photos, freeform
 notes, or any form content. Lead details live only in the owner's inbox/records.

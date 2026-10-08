@@ -26,10 +26,11 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
   `62a1a46`, owner-authorized, live acceptance checks passed. See
   `docs/verification/VERIFICATION.md`.
 - **Remaining owner items:** formal launch checklist (legal entity spelling, insurance/bonding/
-  licensing claims, genuine review link, final cancellation percentages), Instagram and Google
-  Business Profile verification results, the deferred YouTube channel (Google Workspace
-  eligibility — no paid workarounds), genuine photography and reviews. Eight profiles are live in
-  the Follow Us section (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals) with
+  licensing claims, genuine reviews, final cancellation percentages), Instagram verification,
+  the deferred YouTube channel (Google Workspace eligibility — no paid workarounds), genuine
+  photography and reviews. **Google Business Profile is verified with its profile + review links
+  captured** (owner-supplied 2026-10-08). Nine profiles are live in the Follow Us section (Google
+  Business Profile plus Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals) with
   their basic tracked UTM links placed. See `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing
   approvals M2–M7; M1 — the software release — was deployed 2026-10-03).
 - **We are now in the marketing phase. Immediate priorities: film Hayli's founder introduction,

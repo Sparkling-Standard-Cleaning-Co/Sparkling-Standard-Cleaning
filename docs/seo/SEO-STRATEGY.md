@@ -38,9 +38,11 @@ lives in `business.serviceArea.summary` and on `/service-area/`.
 ## Local SEO foundation
 
 Prepared for: Google Business Profile, Bing Places, Apple Business Connect, local citations,
-review acquisition and NAP consistency. None of these are claimed as existing — the profile
-setup checklist lives in `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (§Week 1) and the launch
-blockers in `docs/launch/OWNER-INPUT-REQUIRED.md`.
+review acquisition and NAP consistency. **Google Business Profile is verified with its profile +
+review links captured (owner-supplied 2026-10-08)** and active; Bing Places creation is unblocked
+(import from Google). The profile setup checklist lives in
+`docs/marketing/SOCIAL-ACCOUNT-SETUP.md` and the operating rhythm in
+`docs/marketing/LOCAL-AUTHORITY.md`.
 
 Rules:
 
@@ -88,8 +90,9 @@ Rules:
 3. `npm run validate:production` → passes.
 4. robots.txt shows `Allow: /` + sitemap; a live URL's meta robots is `index, follow`.
 5. Submit sitemap in Google Search Console + Bing Webmaster Tools.
-6. Create/populate the Google Business Profile (name, category, area, hours, phone, website
-   with the GBP campaign link from `docs/marketing/UTM-MASTER-LINKS.md`).
+6. Google Business Profile: **verified with profile + review links captured (owner-supplied
+   2026-10-08)** — keep name, category, area, hours, phone and the tracked GBP website link
+   current.
 7. Verify rich results (LocalBusiness/Service/Breadcrumb/FAQ) with Google's Rich Results Test.
 8. Optional: `node scripts/indexnow.mjs --all` with `INDEXNOW_KEY` configured.
 9. Recheck after 72h: indexed page count, coverage errors, canonical warnings.

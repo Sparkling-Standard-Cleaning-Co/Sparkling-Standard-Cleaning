@@ -5,12 +5,15 @@ does it and the account status is updated in `docs/marketing/PLATFORM-REGISTER.m
 creation, profile publishing and verification are all **pending** unless that register says
 otherwise; never mark an account created, verified or linked before the owner confirms it.
 
-**Status 2026-10-03:** eight profiles are integrated and live (Facebook, Nextdoor, TikTok,
-Pinterest, Rumble, Gab, Parler, Locals). The owner confirms the **basic tracked UTM website/bio
-links are placed** on all eight, so their registry entries are active (`pending: false`) and their
-tracked URLs are recorded below. **Instagram is undergoing verification** (do not mark verified or
-publish an unconfirmed URL). **YouTube creation is deferred** — temporarily blocked by new Google
-Workspace account eligibility, not abandoned; do not add paid services to work around it.
+**Status 2026-10-08:** **Google Business Profile is VERIFIED with its exact public profile URL and
+"Ask for reviews" link captured (owner-supplied 2026-10-08)** — it is active operating
+infrastructure and review requests are unblocked (§ Google Business Profile below). Nine profiles
+render in the Follow Us section (Google Business Profile plus the eight below). The owner confirms
+the **basic tracked UTM website/bio links are placed** on the eight social profiles, so their
+registry entries are active (`pending: false`) and their tracked URLs are recorded below.
+**Instagram is undergoing verification** (do not mark verified or publish an unconfirmed URL).
+**YouTube creation is deferred** — temporarily blocked by new Google Workspace account
+eligibility, not abandoned; do not add paid services to work around it.
 
 **Immediate execution priority (owner direction):** film Hayli's founder introduction, produce the
 first cleaning videos and acquire local recurring customers. Account setup is no longer the
@@ -25,7 +28,7 @@ and `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`. Tracked links: generated
 
 | Order | Platform | Current status | Role |
 | --- | --- | --- | --- |
-| 1 | Google Business Profile | **Created — verification in progress (2026-10-03)** | Local discovery; reviews; high-intent search |
+| 1 | Google Business Profile | **Verified (owner-confirmed 2026-10-08)** | Local discovery; reviews; high-intent search |
 | 2 | Instagram | **Verification in progress (2026-10-03) — URL not published** | Primary content channel (Reels) |
 | 3 | TikTok | **Confirmed — account created; tracked bio link placed** | Primary content channel (short-form reach) |
 | 4 | YouTube | **Deferred — Google Workspace account eligibility (not abandoned)** | Primary content channel (Shorts + founder/process long-form) |
@@ -52,24 +55,28 @@ and `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`. Tracked links: generated
 
 ## Per-account checklist
 
-### Google Business Profile (priority 1 — verification pending)
+### Google Business Profile (priority 1 — VERIFIED, active)
 
-Do **not** publish the URL or claim verification until Google confirms. Status:
-`docs/operations/PLATFORM-STATUS.md`.
+The profile is **verified and publicly visible**, and its exact public profile URL and
+"Ask for reviews" link are **captured in `business.ts`** (owner-supplied 2026-10-08). Status:
+`docs/operations/PLATFORM-STATUS.md`. Operating rhythm: `docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md`.
 
-- [ ] Confirm Google's verification result in the profile dashboard (owner action; may take days).
+- [x] Verification confirmed by Google (owner-confirmed 2026-10-08).
+- [x] Exact links captured and configured: `business.socials.googleProfile` and
+      `business.reviews.profileUrl` = the owner-supplied public profile URL;
+      `business.reviews.submissionUrl` = `https://g.page/r/CXAcv1Pp7OI2ECE/review` (the exact
+      "Ask for reviews" short link). Never modify, shorten or hand-build these URLs.
 - [ ] Business category: House cleaning service (primary); add honest secondary categories only.
 - [ ] Service-area business settings: hide the street address; set the approved service area.
 - [ ] Hours: the residential window configured for the business.
 - [ ] Services: mirror the site's seven service pages with honest descriptions.
-- [ ] Website field: the tracked **GBP → website** link (registry: `gbp_home`).
-- [ ] Appointment/estimate link: the tracked **GBP → appointment** link (`gbp_estimate`).
+- [ ] Website field: the tracked **GBP → website** link (registry: `gbp_home`) — ready to paste now.
+- [ ] Appointment/estimate link: the tracked **GBP → appointment** link (`gbp_estimate`) — ready to paste now.
 - [ ] Photos: real work only after permission; no stock, no identifying details.
-- [ ] Reviews: request after every completed job (`docs/marketing/REVIEW-GROWTH-SYSTEM.md`); never
-      buy, gate or invent reviews.
-- [ ] When verified, copy the real "Ask for reviews" short link into
-      `business.reviews.submissionUrl` — never hand-build a review URL.
-- [ ] Record the verified status and (when the owner chooses to publish) the URL in the register.
+- [ ] Posts: begin the weekly GBP rhythm (`LOCAL-AUTHORITY.md` §1) using the tracked post links
+      (`gbp_deep_clean`, `gbp_gift_post`).
+- [ ] Reviews: request after every satisfied job using the configured review link
+      (`docs/marketing/REVIEW-GROWTH-SYSTEM.md`); never buy, gate or invent reviews.
 
 ### Instagram (priority 2 — verification in progress)
 
@@ -129,8 +136,9 @@ this table as the record when auditing each profile.
 | Locals | Profile → Website | `https://sparkling-standard.com/?utm_source=locals&utm_medium=organic_social&utm_campaign=profile` |
 
 Never add these UTMs to internal site navigation or to the outbound profile links on the website —
-they belong only on the inbound campaign links placed inside the platforms. Instagram, YouTube and
-GBP links remain **prepared, not placed**.
+they belong only on the inbound campaign links placed inside the platforms. Instagram and YouTube
+links remain **prepared, not placed**. The four GBP links are now **ready to paste** into the
+verified profile (owner action).
 
 ### Facebook and Nextdoor (confirmed — tracked links placed)
 

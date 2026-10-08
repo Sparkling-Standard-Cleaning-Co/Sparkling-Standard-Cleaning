@@ -256,6 +256,45 @@ representative cleaning photograph beside the founder narrative.
 | Layout | Screenshots at 1280/768/390 + browser checks | Portrait leads the founder section on phones (order swap) and sits beside the story on desktop; no overflow or clipping |
 | Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (79 pass), `npm run build`, `npm run validate`, `pending`, `smoke`, `testimonials`, `audit:facts` | All pass |
 
+## Verified — GBP status update + execution layer (2026-10-08)
+
+Owner-confirmed fact: **Google Business Profile is verified and publicly visible.** At the time of
+this check the exact profile URL and "Ask for reviews" link were **not present anywhere in the
+repository** (`business.socials.googleProfile`, `business.reviews.profileUrl`,
+`business.reviews.submissionUrl` were still `PENDING`) — capturing them was the remaining owner
+action, and no URL was constructed. *(Superseded later the same day: the owner supplied the exact
+URLs — see the next section.)*
+
+| Check | Method | Result |
+| --- | --- | --- |
+| GBP status propagated | Repository-wide grep sweep (`*.md`, `*.ts`, `*.astro`, `*.mjs`) | No stale GBP "verification pending / in progress / not publicly visible" statements remain; the only surviving "verification in progress" references are Instagram (legitimate) and the generic status-vocabulary row |
+| Tracked GBP links activated | `src/config/marketing-links.ts` pending flags | The four GBP links (`gbp_home`, `gbp_estimate`, `gbp_deep_clean`, `gbp_gift_post`) moved prepared → ready (registry now 38 ready / 18 prepared) |
+| Generated link docs | `npm run marketing:links` + `npm run marketing:verify` | 3 documents + 57 QR files written; registry valid, documents in sync, every QR decodes to its intended URL |
+| Execution layer | `docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md` created | Daily/weekly operating front door; linked from `OPERATIONS-HUB.md`, `GROWTH-SYSTEM.md` and the AGENTS.md system map |
+| Internal references | Automated `docs/...` reference check across all markdown | All references resolve |
+| No fabricated facts | `business.ts` unchanged in behavior (comments only); review/profile URLs were still PENDING at that point | No invented URL, review, or claim |
+| Full suites | `npm run verify` (astro check 0 errors/0 warnings, build 21 pages, validate 1,264 links + SEO + registry + GTM + checklist leak), `npm test` (304 pass, 1 skip, 0 fail), `npm run test:print` (8 pass, 1 skip, 0 fail), `pending` (24 files), `smoke` (17 pages), `testimonials`, `audit:facts` | All pass; `audit:facts` context-review terms are pre-existing and unchanged |
+
+## Verified — GBP profile + review URLs captured and live (2026-10-08)
+
+The owner supplied the exact Google Business Profile URLs. They are now the canonical configured
+values (never modified, shortened or reconstructed):
+
+- **Public profile** (also `reviews.profileUrl` and `socials.googleProfile`):
+  `https://www.google.com/search?kgmid=/g/11zz5t1059&hl=en-US&q=Sparkling+Standard+Cleaning+Co.`
+- **Ask-for-Reviews** (`reviews.submissionUrl`): `https://g.page/r/CXAcv1Pp7OI2ECE/review`
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Canonical values configured | `src/config/business.ts` | The three fields hold the exact owner-supplied URLs; no PENDING remains for GBP/review links |
+| `/leave-review/` page activates | Build + page inspection | The page renders the real review CTA (honest fallback removed); still `noindex` and excluded from the sitemap |
+| Follow Us renders GBP | `SocialLinks.astro` (non-PENDING URL) + browser suite | Google Business Profile renders as the first profile; nine confirmed profiles total |
+| Browser regression updated | `tests/browser/social-links.test.mjs` | Confirmed list now asserts nine exact URLs (incl. the GBP URL), `social-googleprofile` CTA, no UTMs; Nextdoor glyph index updated; mobile wrap asserted as 4 + 4 + 1; GBP removed from the must-not-render list |
+| LocalBusiness `sameAs` | `src/lib/schema.ts` (`socialUrls()`) | The GBP profile URL is included in structured data (owner-supplied fact) |
+| No fabricated URLs | Diff review | Only the two owner-supplied URLs were added; nothing invented or reconstructed |
+| Stale sweep | Repository-wide grep (`*.md`, `*.ts`, `*.astro`, `*.mjs`) | No remaining claim that GBP verification, profile capture or review-link capture is pending (Instagram/YouTube remain legitimately pending) |
+| Full suites | `npm run verify` (astro check 0 errors/0 warnings, build 21 pages, validate 1,263 links + SEO + registry + GTM + checklist leak), `npm test` (304 pass, 1 skip, 0 fail), `npm run test:browser` (79 pass, 0 fail), `npm run test:print` (8 pass, 1 skip, 0 fail), `marketing:verify`, `pending` (24 files), `smoke` (17 pages), `testimonials`, `audit:facts` | All pass; `audit:facts` context-review terms are pre-existing and unchanged |
+
 ## Pending (cannot be verified in this environment — owner or tooling required)
 
 | Item | Why pending | How to verify |

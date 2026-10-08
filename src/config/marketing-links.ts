@@ -118,8 +118,8 @@ export const marketingLinks: MarketingLink[] = [
     utm: { source: 'google', medium: 'organic', campaign: 'gbp' },
     purpose: 'Identify visits that start from the Google Business Profile listing.',
     manual: true,
-    whereToPaste: 'Google Business Profile → Edit profile → Contact → Website. Only after the GBP listing exists.',
-    pending: true,
+    whereToPaste: 'Google Business Profile → Edit profile → Contact → Website.',
+    pending: false,
   },
   {
     id: 'gbp_estimate',
@@ -131,7 +131,7 @@ export const marketingLinks: MarketingLink[] = [
     purpose: 'Attribute GBP appointment-link clicks that go straight to the estimate flow.',
     manual: true,
     whereToPaste: 'Google Business Profile → Bookings/Appointment link (or the contact link if appointments are not enabled).',
-    pending: true,
+    pending: false,
   },
 
   // ── Social profiles ────────────────────────────────────────────────────────
@@ -627,7 +627,7 @@ export const marketingLinks: MarketingLink[] = [
     purpose: 'Track deep-clean interest from GBP posts.',
     manual: true,
     whereToPaste: 'Google Business Profile → Add update (Post) link.',
-    pending: true,
+    pending: false,
   },
   {
     id: 'instagram_before_after',
@@ -759,8 +759,8 @@ export const marketingLinks: MarketingLink[] = [
     utm: { source: 'google', medium: 'organic', campaign: 'gift_certificate', content: 'post' },
     purpose: 'Track gift-certificate interest from Google Business Profile posts.',
     manual: true,
-    whereToPaste: 'Google Business Profile → Add update, once the profile is verified and visible.',
-    pending: true,
+    whereToPaste: 'Google Business Profile → Add update (Post) link.',
+    pending: false,
   },
   {
     id: 'instagram_gift',

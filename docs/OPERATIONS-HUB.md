@@ -11,7 +11,9 @@ source for every system without asking the owner about anything already document
 - Business facts source of truth: `src/config/business.ts`
 - Owner input checklist: `docs/launch/OWNER-INPUT-REQUIRED.md`
 - Current platform status: `docs/operations/PLATFORM-STATUS.md` (**the only place status lives**)
-- Marketing entry point: `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`
+- Marketing entry point: `docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md` (run the week) →
+  `docs/marketing/GROWTH-SYSTEM.md` (the growth spine) →
+  `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` (platform operations)
 
 ## 1. Executive overview
 
@@ -179,10 +181,14 @@ including the eight-profile logo-only Follow Us section. Any later local documen
 stays unpublished until the owner authorizes another push.
 
 **Pending (owner):** marketing launch actions M2–M7 in
-`docs/launch/OWNER-INPUT-REQUIRED.md` — confirm Google Business Profile verification, create the
-priority social accounts, approve the proposed content plan and film/publish the opening content.
-Formal launch checklist items (legal entity spelling, claims, genuine review link, final
+`docs/launch/OWNER-INPUT-REQUIRED.md` — paste the tracked Google Business Profile links (the
+profile + review URLs are **captured**, owner-supplied 2026-10-08), finish Instagram verification,
+approve the proposed content plan and film/publish the opening content.
+Formal launch checklist items (legal entity spelling, claims, genuine reviews, final
 cancellation percentages) and Stripe enabled-method confirmation also remain open.
+
+**Execution layer:** `docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md` is the front door for daily and
+weekly operations; the strategy system above is the reference behind it.
 
 ## 10. Documentation directory
 
@@ -199,6 +205,17 @@ cancellation percentages) and Stripe enabled-method confirmation also remain ope
 
 **Deployment & verification:** `docs/deployment/DEPLOYMENT.md`,
 `docs/verification/VERIFICATION.md`.
+
+**Growth system:** start with `docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md` (the execution front
+door: daily/weekly rhythm, 50–75 door system, capture habits). Then
+`docs/marketing/GROWTH-SYSTEM.md` (the spine: flywheel, platform
+roles, Hayli's weekly loop, KPIs, 12-month roadmap). Subsystem documents: `COMPETITIVE-STRATEGY.md`
+(moat and positioning), `CONTENT-ENGINE.md` (brand device, hierarchy, scoring, kill rules, 90-day
+command system), `FIELD-CONTENT-CAPTURE.md` (capture SOP), `VIDEO-DIRECTING-SHEETS.md`
+(ready-to-film sheets), `CUSTOMER-LIFECYCLE.md` (recurring/review/referral/reactivation),
+`ACQUISITION-CHANNELS.md` (channel ranking, door-to-door system, 4,000-door plan, density,
+partnerships, experiments), `LOCAL-AUTHORITY.md` (GBP/local SEO/PR) and `ECONOMIC-MODEL.md`
+(planning scenarios — not forecasts; CAC/LTV/sensitivity).
 
 **Marketing:** start with `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` (strategy, two growth
 engines, priorities). Then `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (pillars/roles),

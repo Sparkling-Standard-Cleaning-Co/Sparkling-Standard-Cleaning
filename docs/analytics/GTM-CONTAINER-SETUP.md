@@ -56,7 +56,7 @@ Tag type for every row: **Google Analytics: GA4 Event**, Measurement ID `G-LG222
 | 9 | `str_request_start` | First interaction with the STR form | `CE - str_request_start` | `GA4 - Event - str_request_start` | — | no — funnel entry |
 | 10 | `str_request_submit` | STR request delivered | `CE - str_request_submit` | `GA4 - Event - str_request_submit` | — | **primary** |
 | 11 | `booking_request` | Request included a preferred date | `CE - booking_request` | `GA4 - Event - booking_request` | `service_type` | secondary |
-| 12 | `review_link_click` | A review link was clicked (once a real link exists) | `CE - review_link_click` | `GA4 - Event - review_link_click` | `platform` | no — engagement |
+| 12 | `review_link_click` | A review link was clicked (review link captured 2026-10-08) | `CE - review_link_click` | `GA4 - Event - review_link_click` | `platform` | no — engagement |
 
 Also required once, on **Initialization – All Pages**:
 
@@ -160,4 +160,5 @@ Use GTM **Preview** (Tag Assistant) and GA4 **DebugView**:
 - ✅ The three primary key events are configured; Enhanced Measurement form interactions are off;
   consent tests passed.
 - ⏳ Optional and open: internal-traffic filter for owner devices.
-- ⏳ Google Business Profile verification result (independent of analytics).
+- ✅ Google Business Profile **verified with its profile + review links captured** (owner-supplied
+  2026-10-08; independent of analytics).

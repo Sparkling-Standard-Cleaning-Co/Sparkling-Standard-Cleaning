@@ -68,14 +68,15 @@ conversion data after launch.
 | Real travel routing + live fuel price | `TRAVEL_ORIGIN`, optional `ROUTES_PROVIDER`/`ROUTES_API_KEY`, `EIA_API_KEY` not set | Add secrets → redeploy |
 | Analytics (GTM/GA4, Umami) | Live and consent-gated; GA4 owner-confirmed operational with all three inquiry key events; Umami has no ID | Optional: create Umami only if wanted; add an internal-traffic filter |
 | Turnstile spam protection | Optional keys not set | Enable in Cloudflare |
-| Review system | No Google Business Profile / review link | Create GBP, then activate the documented review workflow |
+| Review system | GBP **verified; profile + review links captured (owner-supplied 2026-10-08)** | Activate the documented review workflow (request after satisfaction) |
 | Indexing accelerators | IndexNow key not set (site is already indexable) | Optional post-launch |
 | SMS CTAs | SMS capability unverified | Verify a real text, then flip `smsEnabled` |
 
 ### C. Missing and commercially valuable (recommended)
 
 1. **Form delivery activation** — without it the site cannot capture any lead. Highest priority.
-2. **Google Business Profile + review link** — local search and trust; drives calls and reviews.
+2. **Google Business Profile + review link** — GBP is **verified with its profile + review links
+   captured (owner-supplied 2026-10-08)**; local search, trust and review requests are active.
 3. **Founder portrait + genuine photography slots** — the hero and proof band currently carry
    empty placeholder boxes; real photos (with permission) are the largest visual/trust upgrade.
 4. **Published "from" pricing transparency** (owner-approved) — competitor publishes starting
@@ -111,8 +112,8 @@ The full plan, exact owner actions and the implementation sequence live in
 1. Configure Web3Forms (both variables) and pass an authorized live test in all four categories.
 2. Set `TRAVEL_ORIGIN` (and optionally a routing provider/EIA) so the estimator prices travel
    precisely.
-3. Create the Google Business Profile (service-area, private address) and wire the review link +
-   review-request workflow.
+3. **Google Business Profile + review link** — GBP is **verified with its profile + review links
+   captured (owner-supplied 2026-10-08)**; the review workflow is active.
 4. Finish analytics: import the prepared GTM files, verify consent first, confirm the conversion
    events in DebugView/Realtime, publish, mark key events; add Umami only if wanted.
 5. Collect and publish genuine founder/work photos and the first genuine reviews.

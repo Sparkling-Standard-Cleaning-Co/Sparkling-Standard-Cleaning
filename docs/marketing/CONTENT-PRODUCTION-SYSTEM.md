@@ -151,9 +151,9 @@ service explanations) rather than every video reposted mechanically.
   each app; use each platform's own caption/hashtag conventions.
 - **Local channels:** Facebook and Nextdoor (both confirmed) get local communication — an
   availability note, a genuine update or a helpful local answer — plus selected videos.
-- **Google Business Profile (verification pending):** once Google confirms verification, add real
-  photos, accurate service information and periodic updates; never publish the profile URL or
-  claim verification before that.
+- **Google Business Profile (verified — active, owner-confirmed 2026-10-08):** add real photos,
+  accurate service information and periodic updates now; never publish a profile URL or review
+  link the owner has not supplied.
 - **Tracked links:** use only the inbound links from the generated master
   (`docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md`). Never add UTM parameters to internal website
   navigation, profile links or review links. The live destination must match the link's stated

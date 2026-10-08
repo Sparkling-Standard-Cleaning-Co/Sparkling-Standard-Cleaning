@@ -5,7 +5,8 @@ How Sparkling Standard runs its platform presence **sustainably**. The business 
 original asset should produce several adapted publications; low-priority channels receive adapted
 versions, never separate content factories.
 
-Companion documents: `docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (owner account checklist),
+Companion documents: `docs/marketing/GROWTH-SYSTEM.md` (the growth spine and weekly loop),
+`docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (owner account checklist),
 `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` (production workflow and the proposed series),
 `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (channel roles and pillars),
 `docs/marketing/PLATFORM-REGISTER.md` (accounts and status),
@@ -28,7 +29,8 @@ her standards and her entrepreneurial story. Zero additional spending is the def
 
 **Immediate execution priorities (owner direction, 2026-10-03):** (1) film Hayli's founder
 introduction, (2) produce the first cleaning videos, (3) acquire local recurring customers.
-Account setup is complete for the eight live profiles; production and local acquisition are the
+Account setup is complete for the live profiles (Google Business Profile verified with its profile
++ review links captured, 2026-10-08); production and local acquisition are the
 focus now. Instagram verification and the deferred YouTube channel are tracked in
 `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
 
@@ -37,7 +39,7 @@ Two complementary engines (do not confuse them):
 | Engine | Purpose | Channels | Primary outcome |
 | --- | --- | --- | --- |
 | **Audience growth** | Discovery, reach and sharing through original, entertaining, educational and visually satisfying cleaning content | Instagram, TikTok, YouTube (primary content); Pinterest, Rumble and distribution channels as adaptations | Qualified attention that can convert later — **not** the business result by itself |
-| **Local customer acquisition** | Turn local attention and trust into actual inquiries and recurring customers | Google Business Profile (verification pending), Facebook, Nextdoor, the website's estimate flow, direct outreach, genuine reviews and referrals | **Inquiries, confirmed bookings and recurring customers** |
+| **Local customer acquisition** | Turn local attention and trust into actual inquiries and recurring customers | Google Business Profile (verified — active), Facebook, Nextdoor, the website's estimate flow, direct outreach, genuine reviews and referrals | **Inquiries, confirmed bookings and recurring customers** |
 
 Audience growth is not the primary business outcome. A video with modest views that produces a
 weekly client is worth more than a viral clip that produces none.
@@ -47,7 +49,7 @@ weekly client is worth more than a viral clip that produces none.
 | Tier | Platforms | Why | Effort |
 | --- | --- | --- | --- |
 | **1 — Primary content** | TikTok (live), Instagram (verification in progress), YouTube (deferred — Google Workspace eligibility) | The three channels where short-form cleaning content is discovered and shared. One filmed detail can be cut for all three. TikTok is live with its tracked link placed; Instagram awaits verification; YouTube is deferred, not abandoned. | One shoot → three publications |
-| **1 — Local acquisition** | Google Business Profile (verification pending), Facebook, Nextdoor, the website's estimate flow, direct outreach | Where Pensacola/Cantonment homeowners actually look, ask and refer. Google Business Profile receives authentic photos, accurate services, updates and genuine reviews once verification is confirmed. | Highest care |
+| **1 — Local acquisition** | Google Business Profile (verified — active), Facebook, Nextdoor, the website's estimate flow, direct outreach | Where Pensacola/Cantonment homeowners actually look, ask and refer. Google Business Profile receives authentic photos, accurate services, updates and genuine reviews (review requests once the review link is captured). | Highest care |
 | **2 — Adapted distribution** | Pinterest, Rumble, Gab, Parler, Locals (all created 2026-10-03), plus X and Threads when supplied | Adapted reposts of Tier-1 assets. Locals is a secondary distribution/community channel for the same master content — never a separate production line. No separate production. | Minutes per post |
 | **3 — Professional** | LinkedIn, Alignable | Commercial, property-manager and B2B relationships. | Weekly touch |
 | **4 — Directories & community** | Yelp, Bing Places, Reddit | Citations/trust plus genuine local conversation; Bing Places imports from Google Business after verification. | Setup + occasional |
@@ -96,7 +98,7 @@ and one editing block keep it realistic.
 
 | Day | Action | Time |
 | --- | --- | --- |
-| Monday | Google Business Profile post + reply to any reviews (once verified) | 15 min |
+| Monday | Google Business Profile post + reply to any reviews (GBP is verified and active) | 15 min |
 | Tuesday | Batch film 2–4 detail clips at a real job (permission logged) | 30 min |
 | Wednesday | Publish video 1: Instagram Reel + TikTok + YouTube Short | 25 min |
 | Thursday | Facebook + Nextdoor local post (tip, availability or answer) with its tracked link | 15 min |
@@ -116,12 +118,12 @@ until the owner confirms it.
 
 | Step | Action |
 | --- | --- |
-| 1 | Confirm the Google Business Profile verification result (pending); do not claim verification early. |
+| 1 | Google Business Profile is **verified with its profile + review links captured (owner-supplied 2026-10-08)** — begin the GBP rhythm and review requests (`docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md`). |
 | 2 | Accounts and placements are set: the eight live profiles have their tracked UTM links placed (owner-confirmed). Instagram is in verification (URL not published); YouTube is deferred by Google Workspace eligibility. **Move directly to filming the founder introduction and the first cleaning videos.** |
 | 3 | Keep Facebook and Nextdoor contact details and tracked links consistent; prepare a genuine welcome/local update. |
 | 4 | Film the founder introduction (long + short edit) and the first 2–3 detail clips. |
 | 5 | Publish the opening content across the three primary channels; post the local update to Facebook/Nextdoor. |
-| 6 | Add GBP photos/updates once verification completes; begin genuine review requests after completed jobs. |
+| 6 | Add GBP photos/updates now (verified); request genuine reviews after satisfied jobs (review link captured). |
 | 7 | Review the week's numbers in the scorecard; set next week's shot list. |
 
 ## 6. Direct outreach cadence (recurring pipeline)
@@ -158,7 +160,7 @@ Use the reporting hierarchy in `docs/marketing/LEAD-MEASUREMENT-MODEL.md` and th
    operational; owner inbox remains the authoritative delivery record).
 3. Recurring requests (weekly/biweekly) vs one-time.
 4. Confirmed bookings and completed-job revenue (owner records).
-5. Reviews received/replied — plus profile views once GBP is live.
+5. Reviews received/replied — plus profile views (GBP is verified and live).
 
 Do not chase vanity metrics (likes/followers); a single weekly/biweekly client is worth more than
 a thousand impressions.

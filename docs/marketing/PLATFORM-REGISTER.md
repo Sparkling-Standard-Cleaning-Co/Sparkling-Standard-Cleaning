@@ -5,7 +5,7 @@ a platform is **confirmed** only when the owner has supplied its real profile UR
 configured in `src/config/business.ts`. Nothing pending ever renders on the website, and no handle,
 profile URL or account is ever invented.
 
-**Registry links are not accounts.** The marketing-link registry (29 ready / 22 prepared) records
+**Registry links are not accounts.** The marketing-link registry (38 ready / 18 prepared) records
 *links*, not platform presence. The owner checklist for creating the priority accounts is
 `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`; distribution priorities are in
 `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`.
@@ -16,10 +16,13 @@ profile URL or account is ever invented.
 2026-10-03; this confirms the destination resolves but is **not** independent identity
 verification.
 
-**Tracked-link placements (owner-confirmed 2026-10-03):** the owner confirms the basic UTM
-website/bio links have been placed on the eight existing profiles (Facebook, Nextdoor, TikTok,
-Pinterest, Rumble, Gab, Parler, Locals). Their registry entries are therefore **active**
-(`pending: false`). Placements on not-yet-created or unverified platforms (Instagram, YouTube, GBP,
+**Tracked-link placements (owner-confirmed 2026-10-03; GBP 2026-10-08):** the owner confirms the
+basic UTM website/bio links have been placed on the eight existing profiles (Facebook, Nextdoor,
+TikTok, Pinterest, Rumble, Gab, Parler, Locals). Their registry entries are therefore **active**
+(`pending: false`). The Google Business Profile is **verified, and its public profile URL and
+"Ask for reviews" link are captured** (owner-supplied 2026-10-08), so its four tracked links
+(`gbp_home`, `gbp_estimate`, `gbp_deep_clean`, `gbp_gift_post`) are now also **ready to paste**
+into the live profile. Placements on not-yet-created or unverified platforms (Instagram, YouTube,
 X, Threads, LinkedIn, Alignable, Reddit, Yelp, Bing Places) remain **prepared** and are not
 presented as live. Account existence, tracked-link placement and verification are three separate
 statuses; this document keeps them distinct.
@@ -32,7 +35,8 @@ Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/compone
 | Status | Meaning |
 | --- | --- |
 | **Confirmed** | Real URL supplied by the owner, configured, and rendering publicly. |
-| **Created — verification pending** | The profile exists but is under review/not publicly visible. **Do not publish its URL or claim verification.** |
+| **Verified (owner-confirmed)** | The platform has confirmed the account/listing and the owner has supplied the exact URLs where applicable (e.g. Google Business Profile profile + review links, 2026-10-08). Never construct, modify or substitute a URL. |
+| **Verification in progress** | The profile exists but is under review/not publicly visible. **Do not publish its URL or claim verification.** |
 | **Pending** | Owner has not supplied a verified URL. Prepared in the registry, never rendered. |
 | **Not used** | Deliberately excluded (no genuine business benefit at this stage). |
 
@@ -40,7 +44,7 @@ Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/compone
 
 | Platform | Category | Priority | Status | Public URL | Owner action / notes |
 | --- | --- | --- | --- | --- | --- |
-| Google Business Profile | Local discovery | **1 — local acquisition** | **Created — verification in progress (2026-10-03)** | Not published | Google management shows verification being reviewed. Do **not** mark verified or publish a URL until Google confirms. Then complete the GBP checklist in `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`. |
+| Google Business Profile | Local discovery | **1 — local acquisition** | **Verified — profile + review links captured (owner-confirmed 2026-10-08)** | `https://www.google.com/search?kgmid=/g/11zz5t1059&hl=en-US&q=Sparkling+Standard+Cleaning+Co.` | The profile is verified and publicly visible; the exact public profile URL and the "Ask for reviews" link are configured in `business.ts` (review link: `https://g.page/r/CXAcv1Pp7OI2ECE/review`). **Remaining owner action:** paste the four tracked GBP links (`gbp_home`, `gbp_estimate`, `gbp_deep_clean`, `gbp_gift_post`) and run the weekly rhythm (`docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md`, `docs/marketing/LOCAL-AUTHORITY.md`). |
 | Instagram | Primary content | **2 — primary content** | **Verification in progress (owner-confirmed 2026-10-03)** | Not published | The account is undergoing verification. Do **not** mark it verified and do **not** publish an unconfirmed URL; the URL stays PENDING in `business.ts` until the owner supplies the verified profile. Tracked bio link is prepared (`instagram_profile`). Also feeds Threads. |
 | TikTok | Primary content | **3 — primary content** | **Confirmed (owner-supplied 2026-10-03)** | `https://www.tiktok.com/@sparkling_standard?lang=en` | Account created; tracked bio link placed (owner-confirmed). Vertical detail videos. |
 | YouTube | Primary content | **4 — primary content** | **Deferred (not abandoned) — Google Workspace eligibility** | — | Channel creation is temporarily blocked by new Google Workspace account eligibility. Revisit when eligible; do not purchase or add paid services to work around it. Tracked channel link stays prepared (`youtube_profile`). |
@@ -51,7 +55,7 @@ Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/compone
 | Gab | Adapted distribution | Later | **Confirmed (owner-supplied 2026-10-03)** | `https://gab.com/Sparkling_Standard` | Created; tracked profile link placed (owner-confirmed). Adapted reposts. |
 | Parler | Adapted distribution | Later | **Confirmed (owner-supplied 2026-10-03)** | `https://app.parler.com/Sparkling-Standard` | Created; tracked profile link placed (owner-confirmed). Adapted reposts. |
 | Locals | Additional distribution / community | Later | **Confirmed (owner-supplied 2026-10-03)** | `https://sparkling-standards.locals.com` | Created; tracked profile link placed (owner-confirmed). Proposed role: a secondary distribution/community channel for the same master content (adapted posts, not a separate production line). |
-| Bing Places | Local discovery | Later | Pending | — | Create/import from Google Business after GBP verifies; paste the tracked Bing Places UTM link as the website. |
+| Bing Places | Local discovery | Later | Pending | — | Create/import from Google Business (**GBP is verified**); paste the tracked Bing Places UTM link as the website. |
 | X | Adapted distribution | Later | Pending | — | Profile bio link; reposts of short tips. |
 | Threads | Adapted distribution | Later | Pending | — | Tied to the Instagram account; link in bio. |
 | LinkedIn | Professional | Later | Pending | — | Company page; commercial/office outreach. |
