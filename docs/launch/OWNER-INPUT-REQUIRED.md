@@ -86,7 +86,7 @@ Exact steps: `docs/deployment/DEPLOYMENT.md` §4a; architecture:
 | R1 | Resend account + API key | Cloudflare **Secret** `RESEND_API_KEY` | **Done (owner-confirmed 2026-10-08).** Server-side only; never a `PUBLIC_*` variable, never committed. The lead flow works without it — only the customer email is skipped |
 | R2 | Sender-domain verification | Resend → Domains → `sparkling-standard.com` | **Done (owner-confirmed 2026-10-08):** domain verified, DNS complete. The exact records were added DNS-only; Google Workspace MX/SPF/DKIM untouched |
 | R3 | Optional sender overrides | Cloudflare Text `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO` | Defaults: `Sparkling Standard Cleaning Co. <notifications@sparkling-standard.com>` and `owner@sparkling-standard.com`. Only change to another verified sender |
-| R4 | One controlled live test | Owner-controlled email address | After this build deploys, submit one clearly marked test request and confirm: owner notification arrives, customer confirmation arrives with subject `We received your Sparkling Standard request`, and replying reaches the owner inbox |
+| R4 | One controlled live test | Owner-controlled email address | **Submitted 2026-10-08** (`SS Live Form Test`, both emails addressed to the owner inbox; every engineering-observable stage passed). **Awaiting the owner's confirmation** that the owner notification and the customer confirmation arrived (and a Resend dashboard check). Report any failure and it will be fixed |
 
 ## GIFT CERTIFICATES — owner decisions before sales activate
 

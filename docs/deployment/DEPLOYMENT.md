@@ -157,10 +157,13 @@ The customer confirmation is sent by `functions/api/lead.ts` through Resend **af
 notification is accepted. Until the setup below is complete, the code path is inert
 (`skipped_not_configured` / provider rejection) and the lead flow is unaffected.
 
-**Status 2026-10-08 (owner-confirmed):** steps 1–3 are complete — `RESEND_API_KEY` is set in
-Cloudflare as a runtime Secret and `sparkling-standard.com` is verified in Resend (DNS complete;
-no `PUBLIC_RESEND_*` variable exists). Step 5 (deploy this build) and step 6 (the one controlled
-live test) are the remaining actions.
+**Status 2026-10-08 (owner-confirmed + live-tested):** steps 1–3 are complete —
+`RESEND_API_KEY` is set in Cloudflare as a runtime Secret and `sparkling-standard.com` is verified
+in Resend (DNS complete; no `PUBLIC_RESEND_*` variable exists). Step 5 is done (deployed via
+`c8a9723`, with the ZIP fix `f92719c`); step 6's controlled live test was submitted through the
+production estimate wizard and passed every engineering-observable stage (submission `200`,
+server-verified quote, exactly one customer-email send attempted, thank-you summary, analytics
+events once, no errors). **Inbox delivery of the two emails is the remaining owner confirmation.**
 
 1. **Owner:** create/log in to the Resend account for the business (free tier is sufficient for
    current volume) and create an API key. Store it as a Cloudflare **Secret** named
@@ -174,12 +177,14 @@ live test) are the remaining actions.
    `notifications@sparkling-standard.com` be accepted. ✅ done 2026-10-08
 4. Optional: set `RESEND_FROM_EMAIL` / `RESEND_REPLY_TO` as dashboard **Text** variables to
    override the defaults (only to another verified sender).
-5. Trigger a new deployment so the Functions receive the secret.
+5. Trigger a new deployment so the Functions receive the secret. ✅ deployed 2026-10-08
 6. **One controlled live test (owner-approved only):** submit one clearly marked test request
    using an address the owner controls (e.g. the owner's own email as the "customer" address) and
    confirm: the owner notification arrives, the customer confirmation arrives from the verified
    sender, the subject is `We received your Sparkling Standard request`, and replying to it
    reaches `owner@sparkling-standard.com`. No other live test email is ever sent.
+   ✅ submitted 2026-10-08 (`SS Live Form Test`, both emails addressed to the owner inbox) —
+   **awaiting the owner's inbox confirmation**.
 
 Failure behavior (by design): if Resend rejects or fails, the function logs
 `customer-confirmation: failed (provider N)` server-side — no PII, no secrets — and still returns

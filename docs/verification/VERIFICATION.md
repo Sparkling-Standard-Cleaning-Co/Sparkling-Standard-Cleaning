@@ -330,6 +330,42 @@ customer email is additive and best-effort.
 | Config/docs | `.env.example`, `scripts/generate-deploy-secrets.mjs`, `DEPLOYMENT.md` §4/§4a, `README.md`, `PLATFORM-STATUS.md`, `OWNER-INPUT-REQUIRED.md`, `AUTOMATION-REGISTER.md`, `CUSTOMER-CONFIRMATION-EMAIL.md`, `COMMUNICATION-TEMPLATES.md`, `GIFT-CERTIFICATES.md`, `LEAD-NOTIFICATION-FORMAT.md`, `privacy.astro` | Secret is server-side only (`RESEND_API_KEY`); sender-domain verification and the one controlled live test documented; no remaining claim that a Web3Forms paid autoresponder is required |
 | Full suites | `npm run check` (0 errors/0 warnings/0 hints, 103 files), `npm run verify` (build 21 pages; validate 1,264 links + SEO + registry/QR + GTM + checklist leak), `npm test` (361 pass, 1 skip, 0 fail), `npm run test:browser` (81 pass, 0 fail), `smoke` (17 pages), `pending` (24 files), `testimonials`, `audit:facts`, `marketing:verify` | All pass; no real email sent (all provider calls mocked) |
 
+## Verified — production deployment + controlled live form test (2026-10-08)
+
+Deployed `c8a9723` (form/email/invoicing workflow) and `f92719c` (address ZIP fix) via GitHub
+`main` → Cloudflare Pages; production serves the new build (thank-you summary markup + Resend
+privacy disclosure live).
+
+**Controlled live test** — Playwright against production, clearly marked data (`SS Live Form
+Test`, `owner@sparkling-standard.com` as the customer address, notes
+`LIVE TEST — NOT A REAL CUSTOMER — VERIFY OWNER + CUSTOMER EMAIL DELIVERY`):
+
+| Stage | Result |
+| --- | --- |
+| Address + ZIP | **PASS** — suggestion → pin → ZIP `32502` auto-filled → step advanced |
+| Submission | **PASS** — exactly one `/api/lead` request: `200 {"ok":true,"verification":{"status":"verified","travel_verified":true,"travel_method":"route","config_match":"match"}}` |
+| Owner notification | Accepted by Web3Forms (`200`). Inbox arrival **owner-side confirmation pending** |
+| Customer confirmation | Send path exercised exactly once (no duplicate send). Inbox arrival **owner-side confirmation pending** |
+| Success UI + thank-you | **PASS** — summary accurate (service/home/address/date/provisional range `$225–$275`/reference `SS-20261009-OYL0G8`), hidden after reload (single-use) |
+| Analytics | **PASS** — `estimate_start`, `estimate_complete`, `cleaning_request_submit`, `booking_request` each fired once; no duplicate conversion; attribution intact |
+| Console / network | **PASS** — no console errors, no page errors, no failed responses |
+
+**Defect found and fixed (`f92719c`):** exact provider suggestions with embedded coordinates skip
+the resolver, so the required ZIP stayed empty and the address step could not advance (typing the
+ZIP afterwards invalidated the confirmed pin). Fix: fill the ZIP from the provider label under the
+same `applyingResolved` guard the resolver path uses. Regression test added
+(`tests/browser/journey.test.mjs`, `exactSuggestion` mock) — fails without the fix, passes with it.
+
+**Not claimed:** inbox delivery of the two emails and the Resend dashboard status — those require
+the owner's inbox/account and remain owner-side. Production checks: home, `/contact/`,
+`/estimate/`, `/thank-you/` and `/leave-review/` all return `200` with the expected markup; no
+server-secret names in client chunks.
+
+**CI note:** the `validate` workflow fails at `tests/routes/privacy.test.ts`
+(`git check-ignore canvass-out`) — pre-existing and environment-dependent (passes locally where
+`canvass-out/` exists; fails in a fresh checkout because `.gitignore` uses the directory pattern
+`canvass-out/`). Identical failure on the three preceding pushes; unrelated to this work.
+
 ## Pending (cannot be verified in this environment — owner or tooling required)
 
 | Item | Why pending | How to verify |
