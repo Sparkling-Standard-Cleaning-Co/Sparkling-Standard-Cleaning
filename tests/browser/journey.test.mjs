@@ -81,7 +81,15 @@ async function mockProviders(page, options = {}) {
           suggestions: [
             options.suggestCoords === false
               ? { id: 'us:123', label: ADDRESS.label }
-              : { id: 'osm:w73681389:addr', label: ADDRESS.label, lat: ADDRESS.lat, lng: ADDRESS.lng },
+              : options.exactSuggestion
+                ? {
+                    id: 'osm:w73681389:addr',
+                    kind: 'address',
+                    label: '100 S Baylen St, Pensacola, FL 32502',
+                    lat: ADDRESS.lat,
+                    lng: ADDRESS.lng,
+                  }
+                : { id: 'osm:w73681389:addr', label: ADDRESS.label, lat: ADDRESS.lat, lng: ADDRESS.lng },
           ],
         }),
       });
@@ -235,6 +243,32 @@ test('address autocomplete: debounced suggestions resolve and confirm a destinat
     );
     assert.equal(await page.inputValue('#est-zip'), '32502', 'provider ZIP fills the coverage field');
     await shot(page, '01-address-confirmed-desktop');
+  } finally {
+    await context.close();
+  }
+});
+
+test('an exact provider suggestion fills the required ZIP and advances', async () => {
+  // Regression: exact suggestions with embedded coordinates skip the resolver,
+  // so the label's ZIP must fill the required field — otherwise the step is
+  // blocked (and editing the ZIP afterwards invalidates the confirmed pin).
+  const { context, page } = await openEstimate(1440, 900, { exactSuggestion: true });
+  try {
+    await step1(page);
+    await page.fill('#est-address', '100 S Baylen');
+    await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
+    await page.click('#est-address-suggestions li');
+    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
+    assert.equal(
+      await page.inputValue('#est-zip'),
+      '32502',
+      'the provider label ZIP fills the required field without invalidating the candidate',
+    );
+    await page.click('[data-address-confirm]');
+    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
+    await page.click('[data-next]');
+    await page.waitForSelector('#est-property', { state: 'visible' });
+    assert.equal(await isVisible(page, '#est-property'), true, 'the wizard advances to the home step');
   } finally {
     await context.close();
   }

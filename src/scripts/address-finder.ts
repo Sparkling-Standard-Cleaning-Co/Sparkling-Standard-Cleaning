@@ -330,7 +330,20 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     setMethod('manual');
     manualCandidate = resolved;
     clearSuggestions();
-    if (resolved.zip) fillField(zipInput, resolved.zip);
+    // The provider label carries the ZIP even when the resolve response does
+    // not: exact suggestions with embedded coordinates skip the resolver, and
+    // the ZIP is a required field. Editing it later would invalidate the
+    // confirmed candidate, so fill it here under the same guard the resolver
+    // path uses — never leaving a confirmed pin with an empty required ZIP.
+    const zip = resolved.zip ?? zipFromLabel(resolved.label) ?? undefined;
+    if (zip) {
+      applyingResolved = true;
+      try {
+        fillField(zipInput, zip);
+      } finally {
+        applyingResolved = false;
+      }
+    }
     settleDestinationValues();
     if (mapCard) mapCard.hidden = false;
     if (confirmedCard) confirmedCard.hidden = true;
