@@ -18,8 +18,13 @@ const tracked = execSync('git ls-files --cached --others --exclude-standard', { 
 const textExtensions = /\.(md|json|js|mjs|ts|py|csv|html|txt|yml|yaml|astro)$/i;
 
 test('canvass-out is git-ignored and contains no tracked files', () => {
-  const ignore = execSync('git check-ignore canvass-out', { encoding: 'utf8' }).trim();
-  assert.equal(ignore, 'canvass-out');
+  // The trailing slash makes git evaluate the path as a directory, so the
+  // directory-only rule (`canvass-out/`) matches even when the directory does
+  // not physically exist — true in a fresh clone and in CI. Without it,
+  // `git check-ignore canvass-out` exits 1 in a clean checkout because git
+  // cannot tell that the nonexistent path is a directory.
+  const ignore = execSync('git check-ignore canvass-out/', { encoding: 'utf8' }).trim();
+  assert.equal(ignore, 'canvass-out/');
   assert.equal(tracked.some((file) => file.startsWith('canvass-out/')), false);
 });
 
