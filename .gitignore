@@ -37,6 +37,12 @@ Thumbs.db
 # owner-generated gift certificates / confirmations (contain customer data)
 gift-out/
 
+# owner-generated customer confirmations (contain customer data)
+confirmation-out/
+
+# owner-generated commercial invoices (contain customer data)
+invoice-out/
+
 # canvassing intelligence data (address-level operational data; local only)
 canvass-out/
 

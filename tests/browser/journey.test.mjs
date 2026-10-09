@@ -764,6 +764,57 @@ test('the contact form still submits and shows an honest success state', async (
   }
 });
 
+test('the contact form validates the email and prevents double submission', async () => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  let requests = 0;
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  try {
+    await page.route('**/api/lead', async (route) => {
+      requests += 1;
+      await gate;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+    });
+    await page.goto(BASE + '/contact/', { waitUntil: 'load' });
+    await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
+
+    // An invalid email never reaches the network — native validation blocks it.
+    await page.fill('#contact-name', 'Browser test (please ignore)');
+    await page.fill('#contact-phone', '8500000000');
+    await page.fill('#contact-email', 'not-an-email');
+    await page.fill('#contact-message', 'Automated privacy-safe test message — please ignore.');
+    await delay(2600);
+    await page.click('[data-variant="contact"] button[type="submit"]');
+    await delay(300);
+    assert.equal(requests, 0, 'an invalid email never reaches the network');
+    assert.equal(
+      await page.locator('[data-variant="contact"] [data-form-status][data-state="success"]').count(),
+      0,
+      'no success state for an invalid submission',
+    );
+
+    // Fix the email, then submit twice quickly: exactly one request is sent.
+    await page.fill('#contact-email', 'owner@sparkling-standard.com');
+    const submit = page.locator('[data-variant="contact"] button[type="submit"]');
+    await submit.click();
+    await delay(120);
+    assert.equal(await submit.isDisabled(), true, 'disabled while sending');
+    await submit.click({ force: true }).catch(() => {});
+    await delay(300);
+    assert.equal(requests, 1, 'double submission sends exactly one request');
+
+    release();
+    await page.waitForSelector('[data-variant="contact"] [data-form-status][data-state="success"]', {
+      timeout: 10000,
+    });
+  } finally {
+    await context.close();
+  }
+});
+
 // ── Security: no private origin, keys or billable services in the bundle ─────
 
 test('built client output contains no private origin, credentials or payment endpoints', () => {
@@ -807,5 +858,61 @@ test('built client output contains no private origin, credentials or payment end
     }
     // No new billable service can be triggered from the client bundle.
     assert.doesNotMatch(content, /api\.stripe\.com|sk_live_|sk_test_/, `${relative} references payment credentials`);
+  }
+});
+
+// ── Thank-you page: the single-use request summary ──────────────────────────
+
+test('the thank-you page shows the single-use request summary exactly once', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    // Without a stored summary (direct visit) the card stays hidden.
+    await page.goto(BASE + '/thank-you/', { waitUntil: 'load' });
+    assert.equal(await page.locator('[data-request-summary]').isVisible(), false);
+
+    await page.evaluate(() => {
+      sessionStorage.setItem(
+        'pcc-request-summary',
+        JSON.stringify({
+          request_type: 'reservation_request',
+          service_type: 'standard',
+          frequency: 'biweekly',
+          service_address: '100 S Baylen St',
+          address_city: 'Pensacola',
+          address_state: 'FL',
+          zip: '32502',
+          preferred_date: '2026-12-15',
+          quoted_range: '$180–$220',
+          quote_reference: 'SS-20261002-ABC123',
+        }),
+      );
+    });
+    await page.reload({ waitUntil: 'load' });
+
+    const card = page.locator('[data-request-summary]');
+    assert.equal(await card.isVisible(), true, 'the summary card renders from the stored receipt');
+    const text = (await card.textContent()) ?? '';
+    assert.match(text, /Reservation request/);
+    assert.match(text, /House cleaning \(standard\)/);
+    assert.match(text, /Every two weeks/);
+    assert.match(text, /100 S Baylen St, Pensacola, FL 32502/);
+    assert.match(text, /Tuesday, December 15, 2026/);
+    assert.match(text, /Provisional estimate range/i);
+    assert.match(text, /\$180–\$220/);
+    assert.match(text, /SS-20261002-ABC123/);
+    assert.match(text, /Final scope, pricing and availability may require confirmation/i);
+    // The page still states the request-only status prominently.
+    assert.match((await page.locator('h1').textContent()) ?? '', /Request received/i);
+    assert.match(
+      (await page.locator('.lead').first().textContent()) ?? '',
+      /not a confirmed\s+booking yet/i,
+    );
+
+    // Single use: a reload no longer shows it.
+    await page.reload({ waitUntil: 'load' });
+    assert.equal(await page.locator('[data-request-summary]').isVisible(), false);
+  } finally {
+    await context.close();
   }
 });

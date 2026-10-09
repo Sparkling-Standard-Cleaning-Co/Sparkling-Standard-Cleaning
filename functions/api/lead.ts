@@ -26,12 +26,17 @@ import {
   type QuoteVerificationEnv,
 } from '../../src/lib/estimate/verify.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
+import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
 import { schedulingConfig } from '../../src/config/scheduling.ts';
 
 interface Env extends QuoteVerificationEnv {
   WEB3FORMS_ACCESS_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
+  // Customer confirmation email (Resend). Server-side only; never public.
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
+  RESEND_REPLY_TO?: string;
 }
 
 // The estimator sends structured scope + quote + attribution fields; the cap
@@ -302,6 +307,14 @@ export async function onRequestPost(context: {
     });
     const data = (await response.json().catch(() => ({}))) as { success?: boolean };
     if (response.ok && data.success === true) {
+      // The owner notification is delivered — the lead is safe. The customer
+      // confirmation is a best-effort second path (Resend): a failure here is
+      // logged server-side (no PII, no secrets) and never turns a successful
+      // lead into a failed submission. At most one send per server request.
+      const customerEmail = await sendCustomerConfirmation(clean, env);
+      if (customerEmail.status === 'failed') {
+        console.error(describeCustomerEmailOutcome(customerEmail));
+      }
       return json({
         ok: true,
         ...(clientVerification ? { verification: clientVerification } : {}),

@@ -49,8 +49,9 @@ This repository is the company's marketing and lead system:
                    │                          │
               ANALYTICS                    LEADS
    GTM → GA4 (consent-gated)     Instant estimate → /api/lead → Web3Forms
-   Umami (cookieless, gated)     Direct call / email to owner@sparkling-standard.com
-   fixed event names only        no CRM — owner-managed follow-up
+   Umami (cookieless, gated)     → Resend customer confirmation (when configured)
+   fixed event names only        Direct call / email to owner@sparkling-standard.com
+                                 no CRM — owner-managed follow-up
                    │
              MARKETING SYSTEM
    src/config/marketing-links.ts → UTM docs + QR assets (generated, verified)
@@ -157,6 +158,7 @@ Full detail — triggers, failure behavior, recovery: `docs/operations/AUTOMATIO
 | Deployment secret packaging | Manual | `npm run deploy:secrets` | `scripts/generate-deploy-secrets.mjs` |
 | IndexNow submissions | Manual (post-launch) | `node scripts/indexnow.mjs` | script only; no workflow |
 | Lead relay | Event-driven | Form submit | `functions/api/lead.ts` → Web3Forms |
+| Customer confirmation email | Event-driven | Owner notification accepted | `functions/api/lead.ts` → `src/lib/forms/customer-email.ts` → Resend (inert until `RESEND_API_KEY` + verified sender) |
 | Content, publishing, follow-up, reviews, pricing calibration | **Manual** | — | No automation exists |
 
 ## 9. Current status and outstanding work
@@ -202,6 +204,14 @@ weekly operations; the strategy system above is the reference behind it.
 `docs/operations/SEARCH-CONSOLE-SETUP.md`,
 `docs/operations/SERVICE-SCOPE-MATRIX.md`, `docs/operations/PROPERTY-ACCESS-SECURITY.md`,
 `docs/operations/CAPABILITY-REVIEW.md`.
+
+**Customer communication & invoicing:** `docs/operations/LEAD-NOTIFICATION-FORMAT.md` (owner
+email), `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md` (customer confirmation: on-page summary,
+branded email sent automatically through Resend once configured, manual fallback),
+`docs/operations/COMMUNICATION-TEMPLATES.md`
+(paste-ready messages), `docs/operations/FINANCIAL-WORKFLOW.md` (request → estimate → booking →
+invoice → receipt vocabulary), `docs/operations/COMMERCIAL-INVOICING.md` (invoice tool:
+`scripts/commercial-invoice.mjs`, source template `assets/invoicing/`).
 
 **Deployment & verification:** `docs/deployment/DEPLOYMENT.md`,
 `docs/verification/VERIFICATION.md`.

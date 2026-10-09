@@ -6,6 +6,7 @@ import { business, contactPhone, isPending } from '../config/business';
 import { attributionFields } from '../lib/attribution';
 import { submitLead, recordConversion, type SubmitOutcome } from '../lib/forms/submit';
 import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
+import { saveSubmissionSummary } from '../lib/forms/submission-receipt';
 import { track, type AnalyticsEventName } from '../lib/analytics/events';
 
 type Variant = 'contact' | 'commercial' | 'str' | 'gift';
@@ -120,6 +121,9 @@ for (const form of document.querySelectorAll<HTMLFormElement>('[data-lead-form]'
     const outcome = await submitLead(fields, subject);
 
     if (outcome.ok) {
+      // Keep a single-use, sanitized copy so the thank-you page can show the
+      // customer exactly what they submitted.
+      saveSubmissionSummary(fields);
       const event = variantEvent(variant);
       if (event) recordConversion(event, variantEventPayload(variant, fields));
       setStatus(

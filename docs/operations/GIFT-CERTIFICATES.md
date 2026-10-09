@@ -50,8 +50,11 @@ can never mint a second code; the ledger records the Stripe event id as the dura
 | Certificate delivery to purchaser/recipient | — | ✔ owner emails the file (Gmail; Web3Forms does not send outbound branded mail) |
 | Redemption + balance updates | — | ✔ owner ledger |
 
-No automated email is claimed: the free Web3Forms service only notifies the owner. A paid email
-service would be required for automated delivery; that is deliberately not introduced.
+The request acknowledgment is now automatic: the on-page summary is immediate, and the branded
+confirmation email is sent through Resend once configured
+(`docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`). Certificate delivery itself remains manual
+because it attaches the generated certificate file — the automated email sends the standard
+confirmation only.
 
 ## 4. Activation checklist (owner decisions required)
 

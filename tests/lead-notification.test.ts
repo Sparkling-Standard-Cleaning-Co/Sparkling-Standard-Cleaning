@@ -340,3 +340,85 @@ test('legacy plain UTM fields still map to latest-touch labels', () => {
   assert.equal(notification['Attribution — Latest-touch content'], 'ad');
   assert.equal(notification['More details — Utm source'], undefined);
 });
+
+test('the at-a-glance summary leads the email with the triage facts', () => {
+  const notification = buildLeadNotification(estimatorBase);
+  const labels = Object.keys(notification);
+  assert.equal(labels[0], 'Summary — Request');
+  assert.match(notification['Summary — Request'] ?? '', /Reservation request/);
+  assert.match(notification['Summary — Request'] ?? '', /House cleaning \(standard\)/);
+  assert.match(notification['Summary — Request'] ?? '', /Every two weeks/);
+  assert.equal(
+    notification['Summary — Customer'],
+    'Synthetic Customer · 8500000000 · synthetic@example.com',
+  );
+  assert.equal(notification['Summary — Location'], '100 S Baylen St, Pensacola, FL 32502');
+  assert.match(notification['Summary — Price'] ?? '', /Proposed \$200/);
+  assert.match(notification['Summary — Price'] ?? '', /VERIFIED/);
+  assert.equal(notification['Summary — Action'], undefined, 'a clean verified request needs no action line');
+  assert.ok(labels.indexOf('Summary — Request') < labels.indexOf('Inquiry — Type'));
+});
+
+test('the summary surfaces a mismatch as an action item', () => {
+  const notification = buildLeadNotification({
+    ...estimatorBase,
+    quote_verified: 'mismatch',
+    client_price: '200',
+    verified_price: '235',
+  });
+  assert.match(notification['Summary — Price'] ?? '', /MISMATCH/);
+  assert.match(notification['Summary — Price'] ?? '', /Proposed \$200/);
+  assert.match(notification['Summary — Price'] ?? '', /Server \$235/);
+  assert.match(notification['Summary — Action'] ?? '', /confirm the correct price/i);
+});
+
+test('the summary carries a next action for gift, commercial and STR requests', () => {
+  const gift = buildLeadNotification({
+    name: 'Synthetic Customer',
+    phone: '8500000000',
+    recipient_name: 'Recipient',
+    gift_value: '100',
+  });
+  assert.match(gift['Summary — Request'] ?? '', /Gift certificate request/);
+  assert.match(gift['Summary — Action'] ?? '', /payment link/i);
+
+  const commercial = buildLeadNotification({
+    organization: 'Example Church',
+    facility_type: 'church',
+    name: 'Facilities Lead',
+    phone: '8500000000',
+  });
+  assert.match(commercial['Summary — Action'] ?? '', /walkthrough/i);
+
+  const str = buildLeadNotification({
+    property_location: '12 Beach Rd',
+    turnover_frequency: 'per_stay',
+    name: 'Host',
+    phone: '8500000000',
+  });
+  assert.match(str['Summary — Action'] ?? '', /turnover details/i);
+});
+
+test('summary rows are omitted when there is nothing to summarize', () => {
+  const notification = buildLeadNotification({
+    request_type: 'contact',
+    name: 'Synthetic Customer',
+    phone: '8500000000',
+    email: 'synthetic@example.com',
+    message: 'Hello',
+  });
+  assert.equal(notification['Summary — Location'], undefined);
+  assert.equal(notification['Summary — Price'], undefined);
+  assert.equal(notification['Summary — Action'], undefined);
+  assert.equal(notification['Summary — Customer'], 'Synthetic Customer · 8500000000 · synthetic@example.com');
+});
+
+test('the summary never exposes private infrastructure or credentials', () => {
+  const notification = buildLeadNotification(estimatorBase);
+  const summary = Object.entries(notification)
+    .filter(([label]) => label.startsWith('Summary — '))
+    .map(([, value]) => value)
+    .join(' ');
+  assert.doesNotMatch(summary, /TRAVEL_ORIGIN|ROUTES_API_KEY|MAPMAP_API_KEY|WEB3FORMS_ACCESS_KEY/);
+  assert.doesNotMatch(summary, /server_relay|authoritative|quote_reference_valid/i);
+});

@@ -1,0 +1,39 @@
+{
+  "_readme": "Editable source for a commercial invoice. Copy this file outside the repository (or to an untracked name), complete every field marked with [ ], then run: node scripts/commercial-invoice.mjs --data <your-file>. Never commit a completed invoice — it contains customer data.",
+  "invoiceNumber": "SS-INV-2026-0001",
+  "issueDate": "2026-10-08",
+  "dueDate": "",
+  "billedTo": {
+    "company": "[Customer company name]",
+    "contact": "[Contact name]",
+    "email": "[billing email]",
+    "phone": "[phone]",
+    "addressLines": ["[street address]", "[city, state ZIP]"]
+  },
+  "serviceLocation": "[Service address — if different from the billing address]",
+  "poReference": "",
+  "lineItems": [
+    {
+      "description": "[Service description — e.g. Commercial cleaning, October 2026 — twice weekly service]",
+      "quantity": 1,
+      "unitPrice": 0
+    }
+  ],
+  "taxLabel": "",
+  "taxRatePercent": null,
+  "notes": "[Scope notes — what was cleaned, the schedule, anything excluded]",
+  "paymentTerms": "",
+  "paymentMethods": [
+    "Major credit and debit cards",
+    "Apple Pay",
+    "Google Pay",
+    "ACH bank transfer"
+  ],
+  "contact": {
+    "name": "Sparkling Standard Cleaning Co.",
+    "phone": "(850) 426-8479",
+    "email": "owner@sparkling-standard.com",
+    "website": "sparkling-standard.com",
+    "legalName": ""
+  }
+}

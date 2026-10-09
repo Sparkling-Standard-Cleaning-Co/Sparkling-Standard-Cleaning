@@ -31,14 +31,14 @@ Properties examined:
 | SEO infrastructure | Canonicals, sitemap, JSON-LD, page ownership, verify scripts | Basic (Mobirise builder; little structure observable) | Extensive SEO documentation + verification |
 | Accessibility (measured) | axe WCAG 2.0/2.1/2.2 A+AA: **0 violations** across 15 pages (2026-10-01) | Not measured here | Documented target |
 | Performance (measured) | LCP 1.26–1.65 s, CLS ≤ 0.038 on mobile-throttled Chromium (2026-10-01) | Not measured here | Documented target |
-| Lead capture reliability | **Blocked**: no forms deliver until the Web3Forms key is configured (verified live) | Facebook DM path works; on-page email/tel links are broken | Working (Web3Forms) |
+| Lead capture reliability | **Live (verified 2026-10-01):** all four funnels deliver to the owner inbox; server relay + static fallback; honest failure copy | Facebook DM path works; on-page email/tel links are broken | Working (Web3Forms) |
 | Content freshness | Honest placeholders; real photos/reviews pending | Facebook + photo galleries | Ongoing content system |
 
 **What this comparison does and does not say.** Refresh Cleaning publishes prices, checklists and
 testimonials, which are useful trust signals; its direct contact links are broken and its booking
 depends on a social platform. Sparkling Standard has stronger technical foundations (estimate
-engine, structured data, accessible markup, attribution, measured performance) but currently
-cannot capture a lead at all because the form provider key is not configured. No claim is made
+engine, structured data, accessible markup, attribution, measured performance) and, since
+2026-10-01, working lead capture in all four funnels. No claim is made
 that any design change will outperform either competitor; that requires measured traffic and
 conversion data after launch.
 
@@ -64,17 +64,21 @@ conversion data after launch.
 
 | Capability | Blocker | Exact action |
 | --- | --- | --- |
-| Form delivery (residential, estimate, commercial, STR) | `WEB3FORMS_ACCESS_KEY` runtime secret + `PUBLIC_WEB3FORMS_ACCESS_KEY` build variable not set | Add both (same key) in Cloudflare → redeploy → authorized live test |
-| Real travel routing + live fuel price | `TRAVEL_ORIGIN`, optional `ROUTES_PROVIDER`/`ROUTES_API_KEY`, `EIA_API_KEY` not set | Add secrets → redeploy |
+| Form delivery (residential, estimate, commercial, STR) | **Done 2026-10-01:** `WEB3FORMS_ACCESS_KEY` (runtime Secret) + `PUBLIC_WEB3FORMS_ACCESS_KEY` (build Text, same key) configured; all four funnels owner-confirmed delivering | None; re-test after any future form change |
+| Real travel routing + live fuel price | **Live (verified 2026-10-02):** MapMap routing + geocoding configured; optional `EIA_API_KEY` still unset | None; optional EIA key |
 | Analytics (GTM/GA4, Umami) | Live and consent-gated; GA4 owner-confirmed operational with all three inquiry key events; Umami has no ID | Optional: create Umami only if wanted; add an internal-traffic filter |
 | Turnstile spam protection | Optional keys not set | Enable in Cloudflare |
 | Review system | GBP **verified; profile + review links captured (owner-supplied 2026-10-08)** | Activate the documented review workflow (request after satisfaction) |
 | Indexing accelerators | IndexNow key not set (site is already indexable) | Optional post-launch |
-| SMS CTAs | SMS capability unverified | Verify a real text, then flip `smsEnabled` |
+| SMS CTAs | **Done 2026-10-01:** owner verified SMS delivery; `business.flags.smsEnabled = true` | None |
 
 ### C. Missing and commercially valuable (recommended)
 
-1. **Form delivery activation** — without it the site cannot capture any lead. Highest priority.
+1. **Form delivery — done 2026-10-01.** All four funnels deliver to the owner inbox (server relay
+   with authoritative quote verification + static fallback, honest failure copy). The owner
+   notification now opens with an at-a-glance summary
+   (`docs/operations/LEAD-NOTIFICATION-FORMAT.md`); the customer confirmation system is documented
+   in `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`.
 2. **Google Business Profile + review link** — GBP is **verified with its profile + review links
    captured (owner-supplied 2026-10-08)**; local search, trust and review requests are active.
 3. **Founder portrait + genuine photography slots** — the hero and proof band currently carry

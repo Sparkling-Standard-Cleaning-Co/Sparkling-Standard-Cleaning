@@ -97,13 +97,16 @@ Do these in order, stopping when the branch list appears.
 - Three Pages Functions (all configured on production as of 2026-10-02):
   - `POST /api/lead` — validates and relays form submissions to Web3Forms using the runtime
     `WEB3FORMS_ACCESS_KEY`; returns `503 not_configured` when the key is missing so the client can
-    use its static fallback instead of showing a false success.
+    use its static fallback instead of showing a false success. After the owner notification is
+    accepted, it sends the branded customer confirmation through Resend when `RESEND_API_KEY` is
+    configured (see section 4a); a customer-email failure never fails the lead.
   - `POST /api/travel` — route distance/duration + Gulf Coast gasoline reference; live and verified
     on production. Returns `503 origin_not_configured` only when `TRAVEL_ORIGIN` is missing; the
     estimator keeps working in offline zone mode either way.
   - `POST /api/geocode` — server-side address suggestions/resolution/reverse proxy. Provider keys
     stay in the function environment; the private travel origin is never read or returned here.
-- Outbound calls: `api.web3forms.com`, `api.mapmap.ai` (addresses + routing), `geocoding.geo.census.gov`
+- Outbound calls: `api.web3forms.com`, `api.resend.com` (customer confirmation, optional),
+  `api.mapmap.ai` (addresses + routing), `geocoding.geo.census.gov`
   (free fallback), `api.eia.gov` (optional), `challenges.cloudflare.com` (Turnstile, optional).
 
 ## 4. Environment variables — build-time vs runtime
@@ -132,6 +135,7 @@ a commit) before the built pages and Functions see it.
 | Secret | Required | Read by | Effect when missing |
 | --- | --- | --- | --- |
 | `WEB3FORMS_ACCESS_KEY` | Yes | `functions/api/lead.ts` | `/api/lead` returns `503`; client falls back to direct Web3Forms submit when the public key is set |
+| `RESEND_API_KEY` | Optional (customer email) | `functions/api/lead.ts` → `src/lib/forms/customer-email.ts` | The customer confirmation is skipped; the lead, the owner notification and the on-page summary are unaffected. Server-side only — never a `PUBLIC_*` value |
 | `TRAVEL_ORIGIN` | Yes for routed travel | `functions/api/travel.ts` | `/api/travel` returns `503`; estimator stays in offline zone mode |
 | `TURNSTILE_SECRET_KEY` | Optional | `functions/api/lead.ts` | Turnstile check skipped; honeypot + timing still apply |
 | `ROUTES_API_KEY` | Optional | `functions/api/travel.ts` | Straight-line × 1.18 distance estimate labeled as such |
@@ -144,6 +148,43 @@ a commit) before the built pages and Functions see it.
 | `ROUTES_PROVIDER` | unset | `google` or `mapbox`; requires `ROUTES_API_KEY` |
 | `REFERENCE_GAS_PRICE` | `3.1` | USD/gal fallback |
 | `TRAVEL_CACHE_SECONDS` | `21600` | Per-isolate route cache |
+| `RESEND_FROM_EMAIL` | `Sparkling Standard Cleaning Co. <notifications@sparkling-standard.com>` | Sender for the customer confirmation; change only to another **verified** sender in Resend |
+| `RESEND_REPLY_TO` | `owner@sparkling-standard.com` | Customer replies reach the owner directly |
+
+### 4a. Customer confirmation email (Resend) — owner setup
+
+The customer confirmation is sent by `functions/api/lead.ts` through Resend **after** the owner
+notification is accepted. Until the setup below is complete, the code path is inert
+(`skipped_not_configured` / provider rejection) and the lead flow is unaffected.
+
+**Status 2026-10-08 (owner-confirmed):** steps 1–3 are complete — `RESEND_API_KEY` is set in
+Cloudflare as a runtime Secret and `sparkling-standard.com` is verified in Resend (DNS complete;
+no `PUBLIC_RESEND_*` variable exists). Step 5 (deploy this build) and step 6 (the one controlled
+live test) are the remaining actions.
+
+1. **Owner:** create/log in to the Resend account for the business (free tier is sufficient for
+   current volume) and create an API key. Store it as a Cloudflare **Secret** named
+   `RESEND_API_KEY` (never a `PUBLIC_*` variable; never committed). ✅ done 2026-10-08
+2. **Owner:** add the sending domain `sparkling-standard.com` in Resend → Domains. Resend shows
+   the exact DNS records it needs (typically a sending subdomain with SPF/DKIM records). Add those
+   records in Cloudflare DNS **exactly as Resend shows them**, set to DNS-only (never proxied).
+   - Do **not** change the existing Google Workspace MX, SPF (`v=spf1`) or DKIM records — the
+     Resend records belong on the sending subdomain Resend specifies. ✅ done 2026-10-08
+3. Wait for Resend to report the domain **Verified**. Only then will sends from
+   `notifications@sparkling-standard.com` be accepted. ✅ done 2026-10-08
+4. Optional: set `RESEND_FROM_EMAIL` / `RESEND_REPLY_TO` as dashboard **Text** variables to
+   override the defaults (only to another verified sender).
+5. Trigger a new deployment so the Functions receive the secret.
+6. **One controlled live test (owner-approved only):** submit one clearly marked test request
+   using an address the owner controls (e.g. the owner's own email as the "customer" address) and
+   confirm: the owner notification arrives, the customer confirmation arrives from the verified
+   sender, the subject is `We received your Sparkling Standard request`, and replying to it
+   reaches `owner@sparkling-standard.com`. No other live test email is ever sent.
+
+Failure behavior (by design): if Resend rejects or fails, the function logs
+`customer-confirmation: failed (provider N)` server-side — no PII, no secrets — and still returns
+success to the customer, because the lead was already delivered. The on-page thank-you summary is
+always shown immediately.
 
 ### Documented but NOT consumed by code
 

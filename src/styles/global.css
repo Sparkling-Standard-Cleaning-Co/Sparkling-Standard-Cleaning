@@ -1095,6 +1095,49 @@ li + li {
   margin: var(--space-2) 0 0;
 }
 
+/* ── Submission summary (thank-you page) ───────────────────────────────────── */
+.summary-list {
+  display: grid;
+  grid-template-columns: minmax(8rem, 38%) 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-4) 0 0;
+}
+
+.summary-list dt {
+  color: var(--color-taupe-600);
+  font-size: var(--text-sm);
+}
+
+.summary-list dd {
+  margin: 0;
+  color: var(--color-ink-800);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.summary-estimate {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-champagne-100, #f7efdf);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 0.5rem);
+}
+
+.summary-estimate__label {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs, 0.75rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-champagne-text, #6d5426);
+}
+
+.summary-estimate__value {
+  margin: 0;
+  font-size: var(--text-xl, 1.375rem);
+  font-weight: 700;
+  color: var(--color-ink-900);
+}
+
 /* ── Steps ─────────────────────────────────────────────────────────────────── */
 .steps {
   list-style: none;

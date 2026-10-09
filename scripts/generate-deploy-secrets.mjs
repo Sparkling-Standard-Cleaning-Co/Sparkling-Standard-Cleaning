@@ -31,6 +31,7 @@ const SECRET_KEYS = [
   'TRAVEL_ORIGIN',
   'ROUTES_API_KEY',
   'EIA_API_KEY',
+  'RESEND_API_KEY',
 ];
 
 /** Build-time public variables (inlined by Astro at build). */
@@ -43,7 +44,13 @@ const PUBLIC_KEYS = [
 ];
 
 /** Non-secret runtime tuning values (dashboard "Text" variables, optional). */
-const RUNTIME_TEXT_KEYS = ['ROUTES_PROVIDER', 'REFERENCE_GAS_PRICE', 'TRAVEL_CACHE_SECONDS'];
+const RUNTIME_TEXT_KEYS = [
+  'ROUTES_PROVIDER',
+  'REFERENCE_GAS_PRICE',
+  'TRAVEL_CACHE_SECONDS',
+  'RESEND_FROM_EMAIL',
+  'RESEND_REPLY_TO',
+];
 
 const env = { ...loadDotEnv('.env'), ...process.env };
 const value = (key) => env[key]?.trim() ?? '';

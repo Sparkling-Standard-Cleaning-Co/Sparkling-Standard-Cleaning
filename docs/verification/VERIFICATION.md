@@ -295,11 +295,46 @@ values (never modified, shortened or reconstructed):
 | Stale sweep | Repository-wide grep (`*.md`, `*.ts`, `*.astro`, `*.mjs`) | No remaining claim that GBP verification, profile capture or review-link capture is pending (Instagram/YouTube remain legitimately pending) |
 | Full suites | `npm run verify` (astro check 0 errors/0 warnings, build 21 pages, validate 1,263 links + SEO + registry + GTM + checklist leak), `npm test` (304 pass, 1 skip, 0 fail), `npm run test:browser` (79 pass, 0 fail), `npm run test:print` (8 pass, 1 skip, 0 fail), `marketing:verify`, `pending` (24 files), `smoke` (17 pages), `testimonials`, `audit:facts` | All pass; `audit:facts` context-review terms are pre-existing and unchanged |
 
+## Verified — form/email workflow completion (2026-10-08)
+
+What was wrong, what was built, and what was actually run.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Key/env handling | Source + docs audit | **Correct as designed and kept:** `WEB3FORMS_ACCESS_KEY` is a Cloudflare runtime Secret read only by `functions/api/lead.ts`; `PUBLIC_WEB3FORMS_ACCESS_KEY` is a build-time Text variable (same key, client-safe public identifier) for the static fallback. No secret is committed; `.env.example` and DEPLOYMENT.md match the code |
+| Stale form-status docs | Doc review | `docs/marketing/COMPETITIVE-COMPARISON.md` form-delivery/travel/SMS "blocker" rows and the `VERIFICATION.md` "live form delivery pending" row were stale (all resolved 2026-10-01/02) — reconciled to the verified state |
+| Owner email | `tests/lead-notification.test.ts` (19 cases) | At-a-glance `Summary — …` block added (request · customer · location · price + verdict · action); detail sections unchanged; order, honesty and no-credential invariants still asserted |
+| Customer confirmation email | `tests/customer-confirmation.test.ts` (10 cases) | Branded email-client-safe HTML + plain-text fallback + intro text; never says booked/paid/invoice/receipt; escaping, estimate labeling, gift/commercial variants, contact block |
+| Shared request summary | `tests/request-summary.test.ts` (11 cases) | Same facts as the email; internal fields never surfaced; missing address marked "to be confirmed", never invented |
+| Single-use session receipt | `tests/submission-receipt.test.ts` (5 cases) | Sanitized allowlist, single-use read, length caps, storage failures never break a submission |
+| Thank-you flow | Browser `journey.test.mjs` | Summary card hidden on a direct visit; renders the stored request once; hidden again after reload; page keeps the request-only wording |
+| Invalid email | Browser `journey.test.mjs` | Native validation blocks submission — zero network requests, no success state |
+| Double submission | Browser `journey.test.mjs` | Button disabled while sending; a second click sends exactly one request |
+| Provider/API failure, missing config, spam, Turnstile | `tests/api.test.ts`, `tests/failure-copy.test.ts`, browser wizard suite | Unchanged and passing (provider failure never reported as success; 503 not_configured falls back; distinct honest failure copy) |
+| Commercial invoice | `tests/invoice.test.ts` (9 cases) + `node scripts/commercial-invoice.mjs --sample` | Totals to the cent; tax only with label+rate; owner-completion placeholders; no invented bank details/tax IDs/terms; HTML + text + Letter PDF written to git-ignored `invoice-out/` |
+| Customer confirmation tool | `node scripts/customer-confirmation.mjs --sample` | Writes HTML + text to git-ignored `confirmation-out/`; verified contact drift guard |
+| Full suites | `npm run check` (0 errors/0 warnings/0 hints, 102 files), `npm run verify` (build 21 pages; validate 1,264 links + SEO + registry/QR + GTM + checklist leak), `npm test` (344 pass, 1 skip, 0 fail), `npm run test:browser` (81 pass, 0 fail), `npm run marketing:verify`, `pending` (24 files), `smoke` (17 pages), `testimonials`, `audit:facts` | All pass; no new audit context items |
+
+## Verified — Resend customer-confirmation delivery (2026-10-08)
+
+The second transactional path: after the Web3Forms owner notification is accepted, the lead
+relay sends the branded customer confirmation through Resend. The lead flow is unchanged; the
+customer email is additive and best-effort.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Sending module | `tests/customer-email.test.ts` (10 cases) | Verified facts drift-guard against `business.ts`; fixed subject; correct recipient; HTML + text bodies; sender/reply-to overrides; skips (no email / invalid / no key) never call the provider; provider rejection and network failure return status only; HTML escaping; log line carries no PII or key |
+| Lead-function integration | `tests/api.test.ts` (7 new cases, Resend mocked) | One send after owner success; correct recipient + subject `We received your Sparkling Standard request`; HTML/text generated; Resend failure after owner success still returns `200 { ok: true }`; owner failure (`502`) never triggers a confirmation; phone-only and invalid-email requests skip safely; no duplicate send per invocation; no secret/config detail in the response |
+| Failure logging | Test-captured `console.error` | `customer-confirmation: failed (provider 500)` recorded server-side; assertions prove the line contains no customer address and no API key |
+| Existing paths unchanged | Full api/verification suites | Owner notification, quote verification, Turnstile, honeypot and fallback behavior unchanged and passing |
+| Config/docs | `.env.example`, `scripts/generate-deploy-secrets.mjs`, `DEPLOYMENT.md` §4/§4a, `README.md`, `PLATFORM-STATUS.md`, `OWNER-INPUT-REQUIRED.md`, `AUTOMATION-REGISTER.md`, `CUSTOMER-CONFIRMATION-EMAIL.md`, `COMMUNICATION-TEMPLATES.md`, `GIFT-CERTIFICATES.md`, `LEAD-NOTIFICATION-FORMAT.md`, `privacy.astro` | Secret is server-side only (`RESEND_API_KEY`); sender-domain verification and the one controlled live test documented; no remaining claim that a Web3Forms paid autoresponder is required |
+| Full suites | `npm run check` (0 errors/0 warnings/0 hints, 103 files), `npm run verify` (build 21 pages; validate 1,264 links + SEO + registry/QR + GTM + checklist leak), `npm test` (361 pass, 1 skip, 0 fail), `npm run test:browser` (81 pass, 0 fail), `smoke` (17 pages), `pending` (24 files), `testimonials`, `audit:facts`, `marketing:verify` | All pass; no real email sent (all provider calls mocked) |
+
 ## Pending (cannot be verified in this environment — owner or tooling required)
 
 | Item | Why pending | How to verify |
 | --- | --- | --- |
-| Live form delivery | Requires the Web3Forms key and inbox | Owner-authorized test submission per form category after configuring `WEB3FORMS_*`; confirm it arrives at `owner@sparkling-standard.com` |
+| Live form delivery re-check | Delivery itself is owner-confirmed operational (2026-10-01); inbox receipt cannot be re-verified from the repo | After any form/submission change, submit one clearly marked test per category and confirm it arrives at `owner@sparkling-standard.com` |
 | Live Turnstile | Requires Cloudflare keys | Enable, submit, confirm challenge appears server-side |
 | Real route distance / EIA price | Requires `TRAVEL_ORIGIN` + provider keys | `POST /api/travel` after deployment with keys |
 | Cloudflare preview environments | **Not used by owner decision (2026-10-02).** Production deploys from `main` only; no preview branches, Preview environment variables, preview secrets or Cloudflare Access are configured or required | No action; a temporary `PUBLIC_PREVIEW_MODE=true` staging deploy remains available if ever needed |

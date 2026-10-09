@@ -106,6 +106,14 @@ const VERIFICATION_LABELS: Record<string, string> = {
   unverifiable: 'UNVERIFIABLE — could not be checked; review manually',
 };
 
+/** Compact verdict labels for the at-a-glance summary line. */
+const VERIFICATION_SHORT: Record<string, string> = {
+  verified: 'VERIFIED',
+  preliminary: 'PRELIMINARY',
+  mismatch: 'MISMATCH',
+  unverifiable: 'UNVERIFIABLE',
+};
+
 const QUALIFICATION_LABELS: Record<string, string> = {
   verified_route: 'Verified route to the confirmed address',
   preliminary_route: 'Preliminary route (address or pin not fully verified)',
@@ -164,6 +172,24 @@ function requestType(fields: Record<string, string>): string {
   }
   if (text(fields, 'turnover_frequency') || text(fields, 'property_location') || text(fields, 'checkout_time')) {
     return 'Short-term rental turnover request';
+  }
+  if (text(fields, 'message')) return 'Website message';
+  if (explicit) return humanizeKey(explicit);
+  return 'Cleaning inquiry';
+}
+
+/** Compact request label for the at-a-glance summary line. */
+function requestTypeShort(fields: Record<string, string>): string {
+  const explicit = text(fields, 'request_type');
+  if (explicit === 'reservation_request') return 'Reservation request';
+  if (explicit === 'residential_estimate') return 'Estimate request';
+  if (explicit === 'commercial') return 'Commercial walkthrough request';
+  if (explicit === 'str') return 'STR turnover request';
+  if (explicit === 'contact') return 'Website message';
+  if (text(fields, 'recipient_name')) return 'Gift certificate request';
+  if (text(fields, 'facility_type') || text(fields, 'organization')) return 'Commercial walkthrough request';
+  if (text(fields, 'turnover_frequency') || text(fields, 'property_location') || text(fields, 'checkout_time')) {
+    return 'STR turnover request';
   }
   if (text(fields, 'message')) return 'Website message';
   if (explicit) return humanizeKey(explicit);
@@ -325,6 +351,74 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
     for (const [label, value] of lines) add(label, value);
     for (const key of consumed) used.add(key);
   };
+
+  // ── At a glance (the first rows the owner sees in the inbox) ────────────
+  // A compact triage view; the full detail sections follow below. Values are
+  // the same facts, never a second interpretation.
+  const summaryRequest = [requestTypeShort(fields), serviceLine(fields), frequencyLine(fields)]
+    .filter(Boolean)
+    .join(' · ');
+  add('Summary — Request', summaryRequest);
+  const summaryCustomer = [
+    text(fields, 'name'),
+    text(fields, 'organization'),
+    text(fields, 'phone'),
+    text(fields, 'email'),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  add('Summary — Customer', summaryCustomer);
+  const summaryRegion = [text(fields, 'address_city'), text(fields, 'address_state')]
+    .filter(Boolean)
+    .join(', ');
+  const summaryLocation = [
+    text(fields, 'service_address', 'property_location'),
+    [summaryRegion, text(fields, 'zip')].filter(Boolean).join(' '),
+  ]
+    .filter(Boolean)
+    .join(', ');
+  add('Summary — Location', summaryLocation);
+
+  const summaryPriceParts: string[] = [];
+  const proposedPrice = text(fields, 'quoted_price', 'client_price');
+  const verifiedPrice = text(fields, 'verified_price');
+  if (proposedPrice) summaryPriceParts.push(`Proposed ${money(proposedPrice)}`);
+  if (verifiedPrice && (!proposedPrice || money(verifiedPrice) !== money(proposedPrice))) {
+    summaryPriceParts.push(`Server ${money(verifiedPrice)}`);
+  }
+  const estimateRange = text(fields, 'quoted_range');
+  const estimateLow = text(fields, 'estimate_low');
+  const estimateHigh = text(fields, 'estimate_high');
+  if (!proposedPrice && !verifiedPrice && estimateRange) {
+    summaryPriceParts.push(`Estimate ${estimateRange}`);
+  } else if (!proposedPrice && !verifiedPrice && estimateLow && estimateHigh) {
+    summaryPriceParts.push(`Estimate $${money(estimateLow)}–$${money(estimateHigh)}`);
+  }
+  const verdict = text(fields, 'quote_verified');
+  if (verdict && VERIFICATION_SHORT[verdict]) summaryPriceParts.push(VERIFICATION_SHORT[verdict] as string);
+  add('Summary — Price', summaryPriceParts.join(' · '));
+
+  const actions: string[] = [];
+  if (verdict === 'mismatch') {
+    actions.push('Price mismatch — confirm the correct price before scheduling');
+  }
+  if (verdict === 'unverifiable' || text(fields, 'verification_status') === 'authoritative_error') {
+    actions.push('Verification could not complete — review manually');
+  }
+  if (verdict === 'preliminary') actions.push('Travel check pending — confirm the final price');
+  if (text(fields, 'travel_qualification') === 'manual_review') {
+    actions.push('Location needs manual review (out of area or unverified)');
+  }
+  if (text(fields, 'preferred_date_note')) actions.push('Preferred date was invalid and discarded');
+  if (text(fields, 'pin_precision') === 'street') actions.push('Street-level pin — confirm the exact property');
+  if (text(fields, 'recipient_name')) {
+    actions.push('Gift request — confirm details and send the payment link (no payment taken)');
+  }
+  if (!text(fields, 'recipient_name') && (text(fields, 'facility_type') || text(fields, 'organization'))) {
+    actions.push('Schedule the walkthrough');
+  }
+  if (text(fields, 'turnover_frequency')) actions.push('Confirm turnover details and the first date');
+  add('Summary — Action', actions.join(' · '));
 
   // ── A. New cleaning inquiry ─────────────────────────────────────────────
   add('Inquiry — Type', requestType(fields), 'request_type', 'facility_type');

@@ -7,10 +7,19 @@ the sanitized field map through `src/lib/forms/lead-notification.ts`, which prod
 readable summary. Every collected value is preserved — unmapped fields appear under
 “More details” — and the customer's email becomes the provider **reply-to** address.
 
+The email opens with an **at-a-glance summary** (request, customer, location, price/verdict, and a
+next-action line when something needs attention) so the owner can triage from the inbox preview
+before scrolling. The detail sections follow in reading order.
+
+This owner notification is unchanged by the customer confirmation path: after Web3Forms accepts
+it, the function sends the customer a separate branded email through Resend
+(`docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`).
+
 ## Section order
 
 | Section | Contents |
 | --- | --- |
+| **Summary** | Request type · service · frequency; customer name/organization/phone/email; location; price + verdict; an explicit action line when something needs attention (price mismatch, unverifiable, out-of-area review, discarded date, street-level pin, gift payment link, walkthrough scheduling, turnover details) |
 | **Inquiry** | Type (estimate / preliminary / reservation request), service, frequency, submitted time (Central), preferred date, estimate status |
 | **Contact** | Name, organization (commercial), phone, email |
 | **Location** | Entered address, unit, city/state/ZIP, entry method, confirmation + precision, map pin |
@@ -33,6 +42,10 @@ are plain text (no HTML), and labels are fixed by code, so the customer cannot i
 Input: 3/2 biweekly reservation, two add-ons, verified route, a note about parking.
 
 ```
+Summary — Request: Reservation request · House cleaning (standard) · Every two weeks
+Summary — Customer: Synthetic Customer · 8500000000 · synthetic@example.com
+Summary — Location: 100 S Baylen St, Pensacola, FL 32502
+Summary — Price: Proposed $235 · VERIFIED
 Inquiry — Type: Reservation request — proposed price, subject to personal confirmation
 Inquiry — Service: House cleaning (standard)
 Inquiry — Frequency: Every two weeks
@@ -120,8 +133,8 @@ Pricing — ACTION REQUIRED: The submitted price differs from the server recalcu
 
 - Unit: `tests/lead-notification.test.ts` covers residential, recurring, preliminary, mismatch,
   out-of-area, commercial, STR, many add-ons, long notes, missing optionals, unmapped-field
-  preservation and the no-credentials invariant, plus first/latest attribution labeling and the
-  legacy `utm_*` fallback.
+  preservation and the no-credentials invariant, plus first/latest attribution labeling, the
+  legacy `utm_*` fallback, and the at-a-glance summary (triage facts, action lines, omissions).
 - Unit: `tests/attribution.test.ts` locks the collector rules (first-touch preservation, new
   campaigns updating latest-touch, internal/direct views never erasing a campaign, external
   referrals vs same-domain navigation, ad click id survival).

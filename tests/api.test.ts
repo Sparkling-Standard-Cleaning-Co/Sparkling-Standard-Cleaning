@@ -141,6 +141,159 @@ test('lead: GET is method-not-allowed', async () => {
   assert.equal(response.status, 405);
 });
 
+// ── /api/lead → customer confirmation (Resend, mocked) ─────────────────────
+//
+// The lead is delivered through Web3Forms first; the customer confirmation is
+// a second, independent path. No real email is sent: every provider call is
+// routed through a stub.
+
+const customerFields = {
+  name: 'Synthetic Customer',
+  phone: '8500000000',
+  email: 'synthetic@example.com',
+  service_type: 'standard',
+  frequency: 'biweekly',
+  service_address: '100 S Baylen St',
+  address_city: 'Pensacola',
+  address_state: 'FL',
+  zip: '32502',
+};
+
+interface RoutedCall {
+  url: string;
+  init?: RequestInit;
+}
+
+async function withRoutedFetch<T>(
+  handlers: { web3forms?: () => Promise<Response>; resend?: () => Promise<Response> },
+  run: (calls: RoutedCall[]) => Promise<T>,
+): Promise<T> {
+  const original = globalThis.fetch;
+  const calls: RoutedCall[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    calls.push({ url, init });
+    if (url.includes('api.web3forms.com')) {
+      return handlers.web3forms ? handlers.web3forms() : jsonResponse({ success: true });
+    }
+    if (url.includes('api.resend.com')) {
+      return handlers.resend ? handlers.resend() : jsonResponse({ id: 'email-1' });
+    }
+    throw new Error(`unexpected fetch in test: ${url}`);
+  }) as typeof fetch;
+  try {
+    return await run(calls);
+  } finally {
+    globalThis.fetch = original;
+  }
+}
+
+test('lead: a successful owner delivery sends exactly one branded customer confirmation', async () => {
+  await withRoutedFetch({}, async (calls) => {
+    const response = await leadPost({
+      request: jsonRequest({ subject: 'x', fields: customerFields }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
+    } as never);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true });
+
+    const resendCalls = calls.filter((call) => call.url.includes('api.resend.com'));
+    assert.equal(resendCalls.length, 1, 'no duplicate send for one server invocation');
+    const body = JSON.parse(String(resendCalls[0].init?.body)) as Record<string, unknown>;
+    assert.deepEqual(body.to, ['synthetic@example.com'], 'correct recipient');
+    assert.equal(body.subject, 'We received your Sparkling Standard request', 'correct subject');
+    assert.match(String(body.html), /We received your request/, 'HTML body generated');
+    assert.match(String(body.html), /House cleaning \(standard\)/);
+    assert.match(String(body.text), /WE RECEIVED YOUR REQUEST/, 'plain-text body generated');
+    assert.match(String(body.text), /100 S Baylen St, Pensacola, FL 32502/);
+    const headers = resendCalls[0].init?.headers as Record<string, string>;
+    assert.equal(headers.Authorization, 'Bearer dummy-resend-key');
+  });
+});
+
+test('lead: a Resend failure after owner delivery still returns a successful lead response', async () => {
+  const errors: string[] = [];
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => {
+    errors.push(args.map(String).join(' '));
+  };
+  try {
+    await withRoutedFetch({ resend: async () => jsonResponse({ error: 'provider down' }, 500) }, async (calls) => {
+      const response = await leadPost({
+        request: jsonRequest({ subject: 'x', fields: customerFields }),
+        env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
+      } as never);
+      assert.equal(response.status, 200, 'the lead stays successful');
+      assert.deepEqual(await response.json(), { ok: true });
+      assert.equal(calls.filter((call) => call.url.includes('api.resend.com')).length, 1);
+    });
+  } finally {
+    console.error = originalError;
+  }
+  assert.ok(
+    errors.some((line) => line.includes('customer-confirmation: failed (provider 500)')),
+    'the failure is recorded server-side',
+  );
+  assert.ok(
+    errors.every((line) => !line.includes('synthetic@example.com') && !line.includes('dummy-resend-key')),
+    'no PII or secret in the log line',
+  );
+});
+
+test('lead: owner-delivery failure never triggers a customer confirmation', async () => {
+  await withRoutedFetch({ web3forms: async () => jsonResponse({ success: false }, 500) }, async (calls) => {
+    const response = await leadPost({
+      request: jsonRequest({ subject: 'x', fields: customerFields }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
+    } as never);
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), { ok: false, error: 'provider_failed' });
+    assert.equal(
+      calls.filter((call) => call.url.includes('api.resend.com')).length,
+      0,
+      'a failed lead is never confirmed to the customer',
+    );
+  });
+});
+
+test('lead: a phone-only request skips the customer confirmation safely', async () => {
+  await withRoutedFetch({}, async (calls) => {
+    const response = await leadPost({
+      request: jsonRequest({ subject: 'x', fields: { name: 'Synthetic', phone: '8500000000' } }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
+    } as never);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true });
+    assert.equal(calls.filter((call) => call.url.includes('api.resend.com')).length, 0);
+  });
+});
+
+test('lead: an invalid customer email is never sent a confirmation', async () => {
+  await withRoutedFetch({}, async (calls) => {
+    const response = await leadPost({
+      request: jsonRequest({ subject: 'x', fields: { ...customerFields, email: 'not-an-email' } }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
+    } as never);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true });
+    assert.equal(calls.filter((call) => call.url.includes('api.resend.com')).length, 0);
+  });
+});
+
+test('lead: without the Resend secret the lead still succeeds and no confirmation is attempted', async () => {
+  await withRoutedFetch({}, async (calls) => {
+    const response = await leadPost({
+      request: jsonRequest({ subject: 'x', fields: customerFields }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key' },
+    } as never);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.deepEqual(payload, { ok: true });
+    assert.equal(calls.filter((call) => call.url.includes('api.resend.com')).length, 0);
+    assert.equal(JSON.stringify(payload).includes('RESEND'), false, 'no configuration detail in the response');
+  });
+});
+
 // ── /api/travel ─────────────────────────────────────────────────────────────
 
 test('travel: missing origin returns origin_not_configured', async () => {

@@ -29,6 +29,7 @@ import { locationKey, formatLocationLine, type ConfirmedLocation } from '../lib/
 import { initAddressFinder, type AddressFinderHandle } from './address-finder';
 import { submitLead, recordConversion } from '../lib/forms/submit';
 import { reservationReceipt } from '../lib/forms/verification-copy';
+import { saveSubmissionSummary } from '../lib/forms/submission-receipt';
 import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { track } from '../lib/analytics/events';
 import { attributionFields } from '../lib/attribution';
@@ -1097,6 +1098,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (fields.preferred_date) {
       recordConversion('booking_request', { service_type: fields.service_type });
     }
+    // Keep a single-use, sanitized copy so the thank-you page can show the
+    // customer exactly what they submitted.
+    saveSubmissionSummary(fields);
 
     // The receipt reflects the server's actual verdict. A mismatch or
     // preliminary travel result is never presented as an accepted price.

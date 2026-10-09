@@ -201,6 +201,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`) | `docs/verification/VERIFICATION.md` |
 | Promotions, bundles, Founding-10 (all disabled) | `src/lib/estimate/promotions.ts` + `src/config/owner-pricing.ts` | `docs/launch/PROMOTION-PROPOSALS.md` |
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
+| Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` §4a |
 | Reservation window, statuses, ledger | `src/config/scheduling.ts` + `src/scripts/estimate-wizard.ts` | `docs/operations/RESERVATION-TRACKING.md` |
 | Gift certificates (sales disabled pending approval) | `src/config/gift-certificates.ts`, `src/lib/gift/`, `src/pages/gift-certificates/`, `functions/api/gift-checkout.ts`, `functions/api/stripe-webhook.ts` | `docs/operations/GIFT-CERTIFICATES.md`, `docs/operations/COMMUNICATION-TEMPLATES.md` |
 | Platform accounts, status, owner actions | `src/config/business.ts` `socials` + `src/components/SocialLinks.astro` | `docs/marketing/PLATFORM-REGISTER.md`, `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` |
@@ -413,8 +414,9 @@ collections are intentionally empty — not errors.
 - **Pending owner input:** legal entity spelling/suffix, insurance/bonding/licensing claims,
   Instagram verification, the deferred
   YouTube channel (Google Workspace eligibility), Umami website ID, final cancellation
-  percentages, marketing-launch approvals (M2–M7; M1 deployed 2026-10-03) and any marketing claim
-  not yet supplied. (Google Business Profile is **verified with its profile + review links
-  captured**, owner-supplied 2026-10-08.)
+  percentages, marketing-launch approvals (M2–M7; M1 deployed 2026-10-03), the Resend
+  customer-email setup (`RESEND_API_KEY` + sender-domain verification — `DEPLOYMENT.md` §4a) and
+  any marketing claim not yet supplied. (Google Business Profile is **verified with its profile +
+  review links captured**, owner-supplied 2026-10-08.)
 - Current platform details: `docs/operations/PLATFORM-STATUS.md`. Owner checklist:
   `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals are grouped there as M2–M7).

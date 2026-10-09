@@ -85,6 +85,11 @@ const hasEmail = !isPending(business.email);
               landing page, kept to attach to a future request.
             </li>
             <li>
+              <strong>A single-use request summary</strong> (session storage) — the details you
+              just submitted, shown once on the thank-you page so you can check them, then removed
+              when the page reads it. It never leaves your browser.
+            </li>
+            <li>
               <strong>A single-use submission receipt</strong> (session storage) — cleared when
               used, so a confirmed request can be counted once, only with your consent.
             </li>
@@ -188,7 +193,9 @@ const hasEmail = !isPending(business.email);
             Submissions are protected by a hidden-field check and a minimum completion-time check.
             If enabled, Cloudflare Turnstile may also be used to verify that a submission is human.
             Your form details are delivered to the business through the configured form service and
-            are used only to respond to you.
+            are used only to respond to you. If you provide an email address, a confirmation email
+            is sent to you through our transactional email provider (Resend) — it contains the
+            summary of your request and how to reach us, and is never marketing.
           </p>
         </section>
 

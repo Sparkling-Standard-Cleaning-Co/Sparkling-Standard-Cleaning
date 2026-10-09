@@ -69,6 +69,8 @@ All optional for local development; all documented in `.env.example`.
 | `PUBLIC_BUSINESS_PHONE` / `_EMAIL` | Owner-approved contact facts. |
 | `PUBLIC_WEB3FORMS_ACCESS_KEY` | Public client-safe form key (static fallback path). |
 | `WEB3FORMS_ACCESS_KEY` | Server-side key used by `functions/api/lead.ts`. |
+| `RESEND_API_KEY` | Optional server-side Resend key: sends the branded customer confirmation after the owner notification is delivered. Never public. |
+| `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO` | Optional sender/reply-to overrides for the customer confirmation (defaults documented in `.env.example`). |
 | `PUBLIC_UMAMI_WEBSITE_ID`, `PUBLIC_GTM_CONTAINER_ID` | Analytics IDs (consent-gated; empty = off). |
 | `PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Optional Cloudflare Turnstile spam protection. |
 | `TRAVEL_ORIGIN`, `ROUTES_PROVIDER`, `ROUTES_API_KEY` | Server-side travel routing for the estimator. |

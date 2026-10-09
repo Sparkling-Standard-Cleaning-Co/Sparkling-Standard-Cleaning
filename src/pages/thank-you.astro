@@ -20,6 +20,23 @@ const phone = contactPhone();
         booking yet. Sparkling Standard reviews every request personally.
       </p>
 
+      <div class="card mt-6" data-request-summary hidden style="text-align:left">
+        <h2 class="card__title">Here's what you submitted</h2>
+        <p class="small text-muted" data-request-summary-kind></p>
+        <dl class="summary-list" data-request-summary-rows></dl>
+        <div class="summary-estimate" data-request-summary-estimate hidden>
+          <p class="summary-estimate__label" data-request-summary-estimate-label></p>
+          <p class="summary-estimate__value" data-request-summary-estimate-value></p>
+          <p class="small text-muted" data-request-summary-estimate-note></p>
+        </div>
+        <p class="small text-muted" data-request-summary-reference hidden></p>
+        <p class="small text-muted mt-4">
+          Final scope, pricing and availability may require confirmation before anything is
+          scheduled. Please don't send payment until we've confirmed an amount and a payment method
+          with you.
+        </p>
+      </div>
+
       <div class="card mt-6 text-center" style="text-align:left">
         <h2 class="card__title">What happens next</h2>
         <ol class="steps" style="gap: var(--space-4); margin-top: var(--space-4)">
@@ -61,3 +78,7 @@ const phone = contactPhone();
     </div>
   </section>
 </BaseLayout>
+
+<script>
+  import '../scripts/thank-you-summary';
+</script>

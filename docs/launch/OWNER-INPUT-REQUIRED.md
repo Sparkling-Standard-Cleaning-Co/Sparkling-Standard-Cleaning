@@ -73,6 +73,21 @@ The full schedule is `docs/marketing/90-DAY-LAUNCH-PLAN.md`; account setup is
 | M6 | Optional: add a GA4 internal-traffic filter for owner devices | Keeps test visits out of reports |
 | M7 | 30-day review (end of week 4) | Compare channels by inquiries, confirmed bookings, completed jobs and recurring customers — not views |
 
+## CUSTOMER CONFIRMATION EMAIL — owner setup (Resend)
+
+The code path is implemented and tested. **Owner-confirmed 2026-10-08: R1 and R2 are complete**
+(`RESEND_API_KEY` set in Cloudflare; `sparkling-standard.com` verified in Resend with DNS
+complete). Remaining: deploy the current build and run the one controlled live test (R4).
+Exact steps: `docs/deployment/DEPLOYMENT.md` §4a; architecture:
+`docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`.
+
+| # | Item | Where | Notes |
+| --- | --- | --- | --- |
+| R1 | Resend account + API key | Cloudflare **Secret** `RESEND_API_KEY` | **Done (owner-confirmed 2026-10-08).** Server-side only; never a `PUBLIC_*` variable, never committed. The lead flow works without it — only the customer email is skipped |
+| R2 | Sender-domain verification | Resend → Domains → `sparkling-standard.com` | **Done (owner-confirmed 2026-10-08):** domain verified, DNS complete. The exact records were added DNS-only; Google Workspace MX/SPF/DKIM untouched |
+| R3 | Optional sender overrides | Cloudflare Text `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO` | Defaults: `Sparkling Standard Cleaning Co. <notifications@sparkling-standard.com>` and `owner@sparkling-standard.com`. Only change to another verified sender |
+| R4 | One controlled live test | Owner-controlled email address | After this build deploys, submit one clearly marked test request and confirm: owner notification arrives, customer confirmation arrives with subject `We received your Sparkling Standard request`, and replying reaches the owner inbox |
+
 ## GIFT CERTIFICATES — owner decisions before sales activate
 
 Online sales are **disabled** (`src/config/gift-certificates.ts` `enabled: false`); the page takes

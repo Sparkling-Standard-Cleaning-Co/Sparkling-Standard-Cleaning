@@ -1,9 +1,14 @@
 # Communication templates
 
 Branded, mobile-readable copy for the three customer communications. Replace `[bracketed]` text;
-never invent facts. These are paste-ready for Gmail (the company's existing tool) — the website's
-free form service notifies the owner only, so outbound messages are sent personally unless and
-until a paid email service is approved.
+never invent facts. These are paste-ready for Gmail (the company's existing tool). The website
+now sends the request acknowledgment automatically — on-page immediately, and by email through
+Resend once configured (`docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`) — so these templates
+remain for personal replies, confirmed-appointment messages and gift-certificate delivery, which
+the website does not send.
+
+Stage vocabulary is fixed by `docs/operations/FINANCIAL-WORKFLOW.md` — a request is never a
+booking.
 
 Related: `docs/operations/RESERVATION-TRACKING.md` (statuses + ledger),
 `docs/operations/GIFT-CERTIFICATES.md` (certificate workflow).
