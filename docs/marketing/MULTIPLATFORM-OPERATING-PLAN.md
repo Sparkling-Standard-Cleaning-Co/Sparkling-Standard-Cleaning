@@ -8,6 +8,7 @@ versions, never separate content factories.
 Companion documents: `docs/marketing/GROWTH-SYSTEM.md` (the growth spine and weekly loop),
 `docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (owner account checklist),
 `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` (production workflow and the proposed series),
+`docs/marketing/CAPCUT-OPERATING-STANDARD.md` (editing environment — CapCut Desktop 9.5.0),
 `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (channel roles and pillars),
 `docs/marketing/PLATFORM-REGISTER.md` (accounts and status),
 `docs/marketing/UTM-MASTER-LINKS.md` / `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md` (tracked
@@ -103,7 +104,7 @@ and one editing block keep it realistic.
 | Wednesday | Publish video 1: Instagram Reel + TikTok + YouTube Short | 25 min |
 | Thursday | Facebook + Nextdoor local post (tip, availability or answer) with its tracked link | 15 min |
 | Friday | Publish video 2 (adapted cut); Pinterest pin + X/Threads repost | 20 min |
-| Saturday | Batch-edit the week's remaining videos in DaVinci Resolve | 45 min |
+| Saturday | Batch-edit the week's remaining videos in CapCut Desktop | 45 min |
 | Sunday | Weekly scorecard (`WEEKLY-SCORECARD.md`) + next week's shot list | 15 min |
 
 Publish the remaining weekly videos on a simple alternating schedule (for example Tuesday/

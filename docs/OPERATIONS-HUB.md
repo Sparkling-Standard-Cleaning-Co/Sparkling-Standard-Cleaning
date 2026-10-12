@@ -230,6 +230,7 @@ partnerships, experiments), `LOCAL-AUTHORITY.md` (GBP/local SEO/PR) and `ECONOMI
 **Marketing:** start with `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` (strategy, two growth
 engines, priorities). Then `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (pillars/roles),
 `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` (proposed series + video workflow),
+`docs/marketing/CAPCUT-OPERATING-STANDARD.md` (editing environment — CapCut Desktop 9.5.0),
 `docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (owner account checklist),
 `docs/marketing/PLATFORM-REGISTER.md` (account status),
 `docs/marketing/90-DAY-LAUNCH-PLAN.md` (schedule), `docs/marketing/LEAD-MEASUREMENT-MODEL.md`

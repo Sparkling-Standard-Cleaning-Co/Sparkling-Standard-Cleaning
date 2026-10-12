@@ -136,7 +136,7 @@ All optional for local development; all documented in `.env.example`.
   audience growth vs. local customer acquisition).
 - Content: `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (pillars/roles) and
   `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` (proposed "30 Days. 30 Details." series, four-week
-  plan, founder brief, iPhone + DaVinci Resolve workflow).
+  plan, founder brief, iPhone + CapCut Desktop 9.5.0 workflow).
 - Accounts: `docs/marketing/PLATFORM-REGISTER.md` (status) and
   `docs/marketing/SOCIAL-ACCOUNT-SETUP.md` (owner checklist and placement record).
 - Measurement: `docs/marketing/LEAD-MEASUREMENT-MODEL.md` (reporting hierarchy) and

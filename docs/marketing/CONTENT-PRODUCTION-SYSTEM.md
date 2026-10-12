@@ -5,10 +5,17 @@ obligation, a production promise or an approved campaign name. The owner approve
 titles and schedule before anything is filmed or published, and all production remains
 owner-operated with **zero additional spending**.
 
+**Owner direction (2026-10-12):** the first production is **Hayli's general founder introduction**;
+next come **2–3 exceptional original videos** (storytelling, personality, unexpected comedy,
+cinematic moments, authentic transformations). **"30 Days. 30 Details." remains proposed** — not a
+commitment to 30 daily videos — and the four-week plan below remains proposed. Editing environment:
+**CapCut Desktop 9.5.0 is the primary editor** (see `docs/marketing/CAPCUT-OPERATING-STANDARD.md`);
+DaVinci Resolve Studio 19 remains a legacy/secondary tool.
+
 This is the production layer beneath `docs/marketing/CONTENT-OPERATING-SYSTEM.md` (channel roles,
 content pillars) and `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` (distribution tiers). It
 covers how an idea becomes a published video: concepts, scripts, shot lists, the iPhone 16 Pro Max
-+ DaVinci Resolve Studio workflow, publishing instructions and measurement.
++ CapCut Desktop 9.5.0 workflow, publishing instructions and measurement.
 
 ## 1. Signature campaign concept — "30 Days. 30 Details." (proposed title)
 
@@ -106,7 +113,7 @@ Every short video follows the same production skeleton (~20–45 seconds):
 On-screen text: one idea per frame, large and readable; captions on every video (most viewers
 watch muted). Burned-in captions plus a clean export without text for platform-native captions.
 
-## 5. Production workflow — iPhone 16 Pro Max + DaVinci Resolve Studio
+## 5. Production workflow — iPhone 16 Pro Max + CapCut Desktop 9.5.0
 
 ### Filming (batch, one session feeds many posts)
 
@@ -120,19 +127,26 @@ watch muted). Burned-in captions plus a clean export without text for platform-n
   macro work; light the work surface from the side/front, never backlit; lock focus/exposure on
   the detail.
 - **Audio:** record Hayli's voice in a quiet room for voiceovers; for on-camera lines, keep the
-  phone close or use the phone's directional audio. Music only from platform-provided libraries
-  (no copyrighted tracks).
+  phone close or use the phone's directional audio. Music and SFX: CapCut library audio is cleared
+  only for CapCut/TikTok placements — use licensed external tracks (for example Pixabay) for
+  Facebook, Instagram, YouTube and website use, and keep a license record per video
+  (`docs/marketing/CAPCUT-OPERATING-STANDARD.md`).
 - **Permission:** never film an identifiable interior without the customer's permission; log the
   permission in the job notes the same day. Full rules: `docs/privacy/PHOTO-PRIVACY-SOP.md`.
 
-### Editing (DaVinci Resolve Studio)
+### Editing (CapCut Desktop 9.5.0)
 
-- One vertical project per episode: **1080×1920, 30 fps** timeline; import originals from the
-  phone; color-match the before/after frames so the reveal is honest.
+- One vertical project per episode: **1080×1920, 30 fps**; import originals from the phone;
+  color-match the before/after frames so the reveal is honest (never fake a result). Proxy mode
+  and hardware acceleration on for 4K footage.
 - Keep a master project per week; cut all of the week's episodes in one editing block.
+- Captions: Auto Captions → correct the transcript → Style tab for one consistent look; import the
+  brand fonts once (local font import is supported on desktop).
 - Export H.264 MP4 at 1080×1920 for short-form channels; export a 1920×1080 version when a
-  platform or embed needs it; archive project files and originals to an external drive.
+  platform or embed needs it; archive exports plus the project draft folder to an external drive
+  (library assets can be delisted — the export is the durable artifact).
 - Naming convention: `SS_YYYYMMDD_<detail-slug>_<vN>` (example: `SS_20261012_faucet-base_v1`).
+- Full tool reference and favorites workflow: `docs/marketing/CAPCUT-OPERATING-STANDARD.md`.
 
 ### One asset → many publications
 

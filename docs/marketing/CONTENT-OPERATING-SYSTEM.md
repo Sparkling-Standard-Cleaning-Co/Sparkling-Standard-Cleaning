@@ -6,7 +6,7 @@ paid ads.
 
 **Production layer (2026-10-03, proposed):** how an idea becomes a published video — the proposed
 "30 Days. 30 Details." series, the four-week plan, the founder introduction brief, the repeatable
-video structure, the iPhone 16 Pro Max + DaVinci Resolve workflow and the publishing/measurement
+video structure, the iPhone 16 Pro Max + CapCut Desktop 9.5.0 workflow and the publishing/measurement
 instructions — lives in `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`. That document is proposed
 until the owner approves it.
 
@@ -92,7 +92,7 @@ generation, forms and the content workflow all run on what already exists.
 | --- | --- |
 | GBP/Listings | $0 (owner-managed) |
 | Domain + hosting | Owned via the Cloudflare project |
-| Content production | iPhone 16 Pro Max + DaVinci Resolve Studio already owned; no new gear or software |
+| Content production | iPhone 16 Pro Max + CapCut Desktop 9.5.0 (primary editor since 2026-10-12; DaVinci Resolve Studio 19 remains a legacy secondary tool) already owned; no new gear or software |
 | Publishing/scheduling | Native, free platform tools only |
 | Print (door hangers/flyers/cards) | Optional and **owner-funded only**; regenerate QR only if the owner orders a print run |
 | Vehicle magnets | Optional; a clean sign is acceptable |
