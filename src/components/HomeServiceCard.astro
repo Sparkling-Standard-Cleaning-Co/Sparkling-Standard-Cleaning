@@ -1,0 +1,37 @@
+---
+import Icon from './Icon.astro';
+import type { IconName } from '../lib/icons';
+
+interface Props {
+  title: string;
+  summary: string;
+  paragraphs: string[];
+  href: string;
+  icon: IconName;
+  cta?: string;
+  featured?: boolean;
+}
+
+const {
+  title,
+  summary,
+  paragraphs,
+  href,
+  icon,
+  cta = 'Explore this service',
+  featured = false,
+} = Astro.props;
+
+const copy = paragraphs.length > 0 ? paragraphs : [summary];
+---
+
+<article class:list={['card', 'service-card', 'service-card--row', featured && 'card--feature']}>
+  <div class="service-card__head">
+    <span class="card__icon"><Icon name={icon} /></span>
+    <h3 class="card__title"><a href={href}>{title}</a></h3>
+  </div>
+  <div class="service-card__body">
+    {copy.map((paragraph) => <p class="card__text">{paragraph}</p>)}
+    <a class="card__more" href={href}>{cta} <Icon name="arrow-right" size={16} /></a>
+  </div>
+</article>

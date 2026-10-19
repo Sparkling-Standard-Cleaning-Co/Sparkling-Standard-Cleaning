@@ -3,6 +3,8 @@ title: Short-term Rental Turnover Cleaning
 metaTitle: Airbnb & Vrbo Turnover Cleaning in Pensacola | STR Cleaning
 metaDescription: Premium short-term rental turnover cleaning for Pensacola-area Airbnb, Vrbo and vacation rental hosts — linen resets, consumable checks, completion photos and issue reporting.
 summary: A complete turnover service for Airbnb and Vrbo hosts that protects your reviews and keeps bookings coming. More than a quick clean, we provide a reset between guests to help ensure your rental is sanitary, refreshed, and ready for the next arrival.
+homepageParagraphs:
+  - A complete turnover service for Airbnb and Vrbo hosts that protects your reviews and keeps bookings coming. More than a quick clean, we provide a reset between guests to help ensure your rental is sanitary, refreshed, and ready for the next arrival.
 icon: key
 order: 5
 path: /short-term-rental-cleaning/

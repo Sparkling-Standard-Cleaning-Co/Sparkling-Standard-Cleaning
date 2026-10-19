@@ -1007,13 +1007,47 @@ li + li {
   line-height: 1.65;
 }
 
-@media (min-width: 56rem) {
-  .services-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.service-card .card__text + .card__text {
+  margin-top: var(--space-3);
+}
 
-  .services-grid > :last-child:nth-child(odd) {
-    grid-column: 1 / -1;
+.service-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* Full-width horizontal cards keep the complete approved copy readable and
+   avoid one short card stretching to match a much longer neighbour. */
+.service-card--row {
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.8fr) minmax(0, 1.7fr);
+  gap: var(--space-7);
+  align-items: start;
+}
+
+.service-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.service-card__head .card__title {
+  margin: 0;
+}
+
+.service-card__body {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.service-card__body .card__more {
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 55.99rem) {
+  .service-card--row {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
   }
 }
 

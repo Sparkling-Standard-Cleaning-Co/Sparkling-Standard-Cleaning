@@ -38,6 +38,12 @@ const services = defineCollection({
     metaTitle: z.string().optional(),
     metaDescription: z.string(),
     summary: z.string(),
+    /**
+     * Full owner-approved service copy for the homepage. This is deliberately
+     * separate from the SEO/meta summary and the service-page excerpt so the
+     * homepage can carry Hayli's complete descriptions verbatim.
+     */
+    homepageParagraphs: z.array(z.string()).default([]),
     icon: iconEnum,
     order: z.number().int(),
     /** Public top-level path this service owns (trailing slash). */

@@ -37,6 +37,10 @@ Frontmatter drives the page structure:
 - `faqIds` → FAQ entries shown on the page (ids = FAQ filenames without `.md`)
 - `related` → related service paths
 - `checklistId` → matching checklist entry (only `visibility: public` renders)
+- `homepageParagraphs` → the complete owner-approved copy shown on the homepage.
+  This is deliberately separate from `summary` (SEO excerpts and related-service cards);
+  put every approved paragraph here, including Deep Cleaning's recurring prerequisite.
+  `npm run validate` checks the rendered homepage copy.
 
 The Markdown body is the long-form content under the hero.
 

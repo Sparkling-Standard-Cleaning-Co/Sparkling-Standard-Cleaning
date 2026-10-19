@@ -24,6 +24,7 @@ function run(label, script, scriptArgs = []) {
 
 run('internal links', 'scripts/links.mjs');
 run('SEO', 'scripts/verify-seo.mjs');
+run('homepage audit copy', 'scripts/check-homepage-audit.mjs');
 run('marketing registry + QR verification', 'scripts/generate-marketing-links.mjs', ['--check']);
 run('GTM import artifacts', 'scripts/generate-gtm-import.mjs', ['--check']);
 

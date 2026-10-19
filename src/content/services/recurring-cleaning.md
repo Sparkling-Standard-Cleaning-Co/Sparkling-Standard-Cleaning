@@ -3,6 +3,8 @@ title: Recurring Residential Cleaning
 metaTitle: Recurring Residential Cleaning in Pensacola & Cantonment
 metaDescription: Recurring weekly, biweekly, and monthly residential cleaning for Pensacola and Cantonment homes. Every new recurring arrangement begins with a required Deep Cleaning.
 summary: A consistent, scheduled cleaning that keeps your home maintained, tidy, and sparkling. Choose a weekly, biweekly, or monthly schedule to keep your home looking its best.
+homepageParagraphs:
+  - A consistent, scheduled cleaning that keeps your home maintained, tidy, and sparkling. Choose a weekly, biweekly, or monthly schedule to keep your home looking its best.
 icon: refresh
 order: 1
 path: /recurring-cleaning/

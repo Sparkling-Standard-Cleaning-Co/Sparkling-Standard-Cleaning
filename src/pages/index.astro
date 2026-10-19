@@ -2,7 +2,7 @@
 import { Image } from 'astro:assets';
 import { getCollection, getEntry } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import ServiceCard from '../components/ServiceCard.astro';
+import HomeServiceCard from '../components/HomeServiceCard.astro';
 import TrustChips from '../components/TrustChips.astro';
 import FaqItem from '../components/FaqItem.astro';
 import Checklist from '../components/Checklist.astro';
@@ -100,15 +100,15 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
         <h2>{data.servicesIntro?.heading}</h2>
         {data.servicesIntro?.lead && <p class="lead">{data.servicesIntro.lead}</p>}
       </div>
-      <div class="grid grid--2 services-grid">
+      <div class="service-list">
         {
           services.map((service) => (
-            <ServiceCard
+            <HomeServiceCard
               title={service.data.title}
               summary={service.data.summary}
+              paragraphs={service.data.homepageParagraphs}
               href={service.data.path}
               icon={service.data.icon}
-              cta="Explore this service"
               featured={service.data.path === '/recurring-cleaning/'}
             />
           ))
