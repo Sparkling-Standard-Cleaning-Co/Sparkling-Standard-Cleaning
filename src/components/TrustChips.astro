@@ -1,9 +1,10 @@
 ---
 import Icon from './Icon.astro';
 import type { IconName } from '../lib/icons';
+import { business } from '../config/business';
 
-// Honest trust/positioning statements derived from owner-approved facts.
-// Never add numbers, guarantees, credentials or claims here without approval.
+// The four owner-approved supporting statements for "The difference, in one
+// thought." Wording is Hayli's; do not rewrite or add claims.
 
 interface TrustItem {
   icon: IconName;
@@ -18,23 +19,23 @@ interface Props {
 const defaultItems: TrustItem[] = [
   {
     icon: 'star',
-    title: 'Detail-first cleaning',
-    text: 'The small things get noticed here — fingerprints, buildup and spots a quick clean walks past.',
+    title: 'Details matter',
+    text: 'The small things get noticed here — fingerprints, buildup, and neglected areas.',
   },
   {
     icon: 'heart',
-    title: 'Owner-operated',
-    text: 'Your cleaning is done by the founder, with an occasional trusted helper alongside her — never a rotating crew.',
+    title: 'Owner operated',
+    text: 'Your cleaning is done by the owner, occasionally alongside a trusted partner — never a rotating crew.',
   },
   {
     icon: 'clipboard',
-    title: 'Every request reviewed personally',
-    text: 'Dates, scope and price are confirmed by Sparkling Standard before anything is booked. No auto-generated appointments.',
+    title: 'Requests reviewed personally',
+    text: 'Appointments are not automatically generated. Dates, scopes, and prices are confirmed by the owner of Sparkling Standard before anything is booked.',
   },
   {
     icon: 'calendar',
-    title: 'Seven days a week',
-    text: 'Morning through early evening, with flexible scheduling for commercial accounts.',
+    title: 'Flexible scheduling',
+    text: `We are open ${business.hours.days.toLowerCase()}, ${business.hours.residentialWindow}.`,
   },
 ];
 

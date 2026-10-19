@@ -35,11 +35,11 @@ export interface RequestSummary {
 }
 
 const SERVICE_LABELS: Record<string, string> = {
-  standard: 'House cleaning (standard)',
+  standard: 'Residential house cleaning',
   deep: 'Deep cleaning',
-  move_in_out: 'Move-in / move-out cleaning',
+  move_in_out: 'Move-in and move-out cleaning',
   str_turnover: 'Short-term rental turnover',
-  house: 'House cleaning (standard)',
+  house: 'Residential house cleaning',
 };
 
 const FREQUENCY_LABELS: Record<string, string> = {
@@ -213,6 +213,12 @@ export function buildRequestSummary(fields: Record<string, string>): RequestSumm
   if (frequency) {
     const label = FREQUENCY_LABELS[frequency] ?? humanizeKey(frequency);
     add(text(fields, 'turnover_frequency') ? 'Turnovers' : 'Frequency', label);
+    if (
+      text(fields, 'service_type') === 'standard' &&
+      ['weekly', 'biweekly', 'monthly'].includes(frequency)
+    ) {
+      add('First visit', 'Deep Cleaning (required)');
+    }
   }
   if (kind === 'gift') {
     add('Recipient', text(fields, 'recipient_name'));

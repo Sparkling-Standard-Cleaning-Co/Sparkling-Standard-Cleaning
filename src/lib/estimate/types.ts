@@ -57,6 +57,7 @@ export type FlagSeverity = 'info' | 'review' | 'block';
 export interface EstimateFlag {
   code:
     | 'CUSTOM_CONFIRMATION_REQUIRED'
+    | 'INITIAL_DEEP_CLEAN_REQUIRED'
     | 'INITIAL_DETAILED_CLEAN_SUGGESTED'
     | 'MINIMUM_JOB_APPLIED'
     | 'EXTENDED_AREA_CONFIRMATION'

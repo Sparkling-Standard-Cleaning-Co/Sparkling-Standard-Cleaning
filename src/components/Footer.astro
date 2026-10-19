@@ -1,6 +1,6 @@
 ---
 import { business, isPending, siteName } from '../config/business';
-import { footerServicesNav, footerCompanyNav, footerResourcesNav } from '../lib/site';
+import { footerServicesNav, footerCompanyNav } from '../lib/site';
 import Logo from './Logo.astro';
 import SocialLinks from './SocialLinks.astro';
 
@@ -15,33 +15,38 @@ const socialEntries = Object.values(business.socials).filter(
 <footer class="site-footer">
   <div class="container">
     <div class="site-footer__grid">
-      <div>
+      <div class="site-footer__brand">
         <Logo class="brand" />
-        <p class="small" style="margin-top: var(--space-4)">
-          {business.serviceArea.summary}
-        </p>
+        {
+          socialEntries.length > 0 && (
+            <section class="social-follow social-follow--bubble" data-social-follow aria-labelledby="social-follow-heading">
+              <h2 class="social-follow__title" id="social-follow-heading">Follow Us</h2>
+              <p class="social-follow__copy">Follow along for updates and a closer look at our work.</p>
+              <SocialLinks />
+            </section>
+          )
+        }
+        <p class="small site-footer__area">{business.serviceArea.summary}</p>
         {preview && <p class="small"><span class="pending-badge">Pre-launch preview</span></p>}
       </div>
 
-      <div>
-        <h3>Services</h3>
-        <ul>
-          {footerServicesNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
-        </ul>
+      <div class="site-footer__middle">
+        <div>
+          <h3>Services</h3>
+          <ul>
+            {footerServicesNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+          </ul>
+        </div>
+
+        <div>
+          <h3>Company</h3>
+          <ul>
+            {footerCompanyNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+          </ul>
+        </div>
       </div>
 
-      <div>
-        <h3>Company</h3>
-        <ul>
-          {footerCompanyNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
-        </ul>
-        <h3 style="margin-top: var(--space-5)">Resources</h3>
-        <ul>
-          {footerResourcesNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
-        </ul>
-      </div>
-
-      <div>
+      <div class="site-footer__contact">
         <h3>Contact</h3>
         <ul>
           {
@@ -85,20 +90,6 @@ const socialEntries = Object.values(business.socials).filter(
         </ul>
       </div>
     </div>
-
-    {
-      socialEntries.length > 0 && (
-        <section class="social-follow" data-social-follow aria-labelledby="social-follow-heading">
-          <div class="social-follow__intro">
-            <h2 class="social-follow__title" id="social-follow-heading">Follow Us</h2>
-            <p class="social-follow__copy">
-              Follow along for updates and a closer look at our work.
-            </p>
-          </div>
-          <SocialLinks />
-        </section>
-      )
-    }
 
     <div class="site-footer__bottom">
       <span>© {year} {siteName()} All rights reserved.</span>

@@ -472,6 +472,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
         input.serviceType ? SERVICE_LABELS[input.serviceType as ServiceType] : '',
       );
       addSummaryRow(reservationScope, 'Frequency', input.frequency ? FREQUENCY_LABELS[input.frequency as keyof typeof FREQUENCY_LABELS] : '');
+      if (requiresInitialDeepClean()) {
+        addSummaryRow(reservationScope, 'First visit', 'Deep Cleaning (required)');
+      }
       const homeParts = [
         input.propertyType ? input.propertyType.charAt(0).toUpperCase() + input.propertyType.slice(1) : '',
         input.squareFeet ? `${input.squareFeet.toLocaleString()} sqft` : '',
@@ -682,6 +685,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
     // Hidden manual fields never block a GPS-based request.
     if (submission.method === 'gps' && (field.id === 'est-address' || field.id === 'est-zip')) return null;
     const value = field.value.trim();
+    if (field instanceof HTMLInputElement && field.type === 'checkbox') {
+      return field.required && !field.checked
+        ? field.dataset.errorRequired ?? 'Please confirm this requirement to continue.'
+        : null;
+    }
     if (field.id === 'est-zip') {
       return /^\d{5}(-\d{4})?$/.test(value) ? null : 'Please enter a valid ZIP code.';
     }
@@ -836,7 +844,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return true;
   }
 
-  // ── STR-specific fields ───────────────────────────────────────────────────
+  // ── Conditional fields and owner policies ────────────────────────────────
+  function requiresInitialDeepClean(): boolean {
+    return radioValue('serviceType') === 'standard' && RECURRING_FREQUENCIES.has(textValue('frequency') ?? '');
+  }
+
   function syncConditionalFields(): void {
     const isStr = radioValue('serviceType') === 'str_turnover';
     for (const wrapper of form.querySelectorAll<HTMLElement>('[data-str-only]')) {
@@ -844,6 +856,16 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     const bedsInput = form.querySelector<HTMLInputElement>('input[name="beds"]');
     if (bedsInput) bedsInput.required = isStr;
+
+    const deepRequired = requiresInitialDeepClean();
+    for (const wrapper of form.querySelectorAll<HTMLElement>('[data-recurring-deep]')) {
+      wrapper.hidden = !deepRequired;
+    }
+    const acknowledged = form.querySelector<HTMLInputElement>('input[name="initialDeepCleanAcknowledged"]');
+    if (acknowledged) {
+      acknowledged.required = deepRequired;
+      if (!deepRequired) acknowledged.checked = false;
+    }
   }
 
   // ── Travel lookup ─────────────────────────────────────────────────────────
@@ -1033,6 +1055,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
       phone: textValue('phone') ?? '',
       email: textValue('email') ?? '',
     };
+    if (requiresInitialDeepClean()) {
+      const acknowledged = form.querySelector<HTMLInputElement>('input[name="initialDeepCleanAcknowledged"]');
+      fields.initial_deep_clean_acknowledged = acknowledged?.checked ? 'yes' : 'no';
+    }
     if (isReservation && latestQuote) {
       fields.quoted_price = String(latestQuote.amount);
       fields.quote_reference = latestQuote.reference;

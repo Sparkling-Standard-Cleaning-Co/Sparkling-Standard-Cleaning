@@ -51,19 +51,22 @@ for (const width of [1024, 1280, 1440, 1680]) {
   test(`desktop header fits and aligns at ${width}px`, async () => {
     const { context, page } = await open('/', width);
     try {
-      // About is a first-class desktop navigation item.
+      // Types of Cleanings and About are the two primary desktop items.
       const about = page.locator('.site-nav__links a[href="/about/"]');
       assert.equal(await about.isVisible(), true, 'About link visible in desktop nav');
       assert.equal((await about.textContent())?.trim(), 'About');
+      const types = page.locator('.site-nav__links .nav-dropdown__trigger');
+      assert.equal(await types.isVisible(), true, 'Types of Cleanings dropdown visible');
+      assert.match((await types.textContent())?.trim() ?? '', /^Types of Cleanings/);
 
       // Every label shares one vertical centerline and a single-line height.
-      const boxes = await page.locator('.site-nav__links a').evaluateAll((links) =>
-        links.map((link) => {
-          const rect = link.getBoundingClientRect();
+      const boxes = await page.locator('.site-nav__links > li').evaluateAll((items) =>
+        items.map((item) => {
+          const rect = item.getBoundingClientRect();
           return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
         }),
       );
-      assert.equal(boxes.length, 6, 'six primary navigation links');
+      assert.equal(boxes.length, 2, 'two primary navigation items');
       const centers = boxes.map(centerY);
       const firstCenter = centers[0];
       for (const center of centers) {
@@ -104,33 +107,53 @@ for (const width of [1024, 1280, 1440, 1680]) {
   });
 }
 
-test('the brand lockup carries the full identity and links home', async () => {
+test('the circular brand mark carries the full identity and links home', async () => {
   const { context, page } = await open('/', 1280, 900);
   try {
     const brand = page.locator('.site-header .brand');
     assert.equal(await brand.getAttribute('href'), '/');
-    assert.equal(await brand.locator('.brand__crest svg').count(), 1, 'crest mark present');
-    assert.equal((await brand.locator('.brand__sparkling').textContent())?.trim(), 'Sparkling');
-    assert.equal((await brand.locator('.brand__standard').textContent())?.trim(), 'Standard');
-    assert.match((await brand.locator('.brand__descriptor').textContent()) ?? '', /Cleaning Co\./);
-    assert.match((await brand.locator('.brand__tagline').textContent()) ?? '', /Details Are Our Standard/i);
+    const logo = brand.locator('.brand__logo svg');
+    assert.equal(await logo.count(), 1, 'circular logo present');
+    const logoText = (await logo.textContent()) ?? '';
+    assert.match(logoText, /Sparkling/, 'script word present');
+    assert.match(logoText, /STANDARD/, 'STANDARD present');
+    assert.match((await brand.getAttribute('aria-label')) ?? '', /Sparkling Standard Cleaning Co\./);
     assert.match((await brand.getAttribute('aria-label')) ?? '', /home/i);
-    // One of the two prepared treatments is applied (romantic script is default).
-    assert.match(
-      (await brand.locator('.brand__text').getAttribute('class')) ?? '',
-      /brand__text--(soft-serif|romantic-script)/,
+    assert.equal(await brand.locator('.brand__descriptor').count(), 0, 'Cleaning Co. removed from the visual logo');
+    assert.equal(await brand.locator('.brand__tagline').count(), 0, 'tagline removed from the visual logo');
+  } finally {
+    await context.close();
+  }
+});
+
+test('Types of Cleanings exposes the five approved cleaning categories', async () => {
+  const { context, page } = await open('/', 1280, 900);
+  try {
+    await page.locator('.nav-dropdown__trigger').click();
+    const links = page.locator('.nav-dropdown__menu a');
+    assert.equal(await links.count(), 5, 'five cleaning categories');
+    const labels = await links.allTextContents();
+    assert.deepEqual(
+      labels.map((label) => label.trim()),
+      [
+        'Recurring Residential Cleaning',
+        'Deep Cleaning',
+        'Move-in and Move-out Cleaning',
+        'Short-term Rental Turnover Cleaning',
+        'Commercial Cleaning',
+      ],
     );
   } finally {
     await context.close();
   }
 });
 
-test('the compact mobile brand stays readable without the header tagline', async () => {
+test('the compact mobile brand stays readable without descriptor or tagline', async () => {
   const { context, page } = await open('/', 390, 844);
   try {
-    assert.equal(await page.locator('.site-header .brand__tagline').isVisible(), false, 'tagline hides on compact phones');
-    assert.equal(await page.locator('.site-header .brand__descriptor').isVisible(), true, 'Cleaning Co. stays visible');
-    assert.equal(await page.locator('.site-header .brand__crest svg').isVisible(), true, 'crest stays visible');
+    assert.equal(await page.locator('.site-header .brand__logo').isVisible(), true, 'circular logo visible');
+    assert.equal(await page.locator('.site-header .brand__descriptor').count(), 0, 'Cleaning Co. is not in the mark');
+    assert.equal(await page.locator('.site-header .brand__tagline').count(), 0, 'tagline is not in the mark');
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );

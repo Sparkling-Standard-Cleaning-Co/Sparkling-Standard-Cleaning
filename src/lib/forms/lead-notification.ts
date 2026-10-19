@@ -19,11 +19,11 @@
 //  - The customer's notes are passed through verbatim.
 
 const SERVICE_LABELS: Record<string, string> = {
-  standard: 'House cleaning (standard)',
+  standard: 'Residential house cleaning',
   deep: 'Deep cleaning',
-  move_in_out: 'Move-in / move-out cleaning',
+  move_in_out: 'Move-in and move-out cleaning',
   str_turnover: 'Short-term rental turnover',
-  house: 'House cleaning (standard)',
+  house: 'Residential house cleaning',
 };
 
 const REQUEST_LABELS: Record<string, string> = {
@@ -418,6 +418,9 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
     actions.push('Schedule the walkthrough');
   }
   if (text(fields, 'turnover_frequency')) actions.push('Confirm turnover details and the first date');
+  if (text(fields, 'initial_deep_clean_required') === 'yes') {
+    actions.push('Initial Deep Cleaning required before recurring maintenance service');
+  }
   add('Summary — Action', actions.join(' · '));
 
   // ── A. New cleaning inquiry ─────────────────────────────────────────────
@@ -428,6 +431,18 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   const preferredDate = text(fields, 'preferred_date', 'walkthrough_date');
   add('Inquiry — Preferred date', preferredDate, 'preferred_date', 'walkthrough_date');
   add('Inquiry — Estimate status', text(fields, 'estimate_status'), 'estimate_status');
+  if (text(fields, 'initial_deep_clean_required') === 'yes') {
+    add(
+      'Inquiry — Initial Deep Cleaning',
+      'REQUIRED before recurring residential maintenance service',
+      'initial_deep_clean_required',
+    );
+    add(
+      'Inquiry — Deep Cleaning acknowledged',
+      YES_NO_LABELS[text(fields, 'initial_deep_clean_acknowledged')] ?? text(fields, 'initial_deep_clean_acknowledged'),
+      'initial_deep_clean_acknowledged',
+    );
+  }
 
   // ── B. Customer contact ─────────────────────────────────────────────────
   add('Contact — Name', text(fields, 'name'), 'name');

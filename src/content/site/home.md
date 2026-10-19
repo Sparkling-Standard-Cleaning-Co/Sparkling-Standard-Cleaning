@@ -1,85 +1,37 @@
 ---
-metaTitle: Cleaning That Notices the Little Things | Pensacola & Cantonment
-metaDescription: Thoughtful residential and commercial cleaning for Pensacola, Cantonment and surrounding communities. Get a proposed cleaning price and see why the details matter.
+metaTitle: Sparkling Standard Cleaning Co. | Pensacola & Cantonment
+metaDescription: Professional owner-operated residential and commercial cleaning for Pensacola, Cantonment, and surrounding communities. Explore five cleaning services and get an instant estimate.
 hero:
-  headline: A cleaning company that notices
-  accent: the little things.
-  lead: Professional residential and commercial cleaning for Pensacola, Cantonment and surrounding communities — planned with enough time to actually do it right.
-  ctaLabel: Get Instant Estimate
+  headline: The cleaning company that leaves your space
+  highlight: Sparkling
+  lead: Professional owner-operated residential and commercial cleaning for Pensacola, Cantonment, and surrounding communities.
+  ctaLabel: Instant Estimate
 servicesIntro:
-  eyebrow: What we clean
-  heading: A service for every kind of space
-  lead: Seven services, each with its own owning page and its own honest scope — no buried details, no one-size-fits-all promises.
-recurringPlans:
-  eyebrow: Recurring cleaning
-  heading: Pick a rhythm that keeps your home consistently fresh
-  text: The longer a home stays maintained, the less time each visit takes — so recurring pricing reflects real labor efficiency, not a one-time reset. Choose a rhythm below and the estimate starts there.
-  linkLabel: How recurring cleaning works
-  items:
-    - title: Weekly
-      frequency: weekly
-      text: The most consistent result for busy homes and pets — and the strongest per-visit value.
-    - title: Every two weeks
-      frequency: biweekly
-      text: A dependable balance of a fresh home and a sensible budget for family homes.
-    - title: Monthly
-      frequency: monthly
-      text: For lighter homes and smaller spaces that need a consistent touch.
-founderBand:
-  eyebrow: The difference
-  heading: Built around noticing what rushed cleaning walks past
-  paragraphs:
-    - Our founder grew up around cleaning — a grandmother who owned a cleaning business, shifts alongside family, then established local companies where she worked directly with customers and inspected the quality of the work.
-    - What she kept seeing was a production model that values speed over care. Homes deserve better than that. This company exists to deliver cleaning where the small things are actually noticed — the fingerprint on the switch plate, the buildup behind the faucet, the toothbrush holder nobody cleans.
-    - She is young, and she is experienced. Both are true. The standards come from real professional work, and the ambition comes from knowing exactly what she wants to build.
-  linkLabel: Meet our founder
+  heading: Our Services
+  lead: Sparkling Standard offers five distinct cleaning services, each with its own scope and level of care, so you can find the right fit for your space.
 estimateBand:
   eyebrow: The estimate
-  heading: See your estimated range in about a minute
-  text: A few quick questions about your home, an honest range built on real labor math, and a request that Sparkling Standard reviews personally before anything is confirmed.
-  ctaLabel: Start my estimate
-recurringBand:
-  eyebrow: Recurring cleaning
-  heading: The easy way to keep a home consistently fresh
-  text: Weekly, biweekly or monthly visits from the same cleaner who learns your home — with better per-visit value as the home stays maintained.
-  linkLabel: Explore recurring cleaning
-strBand:
-  eyebrow: Short-term rentals
-  heading: Turnovers that protect your reviews
-  text: A complete reset between guests — linens, consumables, verification photos and issue reporting — built for hosts who can't afford an off day.
-  linkLabel: See turnover service
-moveoutBand:
-  eyebrow: Moving?
-  heading: Move-out cleaning built around the walkthrough
-  text: When the home is empty, everything shows. We clean the inside of cabinets, the appliances and the details that decide how a walkthrough goes.
-  linkLabel: Get a move-out estimate
-commercialBand:
-  eyebrow: Commercial
-  heading: A facility standard you can hold us to
-  text: Walkthrough-based scopes, flexible scheduling around your hours, and consistent execution for offices, churches, salons, gyms, retail and more.
-  linkLabel: Request a walkthrough
-proof:
-  eyebrow: Detail proof
-  heading: Proof, not polished marketing
-  lead: Real work, real conditions, real results — published only with customer permission, never staged.
-process:
-  eyebrow: How it works
-  heading: From estimate to confirmed booking
-  steps:
-    - title: Tell us about your home
-      text: A short, mobile-friendly flow — no thirty-field interrogation for a recurring clean.
-    - title: See your estimated range
-      text: An honest range built on real labor math, with clear notes on anything that needs personal confirmation.
-    - title: Request your preferred date
-      text: Pick your date and arrival preference, add notes or photos if they help, and send your request.
-    - title: We confirm everything
-      text: Sparkling Standard reviews scope, condition and schedule, then confirms your date and final price. Only then is it booked.
+  heading: Ready for your home to sparkle?
+  text: Get an estimated quote in around one minute.
+  body: After you are guided through a few quick questions, our estimating software will present you with a practical pricing range, built mathematically. When you move forward, a service request is sent to Sparkling Standard, where your quote is personally reviewed and approved before confirmation.
+  ctaLabel: Instant Estimate
+founderBand:
+  heading: The difference
+  paragraphs:
+    - Our founder grew up around cleaning — from a grandmother who owned her own cleaning business to working alongside family, then building experience with established local cleaning companies. She coordinated directly with customers and inspected the quality of work firsthand, gaining an inside perspective on the industry.
+    - Over time, she repeatedly saw speed and profit being prioritized over care and quality. Homeowners deserve better than that.
+    - "Sparkling Standard exists for this reason: to create spaces so clean they amaze, where the small things are actually noticed. The fingerprints on the switch plate, the buildup behind the faucet, the spattered toothbrush holder nobody notices."
+    - Our founder’s standards are shaped from her hands-on experience, a firsthand understanding of where cleaning services can fall short, and her genuine passion for transforming untidy spaces into clean, polished sanctuaries.
+    - "Her ambition comes from knowing exactly what she wants to build: a company devoted to delivering the highest quality of work, where care is never sacrificed, and the details always matter."
+  linkLabel: Meet Our Founder
 areaBand:
   eyebrow: Service area
-  heading: Serving Pensacola, Cantonment and beyond
-  text: Proudly local to Pensacola and Cantonment, with surrounding communities day to day and select nearby service into Alabama by arrangement.
-finalCta:
-  heading: Ready for a home that feels handled?
-  text: Start with the estimate — it costs nothing and tells you honestly what your home needs.
+  heading: Serving Pensacola, Cantonment, and beyond
+  text: Proudly local to the Pensacola/Cantonment area, servicing surrounding Florida and Alabama communities depending on distance.
+homeFaqIds:
+  - how-estimate-works
+  - minimum-and-pricing
+  - payment-timing
+  - estimate-vs-final-price
 sections: []
 ---

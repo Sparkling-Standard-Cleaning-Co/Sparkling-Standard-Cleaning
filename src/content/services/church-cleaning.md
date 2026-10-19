@@ -56,7 +56,7 @@ After the walkthrough you'll receive a clear scope and quote: what's cleaned, ho
 
 ## Scheduling around church life
 
-Weekday cleaning between services is the usual rhythm; larger preparation cleanings can be scheduled before Easter, Christmas and community events. Evening and early-morning windows are available when the building's calendar requires them. Tell us how your building operates — the schedule is built to fit it, not the other way around.
+Weekday cleaning between services is the usual rhythm; larger preparation cleanings can be scheduled before Easter, Christmas and community events. Windows within our published hours, 7:00 a.m. – 7:00 p.m., seven days a week, are available when the building's calendar requires them. Tell us how your building operates — the schedule is built to fit it, not the other way around.
 
 ## Volunteers deserve backup
 

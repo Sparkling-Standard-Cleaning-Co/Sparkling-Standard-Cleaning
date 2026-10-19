@@ -90,6 +90,7 @@ async function waitForTurnstileToken(timeoutMs = 10_000): Promise<string | undef
 /** Maps a relay error body/status to a distinct, actionable failure reason. */
 function relayFailureReason(status: number, error: string): FailureReason {
   if (error === 'verification_failed') return 'verification_failed';
+  if (error === 'deep_clean_required') return 'deep_clean_required';
   if (error === 'spam_rejected' || status === 403) return 'spam_rejected';
   if (error === 'invalid_request' || status === 400 || status === 422) return 'invalid_request';
   return 'server_error';

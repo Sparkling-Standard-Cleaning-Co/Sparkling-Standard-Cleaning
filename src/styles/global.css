@@ -413,6 +413,30 @@ li + li {
   flex: none;
 }
 
+/* The circular mark contains the complete wordmark, ring and sparkles. */
+.brand__logo {
+  display: block;
+  width: 3.8rem;
+  height: 3.8rem;
+  flex: none;
+}
+
+.brand__logo svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.site-footer .brand {
+  --brand-logo-primary: var(--color-rose-300);
+  --brand-logo-secondary: var(--color-cream-100);
+}
+
+.site-footer .brand__logo {
+  width: 7.5rem;
+  height: 7.5rem;
+}
+
 .brand__crest {
   display: block;
   width: 2.9rem;
@@ -578,6 +602,16 @@ li + li {
     gap: var(--space-2);
   }
 
+  .brand__logo {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .site-footer .brand__logo {
+    width: 5.5rem;
+    height: 5.5rem;
+  }
+
   .brand__crest {
     width: 2.5rem;
     height: 2.5rem;
@@ -693,6 +727,77 @@ li + li {
     color: var(--color-rose-700);
     background: var(--color-rose-50);
   }
+
+  .nav-dropdown {
+    position: relative;
+  }
+
+  .nav-dropdown__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 2.75rem;
+    padding-inline: 0.55rem;
+    border-radius: var(--radius-md);
+    color: var(--color-ink-800);
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+    list-style: none;
+    white-space: nowrap;
+  }
+
+  .nav-dropdown__trigger::-webkit-details-marker {
+    display: none;
+  }
+
+  .nav-dropdown__trigger:hover,
+  .nav-dropdown__trigger[aria-current='page'],
+  .nav-dropdown[open] > .nav-dropdown__trigger {
+    color: var(--color-rose-700);
+    background: var(--color-rose-50);
+  }
+
+  .nav-dropdown__trigger svg {
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .nav-dropdown[open] .nav-dropdown__trigger svg {
+    transform: rotate(180deg);
+  }
+
+  .nav-dropdown__menu {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    left: 0;
+    z-index: 60;
+    min-width: 19rem;
+    margin: 0;
+    padding: var(--space-2);
+    list-style: none;
+    display: grid;
+    gap: 0.15rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+  }
+
+  .nav-dropdown__menu a {
+    display: block;
+    padding: 0.65rem 0.75rem;
+    border-radius: var(--radius-md);
+    color: var(--color-ink-800);
+    text-decoration: none;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+  }
+
+  .nav-dropdown__menu a:hover,
+  .nav-dropdown__menu a[aria-current='page'] {
+    color: var(--color-rose-700);
+    background: var(--color-rose-50);
+  }
 }
 
 /* Narrow desktop: the phone number button would force the nav to wrap; the
@@ -764,6 +869,26 @@ li + li {
   color: var(--color-rose-700);
 }
 
+.mobile-nav__group {
+  margin-bottom: var(--space-4);
+}
+
+.mobile-nav__group-label {
+  margin: 0 0 var(--space-2);
+  padding-inline: var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.mobile-nav__links--nested a {
+  min-height: 2.75rem;
+  padding-left: var(--space-5);
+  font-weight: var(--weight-regular);
+}
+
 @media (min-width: 62rem) {
   .mobile-nav[data-open='true'] {
     display: none;
@@ -802,6 +927,107 @@ li + li {
   display: block;
   color: var(--color-rose-700);
   font-style: italic;
+}
+
+.hero__sparkle-word {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18em;
+  color: var(--color-rose-600);
+  font-family: 'Great Vibes', 'Parisienne', var(--font-display), cursive;
+  font-size: 1.12em;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  padding-inline: 0.04em;
+  white-space: nowrap;
+}
+
+.hero__sparkle-icon {
+  width: 0.42em;
+  height: 0.42em;
+  flex: none;
+  fill: var(--color-champagne-500);
+}
+
+.hero__sparkle-icon--small {
+  width: 0.24em;
+  height: 0.24em;
+  margin-top: -0.35em;
+}
+
+/* ── "The difference, in one thought" ───────────────────────────────────── */
+.difference-intro__grid {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.difference-intro__heading {
+  margin: 0;
+  max-width: 16ch;
+}
+
+.difference-intro__copy {
+  max-width: 62ch;
+}
+
+.difference-intro__copy p:first-child {
+  margin-top: 0;
+}
+
+.difference-intro__copy p:last-child {
+  margin-bottom: 0;
+}
+
+@media (min-width: 56rem) {
+  .difference-intro__grid {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.5fr);
+    gap: var(--space-7);
+  }
+}
+
+/* ── Homepage estimate band ─────────────────────────────────────────────── */
+.estimate-card {
+  padding: clamp(1.5rem, 4vw, 2.75rem);
+}
+
+.estimate-card__grid {
+  align-items: center;
+}
+
+.estimate-assurances {
+  margin: 0;
+  font-weight: var(--weight-semibold);
+}
+
+/* The five approved service descriptions are longer than the old cards. */
+.service-card .card__text {
+  font-size: var(--text-base);
+  line-height: 1.65;
+}
+
+@media (min-width: 56rem) {
+  .services-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .services-grid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* On the homepage the narrative leads on phones; About keeps the portrait first. */
+@media (max-width: 55.99rem) {
+  .founder-card.founder-card--homepage {
+    order: 0;
+  }
+}
+
+@media (min-width: 56rem) {
+  .estimate-card__grid {
+    grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 1fr);
+  }
 }
 
 .hero .lead {
@@ -1289,6 +1515,48 @@ li + li {
 .field .hint {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+/* Owner policy: new recurring residential arrangements start with a Deep
+   Cleaning. The notice appears only when the selected frequency requires it. */
+.policy-notice {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-rose-200);
+  border-radius: var(--radius-md);
+  background: var(--color-rose-50);
+}
+
+.policy-notice p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.policy-notice__title {
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-900) !important;
+}
+
+.policy-notice__confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink-800);
+  cursor: pointer;
+}
+
+.policy-notice__confirm input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+  flex: none;
+  accent-color: var(--color-rose-700);
 }
 
 .input,
@@ -2486,8 +2754,20 @@ fieldset.input--invalid {
 
 @media (min-width: 48rem) {
   .site-footer__grid {
-    grid-template-columns: 1.4fr 1fr 1fr 1.2fr;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.8fr) minmax(0, 1fr);
   }
+}
+
+.site-footer__middle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+.site-footer__area {
+  max-width: 30ch;
+  margin: var(--space-4) 0 0;
+  color: var(--color-ink-muted);
 }
 
 .site-footer h3 {
@@ -2531,6 +2811,30 @@ fieldset.input--invalid {
 
 .social-follow__intro {
   max-width: 48ch;
+}
+
+/* The footer's "Follow Us" bubble sits directly beneath the circular logo. */
+.site-footer .social-follow--bubble {
+  display: block;
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid rgba(217, 201, 192, 0.28);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(120deg, rgba(249, 230, 233, 0.14), rgba(198, 163, 105, 0.14));
+}
+
+.site-footer .social-follow--bubble .social-follow__title {
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-1);
+}
+
+.site-footer .social-follow--bubble .social-follow__copy {
+  margin-bottom: var(--space-3);
+}
+
+.site-footer .social-follow--bubble .social-links {
+  /* Four 52px buttons per row on phones, exactly as before the bubble move. */
+  max-width: 15.25rem;
 }
 
 .social-follow__title {

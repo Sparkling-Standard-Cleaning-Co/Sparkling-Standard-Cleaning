@@ -4,36 +4,30 @@ import { getCollection, getEntry } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ServiceCard from '../components/ServiceCard.astro';
 import TrustChips from '../components/TrustChips.astro';
-import Steps from '../components/Steps.astro';
 import FaqItem from '../components/FaqItem.astro';
-import ProofGrid from '../components/ProofGrid.astro';
+import Checklist from '../components/Checklist.astro';
 import Reviews from '../components/Reviews.astro';
-import CtaBand from '../components/CtaBand.astro';
 import Icon from '../components/Icon.astro';
 import { breadcrumbNode } from '../lib/schema';
+import { cleaningTypesNav } from '../lib/site';
 import heroPhoto from '../assets/images/living-room-bright.jpg';
-import kitchenPhoto from '../assets/images/kitchen-white-clean.jpg';
-import bedroomPhoto from '../assets/images/bedroom-made.jpg';
-import moveoutPhoto from '../assets/images/empty-room-moveout.jpg';
-import officePhoto from '../assets/images/office-planted.jpg';
-import sinkPhoto from '../assets/images/kitchen-sink-detail.jpg';
+import hayliPortrait from '../assets/images/hayli-founder.webp';
 
 const home = await getEntry('site', 'home');
 if (!home) throw new Error('Missing content entry: src/content/site/home.md');
 const { data } = home;
 
-const allServices = (await getCollection('services')).sort((a, b) => a.data.order - b.data.order);
-// Recurring residential cleaning is the primary business objective, so the
-// homepage grid leads with it and marks it featured. Service pages and query
-// ownership are unaffected.
-const recurringService = allServices.find((service) => service.data.path === '/recurring-cleaning/');
-const services = recurringService
-  ? [recurringService, ...allServices.filter((service) => service !== recurringService)]
-  : allServices;
-const faqs = (await getCollection('faqs'))
-  .filter((faq) => ['process', 'pricing', 'payments'].includes(faq.data.category))
-  .sort((a, b) => a.data.order - b.data.order)
-  .slice(0, 4);
+const allServices = await getCollection('services');
+const services = cleaningTypesNav.flatMap((item) => {
+  const service = allServices.find((entry) => entry.data.path === item.href);
+  return service ? [service] : [];
+});
+
+const allFaqs = await getCollection('faqs');
+const faqs = data.homeFaqIds.flatMap((id) => {
+  const faq = allFaqs.find((entry) => entry.id === id);
+  return faq ? [faq] : [];
+});
 
 const site = Astro.site ?? new URL('https://pending-website-url.invalid');
 const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
@@ -44,19 +38,27 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
     <div class="container hero__inner">
       <div>
         <h1>
-          {data.hero.headline}
+          {data.hero.headline}{' '}
+          {data.hero.highlight && (
+            <span class="hero__sparkle-word">
+              <svg class="hero__sparkle-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 1.5 14 9.9l8.5 2.1-8.5 2.1L12 22.5l-2-8.4L1.5 12 10 9.9Z" />
+              </svg>
+              <span>{data.hero.highlight}</span>
+              <svg class="hero__sparkle-icon hero__sparkle-icon--small" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 1.5 14 9.9l8.5 2.1-8.5 2.1L12 22.5l-2-8.4L1.5 12 10 9.9Z" />
+              </svg>
+            </span>
+          )}
           {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
         </h1>
         <p class="lead">{data.hero.lead}</p>
         <div class="btn-row">
           <a class="btn btn--primary btn--large" href="/estimate/" data-cta="home-hero-estimate">
-            {data.hero.ctaLabel ?? 'Get Instant Estimate'}
+            {data.hero.ctaLabel ?? 'Instant Estimate'}
           </a>
-          <a class="btn btn--ghost" href="/house-cleaning/" data-cta="home-hero-services">Explore Services</a>
+          <a class="btn btn--ghost" href="#services" data-cta="home-hero-services">Explore Services</a>
         </div>
-        <p class="small text-muted" style="margin-top: var(--space-4)">
-          Planning regular cleaning? <a href="/recurring-cleaning/" data-cta="home-hero-recurring">See how weekly and every-two-weeks pricing works.</a>
-        </p>
       </div>
       <div class="hero__panel hero__panel--media">
         <Image
@@ -68,28 +70,37 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
           decoding="async"
           class="card__media-image"
         />
-        <p class="eyebrow" style="margin-top: var(--space-5)">The difference, in one thought</p>
-        <p style="font-family: var(--font-display); font-size: var(--text-xl); margin-bottom: var(--space-3)">
-          “A house deserves more than someone rushing through a checklist.”
-        </p>
-        <p class="small text-muted mb-0">
-          That belief is why this company exists — and why the details get the time they need.
-        </p>
         <p class="media-caption">Representative interior photograph — real project photos are added only with customer approval.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section difference-intro" aria-labelledby="difference-thought-heading">
+    <div class="container difference-intro__grid">
+      <h2 id="difference-thought-heading" class="difference-intro__heading">The difference, in one thought</h2>
+      <div class="difference-intro__copy">
+        <p>
+          Truly cleaning a space requires more than just rushing through a checklist. It takes an eye
+          for the details, a commitment to quality, and the care to go the extra mile.
+        </p>
+        <p>
+          At Sparkling Standard, we believe the little things make all the difference. That belief is
+          at the heart of every service we provide, and our namesake. It’s why we’re dedicated to
+          providing a higher standard of clean, a Sparkling Standard.
+        </p>
       </div>
     </div>
   </section>
 
   <TrustChips />
 
-  <section class="section">
+  <section class="section" id="services">
     <div class="container">
       <div class="section-head">
-        <p class="eyebrow">{data.servicesIntro?.eyebrow}</p>
         <h2>{data.servicesIntro?.heading}</h2>
         {data.servicesIntro?.lead && <p class="lead">{data.servicesIntro.lead}</p>}
       </div>
-      <div class="grid grid--3">
+      <div class="grid grid--2 services-grid">
         {
           services.map((service) => (
             <ServiceCard
@@ -97,6 +108,7 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
               summary={service.data.summary}
               href={service.data.path}
               icon={service.data.icon}
+              cta="Explore this service"
               featured={service.data.path === '/recurring-cleaning/'}
             />
           ))
@@ -106,33 +118,26 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
   </section>
 
   {
-    data.recurringPlans && data.recurringPlans.items.length > 0 && (
-      <section class="section section--alt" aria-labelledby="recurring-plans-heading">
+    data.estimateBand && (
+      <section class="section section--alt" aria-labelledby="estimate-heading">
         <div class="container">
-          <div class="section-head">
-            <p class="eyebrow">{data.recurringPlans.eyebrow}</p>
-            <h2 id="recurring-plans-heading">{data.recurringPlans.heading}</h2>
-            <p class="lead">{data.recurringPlans.text}</p>
-          </div>
-          <div class="grid grid--3">
-            {data.recurringPlans.items.map((plan) => (
-              <div class="card">
-                <span class="card__icon"><Icon name="refresh" /></span>
-                <h3 class="card__title">{plan.title}</h3>
-                <p class="card__text">{plan.text}</p>
-                <a
-                  class="card__more"
-                  href={`/estimate/?frequency=${plan.frequency}`}
-                  data-cta={`home-recurring-${plan.frequency}`}
-                >
-                  Start this estimate <Icon name="arrow-right" size={16} />
+          <div class="card card--feature estimate-card">
+            <div class="split estimate-card__grid">
+              <div>
+                <p class="eyebrow">{data.estimateBand.eyebrow}</p>
+                <h2 id="estimate-heading">{data.estimateBand.heading}</h2>
+                <p class="lead">{data.estimateBand.text}</p>
+                {data.estimateBand.body && <p>{data.estimateBand.body}</p>}
+                <a class="btn btn--primary btn--large" href="/estimate/" data-cta="home-estimate">
+                  {data.estimateBand.ctaLabel}
                 </a>
               </div>
-            ))}
+              <Checklist
+                class="estimate-assurances"
+                items={['No account required', 'No auto-booking', 'Private estimate']}
+              />
+            </div>
           </div>
-          <p class="mt-4">
-            <a class="tap-link" href="/recurring-cleaning/">{data.recurringPlans.linkLabel} →</a>
-          </p>
         </div>
       </section>
     )
@@ -140,189 +145,46 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
 
   {
     data.founderBand && (
-      <section class="section">
+      <section class="section" aria-labelledby="founder-heading">
         <div class="container split">
           <div>
-            <p class="eyebrow">{data.founderBand.eyebrow}</p>
-            <h2>{data.founderBand.heading}</h2>
+            <h2 id="founder-heading">{data.founderBand.heading}</h2>
             {data.founderBand.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
             {data.founderBand.linkLabel && (
-              <a class="btn btn--secondary" href="/about/" data-cta="home-founder">{data.founderBand.linkLabel}</a>
+              <a class="btn btn--secondary" href="/about/" data-cta="home-founder">
+                {data.founderBand.linkLabel}
+              </a>
             )}
           </div>
-          <div class="card">
-            <div class="card__media">
+          <div class="card founder-card founder-card--homepage">
+            <div class="founder-card__media">
               <Image
-                src={sinkPhoto}
-                alt="A clean kitchen sink and polished faucet against white cabinets and a light tile backsplash."
-                widths={[360, 560, 800]}
+                src={hayliPortrait}
+                alt="Portrait of Hayli, founder and owner-operator of Sparkling Standard Cleaning Co."
+                widths={[420, 640, 900]}
                 sizes="(min-width: 56rem) 30rem, 92vw"
                 loading="lazy"
                 decoding="async"
-                class="card__media-image"
               />
             </div>
-            <p class="eyebrow">Details we notice</p>
-            <ul class="checklist">
-              <li><span>The toothbrush holder — cleaned, not skipped</span></li>
-              <li><span>Fingerprints on switch plates and frames</span></li>
-              <li><span>Buildup behind faucets and along edges</span></li>
-              <li><span>Dust removed, not moved around</span></li>
-              <li><span>Beds and rooms reset, not just surfaces wiped</span></li>
-            </ul>
-            <p class="small text-muted" style="margin-top: var(--space-3)">
-              Examples of the standard — not a rigid promise list. Every home is different, and that's
-              the point.
-            </p>
+            <p class="founder-card__name">Hayli</p>
+            <p class="founder-card__role">Founder &amp; Owner-Operator</p>
           </div>
         </div>
       </section>
     )
   }
 
-  {
-    data.estimateBand && (
-      <section class="section">
-        <div class="container">
-          <div class="card card--feature" style="padding: clamp(1.5rem, 4vw, 2.5rem)">
-            <div class="split" style="align-items: center">
-              <div>
-                <p class="eyebrow">{data.estimateBand.eyebrow}</p>
-                <h2>{data.estimateBand.heading}</h2>
-                <p style="margin-bottom: var(--space-5)">{data.estimateBand.text}</p>
-                <a class="btn btn--primary btn--large" href="/estimate/" data-cta="home-mid-estimate">
-                  {data.estimateBand.ctaLabel}
-                </a>
-              </div>
-              <ul class="checklist">
-                <li><span>No account required</span></li>
-                <li><span>No auto-booking — Sparkling Standard confirms personally</span></li>
-                <li><span>Fresh, private estimate — nothing is saved in your browser</span></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  <section class="section section--alt">
-    <div class="container grid grid--2">
-      {
-        data.recurringBand && (
-          <div class="card card--link">
-            <div class="card__media">
-              <Image
-                src={kitchenPhoto}
-                alt="A bright white kitchen with a large island, tidy counters and no clutter."
-                widths={[360, 560, 800]}
-                sizes="(min-width: 48rem) 30rem, 92vw"
-                loading="lazy"
-                decoding="async"
-                class="card__media-image"
-              />
-            </div>
-            <p class="eyebrow mb-0">{data.recurringBand.eyebrow}</p>
-            <h3 class="card__title">{data.recurringBand.heading}</h3>
-            <p class="card__text">{data.recurringBand.text}</p>
-            <a class="card__more" href="/recurring-cleaning/">{data.recurringBand.linkLabel} <Icon name="arrow-right" size={16} /></a>
-          </div>
-        )
-      }
-      {
-        data.strBand && (
-          <div class="card card--link">
-            <div class="card__media">
-              <Image
-                src={bedroomPhoto}
-                alt="A neatly made bed with layered pillows and soft neutral bedding in a calm bedroom."
-                widths={[360, 560, 800]}
-                sizes="(min-width: 48rem) 30rem, 92vw"
-                loading="lazy"
-                decoding="async"
-                class="card__media-image"
-              />
-            </div>
-            <p class="eyebrow mb-0">{data.strBand.eyebrow}</p>
-            <h3 class="card__title">{data.strBand.heading}</h3>
-            <p class="card__text">{data.strBand.text}</p>
-            <a class="card__more" href="/short-term-rental-cleaning/">{data.strBand.linkLabel} <Icon name="arrow-right" size={16} /></a>
-          </div>
-        )
-      }
-      {
-        data.moveoutBand && (
-          <div class="card card--link">
-            <div class="card__media">
-              <Image
-                src={moveoutPhoto}
-                alt="An empty room with freshly cleaned hardwood floors and bright natural light."
-                widths={[360, 560, 800]}
-                sizes="(min-width: 48rem) 30rem, 92vw"
-                loading="lazy"
-                decoding="async"
-                class="card__media-image"
-              />
-            </div>
-            <p class="eyebrow mb-0">{data.moveoutBand.eyebrow}</p>
-            <h3 class="card__title">{data.moveoutBand.heading}</h3>
-            <p class="card__text">{data.moveoutBand.text}</p>
-            <a class="card__more" href="/move-in-move-out-cleaning/">{data.moveoutBand.linkLabel} <Icon name="arrow-right" size={16} /></a>
-          </div>
-        )
-      }
-      {
-        data.commercialBand && (
-          <div class="card card--link">
-            <div class="card__media">
-              <Image
-                src={officePhoto}
-                alt="A bright, orderly office with clean desks, plants and natural light."
-                widths={[360, 560, 800]}
-                sizes="(min-width: 48rem) 30rem, 92vw"
-                loading="lazy"
-                decoding="async"
-                class="card__media-image"
-              />
-            </div>
-            <p class="eyebrow mb-0">{data.commercialBand.eyebrow}</p>
-            <h3 class="card__title">{data.commercialBand.heading}</h3>
-            <p class="card__text">{data.commercialBand.text}</p>
-            <a class="card__more" href="/commercial-cleaning/">{data.commercialBand.linkLabel} <Icon name="arrow-right" size={16} /></a>
-          </div>
-        )
-      }
-    </div>
-  </section>
-
-  <ProofGrid
-    heading={data.proof?.heading}
-    eyebrow={data.proof?.eyebrow}
-    lead={data.proof?.lead}
-  />
-
-  {
-    data.process && (
-      <section class="section">
-        <div class="container">
-          <div class="section-head">
-            <p class="eyebrow">{data.process.eyebrow}</p>
-            <h2>{data.process.heading}</h2>
-          </div>
-          <Steps steps={data.process.steps} />
-        </div>
-      </section>
-    )
-  }
-
-  <section class="section section--alt">
+  <section class="section section--alt" aria-labelledby="service-area-heading">
     <div class="container">
       <div class="section-head">
-        <p class="eyebrow">{data.areaBand?.eyebrow}</p>
-        <h2>{data.areaBand?.heading}</h2>
+        {data.areaBand?.eyebrow && <p class="eyebrow">{data.areaBand.eyebrow}</p>}
+        <h2 id="service-area-heading">{data.areaBand?.heading}</h2>
         <p class="lead">{data.areaBand?.text}</p>
       </div>
-      <a class="btn btn--secondary" href="/service-area/">See the Service Area</a>
+      <a class="btn btn--secondary" href="/service-area/" data-cta="home-service-area">
+        See our service area <Icon name="arrow-right" size={16} />
+      </a>
     </div>
   </section>
 
@@ -330,11 +192,11 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
 
   {
     faqs.length > 0 && (
-      <section class="section">
+      <section class="section" aria-labelledby="home-faq-heading">
         <div class="container container--narrow">
           <div class="section-head">
             <p class="eyebrow">Questions</p>
-            <h2>A few things people ask</h2>
+            <h2 id="home-faq-heading">FAQs</h2>
           </div>
           <div class="faq-list">
             {faqs.map((faq) => (
@@ -348,15 +210,4 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
       </section>
     )
   }
-
-  <div class="container section section--tight">
-    <CtaBand
-      title={data.finalCta?.heading ?? 'Ready for a cleaner home?'}
-      text={data.finalCta?.text}
-      primaryLabel="Get Instant Estimate"
-      primaryHref="/estimate/"
-      secondaryLabel="Contact Us"
-      secondaryHref="/contact/"
-    />
-  </div>
 </BaseLayout>

@@ -141,20 +141,20 @@ export const business = {
   // ── Hours (directive §8) ───────────────────────────────────────────────────
   hours: {
     /** Residential booking window. */
-    residentialWindow: '8:00 AM – 6:00 PM',
+    residentialWindow: '7:00 a.m. – 7:00 p.m.',
     /** Availability. */
     days: 'Seven days a week',
-    display: 'Seven days a week · 8:00 AM – 6:00 PM',
-    /** Commercial work can be scheduled outside the residential window. */
+    display: 'Seven days a week · 7:00 a.m. – 7:00 p.m.',
+    /** Commercial work is scheduled within the same published hours. */
     commercialNote:
-      'Commercial accounts can be scheduled day or evening, including early-morning and overnight work when the facility needs it.',
+      'Commercial accounts are scheduled within our published hours, with the exact timing agreed during the walkthrough.',
     /** Scheduling honesty: first appointment of the day gets an exact arrival time. */
     firstAppointmentNote:
       'The first appointment of the day is scheduled for an exact arrival time.',
     arrivalWindowNote:
       'Later appointments use an arrival window — a home takes as long as it takes, and we will not rush yours to hit a clock.',
     timezone: 'America/Chicago',
-    schema: { opens: '08:00', closes: '18:00' },
+    schema: { opens: '07:00', closes: '19:00' },
   },
 
   // ── Reservation scheduling (advance requests, no priority pricing) ────────
@@ -256,7 +256,7 @@ export const business = {
     alternate: ['Cash', 'Check', 'Cash App', 'Venmo', 'Zelle', 'PayPal'],
     /** Residential payment timing, owner-approved. */
     residentialTiming:
-      'Payment is due after the cleaning is complete — you see the result before you pay.',
+      'For a Residential Deep Cleaning, payment is due after the cleaning is complete so you can see the results before you pay. For recurring cleaning arrangements and commercial services, billing terms are discussed and agreed upon during the walkthrough or when your service is confirmed.',
     /** Owner-confirmed processor. Enabled methods are confirmed separately. */
     processor: 'Stripe',
   },

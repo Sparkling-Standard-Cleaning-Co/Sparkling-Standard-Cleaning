@@ -1,6 +1,9 @@
 ---
 question: How does the instant estimate work?
-answer: The online estimate walks you through six short steps — service and address, your home, condition and frequency, extras, scheduling and your estimate — and shows a proposed cleaning price. It's built on real labor-hour math, not a guess dressed up as precision. Final scope, condition, access and unique circumstances can affect the final confirmed price, so Sparkling Standard reviews every request personally before it's confirmed.
+answer: |
+  Our online estimate guides you through six simple steps: service and address, home details, condition and cleaning frequency, extras, scheduling, and your estimate. Once completed, you’ll receive a proposed cleaning price calculated using estimated labor hours and your selected service details.
+
+  Because every space is different, the final price may vary depending on the confirmed scope of work, the condition of the space, access, and any unique circumstances. Before your service is confirmed, Sparkling Standard personally reviews each request to ensure the scope and pricing accurately reflect your needs.
 category: process
 order: 1
 ---

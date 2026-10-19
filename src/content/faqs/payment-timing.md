@@ -1,6 +1,9 @@
 ---
 question: When do I pay?
-answer: For residential cleaning, payment is due after the cleaning is complete — you see the result before you pay. For commercial and recurring arrangements we agree on the billing rhythm during the walkthrough or setup so it fits how your business operates.
+answer: |
+  For a Residential Deep Cleaning, payment is due after the cleaning is complete so you can see the results before you pay.
+
+  For recurring cleaning arrangements and commercial services, billing terms are discussed and agreed upon during the walkthrough or when your service is confirmed.
 category: payments
 order: 1
 ---

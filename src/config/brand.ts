@@ -48,9 +48,58 @@ export const crestGradient = {
   dark: '#9d7736',
 } as const;
 
+export interface LogoSvgOptions {
+  /** Fill for "Sparkling". Defaults to the footer-aware brand token. */
+  primary?: string;
+  /** Fill for "STANDARD". Defaults to the footer-aware brand token. */
+  secondary?: string;
+  /** Optional <title> for standalone (non-decorative) use. */
+  title?: string;
+}
+
 /**
- * The approved crest SVG (gold ring, italic S, sparkles, blossom). The caller
- * supplies a unique gradient id so multiple instances on one page are safe.
+ * The current official circular logo: "Sparkling" above "STANDARD" inside a
+ * gold ring with sparkles. It replaces the old crest + wordmark lockup and
+ * deliberately carries no descriptor or tagline. The caller supplies a unique
+ * gradient id so multiple instances on one page are safe.
+ */
+export function logoSvg(
+  gradientId: string,
+  {
+    primary = 'var(--brand-logo-primary, #b15a6f)',
+    secondary = 'var(--brand-logo-secondary, #302429)',
+    title,
+  }: LogoSvgOptions = {},
+): string {
+  const sparkle = (cx: number, cy: number, size: number): string =>
+    `<path d="M${cx} ${cy - size} L${cx + size * 0.22} ${cy - size * 0.22} L${cx + size} ${cy} L${cx + size * 0.22} ${cy + size * 0.22} L${cx} ${cy + size} L${cx - size * 0.22} ${cy + size * 0.22} L${cx - size} ${cy} L${cx - size * 0.22} ${cy - size * 0.22} Z"></path>`;
+
+  return `<svg viewBox="0 0 240 240" focusable="false"${title ? ' role="img"' : ' aria-hidden="true"'}>
+  ${title ? `<title>${title}</title>` : ''}
+  <defs>
+    <linearGradient id="${gradientId}" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="${crestGradient.light}"></stop>
+      <stop offset="0.55" stop-color="${crestGradient.mid}"></stop>
+      <stop offset="1" stop-color="${crestGradient.dark}"></stop>
+    </linearGradient>
+  </defs>
+  <circle cx="120" cy="120" r="112" fill="none" stroke="url(#${gradientId})" stroke-width="4"></circle>
+  <circle cx="120" cy="120" r="104" fill="none" stroke="url(#${gradientId})" stroke-width="0.8" opacity="0.55"></circle>
+  <g fill="url(#${gradientId})">
+    ${sparkle(120, 45, 12)}
+    ${sparkle(57, 83, 7)}
+    ${sparkle(184, 91, 8)}
+    ${sparkle(69, 166, 6)}
+    ${sparkle(174, 172, 7)}
+  </g>
+  <text x="120" y="112" text-anchor="middle" font-family="'Great Vibes', 'Parisienne', cursive" font-size="52" fill="${primary}">Sparkling</text>
+  <text x="120" y="164" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-weight="600" font-size="22" letter-spacing="4" fill="${secondary}">STANDARD</text>
+</svg>`;
+}
+
+/**
+ * The former crest mark, retained for the existing print system and any
+ * historical reference. The website now uses logoSvg().
  */
 export function crestSvg(gradientId: string): string {
   return `<svg viewBox="0 0 64 64" focusable="false" aria-hidden="true">

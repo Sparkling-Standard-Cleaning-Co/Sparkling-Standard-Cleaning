@@ -19,6 +19,7 @@ import { pricing } from '../../config/pricing.ts';
 import { travelConfig } from '../../config/travel.ts';
 import { zipReference } from '../../config/geography.ts';
 import { calculateEstimate, type EstimateContext } from './calculate.ts';
+import { requiresInitialDeepClean } from './frequency.ts';
 import { selectInstantAmount } from './quote.ts';
 import { validateEstimateInput } from './validation.ts';
 import type { EstimateInputDraft, PricingBreakdown, RoutedTravelInfo } from './types.ts';
@@ -93,6 +94,11 @@ export interface QuoteVerification {
   pinCheck: PinCheck;
   /** Distance between the submitted pin and the geocoded address, metres. */
   pinDistanceMeters: number | null;
+  /** Owner policy: a new recurring residential arrangement starts with a Deep Cleaning. */
+  initialDeepClean: {
+    required: boolean;
+    acknowledged: boolean;
+  };
   travel: QuoteVerificationTravel;
   /**
    * The full transparent price breakdown the server recalculated. Null only
@@ -274,6 +280,7 @@ export async function verifyReservationQuote(
   let pinCheck: PinCheck = 'unknown';
   let pinDistanceMeters: number | null = null;
   let breakdown: PricingBreakdown | null = null;
+  let initialDeepClean = { required: false, acknowledged: false };
   const result = (
     status: QuoteVerificationStatus,
     verifiedPrice: number | null,
@@ -292,6 +299,7 @@ export async function verifyReservationQuote(
     destinationPrecise: travel.destinationSource === 'address_geocode',
     pinCheck,
     pinDistanceMeters,
+    initialDeepClean,
     travel,
     breakdown,
     note,
@@ -304,6 +312,11 @@ export async function verifyReservationQuote(
   if (!validation.ok) {
     return result('unverifiable', null, null, `Could not verify: ${validation.issues[0] ?? 'incomplete request details'}.`);
   }
+
+  initialDeepClean = {
+    required: requiresInitialDeepClean(validation.input.serviceType, validation.input.frequency),
+    acknowledged: fields.initial_deep_clean_acknowledged === 'yes',
+  };
 
   // Server-side destination + route (client coordinates are never used).
   const destination = await resolveServerDestination(fields, env).catch(() => null);
@@ -448,6 +461,12 @@ export async function verifyReservationQuote(
     default:
       // 'ok' — the confirmed pin matches the server-resolved address.
       break;
+  }
+
+  if (initialDeepClean.required && !initialDeepClean.acknowledged) {
+    uncertainties.push(
+      'the required initial Deep Cleaning for a new recurring residential arrangement was not acknowledged',
+    );
   }
 
   if (uncertainties.length === 0) {

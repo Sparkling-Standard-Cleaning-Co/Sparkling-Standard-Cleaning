@@ -1,73 +1,40 @@
 ---
 import { business, isPending } from '../config/business';
-import { brandWords, crestSvg } from '../config/brand';
+import { logoSvg } from '../config/brand';
 
 export type WordmarkTreatment = 'soft-serif' | 'romantic-script';
 export type WordmarkScript = 'great-vibes' | 'parisienne';
 
-/** Owner-selected header treatment (Brand A2, 2026-10-03). */
+/** Owner-selected brand treatment (Brand A2, 2026-10-03). */
 export const DEFAULT_WORDMARK_TREATMENT: WordmarkTreatment = 'romantic-script';
 /** Script face used by the romantic-script treatment (owner-selected: Great Vibes). */
 export const DEFAULT_WORDMARK_SCRIPT: WordmarkScript = 'great-vibes';
 
 interface Props {
   class?: string;
-  /** Show the small descriptor/tagline line under the wordmark. */
+  /** Accepted for call-site compatibility; sizing is handled by CSS. */
   tagline?: boolean;
   /** Accepted for call-site compatibility; responsive CSS handles sizing. */
   compact?: boolean;
-  /** Typographic treatment; defaults to the owner-selectable constant above. */
+  /** Accepted for call-site compatibility; the circular mark is fixed. */
   treatment?: WordmarkTreatment;
-  /** Script face for the romantic-script treatment (preview/approval only). */
+  /** Accepted for call-site compatibility. */
   script?: WordmarkScript;
 }
 
-const {
-  class: className = '',
-  tagline = true,
-  compact = false,
-  treatment = DEFAULT_WORDMARK_TREATMENT,
-  script = DEFAULT_WORDMARK_SCRIPT,
-} = Astro.props;
+const { class: className = '', compact = false } = Astro.props;
 
-const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const pendingName = isPending(business.displayName);
-
-const scriptWord = brandWords.script;
-const capsWord = brandWords.caps;
-const descriptor = brandWords.descriptor;
-const taglineText = brandWords.tagline;
-
-// Unique gradient id per instance (the header and footer both render a logo).
 const gradientId = `brand-gold-${Math.random().toString(36).slice(2, 9)}`;
 
 const ariaLabel = pendingName
   ? 'Home — development placeholder brand'
-  : `${business.wordmark}, ${descriptor} — home`;
+  : `${business.displayName} — home`;
 ---
 
 <a href="/" class:list={['brand', compact && 'brand--compact', className]} aria-label={ariaLabel}>
-  <span class="brand__crest" aria-hidden="true" set:html={crestSvg(gradientId)} />
-
-  <span
-    class:list={[
-      'brand__text',
-      `brand__text--${treatment}`,
-      treatment === 'romantic-script' && `brand__text--script-${script}`,
-    ]}
-  >
-    <span class="brand__wordmark">
-      <span class="brand__sparkling">{pendingName ? 'PENDING' : scriptWord}</span>
-      <span class="brand__standard">{pendingName ? 'BRAND' : capsWord}</span>
-    </span>
-    {
-      tagline && (
-        <span class="brand__line--secondary">
-          <span class="brand__descriptor">{descriptor}</span>
-          <span class="brand__tagline">{taglineText}</span>
-        </span>
-      )
-    }
-    {pendingName && preview && <span class="pending-badge">Name pending</span>}
-  </span>
+  <span class="brand__logo" aria-hidden="true" set:html={logoSvg(gradientId)} />
+  {pendingName && import.meta.env.PUBLIC_PREVIEW_MODE === 'true' && (
+    <span class="pending-badge">Name pending</span>
+  )}
 </a>

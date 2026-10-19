@@ -2,17 +2,17 @@
 title: Commercial Cleaning
 metaTitle: Commercial Cleaning in Pensacola | Request a Walkthrough
 metaDescription: Commercial cleaning for Pensacola-area offices, churches, salons, gyms, medical offices, retail spaces and property portfolios. Request a walkthrough and get a custom quote.
-summary: Recurring and one-time commercial cleaning for local businesses and facilities — scoped through a walkthrough, quoted honestly, scheduled around your operation.
+summary: Recurring or one-time commercial cleaning for local businesses and facilities. Each service is professionally scoped to your space, with scheduling tailored to your operation’s needs.
 icon: briefcase
 order: 6
 path: /commercial-cleaning/
 serviceType: Commercial cleaning
-heroEyebrow: Commercial
-heroLead: Your facility has a standard to keep. We walk the space, agree on the scope, and show up consistently once we do.
+heroEyebrow: Commercial cleaning
+heroLead: Recurring or one-time commercial cleaning for local businesses and facilities. Each service is professionally scoped to your space, with scheduling tailored to your operation’s needs.
 includes:
   - Walkthrough-based scope built around your facility and hours
   - Recurring schedules — daily, weekly, biweekly or custom
-  - "Flexible timing: before opening, after closing, evening or overnight"
+  - Scheduling within our published hours, 7:00 a.m. – 7:00 p.m., seven days a week
   - Professional spaces, retail, salons, gyms, common areas and more
   - Consistent quality with a checklist per facility
   - Reliable communication with whoever manages the space
@@ -57,7 +57,7 @@ After the walkthrough you receive a clear scope: what's cleaned, how often, when
 
 ## Scheduling around your operation
 
-Commercial work can be scheduled day or evening, including early-morning and overnight work when the facility needs it. Churches often prefer weekdays between services; salons often need after-close; offices often want early-morning. Tell us how your space operates, and the schedule is built around that.
+Commercial work is scheduled within our published hours, 7:00 a.m. – 7:00 p.m., seven days a week. Churches often prefer weekdays between services; salons often need an early slot before opening; offices often want service before staff arrive. Tell us how your space operates, and the schedule is built around that.
 
 ## Churches
 

@@ -20,7 +20,7 @@ it, the function sends the customer a separate branded email through Resend
 | Section | Contents |
 | --- | --- |
 | **Summary** | Request type · service · frequency; customer name/organization/phone/email; location; price + verdict; an explicit action line when something needs attention (price mismatch, unverifiable, out-of-area review, discarded date, street-level pin, gift payment link, walkthrough scheduling, turnover details) |
-| **Inquiry** | Type (estimate / preliminary / reservation request), service, frequency, submitted time (Central), preferred date, estimate status |
+| **Inquiry** | Type (estimate / preliminary / reservation request), service, frequency, required initial Deep Cleaning + acknowledgment (new recurring residential requests), submitted time (Central), preferred date, estimate status |
 | **Contact** | Name, organization (commercial), phone, email |
 | **Location** | Entered address, unit, city/state/ZIP, entry method, confirmation + precision, map pin |
 | **Home** | Property type, size, rooms, beds to reset, condition, last professional clean, pets |
@@ -42,13 +42,15 @@ are plain text (no HTML), and labels are fixed by code, so the customer cannot i
 Input: 3/2 biweekly reservation, two add-ons, verified route, a note about parking.
 
 ```
-Summary — Request: Reservation request · House cleaning (standard) · Every two weeks
+Summary — Request: Reservation request · Residential house cleaning · Every two weeks
 Summary — Customer: Synthetic Customer · 8500000000 · synthetic@example.com
 Summary — Location: 100 S Baylen St, Pensacola, FL 32502
 Summary — Price: Proposed $235 · VERIFIED
 Inquiry — Type: Reservation request — proposed price, subject to personal confirmation
-Inquiry — Service: House cleaning (standard)
+Inquiry — Service: Residential house cleaning
 Inquiry — Frequency: Every two weeks
+Inquiry — Initial Deep Cleaning: REQUIRED before recurring residential maintenance service
+Inquiry — Deep Cleaning acknowledged: Yes
 Inquiry — Submitted: Oct 2, 2026, 4:04 PM Central
 Inquiry — Preferred date: 2026-12-15
 Inquiry — Estimate status: estimated

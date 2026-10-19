@@ -1,6 +1,9 @@
 ---
-question: Is there a minimum job price?
-answer: Yes — small jobs carry a minimum visit value so that a trip, supplies and time make sense for a professional clean. The minimum is built into every estimate automatically; you don't need to calculate anything. If you're curious how it applies to your situation, the estimate will show you before you request anything.
+question: Is there a minimum service price?
+answer: |
+  Yes. Smaller jobs are subject to a minimum service price to account for travel, supplies, and the time required to complete your cleaning.
+
+  There’s no need to calculate anything yourself — the minimum is automatically factored into your instant estimate when applicable. You’ll see how it applies to your service before submitting a request.
 category: pricing
 order: 1
 ---

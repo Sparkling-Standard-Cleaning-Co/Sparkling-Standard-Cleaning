@@ -17,7 +17,8 @@ export type FailureReason =
   | 'server_error'
   | 'spam_rejected'
   | 'verification_failed'
-  | 'invalid_request';
+  | 'invalid_request'
+  | 'deep_clean_required';
 
 export interface ContactFacts {
   /** Human-formatted phone, e.g. "(850) 426-8479". */
@@ -51,6 +52,8 @@ export function failureCopy(reason: FailureReason, contact: ContactFacts): strin
       return `We couldn't complete the security check before sending. Please try again — your answers are still here — or ${alternatives}.`;
     case 'invalid_request':
       return `Some of your details didn't come through. Please check the form and try again, or ${alternatives}.`;
+    case 'deep_clean_required':
+      return `A new recurring residential arrangement must begin with a Deep Cleaning. Please go back to the condition and frequency step and confirm the Deep Cleaning requirement, then send your request again.`;
     case 'network_error':
       return `We could not reach the message service. Check your connection and try again, or ${alternatives}.`;
     case 'server_error':

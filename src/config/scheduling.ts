@@ -10,4 +10,14 @@ export const schedulingConfig = {
    * booking them).
    */
   advanceReservationDays: 60,
+  /**
+   * Owner policy (2026-10-19): every NEW recurring residential maintenance
+   * arrangement begins with a Deep Cleaning. Applies to standard residential
+   * recurring requests; move-outs and STR turnovers are one-off scopes.
+   */
+  recurringResidential: {
+    requiresInitialDeepClean: true,
+    message:
+      'A Deep Cleaning is required before a new recurring residential maintenance arrangement begins. Your first visit will be a Deep Cleaning; it is priced and confirmed personally, and the estimate shows your ongoing per-visit price.',
+  },
 } as const;

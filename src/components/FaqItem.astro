@@ -5,11 +5,15 @@ interface Props {
 }
 
 const { question, answer } = Astro.props;
+const paragraphs = answer
+  .split(/\n\s*\n/)
+  .map((paragraph) => paragraph.trim())
+  .filter(Boolean);
 ---
 
 <details class="faq-item">
   <summary>{question}</summary>
   <div class="faq-item__body">
-    <p>{answer}</p>
+    {paragraphs.map((paragraph) => <p>{paragraph}</p>)}
   </div>
 </details>

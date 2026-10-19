@@ -4,16 +4,16 @@
 import type { Condition, Frequency, LastProfessionalClean, PropertyType, PetSituation, ServiceType } from './types.ts';
 
 export const SERVICE_LABELS: Record<ServiceType, string> = {
-  standard: 'Standard / one-time house cleaning',
+  standard: 'Residential house cleaning',
   deep: 'Deep cleaning',
-  move_in_out: 'Move-in / move-out cleaning',
+  move_in_out: 'Move-in and move-out cleaning',
   str_turnover: 'Short-term rental turnover',
 };
 
 export const SERVICE_SHORT: Record<ServiceType, string> = {
-  standard: 'Standard clean',
-  deep: 'Deep clean',
-  move_in_out: 'Move-out clean',
+  standard: 'Residential cleaning',
+  deep: 'Deep cleaning',
+  move_in_out: 'Move-in/move-out cleaning',
   str_turnover: 'Rental turnover',
 };
 

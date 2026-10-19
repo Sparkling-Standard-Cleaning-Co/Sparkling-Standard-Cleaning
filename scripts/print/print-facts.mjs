@@ -113,11 +113,8 @@ export function verifyFacts() {
     }
   }
 
-  if (!logoSource.includes('crestSvg')) {
-    throw new Error('Print facts: Logo.astro no longer consumes the shared crest (src/config/brand.ts).');
-  }
-  if (!logoSource.includes('brandWords')) {
-    throw new Error('Print facts: Logo.astro no longer consumes the shared wordmark (src/config/brand.ts).');
+  if (!logoSource.includes('logoSvg')) {
+    throw new Error('Print facts: Logo.astro no longer consumes the shared circular logo (src/config/brand.ts).');
   }
   if (logoSource.includes('#e2c07c')) {
     throw new Error('Print facts: Logo.astro still contains an inline crest gradient; use crestSvg().');

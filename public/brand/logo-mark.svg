@@ -1,10 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Brand mark">
-  <g fill="#c97285">
-    <path d="M24 3c3.5 5 7 8.6 7 13a7 7 0 0 1-14 0c0-4.4 3.5-8 7-13z"/>
-    <path d="M24 3c3.5 5 7 8.6 7 13a7 7 0 0 1-14 0c0-4.4 3.5-8 7-13z" transform="rotate(72 24 24)"/>
-    <path d="M24 3c3.5 5 7 8.6 7 13a7 7 0 0 1-14 0c0-4.4 3.5-8 7-13z" transform="rotate(144 24 24)"/>
-    <path d="M24 3c3.5 5 7 8.6 7 13a7 7 0 0 1-14 0c0-4.4 3.5-8 7-13z" transform="rotate(216 24 24)"/>
-    <path d="M24 3c3.5 5 7 8.6 7 13a7 7 0 0 1-14 0c0-4.4 3.5-8 7-13z" transform="rotate(288 24 24)"/>
+<svg viewBox="0 0 240 240" focusable="false" role="img">
+  <title>Sparkling Standard</title>
+  <defs>
+    <linearGradient id="brand-gold-static" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#e2c07c"></stop>
+      <stop offset="0.55" stop-color="#c6a369"></stop>
+      <stop offset="1" stop-color="#9d7736"></stop>
+    </linearGradient>
+  </defs>
+  <circle cx="120" cy="120" r="112" fill="none" stroke="url(#brand-gold-static)" stroke-width="4"></circle>
+  <circle cx="120" cy="120" r="104" fill="none" stroke="url(#brand-gold-static)" stroke-width="0.8" opacity="0.55"></circle>
+  <g fill="url(#brand-gold-static)">
+    <path d="M120 33 L122.64 42.36 L132 45 L122.64 47.64 L120 57 L117.36 47.64 L108 45 L117.36 42.36 Z"></path>
+    <path d="M57 76 L58.54 81.46 L64 83 L58.54 84.54 L57 90 L55.46 84.54 L50 83 L55.46 81.46 Z"></path>
+    <path d="M184 83 L185.76 89.24 L192 91 L185.76 92.76 L184 99 L182.24 92.76 L176 91 L182.24 89.24 Z"></path>
+    <path d="M69 160 L70.32 164.68 L75 166 L70.32 167.32 L69 172 L67.68 167.32 L63 166 L67.68 164.68 Z"></path>
+    <path d="M174 165 L175.54 170.46 L181 172 L175.54 173.54 L174 179 L172.46 173.54 L167 172 L172.46 170.46 Z"></path>
   </g>
-  <circle cx="24" cy="24" r="3.4" fill="#c6a369"/>
+  <text x="120" y="112" text-anchor="middle" font-family="'Great Vibes', 'Parisienne', cursive" font-size="52" fill="#b15a6f">Sparkling</text>
+  <text x="120" y="164" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-weight="600" font-size="22" letter-spacing="4" fill="#302429">STANDARD</text>
 </svg>

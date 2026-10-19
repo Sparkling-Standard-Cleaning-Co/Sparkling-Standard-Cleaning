@@ -409,7 +409,7 @@ test('reservation summary carries every answer and the call/text actions work', 
 
     await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
     const summaryText = (await page.locator('[data-reservation-scope]').textContent()) ?? '';
-    assert.match(summaryText, /Standard/);
+    assert.match(summaryText, /Residential house cleaning/);
     assert.match(summaryText, /One-time/);
     assert.match(summaryText, /1,600 sqft/);
     assert.match(summaryText, /Inside oven/);
@@ -678,6 +678,8 @@ test('eligible add-ons show their calculated price before selection and update w
     // Revisit the condition step and switch to recurring → $42/labor-hour.
     await page.click('[data-step-jump="3"]');
     await page.selectOption('#est-frequency', 'biweekly');
+    const deepAck = page.locator('input[name="initialDeepCleanAcknowledged"]');
+    if (await deepAck.isVisible()) await deepAck.check();
     await page.click('[data-next]');
     await page.waitForSelector('[data-addon-price="inside_oven"]:not(:empty)');
     assert.equal(await page.locator('[data-addon-price="inside_oven"]').textContent(), '+$25.20');
@@ -928,7 +930,7 @@ test('the thank-you page shows the single-use request summary exactly once', asy
     assert.equal(await card.isVisible(), true, 'the summary card renders from the stored receipt');
     const text = (await card.textContent()) ?? '';
     assert.match(text, /Reservation request/);
-    assert.match(text, /House cleaning \(standard\)/);
+    assert.match(text, /Residential house cleaning/);
     assert.match(text, /Every two weeks/);
     assert.match(text, /100 S Baylen St, Pensacola, FL 32502/);
     assert.match(text, /Tuesday, December 15, 2026/);

@@ -2,19 +2,19 @@
 
 Brand direction (owner directive): **bright modern home + feminine boutique + family warmth +
 subtle Southern character.** Premium, warm, trustworthy, energetic. Gold/champagne is an accent
-only. The final logo/name are PENDING — the system is built so changing them is a config change,
-not a redesign.
+only. The owner-approved circular logo replaced the old crest/wordmark lockup on 2026-10-19.
 
 ## Logo & brand assets
 
-- The mark (`public/brand/logo-mark.svg`, rendered by `Logo.astro`) is an abstract five-petal
-  rosette — floral, clean, scales to a favicon or a vehicle panel, with no clip-art mop or
-  spray bottle. Faith imagery stays absent by design (tasteful and secondary — a future decision
-  for the owner, not the engineering team).
-- **Wordmark:** driven by `business.displayName`. While PENDING, preview builds render
-  `PENDING_BUSINESS_NAME` with a preview badge; production is blocked by validation.
-- Regenerate favicons/OG assets after brand changes: `node scripts/generate-brand-images.mjs`.
-  Originals/alternates belong in `brand-source/` (owner-managed, not required to build).
+- The official mark (`logoSvg()` in `src/config/brand.ts`, rendered by `Logo.astro`) is a single
+  circular badge: script "Sparkling" above spaced "STANDARD", inside a gold ring with a few
+  sparkles. It carries no "Cleaning Co." descriptor or tagline; the full legal name stays in
+  metadata, structured data and the footer copyright.
+- **Wordmark:** the visual mark itself. Do not add symbols, descriptors or slogans without a new
+  owner decision.
+- Regenerate the favicon/PWA/social assets after brand changes:
+  `node scripts/generate-logo-assets.mjs` (the historical
+  `node scripts/generate-brand-images.mjs` command now aliases it).
 - Do not fabricate a final name or initials. Do not add sparkle/mop clip-art. Do not make the
   site metallic.
 
@@ -92,6 +92,5 @@ Add new names to the union; never inline one-off SVGs. Social glyphs live in
 
 ## Pending visual items
 
-- Final logo/wordmark and brand name (owner)
 - Real founder photography (owner)
 - Any color re-tuning after the founder approves a palette direction

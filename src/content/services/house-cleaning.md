@@ -57,4 +57,4 @@ If anything within the agreed scope doesn't meet your expectations, tell us prom
 
 A standard clean fits a home that is generally maintained and wants consistent attention. If your home hasn't been professionally cleaned in a while — or ever — the first visit may take more time, and the estimate will reflect that honestly instead of promising a price the home can't support.
 
-If you're unsure which service you need, run the estimate: it asks a few quick questions and tells you plainly, including when a deep clean or an initial detailed visit makes more sense.
+If you're unsure which service you need, run the estimate: it asks a few quick questions and tells you plainly, including when a Deep Cleaning is required before recurring service begins.

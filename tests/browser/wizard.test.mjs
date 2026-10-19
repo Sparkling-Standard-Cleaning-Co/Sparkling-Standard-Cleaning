@@ -109,11 +109,44 @@ async function fillHome(page) {
 
 async function fillCondition(page) {
   await page.selectOption('#est-frequency', 'biweekly');
+  const deepAck = page.locator('input[name="initialDeepCleanAcknowledged"]');
+  if (await deepAck.isVisible()) await deepAck.check();
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
   await page.click('[data-next]');
 }
+
+test('a new recurring residential request requires the Deep Cleaning acknowledgment', async () => {
+  const { context, page } = await openWizard(1440, 900);
+  try {
+    await fillStepOne(page);
+    await fillHome(page);
+    await page.selectOption('#est-frequency', 'biweekly');
+
+    const notice = page.locator('[data-recurring-deep]');
+    assert.equal(await notice.isVisible(), true, 'policy notice appears for recurring frequency');
+    const ack = page.locator('input[name="initialDeepCleanAcknowledged"]');
+    assert.equal(await ack.isVisible(), true, 'acknowledgment is visible');
+    assert.notEqual(await ack.getAttribute('required'), null, 'acknowledgment is required');
+
+    await page.click('label.option:has(input[name="condition"][value="maintained"])');
+    await page.selectOption('#est-last-clean', 'within_month');
+    await page.selectOption('#est-pets', 'none');
+    await page.click('[data-next]');
+    assert.equal(await activeStep(page), 3, 'cannot advance without acknowledging the Deep Cleaning');
+    assert.match(
+      (await page.locator('[data-error-for="initialDeepCleanAcknowledged"]').textContent()) ?? '',
+      /first recurring visit will be a Deep Cleaning/i,
+    );
+
+    await ack.check();
+    await page.click('[data-next]');
+    assert.equal(await activeStep(page), 4, 'advances after acknowledgment');
+  } finally {
+    await context.close();
+  }
+});
 
 async function fillExtrasAndScheduling(page) {
   await page.click('[data-next]'); // step 4: no add-ons

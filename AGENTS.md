@@ -82,7 +82,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   (`GTM-KSQ26HMG` / `G-LG222LQRQ2`, GTM Version 3 published, all three inquiry key events
   verified); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); eight confirmed
   social profiles rendering (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals);
-  owner-approved 2026-10-02 favicon/PWA icon kit installed.
+  owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
 - **Release status:** the 2026-10-03 release is **deployed to production** — `origin/main` =
   `62a1a46` (the five-commit release `8b8dde4`/`03d6ba8`/`53a85aa`/`0f3c38c`/`5a4a024`, the
   documentation closeout `7a51efa`, the social integration `cdc4971`, the deployment-closeout
@@ -183,12 +183,13 @@ Never publish unapproved promotional promises or activate binding pricing withou
   (`src/lib/analytics/events.ts`) with allowlisted payload keys. Never send names, emails, phones,
   addresses, ZIPs, photos, form contents or anything you would not publish on a billboard.
   Attribution (UTMs, referrer, ad click ids) is captured for LEAD RECORDS only.
-- Brand assets: browser/PWA icons come from the owner-approved 2026-10-02 favicon kit
+- Brand assets: browser/PWA icons and the social preview come from the owner-approved circular
+  logo (2026-10-19) and are generated together by `node scripts/generate-logo-assets.mjs`
   (`public/favicon.ico`, `favicon.svg`, `favicon-16/32/48/64/96/128/256.png`,
   `public/brand/apple-touch-icon.png`, `icon-192/512.png`, `icon-maskable-512.png`,
-  `public/site.webmanifest`). `scripts/generate-brand-images.mjs` intentionally does NOT regenerate
-  those; it only regenerates `og-default.png` and `logo-mark-soft.svg`. Do not overwrite the
-  approved icons.
+  `og-default.png`, `logo-mark*.svg`). The historical
+  `node scripts/generate-brand-images.mjs` command aliases the same generator. Do not overwrite
+  the approved icons with older artwork.
 
 ## System map — where the source of truth lives
 
@@ -312,7 +313,7 @@ required**, **whether a rebuild/regenerate step is needed**, and **what could br
 | `npm run validate:production` | Production environment gate (formal pre-launch checklist) |
 | `npm run marketing:links` | Regenerate UTM docs + decode-verified QR codes |
 | `npm run analytics:gtm` | Regenerate the GTM import files (`--check` mode via `analytics:gtm:verify`) |
-| `node scripts/generate-brand-images.mjs` | Regenerate `og-default.png` + soft mark (NOT the approved icons) |
+| `node scripts/generate-logo-assets.mjs` | Regenerate the circular logo's favicon/PWA/social assets (historical alias: `generate-brand-images.mjs`) |
 | `node scripts/fetch-fonts.mjs` | Refresh self-hosted fonts |
 
 Build notices like "The collection 'proof' does not exist or is empty" are expected while those
@@ -340,15 +341,19 @@ collections are intentionally empty — not errors.
   pin confirmation for streets the provider only knows by name), MapMap geocode and routing,
   Web3Forms delivery, consent-gated GTM container installation with verified website event
   generation, SMS, eight confirmed social profiles (Facebook, Nextdoor, TikTok, Pinterest,
-  Rumble, Gab, Parler, Locals), approved favicon kit, sitemap/robots, quote verification and owner
-  notification.
+  Rumble, Gab, Parler, Locals), the owner-approved circular logo/favicon kit (2026-10-19),
+  sitemap/robots, quote verification and owner notification. Published hours are **7:00 a.m. –
+  7:00 p.m., seven days per week**, sitewide. A new recurring residential maintenance arrangement
+  requires a **Deep Cleaning first, without exception**; the estimator requires explicit
+  acknowledgment and the lead relay rejects a recurring request without it.
 - **Address reliability (2026-10-02):** state matching parses both full names and USPS codes;
   partially typed street names match by safe prefix; same-state results rank by proximity to the
   public Pensacola centre; provider alternates include suffix expansion and a house-numberless
   street-level fallback. Exact house numbers are never fabricated. Live checks:
   `npm run address:check`. Rules and evidence: `docs/operations/ESTIMATOR-LOCATION-ENGINE.md`.
 - **Premium header + platform registry (2026-10-02):** the header/footer brand lockup uses the
-  approved crest with script "Sparkling", spaced "STANDARD", "Cleaning Co." and the tagline; the
+  owner-approved circular mark (2026-10-19): script "Sparkling" above spaced "STANDARD" inside a
+  gold ring with sparkles, with no "Cleaning Co." or tagline in the visual logo; the
   complete platform inventory (19 platforms) is prepared in `business.socials`, rendered only when
   a confirmed URL exists, and documented in `docs/marketing/PLATFORM-REGISTER.md`. Google Business
   Profile is **verified with its profile + review links captured (owner-supplied 2026-10-08)** —
@@ -366,11 +371,12 @@ collections are intentionally empty — not errors.
   undergoing verification** and **YouTube is deferred** by new Google Workspace account
   eligibility (not abandoned; no paid workarounds); never render a PENDING platform or publish an
   unconfirmed URL. Tracked links and the checklist: `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
-- **Brand A2 selected (2026-10-03):** the owner chose the romantic-script wordmark — Great Vibes
-  "Sparkling" + spaced serif "STANDARD", existing gold S crest, sparkles and pink blossom.
-  `DEFAULT_WORDMARK_TREATMENT`/`DEFAULT_WORDMARK_SCRIPT` in `src/components/Logo.astro` already
-  apply it (`romantic-script` / `great-vibes`); the temporary `/brand-preview/` comparison page
-  has been removed. Do not switch the treatment without a new owner decision.
+- **Circular logo kit (2026-10-19):** the owner replaced the old crest + descriptor + tagline
+  lockup with a single circular mark — script "Sparkling" above spaced "STANDARD" inside a gold
+  ring with sparkles. `logoSvg()` in `src/config/brand.ts` is the shared artwork; regenerate the
+  favicon/PWA/social assets with `node scripts/generate-logo-assets.mjs`. The full legal name
+  remains in metadata, structured data and the footer copyright. Do not add symbols, descriptors
+  or slogans to the mark without a new owner decision.
 - **GA4 operational (owner-confirmed 2026-10-03):** after the container was found empty, the owner
   published GTM Version 3 (`GTM-KSQ26HMG`) with one Google tag, 12 event tags, 12 triggers and 7
   data-layer variables. GA4 `G-LG222LQRQ2` receives page views, `estimate_start` and all three

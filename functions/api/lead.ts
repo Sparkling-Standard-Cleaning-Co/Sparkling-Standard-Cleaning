@@ -25,6 +25,8 @@ import {
   verifyReservationQuote,
   type QuoteVerificationEnv,
 } from '../../src/lib/estimate/verify.ts';
+import { requiresInitialDeepClean } from '../../src/lib/estimate/frequency.ts';
+import type { Frequency } from '../../src/lib/estimate/types.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
 import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
 import { schedulingConfig } from '../../src/config/scheduling.ts';
@@ -80,6 +82,7 @@ const SERVER_OWNED_KEYS = new Set([
   'travel_duration_minutes',
   'travel_verified',
   'travel_destination_source',
+  'initial_deep_clean_required',
 ]);
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -175,6 +178,22 @@ export async function onRequestPost(context: {
   // Require at least one contact channel.
   if (!clean.phone && !clean.email) {
     return json({ ok: false, error: 'invalid_request' }, 400);
+  }
+
+  // Owner policy (2026-10-19): a new recurring residential maintenance
+  // arrangement must begin with a Deep Cleaning. The server derives the policy
+  // from the sanitized scope and fails closed when the customer did not
+  // acknowledge it.
+  if (
+    requiresInitialDeepClean(
+      clean.service_type ?? '',
+      (clean.frequency ?? 'one_time') as Frequency,
+    )
+  ) {
+    if (clean.initial_deep_clean_acknowledged !== 'yes') {
+      return json({ ok: false, error: 'deep_clean_required' }, 400);
+    }
+    clean.initial_deep_clean_required = 'yes';
   }
 
   // Turnstile verification when the secret is configured.

@@ -153,6 +153,7 @@ const customerFields = {
   email: 'synthetic@example.com',
   service_type: 'standard',
   frequency: 'biweekly',
+  initial_deep_clean_acknowledged: 'yes',
   service_address: '100 S Baylen St',
   address_city: 'Pensacola',
   address_state: 'FL',
@@ -203,7 +204,7 @@ test('lead: a successful owner delivery sends exactly one branded customer confi
     assert.deepEqual(body.to, ['synthetic@example.com'], 'correct recipient');
     assert.equal(body.subject, 'We received your Sparkling Standard request', 'correct subject');
     assert.match(String(body.html), /We received your request/, 'HTML body generated');
-    assert.match(String(body.html), /House cleaning \(standard\)/);
+    assert.match(String(body.html), /Residential house cleaning/);
     assert.match(String(body.text), /WE RECEIVED YOUR REQUEST/, 'plain-text body generated');
     assert.match(String(body.text), /100 S Baylen St, Pensacola, FL 32502/);
     const headers = resendCalls[0].init?.headers as Record<string, string>;
@@ -291,6 +292,36 @@ test('lead: without the Resend secret the lead still succeeds and no confirmatio
     assert.deepEqual(payload, { ok: true });
     assert.equal(calls.filter((call) => call.url.includes('api.resend.com')).length, 0);
     assert.equal(JSON.stringify(payload).includes('RESEND'), false, 'no configuration detail in the response');
+  });
+});
+
+test('lead: a recurring residential request must acknowledge the required Deep Cleaning', async () => {
+  await withRoutedFetch({}, async (calls) => {
+    const fields = { ...customerFields };
+    delete (fields as Record<string, string>)['initial_deep_clean_acknowledged'];
+    const response = await leadPost({
+      request: jsonRequest({ subject: 'x', fields }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
+    } as never);
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { ok: false, error: 'deep_clean_required' });
+    assert.equal(calls.filter((call) => call.url.includes('api.web3forms.com')).length, 0);
+    assert.equal(calls.filter((call) => call.url.includes('api.resend.com')).length, 0);
+  });
+});
+
+test('lead: an acknowledged recurring request tells the owner the first visit is a Deep Cleaning', async () => {
+  await withRoutedFetch({}, async (calls) => {
+    const response = await leadPost({
+      request: jsonRequest({ subject: 'x', fields: customerFields }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
+    } as never);
+    assert.equal(response.status, 200);
+    const web3forms = calls.find((call) => call.url.includes('api.web3forms.com'));
+    assert.ok(web3forms);
+    const body = JSON.parse(String(web3forms.init?.body)) as Record<string, string>;
+    assert.match(body['Inquiry — Initial Deep Cleaning'] ?? '', /REQUIRED before recurring residential maintenance service/);
+    assert.equal(body['Summary — Action'], 'Initial Deep Cleaning required before recurring maintenance service');
   });
 });
 

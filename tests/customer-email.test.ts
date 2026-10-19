@@ -89,7 +89,7 @@ test('a valid request sends one branded confirmation with the fixed subject', as
       assert.equal(body.from, DEFAULT_CUSTOMER_EMAIL_FROM);
       assert.equal(body.reply_to, DEFAULT_CUSTOMER_EMAIL_REPLY_TO);
       assert.match(String(body.html), /We received your request/);
-      assert.match(String(body.html), /House cleaning \(standard\)/);
+      assert.match(String(body.html), /Residential house cleaning/);
       assert.match(String(body.text), /WE RECEIVED YOUR REQUEST/);
       assert.match(String(body.text), /100 S Baylen St, Pensacola, FL 32502/);
       assert.doesNotMatch(String(body.subject), /booking confirmed|receipt|invoice/i);

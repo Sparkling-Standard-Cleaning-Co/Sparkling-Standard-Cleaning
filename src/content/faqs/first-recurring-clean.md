@@ -1,6 +1,9 @@
 ---
-question: Does my first recurring clean cost more?
-answer: Often, yes — honestly. A home that hasn't had professional cleaning recently takes more time on the first visit, and the estimate reflects that instead of pretending otherwise. After the first visit, the home settles into its rhythm and recurring visits settle into their per-visit value. If the estimate sees signs the home needs an initial detailed clean, it will flag that before you request.
+question: Does my first recurring cleaning require a Deep Cleaning?
+answer: |
+  Yes. A Deep Cleaning is required before every new recurring residential maintenance arrangement begins, without exceptions. The deep clean resets the home to the standard that recurring visits are designed to maintain, and it lets us confirm the real condition of the space before agreeing to a schedule.
+
+  Once the Deep Cleaning is complete, recurring visits settle into their rhythm. The estimate shows your ongoing per-visit price; Sparkling Standard confirms the initial Deep Cleaning scope and price personally before anything is booked.
 category: recurring
 order: 1
 ---

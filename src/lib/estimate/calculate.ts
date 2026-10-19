@@ -14,7 +14,8 @@ import type { AddonBundleDefinition, FoundingTenConfig, PromotionCustomerKind, P
 import { calculateTravelAdjustment } from '../travel/calculateTravelAdjustment.ts';
 import { resolveAddonCharge, selectAddons } from './addons.ts';
 import { computeLaborHours } from './labor.ts';
-import { recurringResetSuggested } from './frequency.ts';
+import { recurringResetSuggested, requiresInitialDeepClean } from './frequency.ts';
+import { schedulingConfig } from '../../config/scheduling.ts';
 import { evaluatePromotions } from './promotions.ts';
 import { validateEstimateInput } from './validation.ts';
 import type {
@@ -303,7 +304,13 @@ export function calculateEstimate(
     });
   }
 
-  if (recurringResetSuggested(input.frequency, input.lastClean)) {
+  if (requiresInitialDeepClean(input.serviceType, input.frequency)) {
+    flags.push({
+      code: 'INITIAL_DEEP_CLEAN_REQUIRED',
+      severity: 'info',
+      message: schedulingConfig.recurringResidential.message,
+    });
+  } else if (recurringResetSuggested(input.frequency, input.lastClean)) {
     flags.push({
       code: 'INITIAL_DETAILED_CLEAN_SUGGESTED',
       severity: 'info',

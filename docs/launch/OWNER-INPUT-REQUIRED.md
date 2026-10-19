@@ -105,8 +105,8 @@ requests only. Full workflow: `docs/operations/GIFT-CERTIFICATES.md`.
 
 | # | Item | Notes |
 | --- | --- | --- |
-| 18 | Final logo + real founder photos | **Icon kit done 2026-10-02:** the owner-approved favicon/PWA icon kit replaces the old placeholders. Genuine founder/project photography is still outstanding; licensed representative interiors are registered in `docs/design/IMAGE-SOURCE-REGISTER.md` and replaced when real photos arrive. |
-| 19 | Real proof entries (before/after) | `src/content/proof/` — homepage already shows the honest explainer. |
+| 18 | Final logo + real founder photos | **Logo done 2026-10-19:** the owner-approved circular logo replaces the old crest/descriptor/tagline lockup, with regenerated favicon/PWA/social assets. Genuine founder/project photography is still outstanding; licensed representative interiors are registered in `docs/design/IMAGE-SOURCE-REGISTER.md` and replaced when real photos arrive. |
+| 19 | Real proof entries (before/after) | `src/content/proof/` — the homepage proof section was removed in the 2026-10-19 audit; proof stays internal until genuine entries exist. |
 | 20 | Genuine reviews | `src/content/reviews/` — section appears automatically when entries exist. |
 | 21 | Insurance/bonding details | Only publish when real; schema/claims currently omit them. |
 | 22 | Licensed trade info (if any) | Same rule as above. |

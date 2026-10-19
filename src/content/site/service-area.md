@@ -2,9 +2,8 @@
 metaTitle: Service Area | Pensacola, Cantonment & Surrounding Communities
 metaDescription: We serve Pensacola, Cantonment and surrounding communities, with select nearby service into Alabama. Check your ZIP in the instant estimate to see coverage.
 hero:
-  headline: Local to Pensacola.
-  accent: Honest about distance.
-  lead: We serve Pensacola, Cantonment and surrounding communities, with select nearby service into Alabama. When a location is a stretch for us, we say so — and we handle travel openly instead of hiding it in vague pricing.
+  headline: Serving Pensacola, Cantonment, and beyond
+  lead: Proudly local to the Pensacola/Cantonment area, servicing surrounding Florida and Alabama communities depending on distance.
   ctaLabel: Check Your ZIP in the Estimate
 communities:
   heading: Where we clean

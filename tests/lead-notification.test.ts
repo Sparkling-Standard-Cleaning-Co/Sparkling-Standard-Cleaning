@@ -84,7 +84,7 @@ test('a recurring reservation reads as an ordered business summary', () => {
   const labels = Object.keys(notification);
 
   assert.match(notification['Inquiry — Type'] ?? '', /Reservation request/);
-  assert.equal(notification['Inquiry — Service'], 'House cleaning (standard)');
+  assert.equal(notification['Inquiry — Service'], 'Residential house cleaning');
   assert.equal(notification['Inquiry — Frequency'], 'Every two weeks');
   assert.equal(notification['Contact — Name'], 'Synthetic Customer');
   assert.equal(notification['Contact — Phone'], '8500000000');
@@ -346,7 +346,7 @@ test('the at-a-glance summary leads the email with the triage facts', () => {
   const labels = Object.keys(notification);
   assert.equal(labels[0], 'Summary — Request');
   assert.match(notification['Summary — Request'] ?? '', /Reservation request/);
-  assert.match(notification['Summary — Request'] ?? '', /House cleaning \(standard\)/);
+  assert.match(notification['Summary — Request'] ?? '', /Residential house cleaning/);
   assert.match(notification['Summary — Request'] ?? '', /Every two weeks/);
   assert.equal(
     notification['Summary — Customer'],

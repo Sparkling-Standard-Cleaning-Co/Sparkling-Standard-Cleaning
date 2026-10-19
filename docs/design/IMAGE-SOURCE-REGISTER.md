@@ -11,10 +11,10 @@ otherwise.
 
 **Genuine owner-supplied imagery (not stock):** `src/assets/images/hayli-founder.webp` — the
 official founder portrait of Hayli, supplied by the owner on 2026-10-03 and displayed on
-`/about/` with the visible identification "Hayli, Founder & Owner-Operator". It is genuine
-owner-provided material (not representative stock, not AI-generated); it does not appear in the
-stock table below. Do not reuse or republish it on unrelated pages, and do not alter the person's
-appearance.
+`/about/` and in the homepage founder story with the visible identification "Hayli, Founder &
+Owner-Operator". It is genuine owner-provided material (not representative stock, not
+AI-generated); it does not appear in the stock table below. Do not reuse or republish it on
+unrelated pages, and do not alter the person's appearance.
 
 ## Licence
 
@@ -32,7 +32,7 @@ this business. No paid licence, subscription or API key is involved.
 | `src/assets/images/bedroom-made.jpg` | https://www.pexels.com/photo/a-tidy-bedroom-of-a-model-home-7648860/ | Christopher Moon | 2026-10-02 | Home short-term-rental band |
 | `src/assets/images/empty-room-moveout.jpg` | https://www.pexels.com/photo/bright-empty-room-with-wooden-flooring-35493909/ | Peter Vang | 2026-10-02 | Home move-out band |
 | `src/assets/images/office-planted.jpg` | https://www.pexels.com/photo/empty-interior-of-a-modern-office-16254452/ | Rodeo Software | 2026-10-02 | Home commercial band |
-| `src/assets/images/kitchen-sink-detail.jpg` | https://www.pexels.com/photo/view-of-a-kitchen-with-white-cabinets-and-a-silver-sink-19836790/ | Lisa Anna | 2026-10-02 | Home founder/details card |
+| `src/assets/images/kitchen-sink-detail.jpg` | https://www.pexels.com/photo/view-of-a-kitchen-with-white-cabinets-and-a-silver-sink-19836790/ | Lisa Anna | 2026-10-02 | Retained library asset (removed from the homepage in the 2026-10-19 audit) |
 
 ## Replacement policy
 

@@ -1,5 +1,6 @@
 ---
 import { pricing } from '../config/pricing';
+import { schedulingConfig } from '../config/scheduling';
 import { business, contactPhone, isPending } from '../config/business';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
 import { US_STATES } from '../lib/location/location';
@@ -89,8 +90,8 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
               <input type="radio" name="serviceType" value="standard" required />
               <span class="option__control"></span>
               <span>
-                <span class="option__label">Standard / one-time house cleaning</span>
-                <span class="option__desc">A thorough clean of a maintained home.</span>
+                <span class="option__label">Residential house cleaning</span>
+                <span class="option__desc">A thorough clean of a maintained home, one-time or recurring. New recurring customers begin with a required Deep Cleaning.</span>
               </span>
             </label>
             <label class="option">
@@ -316,6 +317,19 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             <option value="one_time">One-time</option>
           </select>
           <span class="hint">Recurring homes stay more maintainable, so per-visit value improves.</span>
+        </div>
+        <div class="policy-notice" data-recurring-deep hidden>
+          <p class="policy-notice__title">Your first visit is a Deep Cleaning</p>
+          <p>{schedulingConfig.recurringResidential.message}</p>
+          <label class="policy-notice__confirm">
+            <input
+              type="checkbox"
+              name="initialDeepCleanAcknowledged"
+              value="yes"
+              data-error-required="Please confirm that your first recurring visit will be a Deep Cleaning."
+            />
+            <span>I understand my first recurring visit will be a Deep Cleaning.</span>
+          </label>
         </div>
         <fieldset class="field" data-group-error="condition" data-group-message="Please choose the home's current condition.">
           <legend>What condition is the home in today?</legend>

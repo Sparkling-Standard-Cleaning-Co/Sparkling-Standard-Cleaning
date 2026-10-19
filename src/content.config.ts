@@ -169,6 +169,8 @@ const reviews = defineCollection({
 const heroSchema = z.object({
   headline: z.string().optional(),
   accent: z.string().optional(),
+  /** A single highlight word/phrase rendered in the display accent style. */
+  highlight: z.string().optional(),
   tail: z.string().optional(),
   lead: z.string(),
   ctaLabel: z.string().optional(),
@@ -194,7 +196,7 @@ const site = defineCollection({
 
     // Home
     servicesIntro: z
-      .object({ eyebrow: z.string(), heading: z.string(), lead: z.string().optional() })
+      .object({ eyebrow: z.string().optional(), heading: z.string(), lead: z.string().optional() })
       .optional(),
     recurringPlans: z
       .object({
@@ -215,15 +217,23 @@ const site = defineCollection({
       .optional(),
     founderBand: z
       .object({
-        eyebrow: z.string(),
+        eyebrow: z.string().optional(),
         heading: z.string(),
         paragraphs: z.array(z.string()),
         linkLabel: z.string().optional(),
       })
       .optional(),
     estimateBand: z
-      .object({ eyebrow: z.string(), heading: z.string(), text: z.string(), ctaLabel: z.string() })
+      .object({
+        eyebrow: z.string(),
+        heading: z.string(),
+        text: z.string(),
+        body: z.string().optional(),
+        ctaLabel: z.string(),
+      })
       .optional(),
+    /** FAQ ids shown on the homepage, in the owner-approved order. */
+    homeFaqIds: z.array(z.string()).default([]),
     recurringBand: z
       .object({ eyebrow: z.string(), heading: z.string(), text: z.string(), linkLabel: z.string() })
       .optional(),
@@ -247,7 +257,7 @@ const site = defineCollection({
       })
       .optional(),
     areaBand: z
-      .object({ eyebrow: z.string(), heading: z.string(), text: z.string() })
+      .object({ eyebrow: z.string().optional(), heading: z.string(), text: z.string() })
       .optional(),
     finalCta: z
       .object({ heading: z.string(), text: z.string().optional() })

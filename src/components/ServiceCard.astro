@@ -14,7 +14,7 @@ interface Props {
 const { title, summary, href, icon, cta = 'Learn more', featured = false } = Astro.props;
 ---
 
-<article class:list={['card', 'card--link', featured && 'card--feature']}>
+<article class:list={['card', 'card--link', 'service-card', featured && 'card--feature']}>
   <span class="card__icon"><Icon name={icon} /></span>
   <h3 class="card__title"><a href={href}>{title}</a></h3>
   <p class="card__text">{summary}</p>

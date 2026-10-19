@@ -79,13 +79,19 @@ test('monthly recurring costs more per visit than weekly but less than one-time'
   assert.ok((monthly.expectedPrice ?? 0) <= (oneTime.expectedPrice ?? 0));
 });
 
-test('recurring request for a long-neglected home flags an initial detailed clean', () => {
+test('every recurring residential request flags the required initial Deep Cleaning', () => {
   const result = calculateEstimate(
     input({ frequency: 'biweekly', lastClean: 'never_professional', condition: 'average' }),
     context(),
   );
   assert.equal(result.status, 'estimated');
-  assert.ok(result.flags.some((flag) => flag.code === 'INITIAL_DETAILED_CLEAN_SUGGESTED'));
+  assert.ok(result.flags.some((flag) => flag.code === 'INITIAL_DEEP_CLEAN_REQUIRED'));
+});
+
+test('a one-time residential clean does not flag the recurring Deep Cleaning requirement', () => {
+  const result = calculateEstimate(input({ frequency: 'one_time' }), context());
+  assert.equal(result.status, 'estimated');
+  assert.ok(!result.flags.some((flag) => flag.code === 'INITIAL_DEEP_CLEAN_REQUIRED'));
 });
 
 // ── Service types ────────────────────────────────────────────────────────────

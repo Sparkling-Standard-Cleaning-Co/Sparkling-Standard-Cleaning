@@ -177,8 +177,8 @@ export const pricing = {
    */
   recurringReset: {
     flagWhenLastCleanIn: ['over_a_year', 'never_professional'] as LastProfessionalClean[],
-    message: 'Initial Detailed Clean May Be Required',
-    note: 'Flags only — the founder keeps discretion. Never force every new recurring customer into a deep clean.',
+    message: 'A Deep Cleaning may be recommended for this returning home',
+    note: 'Flags an additional reset for returning clients whose home has accumulated buildup. The mandatory initial Deep Cleaning for every new recurring residential arrangement is enforced separately and without exception.',
   },
 
   // ── Add-ons (directive §19) ────────────────────────────────────────────────

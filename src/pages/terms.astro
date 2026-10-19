@@ -67,23 +67,43 @@ const phone = contactPhone();
               appointments use an arrival window.
             </li>
             <li>
-              We clean {business.hours.days.toLowerCase()}, generally between
-              {business.hours.residentialWindow}. Commercial work can be scheduled outside those
-              hours by agreement.
+              We clean {business.hours.days.toLowerCase()}, between {business.hours.residentialWindow}.
+              Commercial work is scheduled within the same published hours, with timing agreed
+              during the walkthrough.
             </li>
             <li>A home takes as long as it honestly takes; we do not rush jobs to protect a clock.</li>
           </ul>
         </section>
 
         <section>
+          <h2>Recurring residential cleaning</h2>
+          <ul>
+            <li>
+              A new recurring residential maintenance arrangement requires a Deep Cleaning before
+              maintenance service begins. There are no exceptions.
+            </li>
+            <li>
+              The initial Deep Cleaning is scoped and priced separately; recurring visits begin after
+              it is complete.
+            </li>
+          </ul>
+        </section>
+
+        <section>
           <h2>Payment</h2>
           <ul>
-            <li>Residential cleaning is payable after the cleaning is complete.</li>
+            <li>
+              For a Residential Deep Cleaning, payment is due after the cleaning is complete so you
+              can see the results before you pay.
+            </li>
+            <li>
+              For recurring cleaning arrangements and commercial services, billing terms are discussed
+              and agreed upon during the walkthrough or when your service is confirmed.
+            </li>
             <li>
               Accepted methods include {business.payments.accepted.join(', ')}, plus{' '}
               {business.payments.alternate.join(', ')}.
             </li>
-            <li>Commercial and recurring arrangements are invoiced on the schedule agreed in the scope.</li>
           </ul>
         </section>
 

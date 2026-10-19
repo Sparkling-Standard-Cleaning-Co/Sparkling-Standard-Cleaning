@@ -228,7 +228,7 @@ test('the old inline contact-column social icons are gone (no duplicates)', asyn
     assert.equal(socialLists, 1, 'exactly one social link list');
     // The contact column must not carry its own social links anymore.
     const contactLinks = await page
-      .locator('.site-footer__grid a[href*="facebook.com"], .site-footer__grid a[href*="nextdoor.com"]')
+      .locator('.site-footer__contact a[href*="facebook.com"], .site-footer__contact a[href*="nextdoor.com"]')
       .count();
     assert.equal(contactLinks, 0, 'no duplicated social icons inside the contact column');
   } finally {

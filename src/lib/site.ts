@@ -3,26 +3,32 @@
 export interface NavItem {
   label: string;
   href: string;
+  children?: NavItem[];
 }
 
-/** Desktop primary navigation (keep short). */
-export const primaryNav: NavItem[] = [
-  { label: 'House Cleaning', href: '/house-cleaning/' },
-  { label: 'Recurring', href: '/recurring-cleaning/' },
+/** The five primary cleaning categories, in the owner-approved order. */
+export const cleaningTypesNav: NavItem[] = [
+  { label: 'Recurring Residential Cleaning', href: '/recurring-cleaning/' },
   { label: 'Deep Cleaning', href: '/deep-cleaning/' },
-  { label: 'Rentals', href: '/short-term-rental-cleaning/' },
-  { label: 'Commercial', href: '/commercial-cleaning/' },
+  { label: 'Move-in and Move-out Cleaning', href: '/move-in-move-out-cleaning/' },
+  { label: 'Short-term Rental Turnover Cleaning', href: '/short-term-rental-cleaning/' },
+  { label: 'Commercial Cleaning', href: '/commercial-cleaning/' },
+];
+
+/** Desktop primary navigation: the Types of Cleanings dropdown plus About. */
+export const primaryNav: NavItem[] = [
+  {
+    label: 'Types of Cleanings',
+    href: '/recurring-cleaning/',
+    children: cleaningTypesNav,
+  },
   { label: 'About', href: '/about/' },
 ];
 
-/** Footer services column (includes the long-tail pages). */
+/** Footer services column — the five primary categories plus the supporting pages. */
 export const footerServicesNav: NavItem[] = [
+  ...cleaningTypesNav,
   { label: 'House Cleaning', href: '/house-cleaning/' },
-  { label: 'Recurring Cleaning', href: '/recurring-cleaning/' },
-  { label: 'Deep Cleaning', href: '/deep-cleaning/' },
-  { label: 'Move-In / Move-Out', href: '/move-in-move-out-cleaning/' },
-  { label: 'Short-Term Rental Turnovers', href: '/short-term-rental-cleaning/' },
-  { label: 'Commercial Cleaning', href: '/commercial-cleaning/' },
   { label: 'Church Cleaning', href: '/church-cleaning/' },
 ];
 
@@ -32,8 +38,11 @@ export const footerCompanyNav: NavItem[] = [
   { label: 'Get an Estimate', href: '/estimate/' },
   { label: 'Contact', href: '/contact/' },
   { label: 'FAQ', href: '/faq/' },
+  { label: 'Privacy Policy', href: '/privacy/' },
+  { label: 'Terms of Service', href: '/terms/' },
 ];
 
+/** Kept for scripts that reference the historical footer resources list. */
 export const footerResourcesNav: NavItem[] = [
   { label: 'Instant Estimate', href: '/estimate/' },
   { label: 'Privacy Policy', href: '/privacy/' },

@@ -93,10 +93,9 @@ const facilityTypes = [
       <label for="commercial-time">Preferred time window</label>
       <select class="select" id="commercial-time" name="time_preference" required>
         <option value="">When should we clean?</option>
+        <option value="early-morning">Early morning (from 7:00 a.m.)</option>
         <option value="daytime">Daytime</option>
-        <option value="before-hours">Before opening</option>
-        <option value="after-hours">After closing</option>
-        <option value="overnight">Overnight</option>
+        <option value="evening">Evening (until 7:00 p.m.)</option>
         <option value="flexible">Flexible / discuss</option>
       </select>
     </div>
@@ -105,7 +104,7 @@ const facilityTypes = [
   <div class="field-row field-row--2">
     <div class="field">
       <label for="commercial-days">Preferred days</label>
-      <input class="input" id="commercial-days" name="preferred_days" type="text" placeholder="e.g. Tuesday & Friday evenings" />
+      <input class="input" id="commercial-days" name="preferred_days" type="text" placeholder="e.g. Tuesday & Friday mornings" />
     </div>
     <div class="field">
       <label for="commercial-walkthrough">Preferred walkthrough date</label>

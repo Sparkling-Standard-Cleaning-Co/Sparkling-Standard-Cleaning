@@ -1,6 +1,6 @@
 ---
 import { business, contactPhone } from '../config/business';
-import { primaryNav } from '../lib/site';
+import { cleaningTypesNav, primaryNav } from '../lib/site';
 import Logo from './Logo.astro';
 import Icon from './Icon.astro';
 import PendingNote from './PendingNote.astro';
@@ -17,13 +17,38 @@ const isActive = (href: string) => pathname === href || (href !== '/' && pathnam
     <nav class="site-nav" aria-label="Primary">
       <ul class="site-nav__links">
         {
-          primaryNav.map((item) => (
-            <li>
-              <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
-                {item.label}
-              </a>
-            </li>
-          ))
+          primaryNav.map((item) =>
+            item.children ? (
+              <li>
+                <details class="nav-dropdown" data-nav-dropdown>
+                  <summary
+                    class="nav-dropdown__trigger"
+                    aria-current={
+                      item.children.some((child) => pathname.startsWith(child.href)) ? 'page' : undefined
+                    }
+                  >
+                    {item.label}
+                    <Icon name="chevron-down" size={14} />
+                  </summary>
+                  <ul class="nav-dropdown__menu">
+                    {item.children.map((child) => (
+                      <li>
+                        <a href={child.href} aria-current={pathname.startsWith(child.href) ? 'page' : undefined}>
+                          {child.label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            ) : (
+              <li>
+                <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+                  {item.label}
+                </a>
+              </li>
+            ),
+          )
         }
       </ul>
       {
@@ -34,7 +59,7 @@ const isActive = (href: string) => pathname === href || (href !== '/' && pathnam
           </a>
         )
       }
-      <a class="btn btn--primary btn--small" href="/estimate/" data-cta="header-estimate">Get Instant Estimate</a>
+      <a class="btn btn--primary btn--small" href="/estimate/" data-cta="header-estimate">Instant Estimate</a>
       {!phone && <PendingNote label="Phone" />}
     </nav>
 
@@ -52,23 +77,28 @@ const isActive = (href: string) => pathname === href || (href !== '/' && pathnam
 
   <div class="container">
     <nav id="mobile-nav" class="mobile-nav" data-nav-panel data-open="false" aria-label="Mobile">
+      <div class="mobile-nav__group">
+        <p class="mobile-nav__group-label">Types of Cleanings</p>
+        <ul class="mobile-nav__links mobile-nav__links--nested">
+          {
+            cleaningTypesNav.map((item) => (
+              <li>
+                <a href={item.href} aria-current={pathname.startsWith(item.href) ? 'page' : undefined}>
+                  {item.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
       <ul class="mobile-nav__links">
-        {
-          primaryNav.map((item) => (
-            <li>
-              <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
-                {item.label}
-              </a>
-            </li>
-          ))
-        }
-        <li><a href="/move-in-move-out-cleaning/">Move-In / Move-Out</a></li>
+        <li><a href="/about/" aria-current={isActive('/about/') ? 'page' : undefined}>About</a></li>
         <li><a href="/service-area/">Service Area</a></li>
         <li><a href="/contact/">Contact</a></li>
         <li><a href="/faq/">FAQ</a></li>
       </ul>
       <div class="btn-row" style="margin-top: var(--space-4)">
-        <a class="btn btn--primary btn--block" href="/estimate/">Get Instant Estimate</a>
+        <a class="btn btn--primary btn--block" href="/estimate/">Instant Estimate</a>
         {
           phone && (
             <>
@@ -96,4 +126,21 @@ const isActive = (href: string) => pathname === href || (href !== '/' && pathnam
     panel?.setAttribute('data-open', String(!open));
     toggle.setAttribute('aria-expanded', String(!open));
   });
+
+  const dropdowns = document.querySelectorAll<HTMLDetailsElement>('[data-nav-dropdown]');
+  document.addEventListener('click', (event) => {
+    for (const dropdown of dropdowns) {
+      if (dropdown.open && event.target instanceof Node && !dropdown.contains(event.target)) {
+        dropdown.open = false;
+      }
+    }
+  });
+  for (const dropdown of dropdowns) {
+    dropdown.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        dropdown.open = false;
+        dropdown.querySelector<HTMLElement>('summary')?.focus();
+      }
+    });
+  }
 </script>

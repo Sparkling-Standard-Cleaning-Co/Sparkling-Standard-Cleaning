@@ -1,28 +1,28 @@
 ---
 title: Deep Cleaning
-metaTitle: Deep House Cleaning in Pensacola & Cantonment
-metaDescription: Deep cleaning for Pensacola-area homes that need more than maintenance — hand-wiped baseboards, detailed doors and frames, wall spot-cleaning and the buildup a standard clean misses.
-summary: A detailed reset for homes that need real attention — the baseboards wiped by hand, the frames and doors detailed, the buildup other cleans walk past.
+metaTitle: Deep Cleaning in Pensacola & Cantonment
+metaDescription: Deep cleaning for Pensacola-area homes that need extra care and attention — hand-wiped baseboards and blinds, detailed walls and doors, and the buildup a standard clean misses. Required before new recurring service.
+summary: An in-depth reset for a home that needs extra care and attention. Our deep cleaning service focuses on areas that can get buildup over time, from hand wiping baseboards and blinds to detailing walls and doors. We go beyond the basics to leave your home feeling renewed, and thoroughly clean.
 icon: star
 order: 3
 path: /deep-cleaning/
-serviceType: Deep house cleaning
+serviceType: Deep cleaning
 heroEyebrow: Deep cleaning
-heroLead: This is the clean for the home that has been waiting. Slower, more detailed, and honest about what a deep clean can and cannot change.
+heroLead: An in-depth reset for a home that needs extra care and attention. Our deep cleaning service focuses on areas that can get buildup over time, from hand wiping baseboards and blinds to detailing walls and doors.
 includes:
   - Everything in a standard clean, plus
   - Baseboards hand-wiped instead of a dry dust pass
-  - Doors and door frames detailed, including the edges people touch
+  - Blinds and window sills detailed
+  - Walls and doors detailed, including the edges people touch
   - Wall spot-cleaning where the finish allows
   - Damp dusting where the surface calls for it
-  - Blinds and window sills detailed
   - Extra attention to visible soil and buildup throughout
   - More detailed cabinet fronts and kitchen/bath detail work
 goodFor:
   - Homes that have not had professional cleaning in a long time
-  - Spring cleaning, big events, or a fresh start after a season of chaos
-  - Homes being prepared for guests, family gatherings or a new chapter
-  - Anyone who wants to see what "detailed" actually means before choosing recurring service
+  - One-time cleanings and seasonal resets
+  - Every new recurring residential customer — a Deep Cleaning is required before maintenance service begins
+  - Anyone who wants to see what "detailed" actually means
 notIncluded:
   - Stain removal on every surface (we care for finishes first and never promise a perfect result on every mark)
   - Restoration or repair work of any kind
@@ -31,27 +31,29 @@ notIncluded:
 faqIds:
   - deep-vs-standard
   - deep-what-included
+  - first-recurring-clean
   - how-estimate-works
-  - products-preference
   - exclusions
 related:
-  - /house-cleaning/
   - /recurring-cleaning/
+  - /house-cleaning/
   - /move-in-move-out-cleaning/
-ctaLabel: Get Instant Estimate
+ctaLabel: Instant Estimate
 checklistId: deep-clean
 ---
 
 ## What "deep" really means here
 
-Deep cleaning is not standard cleaning done faster or slower — it's a different scope. The visible surfaces still get cleaned, but the time goes into what most cleans skip: baseboards wiped by hand so the dust is actually removed, doors and frames detailed, switch plates and edges cleaned, walls spot-treated where the finish allows.
+Deep cleaning is not standard cleaning done faster or slower — it's a different scope. The visible surfaces still get cleaned, but the time goes into what most cleans skip: baseboards wiped by hand so the dust is actually removed, blinds and sills detailed, walls and doors carefully cleaned, and the edges people touch attended to.
 
 It's also the service where the founder's detail philosophy matters most. A deep clean is the difference between a room that looks clean from the doorway and a room that holds up when you look closer.
+
+## One-time reset — and the required first step for recurring service
+
+This service is ideal for one-time cleanings and is required before beginning recurring residential maintenance cleaning. It's also recommended for returning clients when dirt, grime, or buildup begins to accumulate beyond what routine maintenance cleaning is designed to address.
+
+If you are starting a recurring plan, the Deep Cleaning comes first. There are no exceptions to that sequence: it establishes the standard the recurring visits are meant to maintain, and it gives us an honest look at the home before a schedule is agreed.
 
 ## Careful where it counts
 
 Walls, paint and finishes require judgment, and we use it: the right product for the right surface, damp dusting where dry dusting would just move dirt around, and a careful approach around anything delicate. We never promise that every stain will disappear — some marks belong to the finish, not the dirt — but we will tell you honestly what we expect before we start.
-
-## Deep cleaning and the reset
-
-A deep clean works as a one-time reset, or as the occasional seasonal visit for recurring customers who want to catch the details that regular maintenance doesn't cover. If your home has been neglected for a while, the estimate will tell you when a deep clean — or an initial detailed clean before recurring service — is the honest recommendation.
