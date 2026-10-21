@@ -15,6 +15,7 @@
 //    reviews supplied by the owner.
 
 import { business, isPending, siteName } from '../config/business';
+import { brandWords } from '../config/brand';
 
 type JsonLdNode = Record<string, unknown>;
 
@@ -44,7 +45,7 @@ export function localBusinessNode(site: URL, socialUrls: string[]): JsonLdNode {
     logo: new URL('/brand/icon-512.png', site).href,
     priceRange: '$$',
     description: business.serviceArea.summary,
-    slogan: 'The Details Are Our Standard.',
+    slogan: brandWords.tagline,
     telephone: isPending(business.phone) ? undefined : business.phone.e164,
     email: isPending(business.email) ? undefined : business.email,
     legalName: isPending(business.legalName) ? undefined : business.legalName,

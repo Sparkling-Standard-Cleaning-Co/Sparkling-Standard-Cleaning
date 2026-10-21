@@ -1,5 +1,6 @@
 ---
 import { business, isPending, siteName } from '../config/business';
+import { brandWords } from '../config/brand';
 import { footerServicesNav, footerCompanyNav } from '../lib/site';
 import Logo from './Logo.astro';
 import SocialLinks from './SocialLinks.astro';
@@ -17,6 +18,7 @@ const socialEntries = Object.values(business.socials).filter(
     <div class="site-footer__grid">
       <div class="site-footer__brand">
         <Logo class="brand" />
+        <p class="site-footer__tagline">{brandWords.tagline}</p>
         {
           socialEntries.length > 0 && (
             <section class="social-follow social-follow--bubble" data-social-follow aria-labelledby="social-follow-heading">

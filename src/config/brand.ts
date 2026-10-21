@@ -15,7 +15,7 @@ export const brandWords = {
   caps: 'Standard',
   capsDisplay: 'STANDARD',
   descriptor: 'Cleaning Co.',
-  tagline: 'The Details Are Our Standard.',
+  tagline: 'Leaving Your Space Sparkling.',
 } as const;
 
 /** Exact token values used by the print system (verified against tokens.css). */

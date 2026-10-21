@@ -24,7 +24,7 @@ commercial properties and churches) are supported through the same content and o
 but they do not replace the recurring residential focus.
 
 **Brand:** premium, feminine, elegant, warm and trustworthy; pink and gold; approved slogan
-**The Details Are Our Standard.** Hayli — founder and owner-operator — is the recognizable face of
+**Leaving Your Space Sparkling.** Hayli — founder and owner-operator — is the recognizable face of
 the marketing, supported by authentic demonstrations of her work, her professional experience,
 her standards and her entrepreneurial story. Zero additional spending is the default.
 

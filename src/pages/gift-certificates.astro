@@ -4,6 +4,7 @@ import Breadcrumbs from '../components/Breadcrumbs.astro';
 import Icon from '../components/Icon.astro';
 import { giftCertificateConfig } from '../config/gift-certificates';
 import { business, contactPhone, isPending } from '../config/business';
+import { brandWords } from '../config/brand';
 import { breadcrumbNode } from '../lib/schema';
 
 const enabled = giftCertificateConfig.enabled;
@@ -74,7 +75,7 @@ const sampleCode = 'SSGC-SAMP-LE42';
         <div class="gift-sample">
           <p class="gift-sample__brand-script">Sparkling</p>
           <p class="gift-sample__brand-caps">Standard</p>
-          <p class="gift-sample__descriptor">Cleaning Co. · The Details Are Our Standard.</p>
+          <p class="gift-sample__descriptor">Cleaning Co. · {brandWords.tagline}</p>
           <p class="gift-sample__title">Gift Certificate</p>
           <p class="gift-sample__value">$100</p>
           <p class="gift-sample__label">Toward cleaning services</p>

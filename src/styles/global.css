@@ -2798,6 +2798,15 @@ fieldset.input--invalid {
   gap: var(--space-6);
 }
 
+.site-footer__tagline {
+  margin: var(--space-3) 0 0;
+  color: var(--color-champagne-300);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-style: italic;
+  line-height: 1.25;
+}
+
 .site-footer__area {
   max-width: 30ch;
   margin: var(--space-4) 0 0;

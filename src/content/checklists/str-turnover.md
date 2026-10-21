@@ -7,7 +7,7 @@ items:
   - Every room reset to the guest-ready standard in your listing photos
   - Bed reset — fresh linens on every bed
   - Towel reset and placement
-  - Onsite laundry as the default; offsite available as a premium arrangement
+  - Laundry plan confirmed per property - onsite where available, offsite by arrangement
   - Bathroom reset and presentation
   - Kitchen reset, including appliances that guests use
   - Consumable inventory check against your list

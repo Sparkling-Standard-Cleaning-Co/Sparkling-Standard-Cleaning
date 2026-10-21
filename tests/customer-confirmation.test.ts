@@ -74,7 +74,7 @@ test('the branded HTML is email-safe: inline styles, no scripts, no external ima
   assert.doesNotMatch(confirmation.html, /<script/i);
   assert.doesNotMatch(confirmation.html, /<img/i);
   assert.doesNotMatch(confirmation.html, /https?:\/\/(?!sparkling-standard\.com)/i);
-  assert.match(confirmation.html, /The Details Are Our Standard\./);
+  assert.match(confirmation.html, /Leaving Your Space Sparkling\./);
 });
 
 test('the summary and the provisional estimate appear in both HTML and plain text', () => {

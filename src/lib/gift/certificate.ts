@@ -8,6 +8,8 @@
 //  - The redeem URL carries ONLY the certificate code; no customer details.
 //  - All interpolated text is HTML-escaped in the printable template.
 
+import { brandWords } from '../../config/brand.ts';
+
 /** Code alphabet without ambiguous characters (no I, L, O, 0, 1). */
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const GIFT_CODE_PREFIX = 'SSGC';
@@ -159,7 +161,7 @@ h1 { text-align: center; font-size: 21px; letter-spacing: .28em; text-transform:
     <div class="brand">
       <span class="sparkling">Sparkling</span>
       <span class="standard">Standard</span>
-      <span class="descriptor">Cleaning Co. · The Details Are Our Standard.</span>
+      <span class="descriptor">Cleaning Co. · ${brandWords.tagline}</span>
     </div>
     <h1>Gift Certificate</h1>
     <p class="value">${e(data.value)}</p>

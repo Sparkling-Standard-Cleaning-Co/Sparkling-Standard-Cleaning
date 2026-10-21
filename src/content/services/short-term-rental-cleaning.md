@@ -15,19 +15,19 @@ includes:
   - Full turnover clean of every room, guest-ready presentation included
   - Bed reset — fresh linens on every bed
   - Towel reset and placement
-  - Onsite laundry as the standard (offsite laundry available as a premium arrangement)
+  - Laundry plan confirmed per property - onsite where available, offsite by arrangement
   - Bathroom and kitchen reset to the listing standard
   - Consumable inventory check against your list
   - Visual property check for damage or problems
   - Completion checklist and turnaround photos when your workflow needs them
   - Issue report and host notification if something needs your attention
 goodFor:
-  - Airbnb and VRBO hosts who need reliable same-day turnarounds
+  - Airbnb and VRBO hosts who need reliable turnovers within a confirmed check-in window
   - Vacation rental owners who manage from out of town
   - Property managers with a portfolio of short-term units
   - Hosts who want consistent presentation between every guest
 notIncluded:
-  - Offsite/commercial laundry by default (available as a premium, custom-priced arrangement)
+  - Offsite/commercial laundry as part of the standard scope - available by arrangement and custom-priced
   - Supplying linens, toiletries, paper goods, coffee, soaps or trash bags — the host normally supplies these
   - Deep restoration or repairs — issues are reported, not repaired
   - Severe conditions and biohazards — see our exclusions FAQ
@@ -66,4 +66,4 @@ Regular hosts don't need to fill out a form from scratch for every turnover. Onc
 
 ## The honest possibilities
 
-Onsite laundry is the default for turnovers. Offsite laundry is available as a premium arrangement when timing and volume justify it — quoted honestly, never hidden in the base price. Restocking services can be arranged as a separate agreement with their own service charge so the agreement stays profitable for both sides. Nothing about the arrangement is designed to be a free concierge; everything about it is designed to be reliable.
+Laundry is planned per property. Onsite laundry is used where the property and schedule support it; offsite laundry may be arranged when timing, volume or the property setup makes it the better choice. Restocking services can be arranged as a separate agreement. Availability and any premium are confirmed before the turnover is accepted, so nothing is promised that the schedule cannot support.

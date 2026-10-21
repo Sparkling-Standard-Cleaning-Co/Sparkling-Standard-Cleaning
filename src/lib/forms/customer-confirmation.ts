@@ -15,6 +15,7 @@
 // The HTML is table-based with inline styles (the only reliable approach in
 // email clients) and contains no external images or tracking.
 
+import { brandWords } from '../../config/brand.ts';
 import { buildRequestSummary, type RequestSummary } from './request-summary.ts';
 
 export interface ConfirmationBusiness {
@@ -188,7 +189,7 @@ function buildHtml(
       <tr>
         <td style="background:${PALETTE.card};border:1px solid ${PALETTE.border};border-radius:12px;padding:32px 32px 28px;">
           <p style="margin:0 0 2px;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:700;color:${PALETTE.ink};">Sparkling <span style="letter-spacing:.12em;">STANDARD</span></p>
-          <p style="margin:0 0 18px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.champagneText};">The Details Are Our Standard.</p>
+          <p style="margin:0 0 18px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.champagneText};">${brandWords.tagline}</p>
           <h1 style="margin:0 0 12px;font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${PALETTE.ink};">We received your request</h1>
           <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:${PALETTE.inkSoft};">${escapeHtml(intro)}</p>
 
@@ -241,7 +242,7 @@ function buildText(
 ): string {
   const lines: string[] = [];
   lines.push(business.name);
-  lines.push('The Details Are Our Standard.');
+  lines.push(brandWords.tagline);
   lines.push('');
   lines.push('WE RECEIVED YOUR REQUEST');
   lines.push('');

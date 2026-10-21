@@ -51,7 +51,7 @@ and `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`. Tracked links: generated
 - Header/cover/OG-style imagery: `public/brand/logo-mark-soft.svg`, `og-default.png`; real
   permissioned work photography once available (follow `docs/privacy/PHOTO-PRIVACY-SOP.md`).
 - Identity: premium, feminine, elegant, warm, trustworthy; pink and gold.
-- Approved slogan: **The Details Are Our Standard.**
+- Approved slogan: **Leaving Your Space Sparkling.**
 
 ## Per-account checklist
 
