@@ -38,7 +38,7 @@ and `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`. Tracked links: generated
 
 ## Contact facts to keep identical everywhere (single source: `src/config/business.ts`)
 
-- Business name: **Sparkling Standard Cleaning Co.** (public brand "Sparkling Standard")
+- Business name: **Sparkling Standard** (public brand "Sparkling Standard")
 - Phone: **(850) 426-8479** — email: **owner@sparkling-standard.com**
 - Website: **https://sparkling-standard.com**
 - Service area: Cantonment and Pensacola, nearby communities, select Alabama areas

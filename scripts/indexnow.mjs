@@ -1,97 +1,112 @@
-// IndexNow submission — notify search engines about changed canonical URLs.
-//
-// Requires (post-launch only):
-//   PUBLIC_SITE_URL=https://your-domain.com
-//   INDEXNOW_KEY=<a random 8-128 char key you also host at /<key>.txt>
-//
-// Usage:
-//   node scripts/indexnow.mjs --all               submit every sitemap URL
-//   node scripts/indexnow.mjs --urls /a/ /b/      submit specific paths
-//   node scripts/indexnow.mjs --range 1..10       submit sitemap entries 1..10
-//
-// Never runs in preview mode; never invents URLs.
-
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const args = process.argv.slice(2);
-const SITE_URL = (process.env.PUBLIC_SITE_URL ?? '').replace(/\/+$/, '');
-const KEY = process.env.INDEXNOW_KEY ?? '';
+const HOST = 'sparkling-standard.com';
+const ORIGIN = `https://${HOST}`;
+const ENDPOINT = 'https://api.indexnow.org/indexnow';
+const STATE_DIR = 'indexnow-out';
+const STATE_FILE = path.join(STATE_DIR, 'state.json');
+const SITEMAP_FILE = path.join('dist', 'sitemap-0.xml');
+const PUBLIC_DIR = 'public';
 
-if (!SITE_URL || SITE_URL.includes('.invalid')) {
-  console.error('PUBLIC_SITE_URL is not configured — IndexNow is a post-launch tool. Nothing submitted.');
-  process.exit(1);
-}
-if (!KEY) {
-  console.error('INDEXNOW_KEY is not set. Create a key, host it at /<key>.txt, then retry.');
-  process.exit(1);
-}
-if (process.env.PUBLIC_PREVIEW_MODE === 'true') {
-  console.error('Preview mode — refusing to submit URLs for indexing.');
+const args = new Set(process.argv.slice(2));
+const dryRun = args.has('--dry-run');
+const submitAll = args.has('--all');
+
+function fail(message) {
+  console.error(`indexnow: ${message}`);
   process.exit(1);
 }
 
-function sitemapUrls() {
-  const sitemapDir = 'dist';
-  if (!fs.existsSync(sitemapDir)) {
-    console.error('dist/ not found — run npm run build first.');
-    process.exit(1);
+function findKey() {
+  if (!fs.existsSync(PUBLIC_DIR)) fail('public directory not found');
+  const candidates = fs
+    .readdirSync(PUBLIC_DIR)
+    .filter((name) => /^[a-f0-9]{32}\.txt$/.test(name));
+  if (candidates.length !== 1) {
+    fail(`expected exactly one IndexNow key file in public/, found ${candidates.length}`);
   }
-  const files = fs
-    .readdirSync(sitemapDir)
-    .filter((file) => /^sitemap-\d+\.xml$/.test(file));
-  const urls = [];
-  for (const file of files) {
-    const xml = fs.readFileSync(path.join(sitemapDir, file), 'utf8');
-    for (const match of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) {
-      const loc = match[1];
-      if (loc?.startsWith(SITE_URL)) urls.push(loc);
-    }
+  const fileName = candidates[0];
+  const key = fileName.replace(/\.txt$/, '');
+  const content = fs.readFileSync(path.join(PUBLIC_DIR, fileName), 'utf8').trim();
+  if (content !== key) fail(`${fileName} must contain only the key`);
+  return { key, keyLocation: `${ORIGIN}/${fileName}` };
+}
+
+function readSitemapUrls() {
+  if (!fs.existsSync(SITEMAP_FILE)) fail('dist/sitemap-0.xml not found - run npm run build first');
+  const xml = fs.readFileSync(SITEMAP_FILE, 'utf8');
+  const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1].trim());
+  const unique = [...new Set(urls)];
+  for (const url of unique) {
+    const parsed = new URL(url);
+    if (parsed.origin !== ORIGIN) fail(`sitemap URL is outside ${ORIGIN}: ${url}`);
+    if (parsed.search || parsed.hash) fail(`sitemap URL is not canonical: ${url}`);
   }
-  return urls;
+  if (unique.length === 0) fail('sitemap contains no URLs');
+  return unique;
 }
 
-let urls = [];
-if (args.includes('--all')) {
-  urls = sitemapUrls();
-} else if (args.includes('--urls')) {
-  urls = args
-    .slice(args.indexOf('--urls') + 1)
-    .filter((arg) => !arg.startsWith('--'))
-    .map((p) => new URL(p, `${SITE_URL}/`).href);
-} else if (args.includes('--range')) {
-  const range = args[args.indexOf('--range') + 1] ?? '';
-  const [from, to] = range.split('..').map(Number);
-  const all = sitemapUrls();
-  if (!Number.isFinite(from) || !Number.isFinite(to)) {
-    console.error('Invalid --range, expected e.g. 1..10');
-    process.exit(1);
+function builtFileFor(url) {
+  const pathname = decodeURIComponent(new URL(url).pathname);
+  const relative = pathname.endsWith('/') ? `${pathname}index.html` : pathname;
+  const full = path.resolve('dist', `.${relative}`);
+  const root = path.resolve('dist');
+  if (!full.startsWith(root + path.sep)) fail(`unsafe sitemap path: ${url}`);
+  if (!fs.existsSync(full)) fail(`built page missing for ${url}: ${full}`);
+  return full;
+}
+
+function hashPage(url) {
+  return crypto.createHash('sha256').update(fs.readFileSync(builtFileFor(url))).digest('hex');
+}
+
+function readState() {
+  if (!fs.existsSync(STATE_FILE)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')).urls ?? {};
+  } catch {
+    fail(`could not parse ${STATE_FILE}; delete it to resubmit all URLs`);
   }
-  urls = all.slice(from - 1, to);
-} else {
-  console.error('Usage: node scripts/indexnow.mjs --all | --urls <paths…> | --range <from>..<to>');
-  process.exit(1);
 }
 
-if (urls.length === 0) {
-  console.error('No URLs to submit.');
-  process.exit(1);
+const { key, keyLocation } = findKey();
+const urls = readSitemapUrls();
+const previous = readState();
+const current = Object.fromEntries(urls.map((url) => [url, hashPage(url)]));
+const changed = submitAll ? urls : urls.filter((url) => previous[url] !== current[url]);
+const removed = submitAll ? [] : Object.keys(previous).filter((url) => !(url in current));
+const urlList = [...new Set([...changed, ...removed])];
+
+if (urlList.length === 0) {
+  console.log('indexnow: no new, changed or removed public URLs');
+  process.exit(0);
 }
 
-const response = await fetch('https://api.indexnow.org/indexnow', {
+if (dryRun) {
+  console.log(`indexnow: would submit ${urlList.length} URL(s) to ${ENDPOINT}`);
+  for (const url of urlList) console.log(`  ${url}`);
+  process.exit(0);
+}
+
+const response = await fetch(ENDPOINT, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json; charset=utf-8' },
-  body: JSON.stringify({
-    host: new URL(SITE_URL).host,
-    key: KEY,
-    keyLocation: `${SITE_URL}/${KEY}.txt`,
-    urlList: urls,
-  }),
+  body: JSON.stringify({ host: HOST, key, keyLocation, urlList }),
 });
 
-if (response.ok || response.status === 202) {
-  console.log(`✓ IndexNow accepted ${urls.length} URL(s) (HTTP ${response.status})`);
-} else {
-  console.error(`IndexNow submission failed: HTTP ${response.status}`);
-  process.exit(1);
+const body = await response.text();
+if (response.status !== 200 && response.status !== 202) {
+  fail(`submission failed with HTTP ${response.status}${body ? `: ${body.slice(0, 500)}` : ''}`);
 }
+
+fs.mkdirSync(STATE_DIR, { recursive: true });
+fs.writeFileSync(
+  STATE_FILE,
+  `${JSON.stringify({ submittedAt: new Date().toISOString(), keyLocation, urls: current }, null, 2)}\n`,
+  'utf8',
+);
+
+console.log(`indexnow: submitted ${urlList.length} URL(s); HTTP ${response.status}`);
+for (const url of urlList) console.log(`  ${url}`);

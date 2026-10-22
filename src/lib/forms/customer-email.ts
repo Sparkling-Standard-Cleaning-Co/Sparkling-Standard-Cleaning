@@ -25,7 +25,7 @@ import { buildCustomerConfirmation, type ConfirmationBusiness } from './customer
 
 /** Owner-approved public facts (drift-guarded by tests/customer-email.test.ts). */
 export const CUSTOMER_EMAIL_BUSINESS: ConfirmationBusiness = {
-  name: 'Sparkling Standard Cleaning Co.',
+  name: 'Sparkling Standard',
   founder: 'Hayli',
   phone: '(850) 426-8479',
   email: 'owner@sparkling-standard.com',
@@ -34,7 +34,7 @@ export const CUSTOMER_EMAIL_BUSINESS: ConfirmationBusiness = {
 
 /** Default sender once the Sparkling Standard domain is verified in Resend. */
 export const DEFAULT_CUSTOMER_EMAIL_FROM =
-  'Sparkling Standard Cleaning Co. <notifications@sparkling-standard.com>';
+  'Sparkling Standard <notifications@sparkling-standard.com>';
 
 /** Customer replies reach the owner directly. */
 export const DEFAULT_CUSTOMER_EMAIL_REPLY_TO = 'owner@sparkling-standard.com';

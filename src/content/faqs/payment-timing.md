@@ -1,9 +1,9 @@
 ---
 question: When do I pay?
 answer: |
-  For a Residential Deep Cleaning, payment is due after the cleaning is complete so you can see the results before you pay.
+  Residential cleaning is paid upon completion. Commercial cleaning is invoiced monthly with Net 15 terms.
 
-  For recurring cleaning arrangements and commercial services, billing terms are discussed and agreed upon during the walkthrough or when your service is confirmed.
+  No standard deposit or late fee applies initially. Large projects may be considered separately with written terms agreed before work begins.
 category: payments
 order: 1
 ---

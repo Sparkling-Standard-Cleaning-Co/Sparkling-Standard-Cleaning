@@ -1,4 +1,4 @@
-# Operations Hub — Sparkling Standard Cleaning Co.
+# Operations Hub — Sparkling Standard
 
 Single authoritative entry point for the website and digital operating system: the website,
 estimate system, lead handling, analytics, marketing system, deployment and maintenance.
@@ -17,7 +17,7 @@ source for every system without asking the owner about anything already document
 
 ## 1. Executive overview
 
-Sparkling Standard Cleaning Co. is an owner-operated residential and commercial cleaning company
+Sparkling Standard is an owner-operated residential and commercial cleaning company
 based in Cantonment, Florida, serving Pensacola, surrounding communities within about an hour's
 drive, and select nearby areas into Alabama. The differentiator is detail: estimates are built on
 real labor hours, and the company sells a standard that rushed production cleaning cannot match.

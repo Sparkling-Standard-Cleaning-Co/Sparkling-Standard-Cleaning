@@ -14,7 +14,7 @@ import {
 } from '../src/lib/invoicing/invoice.ts';
 
 const contact = {
-  name: 'Sparkling Standard Cleaning Co.',
+  name: 'Sparkling Standard',
   phone: '(850) 426-8479',
   email: 'owner@sparkling-standard.com',
   website: 'sparkling-standard.com',
@@ -95,9 +95,9 @@ test('unset due date, payment terms and legal entity are explicit owner-completi
 });
 
 test('a completed invoice reports no remaining placeholders', () => {
-  const invoice = buildInvoice({ ...base, contact: { ...contact, legalName: 'Sparkling Standard Cleaning Co. LLC' } });
+  const invoice = buildInvoice({ ...base, contact: { ...contact, legalName: 'Sparkling Standard LLC' } });
   assert.equal(hasOwnerPlaceholders(invoice), false);
-  assert.match(invoice.html, /Legal entity: Sparkling Standard Cleaning Co\. LLC/);
+  assert.match(invoice.html, /Legal entity: Sparkling Standard LLC/);
 });
 
 test('no bank details, tax IDs or legal terms are ever invented', () => {

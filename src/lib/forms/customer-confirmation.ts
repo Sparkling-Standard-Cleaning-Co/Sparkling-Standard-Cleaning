@@ -19,7 +19,7 @@ import { brandWords } from '../../config/brand.ts';
 import { buildRequestSummary, type RequestSummary } from './request-summary.ts';
 
 export interface ConfirmationBusiness {
-  /** Public business name, e.g. "Sparkling Standard Cleaning Co." */
+  /** Public business name, e.g. "Sparkling Standard" */
   name: string;
   /** Founder first name for the signature, when approved for public use. */
   founder?: string;

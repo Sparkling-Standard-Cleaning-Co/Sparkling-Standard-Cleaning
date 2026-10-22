@@ -68,23 +68,21 @@ const phoneEnv = formatPhone(envFact(import.meta.env.PUBLIC_BUSINESS_PHONE));
 // ── Business entity ──────────────────────────────────────────────────────────
 export const business = {
   /**
-   * Final company name — owner-confirmed October 2026 (public brand:
-   * "Sparkling Standard", with "Cleaning Co." as the descriptor).
+   * Public business name — owner-confirmed October 21, 2026. The brand is
+   * "Sparkling Standard"; the former descriptor is discontinued.
    */
-  displayName: envFact(import.meta.env.PUBLIC_BUSINESS_NAME) ?? 'Sparkling Standard Cleaning Co.',
+  displayName: envFact(import.meta.env.PUBLIC_BUSINESS_NAME) ?? 'Sparkling Standard',
 
-  /**
-   * Short public wordmark (site header). The approved brand emphasis is
-   * "Sparkling Standard", with "Cleaning Co." as the secondary descriptor.
-   */
+  /** Short public wordmark (site header and footer). */
   wordmark: 'Sparkling Standard',
 
   /**
-   * Registered legal entity name. The owner has registered the business as
-   * "Sparkling Standard Cleaning Co."; the precise legal spelling/entity
-   * suffix is still being verified. Do not publish until confirmed.
+   * Registered legal entity name — owner-confirmed October 21, 2026.
+   * Retained for contracts, tax documents, formal disclosures and schema;
+   * not displayed as marketing copy.
    */
-  legalName: envFact(import.meta.env.PUBLIC_BUSINESS_LEGAL_NAME) ?? PENDING,
+  legalName:
+    envFact(import.meta.env.PUBLIC_BUSINESS_LEGAL_NAME) ?? 'Sparkling Standard LLC',
 
   /** Production origin without trailing slash — owner-confirmed domain. */
   url: envFact(import.meta.env.PUBLIC_SITE_URL) ?? 'https://sparkling-standard.com',
@@ -243,9 +241,9 @@ export const business = {
      */
   },
 
-  // ── Payments (owner-approved methods; processor is PENDING) ───────────────
+  // ── Payments (owner-approved methods; Stripe confirmed 2026-10-21) ────────
   payments: {
-    /** Emphasized professional methods. */
+    /** Emphasized professional methods confirmed by the owner. */
     accepted: [
       'Major credit and debit cards',
       'Apple Pay',
@@ -254,10 +252,10 @@ export const business = {
     ],
     /** Documented selectively, not as a logo wall. */
     alternate: ['Cash', 'Check', 'Cash App', 'Venmo', 'Zelle', 'PayPal'],
-    /** Residential payment timing, owner-approved. */
+    /** Residential payment timing, owner-approved October 21, 2026. */
     residentialTiming:
-      'For a Residential Deep Cleaning, payment is due after the cleaning is complete so you can see the results before you pay. For recurring cleaning arrangements and commercial services, billing terms are discussed and agreed upon during the walkthrough or when your service is confirmed.',
-    /** Owner-confirmed processor. Enabled methods are confirmed separately. */
+      'Residential cleaning is paid upon completion. Commercial cleaning is invoiced monthly with Net 15 terms. No standard deposit or late fee applies initially; large projects may be considered separately with written terms.',
+    /** Owner-confirmed processor. */
     processor: 'Stripe',
   },
 

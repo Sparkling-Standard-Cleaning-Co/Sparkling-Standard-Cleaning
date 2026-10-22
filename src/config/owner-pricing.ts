@@ -273,8 +273,8 @@ export const ownerPricing: OwnerPricingConfig = {
   // ── 1. Hourly rates ───────────────────────────────────────────────────────
   // Owner-approved Option C (2026-10-01). INTERNAL ONLY — never displayed.
   hourlyRates: {
-    recurring: 42,
-    otherServices: 50,
+    recurring: 55,
+    otherServices: 55,
     ownerLaborTarget: 35,
   },
 

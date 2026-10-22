@@ -46,6 +46,9 @@ invoice-out/
 # canvassing intelligence data (address-level operational data; local only)
 canvass-out/
 
+# IndexNow submission state (local duplicate-suppression record)
+indexnow-out/
+
 # python bytecode (route/print scripts)
 __pycache__/
 *.pyc

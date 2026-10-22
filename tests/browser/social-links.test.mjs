@@ -132,7 +132,7 @@ test('the footer shows a distinct Follow Us section with only confirmed platform
     );
     for (const profile of CONFIRMED) {
       const named = page.getByRole('link', {
-        name: new RegExp(`^${profile.label} — Sparkling Standard Cleaning Co\\. \\(opens in a new tab\\)$`),
+        name: new RegExp(`^${profile.label} — Sparkling Standard \\(opens in a new tab\\)$`),
       });
       assert.equal(await named.count(), 1, `${profile.label} has a descriptive accessible name`);
     }

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { buildCustomerConfirmation } from '../src/lib/forms/customer-confirmation.ts';
 
 const business = {
-  name: 'Sparkling Standard Cleaning Co.',
+  name: 'Sparkling Standard',
   founder: 'Hayli',
   phone: '(850) 426-8479',
   email: 'owner@sparkling-standard.com',

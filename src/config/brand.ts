@@ -14,7 +14,7 @@ export const brandWords = {
   script: 'Sparkling',
   caps: 'Standard',
   capsDisplay: 'STANDARD',
-  descriptor: 'Cleaning Co.',
+  descriptor: '',
   tagline: 'Leaving Your Space Sparkling.',
 } as const;
 

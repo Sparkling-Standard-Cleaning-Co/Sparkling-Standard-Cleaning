@@ -1,4 +1,4 @@
-# Cloudflare deployment guide — Sparkling Standard Cleaning Co.
+# Cloudflare deployment guide — Sparkling Standard
 
 Single authoritative deployment document. If anything here disagrees with the actual code or
 dashboard, stop and reconcile before deploying. Owner-confirmed facts live in
@@ -148,7 +148,7 @@ a commit) before the built pages and Functions see it.
 | `ROUTES_PROVIDER` | unset | `google` or `mapbox`; requires `ROUTES_API_KEY` |
 | `REFERENCE_GAS_PRICE` | `3.1` | USD/gal fallback |
 | `TRAVEL_CACHE_SECONDS` | `21600` | Per-isolate route cache |
-| `RESEND_FROM_EMAIL` | `Sparkling Standard Cleaning Co. <notifications@sparkling-standard.com>` | Sender for the customer confirmation; change only to another **verified** sender in Resend |
+| `RESEND_FROM_EMAIL` | `Sparkling Standard <notifications@sparkling-standard.com>` | Sender for the customer confirmation; change only to another **verified** sender in Resend |
 | `RESEND_REPLY_TO` | `owner@sparkling-standard.com` | Customer replies reach the owner directly |
 
 ### 4a. Customer confirmation email (Resend) — owner setup
@@ -301,12 +301,13 @@ deployment as successful from the dashboard status alone.
 ## 11. Formal production approval (the site is already live)
 
 The live site and pipeline are verified operational. `business.launch.productionApproved` remains
-`false` as the **formal owner checklist gate** (legal entity spelling, insurance/bonding/licensing
-claims, genuine reviews, final cancellation percentages, remaining profile URLs). Closing it
-requires ALL of the following:
+`false` as the **formal owner checklist gate**. All 46 decisions are now recorded; remaining items
+are evidence and professional review (Sunbiz record, insurance/workers' compensation policy
+details, payroll setup, Stripe dashboard evidence, Terms/Privacy and contract review, genuine
+reviews/photography and any unverified profile URL). Closing it requires ALL of the following:
 
-1. `docs/launch/OWNER-INPUT-REQUIRED.md` items resolved (legal name, claims, genuine reviews,
-   remaining profile URLs, final cancellation percentages).
+1. `docs/launch/OWNER-INPUT-REQUIRED.md` evidence items resolved and the Business HQ verification
+   register cleared or explicitly accepted.
 2. Confirm live: `robots.txt` = `Allow: /`; meta robots = `index, follow`; canonical = the
    production domain with trailing slash; `PUBLIC_PREVIEW_MODE` is NOT set in Production.
 3. Live form delivery confirmed for every category (section 8), with any test submission clearly

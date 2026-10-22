@@ -55,13 +55,13 @@ async function withFetch<T>(
 
 test('the embedded business facts cannot drift from business.ts', () => {
   const source = fs.readFileSync('src/config/business.ts', 'utf8');
-  assert.equal(CUSTOMER_EMAIL_BUSINESS.name, 'Sparkling Standard Cleaning Co.');
+  assert.equal(CUSTOMER_EMAIL_BUSINESS.name, 'Sparkling Standard');
   assert.equal(CUSTOMER_EMAIL_BUSINESS.founder, 'Hayli');
   assert.equal(CUSTOMER_EMAIL_BUSINESS.phone, '(850) 426-8479');
   assert.equal(CUSTOMER_EMAIL_BUSINESS.email, 'owner@sparkling-standard.com');
   assert.equal(CUSTOMER_EMAIL_BUSINESS.website, 'sparkling-standard.com');
   for (const literal of [
-    "'Sparkling Standard Cleaning Co.'",
+    "'Sparkling Standard'",
     "firstName: 'Hayli'",
     "formatPhone('850-426-8479')",
     "'owner@sparkling-standard.com'",
@@ -103,12 +103,12 @@ test('sender and reply-to can be overridden by environment configuration', async
     async (calls) => {
       const outcome = await sendCustomerConfirmation(fields, {
         RESEND_API_KEY: 'dummy-resend-key',
-        RESEND_FROM_EMAIL: 'Sparkling Standard Cleaning Co. <hello@verified.example>',
+        RESEND_FROM_EMAIL: 'Sparkling Standard <hello@verified.example>',
         RESEND_REPLY_TO: 'replies@sparkling-standard.com',
       });
       assert.equal(outcome.status, 'sent');
       const body = JSON.parse(String(calls[0].init?.body)) as Record<string, unknown>;
-      assert.equal(body.from, 'Sparkling Standard Cleaning Co. <hello@verified.example>');
+      assert.equal(body.from, 'Sparkling Standard <hello@verified.example>');
       assert.equal(body.reply_to, 'replies@sparkling-standard.com');
     },
   );

@@ -31,7 +31,7 @@ defines a competing template.
 - **Branded HTML:** email-client-safe (table layout, inline styles, no scripts,
   no external images, no tracking), brand palette and tagline.
 - **Plain-text fallback:** the same content without markup.
-- **Sender:** `Sparkling Standard Cleaning Co. <notifications@sparkling-standard.com>`
+- **Sender:** `Sparkling Standard <notifications@sparkling-standard.com>`
   (override with `RESEND_FROM_EMAIL` only to another verified sender).
 - **Reply-to:** `owner@sparkling-standard.com` — replying reaches Hayli.
 - **Wording rules (tested):** "We received your request" / "Here's a summary of

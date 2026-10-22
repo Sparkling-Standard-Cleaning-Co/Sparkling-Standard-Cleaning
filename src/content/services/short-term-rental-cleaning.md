@@ -66,4 +66,4 @@ Regular hosts don't need to fill out a form from scratch for every turnover. Onc
 
 ## The honest possibilities
 
-Laundry is planned per property. Onsite laundry is used where the property and schedule support it; offsite laundry may be arranged when timing, volume or the property setup makes it the better choice. Restocking services can be arranged as a separate agreement. Availability and any premium are confirmed before the turnover is accepted, so nothing is promised that the schedule cannot support.
+Laundry is planned per property. Onsite laundry is offered where the property equipment and turnover timing permit; offsite laundry is not standard and may be arranged separately. Restocking services can be arranged as a separate agreement. Same-day turnovers are considered case by case when cleaner availability, property access, linens and scheduling are confirmed. There is no automatic same-day guarantee or published premium. Availability and scope are confirmed before the turnover is accepted, so nothing is promised that the schedule cannot support.

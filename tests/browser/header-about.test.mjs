@@ -117,7 +117,7 @@ test('the circular brand mark carries the full identity and links home', async (
     const logoText = (await logo.textContent()) ?? '';
     assert.match(logoText, /Sparkling/, 'script word present');
     assert.match(logoText, /STANDARD/, 'STANDARD present');
-    assert.match((await brand.getAttribute('aria-label')) ?? '', /Sparkling Standard Cleaning Co\./);
+    assert.match((await brand.getAttribute('aria-label')) ?? '', /Sparkling Standard/);
     assert.match((await brand.getAttribute('aria-label')) ?? '', /home/i);
     assert.equal(await brand.locator('.brand__descriptor').count(), 0, 'Cleaning Co. removed from the visual logo');
     assert.equal(await brand.locator('.brand__tagline').count(), 0, 'tagline removed from the visual logo');

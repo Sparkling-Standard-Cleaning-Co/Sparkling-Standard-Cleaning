@@ -1,4 +1,4 @@
-# Physical brand system audit — Sparkling Standard Cleaning Co.
+# Physical brand system audit — Sparkling Standard
 
 Purpose: establish, from repository evidence only, what the brand actually is before extending it into
 physical customer-acquisition media. This audit is the authority for every printed piece; the
@@ -6,7 +6,7 @@ owner's Grok-generated business-card concept is treated as inspiration, never as
 
 ## 1. Who Sparkling Standard is
 
-- **Legal/public name:** "Sparkling Standard Cleaning Co." (public wordmark "Sparkling Standard"),
+- **Legal/public name:** "Sparkling Standard" (public wordmark "Sparkling Standard"),
   source of truth `src/config/business.ts:74,80`.
 - **Founder-led:** Hayli, Founder & Owner-Operator, an owner-operated residential and commercial
   cleaning company (`business.ts` `founder`; visible identification on `/about/`).
@@ -62,10 +62,9 @@ Evidence from the design tokens and copy:
 
 ## 5. Visual characteristics that create recognition
 
-- **Crest:** gold gradient ring with italic "S", sparkles and a pink blossom cluster
-  (`Logo.astro:49-84`).
-- **Wordmark (Brand A2):** Great Vibes "Sparkling" + spaced Fraunces "STANDARD" + "Cleaning Co."
-  + the tagline, all in one rose/ink tone (`Logo.astro:8-10,35-38`).
+- **Official mark (2026-10-19, current):** circular gold ring with script "Sparkling" above
+  spaced "STANDARD" and sparkles. It has no descriptor or tagline; the full legal name remains in
+  metadata and formal disclosures (`src/config/brand.ts`).
 - **Palette:** cream, sand, taupe, warm ink, rose, sage, champagne — gold/champagne is an accent
   only, never small text on light (`tokens.css:4-52`).
 - **Type:** Fraunces display serif + Nunito Sans body (`tokens.css:76-78`), self-hosted.

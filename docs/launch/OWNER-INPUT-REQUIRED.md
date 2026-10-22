@@ -1,10 +1,9 @@
 # Owner input required
 
+> **2026-10-21 owner decision pass:** all 46 decisions are recorded in `Business HQ\00_START_HERE\MASTER_OWNER_DECISIONS.xlsx`. Remaining items below are evidence or professional review, not unanswered decisions. The workbook's `VERIFICATION_REGISTER` is the authoritative remaining-work list.
+
 **The site is live at `https://sparkling-standard.com`** and its pipeline is verified operational.
-The formal owner checklist below — legal entity spelling, claims, final cancellation percentages —
-is still outstanding and keeps `business.launch.productionApproved = false`. That flag is the formal
-sign-off gate; it does **not** describe deployment state. This is the single authoritative list —
-do not scatter TODOs elsewhere.
+All 46 decisions are recorded; the remaining items are evidence and professional review. `business.launch.productionApproved` remains the formal checklist gate and does not describe deployment state.
 
 **How to resolve:** facts are entered in `src/config/business.ts` (or the matching `.env` /
 Cloudflare environment value), then run `npm run verify` and `npm run validate:production`.
@@ -13,13 +12,14 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 
 | Item | Value |
 | --- | --- |
-| Final company name | **Sparkling Standard Cleaning Co.** (public brand: "Sparkling Standard") — in `src/config/business.ts` |
+| Registered legal name | **Sparkling Standard LLC**; public brand **Sparkling Standard** — owner-confirmed 2026-10-21; Sunbiz record pending |
+| Official slogan | **Leaving Your Space Sparkling.** |
 | Final domain | **https://sparkling-standard.com** — in `src/config/business.ts` + `astro.config.mjs` default |
 | Public phone | **(850) 426-8479** — in `src/config/business.ts` (owner-corrected 2026-10-02; the earlier `(850) 246-8479` was a typo) |
 | Public email | **owner@sparkling-standard.com** — in `src/config/business.ts` |
 | Founder identity | **Hayli** — approved founder background in `business.founder` |
 | Service territory (broad) | About one hour of actual driving time from the Cantonment-area origin |
-| Payment processor | Stripe (enabled methods still to confirm — see #4) |
+| Payment processor | Stripe; owner confirms cards, Apple Pay, Google Pay and ACH enabled (2026-10-21); dashboard evidence pending |
 | Hosting | Dedicated Cloudflare account; domain active on Cloudflare DNS |
 | Repository | `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning` |
 | Travel origin + routing | Private Cantonment-area origin configured as a Cloudflare secret; `/api/travel` verified live `method: route, verified: true` (2026-10-02) |
@@ -37,24 +37,24 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | 1 | **Web3Forms access key** | `WEB3FORMS_ACCESS_KEY` (Secret) + `PUBLIC_WEB3FORMS_ACCESS_KEY` (Text) in Cloudflare | **Done 2026-10-01.** Owner-confirmed: all four marked test inquiries (residential, estimate, commercial, STR) arrived in the inbox. Lead delivery is operational. |
 | 2 | **Operating origin** | `TRAVEL_ORIGIN` ("lat,lng", Cloudflare Secret) | **Done 2026-10-02** — configured and verified live (`/api/travel` returns `method: route, verified: true`). Server-side only — never published on the site, in schema, in the repository or in marketing material. |
 | 3 | **Live form-delivery test** | after deployment | **Done 2026-10-01** — one marked test per category, all four owner-confirmed in the inbox. Re-run after any future form change. |
-| 4 | **Stripe enabled methods** | `business.payments` | Confirm which methods are actually enabled in the Stripe account (cards / Apple Pay / Google Pay / ACH). The site currently lists cards, Apple Pay, Google Pay and ACH. |
+| 4 | **Stripe enabled methods** | `business.payments` | **Owner confirmed 2026-10-21:** cards, Apple Pay, Google Pay and ACH are enabled. Retain dashboard/checkout evidence. |
 | 5 | **Owner launch approval** | `business.launch.productionApproved = true` | Deliberate, reviewable code change after this list is cleared. |
 
 ## IMPORTANT BEFORE LAUNCH
 
 | # | Item | Where | Notes |
 | --- | --- | --- | --- |
-| 6 | Legal entity spelling / suffix | `PUBLIC_BUSINESS_LEGAL_NAME` | Registered as "Sparkling Standard Cleaning Co."; verify the precise legal spelling and entity suffix before publishing. Stays unpublished (and omitted from schema) until confirmed. |
+| 6 | ~~Legal entity spelling / suffix~~ **Resolved 2026-10-21** | `business.legalName` | **Sparkling Standard LLC** configured and published in schema/formal disclosures. Supply the Sunbiz record/certificate and confirm abbreviated-brand use with counsel. |
 | 7 | Exact service-zone review | `src/config/geography.ts` | Zones are provisional ZIP centroids around the one-hour driving boundary. Confirm the final list after the origin coordinates are entered. |
-| 8 | Pricing matrix approval | `docs/launch/PRICING-PROPOSAL.md` | Market research + proposed rates. Production rates do NOT change until the owner approves. |
+| 8 | ~~Pricing matrix approval~~ **Resolved 2026-10-21** | `src/config/owner-pricing.ts` | Owner approved **$55 per productive cleaning labor-hour** as the internal billing target. Customers receive job-specific quotes; no public hourly rate. |
 | 9 | ~~Review link + profile URL (Google)~~ **Done 2026-10-08** | `business.reviews.submissionUrl`, `business.reviews.profileUrl`, `business.socials.googleProfile` | **Resolved:** the exact owner-supplied URLs are configured (see the Resolved table); the `/leave-review/` page is live and review requests are unblocked. Never modify, shorten or hand-build the URLs. |
 | 10 | Remaining platform profile URLs | `business.socials` | **Mostly done (2026-10-03):** eight social profiles live and rendering — Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler and Locals — with their basic tracked UTM links placed (owner-confirmed). **Google Business Profile is verified with its profile + review links captured (owner-supplied 2026-10-08).** **Instagram is undergoing verification** (do not publish an unconfirmed URL). **YouTube is deferred** by new Google Workspace account eligibility — not abandoned, no paid workarounds. Bing Places, Yelp, X, Threads, LinkedIn, Alignable and Reddit are prepared as PENDING and never render until supplied. Full actions: `docs/marketing/PLATFORM-REGISTER.md`. |
 | 11 | Analytics IDs | `PUBLIC_UMAMI_WEBSITE_ID`, `PUBLIC_GTM_CONTAINER_ID` | **GA4 done (owner-confirmed 2026-10-03):** `GTM-KSQ26HMG` / `G-LG222LQRQ2` operational with all three key events verified. Umami remains optional with no website ID; the privacy page names only configured services. Accounts must be unique to this business. |
 | 12 | SMS capability | `business.flags.smsEnabled` | **Done 2026-10-01.** Owner-confirmed: the business number receives SMS and text contact is authorized; `business.flags.smsEnabled` is true and the Call/Text reservation actions are live. |
-| 13 | Final cancellation percentages | `src/config/pricing.ts` cancellation | Currently provisional; public copy intentionally avoids numbers until approved. |
+| 13 | ~~Final cancellation percentages~~ **Resolved 2026-10-21** | `src/config/pricing.ts` | 24 hours' notice requested; no standard fee initially; repeated cancellations or access problems may lead to declining future bookings. |
 | 14 | Turnstile keys (recommended) | `PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Otherwise forms rely on honeypot + timing. |
 | 15 | EIA API key (optional) | `EIA_API_KEY` | Live Gulf Coast gas reference; fallback price works without it. |
-| 16 | Browser/device QA + Lighthouse + accessibility scan | local preview / production preview | **Partially done:** browser regression suites and axe WCAG 2.2 AA scans pass in Chromium and are recorded in `docs/verification/VERIFICATION.md`. Physical-device smoke and a Lighthouse/PSI run remain owner-side. |
+| 16 | Browser/device QA + Lighthouse + accessibility scan | local preview / production preview | **Owner accepts completed launch testing (2026-10-21).** Additional Lighthouse/device testing is optional unless a new change causes a problem; regression testing continues. |
 | 17 | Owner legal review of `/terms/` and `/privacy/` | site pages | Drafted as honest operating terms, not legal advice. |
 
 ## MARKETING LAUNCH — owner approvals and actions (grouped in execution order)
@@ -85,8 +85,8 @@ Exact steps: `docs/deployment/DEPLOYMENT.md` §4a; architecture:
 | --- | --- | --- | --- |
 | R1 | Resend account + API key | Cloudflare **Secret** `RESEND_API_KEY` | **Done (owner-confirmed 2026-10-08).** Server-side only; never a `PUBLIC_*` variable, never committed. The lead flow works without it — only the customer email is skipped |
 | R2 | Sender-domain verification | Resend → Domains → `sparkling-standard.com` | **Done (owner-confirmed 2026-10-08):** domain verified, DNS complete. The exact records were added DNS-only; Google Workspace MX/SPF/DKIM untouched |
-| R3 | Optional sender overrides | Cloudflare Text `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO` | Defaults: `Sparkling Standard Cleaning Co. <notifications@sparkling-standard.com>` and `owner@sparkling-standard.com`. Only change to another verified sender |
-| R4 | One controlled live test | Owner-controlled email address | **Submitted 2026-10-08** (`SS Live Form Test`, both emails addressed to the owner inbox; every engineering-observable stage passed). **Awaiting the owner's confirmation** that the owner notification and the customer confirmation arrived (and a Resend dashboard check). Report any failure and it will be fixed |
+| R3 | Optional sender overrides | Cloudflare Text `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO` | Defaults: `Sparkling Standard <notifications@sparkling-standard.com>` and `owner@sparkling-standard.com`. Only change to another verified sender |
+| R4 | One controlled live test | Owner-controlled email address | **Owner confirmed 2026-10-21:** the expected inquiry emails arrived. Continue normal delivery/error monitoring and retain dashboard evidence. |
 
 ## GIFT CERTIFICATES — owner decisions before sales activate
 
@@ -112,7 +112,7 @@ requests only. Full workflow: `docs/operations/GIFT-CERTIFICATES.md`.
 | 22 | Licensed trade info (if any) | Same rule as above. |
 | 23 | Referral program terms | `docs/marketing/REFERRAL-PROGRAM.md` — design ready, offer not active. |
 | 24 | Photo upload support | Requires a storage provider decision; noted as a deliberate limitation. |
-| 25 | IndexNow key | Optional post-launch indexing accelerator. |
+| 25 | ~~IndexNow key~~ **Implemented 2026-10-21** | Production key file, change-only submission script and canonical URL submission are configured; indexing is never guaranteed. |
 
 ## What was deliberately NOT decided by engineering
 

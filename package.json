@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Marketing, estimate, and lead system for Sparkling Standard Cleaning Co., serving the Pensacola and Cantonment area.",
+  "description": "Marketing, estimate, and lead system for Sparkling Standard, serving the Pensacola and Cantonment area.",
   "engines": {
     "node": ">=20"
   },
@@ -45,7 +45,10 @@
     "mapmap:verify": "node scripts/test-mapmap.mjs",
     "address:check": "node scripts/address-live-check.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "audit:facts": "node scripts/audit-facts.mjs"
+    "audit:facts": "node scripts/audit-facts.mjs",
+    "indexnow": "node scripts/indexnow.mjs",
+    "indexnow:dry": "node scripts/indexnow.mjs --dry-run",
+    "indexnow:all": "node scripts/indexnow.mjs --all"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.4.0",

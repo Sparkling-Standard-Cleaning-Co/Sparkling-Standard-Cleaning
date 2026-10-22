@@ -2,7 +2,7 @@
 
 Purpose: compare this project's engineering and operational patterns with a publicly visible,
 mature service-business website system used purely as an architectural reference, and record
-which practical capabilities are worth adopting for Sparkling Standard Cleaning Co.
+which practical capabilities are worth adopting for Sparkling Standard
 
 Method: read-only inspection of the reference project's public repository structure and its
 operations hub / onboarding documentation. No business information, branding, credentials,

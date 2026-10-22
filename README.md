@@ -1,7 +1,7 @@
-# Sparkling Standard Cleaning Co. — digital operating system
+# Sparkling Standard — digital operating system
 
-Marketing, estimate and lead-capture platform for Sparkling Standard Cleaning Co. (public brand:
-"Sparkling Standard"), an owner-operated residential and commercial cleaning company based in
+Marketing, estimate and lead-capture platform for Sparkling Standard (legal entity: Sparkling
+Standard LLC), an owner-operated residential and commercial cleaning company based in
 Cantonment and serving Pensacola, surrounding communities within about an hour of Cantonment, and
 select nearby areas into Alabama.
 

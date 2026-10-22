@@ -36,7 +36,7 @@ customer wrote by phone/email or if a personal reply adds value).
 > Next I check availability and confirm the scope, arrival window and final price with you before
 > your appointment is confirmed. If anything above is wrong, just reply and I will fix it.
 >
-> — Hayli, Sparkling Standard Cleaning Co.
+> — Hayli, Sparkling Standard
 > (850) 426-8479 · owner@sparkling-standard.com
 
 ---
@@ -69,7 +69,7 @@ first moment an appointment exists.
 >
 > If anything changes, call or text (850) 426-8479 — a reply to this email reaches me too.
 >
-> — Hayli, Sparkling Standard Cleaning Co.
+> — Hayli, Sparkling Standard
 
 *QR (optional):* only add a QR if it leads somewhere genuinely useful. The natural target is the
 contact page (`https://sparkling-standard.com/contact/`); never present a decorative QR as
@@ -98,7 +98,7 @@ functional.
 > different, the final scope and price are confirmed with them first. The full terms are on the
 > certificate.
 >
-> — Hayli, Sparkling Standard Cleaning Co.
+> — Hayli, Sparkling Standard
 > (850) 426-8479 · owner@sparkling-standard.com
 
 *Do not send payment/financial details to the recipient.* Keep proof of purchase and the
@@ -121,7 +121,7 @@ certificate as separate messages; the recipient receives only C2 (or a private h
 > The printable certificate (with a scannable QR) is attached. There is no rush — contact me when
 > you are ready.
 >
-> — Hayli, Sparkling Standard Cleaning Co.
+> — Hayli, Sparkling Standard
 
 ---
 

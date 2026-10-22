@@ -40,12 +40,12 @@ if (!serviceAreaMatch) {
 const serviceAreaFull = serviceAreaMatch[1];
 const serviceAreaShort = serviceAreaFull.replace(' within about an hour of Cantonment', '');
 
-const hoursLiteral = 'Seven days a week · 8:00 AM – 6:00 PM';
+const hoursLiteral = 'Seven days a week · 7:00 a.m. – 7:00 p.m.';
 requireSource(`display: '${hoursLiteral}'`, 'hours.display');
 
 /** Verified print facts. */
 export const FACTS = {
-  displayName: 'Sparkling Standard Cleaning Co.',
+  displayName: 'Sparkling Standard',
   wordmark: 'Sparkling Standard',
   scriptWord: brandWords.script,
   capsWord: brandWords.capsDisplay,
@@ -80,7 +80,7 @@ const SERVICE_TITLE_MAP = {
 };
 
 export function verifyFacts() {
-  requireSource("'Sparkling Standard Cleaning Co.'", 'displayName');
+  requireSource("'Sparkling Standard'", 'displayName');
   requireSource("firstName: 'Hayli'", 'founder.firstName');
   requireSource("role: 'Founder & Owner-Operator'", 'founder.role');
   requireSource("formatPhone('850-426-8479')", 'phone');

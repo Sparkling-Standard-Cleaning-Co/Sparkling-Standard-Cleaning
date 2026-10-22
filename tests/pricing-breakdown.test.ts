@@ -57,7 +57,7 @@ test('every eligible add-on has a labor-derived charge and the figures reconcile
   assert.equal(result.status, 'estimated');
 
   // One authoritative method: charge = labor-hours × the applied rate.
-  assert.equal(p.ratePerLaborHour, 50);
+  assert.equal(p.ratePerLaborHour, 55);
   assert.equal(p.pricingCategory, 'other_services');
   for (const line of p.addonPrices.filter((addon) => !addon.customQuote)) {
     assert.equal(line.charge, Math.round(line.laborHours * p.ratePerLaborHour * 100) / 100);
@@ -78,14 +78,14 @@ test('every eligible add-on has a labor-derived charge and the figures reconcile
 
 test('recurring maintenance drives the recurring rate and its add-on charges', () => {
   const recurring = calculateEstimate(input({ frequency: 'biweekly', addonIds: ['inside_oven'] }), context());
-  assert.equal(recurring.pricing.ratePerLaborHour, 42);
+  assert.equal(recurring.pricing.ratePerLaborHour, 55);
   assert.equal(recurring.pricing.pricingCategory, 'recurring_maintenance');
   const oven = recurring.pricing.addonPrices.find((addon) => addon.id === 'inside_oven');
-  assert.equal(oven?.charge, Math.round(0.6 * 42 * 100) / 100);
+  assert.equal(oven?.charge, Math.round(0.6 * 55 * 100) / 100);
 
   const oneTime = calculateEstimate(input({ frequency: 'one_time', addonIds: ['inside_oven'] }), context());
-  assert.equal(oneTime.pricing.addonPrices.find((addon) => addon.id === 'inside_oven')?.charge, 30);
-  assert.notEqual(recurring.pricing.addonPrices.find((a) => a.id === 'inside_oven')?.charge, 30);
+  assert.equal(oneTime.pricing.addonPrices.find((addon) => addon.id === 'inside_oven')?.charge, 33);
+  assert.equal(recurring.pricing.addonPrices.find((a) => a.id === 'inside_oven')?.charge, 33);
 });
 
 test('the incentive is OFF by default and never changes the proposed price', () => {
@@ -156,7 +156,6 @@ test('minimum-price jobs never show an effective discount and still reconcile', 
       fullBaths: 0,
       propertyType: 'apartment',
       frequency: 'biweekly',
-      addonIds: ['dishes', 'bed_linen_change'],
     }),
     context({ addonIncentive: incentive(true) }),
   );

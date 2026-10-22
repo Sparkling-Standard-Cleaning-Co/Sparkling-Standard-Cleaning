@@ -81,7 +81,7 @@ if (args.sample) {
 // Verified contact facts — the same drift guard the invoice tool uses.
 const businessSource = fs.readFileSync('src/config/business.ts', 'utf8');
 for (const [value, fact] of [
-  ["'Sparkling Standard Cleaning Co.'", 'business name'],
+  ["'Sparkling Standard'", 'business name'],
   ["formatPhone('850-426-8479')", 'phone'],
   ["'owner@sparkling-standard.com'", 'email'],
   ["'https://sparkling-standard.com'", 'website'],
@@ -90,7 +90,7 @@ for (const [value, fact] of [
 }
 
 const confirmation = buildCustomerConfirmation(fields, {
-  name: 'Sparkling Standard Cleaning Co.',
+  name: 'Sparkling Standard',
   founder: 'Hayli',
   phone: '(850) 426-8479',
   email: 'owner@sparkling-standard.com',

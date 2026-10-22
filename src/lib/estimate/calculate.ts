@@ -79,7 +79,7 @@ function roundUpToStep(value: number, step: number): number {
 }
 
 function round2(value: number): number {
-  return Math.round(value * 100) / 100;
+  return Math.round((value + 1e-9) * 100) / 100;
 }
 
 const EMPTY_TRAVEL: TravelEstimate = {

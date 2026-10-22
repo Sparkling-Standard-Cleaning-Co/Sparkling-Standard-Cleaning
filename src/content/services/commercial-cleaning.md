@@ -55,7 +55,7 @@ That's why commercial pricing is never instant. The walkthrough exists to see th
 
 ## A scope you can hold us to
 
-After the walkthrough you receive a clear scope: what's cleaned, how often, when it happens relative to your operating hours, and what it costs. Nothing vague, nothing hidden. If your needs change — a new space, a busier season, an event — the scope is easy to adjust.
+After the walkthrough you receive a clear scope: what's cleaned, how often, when it happens relative to your operating hours, and what it costs. Nothing vague, nothing hidden. Commercial cleaning is invoiced monthly with Net 15 terms; no standard deposit or late fee applies initially. If your needs change — a new space, a busier season, an event — the scope is easy to adjust.
 
 ## Scheduling around your operation
 

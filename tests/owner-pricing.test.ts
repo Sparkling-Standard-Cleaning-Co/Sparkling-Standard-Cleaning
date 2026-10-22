@@ -175,7 +175,7 @@ test('recurring 1600 sqft 3/2 biweekly with two add-ons reconciles client and se
   assert.equal(client.status, 'estimated');
   assert.equal(client.minimumApplied, false);
   const p = client.pricing;
-  assert.equal(p.ratePerLaborHour, 42);
+  assert.equal(p.ratePerLaborHour, 55);
   assert.equal(p.pricingCategory, 'recurring_maintenance');
 
   // Independent formula from the effective configuration.
@@ -198,7 +198,7 @@ test('recurring 1600 sqft 3/2 biweekly with two add-ons reconciles client and se
   assert.equal(p.extrasSubtotal, round2(expectedExtras));
   assert.equal(p.subtotal, expectedSubtotal);
   assert.equal(selectInstantAmount(client), expectedTotal);
-  assert.equal(expectedTotal, 255, 'the representative scenario total is unchanged');
+  assert.equal(expectedTotal, 330, 'the representative scenario reflects the $55 billing target');
 
   // Server path: the same flat fields must reproduce the client amount.
   const server = calculateEstimate(

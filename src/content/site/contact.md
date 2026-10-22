@@ -7,6 +7,6 @@ hero:
   lead: Call, text or send a message — whichever is easiest. Every message gets a real reply from Sparkling Standard, not an automated sequence.
 waysHeading: Ways to reach us
 formHeading: Send a message
-contactNote: For the fastest response, text or call. Messages sent here are delivered to Sparkling Standard directly; you'll hear back as soon as possible — usually the same day.
+contactNote: For the fastest response, text or call. Messages sent here are delivered to Sparkling Standard directly, and we respond personally as soon as possible.
 sections: []
 ---

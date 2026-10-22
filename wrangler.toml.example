@@ -23,4 +23,5 @@ compatibility_date = "2026-10-01"
 #
 # [vars]
 # PUBLIC_SITE_URL = "https://sparkling-standard.com"
-# PUBLIC_BUSINESS_NAME = "Sparkling Standard Cleaning Co."
+# PUBLIC_BUSINESS_NAME = "Sparkling Standard"
+# PUBLIC_BUSINESS_LEGAL_NAME = "Sparkling Standard LLC"

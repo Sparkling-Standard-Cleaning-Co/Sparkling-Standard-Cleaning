@@ -1,6 +1,6 @@
 ---
 question: How do you handle keys, lockboxes and alarm codes?
-answer: If you choose to leave access for your cleaning, we treat that information as confidential. Codes and access details are kept only as long as needed, never used outside booked work, and removed when they're no longer current. Many customers prefer to be home or to use a single-use entry method, and that's completely fine. The full policy lives in our property access document shared with recurring customers.
+answer: We do not retain customer physical keys. Access is provided through an authorized temporary method, a customer-controlled lockbox or another approved arrangement. Codes and access details are treated as confidential, used only for booked work, and removed when they are no longer current. Many customers prefer to be home or use a temporary entry method, and that is completely fine.
 category: process
 order: 4
 ---

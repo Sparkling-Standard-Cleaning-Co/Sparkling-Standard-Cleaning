@@ -22,7 +22,7 @@ overwrite it, and never add a second Google tag.
 | --- | --- |
 | GTM container | `GTM-KSQ26HMG` |
 | GA4 measurement ID | `G-LG222LQRQ2` |
-| GA4 web stream | Sparkling Standard Cleaning Co. (https://sparkling-standard.com) |
+| GA4 web stream | Sparkling Standard (https://sparkling-standard.com) |
 
 Do **not** create another GTM container, GA4 property or web stream, and never paste a second
 `gtag.js`/Google tag into the website. The website's only Google entry point is the GTM container.

@@ -89,18 +89,17 @@ export const pricing = {
      * the estimate range. INTERNAL ONLY — this is not what anyone is paid and
      * must never be displayed.
      *
-     * Option C (owner-approved 2026-10-01): $42/labor-hour for applicable
-     * recurring maintenance (recurring standard cleans) and $50/labor-hour for
-     * other approved service categories (one-time, deep, move-out, STR).
-     * The model must still cover real operating costs and margin.
+     * Owner-approved billing target (2026-10-21): $55 per productive cleaning
+     * labor-hour. Customers receive job-specific quotes, not a published
+     * hourly rate. The model must still cover real operating costs and margin.
      */
     targetGrossRevenuePerLaborHour: approved(
       ownerPricing.hourlyRates.otherServices,
-      'Option C — other service categories rate (one-time, deep, move-in/out, STR). Owner-approved 2026-10-01. Never displayed publicly.',
+      'Owner-approved $55 productive labor-hour billing target (2026-10-21), applied to one-time, deep, move-in/out and STR work. Never displayed publicly.',
     ),
     recurringGrossRevenuePerLaborHour: approved(
       ownerPricing.hourlyRates.recurring,
-      'Option C — applicable recurring maintenance rate (weekly/biweekly/monthly standard cleans). Owner-approved 2026-10-01. Never displayed publicly.',
+      'Owner-approved $55 productive labor-hour billing target (2026-10-21), applied to recurring maintenance. Never displayed publicly.',
     ),
     /**
      * Desired owner labor compensation floor BEFORE overheads and profit.
@@ -339,7 +338,7 @@ export const pricing = {
      * the server before a reservation is accepted. Bump when pricing logic,
      * rates or policy values change so old quotes cannot be silently reused.
      */
-    configVersion: approved('2026-10-01.option-c.v1', 'Quote provenance marker. Increment on any pricing/policy change.'),
+    configVersion: approved('2026-10-21.billing-target.v1', 'Quote provenance marker. Incremented for the owner-approved $55 productive labor-hour billing target and policy changes.'),
     /**
      * Which value from the calculation becomes the offered price. 'expected' is
      * the model price and never the lowest range value; 'midpoint' and 'high'
@@ -357,21 +356,21 @@ export const pricing = {
     validityHours: provisional(336, 'Server-issued verification validity window (14 days) for the owner notification only. Not shown to customers as a hold.'),
   },
 
-  // ── Cancellation policy (directive §36) — PROVISIONAL, not final ──────────
+  // ── Cancellation policy (owner-approved 2026-10-21) ───────────────────────
   cancellation: {
-    ownerApproved: false,
-    noticeHours: provisional(24, 'Provisional 24-hour notice expectation.'),
-    underNoticePercent: provisional(25, 'Provisional fee under 24 hours. NOT FINAL until owner approval.'),
-    sameDayPercent: provisional(50, 'Provisional same-day / no-access / lockout fee. NOT FINAL until owner approval.'),
+    ownerApproved: true,
+    noticeHours: approved(24, 'Owner-approved request for at least 24 hours notice.'),
+    underNoticePercent: approved(0, 'No standard cancellation fee initially.'),
+    sameDayPercent: approved(0, 'No standard same-day or no-access fee initially.'),
     discretionNote:
-      'The founder may exercise reasonable discretion for established clients and genuine emergencies.',
+      'Repeated cancellations or access problems may lead to declining future bookings.',
   },
 
-  // ── Satisfaction philosophy (directive §37) ────────────────────────────────
+  // ── Satisfaction policy (owner-approved 2026-10-21) ───────────────────────
   satisfaction: {
     statement:
-      'If something within the agreed cleaning scope was missed, contact us promptly and we will work quickly to make it right.',
-    notificationWindowHours: provisional(null as number | null, 'Directive §37: a notification window (for example 24 hours) may be configured after owner approval. Until then, public copy deliberately avoids a hard number.'),
+      'If something within the agreed cleaning scope was missed, report it within 24 hours. We will review it and provide reasonable corrective cleaning at no additional charge for verified missed work. This is not an unconditional refund promise.',
+    notificationWindowHours: approved(24, 'Owner-approved 24-hour reporting window for cleaning concerns.'),
   },
 
   // ── Calibration (directive §74) ────────────────────────────────────────────

@@ -160,7 +160,7 @@ function containerVersion(name, { includeGoogleTag }) {
       path: 'accounts/0/containers/0',
       accountId: '0',
       containerId: '0',
-      name: 'Sparkling Standard Cleaning Co.',
+      name: 'Sparkling Standard',
       publicId: GTM_PUBLIC_ID,
       usageContext: ['WEB'],
       fingerprint: '0',

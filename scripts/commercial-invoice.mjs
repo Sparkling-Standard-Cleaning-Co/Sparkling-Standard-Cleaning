@@ -90,13 +90,13 @@ const requireSource = (value, label) => {
     fail(`contact.${label} ("${value}") does not match src/config/business.ts — update the repo source first`);
   }
 };
-requireSource("'Sparkling Standard Cleaning Co.'", 'name');
+requireSource("'Sparkling Standard'", 'name');
 requireSource("formatPhone('850-426-8479')", 'phone');
 requireSource("'owner@sparkling-standard.com'", 'email');
 requireSource("'https://sparkling-standard.com'", 'website');
 
 const contact = data.contact ?? {};
-if (contact.name !== 'Sparkling Standard Cleaning Co.') fail('contact.name must match the verified business name');
+if (contact.name !== 'Sparkling Standard') fail('contact.name must match the verified business name');
 if (contact.phone !== '(850) 426-8479') fail('contact.phone must match the verified number');
 if (contact.email !== 'owner@sparkling-standard.com') fail('contact.email must match the verified address');
 if (contact.website !== 'sparkling-standard.com') fail('contact.website must match the verified domain');

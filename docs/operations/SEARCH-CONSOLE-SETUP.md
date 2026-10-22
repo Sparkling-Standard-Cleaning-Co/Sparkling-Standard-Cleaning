@@ -37,7 +37,7 @@ This is the single highest-value local visibility step for a cleaning company.
 
 1. Go to `https://business.google.com` with the company Google account.
 2. Create the business:
-   - Name: **Sparkling Standard Cleaning Co.**
+   - Name: **Sparkling Standard**
    - Category: **House cleaning service** (add **Commercial cleaning service** as a secondary
      category).
    - **Service-area business**: choose "I deliver goods and services to my customers" and **hide

@@ -3,6 +3,23 @@
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
+## Verified - 2026-10-21 owner-decision implementation
+
+| Check | Command | Result |
+| --- | --- | --- |
+| TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints |
+| Production build | `npm run build` | 21 pages + sitemap, no errors |
+| Unit suite | `npm test` | 364 passed, 1 intentional skip, 0 failed |
+| Browser regression suite | `npm run test:browser` | 87 passed, 0 failed |
+| Static validation | `npm run validate` | 1,202 internal links, SEO, marketing/QR, GTM artifacts and internal-checklist checks passed |
+| Smoke test | `npm run smoke` | 17 pages passed |
+| PENDING-fact gate | `npm run pending` | no PENDING placeholders across 25 built files |
+| No-fabrication audit | `npm run audit:facts` | no unsupported factual claims; 11 context-review terms are negative/exclusion language |
+| Brand and policy copy | Built HTML inspection | Sparkling Standard brand; circular logo; new slogan; legal entity Sparkling Standard LLC in schema/footer; no customer-facing "Cleaning Co." |
+| Terms and STR policy | Built HTML inspection | Residential payment upon completion; commercial Net 15; no standard cancellation fee; 24-hour satisfaction report; no retained physical keys; written photo consent; STR same-day case-by-case and no automatic laundry premium |
+| Analytics | Production browser check | GTM and GA4 load only after consent; `page_view` observed; no pre-consent Google requests |
+| IndexNow | `npm run indexnow` | Canonical URL submission verified after deployment; a successful request does not guarantee indexing |
+
 ## Verified (October 2026, branded pre-launch build)
 
 Recovery note: this work was verified in the recovered standalone repository
@@ -98,7 +115,7 @@ owner confirmation.
 
 | Check | Method | Result |
 | --- | --- | --- |
-| Premium header lockup | Real Chromium at 320/390/768/1024/1280/1440 px; screenshots inspected | Crest + script “Sparkling” + spaced “STANDARD” + “Cleaning Co.” + tagline; mobile drops the tagline to stay legible; no overflow; `/estimate/` intro spacing reduced |
+| Premium header lockup | Real Chromium at 320/390/768/1024/1280/1440 px; screenshots inspected | Circular mark with script “Sparkling” + spaced “STANDARD”; no descriptor or tagline in the mark; mobile legibility and no overflow verified; `/estimate/` intro spacing reduced |
 | Header/nav contract | `npm run test:browser` | 7/7 header-about tests (fit/alignment at four widths, brand identity, mobile lockup, About page) |
 | Platform registry | Unit/config + browser tests | 19 platforms prepared; only confirmed profiles render; pending platforms never appear. **Superseded (2026-10-03):** eight confirmed profiles now render — see the social Follow Us section below |
 | UTM expansion | `npm run marketing:links` + `npm run marketing:verify` | 51 tracked inbound links (29 ready, 22 prepared — refreshed 2026-10-03); all committed QR assets decode-verified; docs byte-identical on check |
@@ -228,7 +245,7 @@ logo-only circular buttons — was implemented directly (no alternative layouts)
 | --- | --- | --- |
 | Appearance | Real Chromium + screenshots | Eight official marks in single 52px warm off-white circles (1px sand border, 12px gaps), no visible labels, no nested circles, no heavy shadows; plum background, Follow Us heading and gold panel border unchanged; compact padding |
 | Interaction | Screenshots + CSS | Restrained hover (gold border, 1px lift) and a clearly visible gold keyboard-focus ring (`outline: 3px solid var(--color-champagne-300)`); reduced-motion support retained |
-| Accessible names | Browser test via role query | Every link exposes `<platform> — Sparkling Standard Cleaning Co. (opens in a new tab)`; no visible label element remains |
+| Accessible names | Browser test via role query | Every link exposes `<platform> — Sparkling Standard (opens in a new tab)`; no visible label element remains |
 | Links/security | Browser test | All eight exact owner-supplied URLs, `target="_blank"`, `rel="noopener noreferrer"`, no UTM parameters, ≥44px targets |
 | Layout | Screenshots at 1280/768/390/320 + browser tests | Desktop: heading left + one row of eight right (section 124px tall); tablet: stacked naturally (189px); phones: two balanced rows of four (247px); 320px no horizontal overflow, no clipped icons |
 | Icons preserved | Browser test | Official Nextdoor house-"n" (`#1B8751`), Gab, Parler and Locals marks unchanged; no monogram placeholders among the eight |

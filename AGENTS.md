@@ -1,4 +1,4 @@
-# AGENTS.md — Sparkling Standard Cleaning Co. Digital Operating System
+# AGENTS.md — Sparkling Standard Digital Operating System
 
 Authoritative operating instructions for every AI engineering agent (OpenCode and similar)
 working in this repository. Read this file fully before changing anything, then read the specific
@@ -65,8 +65,9 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
 
 ## Project identity and current verified status
 
-- Marketing, estimate and lead-capture website for **Sparkling Standard Cleaning Co.** (public
-  brand "Sparkling Standard"), an owner-operated residential and commercial cleaning company based
+- **2026-10-21 owner decision implementation:** 46 decisions applied; public brand **Sparkling Standard**, legal entity **Sparkling Standard LLC**, slogan **Leaving Your Space Sparkling.** See `docs/verification/VERIFICATION.md` and the Business HQ workbook.
+- Marketing, estimate and lead-capture website for **Sparkling Standard** (legal entity:
+  **Sparkling Standard LLC**), an owner-operated residential and commercial cleaning company based
   in Cantonment, serving Pensacola, surrounding communities within about an hour of driving time
   from the private operating origin, and select nearby areas into Alabama.
 - Repo: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`. **`main` is the production
@@ -83,7 +84,8 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   verified); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); eight confirmed
   social profiles rendering (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Release status:** the 2026-10-03 release is **deployed to production** — `origin/main` =
+- **Current release (2026-10-21):** the 46-decision owner implementation is the current production release set. Verify the exact deployed SHA with git log -1; Cloudflare Pages and the live site are verified after each push. The historical release note follows.
+- **Prior release status:** the 2026-10-03 release was **deployed to production** — `origin/main` =
   `62a1a46` (the five-commit release `8b8dde4`/`03d6ba8`/`53a85aa`/`0f3c38c`/`5a4a024`, the
   documentation closeout `7a51efa`, the social integration `cdc4971`, the deployment-closeout
   `6ebc3fb` and the logo-only Follow Us redesign `62a1a46`), owner-authorized with live

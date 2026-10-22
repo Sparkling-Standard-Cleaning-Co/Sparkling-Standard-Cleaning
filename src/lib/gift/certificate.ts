@@ -161,7 +161,7 @@ h1 { text-align: center; font-size: 21px; letter-spacing: .28em; text-transform:
     <div class="brand">
       <span class="sparkling">Sparkling</span>
       <span class="standard">Standard</span>
-      <span class="descriptor">Cleaning Co. · ${brandWords.tagline}</span>
+      <span class="descriptor">${brandWords.tagline}</span>
     </div>
     <h1>Gift Certificate</h1>
     <p class="value">${e(data.value)}</p>
@@ -184,7 +184,7 @@ h1 { text-align: center; font-size: 21px; letter-spacing: .28em; text-transform:
     </div>
     ${contactParts.length ? `<p class="contact">${contactParts.join(' · ')}</p>` : ''}
     ${data.terms ? `<p class="terms">${e(data.terms)}</p>` : ''}
-    <p class="footer-note">Issued ${e(data.issuedOn)} · Sparkling Standard Cleaning Co.</p>
+    <p class="footer-note">Issued ${e(data.issuedOn)} · Sparkling Standard</p>
   </section>
 </body>
 </html>`;

@@ -5,7 +5,7 @@ genuine project photography exists, this register records every licensed stock i
 source, its licence and where it appears. Update it whenever an image is added, replaced or
 removed.
 
-**No image in the stock register depicts work performed by Sparkling Standard Cleaning Co.** All
+**No image in the stock register depicts work performed by Sparkling Standard** All
 are representative interiors and process details. Public captions and alt text must never claim
 otherwise.
 

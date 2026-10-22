@@ -1,6 +1,6 @@
 ---
 question: What if something within the agreed scope was missed?
-answer: Contact us promptly after the cleaning and we will work quickly to make it right. That's the policy, and it's real — this business is built on customers who felt the difference. It doesn't extend to unlimited liability or to items outside the agreed scope, but if we missed something we said we'd do, fixing it is our job.
+answer: Report the concern within 24 hours of the cleaning. We will review it and, for verified work missed within the agreed scope, provide reasonable corrective cleaning at no additional charge. This is not an unconditional refund promise, and it does not extend to unrelated work, restoration or conditions outside the agreed scope.
 category: policies
 order: 2
 ---

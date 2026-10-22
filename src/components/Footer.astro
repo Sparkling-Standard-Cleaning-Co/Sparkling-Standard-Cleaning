@@ -94,7 +94,7 @@ const socialEntries = Object.values(business.socials).filter(
     </div>
 
     <div class="site-footer__bottom">
-      <span>© {year} {siteName()} All rights reserved.</span>
+      <span>© {year} {isPending(business.legalName) ? siteName() : business.legalName}. All rights reserved.</span>
       <span>
         <a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a> · <a href="/service-area/">Service Area</a>
       </span>
