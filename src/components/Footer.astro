@@ -5,120 +5,112 @@ import { footerServicesNav, footerCompanyNav } from '../lib/site';
 import Logo from './Logo.astro';
 import SocialLinks from './SocialLinks.astro';
 import GoogleG from './GoogleG.astro';
+import Icon from './Icon.astro';
 
 const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const year = new Date().getFullYear();
-const reviewReadUrl = isPending(business.reviews.profileUrl) ? null : business.reviews.profileUrl;
 const reviewLeaveUrl = isPending(business.reviews.submissionUrl) ? null : business.reviews.submissionUrl;
 
 const socialEntries = Object.values(business.socials).filter(
   (url) => typeof url === 'string' && url.length > 0 && !isPending(url),
 );
+
+// The slogan's final word ("Sparkle.") carries the script treatment. Splitting
+// on the last word keeps the rendering honest if the owner updates the slogan.
+const taglineWords = brandWords.tagline.trim().split(/\s+/);
+const taglineLast = taglineWords.pop() ?? '';
+const taglineLead = taglineWords.join(' ');
+
+const phone = isPending(business.phone) ? null : business.phone;
 ---
 
 <footer class="site-footer">
   <div class="container">
+    <div class="site-footer__masthead">
+      <Logo class="brand" />
+      <p class="site-footer__tagline">
+        {taglineLead && <>{taglineLead} </>}
+        <span class="site-footer__sparkle">{taglineLast}</span>
+      </p>
+      {
+        socialEntries.length > 0 && (
+          <section class="social-follow social-follow--bubble" data-social-follow aria-labelledby="social-follow-heading">
+            <h2 class="social-follow__title" id="social-follow-heading">Follow Us</h2>
+            <p class="social-follow__copy">Follow along for updates and a closer look at our work.</p>
+            <SocialLinks />
+          </section>
+        )
+      }
+      <p class="small site-footer__area">{business.serviceArea.summary}</p>
+      {preview && <p class="small"><span class="pending-badge">Pre-launch preview</span></p>}
+    </div>
+
     <div class="site-footer__grid">
-      <div class="site-footer__brand">
-        <Logo class="brand" />
-        <p class="site-footer__tagline">{brandWords.tagline}</p>
+      <div>
+        <h3>Services</h3>
+        <ul>
+          {footerServicesNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+        </ul>
+      </div>
+
+      <div>
+        <h3>Company</h3>
+        <ul>
+          {footerCompanyNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+        </ul>
+      </div>
+
+      <div>
+        <h3>Reviews</h3>
         {
-          socialEntries.length > 0 && (
-            <section class="social-follow social-follow--bubble" data-social-follow aria-labelledby="social-follow-heading">
-              <h2 class="social-follow__title" id="social-follow-heading">Follow Us</h2>
-              <p class="social-follow__copy">Follow along for updates and a closer look at our work.</p>
-              <SocialLinks />
-            </section>
+          reviewLeaveUrl ? (
+            <div class="site-footer__reviews-card">
+              <GoogleG size={22} />
+              <a
+                class="btn btn--ghost site-footer__review-btn"
+                href={reviewLeaveUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Leave us a review on Google (opens in a new tab)"
+                data-review-link="google"
+                data-cta="footer-reviews-leave"
+              >
+                Leave Us a Review
+              </a>
+              <p class="small site-footer__reviews-note">
+                Had a great experience? A quick Google review helps your neighbors find a
+                cleaner they can trust — and it means the world to a small local business.
+              </p>
+            </div>
+          ) : (
+            <p class="small site-footer__reviews-note">Review links are being set up.</p>
           )
         }
-        <p class="small site-footer__area">{business.serviceArea.summary}</p>
-        {preview && <p class="small"><span class="pending-badge">Pre-launch preview</span></p>}
       </div>
 
-      <div class="site-footer__middle">
-        <div>
-          <h3>Services</h3>
-          <ul>
-            {footerServicesNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
-          </ul>
-        </div>
-
-        <div>
-          <h3>Company</h3>
-          <ul>
-            {footerCompanyNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
-          </ul>
-        </div>
-
-        <div>
-          <h3>Reviews</h3>
-          {
-            (reviewReadUrl || reviewLeaveUrl) && (
-              <div class="site-footer__reviews-card">
-                <GoogleG size={22} />
-                <ul>
-                  {reviewReadUrl && (
-                    <li>
-                      <a
-                        href={reviewReadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="Read our reviews on Google (opens in a new tab)"
-                        data-review-link="google"
-                        data-cta="footer-reviews-read"
-                      >
-                        Read Our Google Reviews
-                      </a>
-                    </li>
-                  )}
-                  {reviewLeaveUrl && (
-                    <li>
-                      <a
-                        href={reviewLeaveUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="Leave us a review on Google (opens in a new tab)"
-                        data-review-link="google"
-                        data-cta="footer-reviews-leave"
-                      >
-                        Leave Us a Review
-                      </a>
-                    </li>
-                  )}
-                </ul>
-                <p class="small site-footer__reviews-note">
-                  Honest reviews from real customers help neighbors find a cleaner they can trust.
-                </p>
-              </div>
-            )
-          }
-        </div>
-      </div>
-
-      <div class="site-footer__contact">
+      <div>
         <h3>Contact</h3>
-        <ul>
-          {
-            isPending(business.phone) ? (
-              <li>
-                {preview ? (
-                  <>
-                    <span class="small">Phone: </span>
-                    <span class="pending-badge">Pending owner input</span>
-                  </>
-                ) : (
-                  <span class="small">Phone being set up — use the contact form meanwhile.</span>
-                )}
-              </li>
-            ) : (
-              <>
-                <li><a href={business.phone.href} data-cta="footer-call">Call {business.phone.display}</a></li>
-                {business.flags.smsEnabled && (
-                  <li><a href={business.phone.sms} data-cta="footer-text">Text {business.phone.display}</a></li>
-                )}
-              </>
-            )
-          }
+        {
+          phone ? (
+            <div class="site-footer__contact-actions">
+              <a class="btn btn--ghost" href={phone.href} data-cta="footer-call">
+                <Icon name="phone" size={18} /> Call {phone.display}
+              </a>
+              {
+                business.flags.smsEnabled && (
+                  <a class="btn btn--ghost" href={phone.sms} data-cta="footer-text">
+                    <Icon name="message" size={18} /> Text {phone.display}
+                  </a>
+                )
+              }
+            </div>
+          ) : preview ? (
+            <p class="small"><span class="small">Phone: </span><span class="pending-badge">Pending owner input</span></p>
+          ) : (
+            <p class="small">Phone being set up — use the contact form meanwhile.</p>
+          )
+        }
+        <ul class="site-footer__contact-list">
           {
             isPending(business.email) ? (
               <li>

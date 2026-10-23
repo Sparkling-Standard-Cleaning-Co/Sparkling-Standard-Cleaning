@@ -71,11 +71,17 @@ test('the offered price is never the lowest range value', () => {
   assert.ok(amount > result.low, 'must not simply reuse the low end of the range');
 });
 
-test('weekly and biweekly recurring homes get distinct quotes', () => {
-  const weekly = selectInstantAmount(calculateEstimate(input({ frequency: 'weekly' }), context));
-  const biweekly = selectInstantAmount(calculateEstimate(input({ frequency: 'biweekly' }), context));
+test('weekly and biweekly recurring homes get distinct ongoing per-visit prices', () => {
+  const weeklyResult = calculateEstimate(input({ frequency: 'weekly' }), context);
+  const biweeklyResult = calculateEstimate(input({ frequency: 'biweekly' }), context);
+  assert.ok(weeklyResult.ongoing && biweeklyResult.ongoing);
+  // P12: both quotes price the identical required first-visit Deep Cleaning;
+  // the rhythm distinction lives in the ongoing per-visit price.
+  assert.equal(weeklyResult.ongoing.perVisitPrice < biweeklyResult.ongoing.perVisitPrice, true);
+  const weekly = selectInstantAmount(weeklyResult);
+  const biweekly = selectInstantAmount(biweeklyResult);
   assert.ok(weekly !== null && biweekly !== null);
-  assert.ok(weekly < biweekly, 'weekly maintenance is the most efficient per visit');
+  assert.equal(weekly, biweekly, 'the first-visit quote is the same Deep Cleaning for every rhythm');
 });
 
 test('a first clean quotes above a maintained one-time clean', () => {

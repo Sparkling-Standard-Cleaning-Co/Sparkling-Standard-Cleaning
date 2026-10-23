@@ -78,10 +78,13 @@ test('every eligible add-on has a labor-derived charge and the figures reconcile
 
 test('recurring maintenance drives the recurring rate and its add-on charges', () => {
   const recurring = calculateEstimate(input({ frequency: 'biweekly', addonIds: ['inside_oven'] }), context());
-  assert.equal(recurring.pricing.ratePerLaborHour, 55);
-  assert.equal(recurring.pricing.pricingCategory, 'recurring_maintenance');
-  const oven = recurring.pricing.addonPrices.find((addon) => addon.id === 'inside_oven');
-  assert.equal(oven?.charge, Math.round(0.6 * 55 * 100) / 100);
+  // P12: the primary breakdown prices the required first-visit Deep Cleaning;
+  // the recurring rhythm and its rate live in the ongoing summary.
+  assert.ok(recurring.ongoing, 'a new recurring arrangement carries an ongoing summary');
+  assert.equal(recurring.ongoing.pricing.pricingCategory, 'recurring_maintenance');
+  assert.equal(recurring.ongoing.pricing.ratePerLaborHour, 55);
+  const ongoingOven = recurring.ongoing.pricing.addonPrices.find((addon) => addon.id === 'inside_oven');
+  assert.equal(ongoingOven?.charge, Math.round(0.6 * 55 * 100) / 100);
 
   const oneTime = calculateEstimate(input({ frequency: 'one_time', addonIds: ['inside_oven'] }), context());
   assert.equal(oneTime.pricing.addonPrices.find((addon) => addon.id === 'inside_oven')?.charge, 33);
@@ -160,11 +163,15 @@ test('minimum-price jobs never show an effective discount and still reconcile', 
     context({ addonIncentive: incentive(true) }),
   );
   assert.equal(tiny.status, 'estimated');
-  assert.equal(tiny.pricing.minimumApplied, true);
-  assert.equal(tiny.pricing.discount, null, 'the minimum absorbs any incentive');
-  const total = tiny.pricing.subtotal + tiny.pricing.roundingAdjustment;
-  assert.equal(total, pricing.minimumJob.value);
-  assert.equal(selectInstantAmount(tiny), pricing.minimumJob.value);
+  // P12: the required first-visit Deep Cleaning clears the minimum on its own.
+  assert.equal(tiny.pricing.minimumApplied, false);
+  assert.equal(tiny.pricing.discount, null);
+  assert.equal(selectInstantAmount(tiny), tiny.pricing.subtotal + tiny.pricing.roundingAdjustment);
+  // The smaller ongoing rhythm is floored at the minimum and shows no discount.
+  assert.ok(tiny.ongoing);
+  assert.equal(tiny.ongoing.pricing.minimumApplied, true);
+  assert.equal(tiny.ongoing.pricing.discount, null, 'the minimum absorbs any incentive');
+  assert.equal(tiny.ongoing.perVisitPrice, pricing.minimumJob.value);
 });
 
 test('custom-quote specialty work still blocks instant pricing under the unified model', () => {

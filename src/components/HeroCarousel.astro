@@ -1,0 +1,175 @@
+---
+// Hero carousel — a gentle crossfade through representative interiors.
+// Progressively enhanced: without JavaScript every slide still renders as a
+// simple stack, the first one visible. The rotation respects
+// prefers-reduced-motion (no auto-advance) and pauses on hover/focus or a
+// hidden tab so it never spins unseen. Images stay honest representative
+// interiors (see docs/design/IMAGE-SOURCE-REGISTER.md) — alt text never
+// claims our work.
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+export interface HeroCarouselSlide {
+  src: ImageMetadata;
+  alt: string;
+  widths: number[];
+}
+
+interface Props {
+  slides: HeroCarouselSlide[];
+  sizes: string;
+  /** Auto-advance interval in milliseconds (reduced motion always disables it). */
+  intervalMs?: number;
+}
+
+const { slides, sizes, intervalMs = 6000 } = Astro.props;
+---
+
+<div
+  class="hero-carousel"
+  data-hero-carousel
+  data-interval-ms={String(intervalMs)}
+  aria-roledescription="carousel"
+  aria-label="Representative interiors of the spaces we care for"
+>
+  <div class="hero-carousel__track">
+    {
+      slides.map((slide, index) => (
+        <div
+          class="hero-carousel__slide"
+          data-slide={String(index)}
+          data-active={index === 0 ? 'true' : 'false'}
+          aria-hidden={index === 0 ? 'false' : 'true'}
+        >
+          <Image
+            src={slide.src}
+            alt={slide.alt}
+            widths={slide.widths}
+            sizes={sizes}
+            loading={index === 0 ? 'eager' : 'lazy'}
+            decoding="async"
+            class="card__media-image"
+          />
+        </div>
+      ))
+    }
+  </div>
+  <div class="hero-carousel__dots" role="tablist" aria-label="Choose a slide">
+    {
+      slides.map((_slide, index) => (
+        <button
+          type="button"
+          class="hero-carousel__dot"
+          data-dot={String(index)}
+          role="tab"
+          aria-selected={index === 0 ? 'true' : 'false'}
+          aria-label={`Slide ${index + 1} of ${slides.length}`}
+          tabindex={index === 0 ? 0 : -1}
+        />
+      ))
+    }
+  </div>
+</div>
+
+<script>
+  // Carousel behavior — auto-advance with a hard stop for reduced motion,
+  // hover/focus pausing, dot navigation, light swipe support, and a paused
+  // timer whenever the tab is hidden. No dependencies.
+  function initHeroCarousel(root: HTMLElement): void {
+    const slides = [...root.querySelectorAll<HTMLElement>('[data-slide]')];
+    const dots = [...root.querySelectorAll<HTMLButtonElement>('[data-dot]')];
+    if (slides.length < 2 || dots.length !== slides.length) return;
+
+    const intervalMs = Number(root.dataset.intervalMs ?? '6000');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let current = 0;
+    let timer: number | null = null;
+
+    const goTo = (index: number): void => {
+      current = (index + slides.length) % slides.length;
+      for (const [i, slide] of slides.entries()) {
+        const active = i === current;
+        slide.dataset.active = active ? 'true' : 'false';
+        slide.setAttribute('aria-hidden', active ? 'false' : 'true');
+      }
+      for (const [i, dot] of dots.entries()) {
+        const active = i === current;
+        dot.setAttribute('aria-selected', active ? 'true' : 'false');
+        dot.tabIndex = active ? 0 : -1;
+      }
+    };
+
+    const stop = (): void => {
+      if (timer !== null) {
+        window.clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const start = (): void => {
+      if (reducedMotion) return;
+      stop();
+      timer = window.setInterval(() => goTo(current + 1), intervalMs);
+    };
+
+    const userPaused = (): boolean =>
+      root.matches(':hover, :focus-within') || document.hidden;
+
+    for (const [i, dot] of dots.entries()) {
+      dot.addEventListener('click', () => {
+        goTo(i);
+        // A dot press is an explicit choice: restart the timer so the show
+        // continues from the chosen slide.
+        start();
+      });
+      dot.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          goTo(current + 1);
+          dots[current]?.focus();
+        } else if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          goTo(current - 1);
+          dots[current]?.focus();
+        }
+      });
+    }
+
+    // Light swipe support for touch/pointer use.
+    let pointerStart: number | null = null;
+    root.addEventListener('pointerdown', (event) => {
+      pointerStart = event.clientX;
+    });
+    root.addEventListener('pointerup', (event) => {
+      if (pointerStart === null) return;
+      const delta = event.clientX - pointerStart;
+      pointerStart = null;
+      if (Math.abs(delta) < 48) return;
+      goTo(delta < 0 ? current + 1 : current - 1);
+      start();
+    });
+
+    // Pause while hovered, focused, or hidden; resume quietly afterward.
+    for (const eventName of ['pointerenter', 'focusin'] as const) {
+      root.addEventListener(eventName, stop);
+    }
+    root.addEventListener('pointerleave', () => {
+      if (!userPaused()) start();
+    });
+    root.addEventListener('focusout', () => {
+      window.setTimeout(() => {
+        if (!userPaused()) start();
+      }, 0);
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stop();
+      else if (!userPaused()) start();
+    });
+
+    if (!reducedMotion) start();
+  }
+
+  for (const root of document.querySelectorAll<HTMLElement>('[data-hero-carousel]')) {
+    initHeroCarousel(root);
+  }
+</script>

@@ -348,6 +348,25 @@ collections are intentionally empty — not errors.
   7:00 p.m., seven days per week**, sitewide. A new recurring residential maintenance arrangement
   requires a **Deep Cleaning first, without exception**; the estimator requires explicit
   acknowledgment and the lead relay rejects a recurring request without it.
+- **Two-price recurring quotes (2026-10-23):** a NEW recurring residential arrangement is quoted
+  as its required FIRST VISIT (a Deep Cleaning computed at the one-time/deep rate — this is the
+  price the customer submits and the server verifies), with the ongoing per-visit rhythm shown
+  alongside (`EstimateResult.ongoing`, wizard live panel/summary, `first_visit_total` /
+  `ongoing_price_per_visit` / `ongoing_frequency` submission fields, server-owned in the lead
+  relay). The SPARKLE100 campaign discounts ONLY the first visit and only when the customer's
+  arrangement is weekly or biweekly (`campaignArrangement` in
+  `src/lib/estimate/promotions.ts`); the ongoing rhythm is never discounted. Quote
+  `configVersion` is `2026-10-23.recurring-first-visit.v1`.
+- **Homepage refinement (2026-10-23):** the homepage hero carries a four-slide representative
+  interior carousel (`src/components/HeroCarousel.astro`, auto-advance respects
+  prefers-reduced-motion, pauses on hover/focus), the trust strip sits directly under the hero,
+  a Southern-hospitality section follows, and the five service cards are photo cards
+  (honest licensed interiors; see `docs/design/IMAGE-SOURCE-REGISTER.md`). The recurring page
+  has its own dedicated `src/pages/recurring-cleaning.astro` (owner-directed structure) and is
+  excluded from `[service].astro`. The footer is a centered masthead (logo + slogan with the
+  script "Sparkle." finish + Follow Us) over a responsive four-column grid; the footer offers
+  Leave Us a Review only (the Read Our Google Reviews link moved out with the redesign), and
+  the social Google icon is the official four-color G.
 - **Address reliability (2026-10-02):** state matching parses both full names and USPS codes;
   partially typed street names match by safe prefix; same-state results rank by proximity to the
   public Pensacola centre; provider alternates include suffix expansion and a house-numberless

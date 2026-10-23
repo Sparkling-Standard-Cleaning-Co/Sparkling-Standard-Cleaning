@@ -351,7 +351,7 @@ export const pricing = {
      * the server before a reservation is accepted. Bump when pricing logic,
      * rates or policy values change so old quotes cannot be silently reused.
      */
-    configVersion: approved('2026-10-21.sparkle100.v1', 'Quote provenance marker. Incremented for the SPARKLE100 campaign (a price-affecting change) on top of the owner-approved $55 productive labor-hour billing target.'),
+    configVersion: approved('2026-10-23.recurring-first-visit.v1', 'Quote provenance marker. Incremented for the P12 recurring restructure (a price-affecting change): a new recurring residential arrangement is now quoted as its required first-visit Deep Cleaning, with the ongoing per-visit price shown alongside, on top of the SPARKLE100 campaign rules.'),
     /**
      * Which value from the calculation becomes the offered price. 'expected' is
      * the model price and never the lowest range value; 'midpoint' and 'high'

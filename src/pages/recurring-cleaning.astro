@@ -1,0 +1,139 @@
+---
+// Recurring Residential Cleaning — dedicated page (owner-directed structure,
+// 2026-10-23). Every other service renders through [service].astro; this page
+// exists because the owner's approved layout departs from that template:
+//   centered hero → Who this is for (centered) → long-term value → what
+//   investing looks like → grouped Included Services → What this service
+//   doesn't cover (no ask card) → CTA band → deep-first policy → Questions.
+// The copy lives with the rest of the service data in
+// src/content/services/recurring-cleaning.md (single source of truth).
+import { getEntry, render } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import Checklist from '../components/Checklist.astro';
+import CtaBand from '../components/CtaBand.astro';
+import { serviceNode, breadcrumbNode } from '../lib/schema';
+
+const entry = await getEntry('services', 'recurring-cleaning');
+if (!entry) throw new Error('Missing content entry: src/content/services/recurring-cleaning.md');
+const data = entry.data;
+const { Content } = await render(entry);
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+
+const schema = [
+  serviceNode({
+    site,
+    name: data.title,
+    description: data.metaDescription,
+    path: data.path,
+    serviceType: data.serviceType,
+  }),
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: data.title, path: data.path },
+  ]),
+];
+---
+
+<BaseLayout title={data.metaTitle ?? data.title} description={data.metaDescription} schema={schema}>
+  <section class="section section--tight">
+    <div class="container">
+      <Breadcrumbs
+        trail={[
+          { name: 'Home', path: '/' },
+          { name: data.title, path: data.path },
+        ]}
+      />
+      <div class="recurring-hero section-head section-head--center" style="margin-top: var(--space-5)">
+        <h1>{data.title} in Pensacola & Cantonment</h1>
+        <p class="lead">{data.heroLead}</p>
+        {data.heroSupport && <p class="recurring-hero__support">{data.heroSupport}</p>}
+        <div class="btn-row btn-row--center">
+          <a class="btn btn--primary btn--large" href={data.ctaHref} data-cta="recurring-hero-estimate">
+            {data.ctaLabel}
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt" aria-labelledby="who-this-is-for-heading">
+    <div class="container container--narrow">
+      <div class="section-head section-head--center">
+        <h2 id="who-this-is-for-heading">Who this is for</h2>
+      </div>
+      <div class="card card--muted recurring-who">
+        <Checklist items={data.goodFor} />
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="prose recurring-prose">
+        <Content />
+      </div>
+    </div>
+  </section>
+
+  {
+    data.notIncluded.length > 0 && (
+      <section class="section section--alt" aria-labelledby="not-included-heading">
+        <div class="container container--narrow">
+          <div class="section-head section-head--center">
+            <p class="eyebrow">Honest boundaries</p>
+            <h2 id="not-included-heading">What this service doesn't cover</h2>
+          </div>
+          <div class="card">
+            <Checklist items={data.notIncluded} />
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <div class="container section section--tight">
+    <CtaBand
+      title={`Ready for ${data.title.toLowerCase()}?`}
+      text="Start with the estimate — it tells you honestly what your home needs and what it should cost."
+      primaryLabel={data.ctaLabel}
+      primaryHref={data.ctaHref}
+      secondaryLabel="Get in Touch"
+      secondaryHref="/contact/"
+    />
+  </div>
+
+  {
+    data.deepFirstBand && (
+      <section class="section section--alt" aria-labelledby="deep-first-heading">
+        <div class="container container--narrow">
+          <div class="section-head section-head--center">
+            {data.deepFirstBand.eyebrow && <p class="eyebrow">{data.deepFirstBand.eyebrow}</p>}
+            <h2 id="deep-first-heading">{data.deepFirstBand.heading}</h2>
+          </div>
+          <div class="readable recurring-deep-first">
+            {data.deepFirstBand.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section" id="questions" aria-labelledby="questions-heading">
+    <div class="container container--narrow">
+      <div class="section-head section-head--center">
+        <h2 id="questions-heading">Questions?</h2>
+        <p class="lead">
+          See our <a href="/faq/">FAQs</a>. {data.questionsBand?.lead}
+        </p>
+      </div>
+      <div class="btn-row btn-row--center">
+        <a class="btn btn--primary" href={data.ctaHref} data-cta="recurring-questions-estimate">
+          {data.ctaLabel}
+        </a>
+        <a class="btn btn--ghost" href="/contact/" data-cta="recurring-questions-contact">Ask Us</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

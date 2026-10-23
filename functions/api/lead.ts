@@ -84,6 +84,9 @@ const SERVER_OWNED_KEYS = new Set([
   'travel_verified',
   'travel_destination_source',
   'initial_deep_clean_required',
+  'first_visit_total',
+  'ongoing_price_per_visit',
+  'ongoing_frequency',
 ]);
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -231,7 +234,20 @@ export async function onRequestPost(context: {
     null;
   if (isPricedReservation(clean)) {
     try {
-      const verification = await verifyReservationQuote(clean, env);
+      // P12: the ongoing two-price fields are SERVER-OWNED in the sanitized
+      // payload, but the verification still needs the client's claimed
+      // ongoing figure to compare it against the server recompute. It rides
+      // in from the RAW payload here and never reaches the owner email as a
+      // client-asserted value.
+      const rawFields = payload.fields as Record<string, unknown>;
+      const clientOngoingPrice =
+        typeof rawFields.ongoing_price_per_visit === 'string'
+          ? rawFields.ongoing_price_per_visit.trim().slice(0, 32)
+          : '';
+      const verification = await verifyReservationQuote(
+        clientOngoingPrice ? { ...clean, ongoing_price_per_visit: clientOngoingPrice } : clean,
+        env,
+      );
       clean.verification_status = 'authoritative';
       clean.quote_verified = verification.status;
       clean.client_price = verification.clientPrice !== null ? String(verification.clientPrice) : '';
@@ -283,6 +299,17 @@ export async function onRequestPost(context: {
         clean.applied_rate_per_labor_hour = String(breakdown.ratePerLaborHour);
         clean.pricing_category = breakdown.pricingCategory;
         if (breakdown.minimumApplied) clean.minimum_job_applied = 'true';
+      }
+
+      // P12: the server owns the two-price structure. When its recalculation
+      // confirms a NEW recurring arrangement, the first-visit total and the
+      // ongoing rhythm in the owner email are the SERVER's numbers — the
+      // client's copies were already discarded (SERVER_OWNED_KEYS), and a
+      // diverging client figure surfaced as a verification uncertainty above.
+      if (verification.ongoing) {
+        if (verification.verifiedPrice !== null) clean.first_visit_total = String(verification.verifiedPrice);
+        clean.ongoing_price_per_visit = String(verification.ongoing.perVisitPrice);
+        clean.ongoing_frequency = verification.ongoing.frequency;
       }
 
       // The customer-facing receipt carries the verdict (no prices) so the

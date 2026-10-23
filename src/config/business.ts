@@ -224,11 +224,15 @@ export const business = {
   },
   reviews: {
     /**
-     * Link that READS existing reviews — the exact owner-supplied public
-     * Google Business Profile URL (2026-10-08). Never modify or reconstruct it.
+     * Link that READS existing reviews — the canonical Google Maps place URL
+     * (CID 3954983909661285488). Provenance: the owner-supplied "Ask for
+     * reviews" short link `https://g.page/r/CXAcv1Pp7OI2ECE` (2026-10-08) was
+     * resolved through its own redirect chain on 2026-10-23 and lands here
+     * (HTTP 200, canonical Maps place page). This is the same place the
+     * owner-supplied link reaches — not a hand-built or guessed URL. Do not
+     * "restore" the older kgmid search URL below; this one is verified.
      */
-    profileUrl:
-      'https://www.google.com/search?kgmid=/g/11zz5t1059&hl=en-US&q=Sparkling+Standard+Cleaning+Co.',
+    profileUrl: 'https://www.google.com/maps?cid=3954983909661285488&hl=en',
     /**
      * Direct review-submission link (leave-review page / QR destination) — the
      * exact owner-supplied "Ask for reviews" short link (2026-10-08). Never

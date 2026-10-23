@@ -25,7 +25,7 @@ it, the function sends the customer a separate branded email through Resend
 | **Location** | Entered address, unit, city/state/ZIP, entry method, confirmation + precision, map pin |
 | **Home** | Property type, size, rooms, beds to reset, condition, last professional clean, pets |
 | **Extras** | Selected add-ons, priced detail with charges, add-on ids |
-| **Pricing** | Customer-proposed price, range, base, extras, discount, rounding, server recalculated price/range, verification verdict, explicit ACTION REQUIRED on a mismatch |
+| **Pricing** | Customer-proposed price, range, base, extras, discount, rounding, server recalculated price/range, verification verdict, explicit ACTION REQUIRED on a mismatch. For a NEW recurring residential request the proposed price is labeled **First visit (required Deep Cleaning)** and a second line carries the server-recomputed **Ongoing visits** per-visit price for the chosen rhythm (the browser's own ongoing figure is a claim — the server's number wins, and a diverging claim surfaces as a verification uncertainty) |
 | **Travel** | Qualification, one-way distance/time, method, destination source |
 | **Scheduling** | Arrival preference, days/time preferences, STR turnover details, date note |
 | **Notes** | The customer's notes verbatim, website message, current situation |
@@ -45,7 +45,7 @@ Input: 3/2 biweekly reservation, two add-ons, verified route, a note about parki
 Summary — Request: Reservation request · Residential house cleaning · Every two weeks
 Summary — Customer: Synthetic Customer · 8500000000 · synthetic@example.com
 Summary — Location: 100 S Baylen St, Pensacola, FL 32502
-Summary — Price: Proposed $235 · VERIFIED
+Summary — Price: Proposed $235 · Then $185 per biweekly ongoing · VERIFIED
 Inquiry — Type: Reservation request — proposed price, subject to personal confirmation
 Inquiry — Service: Residential house cleaning
 Inquiry — Frequency: Every two weeks
@@ -71,7 +71,8 @@ Home — Pets: One pet
 Extras — Selected: Inside oven, Bed linen change
 Extras — Add-on ids: inside_oven,bed_linen_change
 Extras — Priced detail: Inside oven $25.20; Bed linen change $29.40
-Pricing — Customer-proposed price: $235
+Pricing — First visit (required Deep Cleaning): $235
+Pricing — Ongoing visits (after the required first deep clean): $185 per biweekly visit
 Pricing — Estimated range: $210–$255
 Pricing — Base cleaning price: $195.91
 Pricing — Extras subtotal: $54.60

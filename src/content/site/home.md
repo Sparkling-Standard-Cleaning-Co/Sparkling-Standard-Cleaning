@@ -10,13 +10,12 @@ servicesIntro:
   heading: Our Services
   lead: Sparkling Standard offers five distinct cleaning services, each with its own scope and level of care, so you can find the right fit for your space.
 estimateBand:
-  eyebrow: The estimate
   heading: Ready for your home to sparkle?
-  text: Get an estimated quote in around one minute.
+  text: Get an estimate in less than two minutes!
   body: After you are guided through a few quick questions, our estimating software will present you with a practical pricing range, built mathematically. When you move forward, a service request is sent to Sparkling Standard, where your quote is personally reviewed and approved before confirmation.
   ctaLabel: Instant Estimate
 founderBand:
-  heading: The difference
+  heading: The Woman Behind the Sparkle
   paragraphs:
     - Our founder grew up around cleaning — from a grandmother who owned her own cleaning business to working alongside family, then building experience with established local cleaning companies. She coordinated directly with customers and inspected the quality of work firsthand, gaining an inside perspective on the industry.
     - Over time, she repeatedly saw speed and profit being prioritized over care and quality. Homeowners deserve better than that.

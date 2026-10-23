@@ -23,7 +23,7 @@ import { schedulingConfig } from '../config/scheduling';
 import { calculateEstimate, type EstimateContext } from '../lib/estimate/calculate';
 import { buildInstantQuote, type InstantQuote } from '../lib/estimate/quote';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
-import { SERVICE_LABELS, SERVICE_SHORT, FREQUENCY_LABELS } from '../lib/estimate/labels';
+import { SERVICE_LABELS, SERVICE_SHORT, FREQUENCY_LABELS, FREQUENCY_RHYTHMS } from '../lib/estimate/labels';
 import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInfo, ServiceType } from '../lib/estimate/types';
 import { locationKey, formatLocationLine, type ConfirmedLocation } from '../lib/location/location';
 import { initAddressFinder, type AddressFinderHandle } from './address-finder';
@@ -103,6 +103,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const liveLabel = form.querySelector<HTMLElement>('[data-estimate-label]');
   const livePrice = form.querySelector<HTMLElement>('[data-estimate-price]');
   const liveRange = form.querySelector<HTMLElement>('[data-estimate-range]');
+  const liveOngoing = form.querySelector<HTMLElement>('[data-estimate-ongoing]');
   const liveNote = form.querySelector<HTMLElement>('[data-estimate-note]');
   const liveTravel = form.querySelector<HTMLElement>('[data-estimate-travel]');
   const liveReference = form.querySelector<HTMLElement>('[data-estimate-reference]');
@@ -237,7 +238,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
    */
   function syncPriceLabels(): void {
     const recurring = RECURRING_FREQUENCIES.has(textValue('frequency') ?? '');
-    const label = recurring ? 'Your proposed price per visit' : 'Your proposed cleaning price';
+    const label = requiresInitialDeepClean()
+      ? 'Your proposed first-visit price'
+      : recurring
+        ? 'Your proposed price per visit'
+        : 'Your proposed cleaning price';
     if (liveLabel) liveLabel.textContent = label;
     if (reservationEyebrow) reservationEyebrow.textContent = label;
   }
@@ -333,6 +338,16 @@ function initEstimateWizard(form: HTMLFormElement): void {
             ? `Typical range for this scope: $${result.low.toLocaleString()} – $${result.high.toLocaleString()}`
             : '';
       }
+      if (liveOngoing) {
+        const ongoing = result.ongoing;
+        if (ongoing) {
+          liveOngoing.hidden = false;
+          liveOngoing.textContent = `Your first visit is the required Deep Cleaning above. After it, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are $${ongoing.perVisitPrice.toLocaleString()} each.`;
+        } else {
+          liveOngoing.hidden = true;
+          liveOngoing.textContent = '';
+        }
+      }
       if (liveReference && latestQuote) {
         liveReference.hidden = false;
         liveReference.textContent = `Estimate reference ${latestQuote.reference} — proposed price, subject to confirmation.`;
@@ -353,6 +368,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
       if (liveRange) {
         liveRange.hidden = true;
         liveRange.textContent = '';
+      }
+      if (liveOngoing) {
+        liveOngoing.hidden = true;
+        liveOngoing.textContent = '';
       }
       if (liveReference) {
         liveReference.hidden = true;
@@ -432,6 +451,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
       lines.push({ label: `Rounded up to the nearest $${roundStep}`, value: `+$${p.roundingAdjustment.toFixed(2)}` });
     }
     lines.push({ label: 'Proposed total', value: `$${(p.subtotal + p.roundingAdjustment).toFixed(2)}`, strong: true });
+    // P12: a new recurring arrangement shows the ongoing rhythm right under the
+    // first-visit total — informational, never part of the sum above.
+    if (result.ongoing) {
+      lines.push({
+        label: `Then ongoing ${FREQUENCY_RHYTHMS[result.ongoing.frequency]} visits (after the required first deep clean)`,
+        value: `$${result.ongoing.perVisitPrice.toLocaleString()} each`,
+      });
+    }
     return lines;
   }
 
@@ -529,6 +556,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
       if (requiresInitialDeepClean()) {
         addSummaryRow(reservationScope, 'First visit', 'Deep Cleaning (required)');
       }
+      if (result.ongoing) {
+        addSummaryRow(
+          reservationScope,
+          'Ongoing visits',
+          `$${result.ongoing.perVisitPrice.toLocaleString()} per ${FREQUENCY_RHYTHMS[result.ongoing.frequency]} visit`,
+        );
+      }
       const homeParts = [
         input.propertyType ? input.propertyType.charAt(0).toUpperCase() + input.propertyType.slice(1) : '',
         input.squareFeet ? `${input.squareFeet.toLocaleString()} sqft` : '',
@@ -566,7 +600,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (reserveText) {
       reserveText.hidden = !phone || !business.flags.smsEnabled;
       if (phone) {
-        const body = `Hi! I'd like to reserve a cleaning. My estimate reference is ${latestQuote.reference} with a proposed price of $${latestQuote.amount}${location ? ` at ${formatLocationLine(location)}` : ''}. Sparkling Standard will confirm the final price.`;
+        const ongoing = result.ongoing;
+        const pricePhrase = ongoing
+          ? `a proposed first-visit price of $${latestQuote.amount}, then $${ongoing.perVisitPrice} per ${FREQUENCY_RHYTHMS[ongoing.frequency]} visit`
+          : `a proposed price of $${latestQuote.amount}`;
+        const body = `Hi! I'd like to reserve a cleaning. My estimate reference is ${latestQuote.reference} with ${pricePhrase}${location ? ` at ${formatLocationLine(location)}` : ''}. Sparkling Standard will confirm the final price.`;
         reserveText.href = `${phone.sms}?&body=${encodeURIComponent(body)}`;
       }
     }
@@ -1123,6 +1161,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
       fields.quote_config_version = latestQuote.configVersion;
       fields.quoted_range =
         result.low !== null && result.high !== null ? `$${result.low}–$${result.high}` : '';
+      // P12: for a new recurring arrangement the quoted price IS the
+      // first-visit total; the ongoing rhythm travels as its own labeled
+      // fields so the owner email can show both without any ambiguity.
+      if (result.ongoing) {
+        fields.first_visit_total = String(latestQuote.amount);
+        fields.ongoing_price_per_visit = String(result.ongoing.perVisitPrice);
+        fields.ongoing_frequency = result.ongoing.frequency;
+      }
     }
     return { ...fields, ...attributionFields() };
   }

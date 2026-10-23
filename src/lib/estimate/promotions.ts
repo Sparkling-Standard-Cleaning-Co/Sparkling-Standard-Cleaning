@@ -85,6 +85,15 @@ export interface PromotionInput {
   campaign: CampaignPromotionConfig | null;
   /** The customer's claimed code (popup CTA / campaign link), if any. */
   claimedCampaignCode: string | null;
+  /**
+   * When a NEW recurring arrangement prices its required first visit as a
+   * Deep Cleaning, the calculation runs with serviceType 'deep' +
+   * frequency 'one_time' — but the customer's actual ARRANGEMENT is what the
+   * campaign terms qualify against. This override carries that arrangement
+   * (e.g. standard + weekly). Null means eligibility uses the input's own
+   * service/frequency (every other case).
+   */
+  campaignArrangement?: { serviceType: PricingServiceType; frequency: Frequency } | null;
 }
 
 function round2(value: number): number {
@@ -323,8 +332,14 @@ function campaignCandidate(input: PromotionInput): PromotionCandidate | null {
   if (!config || !config.enabled || !notExpired(config.expiresOn, input.todayIso)) return null;
   const claimed = (input.claimedCampaignCode ?? '').trim().toUpperCase();
   if (!claimed || claimed !== config.code.trim().toUpperCase()) return null;
-  if (!config.services.includes(input.serviceType)) return null;
-  if (!config.frequencies.includes(input.frequency)) return null;
+  // The required first visit of a new recurring arrangement is computed as a
+  // Deep Cleaning one-time visit; campaign eligibility still follows the
+  // customer's actual arrangement, never the internal computation shape.
+  const arrangement = input.campaignArrangement ?? null;
+  const eligibilityServiceType = arrangement ? arrangement.serviceType : input.serviceType;
+  const eligibilityFrequency = arrangement ? arrangement.frequency : input.frequency;
+  if (!config.services.includes(eligibilityServiceType)) return null;
+  if (!config.frequencies.includes(eligibilityFrequency)) return null;
   const amount = effectiveAmount({
     kind: config.kind,
     value: config.value,

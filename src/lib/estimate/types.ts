@@ -179,6 +179,30 @@ export interface CalculationTraceEntry {
   value?: number | string;
 }
 
+/**
+ * Ongoing per-visit summary for a NEW recurring residential arrangement.
+ * Owner policy: the first visit is the required Deep Cleaning, so the primary
+ * result prices that first visit; this summary prices the recurring rhythm
+ * that starts on the second visit. Present only when the policy applies
+ * (standard service + recurring frequency).
+ */
+export interface OngoingVisitSummary {
+  /** The recurring rhythm the customer chose (weekly / biweekly / monthly). */
+  frequency: Frequency;
+  /**
+   * The ongoing per-visit price, rounded with the SAME instant-quote rule as
+   * the primary price (margin floor + minimum job + round-up step).
+   */
+  perVisitPrice: number;
+  /** Model price before the final round-up (transparency/debug only). */
+  modelPrice: number;
+  /** Typical low/high per-visit range for the ongoing rhythm. */
+  range: { low: number; high: number };
+  laborHours: number;
+  /** Transparent breakdown of the ongoing per-visit price. */
+  pricing: PricingBreakdown;
+}
+
 export interface EstimateResult {
   status: 'estimated' | 'custom_confirmation_required' | 'invalid';
   low: number | null;
@@ -193,6 +217,12 @@ export interface EstimateResult {
   minimumApplied: boolean;
   /** Transparent price breakdown — the same numbers the quote is built from. */
   pricing: PricingBreakdown;
+  /**
+   * Present when this result prices a NEW recurring residential arrangement:
+   * the primary numbers above are the required first-visit Deep Cleaning and
+   * `ongoing` summarizes the recurring per-visit price that follows it.
+   */
+  ongoing?: OngoingVisitSummary;
   /** Internal calculation trace — never rendered publicly (preview debug/tests only). */
   trace: CalculationTraceEntry[];
   /** Present when status is 'invalid'. */

@@ -255,7 +255,22 @@ function pricingLines(fields: Record<string, string>): Array<[string, string]> {
   const quoted = text(fields, 'quoted_price', 'client_price');
   const proposedTotal = text(fields, 'proposed_total');
   const verifiedTotal = text(fields, 'verified_price');
-  if (quoted) lines.push(['Pricing — Customer-proposed price', money(quoted)]);
+  // P12: a new recurring arrangement submits its FIRST-VISIT total as the
+  // quoted price; the first_visit_total marker relabels it honestly and the
+  // ongoing rhythm gets its own explicit line.
+  const firstVisitTotal = text(fields, 'first_visit_total');
+  if (quoted) {
+    lines.push([
+      firstVisitTotal ? 'Pricing — First visit (required Deep Cleaning)' : 'Pricing — Customer-proposed price',
+      money(quoted),
+    ]);
+  }
+  const ongoingPrice = text(fields, 'ongoing_price_per_visit');
+  const ongoingFrequency = text(fields, 'ongoing_frequency');
+  if (ongoingPrice) {
+    const rhythm = ongoingFrequency ? ` per ${ongoingFrequency} visit` : ' per visit';
+    lines.push(['Pricing — Ongoing visits (after the required first deep clean)', `${money(ongoingPrice)}${rhythm}`]);
+  }
   // The breakdown total is only shown when it adds information beyond the
   // server-recalculated price line.
   if (proposedTotal && (!verifiedTotal || money(proposedTotal) !== money(verifiedTotal))) {
@@ -407,6 +422,14 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   } else if (!proposedPrice && !verifiedPrice && estimateLow && estimateHigh) {
     summaryPriceParts.push(`Estimate $${money(estimateLow)}–$${money(estimateHigh)}`);
   }
+  // P12: a new recurring arrangement also shows its ongoing rhythm up front.
+  const ongoingPrice = text(fields, 'ongoing_price_per_visit');
+  const ongoingFrequency = text(fields, 'ongoing_frequency');
+  if (ongoingPrice) {
+    summaryPriceParts.push(
+      `Then ${money(ongoingPrice)}${ongoingFrequency ? ` per ${ongoingFrequency}` : ''} ongoing`,
+    );
+  }
   const verdict = text(fields, 'quote_verified');
   if (verdict && VERIFICATION_SHORT[verdict]) summaryPriceParts.push(VERIFICATION_SHORT[verdict] as string);
   add('Summary — Price', summaryPriceParts.join(' · '));
@@ -517,6 +540,9 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   // ── F. Pricing summary ──────────────────────────────────────────────────
   addLines(pricingLines(fields), [
     'quoted_price',
+    'first_visit_total',
+    'ongoing_price_per_visit',
+    'ongoing_frequency',
     'proposed_total',
     'client_price',
     'quoted_range',

@@ -99,6 +99,13 @@ export interface QuoteVerification {
     required: boolean;
     acknowledged: boolean;
   };
+  /**
+   * Server-recomputed ongoing rhythm for a new recurring arrangement: the
+   * primary verified price is the required first-visit Deep Cleaning, and
+   * this carries the per-visit price that follows it. Null when the request
+   * is not a new recurring arrangement.
+   */
+  ongoing: { frequency: string; perVisitPrice: number } | null;
   travel: QuoteVerificationTravel;
   /**
    * The full transparent price breakdown the server recalculated. Null only
@@ -275,6 +282,8 @@ export async function verifyReservationQuote(
   const clientReference = fields.quote_reference?.trim() || null;
   const referenceValid = clientReference !== null && QUOTE_REFERENCE_PATTERN.test(clientReference);
   const clientPrice = numberFrom(fields, 'quoted_price') ?? null;
+  const clientOngoingPrice = numberFrom(fields, 'ongoing_price_per_visit') ?? null;
+  let ongoingServer: { frequency: string; perVisitPrice: number } | null = null;
   const travel: QuoteVerificationTravel = {
     method: 'zone',
     provider: 'none',
@@ -306,6 +315,7 @@ export async function verifyReservationQuote(
     pinCheck,
     pinDistanceMeters,
     initialDeepClean,
+    ongoing: ongoingServer,
     travel,
     breakdown,
     note,
@@ -379,6 +389,9 @@ export async function verifyReservationQuote(
 
   const estimate = calculateEstimate(draft, buildEstimateContext(routed, fields));
   breakdown = estimate.pricing;
+  ongoingServer = estimate.ongoing
+    ? { frequency: estimate.ongoing.frequency, perVisitPrice: estimate.ongoing.perVisitPrice }
+    : null;
   if (estimate.status !== 'estimated') {
     return result(
       'mismatch',
@@ -472,6 +485,24 @@ export async function verifyReservationQuote(
   if (initialDeepClean.required && !initialDeepClean.acknowledged) {
     uncertainties.push(
       'the required initial Deep Cleaning for a new recurring residential arrangement was not acknowledged',
+    );
+  }
+  // P12: the ongoing rhythm is verified the same way as the first visit —
+  // a diverging client figure downgrades the verdict to preliminary.
+  if (ongoingServer && clientOngoingPrice !== null) {
+    const ongoingDifference = Math.round((clientOngoingPrice - ongoingServer.perVisitPrice) * 100) / 100;
+    if (Math.abs(ongoingDifference) > QUOTE_MATCH_TOLERANCE) {
+      uncertainties.push(
+        `the submitted ongoing per-visit price $${clientOngoingPrice} differs from our calculation $${ongoingServer.perVisitPrice} by $${Math.abs(ongoingDifference)}`,
+      );
+    } else if (ongoingDifference !== 0) {
+      uncertainties.push(
+        `the submitted ongoing per-visit price differs by $${Math.abs(ongoingDifference)} from our exact calculation ($${ongoingServer.perVisitPrice})`,
+      );
+    }
+  } else if (!ongoingServer && clientOngoingPrice !== null) {
+    uncertainties.push(
+      'an ongoing per-visit price was submitted, but our recalculation does not produce a new recurring arrangement',
     );
   }
 

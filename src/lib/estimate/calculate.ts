@@ -17,6 +17,7 @@ import { computeLaborHours } from './labor.ts';
 import { recurringResetSuggested, requiresInitialDeepClean } from './frequency.ts';
 import { schedulingConfig } from '../../config/scheduling.ts';
 import { evaluatePromotions } from './promotions.ts';
+import { selectInstantAmount } from './quote.ts';
 import { validateEstimateInput } from './validation.ts';
 import type {
   AddonPriceLine,
@@ -24,8 +25,12 @@ import type {
   EstimateFlag,
   EstimateInputDraft,
   EstimateResult,
+  Frequency,
+  NormalizedEstimateInput,
+  OngoingVisitSummary,
   PricingBreakdown,
   RoutedTravelInfo,
+  ServiceType,
   TravelEstimate,
 } from './types.ts';
 
@@ -77,6 +82,15 @@ export interface EstimateContext {
      * trusted for anything else: the engine re-checks eligibility itself.
      */
     claimedCampaignCode?: string | null;
+    /**
+     * P12: when a NEW recurring arrangement prices its required first visit
+     * as a Deep Cleaning, this override carries the customer's actual
+     * arrangement (standard + their chosen frequency) so the campaign terms
+     * are checked against the arrangement, not the internal first-visit
+     * computation shape. Set automatically by calculateEstimate; callers
+     * never need to provide it.
+     */
+    campaignArrangement?: { serviceType: ServiceType; frequency: Frequency } | null;
   };
 }
 
@@ -147,6 +161,109 @@ export function calculateEstimate(
   }
 
   const input = validation.input;
+
+  // ── P12: first Deep Cleaning vs ongoing per-visit price ─────────────────────
+  // A NEW recurring residential arrangement (standard service + recurring
+  // frequency) is quoted as its required FIRST VISIT — a Deep Cleaning
+  // computed at the deep/one-time rate — while `ongoing` summarizes the
+  // recurring per-visit price that starts on the second visit. The primary
+  // numbers (and the price the customer submits) are the first visit, and
+  // the server recomputes both identically because the split lives here in
+  // the one model — never in the browser display or the server function.
+  if (!requiresInitialDeepClean(input.serviceType, input.frequency)) {
+    return computeCore(input, context);
+  }
+
+  const firstVisit = computeCore(
+    { ...input, serviceType: 'deep', frequency: 'one_time' },
+    {
+      ...context,
+      promotions: {
+        ...context.promotions,
+        // Campaign eligibility follows the customer's actual arrangement
+        // (e.g. standard + weekly), not the internal first-visit shape.
+        campaignArrangement: { serviceType: input.serviceType, frequency: input.frequency },
+      },
+    },
+  );
+  if (firstVisit.status !== 'estimated') {
+    // The custom-confirmation gates depend on the home, extras and travel —
+    // not on service/frequency — so the ongoing rhythm hits the same
+    // outcome; nothing instant is shown either way.
+    return firstVisit;
+  }
+
+  // The welcome campaign is a first-clean offer: it never discounts the
+  // ongoing rhythm, whatever the customer claimed.
+  const ongoing = computeCore(input, {
+    ...context,
+    promotions: {
+      ...context.promotions,
+      claimedCampaignCode: null,
+      campaignArrangement: null,
+    },
+  });
+
+  const ongoingSummary: OngoingVisitSummary | undefined =
+    ongoing.status === 'estimated' && ongoing.expectedPrice !== null
+      ? {
+          frequency: input.frequency,
+          perVisitPrice: selectInstantAmount(ongoing) ?? ongoing.expectedPrice,
+          modelPrice: ongoing.expectedPrice,
+          range: {
+            low: ongoing.low ?? ongoing.expectedPrice,
+            high: ongoing.high ?? ongoing.expectedPrice,
+          },
+          laborHours: ongoing.laborHours ?? 0,
+          pricing: ongoing.pricing,
+        }
+      : undefined;
+
+  // The merged flags price the FIRST visit; the ongoing rhythm contributes
+  // only the informational first-visit requirement (its other flags — e.g. a
+  // minimum applied to the smaller ongoing visit — would describe a price
+  // that is not the one being quoted here).
+  const flags = [...firstVisit.flags];
+  if (!flags.some((flag) => flag.code === 'INITIAL_DEEP_CLEAN_REQUIRED')) {
+    flags.push({
+      code: 'INITIAL_DEEP_CLEAN_REQUIRED',
+      severity: 'info',
+      message: schedulingConfig.recurringResidential.message,
+    });
+  }
+
+  const trace: CalculationTraceEntry[] = [
+    ...firstVisit.trace,
+    {
+      step: 'arrangement:first_visit',
+      detail: 'New recurring arrangement — the required first visit is a Deep Cleaning',
+      ...(firstVisit.expectedPrice !== null ? { value: firstVisit.expectedPrice } : {}),
+    },
+    ...(ongoingSummary
+      ? [
+          {
+            step: 'arrangement:ongoing',
+            detail: `Ongoing ${input.frequency} per-visit price after the first deep clean`,
+            value: ongoingSummary.modelPrice,
+          },
+        ]
+      : []),
+  ];
+
+  return {
+    ...firstVisit,
+    flags,
+    trace,
+    ...(ongoingSummary ? { ongoing: ongoingSummary } : {}),
+  };
+}
+
+/**
+ * One complete single-visit computation: travel, labor, custom-confirmation
+ * gates, rate, promotions, breakdown, confidence and range. Pure — the P12
+ * recurring split above is the only behavior layered on top of it.
+ */
+function computeCore(input: NormalizedEstimateInput, context: EstimateContext): EstimateResult {
   const travelZone = zoneForZip(input.zip);
   const travel = calculateTravelAdjustment({ ...context.travel, zone: travelZone });
   const addonSelection = selectAddons(input.addonIds);
@@ -258,6 +375,7 @@ export function calculateEstimate(
     foundingTen: context.promotions?.foundingTen ?? pricing.promotions.foundingTen,
     campaign: context.promotions?.campaign !== undefined ? context.promotions.campaign : pricing.promotions.campaign.value,
     claimedCampaignCode: context.promotions?.claimedCampaignCode ?? null,
+    campaignArrangement: context.promotions?.campaignArrangement ?? null,
   });
   const discount = evaluation.discount;
   const discountedGross = discount ? round2(gross - discount.amount) : gross;

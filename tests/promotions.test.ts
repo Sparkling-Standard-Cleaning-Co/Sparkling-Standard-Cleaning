@@ -392,6 +392,46 @@ test('the campaign respects service and frequency eligibility', () => {
   assert.equal(str.discount, null, 'specialty services are not eligible');
 });
 
+test('a first-visit computation under an arrangement follows the ARRANGEMENT for campaign eligibility', () => {
+  // P12: a new recurring arrangement prices its first visit as a deep/one-time
+  // computation; the campaign terms still follow the customer's arrangement.
+  const arranged = evaluatePromotions(
+    overrides({
+      campaign: campaignConfig,
+      gross: 300,
+      serviceType: 'deep',
+      frequency: 'one_time',
+      claimedCampaignCode: 'SPARKLE100',
+      campaignArrangement: { serviceType: 'standard', frequency: 'weekly' },
+    }),
+  );
+  assert.equal(arranged.discount?.id, 'SPARKLE100');
+  assert.equal(arranged.discount?.amount, 100);
+
+  const monthlyArrangement = evaluatePromotions(
+    overrides({
+      campaign: campaignConfig,
+      gross: 300,
+      serviceType: 'deep',
+      frequency: 'one_time',
+      claimedCampaignCode: 'SPARKLE100',
+      campaignArrangement: { serviceType: 'standard', frequency: 'monthly' },
+    }),
+  );
+  assert.equal(monthlyArrangement.discount, null, 'monthly arrangements are outside the campaign terms');
+
+  const withoutArrangement = evaluatePromotions(
+    overrides({
+      campaign: campaignConfig,
+      gross: 300,
+      serviceType: 'deep',
+      frequency: 'one_time',
+      claimedCampaignCode: 'SPARKLE100',
+    }),
+  );
+  assert.equal(withoutArrangement.discount, null, 'a bare one-time deep computation is not a qualifying rhythm');
+});
+
 test('the campaign can never push a quote below the minimum job', () => {
   const small = evaluatePromotions(
     overrides({ campaign: campaignConfig, frequency: 'biweekly', gross: 180, claimedCampaignCode: 'SPARKLE100' }),

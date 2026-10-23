@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { onRequestPost as leadPost } from '../functions/api/lead.ts';
+import { pricing } from '../src/config/pricing.ts';
 
 const jsonRequest = (body: unknown) =>
   new Request('https://example.test/api', {
@@ -54,7 +55,7 @@ const reservationFields = (overrides: Record<string, string> = {}) => ({
   phone: '8500000000',
   quoted_price: '0',
   quote_reference: 'SS-20261001-ABC123',
-  quote_config_version: '2026-10-21.sparkle100.v1',
+  quote_config_version: pricing.instantQuote.configVersion.value,
   // A hostile client claiming its own verification result:
   quote_verified: 'match',
   verified_price: '1',
@@ -106,7 +107,7 @@ test('lead: reservation requests are recalculated server-side and labeled for th
   assert.match(sent['Travel — Method'] ?? '', /straight_line_estimate/);
   assert.equal(sent['Internal — Destination source code'], 'address_geocode');
   assert.match(sent['Travel — Destination source'] ?? '', /Server-geocoded address/);
-  assert.equal(sent['Internal — Config version (server)'], '2026-10-21.sparkle100.v1');
+  assert.equal(sent['Internal — Config version (server)'], pricing.instantQuote.configVersion.value);
   assert.equal(sent['Internal — Config match'], 'match');
   assert.equal(sent['Internal — Reference format valid'], 'true');
   assert.match(sent['Internal — Verification note'] ?? '', /verified calculation/i);
@@ -188,6 +189,41 @@ test('lead: selected extras are itemized with their actual server-calculated cha
   assert.equal(sent['Extras — Selected'], 'Inside oven');
   assert.equal(sent['Internal — Pricing category'], 'other_services');
   assert.equal(sent['Internal — Rate per labor hour'], '$55');
+});
+
+test('lead: a new recurring reservation shows the server-owned first-visit and ongoing prices', async () => {
+  const { stub, forwarded } = verificationStub();
+  await withFetch(stub, () =>
+    leadPost({
+      request: jsonRequest({
+        subject: 'Reservation',
+        fields: reservationFields({
+          frequency: 'weekly',
+          quoted_price: '1',
+          first_visit_total: '1',
+          ongoing_price_per_visit: '999',
+          ongoing_frequency: 'weekly',
+          initial_deep_clean_acknowledged: 'yes',
+          promotion_code: 'SPARKLE100',
+        }),
+      }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
+    } as never),
+  );
+  const sent = forwarded[0] as Record<string, string>;
+  // The quoted price is the client's claim; the relabel says what it is.
+  assert.match(sent['Pricing — Verification result'] ?? '', /MISMATCH/);
+  assert.equal(sent['Pricing — First visit (required Deep Cleaning)'], '$1');
+  // The ongoing rhythm is the SERVER's number — never the hostile $999 claim.
+  assert.match(sent['Pricing — Ongoing visits (after the required first deep clean)'] ?? '', /\$\d+(\.\d+)? per weekly visit/);
+  assert.doesNotMatch(JSON.stringify(sent), /"?\$?999"?/, 'the client-asserted ongoing price never reaches the owner');
+  assert.match(sent['Summary — Price'] ?? '', /Then \$[\d.]+ per weekly ongoing/);
+  // The claim surfaces as a claim with its redemption duty.
+  assert.equal(sent['Pricing — Campaign claim'], 'SPARKLE100');
+  assert.match(sent['Pricing — Campaign redemption'] ?? '', /Confirm eligibility/);
+  // The owner policy context is explicit on a recurring request.
+  assert.equal(sent['Inquiry — Initial Deep Cleaning'], 'REQUIRED before recurring residential maintenance service');
+  assert.match(sent['Summary — Action'] ?? '', /Initial Deep Cleaning required/);
 });
 
 test('lead: a non-priced request is delivered without verification fields', async () => {

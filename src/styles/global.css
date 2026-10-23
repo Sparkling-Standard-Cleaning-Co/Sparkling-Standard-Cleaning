@@ -413,11 +413,13 @@ li + li {
   flex: none;
 }
 
-/* The circular mark contains the complete wordmark, ring and sparkles. */
+/* The circular mark contains the complete wordmark, ring and sparkles.
+   Owner-directed prominence (2026-10-23): the header mark is the brand's
+   anchor — noticeably larger than a plain favicon-sized logo. */
 .brand__logo {
   display: block;
-  width: 3.8rem;
-  height: 3.8rem;
+  width: 4.6rem;
+  height: 4.6rem;
   flex: none;
 }
 
@@ -603,8 +605,8 @@ li + li {
   }
 
   .brand__logo {
-    width: 3rem;
-    height: 3rem;
+    width: 3.4rem;
+    height: 3.4rem;
   }
 
   .site-footer .brand__logo {
@@ -1229,6 +1231,112 @@ li + li {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   margin: var(--space-3) var(--space-2) 0;
+}
+
+/* ── Hero carousel (representative interiors, gentle crossfade) ──────────────
+   Without JavaScript the first slide remains fully visible; the rotation is
+   an enhancement that respects prefers-reduced-motion and pauses on
+   hover/focus. */
+.hero-carousel {
+  position: relative;
+}
+
+.hero-carousel__track {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.hero-carousel__slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 600ms var(--ease-out);
+}
+
+.hero-carousel__slide[data-active='true'] {
+  opacity: 1;
+}
+
+.hero-carousel__slide .card__media-image {
+  aspect-ratio: auto;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-carousel__dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.hero-carousel__dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: background var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
+}
+
+.hero-carousel__dot[aria-selected='true'] {
+  background: var(--color-rose-600);
+  border-color: var(--color-rose-600);
+}
+
+.hero-carousel__dot:focus-visible {
+  outline: 2px solid var(--color-rose-600);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-carousel__slide {
+    transition: none;
+  }
+}
+
+/* ── Homepage photo service cards ───────────────────────────────────────────
+   Services with an honest representative image render as photo cards in a
+   two-column grid; text-only entries (no fitting image) keep the row card. */
+.service-list--photo {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+@media (min-width: 40rem) {
+  .service-list--photo {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.service-card--photo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.service-card--photo .service-card__body {
+  flex: 1;
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
+.service-card--photo .service-card__media {
+  display: block;
+  margin-bottom: 0;
+}
+
+.service-list__caption {
+  text-align: center;
+  margin-top: var(--space-4);
 }
 
 .card__title {
@@ -2784,18 +2892,53 @@ fieldset.input--invalid {
 .site-footer__grid {
   display: grid;
   gap: var(--space-6);
+  grid-template-columns: minmax(0, 1fr);
 }
 
-@media (min-width: 48rem) {
+/* Two columns from tablets, four on wide screens. */
+@media (min-width: 40rem) {
   .site-footer__grid {
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.8fr) minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-.site-footer__middle {
+@media (min-width: 64rem) {
+  .site-footer__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Centered masthead — the owner-approved circular mark, the slogan with its
+   script "Sparkle." finish, and the Follow Us bubbles beneath. */
+.site-footer__masthead {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-6);
+  justify-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid rgba(217, 201, 192, 0.25);
+  margin-bottom: var(--space-6);
+}
+
+.site-footer__masthead .brand {
+  justify-content: center;
+}
+
+.site-footer__masthead .social-follow--bubble {
+  margin-top: var(--space-1);
+}
+
+.site-footer__sparkle {
+  font-family: 'Great Vibes', 'Parisienne', var(--font-display), cursive;
+  color: var(--color-champagne-300);
+  font-size: 1.5em;
+  line-height: 1;
+  padding-inline: 0.04em;
+  white-space: nowrap;
+}
+
+.site-footer__masthead .site-footer__area {
+  margin: var(--space-2) 0 0;
 }
 
 .site-footer__reviews-card {
@@ -2812,6 +2955,33 @@ fieldset.input--invalid {
 .site-footer__reviews-note {
   color: var(--color-taupe-600);
   margin: 0;
+}
+
+/* Call / text buttons with their icons and the visible number. */
+.site-footer__contact-actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.site-footer .site-footer__contact-actions .btn,
+.site-footer .site-footer__review-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-color: rgba(217, 201, 192, 0.45);
+  color: var(--color-cream-50);
+}
+
+.site-footer .site-footer__contact-actions .btn:hover,
+.site-footer .site-footer__review-btn:hover {
+  border-color: var(--color-champagne-300);
+  color: var(--color-champagne-200);
+}
+
+.site-footer__contact-list {
+  margin-top: var(--space-2);
 }
 
 /* ── Reviews invitation (empty-collection state) ─────────────────────────── */
@@ -2848,14 +3018,8 @@ fieldset.input--invalid {
 }
 
 
-@media (max-width: 48rem) {
-  .site-footer__middle {
-    grid-template-columns: 1fr;
-  }
-}
-
 .site-footer__tagline {
-  margin: var(--space-3) 0 0;
+  margin: 0;
   color: var(--color-champagne-300);
   font-family: var(--font-display);
   font-size: var(--text-lg);
@@ -3302,6 +3466,33 @@ fieldset.input--invalid {
   height: 1.1rem;
   color: var(--color-sage-700);
   margin-top: 0.2rem;
+}
+
+/* ── Recurring Residential Cleaning page (owner-directed structure) ─────────
+   Centered hero and Who-this-is-for, comfortable reading widths, and a
+   centered closing Questions band. */
+.recurring-hero__support {
+  margin: var(--space-3) auto 0;
+  max-width: 58ch;
+  color: var(--color-text-muted);
+}
+
+.btn-row--center {
+  justify-content: center;
+}
+
+.recurring-who {
+  max-width: 42rem;
+  margin-inline: auto;
+}
+
+.recurring-prose {
+  max-width: 72ch;
+  margin-inline: auto;
+}
+
+.recurring-deep-first {
+  margin-inline: auto;
 }
 
 .pill {

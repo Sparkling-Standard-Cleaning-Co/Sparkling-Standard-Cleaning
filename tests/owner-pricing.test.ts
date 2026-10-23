@@ -174,33 +174,57 @@ test('recurring 1600 sqft 3/2 biweekly with two add-ons reconciles client and se
   );
   assert.equal(client.status, 'estimated');
   assert.equal(client.minimumApplied, false);
+
+  // P12: the primary breakdown prices the required FIRST VISIT — a Deep
+  // Cleaning — and the ongoing biweekly rhythm lives in the summary.
   const p = client.pricing;
   assert.equal(p.ratePerLaborHour, 55);
-  assert.equal(p.pricingCategory, 'recurring_maintenance');
+  assert.equal(p.pricingCategory, 'other_services');
+  assert.ok(client.ongoing, 'a new recurring arrangement carries an ongoing summary');
+  assert.equal(client.ongoing.pricing.pricingCategory, 'recurring_maintenance');
+  assert.equal(client.ongoing.frequency, 'biweekly');
 
-  // Independent formula from the effective configuration.
-  const baseHours =
-    pricingValue(pricing.laborModel.baseHours.standard) +
+  // Independent formulas from the effective configuration.
+  const unitHours =
     (1600 / 1000) * pricingValue(pricing.laborModel.sqftHoursPerThousand) +
     2 * pricingValue(pricing.laborModel.fullBathHours) +
     Math.max(0, 3 - pricingValue(pricing.laborModel.bedroomsIncludedInBase)) * pricingValue(pricing.laborModel.bedroomHours);
-  const expectedLabor =
-    baseHours *
+
+  // First visit: deep scope, one-time frequency.
+  const firstLabor =
+    (pricingValue(pricing.laborModel.baseHours.deep) + unitHours) *
+    pricingValue(pricing.conditionFactors.maintained) *
+    pricingValue(pricing.lastCleanFactors.within_month) *
+    pricingValue(pricing.frequencyFactors.one_time);
+  // Ongoing: standard scope at the chosen rhythm.
+  const ongoingLabor =
+    (pricingValue(pricing.laborModel.baseHours.standard) + unitHours) *
     pricingValue(pricing.conditionFactors.maintained) *
     pricingValue(pricing.lastCleanFactors.within_month) *
     pricingValue(pricing.frequencyFactors.biweekly);
-  const expectedExtras = (0.6 + 0.7) * p.ratePerLaborHour; // inside_oven + laundry
-  const expectedSubtotal = round2(expectedLabor * p.ratePerLaborHour + round2(expectedExtras));
-  const expectedTotal = Math.ceil(expectedSubtotal / 5) * 5;
 
-  assert.equal(p.baseLaborHours, round2(expectedLabor));
+  const expectedExtras = (0.6 + 0.7) * p.ratePerLaborHour; // inside_oven + laundry
+  const firstSubtotal = round2(firstLabor * p.ratePerLaborHour + round2(expectedExtras));
+  const firstTotal = Math.ceil(firstSubtotal / 5) * 5;
+  const ongoingSubtotal = round2(ongoingLabor * p.ratePerLaborHour + round2(expectedExtras));
+  const ongoingTotal = Math.ceil(ongoingSubtotal / 5) * 5;
+
+  // First visit reconciles (this is the price the customer submits).
+  assert.equal(p.baseLaborHours, round2(firstLabor));
   assert.equal(p.addonLaborHours, 1.3);
   assert.equal(p.extrasSubtotal, round2(expectedExtras));
-  assert.equal(p.subtotal, expectedSubtotal);
-  assert.equal(selectInstantAmount(client), expectedTotal);
-  assert.equal(expectedTotal, 330, 'the representative scenario reflects the $55 billing target');
+  assert.equal(p.subtotal, firstSubtotal);
+  assert.equal(selectInstantAmount(client), firstTotal);
 
-  // Server path: the same flat fields must reproduce the client amount.
+  // Ongoing per-visit rhythm reconciles and stays cheaper than the deep visit.
+  assert.equal(client.ongoing.pricing.baseLaborHours, round2(ongoingLabor));
+  assert.equal(client.ongoing.pricing.extrasSubtotal, round2(expectedExtras));
+  assert.equal(client.ongoing.pricing.subtotal, ongoingSubtotal);
+  assert.equal(client.ongoing.perVisitPrice, ongoingTotal);
+  assert.equal(ongoingTotal, 330, 'the representative scenario reflects the $55 billing target');
+  assert.ok(ongoingTotal < firstTotal, 'maintenance visits cost less than the required deep first visit');
+
+  // Server path: the same flat fields must reproduce BOTH amounts.
   const server = calculateEstimate(
     mapReservationFields({
       service_type: 'standard',
@@ -220,4 +244,5 @@ test('recurring 1600 sqft 3/2 biweekly with two add-ons reconciles client and se
   assert.equal(selectInstantAmount(server), selectInstantAmount(client));
   assert.equal(server.pricing.subtotal, p.subtotal);
   assert.equal(server.pricing.extrasSubtotal, p.extrasSubtotal);
+  assert.equal(server.ongoing?.perVisitPrice, client.ongoing?.perVisitPrice);
 });

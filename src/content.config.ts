@@ -52,6 +52,11 @@ const services = defineCollection({
     serviceType: z.string(),
     heroEyebrow: z.string().optional(),
     heroLead: z.string(),
+    /**
+     * Optional second hero line under the lead (owner-supplied recurring-page
+     * copy; any service page may use it).
+     */
+    heroSupport: z.string().optional(),
     /** Marketing-safe list of what is normally included (checked against the checklist). */
     includes: z.array(z.string()).default([]),
     /** Valid uses of this service, honestly scoped. */
@@ -72,6 +77,23 @@ const services = defineCollection({
      * STR turnover). Renders in a section whose id matches the CTA target.
      */
     embedForm: z.enum(['commercial', 'str']).optional(),
+    /**
+     * Owner policy section rendered AFTER the CTA band (the recurring page's
+     * "Why our first visit is a deep clean, every time"). Optional so other
+     * service pages are unaffected.
+     */
+    deepFirstBand: z
+      .object({
+        eyebrow: z.string().optional(),
+        heading: z.string(),
+        paragraphs: z.array(z.string()),
+      })
+      .optional(),
+    /**
+     * Closing "Questions?" band copy (heading is fixed by the page; this
+     * carries the owner's guidance line).
+     */
+    questionsBand: z.object({ lead: z.string() }).optional(),
   }),
 });
 
@@ -231,7 +253,7 @@ const site = defineCollection({
       .optional(),
     estimateBand: z
       .object({
-        eyebrow: z.string(),
+        eyebrow: z.string().optional(),
         heading: z.string(),
         text: z.string(),
         body: z.string().optional(),

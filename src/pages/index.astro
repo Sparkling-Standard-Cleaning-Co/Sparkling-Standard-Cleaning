@@ -3,6 +3,7 @@ import { Image } from 'astro:assets';
 import { getCollection, getEntry } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import HomeServiceCard from '../components/HomeServiceCard.astro';
+import HeroCarousel from '../components/HeroCarousel.astro';
 import TrustChips from '../components/TrustChips.astro';
 import FaqItem from '../components/FaqItem.astro';
 import Checklist from '../components/Checklist.astro';
@@ -10,8 +11,15 @@ import Reviews from '../components/Reviews.astro';
 import Icon from '../components/Icon.astro';
 import { breadcrumbNode } from '../lib/schema';
 import { cleaningTypesNav } from '../lib/site';
-import heroPhoto from '../assets/images/living-room-bright.jpg';
+import type { ImageMetadata } from 'astro';
 import hayliPortrait from '../assets/images/hayli-founder.webp';
+import livingRoomBright from '../assets/images/living-room-bright.jpg';
+import bathroomSpacious from '../assets/images/bathroom-spacious.jpg';
+import kitchenWhiteClean from '../assets/images/kitchen-white-clean.jpg';
+import bedroomMade from '../assets/images/bedroom-made.jpg';
+import emptyRoomMoveout from '../assets/images/empty-room-moveout.jpg';
+import officePlanted from '../assets/images/office-planted.jpg';
+import kitchenSinkDetail from '../assets/images/kitchen-sink-detail.jpg';
 
 const home = await getEntry('site', 'home');
 if (!home) throw new Error('Missing content entry: src/content/site/home.md');
@@ -22,6 +30,36 @@ const services = cleaningTypesNav.flatMap((item) => {
   const service = allServices.find((entry) => entry.data.path === item.href);
   return service ? [service] : [];
 });
+
+// Representative interior per service (licensed stock; never claimed as our
+// work — see docs/design/IMAGE-SOURCE-REGISTER.md). Services without a
+// fitting honest image render as the text card variant.
+const SERVICE_PHOTOS: Record<string, { image: ImageMetadata; alt: string } | undefined> = {
+  '/recurring-cleaning/': {
+    image: kitchenWhiteClean,
+    alt: 'A clean white kitchen with a clear counter and sink.',
+  },
+  '/house-cleaning/': {
+    image: livingRoomBright,
+    alt: 'A bright, tidy living room with a sectional sofa, large windows and soft natural light.',
+  },
+  '/deep-cleaning/': {
+    image: kitchenSinkDetail,
+    alt: 'A detailed view of a white kitchen with polished cabinets and a clean sink.',
+  },
+  '/move-in-move-out-cleaning/': {
+    image: emptyRoomMoveout,
+    alt: 'A bright empty room with wood flooring, ready for move-in day.',
+  },
+  '/short-term-rental-cleaning/': {
+    image: bedroomMade,
+    alt: 'A tidy guest bedroom with the bed neatly made.',
+  },
+  '/commercial-cleaning/': {
+    image: officePlanted,
+    alt: 'The clean interior of a modern office with plants.',
+  },
+};
 
 const allFaqs = await getCollection('faqs');
 const faqs = data.homeFaqIds.flatMap((id) => {
@@ -61,38 +99,59 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
         </div>
       </div>
       <div class="hero__panel hero__panel--media">
-        <Image
-          src={heroPhoto}
-          alt="A bright, tidy living room with a sectional sofa, large windows and soft natural light."
-          widths={[480, 720, 1080]}
+        <HeroCarousel
           sizes="(min-width: 56rem) 34rem, 92vw"
-          loading="eager"
-          decoding="async"
-          class="card__media-image"
+          slides={[
+            {
+              src: livingRoomBright,
+              alt: 'A bright, tidy living room with a sectional sofa, large windows and soft natural light.',
+              widths: [480, 720, 1080],
+            },
+            {
+              src: bathroomSpacious,
+              alt: 'A spacious, bright bathroom with clean surfaces and soft natural light.',
+              widths: [480, 720, 1080],
+            },
+            {
+              src: kitchenWhiteClean,
+              alt: 'A clean white kitchen with a clear counter and sink.',
+              widths: [480, 720, 1080],
+            },
+            {
+              src: bedroomMade,
+              alt: 'A tidy bedroom in a model home with the bed neatly made.',
+              widths: [480, 720, 1080],
+            },
+          ]}
         />
-        <p class="media-caption">Representative interior photograph — real project photos are added only with customer approval.</p>
+        <p class="media-caption">Project photos are shared only with customer approval.</p>
       </div>
     </div>
   </section>
 
-  <section class="section difference-intro" aria-labelledby="difference-thought-heading">
+  <TrustChips />
+
+  <section class="section difference-intro" aria-labelledby="hospitality-heading">
     <div class="container difference-intro__grid">
-      <h2 id="difference-thought-heading" class="difference-intro__heading">The difference, in one thought</h2>
+      <h2 id="hospitality-heading" class="difference-intro__heading">Hospitality is our standard</h2>
       <div class="difference-intro__copy">
+        <p>
+          Here on the Gulf Coast, hospitality means treating people right — welcoming them warmly,
+          caring for the spaces they live in, and never rushing the work. We clean the way a good
+          host gets the house ready for company.
+        </p>
         <p>
           Truly cleaning a space requires more than just rushing through a checklist. It takes an eye
           for the details, a commitment to quality, and the care to go the extra mile.
         </p>
         <p>
           At Sparkling Standard, we believe the little things make all the difference. That belief is
-          at the heart of every service we provide, and our namesake. It’s why we’re dedicated to
+          at the heart of every service we provide, and our namesake. It&rsquo;s why we&rsquo;re dedicated to
           providing a higher standard of clean, a Sparkling Standard.
         </p>
       </div>
     </div>
   </section>
-
-  <TrustChips />
 
   <section class="section" id="services">
     <div class="container">
@@ -100,20 +159,25 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
         <h2>{data.servicesIntro?.heading}</h2>
         {data.servicesIntro?.lead && <p class="lead">{data.servicesIntro.lead}</p>}
       </div>
-      <div class="service-list">
+      <div class="service-list service-list--photo">
         {
-          services.map((service) => (
-            <HomeServiceCard
-              title={service.data.title}
-              summary={service.data.summary}
-              paragraphs={service.data.homepageParagraphs}
-              href={service.data.path}
-              icon={service.data.icon}
-              featured={service.data.path === '/recurring-cleaning/'}
-            />
-          ))
+          services.map((service) => {
+            const photo = SERVICE_PHOTOS[service.data.path];
+            return (
+              <HomeServiceCard
+                title={service.data.title}
+                summary={service.data.summary}
+                paragraphs={service.data.homepageParagraphs}
+                href={service.data.path}
+                icon={service.data.icon}
+                featured={service.data.path === '/recurring-cleaning/'}
+                {...(photo ? { image: photo.image, imageAlt: photo.alt } : {})}
+              />
+            );
+          })
         }
       </div>
+      <p class="media-caption service-list__caption">Representative interiors — project photos are shared only with customer approval.</p>
     </div>
   </section>
 
@@ -124,7 +188,7 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
           <div class="card card--feature estimate-card">
             <div class="split estimate-card__grid">
               <div>
-                <p class="eyebrow">{data.estimateBand.eyebrow}</p>
+                {data.estimateBand.eyebrow && <p class="eyebrow">{data.estimateBand.eyebrow}</p>}
                 <h2 id="estimate-heading">{data.estimateBand.heading}</h2>
                 <p class="lead">{data.estimateBand.text}</p>
                 {data.estimateBand.body && <p>{data.estimateBand.body}</p>}

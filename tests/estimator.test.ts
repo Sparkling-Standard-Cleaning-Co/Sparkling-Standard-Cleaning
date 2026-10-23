@@ -63,20 +63,35 @@ test('first professional clean of a similar 3/2 lands near the 6 labor-hour anch
 
 // ── Frequencies ──────────────────────────────────────────────────────────────
 
-test('weekly recurring takes less labor than biweekly for the same home', () => {
+test('a new recurring arrangement prices its required first Deep Cleaning, then the ongoing rhythm', () => {
   const weekly = calculateEstimate(input({ frequency: 'weekly' }), context());
   const biweekly = calculateEstimate(input({ frequency: 'biweekly' }), context());
   assert.equal(weekly.status, 'estimated');
   assert.equal(biweekly.status, 'estimated');
-  assert.ok((weekly.laborHours ?? 0) < (biweekly.laborHours ?? 0));
+  // P12: the primary numbers price the required FIRST VISIT — the same Deep
+  // Cleaning for every rhythm — and the recurring efficiency lives in the
+  // ongoing summary.
+  assert.ok(weekly.ongoing && biweekly.ongoing, 'both rhythms carry an ongoing summary');
+  assert.equal(weekly.laborHours, biweekly.laborHours);
+  assert.equal(weekly.expectedPrice, biweekly.expectedPrice);
+  assert.ok(
+    (weekly.ongoing.laborHours ?? 0) < (biweekly.ongoing.laborHours ?? 0),
+    'weekly ongoing visits take less labor than biweekly',
+  );
+  // The first visit is a Deep Cleaning: more labor than a one-time standard clean.
+  const oneTime = calculateEstimate(input(), context());
+  assert.ok((weekly.laborHours ?? 0) > (oneTime.laborHours ?? 0));
 });
 
-test('monthly recurring costs more per visit than weekly but less than one-time', () => {
+test('ongoing monthly visits cost more than weekly but less than a one-time standard clean', () => {
   const weekly = calculateEstimate(input({ frequency: 'weekly' }), context());
   const monthly = calculateEstimate(input({ frequency: 'monthly' }), context());
   const oneTime = calculateEstimate(input({ frequency: 'one_time' }), context());
-  assert.ok((weekly.expectedPrice ?? 0) <= (monthly.expectedPrice ?? 0));
-  assert.ok((monthly.expectedPrice ?? 0) <= (oneTime.expectedPrice ?? 0));
+  assert.ok(weekly.ongoing && monthly.ongoing);
+  assert.ok(weekly.ongoing.perVisitPrice <= monthly.ongoing.perVisitPrice);
+  assert.ok(monthly.ongoing.perVisitPrice <= (oneTime.expectedPrice ?? 0));
+  // The quoted (first-visit) price does not depend on the chosen rhythm.
+  assert.equal(weekly.expectedPrice, monthly.expectedPrice);
 });
 
 test('every recurring residential request flags the required initial Deep Cleaning', () => {

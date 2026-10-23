@@ -24,6 +24,18 @@ export const FREQUENCY_LABELS: Record<Frequency, string> = {
   one_time: 'One-time',
 };
 
+/**
+ * Adjectival rhythm forms for sentence positions like "ongoing biweekly
+ * visits" or "per weekly visit", where the display label ("Every two weeks")
+ * would read awkwardly.
+ */
+export const FREQUENCY_RHYTHMS: Record<Frequency, string> = {
+  weekly: 'weekly',
+  biweekly: 'biweekly',
+  monthly: 'monthly',
+  one_time: 'one-time',
+};
+
 export const CONDITION_LABELS: Record<Condition, string> = {
   maintained: 'Maintained — cleaned regularly',
   average: 'Average — normal lived-in buildup',

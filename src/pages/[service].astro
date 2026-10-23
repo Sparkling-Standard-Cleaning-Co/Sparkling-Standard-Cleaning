@@ -13,10 +13,17 @@ import { serviceNode, breadcrumbNode, faqNode } from '../lib/schema';
 
 export async function getStaticPaths() {
   const services = await getCollection('services');
-  return services.map((entry) => ({
-    params: { service: entry.data.path.replaceAll('/', '') },
-    props: { entry },
-  }));
+  // Recurring Residential Cleaning has its own dedicated page
+  // (src/pages/recurring-cleaning.astro) with the owner-directed structure:
+  // centered hero, ongoing-value story, grouped Included Services, the CTA
+  // band directly under "What this service doesn't cover", and the deep-first
+  // policy section after it. It must not also render through this template.
+  return services
+    .filter((entry) => entry.data.path !== '/recurring-cleaning/')
+    .map((entry) => ({
+      params: { service: entry.data.path.replaceAll('/', '') },
+      props: { entry },
+    }));
 }
 
 interface Props {
