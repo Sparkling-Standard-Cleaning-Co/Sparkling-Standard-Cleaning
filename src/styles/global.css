@@ -2794,8 +2794,64 @@ fieldset.input--invalid {
 
 .site-footer__middle {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-6);
+}
+
+.site-footer__reviews-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.site-footer__reviews-card .google-g {
+  flex-shrink: 0;
+}
+
+.site-footer__reviews-note {
+  color: var(--color-taupe-600);
+  margin: 0;
+}
+
+/* ── Reviews invitation (empty-collection state) ─────────────────────────── */
+.reviews-invite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  text-align: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-7) var(--space-5);
+  max-width: 34rem;
+  margin-inline: auto;
+}
+
+.reviews-invite__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.reviews-invite__text {
+  margin: 0;
+  color: var(--color-ink-700);
+}
+
+
+@media (max-width: 48rem) {
+  .site-footer__middle {
+    grid-template-columns: 1fr;
+  }
 }
 
 .site-footer__tagline {
@@ -3041,6 +3097,127 @@ fieldset.input--invalid {
   gap: var(--space-2);
 }
 
+/* ── Welcome-offer popup (SPARKLE100) ─────────────────────────────────────── */
+.promo-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--space-4);
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.promo-popup[data-open='true'] {
+  opacity: 1;
+}
+
+.promo-popup__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(48, 36, 41, 0.55);
+}
+
+.promo-popup__dialog {
+  position: relative;
+  width: 100%;
+  max-width: 26rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-6);
+  text-align: center;
+  transform: translateY(var(--space-5));
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.promo-popup[data-open='true'] .promo-popup__dialog {
+  transform: translateY(0);
+}
+
+@media (min-width: 40rem) {
+  .promo-popup {
+    align-items: center;
+  }
+}
+
+.promo-popup__close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.promo-popup__close:hover {
+  color: var(--color-text-strong);
+  background: var(--color-cream-100);
+}
+
+.promo-popup__eyebrow {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--color-champagne-text);
+}
+
+.promo-popup__headline {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
+  color: var(--color-text-strong);
+}
+
+.promo-popup__offer {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+.promo-popup__offer strong {
+  color: var(--color-primary);
+}
+
+.promo-popup__actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.promo-popup__terms {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .promo-popup,
+  .promo-popup__dialog {
+    transition: none;
+  }
+}
+
+@media print {
+  .promo-popup {
+    display: none;
+  }
+}
+
+
 /* ── Photo / proof components ──────────────────────────────────────────────── */
 .photo-card {
   background: var(--color-surface);
@@ -3256,6 +3433,205 @@ fieldset.input--invalid {
   border-top: 1px solid var(--color-border);
   margin-block: var(--space-6);
 }
+
+/* ── Readable mode (supportive home cleaning) ─────────────────────────────── */
+/* Larger, comfortable type and generous spacing for older visitors and low-
+   vision users, without altering the rest of the site. */
+.readable {
+  font-size: var(--text-lg);
+}
+
+.readable h1 {
+  font-size: var(--text-hero);
+  line-height: var(--leading-tight);
+}
+
+.readable h2 {
+  font-size: var(--text-3xl);
+}
+
+.readable h3,
+.readable .card__title,
+.readable .step__title {
+  font-size: var(--text-xl);
+}
+
+.readable p,
+.readable .card__text,
+.readable .step__text,
+.readable li {
+  line-height: 1.7;
+}
+
+.readable .btn-row,
+.readable-cta {
+  gap: var(--space-3);
+}
+
+.readable .btn--large {
+  min-height: 3.5rem;
+  padding-inline: var(--space-6);
+}
+
+.readable .checklist li {
+  padding-block: var(--space-2);
+}
+
+@media (max-width: 40rem) {
+  .readable {
+    font-size: 1.0625rem;
+  }
+}
+
+/* ── Service-area county map ─────────────────────────────────────────────── */
+.area-map {
+  margin: 0;
+}
+
+.area-map__frame {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-cream-100);
+  box-shadow: var(--shadow-sm);
+}
+
+.area-map__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.area-map__core .area-map__county {
+  fill: var(--color-rose-100);
+  stroke: var(--color-rose-600);
+  stroke-width: 1.75;
+}
+
+.area-map__arrangement .area-map__county {
+  fill: var(--color-sage-100);
+  stroke: var(--color-sage-700);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 5;
+}
+
+.area-map__stateline {
+  stroke: var(--color-ink-800);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.75;
+}
+
+.area-map__county-label {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-anchor: middle;
+  fill: var(--color-ink-700);
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.area-map__county-label--arrangement {
+  fill: var(--color-sage-700);
+}
+
+.area-map__county-label--context {
+  fill: var(--color-taupe-500);
+  font-size: 13px;
+  font-weight: var(--weight-regular);
+  font-style: italic;
+}
+
+.area-map__city-dot {
+  fill: var(--color-rose-700);
+  stroke: var(--color-surface);
+  stroke-width: 2;
+}
+
+.area-map__city-label {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  fill: var(--color-ink-800);
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+}
+
+.area-map__city-label--primary {
+  font-size: 16px;
+  font-weight: var(--weight-bold);
+}
+
+.area-map__water-label {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-style: italic;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  fill: var(--color-taupe-500);
+  opacity: 0.85;
+}
+
+.area-map__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
+  align-items: center;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+}
+
+.area-map__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.area-map__swatch {
+  display: inline-block;
+  width: 1.75rem;
+  height: 1.1rem;
+  border-radius: 0.25rem;
+  flex-shrink: 0;
+}
+
+.area-map__swatch--core {
+  background: var(--color-rose-100);
+  border: 1.75px solid var(--color-rose-600);
+}
+
+.area-map__swatch--arrangement {
+  background: var(--color-sage-100);
+  border: 1.5px dashed var(--color-sage-700);
+}
+
+.area-map__swatch--confirm {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border-strong);
+}
+
+.area-map__note {
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 40rem) {
+  .area-map__legend {
+    gap: var(--space-2) var(--space-4);
+  }
+}
+
+
 
 /* ── Motion preferences ────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {

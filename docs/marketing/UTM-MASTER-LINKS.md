@@ -55,7 +55,7 @@ These URLs are prepared for when the public profiles exist. Do **not** paste the
 | Instagram | Gift-certificate post / story | https://sparkling-standard.com/gift-certificates/?utm_source=instagram&utm_medium=organic_social&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from Instagram. |
 | X | Gift-certificate post | https://sparkling-standard.com/gift-certificates/?utm_source=x&utm_medium=organic_social&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from X. |
 
-## Campaign & outreach links (28)
+## Campaign & outreach links (29)
 
 | Channel | Placement | Final URL | Purpose |
 | --- | --- | --- | --- |
@@ -76,6 +76,7 @@ These URLs are prepared for when the public profiles exist. Do **not** paste the
 | Referral card | Referral card QR | https://sparkling-standard.com/estimate/?utm_source=referral&utm_medium=referral&utm_campaign=referral&utm_content=qr | Track referral-card scans (referral program details are configured separately; no discounts are promised until approved). |
 | Yard sign | Yard sign QR | https://sparkling-standard.com/estimate/?utm_source=yard_sign&utm_medium=print&utm_campaign=yard_sign&utm_content=qr | Track scans from yard signs placed at active job sites (only with customer permission). |
 | Print material | Quarter-sheet QR | https://sparkling-standard.com/recurring-cleaning/?utm_source=quarter_sheet&utm_medium=print&utm_campaign=neighborhood&utm_content=qr | Track recurring-cleaning interest from quarter-sheet handouts. |
+| Print material | Quarter-sheet SPARKLE100 promotion QR | https://sparkling-standard.com/estimate/?promo=SPARKLE100&utm_source=quarter_sheet&utm_medium=print&utm_campaign=sparkle100&utm_content=promo_qr | Open the estimate flow with the owner-approved SPARKLE100 recurring promotion pre-claimed (same terms as the website). |
 | Print material | QR estimate card | https://sparkling-standard.com/estimate/?utm_source=qr_card&utm_medium=print&utm_campaign=estimate_card&utm_content=qr | Track estimate-flow scans from the stand-alone QR estimate card. |
 | Print material | Event poster QR | https://sparkling-standard.com/estimate/?utm_source=event_poster&utm_medium=print&utm_campaign=community_event&utm_content=qr | Track estimate scans from event posters. |
 | Print material | Foam board QR | https://sparkling-standard.com/estimate/?utm_source=foam_board&utm_medium=print&utm_campaign=community_event&utm_content=qr | Track estimate scans from foam-board displays at events. |
@@ -88,7 +89,7 @@ These URLs are prepared for when the public profiles exist. Do **not** paste the
 | Google Business Profile | Business profile post | https://sparkling-standard.com/gift-certificates/?utm_source=google&utm_medium=organic&utm_campaign=gift_certificate&utm_content=post | Track gift-certificate interest from Google Business Profile posts. |
 | Print material | Printed gift card / certificate holder | https://sparkling-standard.com/gift-certificates/?utm_source=gift_card&utm_medium=print&utm_campaign=gift_certificate&utm_content=qr | Track scans from a printed gift card that leads to the gift-certificate page. |
 
-## QR assets (19)
+## QR assets (20)
 
 | Asset | Resolves to | Placement | File |
 | --- | --- | --- | --- |
@@ -107,6 +108,7 @@ These URLs are prepared for when the public profiles exist. Do **not** paste the
 | STR campaign (social/email). | https://sparkling-standard.com/short-term-rental-cleaning/?utm_source=str_host&utm_medium=outreach&utm_campaign=str_turnover&utm_content=packet | Anywhere the STR campaign link is needed. | `public/marketing/qr/str-campaign.svg` |
 | Printed gift card scanning to the gift-certificate page. | https://sparkling-standard.com/gift-certificates/?utm_source=gift_card&utm_medium=print&utm_campaign=gift_certificate&utm_content=qr | Gift card or certificate holder print run. | `public/marketing/qr/gift-card.svg` |
 | Recurring-cleaning quarter sheet. | https://sparkling-standard.com/recurring-cleaning/?utm_source=quarter_sheet&utm_medium=print&utm_campaign=neighborhood&utm_content=qr | Neighborhood handouts and community boards. | `public/marketing/qr/quarter-sheet.svg` |
+| SPARKLE100 recurring promotion on the redesigned quarter sheet. | https://sparkling-standard.com/estimate/?promo=SPARKLE100&utm_source=quarter_sheet&utm_medium=print&utm_campaign=sparkle100&utm_content=promo_qr | Quarter-sheet promotion panel (recurring door-knock campaign). | `public/marketing/qr/quarter-sheet-sparkle100.svg` |
 | Stand-alone QR estimate card. | https://sparkling-standard.com/estimate/?utm_source=qr_card&utm_medium=print&utm_campaign=estimate_card&utm_content=qr | Canvassing and event handouts. | `public/marketing/qr/qr-estimate-card.svg` |
 | Community event poster. | https://sparkling-standard.com/estimate/?utm_source=event_poster&utm_medium=print&utm_campaign=community_event&utm_content=qr | School fairs, markets, community boards. | `public/marketing/qr/event-poster.svg` |
 | Foam-board display. | https://sparkling-standard.com/estimate/?utm_source=foam_board&utm_medium=print&utm_campaign=community_event&utm_content=qr | Event tables and booths. | `public/marketing/qr/foam-board.svg` |

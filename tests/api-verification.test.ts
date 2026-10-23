@@ -54,7 +54,7 @@ const reservationFields = (overrides: Record<string, string> = {}) => ({
   phone: '8500000000',
   quoted_price: '0',
   quote_reference: 'SS-20261001-ABC123',
-  quote_config_version: '2026-10-21.billing-target.v1',
+  quote_config_version: '2026-10-21.sparkle100.v1',
   // A hostile client claiming its own verification result:
   quote_verified: 'match',
   verified_price: '1',
@@ -106,7 +106,7 @@ test('lead: reservation requests are recalculated server-side and labeled for th
   assert.match(sent['Travel — Method'] ?? '', /straight_line_estimate/);
   assert.equal(sent['Internal — Destination source code'], 'address_geocode');
   assert.match(sent['Travel — Destination source'] ?? '', /Server-geocoded address/);
-  assert.equal(sent['Internal — Config version (server)'], '2026-10-21.billing-target.v1');
+  assert.equal(sent['Internal — Config version (server)'], '2026-10-21.sparkle100.v1');
   assert.equal(sent['Internal — Config match'], 'match');
   assert.equal(sent['Internal — Reference format valid'], 'true');
   assert.match(sent['Internal — Verification note'] ?? '', /verified calculation/i);

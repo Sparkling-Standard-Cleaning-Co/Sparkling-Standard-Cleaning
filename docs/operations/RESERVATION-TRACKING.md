@@ -75,7 +75,27 @@ otherwise. The 60-day scheduling window applies to *requests*, never to gift-cer
 5. If a date moves → keep the row, set `rescheduled`, record both dates. Cancellations → `canceled`
    with a one-line reason.
 
-## 5. Gift-certificate redemption inside a reservation
+## 5. SPARKLE100 promotion redemption inside a reservation
+
+The $100-off welcome campaign is **claim-based**: it only ever applies because the customer
+claimed `SPARKLE100` (site popup, `?promo=SPARKLE100` link, or the quarter-sheet QR), and the
+engine already recorded `promotion_code` with the request and applied the discount to the
+first qualifying clean. Two things the software cannot prove, so Hayli confirms them
+**before honoring the discount at booking**:
+
+1. **New recurring residential customer** — this is their first recurring service with
+   Sparkling Standard (weekly or biweekly only).
+2. **One per household** — no household has redeemed SPARKLE100 before.
+
+Check the ledger for the household (name, address, phone) before confirming. If either check
+fails, tell the customer honestly and price the job without the discount. When both pass,
+honor the $100 off the first clean exactly as quoted and note `SPARKLE100 redeemed` plus the
+date on the ledger row. Never stack it with another promotion; never apply it retroactively;
+never apply it to commercial/STR/one-time work. If the campaign is ever retracted, set
+`enabled: false` in `src/config/owner-pricing.ts` — the site, verification and print builds
+all fail closed automatically.
+
+## 6. Gift-certificate redemption inside a reservation
 
 When a customer redeems a gift certificate:
 
@@ -86,7 +106,7 @@ When a customer redeems a gift certificate:
 4. Update the certificate ledger's redemption history and remaining balance — one redemption
    record per appointment, never a silent second application.
 
-## 6. Privacy and retention
+## 7. Privacy and retention
 
 - The website stores nothing beyond the notification email; the private sheet is the record.
 - Do not commit ledger exports, customer rows or addresses to the repository.

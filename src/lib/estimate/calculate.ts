@@ -10,7 +10,7 @@
 
 import { pricing } from '../../config/pricing.ts';
 import { zoneForZip } from '../../config/geography.ts';
-import type { AddonBundleDefinition, FoundingTenConfig, PromotionCustomerKind, PromotionTerms } from '../../config/owner-pricing.ts';
+import type { AddonBundleDefinition, CampaignPromotionConfig, FoundingTenConfig, PromotionCustomerKind, PromotionTerms } from '../../config/owner-pricing.ts';
 import { calculateTravelAdjustment } from '../travel/calculateTravelAdjustment.ts';
 import { resolveAddonCharge, selectAddons } from './addons.ts';
 import { computeLaborHours } from './labor.ts';
@@ -67,6 +67,16 @@ export interface EstimateContext {
     customerKind?: 'unknown' | PromotionCustomerKind;
     /** ISO date used for expiry checks; defaults to today (UTC). */
     todayIso?: string;
+    /**
+     * The claim-based welcome campaign. Defaults to the centralized
+     * pricing.promotions.campaign configuration; null disables it (tests).
+     */
+    campaign?: CampaignPromotionConfig | null;
+    /**
+     * The code the customer claimed (popup CTA / campaign link). Never
+     * trusted for anything else: the engine re-checks eligibility itself.
+     */
+    claimedCampaignCode?: string | null;
   };
 }
 
@@ -246,6 +256,8 @@ export function calculateEstimate(
     appreciationDiscounts: context.promotions?.appreciationDiscounts ?? pricing.promotions.appreciationDiscounts,
     addonBundles: context.promotions?.addonBundles ?? pricing.promotions.addonBundles,
     foundingTen: context.promotions?.foundingTen ?? pricing.promotions.foundingTen,
+    campaign: context.promotions?.campaign !== undefined ? context.promotions.campaign : pricing.promotions.campaign.value,
+    claimedCampaignCode: context.promotions?.claimedCampaignCode ?? null,
   });
   const discount = evaluation.discount;
   const discountedGross = discount ? round2(gross - discount.amount) : gross;

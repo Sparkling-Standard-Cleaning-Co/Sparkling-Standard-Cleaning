@@ -69,6 +69,19 @@ privacy page must stay in sync with whatever is actually enabled.
 | `str_request_submit` | STR request confirmed | — |
 | `booking_request` | Estimate request sent with a preferred date | `service_type` |
 | `review_link_click` | Review link clicked (link captured 2026-10-08) | `platform` |
+| `promotion_displayed` | SPARKLE100 popup shown to an eligible visitor | `code` |
+| `promotion_dismissed` | SPARKLE100 popup dismissed | `code` |
+| `promotion_claimed` | SPARKLE100 claim button clicked (popup → estimate) | `code` |
+| `promotion_estimate_applied` | Recalculation applies the claimed SPARKLE100 discount | `code`, `service_type` |
+| `promotion_request_submit` | Request submitted with SPARKLE100 applied | `code`, `service_type` |
+
+The five `promotion_*` events (added 2026-10-23) measure the SPARKLE100 welcome campaign
+end-to-end: display → dismissal/claim → applied discount → submitted request. They contain no
+PII — just the campaign code and, where relevant, the service type. **Owner GTM action
+required:** the live `GTM-KSQ26HMG` container needs five new custom-event triggers + GA4
+event tags for these names (the prepared import files in `docs/analytics/gtm-import/` already
+include them); publish a new container version after importing. Until then the events reach
+the data layer but not GA4.
 
 **Never sent to analytics:** names, emails, phones, addresses, ZIP codes, photos, freeform
 notes, or any form content. Lead details live only in the owner's inbox/records.

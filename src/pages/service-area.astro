@@ -4,6 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import CtaBand from '../components/CtaBand.astro';
 import Icon from '../components/Icon.astro';
+import ServiceAreaMap from '../components/ServiceAreaMap.astro';
 import { breadcrumbNode } from '../lib/schema';
 
 const entry = await getEntry('site', 'service-area');
@@ -33,6 +34,16 @@ const schema = [
           {data.hero.ctaLabel ?? 'Check Your ZIP in the Estimate'}
         </a>
       </div>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">Our coverage at a glance</p>
+        <h2>Where Sparkling Standard cleans</h2>
+      </div>
+      <ServiceAreaMap />
     </div>
   </section>
 

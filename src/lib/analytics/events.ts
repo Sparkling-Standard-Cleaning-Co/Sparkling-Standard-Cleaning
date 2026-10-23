@@ -19,7 +19,12 @@ export type AnalyticsEventName =
   | 'str_request_start'
   | 'str_request_submit'
   | 'booking_request'
-  | 'review_link_click';
+  | 'review_link_click'
+  | 'promotion_displayed'
+  | 'promotion_dismissed'
+  | 'promotion_claimed'
+  | 'promotion_estimate_applied'
+  | 'promotion_request_submit';
 
 /** Allowlisted payloads — flat, non-identifying values only. */
 export interface EventPayloads {
@@ -35,6 +40,12 @@ export interface EventPayloads {
   str_request_submit: Record<string, never>;
   booking_request: { service_type?: string };
   review_link_click: { platform?: string };
+  // Campaign events carry the public code only — never any customer data.
+  promotion_displayed: { code?: string };
+  promotion_dismissed: { code?: string };
+  promotion_claimed: { code?: string };
+  promotion_estimate_applied: { code?: string; service_type?: string };
+  promotion_request_submit: { code?: string; service_type?: string };
 }
 
 interface ConsentWindow extends Window {

@@ -73,8 +73,8 @@ const { names, params } = readTaxonomy();
 const fullSetup = readArtifact('docs/analytics/gtm-import/gtm-ga4-full-setup.json');
 const eventsOnly = readArtifact('docs/analytics/gtm-import/gtm-ga4-events-only.json');
 
-test('the taxonomy exposes the expected twelve events', () => {
-  assert.equal(names.length, 12);
+test('the taxonomy exposes the expected seventeen events', () => {
+  assert.equal(names.length, 17);
   assert.deepEqual(
     names,
     [
@@ -90,6 +90,11 @@ test('the taxonomy exposes the expected twelve events', () => {
       'str_request_submit',
       'booking_request',
       'review_link_click',
+      'promotion_displayed',
+      'promotion_dismissed',
+      'promotion_claimed',
+      'promotion_estimate_applied',
+      'promotion_request_submit',
     ],
   );
 });

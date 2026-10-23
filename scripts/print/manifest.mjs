@@ -69,7 +69,7 @@ export const PIECES = [
     height: 5.5,
     safeMargin: 0.18,
     sides: [
-      { id: 'front', qr: 'quarter-sheet', caption: 'Scan to start your free estimate', captionMin: 0.06 },
+      { id: 'front', qr: 'quarter-sheet-sparkle100', caption: 'Scan to claim your $100', captionMin: 0.06 },
     ],
     qrMin: 0.85,
     stock: '100 lb matte text',

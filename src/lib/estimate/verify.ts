@@ -183,7 +183,7 @@ export function isGpsPinDestination(fields: Record<string, string>): boolean {
   );
 }
 
-function buildEstimateContext(routed: RoutedTravelInfo | undefined): EstimateContext {
+function buildEstimateContext(routed: RoutedTravelInfo | undefined, fields: Record<string, string>): EstimateContext {
   return {
     travel: {
       ...(routed ? { routed } : {}),
@@ -198,6 +198,12 @@ function buildEstimateContext(routed: RoutedTravelInfo | undefined): EstimateCon
       maxInstantDistanceMiles: travelConfig.maxInstantDistanceMiles,
       maxDrivingMinutes: travelConfig.maxDrivingMinutes,
       reviewBandMinutes: travelConfig.reviewBandMinutes,
+    },
+    promotions: {
+      // The claimed campaign code is a customer assertion, not a proof: the
+      // promotion engine re-checks the claim and every eligibility rule
+      // itself, and redemption is confirmed by the owner at booking.
+      claimedCampaignCode: fields.promotion_code?.trim() || null,
     },
   };
 }
@@ -371,7 +377,7 @@ export async function verifyReservationQuote(
     pinCheck = 'unknown';
   }
 
-  const estimate = calculateEstimate(draft, buildEstimateContext(routed));
+  const estimate = calculateEstimate(draft, buildEstimateContext(routed, fields));
   breakdown = estimate.pricing;
   if (estimate.status !== 'estimated') {
     return result(

@@ -35,6 +35,7 @@ export function printQrMappings() {
   const ids = [
     'business-card',
     'quarter-sheet',
+    'quarter-sheet-sparkle100',
     'door-hanger',
     'qr-estimate-card',
     'event-poster',

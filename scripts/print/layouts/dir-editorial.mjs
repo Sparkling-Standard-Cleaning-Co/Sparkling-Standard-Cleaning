@@ -38,7 +38,7 @@ const cardBack = () => `
   <div class="a-head" style="font-size:.185in;font-style:italic">${F.tagline}</div>
   <div style="display:flex;gap:.16in;margin-top:.12in;flex:1">
     <div style="flex:1.12;display:flex;flex-direction:column">
-      <div class="a-body" style="font-size:.082in">Recurring house cleaning for homes in Pensacola and Cantonment.</div>
+      <div class="a-body" style="font-size:.082in">Recurring residential cleaning for homes in Pensacola and Cantonment.</div>
       <div style="margin-top:auto">
         <div class="a-row" style="padding:.045in 0"><span class="a-rowtext" style="font-size:.078in">Weekly, biweekly or monthly</span></div>
         <div class="a-row" style="padding:.045in 0"><span class="a-rowtext" style="font-size:.078in">The details most cleaners skip</span></div>
@@ -57,7 +57,7 @@ const doorHanger = () => `
   ${lockup({ crestSize: '.4in', script: '.3in', caps: '.14in', descriptor: '.072in' })}
   <div class="a-rule" style="margin:.2in 0 .22in"></div>
   <div class="a-head" style="font-size:.34in">A cleaning standard your neighbors can see.</div>
-  <div class="a-body" style="margin-top:.14in;font-size:.115in">Recurring house cleaning in this neighborhood — with the details most cleaners skip.</div>
+  <div class="a-body" style="margin-top:.14in;font-size:.115in">Recurring residential cleaning in this neighborhood — with the details most cleaners skip.</div>
   <div style="margin-top:.22in">
     <div class="a-row" style="padding:.085in 0"><span class="a-num">01</span><span class="a-rowtext" style="font-size:.105in">Weekly, biweekly or monthly plans</span></div>
     <div class="a-row" style="padding:.085in 0"><span class="a-num">02</span><span class="a-rowtext" style="font-size:.105in">Honest estimates built from real labor hours</span></div>
@@ -74,23 +74,29 @@ const doorHanger = () => `
 </div>`;
 
 const quarterSheet = () => `
-<div style="position:absolute;inset:0;padding:.3in;display:flex;flex-direction:column">
-  ${lockup({ crestSize: '.5in', script: '.37in', caps: '.17in', descriptor: '.085in' })}
-  <div class="a-rule" style="margin:.18in 0 .2in"></div>
-  <div class="a-head" style="font-size:.42in">${F.tagline}</div>
-  <div class="a-body" style="margin-top:.14in;font-size:.125in">Recurring house cleaning planned around your home — not a route clock.</div>
-  <div style="margin-top:.24in">
-    <div class="a-row" style="padding:.08in 0"><span class="a-num">01</span><span class="a-rowtext" style="font-size:.115in">Estimates built from real labor hours, not guesswork</span></div>
-    <div class="a-row" style="padding:.08in 0"><span class="a-num">02</span><span class="a-rowtext" style="font-size:.115in">Weekly, biweekly or monthly — the details stay done</span></div>
-    <div class="a-row" style="padding:.08in 0"><span class="a-num">03</span><span class="a-rowtext" style="font-size:.115in">${F.founder} personally confirms every request</span></div>
+<div style="position:absolute;inset:0;padding:.26in .28in .22in;display:flex;flex-direction:column">
+  ${lockup({ crestSize: '.42in', script: '.31in', caps: '.14in', descriptor: '.075in' })}
+  <div class="a-rule" style="margin:.1in 0 .12in"></div>
+  <div class="a-head" style="font-size:.3in">Your Home Deserves a<br>Sparkling Standard.</div>
+  <div class="a-body" style="margin-top:.09in;font-size:.105in">Recurring residential cleaning planned around your home — not a route clock.</div>
+  <div style="margin-top:.12in">
+    <div class="a-row" style="padding:.04in 0"><span class="a-num">01</span><span class="a-rowtext" style="font-size:.1in">Estimates built from real labor hours, not guesswork</span></div>
+    <div class="a-row" style="padding:.04in 0"><span class="a-num">02</span><span class="a-rowtext" style="font-size:.1in">Weekly, biweekly or monthly — the details stay done</span></div>
+    <div class="a-row" style="padding:.04in 0"><span class="a-num">03</span><span class="a-rowtext" style="font-size:.1in">${F.founder} personally confirms every request</span></div>
+  </div>
+  <div style="border:.008in solid var(--champagne-300);background:var(--champagne-100);border-radius:.12in;padding:.11in .13in;margin-top:.13in">
+    <div class="a-label" style="font-size:.055in;color:var(--champagne-700)">New-neighbor welcome offer</div>
+    <div class="a-head" style="font-size:.125in;margin-top:.035in;line-height:1.18">${F.campaign.headline}</div>
+    <div style="font-size:.055in;color:var(--ink-700);margin-top:.045in;line-height:1.4">${F.campaign.terms}</div>
+    <div style="display:inline-flex;margin-top:.05in;border:.008in dashed var(--champagne-500);border-radius:99px;padding:.028in .1in;font-weight:800;font-size:.062in;letter-spacing:.1em">Code: ${F.campaign.code}</div>
   </div>
   <div style="margin-top:auto;display:flex;align-items:flex-end;justify-content:space-between">
-    ${qr('quarter-sheet', '1.0in', '.068in', 'Scan to start your free estimate')}
+    ${qr('quarter-sheet-sparkle100', '.95in', '.06in', 'Scan to claim your $100')}
     <div style="text-align:right">
-      <div class="a-phone" style="font-size:.19in">${F.phone}</div>
-      <div class="a-small" style="font-size:.1in;margin-top:.05in">${F.email}</div>
-      <div class="a-small" style="font-size:.1in">${F.domain}</div>
-      <div class="a-small" style="font-size:.085in;margin-top:.06in;color:var(--taupe-600)">${F.hours}</div>
+      <div class="a-phone" style="font-size:.16in">${F.phone}</div>
+      <div class="a-small" style="font-size:.088in;margin-top:.035in">${F.email}</div>
+      <div class="a-small" style="font-size:.088in">${F.domain}</div>
+      <div class="a-small" style="font-size:.075in;margin-top:.035in;color:var(--taupe-600)">${F.hours}</div>
     </div>
   </div>
 </div>`;
@@ -117,8 +123,8 @@ const poster = () => `
   <div class="a-rule" style="margin:.4in 0 .55in"></div>
   <div style="display:flex;gap:.8in;flex:1">
     <div style="flex:1.15;display:flex;flex-direction:column;justify-content:space-between">
-      <div class="a-head" style="font-size:1.15in">${F.tagline}</div>
-      <div class="a-body" style="font-size:.27in;max-width:5.6in">Recurring house cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
+      <div class="a-head" style="font-size:.72in">${F.tagline}</div>
+      <div class="a-body" style="font-size:.27in;max-width:5.6in">Recurring residential cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
       <div>
         <div class="a-row" style="padding:.18in 0"><span class="a-num" style="font-size:.22in">01</span><span class="a-rowtext" style="font-size:.24in">Estimates built from real labor hours</span></div>
         <div class="a-row" style="padding:.18in 0"><span class="a-num" style="font-size:.22in">02</span><span class="a-rowtext" style="font-size:.24in">The details most cleaners skip, every visit</span></div>
@@ -126,7 +132,7 @@ const poster = () => `
       </div>
       <div>
         <div class="a-label" style="font-size:.13in">Now scheduling in your neighborhood</div>
-        <div class="a-small" style="font-size:.13in;margin-top:.12in;color:var(--taupe-600)">Recurring house cleaning · Deep cleaning · Move-in / move-out · Short-term rentals · Commercial spaces · Churches</div>
+        <div class="a-small" style="font-size:.13in;margin-top:.12in;color:var(--taupe-600)">Recurring residential cleaning · Deep cleaning · Move-in / move-out · Short-term rentals · Commercial spaces · Churches</div>
       </div>
     </div>
     <div style="flex:.85;display:flex;flex-direction:column;justify-content:flex-end">
@@ -163,7 +169,7 @@ const foamBoard = () => `
   <div style="display:flex;gap:1.6in;flex:1">
     <div style="flex:1.25;display:flex;flex-direction:column;justify-content:space-between">
       <div class="a-head" style="font-size:2.35in">${F.tagline}</div>
-      <div class="a-body" style="font-size:.55in;max-width:12.5in">Recurring house cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
+      <div class="a-body" style="font-size:.55in;max-width:12.5in">Recurring residential cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
       <div>
         <div class="a-row" style="padding:.36in 0"><span class="a-num" style="font-size:.42in">01</span><span class="a-rowtext" style="font-size:.48in">Estimates built from real labor hours</span></div>
         <div class="a-row" style="padding:.36in 0"><span class="a-num" style="font-size:.42in">02</span><span class="a-rowtext" style="font-size:.48in">The details most cleaners skip, every visit</span></div>
@@ -171,7 +177,7 @@ const foamBoard = () => `
       </div>
       <div>
         <div class="a-label" style="font-size:.28in">Now scheduling in your neighborhood</div>
-        <div class="a-small" style="font-size:.28in;margin-top:.25in;color:var(--taupe-600)">Recurring house cleaning · Deep cleaning · Move-in / move-out · Short-term rentals · Commercial spaces · Churches</div>
+        <div class="a-small" style="font-size:.28in;margin-top:.25in;color:var(--taupe-600)">Recurring residential cleaning · Deep cleaning · Move-in / move-out · Short-term rentals · Commercial spaces · Churches</div>
       </div>
     </div>
     <div style="flex:.7;display:flex;flex-direction:column;justify-content:flex-end">
@@ -206,7 +212,7 @@ const leaveBehind = () => `
   <div class="a-body" style="margin-top:.14in;font-size:.12in">Keep this card. When your home needs a hand, ${F.founder} answers personally.</div>
   <div class="a-label" style="font-size:.075in;margin-top:.3in">Services</div>
   <div style="margin-top:.1in;display:grid;grid-template-columns:1fr 1fr;column-gap:.3in">
-    <div class="a-row" style="padding:.08in 0"><span class="a-rowtext" style="font-size:.105in">Recurring house cleaning</span></div>
+    <div class="a-row" style="padding:.08in 0"><span class="a-rowtext" style="font-size:.105in">Recurring residential cleaning</span></div>
     <div class="a-row" style="padding:.08in 0"><span class="a-rowtext" style="font-size:.105in">Deep cleaning</span></div>
     <div class="a-row" style="padding:.08in 0"><span class="a-rowtext" style="font-size:.105in">Move-in / move-out</span></div>
     <div class="a-row" style="padding:.08in 0"><span class="a-rowtext" style="font-size:.105in">Short-term rentals</span></div>

@@ -279,6 +279,19 @@ function pricingLines(fields: Record<string, string>): Array<[string, string]> {
       discountAmount ? `${discountLabel} (−${money(discountAmount)})` : discountLabel,
     ]);
   }
+  // A campaign (e.g. SPARKLE100) discount is a customer CLAIM: the code the
+  // customer submitted and the redemption duty it creates are shown so the
+  // owner can confirm new-customer / one-per-household eligibility before the
+  // discount is honored on a booked job.
+  const promotionSource = text(fields, 'promotion_source');
+  if (promotionSource === 'campaign') {
+    const claimedCode = text(fields, 'promotion_code');
+    if (claimedCode) lines.push(['Pricing — Campaign claim', claimedCode.toUpperCase()]);
+    lines.push([
+      'Pricing — Campaign redemption',
+      'Confirm eligibility (new customer, one per household, first qualifying clean) before honoring the campaign discount.',
+    ]);
+  }
   const rounded = text(fields, 'rounding_adjustment');
   if (rounded && rounded !== '0.00' && rounded !== '0') {
     lines.push(['Pricing — Rounding adjustment', money(rounded)]);
@@ -513,6 +526,8 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
     'extras_subtotal',
     'addon_incentive',
     'discount_amount',
+    'promotion_code',
+    'promotion_source',
     'rounding_adjustment',
     'verified_price',
     'verified_range',

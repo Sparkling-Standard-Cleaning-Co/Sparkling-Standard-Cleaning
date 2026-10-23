@@ -17,6 +17,7 @@
 
 import type {
   AddonBundleDefinition,
+  CampaignPromotionConfig,
   FoundingTenConfig,
   PromotionCustomerKind,
   PromotionEligibility,
@@ -24,7 +25,7 @@ import type {
 } from '../../config/owner-pricing.ts';
 import type { Frequency, PricingServiceType } from '../../config/pricing.ts';
 
-export type PromotionSource = 'addon_incentive' | 'addon_bundle' | 'appreciation' | 'founding';
+export type PromotionSource = 'addon_incentive' | 'addon_bundle' | 'appreciation' | 'founding' | 'campaign';
 
 export interface PromotionCandidate {
   id: string;
@@ -75,6 +76,15 @@ export interface PromotionInput {
   appreciationDiscounts: PromotionTerms[];
   addonBundles: AddonBundleDefinition[];
   foundingTen: FoundingTenConfig;
+  /**
+   * The (approved) SPARKLE100 campaign configuration. Null disables it.
+   * Unlike every other program the campaign is CLAIM-based: it applies only
+   * when `claimedCampaignCode` matches `campaign.code` (case-insensitive).
+   * A missing or non-matching claim fails closed — never a silent discount.
+   */
+  campaign: CampaignPromotionConfig | null;
+  /** The customer's claimed code (popup CTA / campaign link), if any. */
+  claimedCampaignCode: string | null;
 }
 
 function round2(value: number): number {
@@ -298,9 +308,45 @@ function foundingEvaluation(config: FoundingTenConfig, input: PromotionInput): {
 }
 
 /**
+ * The SPARKLE100 welcome campaign. Claim-based by design:
+ *  - the customer must have explicitly claimed the configured code;
+ *  - the first clean may be a standard or deep recurring visit (weekly or
+ *    biweekly) — the discounted visit is the required initial Deep Cleaning
+ *    when a new recurring arrangement starts with one;
+ *  - the fixed amount can never push the quote below the minimum job and
+ *    never applies to travel (the base is the pre-travel gross);
+ *  - "new customer" and "one per household" cannot be proven here, so the
+ *    owner confirms them at REDEMPTION against the reservation ledger.
+ */
+function campaignCandidate(input: PromotionInput): PromotionCandidate | null {
+  const config = input.campaign;
+  if (!config || !config.enabled || !notExpired(config.expiresOn, input.todayIso)) return null;
+  const claimed = (input.claimedCampaignCode ?? '').trim().toUpperCase();
+  if (!claimed || claimed !== config.code.trim().toUpperCase()) return null;
+  if (!config.services.includes(input.serviceType)) return null;
+  if (!config.frequencies.includes(input.frequency)) return null;
+  const amount = effectiveAmount({
+    kind: config.kind,
+    value: config.value,
+    base: input.gross,
+    cap: null,
+    gross: input.gross,
+    minimumJob: input.minimumJob,
+  });
+  if (amount <= 0) return null;
+  return {
+    id: config.code,
+    source: 'campaign',
+    label: config.label,
+    percent: 0,
+    amount,
+  };
+}
+
+/**
  * Evaluates every enabled program and returns at most one discount — the
  * largest effective reduction — plus an optional complimentary-upgrade grant.
- * With every program disabled (the shipped state) this returns nulls.
+ * With every program disabled (and no campaign claim) this returns nulls.
  */
 export function evaluatePromotions(input: PromotionInput): PromotionEvaluation {
   const candidates: PromotionCandidate[] = [];
@@ -316,6 +362,8 @@ export function evaluatePromotions(input: PromotionInput): PromotionEvaluation {
   }
   const founding = foundingEvaluation(input.foundingTen, input);
   if (founding.discount) candidates.push(founding.discount);
+  const campaign = campaignCandidate(input);
+  if (campaign) candidates.push(campaign);
 
   if (candidates.length === 0) return { discount: null, grant: founding.grant };
   candidates.sort((a, b) => b.amount - a.amount);

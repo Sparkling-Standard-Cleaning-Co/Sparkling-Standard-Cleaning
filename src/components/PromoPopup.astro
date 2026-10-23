@@ -1,0 +1,66 @@
+---
+/**
+ * SPARKLE100 welcome-offer popup (directive A6).
+ *
+ * Copy, timing and cooldown are single-sourced from
+ * `src/config/owner-pricing.ts` → `pricing.promotions.campaign.value.popup`.
+ * The component renders only when the owner has the campaign enabled; the
+ * client script (`src/scripts/promo-popup.ts`) enforces the display rules:
+ * active-time trigger, once per session, 30-day dismissal cooldown, never
+ * after a claim, and never over a form/dialog surface.
+ */
+import { pricing } from '../config/pricing';
+
+const campaign = pricing.promotions.campaign.value;
+const popup = campaign.popup;
+const claimHref = `/estimate/?promo=${encodeURIComponent(campaign.code)}`;
+---
+
+{
+  campaign.enabled && (
+    <div
+      class="promo-popup"
+      data-promo-popup
+      data-promo-code={campaign.code}
+      data-active-seconds={popup.activeSeconds}
+      data-cooldown-days={popup.dismissedCooldownDays}
+      hidden
+    >
+      <div class="promo-popup__backdrop" data-promo-dismiss aria-hidden="true" />
+      <section
+        class="promo-popup__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="promo-popup-title"
+        aria-describedby="promo-popup-offer"
+        data-promo-dialog
+      >
+        <button class="promo-popup__close" type="button" data-promo-dismiss aria-label="Close the welcome offer">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+        <p class="promo-popup__eyebrow">{popup.eyebrow}</p>
+        <h2 class="promo-popup__headline" id="promo-popup-title">
+          {popup.headline}
+        </h2>
+        <p class="promo-popup__offer" id="promo-popup-offer">
+          {popup.offer}
+        </p>
+        <div class="promo-popup__actions">
+          <a class="btn btn--primary btn--large btn--block" href={claimHref} data-promo-claim>
+            {popup.ctaLabel}
+          </a>
+          <button class="btn btn--ghost btn--block" type="button" data-promo-dismiss>
+            {popup.secondaryLabel}
+          </button>
+        </div>
+        <p class="promo-popup__terms">{popup.termsLine}</p>
+      </section>
+    </div>
+  )
+}
+
+<script>
+  import '../scripts/promo-popup';
+</script>

@@ -1,0 +1,95 @@
+---
+/**
+ * Premium county-level service-area map (directive §5).
+ *
+ * Real U.S. Census Bureau county geometry, pre-projected into a lightweight
+ * inline SVG by scripts/generate-service-area-map.mjs — no mapping library,
+ * no runtime fetch, no layout shift (intrinsic aspect ratio via viewBox).
+ *
+ * Coverage categories are POLICY, never a whole-county guarantee: the legend
+ * and surrounding copy keep the "confirm your address" qualification and the
+ * authoritative eligibility logic stays in the estimator.
+ */
+import { MAP_COUNTIES, MAP_CONTEXT_PATHS, MAP_CITIES, MAP_COUNTY_LABELS, MAP_STATE_LINE, MAP_WIDTH, MAP_HEIGHT } from '../lib/geo/service-area-map';
+
+const counties = MAP_COUNTIES;
+const core = counties.filter((county) => county.category === 'core');
+const arrangement = counties.filter((county) => county.category === 'arrangement');
+---
+
+<figure class="area-map">
+  <div class="area-map__frame">
+    <svg
+      viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
+      class="area-map__svg"
+      role="img"
+      aria-label="Map of the Sparkling Standard service area: Escambia and Santa Rosa Counties in Florida as the core service area, including Pensacola, Cantonment, Gulf Breeze, Milton and Pace; Baldwin and Escambia Counties in Alabama served by arrangement; neighboring counties shown for context with no coverage implied."
+    >
+      <rect x="0" y="0" width={MAP_WIDTH} height={MAP_HEIGHT} fill="var(--color-cream-100)" />
+      <!-- Neighboring geography: neutral, explicitly not covered -->
+      <g fill="var(--color-cream-200)" stroke="var(--color-sand-300)" stroke-width="1">
+        {MAP_CONTEXT_PATHS.map((path) => <path d={path} />)}
+      </g>
+      <!-- By-arrangement territory -->
+      <g class="area-map__arrangement">
+        {arrangement.map((county) => (
+          <path d={county.path} class="area-map__county" />
+        ))}
+      </g>
+      <!-- Core territory -->
+      <g class="area-map__core">
+        {core.map((county) => (
+          <path d={county.path} class="area-map__county" />
+        ))}
+      </g>
+      <path d={MAP_STATE_LINE} class="area-map__stateline" fill="none" />
+      <!-- County labels -->
+      <g class="area-map__labels">
+        {MAP_COUNTY_LABELS.map((label) => (
+          <text x={label.x} y={label.y} class={`area-map__county-label area-map__county-label--${label.category}`}>
+            {label.name} {label.state}
+          </text>
+        ))}
+      </g>
+      <!-- City markers -->
+      <g class="area-map__cities">
+        {MAP_CITIES.map((city) => (
+          <g>
+            <circle cx={city.x} cy={city.y} r="4.5" class="area-map__city-dot" />
+            <text
+              x={city.x + city.dx}
+              y={city.y + city.dy}
+              text-anchor={city.anchor}
+              class={`area-map__city-label${['Pensacola', 'Cantonment'].includes(city.name) ? ' area-map__city-label--primary' : ''}`}
+            >
+              {city.name}
+            </text>
+          </g>
+        ))}
+      </g>
+      <text x={MAP_WIDTH - 14} y={MAP_HEIGHT - 14} text-anchor="end" class="area-map__water-label">
+        Gulf of Mexico
+      </text>
+    </svg>
+  </div>
+  <figcaption class="area-map__legend">
+    <span class="area-map__legend-item">
+      <span class="area-map__swatch area-map__swatch--core" aria-hidden="true"></span>
+      <strong>Core Service Area</strong>
+    </span>
+    <span class="area-map__legend-item">
+      <span class="area-map__swatch area-map__swatch--arrangement" aria-hidden="true"></span>
+      <strong>Service by Arrangement</strong>
+    </span>
+    <span class="area-map__legend-item">
+      <span class="area-map__swatch area-map__swatch--confirm" aria-hidden="true"></span>
+      <a href="/estimate/" data-cta="area-map-zip">Confirm Your Address</a>
+    </span>
+  </figcaption>
+  <p class="small text-muted area-map__note">
+    Shaded counties describe where we work — not an automatic whole-county
+    guarantee. The instant estimate checks your exact address and confirms
+    coverage and travel before anything is booked. Neighboring counties are
+    shown for orientation only.
+  </p>
+</figure>

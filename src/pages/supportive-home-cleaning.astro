@@ -1,0 +1,205 @@
+---
+import { getEntry } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import CtaBand from '../components/CtaBand.astro';
+import Icon from '../components/Icon.astro';
+import { breadcrumbNode, serviceNode } from '../lib/schema';
+import { business, contactPhone, isPending } from '../config/business';
+
+const entry = await getEntry('site', 'supportive-home-cleaning');
+if (!entry) throw new Error('Missing content entry: src/content/site/supportive-home-cleaning.md');
+const { data } = entry;
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const schema = [
+  serviceNode({
+    site,
+    name: 'Supportive Home Cleaning',
+    description: data.metaDescription,
+    path: '/supportive-home-cleaning/',
+    serviceType: 'Supportive home cleaning for seniors and households needing extra help',
+  }),
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Supportive Home Cleaning', path: '/supportive-home-cleaning/' },
+  ]),
+];
+
+const phone = contactPhone();
+const showCall = phone !== null && !isPending(phone.href);
+const showText = phone !== null && business.flags.smsEnabled && !isPending(phone.sms);
+---
+<BaseLayout title={data.metaTitle} description={data.metaDescription} schema={schema}>
+  <section class="section section--tight">
+    <div class="container">
+      <Breadcrumbs
+        trail={[
+          { name: 'Home', path: '/' },
+          { name: 'Supportive Home Cleaning', path: '/supportive-home-cleaning/' },
+        ]}
+      />
+      <div class="section-head mt-4 readable">
+        <p class="eyebrow">Supportive Home Cleaning</p>
+        <h1>
+          {data.hero.headline}
+          {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
+        </h1>
+        <p class="lead">{data.hero.lead}</p>
+        <div class="btn-row mt-4">
+          <a class="btn btn--primary btn--large" href="/estimate/" data-cta="supportive-estimate">
+            {data.hero.ctaLabel ?? 'Request Service'}
+          </a>
+          {showCall && (
+            <a class="btn btn--ghost btn--large" href={phone.href} data-cta="supportive-call">{phone.display}</a>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-head readable">
+        <p class="eyebrow">{data.sections[0]?.eyebrow}</p>
+        <h2>{data.sections[0]?.heading}</h2>
+        <p class="lead">{data.sections[0]?.lead}</p>
+      </div>
+      <div class="grid grid--3 readable">
+        {
+          data.sections[0]?.items.map((item) => (
+            <div class="card">
+              <span class="card__icon"><Icon name="heart" /></span>
+              <h3 class="card__title">{item.title}</h3>
+              <p class="card__text">{item.text}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container split readable">
+      <div>
+        <p class="eyebrow">{data.sections[1]?.eyebrow}</p>
+        <h2>{data.sections[1]?.heading}</h2>
+        <p>{data.sections[1]?.lead}</p>
+        <ul class="checklist mt-4">
+          {data.sections[1]?.items.map((item) => (
+            <li>
+              <Icon name="check" size={18} />
+              <span><strong>{item.title}.</strong> {item.text}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div class="card card--muted">
+        <h2 class="card__title">A note on honesty</h2>
+        <p class="card__text">
+          Sparkling Standard provides residential cleaning — not medical, nursing,
+          caregiving or home-health services. If a task is outside what we can
+          safely and properly do, we will tell you directly and help you think of
+          the next step.
+        </p>
+        <p class="card__text">
+          You never need to share a diagnosis or medical information to request
+          cleaning. Only tell us what helps us clean your home well.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-head readable">
+        <p class="eyebrow">{data.sections[2]?.eyebrow}</p>
+        <h2>{data.sections[2]?.heading}</h2>
+        <p class="lead">{data.sections[2]?.lead}</p>
+      </div>
+      <div class="grid grid--2 readable">
+        {
+          data.sections[2]?.items.map((item) => (
+            <div class="card">
+              <h3 class="card__title">{item.title}</h3>
+              <p class="card__text">{item.text}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container container--narrow readable">
+      <div class="section-head">
+        <p class="eyebrow">{data.process?.eyebrow}</p>
+        <h2>{data.process?.heading}</h2>
+      </div>
+      <ol class="steps">
+        {(data.process?.steps ?? []).map((step, index) => (
+          <li class="step">
+            <h3 class="step__title">{index + 1}. {step.title}</h3>
+            <p class="step__text">{step.text}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-head readable">
+        <p class="eyebrow">{data.sections[3]?.eyebrow}</p>
+        <h2>{data.sections[3]?.heading}</h2>
+        <p class="lead">{data.sections[3]?.lead}</p>
+      </div>
+      <div class="grid grid--4 readable">
+        {
+          data.sections[3]?.items.map((item) => (
+            <div class="card">
+              <h3 class="card__title">{item.title}</h3>
+              <p class="card__text">{item.text}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container container--narrow readable">
+      <div class="section-head">
+        <h2>{data.finalCta?.heading}</h2>
+        <p class="lead">{data.finalCta?.text}</p>
+      </div>
+      <div class="btn-row readable-cta">
+        <a class="btn btn--primary btn--large" href="/estimate/" data-cta="supportive-estimate-final">
+          {data.hero.ctaLabel ?? 'Request Service'}
+        </a>
+        {showCall && (
+          <a class="btn btn--secondary btn--large" href={phone.href} data-cta="supportive-call-final">Call {phone.display}</a>
+        )}
+        {showText && (
+          <a class="btn btn--ghost btn--large" href={phone.sms} data-cta="supportive-text-final">Text {phone.display}</a>
+        )}
+      </div>
+      <p class="small text-muted mt-4">
+        Prefer to arrange everything through a family member or caregiver? Have
+        them <a href="/contact/">contact us directly</a> — with your permission,
+        we coordinate scheduling and access with the people you trust.
+      </p>
+    </div>
+  </section>
+
+  <div class="container section section--tight">
+    <CtaBand
+      title={data.ctaBand?.heading ?? 'Ready when you are'}
+      text={data.ctaBand?.text}
+      primaryLabel={data.ctaBand?.label ?? 'Get an Estimate'}
+      primaryHref="/estimate/"
+      secondaryLabel="Ask a Question"
+      secondaryHref="/contact/"
+    />
+  </div>
+</BaseLayout>

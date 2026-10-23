@@ -29,7 +29,7 @@ Full research library (owner-local, never published to the website):
   is (no staged dirt, no fake before/afters, no invented reviews — see the photo privacy SOP and
   AGENTS.md no-fabrication rule).
 - Real transformations are the strongest trust asset; ASMR work sound is the strongest attention
-  asset; "Leaving Your Space Sparkling." is the closing line - use it to land the piece, not as repeated filler.
+  asset; "Standards That Make Your Space Sparkle." is the closing line - use it to land the piece, not as repeated filler.
 - Do not prescribe one structure for every video; these are techniques, not a template.
 
 ## 3. Recommended visual styles
@@ -112,7 +112,7 @@ Full research library (owner-local, never published to the website):
 
 **Sheet 1 — Hayli's founder introduction.** Approve the brief (M4) → one quiet session (natural
 light, phone at eye level, close for clean audio) → capture the enhanced set (to camera, real detail
-B-roll from an existing permissioned job, close on "Leaving Your Space Sparkling.") → edit long cut
+B-roll from an existing permissioned job, close on "Standards That Make Your Space Sparkle.") → edit long cut
 (60–120 s) + short cut (30–45 s) in CapCut → publish per the platform plan (TikTok first, Facebook,
 Nextdoor; Instagram/YouTube when available). No further owner decisions are needed to film it.
 

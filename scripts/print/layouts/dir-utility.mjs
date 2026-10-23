@@ -72,7 +72,7 @@ const doorHanger = () => `
   <div style="height:2.85in;background:var(--ink-900);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:.24in">
     <div style="height:1.9in"></div>
     ${lockup({ crestSize: '.42in', script: '.31in', caps: '.145in', descriptor: '.075in' })}
-    <div class="c-label c-label--light" style="font-size:.065in;margin-top:.08in">Recurring house cleaning</div>
+    <div class="c-label c-label--light" style="font-size:.065in;margin-top:.08in">Recurring residential cleaning</div>
   </div>
   <div style="flex:1;padding:.26in .25in .24in;display:flex;flex-direction:column">
     <div class="c-label" style="font-size:.07in">How it works</div>
@@ -99,32 +99,33 @@ const doorHanger = () => `
 </div>`;
 
 const quarterSheet = () => `
-<div style="position:absolute;inset:0;padding:.3in;display:flex;flex-direction:column;background:var(--cream-50)">
+<div style="position:absolute;inset:0;padding:.26in .28in .24in;display:flex;flex-direction:column;background:var(--cream-50)">
   <div style="display:flex;justify-content:space-between;align-items:center">
-    ${lockup({ crestSize: '.46in', script: '.34in', caps: '.155in', descriptor: '.08in' })}
+    ${lockup({ crestSize: '.44in', script: '.32in', caps: '.145in', descriptor: '.075in' })}
     <div class="c-tag" style="font-size:.06in">Recurring plans</div>
   </div>
-  <div class="c-head" style="font-size:.38in;margin-top:.2in">${F.tagline}</div>
-  <div class="c-body" style="font-size:.115in;margin-top:.12in">Recurring house cleaning planned around your home — not a route clock.</div>
-  <div class="c-label" style="font-size:.07in;margin-top:.18in">What's included</div>
-  <div class="c-grid2" style="margin-top:.08in;column-gap:.24in">
-    ${checkItem('Weekly, biweekly or monthly', '.1in')}
-    ${checkItem('Real labor-hour estimates', '.1in')}
-    ${checkItem('The details most cleaners skip', '.1in')}
-    ${checkItem(`${F.founder} confirms every request`, '.1in')}
+  <div class="c-head" style="font-size:.33in;margin-top:.16in;line-height:1.06">Your Home Deserves a<br>Sparkling Standard.</div>
+  <div class="c-body" style="font-size:.105in;margin-top:.1in">Recurring residential cleaning planned around your home — not a route clock.</div>
+  <div class="c-label" style="font-size:.068in;margin-top:.14in">What's included</div>
+  <div class="c-grid2" style="margin-top:.07in;column-gap:.24in">
+    ${checkItem('Weekly, biweekly or monthly', '.094in')}
+    ${checkItem('Real labor-hour estimates', '.094in')}
+    ${checkItem('The details most cleaners skip', '.094in')}
+    ${checkItem(`${F.founder} confirms every request`, '.094in')}
   </div>
-  <div class="c-label" style="font-size:.07in;margin-top:.16in">How it works</div>
-  <div style="margin-top:.08in">
-    ${step(1, 'Scan the code', '.095in')}
-    ${step(2, 'Answer a few questions', '.095in')}
-    ${step(3, 'See your proposed price', '.095in')}
+  <div class="c-panel" style="margin-top:.16in">
+    <div class="c-label" style="font-size:.058in;color:var(--champagne-700)">New-neighbor welcome offer</div>
+    <div class="c-head" style="font-size:.125in;margin-top:.04in;line-height:1.18">${F.campaign.headline}</div>
+    <div style="font-size:.056in;color:var(--ink-700);margin-top:.05in;line-height:1.4">${F.campaign.terms}</div>
+    <div style="display:inline-flex;margin-top:.06in;border:.008in dashed var(--champagne-500);border-radius:99px;padding:.028in .1in;font-weight:800;font-size:.065in;letter-spacing:.1em">Code: ${F.campaign.code}</div>
   </div>
   <div style="margin-top:auto;display:flex;align-items:flex-end;justify-content:space-between">
-    ${qr('quarter-sheet', '1.0in', '.06in')}
+    ${qr('quarter-sheet-sparkle100', '.95in', '.058in', 'Scan to claim your $100')}
     <div style="text-align:right">
-      <div class="c-phone" style="font-size:.175in">${F.phone}</div>
-      <div class="c-body" style="font-size:.09in;margin-top:.04in">${F.email}</div>
-      <div class="c-body" style="font-size:.09in">${F.domain}</div>
+      <div class="c-phone" style="font-size:.165in">${F.phone}</div>
+      <div class="c-body" style="font-size:.085in;margin-top:.04in">${F.email}</div>
+      <div class="c-body" style="font-size:.085in">${F.domain}</div>
+      <div class="c-body" style="font-size:.072in;margin-top:.04in;color:var(--taupe-600)">${F.hours}</div>
     </div>
   </div>
 </div>`;
@@ -155,8 +156,8 @@ const poster = () => `
     <div class="c-tag" style="font-size:.12in;margin-top:.15in">Owner-operated · Pensacola &amp; Cantonment</div>
   </div>
   <div class="c-rule" style="margin:.4in 0 .5in"></div>
-  <div class="c-head" style="font-size:1.2in">${F.tagline}</div>
-  <div class="c-body" style="font-size:.27in;margin-top:.28in;max-width:7in">Recurring house cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
+  <div class="c-head" style="font-size:.95in">${F.tagline}</div>
+  <div class="c-body" style="font-size:.27in;margin-top:.28in;max-width:7in">Recurring residential cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
   <div style="display:flex;gap:.8in;margin-top:.5in;flex:1">
     <div style="flex:1.1;display:flex;flex-direction:column;justify-content:space-between">
       <div class="c-label" style="font-size:.13in">What's included</div>
@@ -176,7 +177,7 @@ const poster = () => `
       <div>
         <div class="c-label" style="font-size:.13in">Services</div>
         <div class="c-panel" style="margin-top:.14in">
-          <div class="c-body" style="font-size:.17in;line-height:1.6">Recurring house cleaning · Deep cleaning · Move-in / move-out · Short-term rentals · Commercial spaces · Churches</div>
+          <div class="c-body" style="font-size:.17in;line-height:1.6">Recurring residential cleaning · Deep cleaning · Move-in / move-out · Short-term rentals · Commercial spaces · Churches</div>
         </div>
       </div>
     </div>
@@ -214,14 +215,14 @@ const foamBoard = () => `
   </div>
   <div class="c-rule"></div>
   <div class="c-head" style="font-size:2.5in;max-width:19in">${F.tagline}</div>
-  <div class="c-body" style="font-size:.6in;max-width:14in">Recurring house cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
+  <div class="c-body" style="font-size:.6in;max-width:14in">Recurring residential cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
   <div style="max-width:17in">
     ${checkItem('Estimates built from real labor hours', '.52in')}
     ${checkItem('The details most cleaners skip, every visit', '.52in')}
     ${checkItem(`${F.founder} confirms every request personally`, '.52in')}
   </div>
   <div class="c-panel" style="max-width:17in">
-    <div class="c-body" style="font-size:.4in;line-height:1.5">Recurring house cleaning · Deep cleaning · Move-in / move-out · Short-term rentals · Commercial spaces · Churches</div>
+    <div class="c-body" style="font-size:.4in;line-height:1.5">Recurring residential cleaning · Deep cleaning · Move-in / move-out · Short-term rentals · Commercial spaces · Churches</div>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between">
     ${qr('foam-board', '5in', '.3in')}
@@ -243,7 +244,7 @@ const leaveBehind = () => `
   <div class="c-body" style="font-size:.115in;margin-top:.12in">Keep this card. When your home needs a hand, ${F.founder} answers personally.</div>
   <div class="c-label" style="font-size:.075in;margin-top:.26in">Services</div>
   <div class="c-matrix" style="margin-top:.1in">
-    <div class="c-matrix-row"><span>Recurring house cleaning</span><span>Weekly · biweekly · monthly</span></div>
+    <div class="c-matrix-row"><span>Recurring residential cleaning</span><span>Weekly · biweekly · monthly</span></div>
     <div class="c-matrix-row"><span>Deep cleaning</span><span>Detail-first reset</span></div>
     <div class="c-matrix-row"><span>Move-in / move-out</span><span>Scheduled around closings</span></div>
     <div class="c-matrix-row"><span>Short-term rentals</span><span>Turnover cleaning</span></div>

@@ -68,6 +68,12 @@ export type MarketingLink = {
   /** Exact owner action (CSV "Where Owner Must Paste It"). */
   whereToPaste: string;
   /**
+   * Optional promotion code appended to the destination (e.g. `SPARKLE100`)
+   * so the estimate flow opens with the owner-approved campaign pre-claimed.
+   * Only the literal promotion code is permitted; never a free-form query.
+   */
+  promo?: 'SPARKLE100';
+  /**
    * Prepared but NOT active: the public profile/placement does not exist yet.
    * Pending links are listed separately and are never presented as ready.
    */
@@ -568,6 +574,20 @@ export const marketingLinks: MarketingLink[] = [
     pending: false,
   },
   {
+    id: 'quarter_sheet_sparkle100',
+    channel: CHANNEL.print,
+    campaign: 'sparkle100',
+    placement: 'Quarter-sheet SPARKLE100 promotion QR',
+    path: destinations.estimate,
+    utm: { source: 'quarter_sheet', medium: 'print', campaign: 'sparkle100', content: 'promo_qr' },
+    promo: 'SPARKLE100',
+    purpose:
+      'Open the estimate flow with the owner-approved SPARKLE100 recurring promotion pre-claimed (same terms as the website).',
+    manual: true,
+    whereToPaste: 'Redesigned quarter-sheet promotion panel QR (SPARKLE100).',
+    pending: false,
+  },
+  {
     id: 'qr_card_estimate',
     channel: CHANNEL.print,
     campaign: 'qr_card',
@@ -828,6 +848,7 @@ export const qrAssets: QrAsset[] = [
   { id: 'str-campaign', linkId: 'str_host_turnover', purpose: 'STR campaign (social/email).', placement: 'Anywhere the STR campaign link is needed.', pending: false },
   { id: 'gift-card', linkId: 'gift_card_print', purpose: 'Printed gift card scanning to the gift-certificate page.', placement: 'Gift card or certificate holder print run.', pending: false },
   { id: 'quarter-sheet', linkId: 'quarter_sheet_recurring', purpose: 'Recurring-cleaning quarter sheet.', placement: 'Neighborhood handouts and community boards.', pending: false },
+  { id: 'quarter-sheet-sparkle100', linkId: 'quarter_sheet_sparkle100', purpose: 'SPARKLE100 recurring promotion on the redesigned quarter sheet.', placement: 'Quarter-sheet promotion panel (recurring door-knock campaign).', pending: false },
   { id: 'qr-estimate-card', linkId: 'qr_card_estimate', purpose: 'Stand-alone QR estimate card.', placement: 'Canvassing and event handouts.', pending: false },
   { id: 'event-poster', linkId: 'event_poster_estimate', purpose: 'Community event poster.', placement: 'School fairs, markets, community boards.', pending: false },
   { id: 'foam-board', linkId: 'foam_board_estimate', purpose: 'Foam-board display.', placement: 'Event tables and booths.', pending: false },
@@ -848,6 +869,7 @@ export function resolveSiteUrl(raw: string | undefined): string {
 
 export function linkUrl(link: MarketingLink, siteUrl: string): string {
   const url = new URL(link.path, resolveSiteUrl(siteUrl));
+  if (link.promo) url.searchParams.set('promo', link.promo);
   url.searchParams.set('utm_source', link.utm.source);
   url.searchParams.set('utm_medium', link.utm.medium);
   url.searchParams.set('utm_campaign', link.utm.campaign);

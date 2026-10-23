@@ -15,6 +15,7 @@ export const F = {
   role: FACTS.founderRole,
   phone: FACTS.phoneDisplay,
   serviceArea: FACTS.serviceAreaShort,
+  campaign: FACTS.campaign,
 };
 
 /** Absolute file URL so generated HTML works from any output folder. */

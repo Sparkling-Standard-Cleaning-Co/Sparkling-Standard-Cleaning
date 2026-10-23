@@ -65,7 +65,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
 
 ## Project identity and current verified status
 
-- **2026-10-21 owner decision implementation:** 46 decisions applied; public brand **Sparkling Standard**, legal entity **Sparkling Standard LLC**, slogan **Leaving Your Space Sparkling.** See `docs/verification/VERIFICATION.md` and the Business HQ workbook.
+- **2026-10-21 owner decision implementation:** 46 decisions applied; public brand **Sparkling Standard**, legal entity **Sparkling Standard LLC**, slogan **Standards That Make Your Space Sparkle.** See `docs/verification/VERIFICATION.md` and the Business HQ workbook.
 - Marketing, estimate and lead-capture website for **Sparkling Standard** (legal entity:
   **Sparkling Standard LLC**), an owner-operated residential and commercial cleaning company based
   in Cantonment, serving Pensacola, surrounding communities within about an hour of driving time

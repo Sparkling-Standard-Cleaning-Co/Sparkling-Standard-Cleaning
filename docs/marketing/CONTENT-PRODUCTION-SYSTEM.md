@@ -27,7 +27,7 @@ detail and proves it on camera.
 - **Status:** creative proposal. It is **not** an approved commitment to produce 30 consecutive
   daily videos. The operational plan below uses ~4 videos per week (a sustainable owner-operated
   pace), not daily production.
-- **Why it fits:** it is the content expression of the brand line *Leaving Your Space Sparkling.*
+- **Why it fits:** it is the content expression of the brand line *Standards That Make Your Space Sparkle.*
   and it showcases the business's actual differentiator.
 - **Episode anatomy:** one detail → one satisfying demonstration → one visible result → one short
   closing line. Examples of detail categories (never fabricated; only filmed when a real job
@@ -60,7 +60,7 @@ session should feed several videos and platforms (see §4).
 
 | # | Working title | Category | Hook concept | Call to action |
 | --- | --- | --- | --- | --- |
-| 1 | "Meet Hayli" (long-form introduction, plus a 30–45 s edit) | Founder | Hayli to camera: why she started and what "Leaving Your Space Sparkling." means | Tracked estimate link in bio |
+| 1 | "Meet Hayli" (long-form introduction, plus a 30–45 s edit) | Founder | Hayli to camera: why she started and what "Standards That Make Your Space Sparkle." means | Tracked estimate link in bio |
 | 2 | "The detail most people miss" | Overlooked detail | Extreme close-up of a grimy detail, then the clean reveal | Follow for the series |
 | 3 | "First clean vs. maintained" (only if a real paired job exists) | Transformation | Split reveal of a real result with permission | Tracked estimate link |
 | 4 | "How to keep a kitchen fresh between visits" | Education | Three quick, genuinely useful tips on real surfaces | Save/share |

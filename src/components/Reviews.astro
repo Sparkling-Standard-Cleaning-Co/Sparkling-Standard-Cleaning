@@ -1,23 +1,32 @@
 ---
 // Customer reviews — renders ONLY genuine owner-supplied entries from
-// src/content/reviews/. Never fabricate reviews, never invent star ratings,
-// and never render an empty reviews shell "to fill space" (directive §43, §56, §77).
+// src/content/reviews/. Never fabricate reviews, never invent star ratings or
+// counts, and never render empty review cards "to fill space" (directive §43,
+// §56, §77).
+//
+// While the collection is intentionally empty (display permission for the real
+// Google reviews is not documented), the section shows a refined invitation to
+// read the authentic reviews directly on Google — with the official Google G.
+// The exact owner-supplied profile/review URLs come from business.ts.
 
 import { getCollection } from 'astro:content';
+import GoogleG from './GoogleG.astro';
+import { business, isPending } from '../config/business';
 
 interface Props {
   heading?: string;
   eyebrow?: string;
 }
 
-const { heading = 'What customers say', eyebrow = 'Reviews' } = Astro.props;
+const { heading = 'Kind Words From Our Customers', eyebrow = 'Reviews' } = Astro.props;
 
 const reviews = (await getCollection('reviews')).sort((a, b) => a.data.order - b.data.order);
+const profileUrl = isPending(business.reviews.profileUrl) ? null : business.reviews.profileUrl;
 ---
 
 {
-  reviews.length > 0 && (
-    <section class="section section--alt" aria-labelledby="reviews-heading">
+  reviews.length > 0 ? (
+    <section class="section section--alt" id="reviews" aria-labelledby="reviews-heading">
       <div class="container">
         <div class="section-head section-head--center">
           <p class="eyebrow">{eyebrow}</p>
@@ -37,5 +46,41 @@ const reviews = (await getCollection('reviews')).sort((a, b) => a.data.order - b
         </div>
       </div>
     </section>
+  ) : (
+    profileUrl && (
+      <section class="section section--alt" id="reviews" aria-labelledby="reviews-heading">
+        <div class="container container--narrow">
+          <div class="section-head section-head--center">
+            <p class="eyebrow">{eyebrow}</p>
+            <h2 id="reviews-heading">{heading}</h2>
+            <p class="lead">
+              See what our customers have shared about their experiences with
+              Sparkling Standard.
+            </p>
+          </div>
+          <div class="reviews-invite">
+            <span class="reviews-invite__mark" aria-hidden="true">
+              <GoogleG />
+            </span>
+            <p class="reviews-invite__text">
+              We're a small, local company building our reputation one home at a
+              time. You can read every authentic review — good or critical —
+              directly on our Google profile.
+            </p>
+            <a
+              class="btn btn--secondary btn--large"
+              href={profileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Read our reviews on Google (opens in a new tab)"
+              data-review-link="google"
+              data-cta="reviews-read-google"
+            >
+              Read Our Google Reviews
+            </a>
+          </div>
+        </div>
+      </section>
+    )
   )
 }

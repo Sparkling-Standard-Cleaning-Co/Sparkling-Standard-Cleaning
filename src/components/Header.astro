@@ -1,6 +1,6 @@
 ---
 import { business, contactPhone } from '../config/business';
-import { cleaningTypesNav, primaryNav } from '../lib/site';
+import { primaryNav, mobileCleaningNav, mobileTopNav } from '../lib/site';
 import Logo from './Logo.astro';
 import Icon from './Icon.astro';
 import PendingNote from './PendingNote.astro';
@@ -78,10 +78,10 @@ const isActive = (href: string) => pathname === href || (href !== '/' && pathnam
   <div class="container">
     <nav id="mobile-nav" class="mobile-nav" data-nav-panel data-open="false" aria-label="Mobile">
       <div class="mobile-nav__group">
-        <p class="mobile-nav__group-label">Types of Cleanings</p>
+        <p class="mobile-nav__group-label">Cleaning Services</p>
         <ul class="mobile-nav__links mobile-nav__links--nested">
           {
-            cleaningTypesNav.map((item) => (
+            mobileCleaningNav.map((item) => (
               <li>
                 <a href={item.href} aria-current={pathname.startsWith(item.href) ? 'page' : undefined}>
                   {item.label}
@@ -92,13 +92,18 @@ const isActive = (href: string) => pathname === href || (href !== '/' && pathnam
         </ul>
       </div>
       <ul class="mobile-nav__links">
-        <li><a href="/about/" aria-current={isActive('/about/') ? 'page' : undefined}>About</a></li>
-        <li><a href="/service-area/">Service Area</a></li>
-        <li><a href="/contact/">Contact</a></li>
-        <li><a href="/faq/">FAQ</a></li>
+        {
+          mobileTopNav.map((item) => (
+            <li>
+              <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+                {item.label}
+              </a>
+            </li>
+          ))
+        }
       </ul>
       <div class="btn-row" style="margin-top: var(--space-4)">
-        <a class="btn btn--primary btn--block" href="/estimate/">Instant Estimate</a>
+        <a class="btn btn--primary btn--block" href="/estimate/" data-cta="mobile-nav-estimate">Get an Estimate</a>
         {
           phone && (
             <>

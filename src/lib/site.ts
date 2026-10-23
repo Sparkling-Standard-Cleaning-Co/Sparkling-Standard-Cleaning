@@ -11,6 +11,7 @@ export const cleaningTypesNav: NavItem[] = [
   { label: 'Recurring Residential Cleaning', href: '/recurring-cleaning/' },
   { label: 'Deep Cleaning', href: '/deep-cleaning/' },
   { label: 'Move-in and Move-out Cleaning', href: '/move-in-move-out-cleaning/' },
+  { label: 'Supportive Home Cleaning', href: '/supportive-home-cleaning/' },
   { label: 'Short-term Rental Turnover Cleaning', href: '/short-term-rental-cleaning/' },
   { label: 'Commercial Cleaning', href: '/commercial-cleaning/' },
 ];
@@ -25,7 +26,30 @@ export const primaryNav: NavItem[] = [
   { label: 'About', href: '/about/' },
 ];
 
-/** Footer services column — the five primary categories plus the supporting pages. */
+/**
+ * Mobile navigation hierarchy (directive §6): a bold "Cleaning Services" group
+ * with every service, then top-level pages. Labels are mobile-tuned display
+ * names; hrefs always point at the canonical owning pages.
+ */
+export const mobileCleaningNav: NavItem[] = [
+  { label: 'Residential Cleaning', href: '/house-cleaning/' },
+  { label: 'Recurring Cleaning', href: '/recurring-cleaning/' },
+  { label: 'Deep Cleaning', href: '/deep-cleaning/' },
+  { label: 'Move-In / Move-Out', href: '/move-in-move-out-cleaning/' },
+  { label: 'Supportive Home Cleaning', href: '/supportive-home-cleaning/' },
+  { label: 'Vacation Rental Turnovers', href: '/short-term-rental-cleaning/' },
+  { label: 'Commercial Cleaning', href: '/commercial-cleaning/' },
+  { label: 'Church Cleaning', href: '/church-cleaning/' },
+];
+
+export const mobileTopNav: NavItem[] = [
+  { label: 'Service Area', href: '/service-area/' },
+  { label: 'Reviews', href: '/#reviews' },
+  { label: 'About', href: '/about/' },
+  { label: 'Contact', href: '/contact/' },
+];
+
+/** Footer services column �?" the five primary categories plus the supporting pages. */
 export const footerServicesNav: NavItem[] = [
   ...cleaningTypesNav,
   { label: 'House Cleaning', href: '/house-cleaning/' },
@@ -35,6 +59,7 @@ export const footerServicesNav: NavItem[] = [
 export const footerCompanyNav: NavItem[] = [
   { label: 'About Us', href: '/about/' },
   { label: 'Service Area', href: '/service-area/' },
+  { label: 'Reviews', href: '/#reviews' },
   { label: 'Get an Estimate', href: '/estimate/' },
   { label: 'Contact', href: '/contact/' },
   { label: 'FAQ', href: '/faq/' },
@@ -59,6 +84,7 @@ export const publicPaths: string[] = [
   '/short-term-rental-cleaning/',
   '/commercial-cleaning/',
   '/church-cleaning/',
+  '/supportive-home-cleaning/',
   '/estimate/',
   '/about/',
   '/service-area/',

@@ -147,6 +147,50 @@ export interface FoundingTenConfig {
   expiresOn: string | null;
 }
 
+/**
+ * The owner-approved welcome campaign (SPARKLE100, approved 2026-10-21).
+ * Unlike the prepared programs above, this one ships ENABLED because the
+ * owner approved its exact copy and terms in writing. The customer's claim
+ * (opt-in via the popup or a campaign link) is the only way it applies: the
+ * engine never grants it silently. "New customer" and "one per household"
+ * cannot be proven by the estimator, so they are enforced at REDEMPTION —
+ * the owner confirms eligibility personally against the reservation ledger
+ * before the discount is honored on a booked job.
+ */
+export interface CampaignPromotionConfig {
+  /** The public claim code. Matching is case-insensitive after trimming. */
+  code: string;
+  /** Keep false to retract the campaign everywhere in one change. */
+  enabled: boolean;
+  kind: 'fixed';
+  /** USD off the first qualifying cleaning. Null = unset (fails closed). */
+  value: number | null;
+  /** Label recorded with the quote/lead and shown in the breakdown. */
+  label: string;
+  /** Service types the discounted first clean may be (standard or deep). */
+  services: PricingServiceType[];
+  /** Qualifying recurring frequencies (weekly or biweekly only). */
+  frequencies: Frequency[];
+  /** ISO date after which the campaign must not apply; null = no expiry. */
+  expiresOn: string | null;
+  /** Exactly one promotion applies. Kept literal for honesty in the type. */
+  stackable: false;
+  /** Popup presentation — the single authoritative copy for every surface. */
+  popup: {
+    eyebrow: string;
+    headline: string;
+    offer: string;
+    ctaLabel: string;
+    secondaryLabel: string;
+    /** Honest terms line shown with the popup and wherever the offer appears. */
+    termsLine: string;
+    /** Active seconds on the site (this session) before the popup appears. */
+    activeSeconds: number;
+    /** Days a dismissal suppresses the popup before it may appear again. */
+    dismissedCooldownDays: number;
+  };
+}
+
 export interface OwnerPricingConfig {
   // ── 1. Hourly rates (internal gross revenue per labor-hour, USD) ──────────
   hourlyRates: {
@@ -266,6 +310,13 @@ export interface OwnerPricingConfig {
      * active. Requires explicit owner approval before any part is enabled.
      */
     foundingTen: FoundingTenConfig;
+    /**
+     * SPARKLE100 welcome campaign — owner-approved 2026-10-21. Claim-based:
+     * the engine applies it only when the customer explicitly claims the
+     * code; redemption eligibility (new customer, one per household) is
+     * confirmed by the owner at booking against the reservation ledger.
+     */
+    campaign: CampaignPromotionConfig;
   };
 }
 
@@ -447,6 +498,35 @@ export const ownerPricing: OwnerPricingConfig = {
       capacity: { slots: 10, enforcement: 'owner_manual', awardedCount: null },
       reservationRequired: true,
       expiresOn: null,
+    },
+    // ── SPARKLE100 (owner-approved 2026-10-21) ──────────────────────────────
+    // $100 off the first qualifying cleaning for new recurring residential
+    // customers (weekly or biweekly). Claim-based, never automatic. To
+    // retract the campaign: set `enabled: false` here — every surface (popup,
+    // estimator, print, server verification) follows this one switch. Any
+    // change to the amount, copy or eligibility also requires updating the
+    // printed flyer and the popup at the same time so the terms stay honest.
+    campaign: {
+      code: 'SPARKLE100',
+      enabled: true,
+      kind: 'fixed',
+      value: 100,
+      label: 'SPARKLE100 — $100 off your first clean',
+      services: ['standard', 'deep'],
+      frequencies: ['weekly', 'biweekly'],
+      expiresOn: null,
+      stackable: false,
+      popup: {
+        eyebrow: 'A SPARKLING WELCOME OFFER',
+        headline: 'Make Your First Clean $100 Sweeter.',
+        offer: 'Get $100 OFF your first clean when you sign up for recurring residential cleaning.',
+        ctaLabel: 'Claim My $100 Offer',
+        secondaryLabel: 'Maybe Later',
+        termsLine:
+          'New recurring residential customers. Weekly or biweekly service. One per household. Applied to your first qualifying cleaning — no cash value, not retroactive, and it cannot combine with another promotion.',
+        activeSeconds: 3,
+        dismissedCooldownDays: 30,
+      },
     },
   },
 };

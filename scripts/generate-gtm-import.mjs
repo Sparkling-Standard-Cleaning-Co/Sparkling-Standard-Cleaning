@@ -45,6 +45,11 @@ const EVENTS = [
   { name: 'str_request_submit', parameters: [] },
   { name: 'booking_request', parameters: ['service_type'] },
   { name: 'review_link_click', parameters: ['platform'] },
+  { name: 'promotion_displayed', parameters: ['code'] },
+  { name: 'promotion_dismissed', parameters: ['code'] },
+  { name: 'promotion_claimed', parameters: ['code'] },
+  { name: 'promotion_estimate_applied', parameters: ['code', 'service_type'] },
+  { name: 'promotion_request_submit', parameters: ['code', 'service_type'] },
 ];
 
 /** Every dataLayer key a tag may forward — the allowlisted payload keys. */

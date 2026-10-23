@@ -33,8 +33,45 @@ import { saveSubmissionSummary } from '../lib/forms/submission-receipt';
 import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { track } from '../lib/analytics/events';
 import { attributionFields } from '../lib/attribution';
-
 const TRAVEL_CACHE_PREFIX = 'pcc-travel-';
+
+// ── SPARKLE100 claim state (first-party, no PII) ─────────────────────────────
+// The popup writes the claim; the wizard reads it here. The URL parameter is
+// validated against the configured code so ?promo=<garbage> claims nothing.
+const PROMO_STATE_KEY = 'pcc-promo-state';
+const CLAIMED_STATES = new Set(['claimed', 'redeemed']);
+
+function configuredCampaignCode(): string | null {
+  const campaign = pricing.promotions.campaign.value;
+  return campaign.enabled ? campaign.code : null;
+}
+
+function storedPromoClaim(): string | null {
+  const code = configuredCampaignCode();
+  if (!code) return null;
+  try {
+    const raw = window.localStorage.getItem(PROMO_STATE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as { state?: string }) : null;
+    if (parsed && typeof parsed.state === 'string' && CLAIMED_STATES.has(parsed.state)) {
+      return code;
+    }
+  } catch {
+    // Storage is best-effort; a claim is never required for an estimate.
+  }
+  return null;
+}
+
+function claimedPromoCode(): string | null {
+  const code = configuredCampaignCode();
+  if (!code) return null;
+  try {
+    const param = new URLSearchParams(window.location.search).get('promo');
+    if (param && param.trim().toUpperCase() === code.toUpperCase()) return code;
+  } catch {
+    // URL parsing is best-effort.
+  }
+  return storedPromoClaim();
+}
 
 const phone = contactPhone();
 const contact = {
@@ -98,6 +135,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   let lastTravelKey = '';
   let estimateStarted = false;
   let estimateCompleted = false;
+  let campaignAppliedTracked = false;
 
   // ── State helpers ─────────────────────────────────────────────────────────
   function radioValue(name: string): string | undefined {
@@ -166,6 +204,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   function buildContext(): EstimateContext {
     const key = currentTravelKey();
     const routedForDestination = routed && routedKey === key ? routed : undefined;
+    const claimedCode = claimedPromoCode();
     return {
       travel: {
         ...(routedForDestination ? { routed: routedForDestination } : {}),
@@ -180,6 +219,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
         maxInstantDistanceMiles: pricing.travel.clientDefaults.maxInstantDistanceMiles.value,
         maxDrivingMinutes: pricing.drivingPolicy.maxDrivingMinutes.value,
         reviewBandMinutes: pricing.drivingPolicy.reviewBandMinutes.value,
+      },
+      promotions: {
+        // The claim is the customer's opt-in; the engine re-checks every
+        // eligibility rule itself and the server recomputes it identically.
+        claimedCampaignCode: claimedCode,
       },
     };
   }
@@ -218,6 +262,16 @@ function initEstimateWizard(form: HTMLFormElement): void {
     renderIncentive(result);
     renderPricePreview(result);
     renderReservationSummary(result);
+    // One aggregated event when the claimed campaign discount lands in the
+    // estimate — the code only, never any customer data.
+    if (!campaignAppliedTracked && result.pricing.discount?.source === 'campaign') {
+      campaignAppliedTracked = true;
+      const code = configuredCampaignCode();
+      track('promotion_estimate_applied', {
+        ...(code ? { code } : {}),
+        ...(input.serviceType ? { service_type: input.serviceType } : {}),
+      });
+    }
     return result;
   }
 
@@ -1059,6 +1113,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const acknowledged = form.querySelector<HTMLInputElement>('input[name="initialDeepCleanAcknowledged"]');
       fields.initial_deep_clean_acknowledged = acknowledged?.checked ? 'yes' : 'no';
     }
+    // The claimed campaign code rides along as a CLAIM — the server recomputes
+    // the discount itself and redemption eligibility is confirmed by the owner.
+    const claimedCode = claimedPromoCode();
+    if (claimedCode) fields.promotion_code = claimedCode;
     if (isReservation && latestQuote) {
       fields.quoted_price = String(latestQuote.amount);
       fields.quote_reference = latestQuote.reference;
@@ -1121,6 +1179,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     const payload = { service_type: fields.service_type, journey: 'residential' as const };
     recordConversion('cleaning_request_submit', payload);
+    if (fields.promotion_code) {
+      const code = configuredCampaignCode();
+      track('promotion_request_submit', {
+        ...(code ? { code } : {}),
+        ...(fields.service_type ? { service_type: fields.service_type } : {}),
+      });
+    }
     if (fields.preferred_date) {
       recordConversion('booking_request', { service_type: fields.service_type });
     }

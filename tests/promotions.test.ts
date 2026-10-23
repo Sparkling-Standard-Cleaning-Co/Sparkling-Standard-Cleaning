@@ -12,6 +12,29 @@ import { calculateEstimate, type EstimateContext } from '../src/lib/estimate/cal
 import { evaluatePromotions, type PromotionInput } from '../src/lib/estimate/promotions.ts';
 import { mapReservationFields } from '../src/lib/estimate/verify.ts';
 import type { EstimateInput } from '../src/lib/estimate/types.ts';
+import type { CampaignPromotionConfig } from '../src/config/owner-pricing.ts';
+
+const campaignConfig: CampaignPromotionConfig = {
+  code: 'SPARKLE100',
+  enabled: true,
+  kind: 'fixed',
+  value: 100,
+  label: 'SPARKLE100 — $100 off your first clean',
+  services: ['standard', 'deep'],
+  frequencies: ['weekly', 'biweekly'],
+  expiresOn: null,
+  stackable: false,
+  popup: {
+    eyebrow: 'A SPARKLING WELCOME OFFER',
+    headline: 'Make Your First Clean $100 Sweeter.',
+    offer: 'Get $100 OFF your first clean when you sign up for recurring residential cleaning.',
+    ctaLabel: 'Claim My $100 Offer',
+    secondaryLabel: 'Maybe Later',
+    termsLine: 'New recurring residential customers. Weekly or biweekly service. One per household.',
+    activeSeconds: 3,
+    dismissedCooldownDays: 30,
+  },
+};
 
 const baseInput: PromotionInput = {
   serviceType: 'standard',
@@ -36,6 +59,8 @@ const baseInput: PromotionInput = {
     reservationRequired: true,
     expiresOn: null,
   },
+  campaign: null,
+  claimedCampaignCode: null,
 };
 
 function overrides(partial: Partial<PromotionInput>): PromotionInput {
@@ -296,6 +321,202 @@ test('null or zero terms can never apply, even if enabled', () => {
     overrides({ appreciationDiscounts: [{ ...appreciationNew, value: 0 }] }),
   );
   assert.equal(zeroTerm.discount, null);
+});
+
+// ── SPARKLE100 welcome campaign (claim-based, owner-approved) ─────────────────
+
+test('the shipped SPARKLE100 campaign is enabled with exactly the approved terms', () => {
+  const campaign = pricing.promotions.campaign.value;
+  assert.equal(campaign.code, 'SPARKLE100');
+  assert.equal(campaign.enabled, true, 'the owner approved this campaign 2026-10-21');
+  assert.equal(campaign.kind, 'fixed');
+  assert.equal(campaign.value, 100, '$100 off the first qualifying cleaning');
+  assert.deepEqual(campaign.services, ['standard', 'deep']);
+  assert.deepEqual(campaign.frequencies, ['weekly', 'biweekly']);
+  assert.equal(campaign.stackable, false);
+  assert.equal(campaign.expiresOn, null, 'no invented expiration');
+  assert.equal(campaign.popup.headline, 'Make Your First Clean $100 Sweeter.');
+  assert.equal(campaign.popup.ctaLabel, 'Claim My $100 Offer');
+  assert.equal(campaign.popup.activeSeconds, 3);
+  assert.equal(campaign.popup.dismissedCooldownDays, 30);
+});
+
+test('the campaign never applies without an explicit claim', () => {
+  const silent = evaluatePromotions(overrides({ campaign: campaignConfig, frequency: 'biweekly' }));
+  assert.equal(silent.discount, null, 'a claim is the only way the campaign can apply');
+
+  const wrongCode = evaluatePromotions(
+    overrides({ campaign: campaignConfig, frequency: 'biweekly', claimedCampaignCode: 'SPARKLE99' }),
+  );
+  assert.equal(wrongCode.discount, null);
+});
+
+test('the campaign applies to a claimed qualifying recurring clean, case-insensitively', () => {
+  const applied = evaluatePromotions(
+    overrides({ campaign: campaignConfig, frequency: 'biweekly', gross: 300, claimedCampaignCode: 'sparkle100' }),
+  );
+  assert.equal(applied.discount?.id, 'SPARKLE100');
+  assert.equal(applied.discount?.source, 'campaign');
+  assert.equal(applied.discount?.amount, 100, '$100 off a $300 first clean');
+
+  const padded = evaluatePromotions(
+    overrides({
+      campaign: campaignConfig,
+      frequency: 'weekly',
+      gross: 300,
+      claimedCampaignCode: '  Sparkle100  ',
+    }),
+  );
+  assert.equal(padded.discount?.amount, 100, 'claims are trimmed and matched case-insensitively');
+});
+
+test('the campaign respects service and frequency eligibility', () => {
+  const oneTime = evaluatePromotions(
+    overrides({ campaign: campaignConfig, frequency: 'one_time', claimedCampaignCode: 'SPARKLE100' }),
+  );
+  assert.equal(oneTime.discount, null, 'one-time work is not eligible');
+
+  const monthly = evaluatePromotions(
+    overrides({ campaign: campaignConfig, frequency: 'monthly', claimedCampaignCode: 'SPARKLE100' }),
+  );
+  assert.equal(monthly.discount, null, 'monthly is not eligible — weekly or biweekly only');
+
+  const str = evaluatePromotions(
+    overrides({
+      campaign: campaignConfig,
+      frequency: 'biweekly',
+      serviceType: 'str_turnover',
+      claimedCampaignCode: 'SPARKLE100',
+    }),
+  );
+  assert.equal(str.discount, null, 'specialty services are not eligible');
+});
+
+test('the campaign can never push a quote below the minimum job', () => {
+  const small = evaluatePromotions(
+    overrides({ campaign: campaignConfig, frequency: 'biweekly', gross: 180, claimedCampaignCode: 'SPARKLE100' }),
+  );
+  assert.equal(small.discount?.amount, 55, 'the $125 minimum leaves only $55 of headroom');
+
+  const tiny = evaluatePromotions(
+    overrides({ campaign: campaignConfig, frequency: 'biweekly', gross: 125, claimedCampaignCode: 'SPARKLE100' }),
+  );
+  assert.equal(tiny.discount, null, 'no headroom above the minimum — no discount');
+});
+
+test('the campaign never stacks — it competes under the single-promotion policy', () => {
+  const evaluation = evaluatePromotions(
+    overrides({
+      campaign: campaignConfig,
+      frequency: 'biweekly',
+      gross: 300,
+      claimedCampaignCode: 'SPARKLE100',
+      addonBundles: [{ ...kitchenBundle, value: 0.5, maxDiscountUsd: null }], // 50% of $50 = $25
+    }),
+  );
+  assert.equal(evaluation.discount?.id, 'SPARKLE100', 'the larger discount wins, never both');
+  assert.equal(evaluation.discount?.amount, 100);
+});
+
+test('an expired campaign fails closed', () => {
+  const expired = evaluatePromotions(
+    overrides({
+      campaign: { ...campaignConfig, expiresOn: '2026-09-01' },
+      frequency: 'biweekly',
+      claimedCampaignCode: 'SPARKLE100',
+    }),
+  );
+  assert.equal(expired.discount, null);
+});
+
+test('a disabled campaign fails closed even with a valid claim', () => {
+  const disabled = evaluatePromotions(
+    overrides({
+      campaign: { ...campaignConfig, enabled: false },
+      frequency: 'biweekly',
+      claimedCampaignCode: 'SPARKLE100',
+    }),
+  );
+  assert.equal(disabled.discount, null);
+});
+
+test('client and server reproduce the same campaign discount from the claimed code', () => {
+  const context: EstimateContext = {
+    travel: {
+      includedOneWayMiles: 15,
+      mpg: 24,
+      wearPerMile: 0.12,
+      referenceGasPrice: 3.1,
+      zoneAdjustments: { core: 0, surrounding: 15 },
+      maxInstantDistanceMiles: 45,
+    },
+    promotions: { claimedCampaignCode: 'SPARKLE100' },
+  };
+  const reservationInput = {
+    serviceType: 'standard',
+    propertyType: 'house',
+    squareFeet: 1600,
+    bedrooms: 3,
+    fullBaths: 2,
+    halfBaths: 0,
+    frequency: 'biweekly',
+    condition: 'maintained',
+    lastClean: 'within_month',
+    addonIds: [],
+    zip: '32503',
+    pets: 'none',
+  };
+  const client = calculateEstimate(reservationInput, context);
+  const server = calculateEstimate(
+    mapReservationFields({
+      service_type: 'standard',
+      property_type: 'house',
+      square_feet: '1600',
+      bedrooms: '3',
+      full_baths: '2',
+      half_baths: '0',
+      frequency: 'biweekly',
+      condition: 'maintained',
+      last_cleaned: 'within_month',
+      addon_ids: '',
+      zip: '32503',
+      promotion_code: 'sparkle100',
+    }),
+    context,
+  );
+  assert.equal(client.pricing.discount?.id, 'SPARKLE100');
+  assert.deepEqual(server.pricing.discount, client.pricing.discount);
+  assert.equal(server.pricing.subtotal, client.pricing.subtotal);
+});
+
+test('an unclaimed server submission produces no campaign discount', () => {
+  const context: EstimateContext = {
+    travel: {
+      includedOneWayMiles: 15,
+      mpg: 24,
+      wearPerMile: 0.12,
+      referenceGasPrice: 3.1,
+      zoneAdjustments: { core: 0, surrounding: 15 },
+      maxInstantDistanceMiles: 45,
+    },
+  };
+  const server = calculateEstimate(
+    mapReservationFields({
+      service_type: 'standard',
+      property_type: 'house',
+      square_feet: '1600',
+      bedrooms: '3',
+      full_baths: '2',
+      half_baths: '0',
+      frequency: 'biweekly',
+      condition: 'maintained',
+      last_cleaned: 'within_month',
+      addon_ids: '',
+      zip: '32503',
+    }),
+    context,
+  );
+  assert.equal(server.pricing.discount, null, 'no promotion_code field — no discount');
 });
 
 // ── Frontend / server consistency ────────────────────────────────────────────

@@ -126,12 +126,12 @@ test('the circular brand mark carries the full identity and links home', async (
   }
 });
 
-test('Types of Cleanings exposes the five approved cleaning categories', async () => {
+test('Types of Cleanings exposes the six approved cleaning categories', async () => {
   const { context, page } = await open('/', 1280, 900);
   try {
     await page.locator('.nav-dropdown__trigger').click();
     const links = page.locator('.nav-dropdown__menu a');
-    assert.equal(await links.count(), 5, 'five cleaning categories');
+    assert.equal(await links.count(), 6, 'six cleaning categories');
     const labels = await links.allTextContents();
     assert.deepEqual(
       labels.map((label) => label.trim()),
@@ -139,6 +139,7 @@ test('Types of Cleanings exposes the five approved cleaning categories', async (
         'Recurring Residential Cleaning',
         'Deep Cleaning',
         'Move-in and Move-out Cleaning',
+        'Supportive Home Cleaning',
         'Short-term Rental Turnover Cleaning',
         'Commercial Cleaning',
       ],

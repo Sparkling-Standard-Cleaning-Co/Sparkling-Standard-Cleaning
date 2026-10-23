@@ -443,7 +443,7 @@ test('reservation summary carries every answer and the call/text actions work', 
     assert.equal(fields.request_type, 'reservation_request');
     assert.equal(fields.quoted_price, '305');
     assert.match(fields.quote_reference, /^SS-\d{8}-[0-9A-Z]{6}$/);
-    assert.equal(fields.quote_config_version, '2026-10-21.billing-target.v1');
+    assert.equal(fields.quote_config_version, '2026-10-21.sparkle100.v1');
     assert.equal(fields.service_address, '100 S Baylen');
     assert.equal(fields.address_unit, '');
     assert.equal(fields.address_confirmed, 'yes');

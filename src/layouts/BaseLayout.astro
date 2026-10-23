@@ -5,6 +5,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import MobileActionBar from '../components/MobileActionBar.astro';
 import ConsentBanner from '../components/ConsentBanner.astro';
+import PromoPopup from '../components/PromoPopup.astro';
 
 interface Props {
   title: string;
@@ -30,6 +31,7 @@ const { title, description, noindex = false, schema = [] } = Astro.props;
     <Footer />
     <MobileActionBar />
     <ConsentBanner />
+    <PromoPopup />
     <script>
       import '../scripts/consent-controller';
       import '../scripts/analytics-clicks';

@@ -4,9 +4,12 @@ import { brandWords } from '../config/brand';
 import { footerServicesNav, footerCompanyNav } from '../lib/site';
 import Logo from './Logo.astro';
 import SocialLinks from './SocialLinks.astro';
+import GoogleG from './GoogleG.astro';
 
 const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const year = new Date().getFullYear();
+const reviewReadUrl = isPending(business.reviews.profileUrl) ? null : business.reviews.profileUrl;
+const reviewLeaveUrl = isPending(business.reviews.submissionUrl) ? null : business.reviews.submissionUrl;
 
 const socialEntries = Object.values(business.socials).filter(
   (url) => typeof url === 'string' && url.length > 0 && !isPending(url),
@@ -45,6 +48,50 @@ const socialEntries = Object.values(business.socials).filter(
           <ul>
             {footerCompanyNav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
           </ul>
+        </div>
+
+        <div>
+          <h3>Reviews</h3>
+          {
+            (reviewReadUrl || reviewLeaveUrl) && (
+              <div class="site-footer__reviews-card">
+                <GoogleG size={22} />
+                <ul>
+                  {reviewReadUrl && (
+                    <li>
+                      <a
+                        href={reviewReadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Read our reviews on Google (opens in a new tab)"
+                        data-review-link="google"
+                        data-cta="footer-reviews-read"
+                      >
+                        Read Our Google Reviews
+                      </a>
+                    </li>
+                  )}
+                  {reviewLeaveUrl && (
+                    <li>
+                      <a
+                        href={reviewLeaveUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Leave us a review on Google (opens in a new tab)"
+                        data-review-link="google"
+                        data-cta="footer-reviews-leave"
+                      >
+                        Leave Us a Review
+                      </a>
+                    </li>
+                  )}
+                </ul>
+                <p class="small site-footer__reviews-note">
+                  Honest reviews from real customers help neighbors find a cleaner they can trust.
+                </p>
+              </div>
+            )
+          }
         </div>
       </div>
 

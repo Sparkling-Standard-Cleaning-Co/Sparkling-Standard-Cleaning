@@ -236,7 +236,20 @@ export const pricing = {
     appreciationDiscounts: ownerPricing.promotions.appreciationDiscounts,
     addonBundles: ownerPricing.promotions.addonBundles,
     foundingTen: ownerPricing.promotions.foundingTen,
-    note: 'Prepared, unpublished promotion programs. Disabled with no terms until the owner approves exact written terms and the required configVersion bump.',
+    /**
+     * SPARKLE100 welcome campaign — the one owner-approved, ENABLED program
+     * (2026-10-21 directive). Claim-based: it applies only when the customer
+     * claims the code (popup CTA or a /estimate/?promo= link); the engine
+     * never grants it silently. Redemption eligibility (new customer, one
+     * per household) is confirmed personally by the owner at booking per
+     * docs/operations/RESERVATION-TRACKING.md. Retract by flipping
+     * ownerPricing.promotions.campaign.enabled to false.
+     */
+    campaign: approved(
+      ownerPricing.promotions.campaign,
+      'Owner-approved $100-off first-clean welcome campaign for new weekly/biweekly recurring residential customers (2026-10-21). Claim-only; redemption confirmed by the owner; never stacks with another promotion.',
+    ),
+    note: 'Prepared, unpublished promotion programs ship disabled with no terms until owner approval. The SPARKLE100 campaign is the single approved exception.',
   },
 
   // ── Instant-estimate boundaries (directive §27) ────────────────────────────
@@ -338,7 +351,7 @@ export const pricing = {
      * the server before a reservation is accepted. Bump when pricing logic,
      * rates or policy values change so old quotes cannot be silently reused.
      */
-    configVersion: approved('2026-10-21.billing-target.v1', 'Quote provenance marker. Incremented for the owner-approved $55 productive labor-hour billing target and policy changes.'),
+    configVersion: approved('2026-10-21.sparkle100.v1', 'Quote provenance marker. Incremented for the SPARKLE100 campaign (a price-affecting change) on top of the owner-approved $55 productive labor-hour billing target.'),
     /**
      * Which value from the calculation becomes the offered price. 'expected' is
      * the model price and never the lowest range value; 'midpoint' and 'high'

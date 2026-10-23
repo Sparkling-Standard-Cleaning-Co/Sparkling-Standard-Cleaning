@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { brandWords, printPalette } from '../../src/config/brand.ts';
+import { pricing } from '../../src/config/pricing.ts';
 
 const businessSource = fs.readFileSync('src/config/business.ts', 'utf8');
 const logoSource = fs.readFileSync('src/components/Logo.astro', 'utf8');
@@ -43,6 +44,21 @@ const serviceAreaShort = serviceAreaFull.replace(' within about an hour of Canto
 const hoursLiteral = 'Seven days a week · 7:00 a.m. – 7:00 p.m.';
 requireSource(`display: '${hoursLiteral}'`, 'hours.display');
 
+/**
+ * The SPARKLE100 promotion, taken from the same approved pricing config the
+ * website and server verification use — never a separately worded print offer.
+ * Print may only show the offer when the campaign is enabled in the config.
+ */
+const campaignConfig = pricing.promotions.campaign;
+if (campaignConfig.state !== 'approved' || !campaignConfig.value.enabled || campaignConfig.value.value === null) {
+  throw new Error('Print facts: the SPARKLE100 campaign is disabled in pricing.ts — print pieces must not display it.');
+}
+const campaign = campaignConfig.value;
+const campaignValue = campaign.value;
+const campaignTerms = campaign.popup.termsLine;
+const campaignHeadline = campaign.popup.offer;
+const campaignCode = campaign.code;
+
 /** Verified print facts. */
 export const FACTS = {
   displayName: 'Sparkling Standard',
@@ -60,8 +76,14 @@ export const FACTS = {
   serviceAreaFull,
   serviceAreaShort,
   hours: hoursLiteral,
+  campaign: {
+    code: campaignCode,
+    value: campaignValue,
+    headline: campaignHeadline,
+    terms: campaignTerms,
+  },
   services: [
-    'Recurring house cleaning',
+    'Recurring residential cleaning',
     'Deep cleaning',
     'Move-in / move-out',
     'Short-term rentals',
@@ -71,10 +93,10 @@ export const FACTS = {
 };
 
 const SERVICE_TITLE_MAP = {
-  'Recurring house cleaning': 'Recurring House Cleaning',
+  'Recurring residential cleaning': 'Recurring Residential Cleaning',
   'Deep cleaning': 'Deep Cleaning',
-  'Move-in / move-out': 'Move-In & Move-Out Cleaning',
-  'Short-term rentals': 'Short-Term Rental Turnover Cleaning',
+  'Move-in / move-out': 'Move-in and Move-out Cleaning',
+  'Short-term rentals': 'Short-term Rental Turnover Cleaning',
   'Commercial spaces': 'Commercial Cleaning',
   Churches: 'Church Cleaning',
 };
@@ -96,6 +118,17 @@ export function verifyFacts() {
   }
   if (serviceAreaShort.includes('about an hour')) {
     throw new Error('Print facts: short service-area form must not silently drop the qualifier incorrectly.');
+  }
+
+  if (campaign.code !== 'SPARKLE100' || campaignValue !== 100) {
+    throw new Error('Print facts: the campaign no longer matches the owner-approved SPARKLE100 terms.');
+  }
+  if (!campaignHeadline.includes('$100')) {
+    throw new Error('Print facts: campaign offer does not state the verified $100 value.');
+  }
+  const termsLower = campaignTerms.toLowerCase();
+  if (!termsLower.includes('recurring') || !termsLower.includes('household')) {
+    throw new Error('Print facts: campaign terms line is missing the verified eligibility wording.');
   }
 
   for (const [printed, sourceTitle] of Object.entries(SERVICE_TITLE_MAP)) {

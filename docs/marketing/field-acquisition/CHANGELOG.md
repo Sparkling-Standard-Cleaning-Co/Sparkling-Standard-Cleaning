@@ -1,5 +1,20 @@
 # Field acquisition changelog
 
+## Redesign release — slogan, SPARKLE100 quarter sheet, card redesign (2026-10-23)
+
+- New official slogan "Standards That Make Your Space Sparkle." flows into every piece from
+  `src/config/brand.ts`; poster headline typography retuned for the longer sentence.
+- Business cards redesigned (front: centered circular logo + slogan + contact rule; back:
+  founder note, concise service line, contacts with hours, one estimate CTA).
+- Quarter sheet redesigned for the door-knock campaign: headline "Your Home Deserves a
+  Sparkling Standard." plus the owner-approved SPARKLE100 offer panel with exact config copy
+  and the pre-claiming promotion QR (`quarter-sheet-sparkle100`, all three variants).
+- Service naming aligned with the renamed "Recurring Residential Cleaning" collection;
+  `print-facts.mjs` now verifies the campaign (enabled, $100, approved terms) at build time.
+- All 27 sides rebuilt and re-verified (boxes, crop marks, margins, QR decode, die clearance,
+  PII); 8 PPTX masters rebuilt and opened in PowerPoint; HQ print folder replaced in place
+  with legacy previews/boards/drafts archived under `99_ARCHIVE/Historical_Research/`.
+
 ## Stage 2 — physical suite productionization and canonical routes (2026-10-06, local branch `stage2/door-knocking-system`)
 
 Print

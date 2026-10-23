@@ -6,7 +6,7 @@ function lockup({ crestSize = '.34in', script = '.25in', caps = '.115in', descri
   return `<div class="b-lockup${center ? ' b-lockup--center' : ''}">${crest(crestSize)}
     <div>
       <div class="b-word"><span class="b-script" style="font-size:${script}">${F.script}</span><span class="b-caps" style="font-size:${caps}">${F.caps}</span></div>
-      <div class="b-descriptor" style="font-size:${descriptor}">${F.descriptor}</div>
+      ${F.descriptor ? `<div class="b-descriptor" style="font-size:${descriptor}">${F.descriptor}</div>` : ''}
     </div>
   </div>`;
 }
@@ -19,44 +19,46 @@ function item(text, size = '.1in') {
   return `<div class="b-item"><span class="b-check">${check(size)}</span><span style="font-size:${size}">${text}</span></div>`;
 }
 
-function qr(id, qrSize, capSize, caption = 'Scan me — your proposed price in about a minute') {
+function qr(id, qrSize, capSize, caption = 'Scan for your instant estimate') {
   return `<div class="b-qr" style="width:fit-content">
     <div class="b-qr-frame"><div style="width:${qrSize}">${readQr(id)}</div></div>
     <div class="b-qr-cap" style="font-size:${capSize};width:calc(${qrSize} + 0.2in)">${caption}</div>
   </div>`;
 }
 
+/** Directive §12A — the front is a beautiful presentation of the circular
+ *  logo: centered mark, the official slogan, and a grounded contact rule. */
 const cardFront = () => `
-<div style="position:absolute;inset:0;padding:.16in .18in;display:flex;flex-direction:column;align-items:center">
-  ${lockup({ center: true })}
-  <div style="display:flex;align-items:center;gap:.14in;margin-top:.13in;width:100%">
-    <div style="width:.6in;height:.6in;border-radius:50%;overflow:hidden;border:.014in solid var(--rose-300);flex:0 0 auto">
-      ${image(PHOTO, 'width:100%;height:100%;object-fit:cover;object-position:50% 18%;display:block')}
-    </div>
-    <div>
-      <div class="b-name" style="font-size:.3in">${F.founder}</div>
-      <div class="b-role" style="font-size:.068in">${F.role}</div>
-    </div>
+<div style="position:absolute;inset:0;padding:.18in .2in;display:flex;flex-direction:column;align-items:center;background:var(--cream-50)">
+  <div style="margin-top:auto;display:flex;flex-direction:column;align-items:center">
+    ${crest('0.92in')}
+    <div style="font-family:var(--font-display);font-style:italic;font-size:.072in;color:var(--taupe-600);margin-top:.11in">${F.tagline}</div>
   </div>
-  <div style="margin-top:auto;text-align:center;width:100%">
-    <div class="b-phone" style="font-size:.13in">${F.phone}</div>
-    <div class="b-small" style="font-size:.078in;margin-top:.03in">${F.email} · ${F.domain}</div>
+  <div style="margin-top:auto;width:100%">
+    <div style="height:.006in;background:var(--champagne-300);width:100%"></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:.09in;width:100%">
+      <div>
+        <div class="b-name" style="font-size:.135in">${F.founder}</div>
+        <div class="b-role" style="font-size:.058in">${F.role}</div>
+      </div>
+      <div class="b-phone" style="font-size:.135in">${F.phone}</div>
+    </div>
   </div>
 </div>`;
 
+/** Directive §12A back — clear contacts, concise services, one estimate CTA. */
 const cardBack = () => `
-<div style="position:absolute;inset:0;padding:.16in .18in;display:flex;flex-direction:column">
-  <div class="b-script" style="font-size:.24in;color:var(--rose-700)">A note from ${F.founder}</div>
-  <div class="b-body" style="font-size:.082in;margin-top:.03in">When your home needs a hand, I answer personally — and the details stay done.</div>
-  <div style="display:flex;gap:.16in;margin-top:.1in;flex:1;align-items:flex-end">
+<div style="position:absolute;inset:0;padding:.16in .18in;display:flex;flex-direction:column;background:var(--cream-50)">
+  <div class="b-script" style="font-size:.19in;color:var(--rose-700)">A note from ${F.founder}</div>
+  <div class="b-body" style="font-size:.075in;margin-top:.02in">Recurring residential cleaning with the details most cleaners skip.</div>
+  <div style="font-size:.06in;color:var(--taupe-600);margin-top:.07in;letter-spacing:.02in">${F.services.join(' · ')}</div>
+  <div style="margin-top:auto;display:flex;align-items:flex-end;gap:.12in">
     <div style="flex:1">
-      ${item('Weekly, biweekly or monthly', '.078in')}
-      ${item('The same careful standard', '.078in')}
-      ${item(`${F.founder} confirms every request`, '.078in')}
+      <div class="b-phone" style="font-size:.135in">${F.phone}</div>
+      <div class="b-small" style="font-size:.068in;margin-top:.025in">${F.email}</div>
+      <div class="b-small" style="font-size:.068in">${F.domain} · ${F.hours}</div>
     </div>
-    <div style="flex:.85;display:flex;justify-content:flex-end">
-      ${qr('business-card', '.85in', '.055in', 'Scan me')}
-    </div>
+    ${qr('business-card', '.85in', '.055in', 'Scan for your instant estimate')}
   </div>
 </div>`;
 
@@ -74,14 +76,14 @@ const doorHanger = () => `
   </div>
   <div style="flex:1;padding:.26in .25in .24in;display:flex;flex-direction:column">
     <div class="b-head" style="font-size:.3in">Let me take care of your home.</div>
-    <div class="b-body" style="font-size:.11in;margin-top:.12in">Recurring house cleaning in this neighborhood — with the details most cleaners skip.</div>
+    <div class="b-body" style="font-size:.11in;margin-top:.12in">Recurring residential cleaning in this neighborhood — with the details most cleaners skip.</div>
     <div style="margin-top:.18in">
       ${item('Weekly, biweekly or monthly plans', '.1in')}
       ${item('Honest estimates built from real labor hours', '.1in')}
       ${item(`Every request confirmed by ${F.founder}`, '.1in')}
     </div>
     <div style="margin-top:auto;display:flex;align-items:flex-end;justify-content:space-between">
-      ${qr('door-hanger', '1.35in', '.068in', 'Scan me')}
+      ${qr('door-hanger', '1.35in', '.068in', 'Scan for your instant estimate')}
       <div style="text-align:right">
         <div class="b-small" style="font-size:.075in">Call or text</div>
         <div class="b-phone" style="font-size:.185in;margin-top:.04in">${F.phone}</div>
@@ -91,24 +93,32 @@ const doorHanger = () => `
   </div>
 </div>`;
 
+/** Directive §12B — the door-knock quarter sheet: interest within seconds,
+ *  with the centrally approved SPARKLE100 offer and its promotion QR. */
 const quarterSheet = () => `
-<div style="position:absolute;inset:0;padding:.3in;display:flex;flex-direction:column;background:var(--cream-50)">
-  ${lockup({ crestSize: '.46in', script: '.34in', caps: '.155in', descriptor: '.08in' })}
-  <div class="b-script" style="font-size:.4in;color:var(--rose-700);margin-top:.2in">A note from ${F.founder}</div>
-  <div class="b-head" style="font-size:.38in;margin-top:.04in">A cleaner home. Less stress. More time.</div>
-  <div class="b-body" style="font-size:.115in;margin-top:.12in">Recurring house cleaning planned around your home — not a route clock. Every request is confirmed personally before anything is scheduled.</div>
-  <div style="margin-top:.18in">
-    ${item('Estimates built from real labor hours', '.105in')}
-    ${item('Weekly, biweekly or monthly — the details stay done', '.105in')}
-    ${item(`${F.founder} personally confirms every request`, '.105in')}
+<div style="position:absolute;inset:0;padding:.24in .26in .2in;display:flex;flex-direction:column;background:var(--cream-50)">
+  ${lockup({ crestSize: '.4in', script: '.3in', caps: '.135in' })}
+  <div class="b-script" style="font-size:.19in;color:var(--rose-700);margin-top:.12in">Hello from your neighborhood cleaner</div>
+  <div class="b-head" style="font-size:.28in;margin-top:.04in;line-height:1.06">Your Home Deserves a<br>Sparkling Standard.</div>
+  <div class="b-body" style="font-size:.09in;margin-top:.08in">Recurring residential cleaning planned around your home — not a route clock. Every request is confirmed personally by ${F.founder}.</div>
+  <div style="margin-top:.09in">
+    ${item('Weekly, biweekly or monthly — the details stay done', '.085in')}
+    ${item('Deep cleaning, move-in / move-out and more', '.085in')}
+    ${item('Owner-operated — the same careful standard every visit', '.085in')}
+  </div>
+  <div class="b-panel" style="margin-top:.12in;padding:.13in .15in">
+    <div style="font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:.052in;color:var(--champagne-700)">New-neighbor welcome offer</div>
+    <div class="b-head" style="font-size:.128in;margin-top:.04in;line-height:1.15">${F.campaign.headline}</div>
+    <div style="font-size:.054in;color:var(--ink-700);margin-top:.045in;line-height:1.4">${F.campaign.terms}</div>
+    <div style="display:inline-flex;align-items:center;margin-top:.055in;border:.008in dashed var(--champagne-500);border-radius:99px;padding:.028in .1in;font-weight:800;font-size:.065in;letter-spacing:.1em">Code: ${F.campaign.code}</div>
   </div>
   <div style="margin-top:auto;display:flex;align-items:flex-end;justify-content:space-between">
-    ${qr('quarter-sheet', '1.05in', '.062in', 'Scan me')}
+    ${qr('quarter-sheet-sparkle100', '.88in', '.06in', 'Scan to claim your $100')}
     <div style="text-align:right">
-      <div class="b-phone" style="font-size:.18in">${F.phone}</div>
-      <div class="b-small" style="font-size:.095in;margin-top:.05in">${F.email}</div>
-      <div class="b-small" style="font-size:.095in">${F.domain}</div>
-      <div class="b-small" style="font-size:.08in;margin-top:.05in;color:var(--taupe-600)">${F.hours}</div>
+      <div class="b-phone" style="font-size:.15in">${F.phone}</div>
+      <div class="b-small" style="font-size:.078in;margin-top:.03in">${F.email}</div>
+      <div class="b-small" style="font-size:.078in">${F.domain}</div>
+      <div class="b-small" style="font-size:.066in;margin-top:.03in;color:var(--taupe-600)">${F.hours}</div>
     </div>
   </div>
 </div>`;
@@ -117,7 +127,7 @@ const qrCard = () => `
 <div style="position:absolute;inset:0;padding:.3in;display:flex;flex-direction:column;align-items:center;background:var(--cream-50)">
   ${lockup({ crestSize: '.42in', script: '.31in', caps: '.14in', descriptor: '.075in', center: true })}
   <div class="b-script" style="font-size:.44in;color:var(--rose-700);margin-top:.26in">Let's get your price.</div>
-  <div style="margin-top:.24in">${qr('qr-estimate-card', '2in', '.075in', 'Scan me')}</div>
+  <div style="margin-top:.24in">${qr('qr-estimate-card', '2in', '.075in', 'Scan for your instant estimate')}</div>
   <div class="b-body" style="font-size:.11in;text-align:center;margin-top:.22in;max-width:2.9in">Answer a few questions about your home and see your proposed price instantly.</div>
   <div class="b-panel" style="margin-top:.24in;width:100%;text-align:center">
     <div style="font-size:.09in;color:var(--ink-700)">No obligation. ${F.founder} confirms every request personally before anything is scheduled.</div>
@@ -144,7 +154,7 @@ const poster = () => `
     <div style="flex:1.1;display:flex;flex-direction:column;justify-content:space-between">
       <div class="b-script" style="font-size:.6in;color:var(--rose-700)">Hello, neighbor.</div>
       <div class="b-head" style="font-size:.82in">${F.tagline}</div>
-      <div class="b-body" style="font-size:.24in;max-width:5.6in">Recurring house cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
+      <div class="b-body" style="font-size:.24in;max-width:5.6in">Recurring residential cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
       <div>
         ${item('Estimates built from real labor hours', '.2in')}
         ${item('The details most cleaners skip, every visit', '.2in')}
@@ -155,7 +165,7 @@ const poster = () => `
         <div style="font-size:.17in;color:var(--ink-700);margin-top:.08in">Recurring cleaning planned around your home — the details stay done.</div>
       </div>
       <div style="display:flex;align-items:center;gap:.5in">
-        ${qr('event-poster', '2.6in', '.13in', 'Scan me')}
+        ${qr('event-poster', '2.6in', '.13in', 'Scan for your instant estimate')}
         <div>
           <div class="b-phone" style="font-size:.36in">${F.phone}</div>
           <div class="b-small" style="font-size:.16in;margin-top:.08in">${F.domain}</div>
@@ -189,7 +199,7 @@ const foamBoard = () => `
     <div style="flex:1.15;display:flex;flex-direction:column;justify-content:space-between">
       <div class="b-script" style="font-size:1.35in;color:var(--rose-700);line-height:.95">Hello, neighbor.</div>
       <div class="b-head" style="font-size:1.8in">${F.tagline}</div>
-      <div class="b-body" style="font-size:.52in;max-width:13in">Recurring house cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
+      <div class="b-body" style="font-size:.52in;max-width:13in">Recurring residential cleaning in Pensacola and Cantonment — weekly, biweekly or monthly.</div>
       <div>
         ${item('Estimates built from real labor hours', '.44in')}
         ${item('The details most cleaners skip, every visit', '.44in')}
@@ -200,7 +210,7 @@ const foamBoard = () => `
         <div style="font-size:.4in;color:var(--ink-700);margin-top:.2in">Recurring cleaning planned around your home — the details stay done.</div>
       </div>
       <div style="display:flex;align-items:center;gap:1.1in">
-        ${qr('foam-board', '5.2in', '.3in', 'Scan me')}
+        ${qr('foam-board', '5.2in', '.3in', 'Scan for your instant estimate')}
         <div>
           <div class="b-phone" style="font-size:.8in">${F.phone}</div>
           <div class="b-small" style="font-size:.4in;margin-top:.2in">${F.email}</div>
@@ -222,7 +232,7 @@ const leaveBehind = () => `
   <div class="b-script" style="font-size:.4in;color:var(--rose-700);margin-top:.22in">Keep this note.</div>
   <div class="b-head" style="font-size:.4in;margin-top:.03in">Ways I can help your home.</div>
   <div style="margin-top:.16in">
-    ${item('Recurring house cleaning', '.105in')}
+    ${item('Recurring residential cleaning', '.105in')}
     ${item('Deep cleaning', '.105in')}
     ${item('Move-in / move-out', '.105in')}
     ${item('Short-term rentals', '.105in')}
@@ -233,7 +243,7 @@ const leaveBehind = () => `
     <div style="font-size:.105in;color:var(--ink-700);margin-top:.04in;line-height:1.4">Every request is confirmed personally, and the details stay done visit after visit.</div>
   </div>
   <div style="margin-top:auto;display:flex;align-items:flex-end;justify-content:space-between">
-    ${qr('community-leave-behind', '1.25in', '.06in', 'Scan me')}
+    ${qr('community-leave-behind', '1.25in', '.06in', 'Scan for your instant estimate')}
     <div style="text-align:right">
       <div class="b-phone" style="font-size:.18in">${F.phone}</div>
       <div class="b-small" style="font-size:.095in;margin-top:.05in">${F.email}</div>

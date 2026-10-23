@@ -14,7 +14,7 @@ owner's Grok-generated business-card concept is treated as inspiration, never as
   Cantonment, with select nearby service into Alabama (`business.ts` `serviceArea.summary`).
 - **Contact:** (850) 426-8479 (owner-corrected 2026-10-02), owner@sparkling-standard.com,
   sparkling-standard.com (`business.ts:98`; AGENTS.md owner-confirmed facts).
-- **Slogan:** "Leaving Your Space Sparkling." (`src/config/brand.ts`).
+- **Slogan:** "Standards That Make Your Space Sparkle." (`src/config/brand.ts`).
 - **Standard:** estimates built from real labor hours; a home that needs four and a half hours gets
   four and a half hours; later appointments use an arrival window rather than a rushed exact time
   (`src/content/site/about.md:18-24`).

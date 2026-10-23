@@ -15,7 +15,7 @@ export const brandWords = {
   caps: 'Standard',
   capsDisplay: 'STANDARD',
   descriptor: '',
-  tagline: 'Leaving Your Space Sparkling.',
+  tagline: 'Standards That Make Your Space Sparkle.',
 } as const;
 
 /** Exact token values used by the print system (verified against tokens.css). */

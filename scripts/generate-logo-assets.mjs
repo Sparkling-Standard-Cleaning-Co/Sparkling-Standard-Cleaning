@@ -107,7 +107,7 @@ h1 { margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 58px; line-h
     <div class="logo">${fullLogo()}</div>
     <div class="copy">
       <p class="eyebrow">Pensacola &amp; Cantonment</p>
-      <h1>Leaving Your Space Sparkling.</h1>
+      <h1>Standards That Make Your Space Sparkle.</h1>
       <p class="lead">Professional, owner-operated cleaning for Pensacola, Cantonment, and surrounding communities.</p>
       <div class="meta"><span>(850) 426-8479</span><span>sparkling-standard.com</span></div>
     </div>

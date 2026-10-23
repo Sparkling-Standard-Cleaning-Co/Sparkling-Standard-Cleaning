@@ -30,7 +30,7 @@ document evaluates the offer options and records what the system actually prints
 
 1. **Margin:** zero discount cost; every booked job is priced by the existing labor-hour model.
 2. **Positioning:** protects the premium standard the website sells; a discount card would contradict
-   "Leaving Your Space Sparkling."
+   "Standards That Make Your Space Sparkle."
 3. **Recurring adoption:** route availability and priority scheduling are structural — they reward
    the behavior the business wants (density, recurring visits) instead of a one-time price cut.
 4. **Compliance:** no promotion is approved; the shipped artwork therefore contains none. This keeps

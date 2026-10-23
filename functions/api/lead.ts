@@ -70,6 +70,7 @@ const SERVER_OWNED_KEYS = new Set([
   'extras_detail',
   'addon_incentive',
   'discount_amount',
+  'promotion_source',
   'rounding_adjustment',
   'proposed_total',
   'estimated_labor_hours',
@@ -270,6 +271,9 @@ export async function onRequestPost(context: {
         if (breakdown.discount) {
           clean.addon_incentive = breakdown.discount.label;
           clean.discount_amount = breakdown.discount.amount.toFixed(2);
+          if (breakdown.discount.source) {
+            clean.promotion_source = breakdown.discount.source;
+          }
         } else {
           clean.addon_incentive = 'None';
         }
