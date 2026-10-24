@@ -1,78 +1,81 @@
 ---
 import { business } from '../config/business';
+import PremiumIcon from './PremiumIcon.astro';
 
-// The owner's four-value trust banner (audit 2026-10-23). These four items and
-// their icons are owner-specified — do not substitute different headings,
-// icons or interpretations:
-//   Locally Owned          — house-with-heart mark
-//   Flexible Scheduling    — calendar with the numeral 7 (seven days a week)
-//   Christian Values       — a simple, tasteful cross
-//   Competitive Pricing    — four dollar signs, ONE filled and three outlined
-//                            (a one-of-four price scale)
-// The copy is short on purpose; the icons lead.
+// The owner's four-value trust banner. Headings and icons are owner-specified
+// (premium vector collection, 2026-10-24) — never substitute different
+// headings, icons or interpretations:
+//   Locally Owned          — premium tile artwork
+//   Flexible Scheduling    — premium tile artwork
+//   Christian Values       — premium cross tile + three KJV New Testament
+//                            excerpts (owner-supplied verbatim, 2026-10-24)
+//   Competitive Pricing    — WIDE premium tile: four dollar signs, ONE filled
+//                            and three outlined, with the owner's exact copy.
 
-interface TrustItem {
-  title: string;
-  text: string;
-  /** Inline SVG (24-unit grid; the pricing mark uses a wide 64-unit canvas). */
-  svg: string;
-  /** SVG viewBox when it is not the default 24×24. */
-  viewBox?: string;
-  /** Wide icon plate (the four-dollar pricing indicator). */
-  iconWide?: boolean;
+interface Verse {
+  quote: string;
+  reference: string;
 }
 
-interface Props {
-  items?: TrustItem[];
-}
-
-const defaultItems: TrustItem[] = [
+const CHRISTIAN_VALUES_VERSES: Verse[] = [
   {
-    title: 'Locally Owned',
-    text: `Proudly rooted in Pensacola — our customers are our neighbors.`,
-    svg: `<path d="M3 10.5 12 3l9 7.5V20a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 20v-9.5z"/><path fill="currentColor" stroke="none" d="M12 17.4c-2.7-2-4.1-3.5-4.1-5.3a2.2 2.2 0 0 1 4.1-1.1 2.2 2.2 0 0 1 4.1 1.1c0 1.8-1.4 3.3-4.1 5.3z"/>`,
+    quote: '…by love serve one another.',
+    reference: 'Galatians 5:13 (KJV, excerpt)',
   },
   {
-    title: 'Flexible Scheduling',
-    text: `Open ${business.hours.days.toLowerCase()} — a rhythm that fits around your life.`,
-    svg: `<path d="M5 4.5h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2zm-2 5h18M16 2.5v4M8 2.5v4"/><text x="12" y="17.6" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor" stroke="none" font-family="inherit">7</text>`,
+    quote: 'Thou shalt love thy neighbour as thyself.',
+    reference: 'Mark 12:31 (KJV)',
   },
   {
-    title: 'Christian Values',
-    text: `Honest work, real integrity, and treating every neighbor like we would want to be treated.`,
-    svg: `<path d="M12 3v18M6.8 8.4h10.4"/>`,
-  },
-  {
-    title: 'Competitive Pricing',
-    text: `Quality care at an easy price.`,
-    // Owner's exact concept: four dollar signs, ONE filled and THREE
-    // outlined — a one-of-four rating on the cost scale. Rendered as a wide
-    // horizontal treatment so each glyph reads clearly at card size.
-    iconWide: true,
-    viewBox: '0 0 64 24',
-    svg: `<text x="8" y="18.5" text-anchor="middle" font-size="19" font-weight="700" fill="currentColor" stroke="none" font-family="Georgia, serif">$</text><text x="24" y="18.5" text-anchor="middle" font-size="19" font-weight="700" fill="none" stroke="currentColor" stroke-width="1.4" font-family="Georgia, serif">$</text><text x="40" y="18.5" text-anchor="middle" font-size="19" font-weight="700" fill="none" stroke="currentColor" stroke-width="1.4" font-family="Georgia, serif">$</text><text x="56" y="18.5" text-anchor="middle" font-size="19" font-weight="700" fill="none" stroke="currentColor" stroke-width="1.4" font-family="Georgia, serif">$</text>`,
+    quote: 'And whatsoever ye do, do it heartily, as to the Lord…',
+    reference: 'Colossians 3:23 (KJV, excerpt)',
   },
 ];
-
-const { items = defaultItems } = Astro.props;
 ---
 
 <div class="trust-strip">
   <div class="container trust-strip__grid">
-    {
-      items.map((item) => (
-        <div class="trust-item">
-          <span
-            class:list={['trust-item__icon', item.iconWide && 'trust-item__icon--wide']}
-            aria-hidden="true"
-            set:html={`<svg viewBox="${item.viewBox ?? '0 0 24 24'}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">${item.svg}</svg>`}
-          />
-          <div>
-            <p class="trust-item__title">{item.title}</p>
-            <p class="trust-item__text">{item.text}</p>
-          </div>
-        </div>
-      ))
-    }
+    <div class="trust-item">
+      <PremiumIcon name="locally-owned" size={3} />
+      <div>
+        <p class="trust-item__title">Locally Owned</p>
+        <p class="trust-item__text">Proudly rooted in Pensacola — our customers are our neighbors.</p>
+      </div>
+    </div>
+
+    <div class="trust-item">
+      <PremiumIcon name="flexible-scheduling" size={3} />
+      <div>
+        <p class="trust-item__title">Flexible Scheduling</p>
+        <p class="trust-item__text">
+          Open {business.hours.days.toLowerCase()} — a rhythm that fits around your life.
+        </p>
+      </div>
+    </div>
+
+    <div class="trust-item">
+      <PremiumIcon name="christian-values" size={3} />
+      <div>
+        <p class="trust-item__title">Christian Values</p>
+        <ul class="trust-item__verses">
+          {
+            CHRISTIAN_VALUES_VERSES.map((verse) => (
+              <li>
+                <p class="trust-verse">“{verse.quote}”</p>
+                <p class="trust-verse__ref">{verse.reference}</p>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+
+    <div class="trust-item trust-item--pricing">
+      <PremiumIcon name="competitive-pricing" size={4.4} />
+      <div>
+        <p class="trust-item__title">Competitive Pricing</p>
+        <p class="trust-item__text">Quality service at an affordable price</p>
+      </div>
+    </div>
   </div>
 </div>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="christian values icon"><defs>
+ <linearGradient id="bg-christian-values" x1="0.1" y1="0" x2=".95" y2="1" gradientUnits="objectBoundingBox">
+  <stop offset="0" stop-color="#d28c9d"/><stop offset=".42" stop-color="#a34e6d"/><stop offset="1" stop-color="#692b47"/>
+ </linearGradient>
+ <linearGradient id="bgIvory-christian-values" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffdfa"/><stop offset=".52" stop-color="#fff3f3"/><stop offset="1" stop-color="#f3dbe0"/></linearGradient>
+ <linearGradient id="gold-christian-values" x1="0" y1="0" x2=".8" y2="1"><stop offset="0" stop-color="#fff2cb"/><stop offset=".43" stop-color="#efc28b"/><stop offset="1" stop-color="#ce9765"/></linearGradient>
+ <radialGradient id="light-christian-values" cx=".18" cy=".02" r=".96"><stop offset="0" stop-color="white" stop-opacity=".33"/><stop offset="1" stop-color="white" stop-opacity="0"/></radialGradient>
+ <filter id="drop-christian-values" x="-25%" y="-25%" width="150%" height="155%"><feDropShadow dx="0" dy="2.2" stdDeviation="2.6" flood-color="#53233a" flood-opacity=".16"/></filter>
+ </defs><rect x="4" y="4" width="120" height="120" rx="27" fill="url(#bgIvory-christian-values)" stroke="#e0b3a6" stroke-width="1.7"/><rect x="8.5" y="8.5" width="111" height="111" rx="24" fill="none" stroke="#fffaf6" stroke-width="2" opacity=".96"/><path d="M29 13 Q64 3 103 20" fill="none" stroke="white" stroke-width="3" opacity=".65"/>
+ <g stroke-linejoin="round" stroke-linecap="round">
+  <path d="M56 20 H73 V49 H99 V65 H73 V108 H56 V65 H30 V49 H56Z" fill="#8d425a" stroke="url(#gold-christian-values)" stroke-width="3.2" />
+  <path d="M63 30 V98" stroke="url(#gold-christian-values)" stroke-width="2.5" opacity=".47" />
+ </g></svg>

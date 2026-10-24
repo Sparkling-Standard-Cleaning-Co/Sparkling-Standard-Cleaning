@@ -9,28 +9,16 @@ import { glob } from 'astro/loaders';
 // they come from src/config/business.ts and src/config/pricing.ts.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Service icon slugs — the OWNER-SUPPLIED premium vector collection
+// (src/assets/icons/premium/, provided 2026-10-24). One slug per service;
+// rendered by PremiumIcon.astro. Never substitute stock icons for these.
 const iconEnum = z.enum([
-  'home',
-  'refresh',
-  'star',
-  'box',
-  'key',
-  'spray',
-  'open-box',
-  'beach',
-  'briefcase',
-  'church',
-  'leaf',
-  'shield',
-  'heart',
-  'clipboard',
-  'camera',
-  'clock',
-  'map-pin',
-  'users',
-  'card',
-  'droplet',
-  'paw',
+  'recurring-residential',
+  'deep-cleaning',
+  'move-in-move-out',
+  'short-term-rental',
+  'commercial-cleaning',
+  'church-cleaning',
 ]);
 
 // Service pages (src/content/services/*.md) — one owning page per query cluster.

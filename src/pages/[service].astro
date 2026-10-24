@@ -8,7 +8,7 @@ import ServiceCard from '../components/ServiceCard.astro';
 import CtaBand from '../components/CtaBand.astro';
 import CommercialForm from '../components/CommercialForm.astro';
 import StrForm from '../components/StrForm.astro';
-import Icon from '../components/Icon.astro';
+import PremiumIcon from '../components/PremiumIcon.astro';
 import { serviceNode, breadcrumbNode, faqNode } from '../lib/schema';
 
 export async function getStaticPaths() {
@@ -91,7 +91,7 @@ const schema = [
           </div>
         </div>
         <div class="card card--muted">
-          <span class="card__icon"><Icon name={data.icon} /></span>
+          <PremiumIcon name={data.icon} size={3.4} class="card__premium-icon" />
           <h2 class="card__title" style="margin-top: var(--space-3)">Who this is for</h2>
           <Checklist items={data.goodFor} />
         </div>
@@ -220,8 +220,7 @@ const schema = [
                 icon={service.data.icon}
               />
             ))}
-          </div>
-        </div>
+          </div>        </div>
       </section>
     )
   }

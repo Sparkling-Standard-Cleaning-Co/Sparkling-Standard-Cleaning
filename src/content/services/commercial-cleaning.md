@@ -5,7 +5,7 @@ metaDescription: Commercial cleaning for Pensacola-area offices, churches, salon
 summary: Recurring or one-time commercial cleaning for local businesses and facilities. Each service is professionally scoped to your space, with scheduling tailored to your operation’s needs.
 homepageParagraphs:
   - Recurring or one-time commercial cleaning for local businesses and facilities. Each service is professionally scoped to your space, with scheduling tailored to your operation’s needs.
-icon: briefcase
+icon: commercial-cleaning
 order: 6
 path: /commercial-cleaning/
 serviceType: Commercial cleaning

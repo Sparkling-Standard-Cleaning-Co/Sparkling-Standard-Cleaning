@@ -3,7 +3,7 @@ title: House Cleaning
 metaTitle: House Cleaning in Pensacola & Cantonment
 metaDescription: Thoughtful standard and one-time house cleaning for Pensacola, Cantonment and surrounding communities. Get an proposed cleaning price, then Sparkling Standard confirms your date.
 summary: A thorough standard clean for everyday homes — done at a pace where the small things get noticed instead of rushed past.
-icon: home
+icon: recurring-residential
 order: 1
 path: /house-cleaning/
 serviceType: House cleaning

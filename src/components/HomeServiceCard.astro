@@ -1,15 +1,16 @@
 ---
 import { Image } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
+import PremiumIcon from './PremiumIcon.astro';
+import type { PremiumIconName } from '../lib/premium-icons.ts';
 import Icon from './Icon.astro';
-import type { IconName } from '../lib/icons';
 
 interface Props {
   title: string;
   summary: string;
   paragraphs: string[];
   href: string;
-  icon: IconName;
+  icon: PremiumIconName;
   cta?: string;
   featured?: boolean;
   /** Representative interior photo (licensed stock — never claimed as our work). */
@@ -40,7 +41,8 @@ const copy = paragraphs.length > 0 ? paragraphs : [summary];
   class:list={[
     'card',
     'service-card',
-    image ? 'service-card--photo card--link' : 'service-card--row',
+    'card--link',
+    image ? 'service-card--photo' : 'service-card--row',
     featured && 'card--feature',
   ]}
 >
@@ -60,7 +62,7 @@ const copy = paragraphs.length > 0 ? paragraphs : [summary];
     )
   }
   <div class="service-card__head">
-    <span class="card__icon"><Icon name={icon} /></span>
+    <PremiumIcon name={icon} size={3.4} />
     <h3 class="card__title"><a href={href}>{title}</a></h3>
   </div>
   <div class="service-card__body">

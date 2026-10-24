@@ -5,7 +5,7 @@ metaDescription: Move-out and move-in cleaning for renters, homeowners, landlord
 summary: Give your home a fresh start with a thorough, top-to-bottom cleaning. Whether you’re moving into a new home or preparing to sell or rent your property, we’ll leave it sparkling clean, and ready for its next residents.
 homepageParagraphs:
   - Give your home a fresh start with a thorough, top-to-bottom cleaning. Whether you’re moving into a new home or preparing to sell or rent your property, we’ll leave it sparkling clean, and ready for its next residents.
-icon: open-box
+icon: move-in-move-out
 order: 4
 path: /move-in-move-out-cleaning/
 serviceType: Move-in move-out cleaning

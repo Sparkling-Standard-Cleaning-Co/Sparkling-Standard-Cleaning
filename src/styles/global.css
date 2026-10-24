@@ -1160,10 +1160,10 @@ li + li {
   padding: var(--space-6);
 }
 
-/* ── Trust strip — the owner's four-value banner (2026-10-23) ─────────────────
+/* ── Trust strip — the owner's four-value banner ─────────────────────────────
    Locally Owned · Flexible Scheduling · Christian Values · Competitive
-   Pricing. Rose-and-cream treatment with prominent custom icon marks; four
-   columns on wide screens, two on tablets, one on phones. */
+   Pricing, on the owner-supplied premium tiles. Two columns from tablet up:
+   the Christian Values card carries three KJV passages and needs the room. */
 .trust-strip {
   border-block: 1px solid var(--color-rose-200);
   background: linear-gradient(120deg, var(--color-rose-50), var(--color-cream-100));
@@ -1182,49 +1182,21 @@ li + li {
   }
 }
 
-@media (min-width: 64rem) {
-  .trust-strip__grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 .trust-item {
   display: flex;
   gap: var(--space-3);
   align-items: flex-start;
 }
 
-.trust-item__icon {
-  flex: none;
+/* The premium tile carries its own background; the wrapper adds nothing. */
+.trust-item .premium-icon {
   width: 3rem;
   height: 3rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  background: var(--color-white);
-  border: 1px solid var(--color-rose-200);
-  box-shadow: var(--shadow-sm);
-  color: var(--color-rose-600);
 }
 
-/* The four-dollar pricing indicator gets a WIDE plate so each glyph is
-   individually readable (owner direction, 2026-10-23 refinement). */
-.trust-item__icon--wide {
-  width: 4.1rem;
-  border-radius: var(--radius-pill);
-}
-
-.trust-item__icon svg {
-  width: 2rem;
-  height: 1.75rem;
-  display: block;
-}
-
-.trust-item__icon--wide svg {
-  width: 3.7rem;
-  height: 1.4rem;
-  color: var(--color-rose-700);
+.trust-item--pricing .premium-icon {
+  width: 4.4rem;
+  height: 2.2rem;
 }
 
 .trust-item__title {
@@ -1240,6 +1212,34 @@ li + li {
   color: var(--color-ink-700);
   margin: 0;
   line-height: 1.5;
+}
+
+/* ── Christian Values verses (owner-supplied KJV excerpts) ──────────────────
+   Each passage gets its own grouping with a visually secondary but legible
+   reference; generous line spacing, readable on mobile. */
+.trust-item__verses {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.trust-verse {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-ink-800);
+}
+
+.trust-verse__ref {
+  margin: 0.2rem 0 0;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--color-rose-700);
+  font-weight: var(--weight-semibold);
 }
 
 /* Anchored sections never hide under the sticky header (e.g. /#reviews and
@@ -1426,6 +1426,26 @@ div[id] {
   }
 }
 
+/* ── Premium icon tiles (owner-supplied collection, 2026-10-24) ──────────────
+   The tiles carry their own gradient backgrounds, inner strokes and drop
+   shadows — the wrapper only handles size and layout. NEVER add a second
+   colored background (chip/plate) around these tiles. */
+.premium-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+.premium-icon__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 /* ── Homepage photo service cards ───────────────────────────────────────────
    Services with an honest representative image render as photo cards in a
    two-column grid; text-only entries (no fitting image) keep the row card. */
@@ -1442,20 +1462,16 @@ div[id] {
   }
 }
 
-/* Owner direction (audit 2026-10-23): the service icons are a brighter
-   pink-and-white theme — a rose gradient chip with a warm-white glyph. */
-.service-card--photo .card__icon {
-  width: 3rem;
-  height: 3rem;
-  background: linear-gradient(135deg, var(--color-rose-500), var(--color-rose-700));
-  color: var(--color-cream-50);
-  border: none;
-  box-shadow: var(--shadow-sm);
+/* Owner direction (2026-10-24): the service icons are the owner-supplied
+   premium vector tiles — self-contained gradient artwork at a comfortable
+   3.4rem (54px). No CSS chip background (never nest tiles). */
+.service-card--photo .service-card__head .premium-icon {
+  width: 3.4rem;
+  height: 3.4rem;
 }
 
-.service-card--photo .card__icon svg {
-  width: 1.6rem;
-  height: 1.6rem;
+.service-card--photo .service-card__head .card__title {
+  margin: 0;
 }
 
 /* Centered services introduction (owner-directed). */

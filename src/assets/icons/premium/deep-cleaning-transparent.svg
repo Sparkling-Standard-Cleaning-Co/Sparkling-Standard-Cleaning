@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="deep cleaning icon"><defs>
+ <linearGradient id="bg-deep-cleaning" x1="0.1" y1="0" x2=".95" y2="1" gradientUnits="objectBoundingBox">
+  <stop offset="0" stop-color="#d28c9d"/><stop offset=".42" stop-color="#a34e6d"/><stop offset="1" stop-color="#692b47"/>
+ </linearGradient>
+ <linearGradient id="bgIvory-deep-cleaning" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffdfa"/><stop offset=".52" stop-color="#fff3f3"/><stop offset="1" stop-color="#f3dbe0"/></linearGradient>
+ <linearGradient id="gold-deep-cleaning" x1="0" y1="0" x2=".8" y2="1"><stop offset="0" stop-color="#fff2cb"/><stop offset=".43" stop-color="#efc28b"/><stop offset="1" stop-color="#ce9765"/></linearGradient>
+ <radialGradient id="light-deep-cleaning" cx=".18" cy=".02" r=".96"><stop offset="0" stop-color="white" stop-opacity=".33"/><stop offset="1" stop-color="white" stop-opacity="0"/></radialGradient>
+ <filter id="drop-deep-cleaning" x="-25%" y="-25%" width="150%" height="155%"><feDropShadow dx="0" dy="2.2" stdDeviation="2.6" flood-color="#53233a" flood-opacity=".16"/></filter>
+ </defs>
+ <g stroke-linecap="round" stroke-linejoin="round">
+   <path d="M26 88 H101" stroke="#d6a26f" stroke-width="4.5" opacity=".8"/>
+   <path d="M30 95 H94" stroke="#883e58" stroke-width="3" opacity=".45"/>
+   <path d="M47 37 H78 Q84 37 84 43 V50 Q84 53 79 53 H46 Q41 53 41 48 V44 Q41 37 47 37Z" fill="#883e58" stroke="#883e58" stroke-width="2"/>
+   <path d="M57 37 V26 Q57 20 64 20 Q72 20 72 27 V37" fill="none" stroke="#883e58" stroke-width="7"/>
+   <path d="M36 56 Q36 50 43 50 H85 Q92 50 92 56 V66 H36Z" fill="#d6a26f" stroke="#883e58" stroke-width="3" />
+   <path d="M38 67 H90" stroke="#883e58" stroke-width="5.5" />
+   <path d="M41 68 V79 M51 68 V81 M61 68 V82 M72 68 V81 M82 68 V79 M90 67 V78" stroke="#883e58" stroke-width="4.4" />
+   <path d="M96 28 L99 37 L108 40 L99 43 L96 52 L93 43 L84 40 L93 37Z" fill="#d6a26f" />
+   <path d="M29 31 L30.5 36 L35 37.5 L30.5 39 L29 44 L27.5 39 L23 37.5 L27.5 36Z" fill="#883e58" />
+   <circle cx="103" cy="65" r="3.4" fill="#883e58"/><circle cx="20" cy="65" r="2.6" fill="#d6a26f"/>
+   <path d="M38 103 Q62 108 89 103" stroke="#d6a26f" stroke-width="3" fill="none" opacity=".7" />
+ </g></svg>

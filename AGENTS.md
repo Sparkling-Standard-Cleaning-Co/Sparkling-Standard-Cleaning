@@ -355,14 +355,30 @@ collections are intentionally empty — not errors.
   ONE filled, three outlined) — in a rose-and-cream strip (`src/components/TrustChips.astro`).
   Both hero CTAs are equal-sized; Explore Services uses the inverse treatment (cream fill, rose
   lettering) and the script "Sparkling" sits centered on its own headline line. The services
-  section head is centered, and the five service icons are the vibrant pink-and-white theme with
-  owner-selected glyphs (deep cleaning = spray bottle, move-in/out = partially opened box,
-  STR = beach umbrella). The estimate CTA section and the service-area section are centered; the
-  service-area copy ends with "Not sure if you're within range?". The header logo renders at
+  section head is centered. The estimate CTA section and the service-area section are centered;
+  the service-area copy ends with "Not sure if you're within range?". The header logo renders at
   6rem (4.35rem on phones). Founder portrait label reads "Founder / Owner-Operator". Photo
   captions read "Project photos are added only with customer approval." Proposed prices round
   **DOWN** to the nearest $5 (owner-approved), and travel assumes a 35-mile round trip
   (17.5 one-way included). Quote `configVersion` is `2026-10-23.floor5-travel35.v1`.
+- **Premium icon collection (2026-10-24, owner-supplied artwork):** the six service icons
+  and four company-value icons are the owner's premium vector tiles
+  (`src/assets/icons/premium/`, rendered by `src/components/PremiumIcon.astro` with the
+  type registry in `src/lib/premium-icons.ts`). The tiles carry their own rose/ivory
+  gradients, drop shadows and gold accents — **never add a CSS chip/plate background
+  around them (no nested tiles) and never substitute stock or redrawn icons**. The
+  services content `icon` field holds the premium slugs (`recurring-residential`,
+  `deep-cleaning`, `move-in-move-out`, `short-term-rental`, `commercial-cleaning`,
+  `church-cleaning`). Competitive Pricing uses the WIDE recommended asset (four dollar
+  signs, ONE filled, three outlined) with the exact copy "Quality service at an
+  affordable price"; Christian Values carries the three owner-supplied KJV New Testament
+  excerpts (Galatians 5:13, Mark 12:31, Colossians 3:23 — shortened passages marked as
+  excerpts); Locally Owned and Flexible Scheduling keep their approved copy. The trust
+  banner is a 2-column grid from tablet up to give the verses room. Church Cleaning's
+  tile renders on the church page (no sixth homepage card). The estimator's Preferred
+  date helper reads exactly "Requests can be made up to 60 days in advance." (the
+  Hayli-confirmation sentence was removed by owner direction). Registry documentation:
+  `docs/design/PREMIUM-ICON-REGISTER.md`.
 - **Authentic reviews live (2026-10-23):** the homepage reviews section renders the two
   genuine Google reviews (Christina Sherwin, Richard Lionhart — owner-supplied verbatim, 5 stars
   each) as cards with the authentic star rating, plus a link to the verified Google reviews

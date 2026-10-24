@@ -1,0 +1,63 @@
+---
+// PremiumIcon — renders the OWNER-SUPPLIED premium vector icon collection
+// (Sparkling Standard Premium Icon Collection, provided 2026-10-24) as real
+// inline SVG artwork. The tiles carry their own rose/ivory gradient
+// backgrounds, drop shadows and gold accents — they are used verbatim and
+// never redrawn. Because the tiles are self-contained, the surrounding
+// component must NOT add a second colored background (no gradient chip
+// inside a gradient tile).
+//
+// Source assets: src/assets/icons/premium/*.svg (real SVG files, the
+// authoritative copies). This component is the ONE icon registry for the
+// premium collection — do not add parallel registries or approximate the
+// artwork with stock icons.
+
+import locallyOwned from '../assets/icons/premium/locally-owned.svg?raw';
+import flexibleScheduling from '../assets/icons/premium/flexible-scheduling.svg?raw';
+import christianValues from '../assets/icons/premium/christian-values.svg?raw';
+import competitivePricingWide from '../assets/icons/premium/competitive-pricing-WIDE-RECOMMENDED.svg?raw';
+import recurringResidential from '../assets/icons/premium/recurring-residential.svg?raw';
+import deepCleaning from '../assets/icons/premium/deep-cleaning.svg?raw';
+import moveInOut from '../assets/icons/premium/move-in-move-out.svg?raw';
+import shortTermRental from '../assets/icons/premium/short-term-rental.svg?raw';
+import commercialCleaning from '../assets/icons/premium/commercial-cleaning.svg?raw';
+import churchCleaning from '../assets/icons/premium/church-cleaning.svg?raw';
+import type { PremiumIconName } from '../lib/premium-icons.ts';
+
+const ART: Record<PremiumIconName, { svg: string }> = {
+  'locally-owned': { svg: locallyOwned },
+  'flexible-scheduling': { svg: flexibleScheduling },
+  'christian-values': { svg: christianValues },
+  // The owner-recommended WIDE treatment keeps all four dollar signs
+  // individually readable at card size.
+  'competitive-pricing': { svg: competitivePricingWide },
+  'recurring-residential': { svg: recurringResidential },
+  'deep-cleaning': { svg: deepCleaning },
+  'move-in-move-out': { svg: moveInOut },
+  'short-term-rental': { svg: shortTermRental },
+  'commercial-cleaning': { svg: commercialCleaning },
+  'church-cleaning': { svg: churchCleaning },
+};
+
+interface Props {
+  name: PremiumIconName;
+  /** Rendered width in CSS rem. The tile's aspect ratio is preserved. */
+  size?: number;
+  /** Extra classes for the wrapper. */
+  class?: string;
+  /** Accessible label; omit when a neighboring heading already names it. */
+  label?: string;
+}
+
+const { name, size = 3, class: className = '', label } = Astro.props;
+const art = ART[name];
+const wide = name === 'competitive-pricing';
+const hiddenAttr = label ? '' : ' aria-hidden="true"';
+const roleAttr = label ? ` role="img" aria-label="${label}"` : '';
+---
+
+<span
+  class:list={['premium-icon', wide && 'premium-icon--wide', className]}
+  style={`width:${size}rem;height:${wide ? size / 2 : size}rem`}
+  set:html={art.svg.replace('<svg ', `<svg class="premium-icon__svg" focusable="false"${roleAttr}${hiddenAttr} `)}
+/>

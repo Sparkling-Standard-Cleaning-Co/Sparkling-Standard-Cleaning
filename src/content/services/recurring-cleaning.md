@@ -5,7 +5,7 @@ metaDescription: Recurring weekly, biweekly, and monthly residential cleaning fo
 summary: A consistent, scheduled cleaning that keeps your home maintained, tidy, and sparkling. Choose a weekly, biweekly, or monthly schedule to keep your home looking its best.
 homepageParagraphs:
   - A consistent, scheduled cleaning that keeps your home maintained, tidy, and sparkling. Choose a weekly, biweekly, or monthly schedule to keep your home looking its best.
-icon: refresh
+icon: recurring-residential
 order: 1
 path: /recurring-cleaning/
 serviceType: Recurring residential cleaning

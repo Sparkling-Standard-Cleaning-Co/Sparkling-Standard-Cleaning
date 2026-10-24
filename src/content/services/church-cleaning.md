@@ -3,7 +3,7 @@ title: Church Cleaning
 metaTitle: Church Cleaning in Pensacola | Serving Faith Facilities
 metaDescription: Church cleaning for Pensacola-area congregations — sanctuaries, fellowship halls, nurseries, restrooms and offices, scheduled around services and church life.
 summary: Careful cleaning for church facilities — sanctuaries and fellowship halls treated with the respect the space deserves, scheduled around services and events.
-icon: church
+icon: church-cleaning
 order: 7
 path: /church-cleaning/
 serviceType: Church cleaning

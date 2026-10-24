@@ -1,12 +1,13 @@
 ---
+import PremiumIcon from './PremiumIcon.astro';
+import type { PremiumIconName } from '../lib/premium-icons.ts';
 import Icon from './Icon.astro';
-import type { IconName } from '../lib/icons';
 
 interface Props {
   title: string;
   summary: string;
   href: string;
-  icon: IconName;
+  icon: PremiumIconName;
   cta?: string;
   featured?: boolean;
 }
@@ -15,7 +16,7 @@ const { title, summary, href, icon, cta = 'Learn more', featured = false } = Ast
 ---
 
 <article class:list={['card', 'card--link', 'service-card', featured && 'card--feature']}>
-  <span class="card__icon"><Icon name={icon} /></span>
+  <PremiumIcon name={icon} size={3} />
   <h3 class="card__title"><a href={href}>{title}</a></h3>
   <p class="card__text">{summary}</p>
   <a class="card__more" href={href}>{cta} <Icon name="arrow-right" size={16} /></a>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="recurring residential icon"><defs>
+ <linearGradient id="bg-recurring-residential" x1="0.1" y1="0" x2=".95" y2="1" gradientUnits="objectBoundingBox">
+  <stop offset="0" stop-color="#d28c9d"/><stop offset=".42" stop-color="#a34e6d"/><stop offset="1" stop-color="#692b47"/>
+ </linearGradient>
+ <linearGradient id="bgIvory-recurring-residential" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffdfa"/><stop offset=".52" stop-color="#fff3f3"/><stop offset="1" stop-color="#f3dbe0"/></linearGradient>
+ <linearGradient id="gold-recurring-residential" x1="0" y1="0" x2=".8" y2="1"><stop offset="0" stop-color="#fff2cb"/><stop offset=".43" stop-color="#efc28b"/><stop offset="1" stop-color="#ce9765"/></linearGradient>
+ <radialGradient id="light-recurring-residential" cx=".18" cy=".02" r=".96"><stop offset="0" stop-color="white" stop-opacity=".33"/><stop offset="1" stop-color="white" stop-opacity="0"/></radialGradient>
+ <filter id="drop-recurring-residential" x="-25%" y="-25%" width="150%" height="155%"><feDropShadow dx="0" dy="2.2" stdDeviation="2.6" flood-color="#53233a" flood-opacity=".16"/></filter>
+ </defs>
+ <g stroke="#883e58" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M29 59 L64 29 L99 59" fill="none" stroke-width="7.6"/>
+   <path d="M40 57 V94 Q40 99 45 99 H85 Q90 99 90 94 V57" fill="none" stroke-width="6.8"/>
+   <path d="M57 99 V72 H72 V99" fill="none" stroke-width="5.5"/>
+   <path d="M30 87 Q21 73 29 59" fill="none" stroke="#d6a26f" stroke-width="5"/>
+   <path d="M25 69 L28 56 L40 60" fill="none" stroke="#d6a26f" stroke-width="4.8"/>
+   <path d="M97 43 Q109 58 99 75" fill="none" stroke="#d6a26f" stroke-width="5"/>
+   <path d="M107 67 L99 79 L89 70" fill="none" stroke="#d6a26f" stroke-width="4.8"/>
+   <path d="M87 23 L89.7 30.5 L97 33 L89.7 35.5 L87 43 L84.3 35.5 L77 33 L84.3 30.5 Z" fill="#d6a26f" stroke="none" />
+ </g></svg>
