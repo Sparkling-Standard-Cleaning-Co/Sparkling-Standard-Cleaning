@@ -36,6 +36,8 @@ interface Env {
 const DEFAULT_MAX_BYTES = 8 * 1024 * 1024;
 /** Hard cap regardless of the env override — one photo never exceeds this. */
 const ABSOLUTE_MAX_BYTES = 12 * 1024 * 1024;
+/** Whole-request ceiling across all files (Sparkling Standard 4.0 §2 hardening). */
+const MAX_TOTAL_BYTES = 32 * 1024 * 1024;
 const MAX_PER_REQUEST = 12;
 const WINDOW_MS = 60_000;
 const PER_IP_PER_MINUTE = 10;
@@ -65,24 +67,28 @@ function throttled(request: Request): boolean {
   return entry.count > PER_IP_PER_MINUTE;
 }
 
-/** Accepted photo formats with their magic-byte signatures and MIME types. */
-const PHOTO_FORMATS = [
-  { mime: 'image/jpeg', ext: 'jpg', magic: [0xff, 0xd8, 0xff] },
-  { mime: 'image/png', ext: 'png', magic: [0x89, 0x50, 0x4e, 0x47] },
-  { mime: 'image/webp', ext: 'webp', magic: [0x52, 0x49, 0x46, 0x46] },
-  { mime: 'image/heic', ext: 'heic', magic: [0x00, 0x00, 0x00, 0x18] },
-  { mime: 'image/heic', ext: 'heic', magic: [0x00, 0x00, 0x00, 0x24] },
-] as const;
-
-function sniffFormat(head: Uint8Array): { mime: string; ext: string } | null {
-  for (const format of PHOTO_FORMATS) {
-    if (format.magic.every((byte, index) => head[index] === byte)) {
-      // RIFF is also AVI/WAV; WebP requires the "WEBP" tag at offset 8.
-      if (format.mime === 'image/webp') {
-        const tag = String.fromCharCode(...head.slice(8, 12));
-        if (tag !== 'WEBP') continue;
-      }
-      return { mime: format.mime, ext: format.ext };
+/** Accepted photo formats, identified by magic bytes (never by extension or
+ *  client-provided MIME type alone). */
+export function sniffPhotoFormat(head: Uint8Array): { mime: string; ext: string } | null {
+  if (head.length < 12) return null;
+  // JPEG
+  if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return { mime: 'image/jpeg', ext: 'jpg' };
+  // PNG
+  if (head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) {
+    return { mime: 'image/png', ext: 'png' };
+  }
+  // RIFF....WEBP
+  const riff = String.fromCharCode(head[0] as number, head[1] as number, head[2] as number, head[3] as number);
+  const webp = String.fromCharCode(head[8] as number, head[9] as number, head[10] as number, head[11] as number);
+  if (riff === 'RIFF' && webp === 'WEBP') return { mime: 'image/webp', ext: 'webp' };
+  // ISO Base Media (HEIC/HEIF): bytes 4–7 must be "ftyp" and the brand at
+  // bytes 8–11 must be a HEIF-family brand. This rejects MP4-family files
+  // that merely share a 4-byte box-size prefix (the Rev1 check was too loose).
+  const ftyp = String.fromCharCode(head[4] as number, head[5] as number, head[6] as number, head[7] as number);
+  if (ftyp === 'ftyp') {
+    const brand = String.fromCharCode(head[8] as number, head[9] as number, head[10] as number, head[11] as number);
+    if (['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1'].includes(brand)) {
+      return { mime: 'image/heic', ext: 'heic' };
     }
   }
   return null;
@@ -153,21 +159,41 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
   const month = new Date().toISOString().slice(0, 7).replace('-', '/');
   const results: Array<{ key: string; category: string; bytes: number }> = [];
+  let totalBytes = 0;
 
   for (const file of files) {
     if (file.size > maxBytes) return json({ ok: false, error: 'file_too_large' }, 413);
     const buffer = await file.arrayBuffer();
     if (buffer.byteLength > maxBytes) return json({ ok: false, error: 'file_too_large' }, 413);
+    totalBytes += buffer.byteLength;
+    if (totalBytes > MAX_TOTAL_BYTES) return json({ ok: false, error: 'request_too_large' }, 413);
     if (buffer.byteLength < 16) return json({ ok: false, error: 'unsupported_format' }, 415);
 
     const head = new Uint8Array(buffer.slice(0, 16));
-    const format = sniffFormat(head);
+    const format = sniffPhotoFormat(head);
     if (!format) return json({ ok: false, error: 'unsupported_format' }, 415);
 
     const key = `leads/${month}/${requestRef}/${category}-${randomKey()}.${format.ext}`;
     try {
       await bucket.put(key, buffer, {
         httpMetadata: { contentType: format.mime },
+      });
+      // Private metadata sidecar: preserves the ORIGINAL filename and upload
+      // facts without altering the original photo bytes (owner decision:
+      // metadata preservation). The sidecar is never served as an image.
+      const safeName = file.name.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 200);
+      const meta = new TextEncoder().encode(
+        JSON.stringify({
+          originalName: safeName,
+          bytes: buffer.byteLength,
+          mime: format.mime,
+          category,
+          requestRef,
+          uploadedAt: new Date().toISOString(),
+        }),
+      );
+      await bucket.put(`${key}.meta.json`, meta, {
+        httpMetadata: { contentType: 'application/json' },
       });
     } catch {
       return json({ ok: false, error: 'storage_failed' }, 500);
