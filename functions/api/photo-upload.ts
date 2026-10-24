@@ -192,7 +192,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           uploadedAt: new Date().toISOString(),
         }),
       );
-      await bucket.put(`${key}.meta.json`, meta, {
+      await bucket.put(`${key}.meta.json`, meta.buffer as ArrayBuffer, {
         httpMetadata: { contentType: 'application/json' },
       });
     } catch {
