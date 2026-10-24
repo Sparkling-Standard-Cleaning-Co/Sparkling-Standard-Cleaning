@@ -170,9 +170,10 @@ const proof = defineCollection({
     }),
 });
 
-// Customer reviews — genuine owner-supplied reviews only. The two Google
-// reviews were supplied verbatim by the owner on 2026-10-23. Never fabricate
-// (directive §56, §77).
+// Customer reviews — genuine owner-supplied reviews only. The Google reviews
+// were supplied verbatim by the owner (two on 2026-10-23, Laura on
+// 2026-10-24); public attributions are first names only. Never fabricate
+// ratings, reviews or star counts (directive §56, §77).
 const reviews = defineCollection({
   loader: glob({ pattern: '*.md', base: './src/content/reviews' }),
   schema: z.object({

@@ -8,9 +8,11 @@ Last reviewed: **2026-10-24** (Sparkling Standard 4.0 stabilization pass; releas
 to the actually deployed commit).
 
 **Release status:** production serves GitHub `main`. At the last verified deployment `origin/main`
-was **`412ade9`** (Smart Estimate System 2.0: two-price recurring quotes, service-driven estimator,
-approximate ZIP-area address fallback, STR turnover context, disabled commercial tiers, disabled R2
-photo intake, House Cleaning removed as a standing offering). Earlier release notes below are
+was **`412ade9`** (Smart Estimate System 2.0); the **Initiative 5.0 search-visibility release
+(2026-10-24)** followed it with the three-review premium carousel (first-name-only attributions,
+Laura added verbatim), homepage/service metadata improvements, contextual internal links, the
+robots/noindex validator fix and the search-visibility audit — see `git log -1` for the exact
+deployed SHA. Earlier release notes below are
 historical: the 2026-10-03 set was `62a1a46` (the five-commit release `8b8dde4`…`5a4a024`, the
 documentation closeout `7a51efa`, the six-profile social integration `cdc4971`, the
 deployment-closeout `6ebc3fb` and the logo-only Follow Us redesign `62a1a46`). Every later

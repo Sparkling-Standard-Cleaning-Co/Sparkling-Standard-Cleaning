@@ -3439,6 +3439,177 @@ fieldset.input--invalid {
   margin-bottom: var(--space-3);
 }
 
+/* Layered "3D" review carousel (Initiative 5.0 §8.4).
+   No-JS: every review is a readable stacked card. With JS: one prominent
+   center card with two recessed-but-readable neighbours, no autoplay. */
+.review-carousel__stage {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.review-carousel__controls {
+  display: none;
+}
+
+.review-carousel__quote {
+  white-space: pre-line;
+}
+
+.review-carousel[data-enhanced='true'] .review-carousel__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  container-type: inline-size;
+  perspective: 1600px;
+  perspective-origin: 50% 40%;
+  padding-block: var(--space-4);
+}
+
+.review-carousel[data-enhanced='true'] .review-carousel__card {
+  grid-area: 1 / 1;
+  width: 42%;
+  margin: 0;
+  transform: translateX(0) translateZ(0) rotateY(0deg) scale(1);
+  transition:
+    transform 0.55s cubic-bezier(0.22, 0.75, 0.25, 1),
+    opacity 0.45s ease,
+    box-shadow 0.55s ease;
+  z-index: 3;
+  opacity: 1;
+  will-change: transform;
+}
+
+/* Neighbours are wider than a "peek": enough of each review stays readable
+   (proportions keep roughly a fifth hidden behind the front card), with no
+   blur and no reduced type size. */
+.review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'],
+.review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
+  width: 38%;
+  z-index: 2;
+  opacity: 0.96;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+}
+
+.review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'] {
+  transform: translateX(-31cqw) translateY(8px) translateZ(-90px) rotateY(6deg) scale(0.95);
+}
+
+.review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
+  transform: translateX(31cqw) translateY(8px) translateZ(-90px) rotateY(-6deg) scale(0.95);
+}
+
+/* Reviews beyond the immediate neighbours are hidden behind the front pair.
+   They remain reachable through the controls (and fully visible without JS). */
+.review-carousel[data-enhanced='true'] .review-carousel__card:not([data-offset='-1']):not([data-offset='0']):not([data-offset='1']) {
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(0) translateZ(-260px) scale(0.6);
+}
+
+.review-carousel[data-enhanced='true'] .review-carousel__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.review-carousel__arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-rose-700);
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.review-carousel__arrow:hover {
+  background: var(--color-surface-warm);
+  border-color: var(--color-accent);
+}
+
+.review-carousel__arrow:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.review-carousel__arrow-icon--prev {
+  transform: rotate(180deg);
+}
+
+.review-carousel__dots {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.review-carousel__dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.review-carousel__dot[aria-pressed='true'] {
+  background: var(--color-rose-700);
+  transform: scale(1.25);
+}
+
+.review-carousel__dot:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+/* Tablets and narrow desktops keep ONE fully readable card; the layered 3D
+   composition needs room to breathe without clipping or page overflow. */
+@media (max-width: 1199px) {
+  .review-carousel[data-enhanced='true'] .review-carousel__stage {
+    perspective: none;
+    padding-block: 0;
+  }
+
+  .review-carousel[data-enhanced='true'] .review-carousel__card,
+  .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'],
+  .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
+    width: 100%;
+  }
+
+  .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'],
+  .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(0) translateZ(0) rotateY(0deg) scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-carousel[data-enhanced='true'] .review-carousel__card {
+    transition: none;
+  }
+
+  .review-carousel__arrow,
+  .review-carousel__dot {
+    transition: none;
+  }
+}
+
 .reviews-more {
   margin: var(--space-5) 0 0;
   text-align: center;

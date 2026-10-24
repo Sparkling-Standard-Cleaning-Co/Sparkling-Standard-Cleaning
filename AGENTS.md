@@ -413,10 +413,17 @@ collections are intentionally empty — not errors.
   date helper reads exactly "Requests can be made up to 60 days in advance." (the
   Hayli-confirmation sentence was removed by owner direction). Registry documentation:
   `docs/design/PREMIUM-ICON-REGISTER.md`.
-- **Authentic reviews live (2026-10-23):** the homepage reviews section renders the two
-  genuine Google reviews (Christina Sherwin, Richard Lionhart — owner-supplied verbatim, 5 stars
-  each) as cards with the authentic star rating, plus a link to the verified Google reviews
-  destination. Never fabricate additional reviews; new genuine entries render automatically.
+- **Authentic reviews live (2026-10-24, Initiative 5.0):** the homepage reviews section is a
+  premium layered 3D carousel (`src/components/Reviews.astro`) rendering ONE front review with
+  two recessed-but-readable neighbours; it is progressively enhanced (no-JS shows every review
+  readable), keyboard/swipe navigable, respects `prefers-reduced-motion`, and never autoplays.
+  Three genuine owner-supplied Google reviews render — **Christina, Richard, Laura** — public
+  attributions are **first names only** (never publish surnames in testimonials). Christina and
+  Richard carry their authentic 5-star ratings; Laura's rating is omitted because no numeric
+  rating was independently verified. Review source files are `src/content/reviews/christina.md`,
+  `richard.md`, `laura.md` (quote text verbatim; never fabricate or "improve" it). Never
+  fabricate additional reviews or aggregate/Review schema; new genuine entries render
+  automatically and the verified Google reviews link stays intact.
 - **Service-driven estimator questionnaire (2026-10-23 finishing pass):** the selected cleaning
   service determines which questions exist — `src/lib/estimate/service-matrix.ts` is the single
   source of truth for service/frequency compatibility: **Residential house cleaning** offers
