@@ -24,6 +24,7 @@ import { calculateEstimate, type EstimateContext } from '../lib/estimate/calcula
 import { buildInstantQuote, type InstantQuote } from '../lib/estimate/quote';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
 import { SERVICE_LABELS, SERVICE_SHORT, FREQUENCY_LABELS, FREQUENCY_RHYTHMS } from '../lib/estimate/labels';
+import { serviceAsksFrequency, serviceSupportsFrequency } from '../lib/estimate/service-matrix';
 import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInfo, ServiceType } from '../lib/estimate/types';
 import { locationKey, formatLocationLine, type ConfirmedLocation } from '../lib/location/location';
 import { initAddressFinder, type AddressFinderHandle } from './address-finder';
@@ -233,23 +234,17 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const RECURRING_FREQUENCIES = new Set(['weekly', 'biweekly', 'monthly']);
 
   /**
-   * Recurring customers are quoted per visit; labeling every price "cleaning
-   * price" hides the value story that drives the recurring business.
+   * The primary price heading is derived from the RESULT, never from stale
+   * form state: a new recurring arrangement shows its FIRST VISIT (the
+   * required Deep Cleaning) with the ongoing rhythm alongside; everything
+   * else shows a single Estimated Price.
    */
-  function syncPriceLabels(): void {
-    const recurring = RECURRING_FREQUENCIES.has(textValue('frequency') ?? '');
-    const label = requiresInitialDeepClean()
-      ? 'Your proposed first-visit price'
-      : recurring
-        ? 'Your proposed price per visit'
-        : 'Your proposed cleaning price';
-    if (liveLabel) liveLabel.textContent = label;
-    if (reservationEyebrow) reservationEyebrow.textContent = label;
+  function primaryPriceHeading(result: EstimateResult): string {
+    return result.ongoing ? 'First Visit — Deep Cleaning' : 'Estimated Price';
   }
 
   function recalc(): EstimateResult {
     const input = gatherInput();
-    syncPriceLabels();
     const result = calculateEstimate(input, buildContext());
     latestResult = result;
     latestQuote =
@@ -320,6 +315,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     if (result.status === 'estimated') {
       const amount = latestQuote ? `$${latestQuote.amount.toLocaleString()}` : '—';
+      if (liveLabel) liveLabel.textContent = primaryPriceHeading(result);
       livePrice.textContent = amount;
       const confidenceCopy =
         submissionAddress().location?.precision === 'street'
@@ -342,7 +338,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const ongoing = result.ongoing;
         if (ongoing) {
           liveOngoing.hidden = false;
-          liveOngoing.textContent = `Your first visit is the required Deep Cleaning above. After it, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are $${ongoing.perVisitPrice.toLocaleString()} each.`;
+          liveOngoing.textContent = `After the required first-visit Deep Cleaning above, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are $${ongoing.perVisitPrice.toLocaleString()} each.`;
         } else {
           liveOngoing.hidden = true;
           liveOngoing.textContent = '';
@@ -495,15 +491,35 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   // ── Reservation summary (order-style, carries every calculator answer) ────
-  function addSummaryRow(container: HTMLElement | null, label: string, value: string): void {
+  function addSummaryRow(
+    container: HTMLElement | null,
+    label: string,
+    value: string,
+    className = '',
+  ): void {
     if (!container || !value) return;
     const item = document.createElement('li');
+    if (className) item.className = className;
     const term = document.createElement('span');
     term.textContent = label;
     const detail = document.createElement('strong');
     detail.textContent = value;
     item.append(term, detail);
     container.appendChild(item);
+  }
+
+  /** One titled group inside the request summary (Cleaning / Schedule / Location). */
+  function summaryGroup(title: string, target: HTMLElement): HTMLElement {
+    const group = document.createElement('div');
+    group.className = 'summary-group';
+    const heading = document.createElement('p');
+    heading.className = 'summary-group__title';
+    heading.textContent = title;
+    const list = document.createElement('ul');
+    list.className = 'summary-group__rows';
+    group.append(heading, list);
+    target.appendChild(group);
+    return list;
   }
 
   function renderReservationSummary(result: EstimateResult): void {
@@ -528,6 +544,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       summarySubmission.location !== null &&
       summarySubmission.street.trim().length >= 5;
     if (reservationPrice) reservationPrice.textContent = `$${latestQuote.amount.toLocaleString()}`;
+    if (reservationEyebrow) reservationEyebrow.textContent = primaryPriceHeading(result);
     if (reservationReference) {
       reservationReference.hidden = false;
       reservationReference.textContent = `Estimate reference ${latestQuote.reference}`;
@@ -547,50 +564,69 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     if (reservationScope) {
       reservationScope.innerHTML = '';
-      addSummaryRow(
-        reservationScope,
-        'Cleaning',
-        input.serviceType ? SERVICE_LABELS[input.serviceType as ServiceType] : '',
-      );
-      addSummaryRow(reservationScope, 'Frequency', input.frequency ? FREQUENCY_LABELS[input.frequency as keyof typeof FREQUENCY_LABELS] : '');
-      if (requiresInitialDeepClean()) {
-        addSummaryRow(reservationScope, 'First visit', 'Deep Cleaning (required)');
-      }
-      if (result.ongoing) {
+
+      // Grouped, readable request details (owner-directed summary
+      // redesign): related rows sit together, and long values like the
+      // service address get the full row width instead of wrapping in a
+      // cramped column.
+      const cleaningRows = summaryGroup('Cleaning details', reservationScope);
         addSummaryRow(
-          reservationScope,
-          'Ongoing visits',
-          `$${result.ongoing.perVisitPrice.toLocaleString()} per ${FREQUENCY_RHYTHMS[result.ongoing.frequency]} visit`,
+          cleaningRows,
+          'Cleaning',
+          input.serviceType ? SERVICE_LABELS[input.serviceType as ServiceType] : '',
+        );
+        addSummaryRow(
+          cleaningRows,
+          'Frequency',
+          input.frequency ? FREQUENCY_LABELS[input.frequency as keyof typeof FREQUENCY_LABELS] : '',
+        );
+        if (requiresInitialDeepClean()) {
+          addSummaryRow(cleaningRows, 'First visit', 'Deep Cleaning (required)');
+        }
+        if (result.ongoing) {
+          addSummaryRow(
+            cleaningRows,
+            'Ongoing visits',
+            `$${result.ongoing.perVisitPrice.toLocaleString()} per ${FREQUENCY_RHYTHMS[result.ongoing.frequency]} visit`,
+          );
+        }
+        const homeParts = [
+          input.propertyType ? input.propertyType.charAt(0).toUpperCase() + input.propertyType.slice(1) : '',
+          input.squareFeet ? `${input.squareFeet.toLocaleString()} sqft` : '',
+          input.bedrooms !== undefined ? `${input.bedrooms} bed` : '',
+          input.fullBaths !== undefined
+            ? `${input.fullBaths} full bath${input.fullBaths === 1 ? '' : 's'}${input.halfBaths ? ` + ${input.halfBaths} half` : ''}`
+            : '',
+        ].filter(Boolean);
+        addSummaryRow(cleaningRows, 'Home', homeParts.join(' · '));
+        addSummaryRow(cleaningRows, 'Condition', input.condition ? input.condition.replaceAll('_', ' ') : '');
+        addSummaryRow(cleaningRows, 'Last professional clean', input.lastClean ? input.lastClean.replaceAll('_', ' ') : '');
+        addSummaryRow(cleaningRows, 'Pets', input.pets ? input.pets.replaceAll('_', ' ') : '');
+        addSummaryRow(
+          cleaningRows,
+          'Extras',
+          result.addons.length > 0 ? result.addons.map((addon) => addon.label).join(', ') : 'None',
+        );
+
+        const scheduleRows = summaryGroup('Schedule', reservationScope);
+        addSummaryRow(scheduleRows, 'Preferred date', textValue('preferredDate') ?? '');
+        addSummaryRow(scheduleRows, 'Arrival', textValue('arrivalPreference')?.replaceAll('-', ' ') ?? '');
+
+        const locationRows = summaryGroup('Location', reservationScope);
+        addSummaryRow(
+          locationRows,
+          'Service address',
+          location ? formatLocationLine(location) : `ZIP ${input.zip ?? ''}`,
+          'summary-row--wide',
+        );
+        addSummaryRow(
+          locationRows,
+          'Travel',
+          travelFullyVerified
+            ? `Confirmed route${result.travel.oneWayMiles !== null ? ` — ${Math.round(result.travel.oneWayMiles)} mi one way` : ''}`
+            : 'Estimated — confirmed before booking',
         );
       }
-      const homeParts = [
-        input.propertyType ? input.propertyType.charAt(0).toUpperCase() + input.propertyType.slice(1) : '',
-        input.squareFeet ? `${input.squareFeet.toLocaleString()} sqft` : '',
-        input.bedrooms !== undefined ? `${input.bedrooms} bed` : '',
-        input.fullBaths !== undefined
-          ? `${input.fullBaths} full bath${input.fullBaths === 1 ? '' : 's'}${input.halfBaths ? ` + ${input.halfBaths} half` : ''}`
-          : '',
-      ].filter(Boolean);
-      addSummaryRow(reservationScope, 'Home', homeParts.join(' · '));
-      addSummaryRow(reservationScope, 'Condition', input.condition ? input.condition.replaceAll('_', ' ') : '');
-      addSummaryRow(reservationScope, 'Last professional clean', input.lastClean ? input.lastClean.replaceAll('_', ' ') : '');
-      addSummaryRow(reservationScope, 'Pets', input.pets ? input.pets.replaceAll('_', ' ') : '');
-      addSummaryRow(
-        reservationScope,
-        'Extras',
-        result.addons.length > 0 ? result.addons.map((addon) => addon.label).join(', ') : 'None',
-      );
-      addSummaryRow(reservationScope, 'Destination', location ? formatLocationLine(location) : `ZIP ${input.zip ?? ''}`);
-      addSummaryRow(
-        reservationScope,
-        'Travel',
-        travelFullyVerified
-          ? `Confirmed route${result.travel.oneWayMiles !== null ? ` — ${Math.round(result.travel.oneWayMiles)} mi one way` : ''}`
-          : 'Estimated — confirmed before booking',
-      );
-      addSummaryRow(reservationScope, 'Preferred date', textValue('preferredDate') ?? '');
-      addSummaryRow(reservationScope, 'Arrival', textValue('arrivalPreference')?.replaceAll('-', ' ') ?? '');
-    }
 
     // Call / text actions carry the estimate context the customer is looking at.
     if (reserveCall) {
@@ -941,13 +977,40 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return radioValue('serviceType') === 'standard' && RECURRING_FREQUENCIES.has(textValue('frequency') ?? '');
   }
 
+  /**
+   * Service-driven questionnaire (owner-directed estimator audit,
+   * 2026-10-23): the selected service decides which questions exist. The
+   * frequency rhythm is a Residential-house-cleaning question only — deep,
+   * move-in/move-out and STR turnovers are one-time services, so the control
+   * is hidden and the value is normalized to one_time (never left stale from
+   * a previously selected service). STR-only fields (beds) are likewise
+   * cleared when the customer switches away.
+   */
   function syncConditionalFields(): void {
-    const isStr = radioValue('serviceType') === 'str_turnover';
+    const service = radioValue('serviceType') as EstimateInput['serviceType'] | undefined;
+    const isStr = service === 'str_turnover';
     for (const wrapper of form.querySelectorAll<HTMLElement>('[data-str-only]')) {
       wrapper.hidden = !isStr;
     }
     const bedsInput = form.querySelector<HTMLInputElement>('input[name="beds"]');
-    if (bedsInput) bedsInput.required = isStr;
+    if (bedsInput) {
+      bedsInput.required = isStr;
+      if (!isStr && bedsInput.value !== '') bedsInput.value = '';
+    }
+
+    const frequencyField = form.querySelector<HTMLElement>('[data-frequency-field]');
+    const frequencySelect = form.querySelector<HTMLSelectElement>('#est-frequency');
+    const asksFrequency = !service || serviceAsksFrequency(service);
+    if (frequencyField) {
+      frequencyField.hidden = !asksFrequency;
+    }
+    if (frequencySelect) {
+      frequencySelect.required = asksFrequency;
+      if (!asksFrequency && frequencySelect.value !== 'one_time') {
+        frequencySelect.value = 'one_time';
+        clearFieldError(frequencySelect);
+      }
+    }
 
     const deepRequired = requiresInitialDeepClean();
     for (const wrapper of form.querySelectorAll<HTMLElement>('[data-recurring-deep]')) {
@@ -1423,10 +1486,16 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     const frequency = params.get('frequency');
     if (frequency && ['weekly', 'biweekly', 'monthly', 'one_time'].includes(frequency)) {
-      const select = form.querySelector<HTMLSelectElement>('#est-frequency');
-      if (select) {
-        select.value = frequency;
-        select.dispatchEvent(new Event('change', { bubbles: true }));
+      // A deep-linked rhythm only applies when the selected service genuinely
+      // supports it (e.g. ?service=deep ignores ?frequency=weekly).
+      const currentService = radioValue('serviceType') as EstimateInput['serviceType'] | undefined;
+      const compatible = !currentService || serviceSupportsFrequency(currentService, frequency as EstimateInput['frequency']);
+      if (compatible) {
+        const select = form.querySelector<HTMLSelectElement>('#est-frequency');
+        if (select) {
+          select.value = frequency;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
       }
     }
   }

@@ -18,7 +18,7 @@ export interface MapCity {
   y: number;
   dx: number;
   dy: number;
-  anchor: 'start' | 'end';
+  anchor: 'start' | 'middle' | 'end';
 }
 
 export interface MapCountyLabel {
@@ -76,24 +76,24 @@ export const MAP_CITIES: MapCity[] = [
     "name": "Pensacola",
     "x": 295.1,
     "y": 396.3,
-    "dx": 10,
-    "dy": 4,
-    "anchor": "start"
+    "dx": -12,
+    "dy": 0,
+    "anchor": "end"
   },
   {
     "name": "Cantonment",
     "x": 267.2,
     "y": 346.3,
-    "dx": 10,
-    "dy": -8,
-    "anchor": "start"
+    "dx": 0,
+    "dy": -15,
+    "anchor": "middle"
   },
   {
     "name": "Gulf Breeze",
     "x": 335.8,
     "y": 413.1,
-    "dx": 10,
-    "dy": 4,
+    "dx": 12,
+    "dy": 0,
     "anchor": "start"
   },
   {
@@ -118,29 +118,29 @@ export const MAP_COUNTY_LABELS: MapCountyLabel[] = [
   {
     "name": "Escambia",
     "state": "FL",
-    "x": 271,
-    "y": 339.1,
+    "x": 245,
+    "y": 268,
     "category": "core"
   },
   {
     "name": "Santa Rosa",
     "state": "FL",
-    "x": 299.1,
-    "y": 318.3,
+    "x": 355,
+    "y": 300,
     "category": "core"
   },
   {
     "name": "Baldwin",
     "state": "AL",
-    "x": 166.4,
-    "y": 297.3,
+    "x": 166,
+    "y": 297,
     "category": "arrangement"
   },
   {
     "name": "Escambia",
     "state": "AL",
-    "x": 359.1,
-    "y": 202.2,
+    "x": 359,
+    "y": 202,
     "category": "arrangement"
   },
   {
@@ -153,8 +153,8 @@ export const MAP_COUNTY_LABELS: MapCountyLabel[] = [
   {
     "name": "Mobile",
     "state": "AL",
-    "x": 96.2,
-    "y": 306.9,
+    "x": 85,
+    "y": 345,
     "category": "context"
   },
   {

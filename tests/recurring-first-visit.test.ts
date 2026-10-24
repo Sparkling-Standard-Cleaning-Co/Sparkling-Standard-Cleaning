@@ -107,13 +107,12 @@ test('a recurring request needing custom confirmation prices nothing and summari
   assert.equal(selectInstantAmount(severe), null);
 });
 
-test('a direct deep weekly request still qualifies for the claimed campaign on its own terms', () => {
-  // Not the P12 split: the customer explicitly asked for recurring deep work.
+test('deep cleaning is a one-time product; a claimed weekly deep request fails closed', () => {
+  // Service-matrix update (owner-directed estimator audit, 2026-10-23):
+  // recurring deep work is not a bookable product — the recurring
+  // residential service (with its required deep first visit) covers it.
   const deep = calculateEstimate(input({ serviceType: 'deep', frequency: 'weekly' }), context(CLAIMED));
-  assert.equal(deep.status, 'estimated');
-  assert.equal(deep.pricing.discount?.source, 'campaign');
-  assert.equal(deep.pricing.discount?.amount, 100);
-  assert.equal(deep.ongoing, undefined, 'deep work carries no maintenance summary');
+  assert.equal(deep.status, 'invalid', 'deep + weekly is not a valid product');
 });
 
 test('the merged first-visit result reconciles with an independent deep one-time computation', () => {

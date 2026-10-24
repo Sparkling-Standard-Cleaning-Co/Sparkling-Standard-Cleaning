@@ -102,8 +102,8 @@ export const business = {
   // Owner-approved for publication (October 2026). Never invent details.
   founder: {
     firstName: 'Hayli' as Fact<string>,
-    /** Public role wording. */
-    role: 'Founder & Owner-Operator',
+    /** Public role wording (owner revision, 2026-10-23 audit). */
+    role: 'Founder / Owner-Operator',
     /** True: the business is currently owner-operated by the founder. */
     ownerOperated: true,
     /**

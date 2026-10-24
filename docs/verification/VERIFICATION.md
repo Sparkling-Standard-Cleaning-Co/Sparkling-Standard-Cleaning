@@ -266,7 +266,7 @@ representative cleaning photograph beside the founder narrative.
 | --- | --- | --- |
 | Genuine owner asset | Asset conversion + browser test | `hayli-founder.webp` derived from the owner's `Headshot.jpg`; no stock or AI replacement; the browser test asserts the `hayli-founder` source and the alt text naming Hayli |
 | Natural proportions | Browser test | Loaded image is 1164 × 1351 (ratio ≈ 0.861); never cropped to a stock aspect ratio; no facial cropping |
-| Identification | Browser test | Visible "Hayli" + "Founder & Owner-Operator" beside the portrait (from `business.founder`, never hard-coded) |
+| Identification | Browser test | Visible "Hayli" + "Founder / Owner-Operator" beside the portrait (from `business.founder`, never hard-coded) |
 | Responsive delivery | Astro `<Image>` | WebP output with `widths={[420, 640, 900]}` and `sizes="(min-width: 56rem) 30rem, 92vw"`; explicit dimensions prevent layout shift; lazy/async |
 | Content preserved | Browser test | Founder story (`#story`, `#pace`) and heritage (`#heritage`) intact; the detail-first checklist moved to its own card (no longer sharing the founder card); estimate CTAs unchanged |
 | Stock removal | Git diff + register | The unused representative `cleaning-gloves-detail.jpg` was removed and its register row deleted; the portrait is recorded as genuine owner-supplied material |

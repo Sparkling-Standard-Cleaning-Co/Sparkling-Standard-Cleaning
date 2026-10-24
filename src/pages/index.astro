@@ -17,6 +17,8 @@ import livingRoomBright from '../assets/images/living-room-bright.jpg';
 import bathroomSpacious from '../assets/images/bathroom-spacious.jpg';
 import kitchenWhiteClean from '../assets/images/kitchen-white-clean.jpg';
 import bedroomMade from '../assets/images/bedroom-made.jpg';
+import livingRoomMaintained from '../assets/images/living-room-maintained.jpg';
+import vacationBedroom from '../assets/images/vacation-bedroom.jpg';
 import emptyRoomMoveout from '../assets/images/empty-room-moveout.jpg';
 import officePlanted from '../assets/images/office-planted.jpg';
 import kitchenSinkDetail from '../assets/images/kitchen-sink-detail.jpg';
@@ -33,11 +35,14 @@ const services = cleaningTypesNav.flatMap((item) => {
 
 // Representative interior per service (licensed stock; never claimed as our
 // work — see docs/design/IMAGE-SOURCE-REGISTER.md). Services without a
-// fitting honest image render as the text card variant.
+// fitting honest image render as the text card variant. The hero carousel
+// and the service cards use DISTINCT photographs (owner-directed,
+// 2026-10-23): recurring and STR cards carry their own scenes instead of
+// reusing carousel slides.
 const SERVICE_PHOTOS: Record<string, { image: ImageMetadata; alt: string } | undefined> = {
   '/recurring-cleaning/': {
-    image: kitchenWhiteClean,
-    alt: 'A clean white kitchen with a clear counter and sink.',
+    image: livingRoomMaintained,
+    alt: 'A warm, well-kept living room with a fireplace, lamp and dining area.',
   },
   '/house-cleaning/': {
     image: livingRoomBright,
@@ -52,8 +57,8 @@ const SERVICE_PHOTOS: Record<string, { image: ImageMetadata; alt: string } | und
     alt: 'A bright empty room with wood flooring, ready for move-in day.',
   },
   '/short-term-rental-cleaning/': {
-    image: bedroomMade,
-    alt: 'A tidy guest bedroom with the bed neatly made.',
+    image: vacationBedroom,
+    alt: 'An inviting vacation bedroom, freshly made and ready for guests.',
   },
   '/commercial-cleaning/': {
     image: officePlanted,

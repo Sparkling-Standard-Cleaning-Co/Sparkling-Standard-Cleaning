@@ -61,7 +61,6 @@ export const footerCompanyNav: NavItem[] = [
   { label: 'Service Area', href: '/service-area/' },
   { label: 'Reviews', href: '/#reviews' },
   { label: 'Get an Estimate', href: '/estimate/' },
-  { label: 'Contact', href: '/contact/' },
   { label: 'FAQ', href: '/faq/' },
   { label: 'Privacy Policy', href: '/privacy/' },
   { label: 'Terms of Service', href: '/terms/' },

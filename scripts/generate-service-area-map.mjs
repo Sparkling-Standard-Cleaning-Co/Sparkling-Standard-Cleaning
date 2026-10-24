@@ -47,14 +47,41 @@ const CATEGORIES = [
   { fips: '01099', category: 'context' }, // Monroe County, AL (neighbor)
 ];
 
-/** City markers (lon, lat) + label placement hints, in SVG-units fractions. */
+/**
+ * City markers (lon, lat) + label placement hints, in SVG units.
+ * Label placement is collision-aware by design (owner-directed map
+ * refinement, 2026-10-23): Cantonment's label sits centered ABOVE its dot so
+ * it can never collide with the Escambia county label or Milton; Pensacola
+ * and Gulf Breeze anchor to opposite sides of the bayou so their labels
+ * never share a row; the county labels are pinned away from the city
+ * cluster (see LABEL_OVERRIDES).
+ */
 const CITIES = [
-  { name: 'Pensacola', lon: -87.2169, lat: 30.4213, dx: 10, dy: 4, anchor: 'start' },
-  { name: 'Cantonment', lon: -87.3394, lat: 30.6094, dx: 10, dy: -8, anchor: 'start' },
-  { name: 'Gulf Breeze', lon: -87.0383, lat: 30.3583, dx: 10, dy: 4, anchor: 'start' },
+  { name: 'Pensacola', lon: -87.2169, lat: 30.4213, dx: -12, dy: 0, anchor: 'end' },
+  { name: 'Cantonment', lon: -87.3394, lat: 30.6094, dx: 0, dy: -15, anchor: 'middle' },
+  { name: 'Gulf Breeze', lon: -87.0383, lat: 30.3583, dx: 12, dy: 0, anchor: 'start' },
   { name: 'Milton', lon: -87.0408, lat: 30.6324, dx: 10, dy: -6, anchor: 'start' },
   { name: 'Pace', lon: -87.1597, lat: 30.5994, dx: -10, dy: 14, anchor: 'end' },
 ];
+
+/**
+ * Explicit county-label positions (SVG units), overriding the automatic
+ * centroid. Centroids land the labels on top of each other in this
+ * crowded corner of the Gulf Coast, so every label is placed by measured
+ * glyph boxes (≈11.4 units per uppercase character at the 11px county
+ * size) into a collision-free band:
+ *   - Escambia FL sits ABOVE the Cantonment/Baldwin rows.
+ *   - Santa Rosa FL sits BELOW Escambia FL's row, clear of Milton/Pace.
+ *   - Mobile AL (context) drops to the lower-left of its county, away from
+ *     Baldwin AL's row.
+ */
+const LABEL_OVERRIDES = {
+  '12033': { x: 245, y: 268 }, // Escambia FL
+  '12113': { x: 355, y: 300 }, // Santa Rosa FL
+  '01003': { x: 166, y: 297 }, // Baldwin AL
+  '01053': { x: 359, y: 202 }, // Escambia AL
+  '01097': { x: 85, y: 345 }, // Mobile AL (context)
+};
 
 const MAP_WIDTH = 720;
 const PAD_DEG = 0.08;
@@ -312,7 +339,8 @@ function centroidOf(county) {
 }
 
 const countyLabels = selected.map((county) => {
-  const [x, y] = centroidOf(county);
+  const override = LABEL_OVERRIDES[county.fips];
+  const [x, y] = override ? [override.x, override.y] : centroidOf(county);
   return { name: county.name, state: county.state === 'Florida' ? 'FL' : 'AL', x, y, category: county.category };
 });
 
@@ -336,7 +364,7 @@ export interface MapCity {
   y: number;
   dx: number;
   dy: number;
-  anchor: 'start' | 'end';
+  anchor: 'start' | 'middle' | 'end';
 }
 
 export interface MapCountyLabel {

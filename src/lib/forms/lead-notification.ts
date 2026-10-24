@@ -92,6 +92,17 @@ const YES_NO_LABELS: Record<string, string> = {
   no: 'No',
 };
 
+/** Contact-form inquiry type (optional context, never a booking selection). */
+const INQUIRY_TYPE_LABELS: Record<string, string> = {
+  general_question: 'General question',
+  recurring_cleaning: 'Recurring residential cleaning',
+  deep_cleaning: 'Deep cleaning',
+  move_in_out: 'Move-in or move-out cleaning',
+  short_term_rental: 'Short-term rental turnover',
+  commercial_cleaning: 'Commercial cleaning',
+  church_cleaning: 'Church cleaning',
+};
+
 const ARRIVAL_LABELS: Record<string, string> = {
   'first-appointment': 'First appointment (exact time)',
   morning: 'Morning window',
@@ -463,6 +474,7 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Inquiry — Type', requestType(fields), 'request_type', 'facility_type');
   add('Inquiry — Service', serviceLine(fields), 'service_type');
   add('Inquiry — Frequency', frequencyLine(fields), 'frequency', 'turnover_frequency');
+  add('Inquiry — Help requested', INQUIRY_TYPE_LABELS[text(fields, 'inquiry_type')] ?? text(fields, 'inquiry_type'), 'inquiry_type');
   add('Inquiry — Submitted', formatCentral(text(fields, 'received_at')), 'received_at');
   const preferredDate = text(fields, 'preferred_date', 'walkthrough_date');
   add('Inquiry — Preferred date', preferredDate, 'preferred_date', 'walkthrough_date');

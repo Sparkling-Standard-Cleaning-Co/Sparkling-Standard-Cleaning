@@ -40,6 +40,20 @@ const { class: className = '' } = Astro.props;
   </div>
 
   <div class="field">
+    <label for="contact-inquiry">What can we help with?</label>
+    <select class="select" id="contact-inquiry" name="inquiry_type">
+      <option value="">Choose one (optional)…</option>
+      <option value="general_question">General question</option>
+      <option value="recurring_cleaning">Recurring residential cleaning</option>
+      <option value="deep_cleaning">Deep cleaning</option>
+      <option value="move_in_out">Move-in or move-out cleaning</option>
+      <option value="short_term_rental">Short-term rental turnover</option>
+      <option value="commercial_cleaning">Commercial cleaning</option>
+      <option value="church_cleaning">Church cleaning</option>
+    </select>
+  </div>
+
+  <div class="field">
     <label for="contact-message">How can we help?</label>
     <textarea
       class="textarea"

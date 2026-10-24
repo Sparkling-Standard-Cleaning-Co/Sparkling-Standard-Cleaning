@@ -186,9 +186,10 @@ test('the About page keeps the founder story and adds the heritage section', asy
     // No invented countries or immigration specifics.
     assert.doesNotMatch(heritageText, /England|Germany|Ireland|Italy|Poland|immigrat/i);
 
-    // Natural estimate CTA remains present.
-    assert.equal(await page.locator('[data-cta="about-estimate"]').getAttribute('href'), '/estimate/');
-    assert.ok(await page.locator('a[href="/estimate/"]').count() >= 2, 'estimate CTA in hero and closing band');
+    // The owner-directed About simplification (2026-10-23): no hero estimate
+    // CTA — the closing band remains the page's one estimate action.
+    assert.equal(await page.locator('[data-cta="about-estimate"]').count(), 0, 'hero estimate CTA removed');
+    assert.ok(await page.locator('a[href="/estimate/"]').count() >= 1, 'closing estimate CTA remains');
   } finally {
     await context.close();
   }
@@ -215,16 +216,17 @@ test('the About page presents Hayli’s official founder portrait with identific
     const ratio = loaded.naturalWidth / loaded.naturalHeight;
     assert.ok(ratio > 0.8 && ratio < 0.95, `natural portrait ratio preserved (${ratio.toFixed(3)})`);
 
-    // Visible identification beside the portrait.
+    // Visible identification beside the portrait (owner wording, 2026-10-23).
     assert.equal((await page.locator('.founder-card__name').textContent())?.trim(), 'Hayli');
     assert.equal(
       (await page.locator('.founder-card__role').textContent())?.trim(),
-      'Founder & Owner-Operator',
+      'Founder / Owner-Operator',
     );
 
-    // The detail-first checklist content is preserved in its own block.
-    const details = page.locator('text=Why “detail-first” is not a slogan');
-    assert.equal(await details.count(), 1, 'detail-first content preserved');
+    // The owner removed the detail-first slogan section and the four-card
+    // values banner from this page (2026-10-23) — both must stay gone.
+    assert.equal(await page.locator('text=Why “detail-first” is not a slogan').count(), 0, 'detail-first section removed');
+    assert.equal(await page.locator('#about .grid--4, [data-about-values]').count(), 0, 'four-card banner removed');
 
     // Desktop: portrait sits beside the story (to its right).
     const storyBox = await page.locator('#story').boundingBox();

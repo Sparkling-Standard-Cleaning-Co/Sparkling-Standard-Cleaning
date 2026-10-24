@@ -8,7 +8,7 @@ owner's Grok-generated business-card concept is treated as inspiration, never as
 
 - **Legal/public name:** "Sparkling Standard" (public wordmark "Sparkling Standard"),
   source of truth `src/config/business.ts:74,80`.
-- **Founder-led:** Hayli, Founder & Owner-Operator, an owner-operated residential and commercial
+- **Founder-led:** Hayli, Founder / Owner-Operator, an owner-operated residential and commercial
   cleaning company (`business.ts` `founder`; visible identification on `/about/`).
 - **Place:** Cantonment base, serving Pensacola and surrounding communities within about an hour of
   Cantonment, with select nearby service into Alabama (`business.ts` `serviceArea.summary`).

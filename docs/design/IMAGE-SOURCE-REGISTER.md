@@ -33,11 +33,13 @@ copyright restrictions; credited here as good practice.
 | --- | --- | --- | --- | --- |
 | `src/assets/images/living-room-bright.jpg` | https://www.pexels.com/photo/living-room-with-white-sectional-sofa-6510974/ | Curtis Adams | 2026-10-02 | Home hero (carousel slide 1) · house-cleaning service card |
 | `src/assets/images/bathroom-spacious.jpg` | https://www.flickr.com/photos/96511847@N04/9203134278 | Foto Miki Digital (Public Domain Mark 1.0) | 2026-10-23 | Home hero (carousel slide 2) |
-| `src/assets/images/kitchen-white-clean.jpg` | https://www.pexels.com/photo/kitchen-counter-top-and-sink-7601079/ | Curtis Adams | 2026-10-02 | Home hero (carousel slide 3) · recurring-cleaning service card |
-| `src/assets/images/bedroom-made.jpg` | https://www.pexels.com/photo/a-tidy-bedroom-of-a-model-home-7648860/ | Christopher Moon | 2026-10-02 | Home hero (carousel slide 4) · short-term-rental service card |
+| `src/assets/images/kitchen-white-clean.jpg` | https://www.pexels.com/photo/kitchen-counter-top-and-sink-7601079/ | Curtis Adams | 2026-10-02 | Home hero (carousel slide 3) |
+| `src/assets/images/bedroom-made.jpg` | https://www.pexels.com/photo/a-tidy-bedroom-of-a-model-home-7648860/ | Christopher Moon | 2026-10-02 | Home hero (carousel slide 4) |
+| `src/assets/images/living-room-maintained.jpg` | https://www.flickr.com/photos/96511847@N04/9199967533 | Foto Miki Digital (Public Domain Mark 1.0) | 2026-10-23 | Home recurring-cleaning service card (distinct from the carousel, owner-directed) |
+| `src/assets/images/vacation-bedroom.jpg` | https://www.flickr.com/photos/96511847@N04/9202944918 | Foto Miki Digital (Public Domain Mark 1.0) | 2026-10-23 | Home short-term-rental service card (distinct from the carousel, owner-directed) |
 | `src/assets/images/empty-room-moveout.jpg` | https://www.pexels.com/photo/bright-empty-room-with-wooden-flooring-35493909/ | Peter Vang | 2026-10-02 | Home move-out service card |
 | `src/assets/images/office-planted.jpg` | https://www.pexels.com/photo/empty-interior-of-a-modern-office-16254452/ | Rodeo Software | 2026-10-02 | Home commercial service card |
-| `src/assets/images/kitchen-sink-detail.jpg` | https://www.pexels.com/photo/view-of-a-kitchen-with-white-cabinets-and-a-silver-sink-19836790/ | Lisa Anna | 2026-10-02 | Home deep-cleaning service card (returned to the homepage in the 2026-10-23 refinement) |
+| `src/assets/images/kitchen-sink-detail.jpg` | https://www.pexels.com/photo/view-of-a-kitchen-with-white-cabinets-and-a-silver-sink-19836790/ | Lisa Anna | 2026-10-02 | Home deep-cleaning service card (returned to the homepage in the 2026-10-19 audit; unique to the card — not in the carousel) |
 
 ## Replacement policy
 

@@ -3,6 +3,7 @@
 
 import { normalizeZip } from '../../config/geography.ts';
 import { pricing } from '../../config/pricing.ts';
+import { serviceSupportsFrequency } from './service-matrix.ts';
 import type {
   Condition,
   EstimateInputDraft,
@@ -63,6 +64,15 @@ export function validateEstimateInput(
   if (!serviceType) issues.push('Choose a cleaning type.');
 
   const frequency: Frequency = asEnum<Frequency>(raw.frequency, FREQUENCIES) ?? 'one_time';
+
+  // Service/frequency compatibility (owner-directed estimator audit,
+  // 2026-10-23): an invalid combination — e.g. a weekly rhythm on a
+  // move-in/move-out clean — is REJECTED here, never silently repriced or
+  // relabeled. The same validator runs in the browser and on the server, so
+  // a stale or hostile submission cannot pass through the backend.
+  if (serviceType && !serviceSupportsFrequency(serviceType, frequency)) {
+    issues.push('That cleaning service is a one-time service — no recurring rhythm applies.');
+  }
 
   const condition = asEnum<Condition>(raw.condition, CONDITIONS);
   if (!condition) issues.push('Choose the home’s current condition.');

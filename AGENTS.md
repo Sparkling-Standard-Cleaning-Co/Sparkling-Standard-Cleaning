@@ -367,6 +367,21 @@ collections are intentionally empty — not errors.
   genuine Google reviews (Christina Sherwin, Richard Lionhart — owner-supplied verbatim, 5 stars
   each) as cards with the authentic star rating, plus a link to the verified Google reviews
   destination. Never fabricate additional reviews; new genuine entries render automatically.
+- **Service-driven estimator questionnaire (2026-10-23 finishing pass):** the selected cleaning
+  service determines which questions exist — `src/lib/estimate/service-matrix.ts` is the single
+  source of truth for service/frequency compatibility: **Residential house cleaning** offers
+  one-time + weekly/biweekly/monthly; **Deep Cleaning, Move-in/Move-out and STR turnover are
+  one-time services** (the rhythm question is hidden, the value normalizes to `one_time`, stale
+  values clear on service switches, and the shared validator REJECTS invalid combinations —
+  never silently repriced). Commercial/church cleaning use their walkthrough request forms, not
+  the instant estimator. The quote display presents **Estimated Price** (one-time) or
+  **First Visit — Deep Cleaning** + **Ongoing Visits** (recurring) with a grouped request
+  summary (Cleaning details / Schedule / Location, full-width address rows). Quote
+  `configVersion` remains `2026-10-23.floor5-travel35.v1`. The service-area map uses
+  collision-aware label placement (county labels pinned away from the city cluster; Cantonment
+  centered above its marker); the About page carries no hero CTA, no detail-first slogan
+  section and no four-card banner (owner removals); the homepage hero carousel and the service
+  cards use DISTINCT photographs.
 - **Two-price recurring quotes (2026-10-23):** a NEW recurring residential arrangement is quoted
   as its required FIRST VISIT (a Deep Cleaning computed at the one-time/deep rate — this is the
   price the customer submits and the server verifies), with the ongoing per-visit rhythm shown

@@ -308,7 +308,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       <!-- Step 3 — condition + frequency -->
       <section class="wizard__step" data-step="3" aria-label={stepTitle(2)}>
         <h2 class="wizard__step-heading">{stepTitle(2)}</h2>
-        <div class="field">
+        <div class="field" data-frequency-field>
           <label for="est-frequency">How often should we clean?</label>
           <select class="select" id="est-frequency" name="frequency" required>
             <option value="">Choose one…</option>
@@ -468,7 +468,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <p class="reservation-summary__meta" data-reservation-validity hidden></p>
 
           <ul class="summary-list price-breakdown" data-price-breakdown></ul>
-          <ul class="summary-list" data-reservation-scope></ul>
+          <div class="summary-groups" data-reservation-scope></div>
           <p class="reservation-summary__qualification" data-reservation-qualification></p>
 
           <div class="reservation-actions">
