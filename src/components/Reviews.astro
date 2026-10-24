@@ -1,16 +1,15 @@
 ---
-// Customer reviews — renders ONLY genuine owner-supplied entries from
-// src/content/reviews/. Never fabricate reviews, never invent star ratings or
-// counts, and never render empty review cards "to fill space" (directive §43,
-// §56, §77).
+// Customer reviews — renders ONLY genuine entries from src/content/reviews/.
+// Never fabricate reviews, never invent star ratings or counts (directive
+// §43, §56, §77). The two live Google reviews were supplied verbatim by the
+// owner on 2026-10-23; more entries render automatically as they are added.
 //
-// While the collection is intentionally empty (display permission for the real
-// Google reviews is not documented), the section shows a refined invitation to
-// read the authentic reviews directly on Google — with the official Google G.
-// The exact owner-supplied profile/review URLs come from business.ts.
+// When entries exist, the section also links to the actual Google reviews
+// destination (the owner-supplied, verified Maps URL from business.ts).
 
 import { getCollection } from 'astro:content';
 import GoogleG from './GoogleG.astro';
+import Icon from './Icon.astro';
 import { business, isPending } from '../config/business';
 
 interface Props {
@@ -32,9 +31,16 @@ const profileUrl = isPending(business.reviews.profileUrl) ? null : business.revi
           <p class="eyebrow">{eyebrow}</p>
           <h2 id="reviews-heading">{heading}</h2>
         </div>
-        <div class="grid grid--3">
+        <div class:list={['grid', reviews.length === 2 ? 'grid--2' : 'grid--3']}>
           {reviews.map((review) => (
-            <blockquote class="card">
+            <blockquote class="card review-card">
+              {review.data.rating && (
+                <p class="review-card__stars" role="img" aria-label={`Rated ${review.data.rating} out of 5 stars`}>
+                  {Array.from({ length: review.data.rating }).map(() => (
+                    <Icon name="star" size={16} />
+                  ))}
+                </p>
+              )}
               <p>“{review.data.quote}”</p>
               <footer class="small text-muted">
                 <strong>{review.data.author}</strong>
@@ -44,6 +50,20 @@ const profileUrl = isPending(business.reviews.profileUrl) ? null : business.revi
             </blockquote>
           ))}
         </div>
+        {profileUrl && (
+          <p class="reviews-more">
+            <a
+              href={profileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Read all our reviews on Google (opens in a new tab)"
+              data-review-link="google"
+              data-cta="reviews-read-google"
+            >
+              <GoogleG size={18} /> Read all our reviews on Google
+            </a>
+          </p>
+        )}
       </div>
     </section>
   ) : (
@@ -53,10 +73,6 @@ const profileUrl = isPending(business.reviews.profileUrl) ? null : business.revi
           <div class="section-head section-head--center">
             <p class="eyebrow">{eyebrow}</p>
             <h2 id="reviews-heading">{heading}</h2>
-            <p class="lead">
-              See what our customers have shared about their experiences with
-              Sparkling Standard.
-            </p>
           </div>
           <div class="reviews-invite">
             <span class="reviews-invite__mark" aria-hidden="true">

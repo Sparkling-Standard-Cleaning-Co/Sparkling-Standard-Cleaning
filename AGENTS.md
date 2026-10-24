@@ -155,7 +155,8 @@ Never publish unapproved promotional promises or activate binding pricing withou
   - `src/config/marketing-links.ts` — inbound UTM links and QR assets.
 - **Content collections** (`src/content.config.ts`, Zod-validated): `services` (seven owning
   pages), `faqs`, `checklists` (`public | internal`; internal must never render publicly),
-  `proof` and `reviews` (intentionally empty until genuine material exists), `site` (page copy).
+  `proof` (intentionally empty until genuine material exists), `reviews` (carries the two
+  authentic owner-supplied Google reviews since 2026-10-23 — never fabricate more), `site` (page copy).
 - Pages are thin wrappers. The estimator engine lives in `src/lib/estimate/`; travel logic in
   `src/lib/travel/`; address/location logic in `src/lib/location/`. Arithmetic never lives in pages.
 - The estimate flow collects a **confirmed destination**: GPS "Use My Current Location" first, with
@@ -362,6 +363,10 @@ collections are intentionally empty — not errors.
   captions read "Project photos are added only with customer approval." Proposed prices round
   **DOWN** to the nearest $5 (owner-approved), and travel assumes a 35-mile round trip
   (17.5 one-way included). Quote `configVersion` is `2026-10-23.floor5-travel35.v1`.
+- **Authentic reviews live (2026-10-23):** the homepage reviews section renders the two
+  genuine Google reviews (Christina Sherwin, Richard Lionhart — owner-supplied verbatim, 5 stars
+  each) as cards with the authentic star rating, plus a link to the verified Google reviews
+  destination. Never fabricate additional reviews; new genuine entries render automatically.
 - **Two-price recurring quotes (2026-10-23):** a NEW recurring residential arrangement is quoted
   as its required FIRST VISIT (a Deep Cleaning computed at the one-time/deep rate — this is the
   price the customer submits and the server verifies), with the ongoing per-visit rhythm shown

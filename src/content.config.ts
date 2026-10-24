@@ -182,8 +182,9 @@ const proof = defineCollection({
     }),
 });
 
-// Customer reviews — EMPTY by design until genuine owner-supplied reviews
-// exist. Never fabricate (directive §56, §77).
+// Customer reviews — genuine owner-supplied reviews only. The two Google
+// reviews were supplied verbatim by the owner on 2026-10-23. Never fabricate
+// (directive §56, §77).
 const reviews = defineCollection({
   loader: glob({ pattern: '*.md', base: './src/content/reviews' }),
   schema: z.object({
@@ -191,6 +192,8 @@ const reviews = defineCollection({
     author: z.string(),
     context: z.string().optional(),
     source: z.enum(['google', 'direct', 'other']).default('direct'),
+    /** Authentic star rating when the platform provides one (1–5). */
+    rating: z.number().int().min(1).max(5).optional(),
     order: z.number().int().default(99),
   }),
 });
