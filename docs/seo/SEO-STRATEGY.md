@@ -2,6 +2,30 @@
 
 One strategy document. Git history is the archive — never create competing "master plan" files.
 
+## Initiative 5.0 (2026-10-24) — search visibility release
+
+The full audit (live checks, verified problems, suspected visibility issues, competitor
+observations, GBP recommendations, citation ledger and the 90-day roadmap) lives in
+`docs/seo/SEARCH-VISIBILITY-AUDIT-2026-10-24.md`. Summary of what changed:
+
+- Homepage title now targets the category (“Cleaning Company in Pensacola, FL | Sparkling
+  Standard”); the description names the real service mix instead of “five services”.
+- About, Contact and Supportive Home Cleaning titles carry local/service intent.
+- `scripts/verify-seo.mjs` now parses robots directives properly (it previously accepted
+  `noindex` because it searched for the substring “index”), detects duplicate/wrong-domain
+  canonicals, stale sitemap URLs and sitemap/noindex contradictions; regression tests live in
+  `tests/seo-checks.test.ts`.
+- Reviews publish first names only (Christina · Richard · Laura); Laura’s authentic review is
+  added with no invented star rating; the section is a progressive-enhancement 3D carousel.
+- Contextual internal links added between deep ↔ recurring, commercial ↔ church and
+  house → recurring/deep/estimate.
+
+**Indexing status is not proven by a deployment.** The audit records that an external
+`site:sparkling-standard.com` query returned no results in the research provider’s index;
+Google Search Console evidence is still required (see the audit §1.4–1.5 and
+`docs/operations/SEARCH-CONSOLE-SETUP.md`). Do not claim Google indexing or rankings without
+authenticated evidence.
+
 ## Owning pages (one per query cluster)
 
 | Query cluster | Owning page | Primary intent |

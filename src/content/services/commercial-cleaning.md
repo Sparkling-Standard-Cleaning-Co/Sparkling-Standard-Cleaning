@@ -62,4 +62,4 @@ Commercial work is scheduled within our published hours, 7:00 a.m. – 7:00 p.m.
 
 ## Churches
 
-Churches are a specific vertical this company cares about, and they have a dedicated page explaining the scope, scheduling and the heart behind serving them. If you're a church, start there.
+Churches are a specific vertical this company cares about, and they have a [dedicated church cleaning page](/church-cleaning/) explaining the scope, scheduling and the heart behind serving them. If you're a church, start there.

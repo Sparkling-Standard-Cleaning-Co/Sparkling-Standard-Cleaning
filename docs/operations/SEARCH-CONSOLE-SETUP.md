@@ -88,3 +88,22 @@ The script verifies `robots.txt` allows crawling, the sitemap URL is present, th
 canonical and robots meta, key pages, and the API reachability. Never introduce noindex or
 `Disallow` on public pages; utility pages intentionally excluded from the sitemap (`/404`,
 `/thank-you/`, `/leave-review/`) must stay excluded.
+
+## 6. Initiative 5.0 evidence request (2026-10-24)
+
+The public-site audit found no technical reason the site cannot be indexed, but external
+evidence showed no visible search presence yet. Retrieve and share the following (free, no
+third-party connector):
+
+1. **Search Console → Indexing → Pages:** the “Indexed” and “Not indexed” counts and the top
+   reasons in “Not indexed” (screenshot or export).
+2. **URL Inspection** for: `/`, `/house-cleaning/`, `/deep-cleaning/`, `/recurring-cleaning/`,
+   `/service-area/`. Report: “URL is on Google” vs not, Google-selected canonical, last crawl.
+3. **Sitemaps:** confirm `sitemap-index.xml` is “Success” and note the discovered URL count.
+4. **Performance:** last 3 months — impressions, clicks, average position, top 20 queries
+   (anonymized export is fine; do not include private customer data anywhere).
+5. **Google Business Profile → Performance:** calls, website clicks, direction requests,
+   searches, and the review count.
+
+Record the numbers in the weekly scorecard. The site cannot be called “indexed” or “ranking”
+until these reports confirm it; a deployment or indexing request is not proof.

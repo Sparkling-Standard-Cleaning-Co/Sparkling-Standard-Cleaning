@@ -54,7 +54,7 @@ It's also the service where the founder's detail philosophy matters most. A deep
 
 This service is ideal for one-time cleanings and is required before beginning recurring residential maintenance cleaning. It's also recommended for returning clients when dirt, grime, or buildup begins to accumulate beyond what routine maintenance cleaning is designed to address.
 
-If you are starting a recurring plan, the Deep Cleaning comes first. There are no exceptions to that sequence: it establishes the standard the recurring visits are meant to maintain, and it gives us an honest look at the home before a schedule is agreed.
+If you are starting a recurring plan, the Deep Cleaning comes first. There are no exceptions to that sequence: it establishes the standard the recurring visits are meant to maintain, and it gives us an honest look at the home before a schedule is agreed. From there, [Recurring Residential Cleaning](/recurring-cleaning/) keeps that standard in place.
 
 ## Careful where it counts
 

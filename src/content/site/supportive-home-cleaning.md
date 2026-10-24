@@ -1,5 +1,5 @@
 ---
-metaTitle: Supportive Home Cleaning | Sparkling Standard
+metaTitle: Supportive Home Cleaning in Pensacola | Sparkling Standard
 metaDescription: Thoughtful, dependable home cleaning for seniors, people with disabilities, and households that could use an extra helping hand in Pensacola and Cantonment. No diagnosis required — just tell us what would help.
 hero:
   headline: 'A Cleaner Home.'

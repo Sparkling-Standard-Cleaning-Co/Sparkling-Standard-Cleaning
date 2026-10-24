@@ -1,6 +1,6 @@
 ---
-metaTitle: Sparkling Standard | Pensacola & Cantonment
-metaDescription: Professional owner-operated residential and commercial cleaning for Pensacola, Cantonment, and surrounding communities. Explore five cleaning services and get an instant estimate.
+metaTitle: Cleaning Company in Pensacola, FL | Sparkling Standard
+metaDescription: Owner-operated residential and commercial cleaning in Pensacola, Cantonment, and nearby communities — recurring, deep, move-in/move-out, short-term rental, commercial, and church cleaning. Get an instant estimate.
 hero:
   headline: The cleaning company that leaves your space
   highlight: Sparkling

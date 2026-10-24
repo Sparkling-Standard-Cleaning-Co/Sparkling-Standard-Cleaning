@@ -11,8 +11,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import {
+  isEffectivelyNoindex,
+  normalizeOrigin,
+  originOf,
+} from './lib/seo-checks.ts';
+
 const DIST = 'dist';
 const PREVIEW = process.env.PUBLIC_PREVIEW_MODE === 'true';
+const EXPECTED_ORIGIN = normalizeOrigin(process.env.PUBLIC_SITE_URL ?? '');
 
 if (!fs.existsSync(DIST)) {
   console.error('dist/ not found — run npm run build first');
@@ -33,8 +40,23 @@ const htmlFiles = walk(DIST).filter((file) => file.endsWith('.html'));
 const problems = [];
 const titles = new Map();
 const descriptions = new Map();
+const canonicals = new Map();
+const noindexPages = new Set();
 
-const NOINDEX_PAGES = new Set(['/404.html', '/thank-you/index.html']);
+// Pages intentionally excluded from indexing (utility/transactional flows).
+// Each must carry an EFFECTIVE noindex and must never appear in the sitemap.
+const NOINDEX_PAGES = new Set([
+  '/404.html',
+  '/404/',
+  '/thank-you/index.html',
+  '/thank-you/',
+  '/leave-review/index.html',
+  '/leave-review/',
+  '/gift-certificates/redeem/index.html',
+  '/gift-certificates/redeem/',
+  '/gift-certificates/success/index.html',
+  '/gift-certificates/success/',
+]);
 
 for (const file of htmlFiles) {
   const html = fs.readFileSync(file, 'utf8');
@@ -61,14 +83,21 @@ for (const file of htmlFiles) {
     if (!canonical.endsWith('/') && !canonical.endsWith('.txt') && !canonical.endsWith('.html')) {
       problems.push(`${page}: canonical does not end with a slash`);
     }
+    if (originOf(canonical) !== EXPECTED_ORIGIN) {
+      problems.push(`${page}: canonical domain ${originOf(canonical) ?? '(invalid)'} does not match ${EXPECTED_ORIGIN}`);
+    }
+    if (canonicals.has(canonical)) problems.push(`${page}: duplicate canonical with ${canonicals.get(canonical)}`);
+    else canonicals.set(canonical, page);
   }
 
   if (h1Count !== 1) problems.push(`${page}: expected exactly one <h1>, found ${h1Count}`);
 
-  const shouldNoindex = PREVIEW || NOINDEX_PAGES.has(relative) || page === '/404/';
+  const shouldNoindex = PREVIEW || NOINDEX_PAGES.has(page) || NOINDEX_PAGES.has(`/${relative}`);
+  const effectiveNoindex = robots ? isEffectivelyNoindex(robots) : false;
+  if (effectiveNoindex) noindexPages.add(page);
   if (!robots) problems.push(`${page}: missing robots meta`);
-  else if (shouldNoindex && !robots.includes('noindex')) problems.push(`${page}: expected noindex`);
-  else if (!shouldNoindex && !robots.includes('index')) problems.push(`${page}: expected index`);
+  else if (shouldNoindex && !effectiveNoindex) problems.push(`${page}: expected noindex`);
+  else if (!shouldNoindex && effectiveNoindex) problems.push(`${page}: effective noindex on an indexable page (content: ${robots})`);
 
   const jsonLdBlocks = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)];
   if (jsonLdBlocks.length === 0) problems.push(`${page}: no JSON-LD found`);
@@ -85,7 +114,7 @@ for (const file of htmlFiles) {
   }
 }
 
-// Sitemap must exclude noindex-only pages.
+// Sitemap must exclude noindex-only pages and stale URLs.
 const sitemapIndex = path.join(DIST, 'sitemap-index.xml');
 if (!fs.existsSync(sitemapIndex)) {
   problems.push('sitemap-index.xml missing');
@@ -94,6 +123,20 @@ if (!fs.existsSync(sitemapIndex)) {
     const xml = fs.readFileSync(file, 'utf8');
     for (const marker of ['/404', '/thank-you/']) {
       if (xml.includes(marker)) problems.push(`${path.basename(file)} contains ${marker} (should be excluded)`);
+    }
+    for (const match of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) {
+      const url = match[1] ?? '';
+      if (originOf(url) !== EXPECTED_ORIGIN) {
+        problems.push(`${path.basename(file)}: sitemap URL ${url} is not on ${EXPECTED_ORIGIN}`);
+        continue;
+      }
+      const urlPath = new URL(url).pathname;
+      if (!canonicals.has(url)) {
+        problems.push(`${path.basename(file)}: sitemap URL ${url} does not match any built canonical`);
+      }
+      if (noindexPages.has(urlPath) || noindexPages.has(`${urlPath}index.html`)) {
+        problems.push(`${path.basename(file)}: sitemap lists noindex page ${url}`);
+      }
     }
   }
 }
