@@ -31,6 +31,10 @@ import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts'
 import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
 import { schedulingConfig } from '../../src/config/scheduling.ts';
 
+interface R2BucketLike {
+  put(key: string, value: unknown, options?: unknown): Promise<unknown>;
+  get(key: string): Promise<unknown>;
+}
 interface Env extends QuoteVerificationEnv {
   WEB3FORMS_ACCESS_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
@@ -39,6 +43,10 @@ interface Env extends QuoteVerificationEnv {
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   RESEND_REPLY_TO?: string;
+  // Customer photo storage (Smart Estimate directive, Part 2). The R2 bucket
+  // binding and the owner viewing token exist only in the function env.
+  PHOTOS_BUCKET?: R2BucketLike;
+  PHOTO_OWNER_TOKEN?: string;
 }
 
 // The estimator sends structured scope + quote + attribution fields; the cap
@@ -87,6 +95,7 @@ const SERVER_OWNED_KEYS = new Set([
   'first_visit_total',
   'ongoing_price_per_visit',
   'ongoing_frequency',
+  'photo_request_ref',
 ]);
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -339,6 +348,23 @@ export async function onRequestPost(context: {
   // is also shown in the Contact section; every other collected value is
   // preserved (mapped or under "More details").
   const notification = buildLeadNotification(clean);
+  // Customer photos (Smart Estimate directive, Part 2): submitted photo keys
+  // become PRIVATE owner-only viewing links. The owner token exists only in
+  // the function environment — the links ride inside the notification email,
+  // never through frontend code or public URLs.
+  const photoKeys = (clean.photo_keys ?? '').split(',').map((entry) => entry.trim()).filter(Boolean);
+  if (photoKeys.length > 0 && env.PHOTO_OWNER_TOKEN && env.PHOTOS_BUCKET) {
+    const origin = new URL(request.url).origin;
+    const photoLinks = photoKeys
+      .map((entry) => {
+        const key = entry.includes(':') ? (entry.split(':').slice(1).join(':')) : entry;
+        return `${origin}/api/photo-view?key=${encodeURIComponent(key)}&t=${encodeURIComponent(env.PHOTO_OWNER_TOKEN as string)}`;
+      })
+      .join(' | ');
+    notification['Photos — Private owner links'] = photoLinks;
+    notification['Photos — Note'] =
+      'Links open the customer-uploaded photos privately (R2 storage). Do not forward outside Sparkling Standard.';
+  }
   const replyTo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean.email ?? '') ? clean.email : undefined;
 
   const endpoint = env.WEB3FORMS_ENDPOINT ?? 'https://api.web3forms.com/submit';

@@ -80,7 +80,7 @@ test('the branded HTML is email-safe: inline styles, no scripts, no external ima
 test('the summary and the provisional estimate appear in both HTML and plain text', () => {
   const confirmation = buildCustomerConfirmation(reservation, business);
   for (const body of [confirmation.html, confirmation.text]) {
-    assert.match(body, /Residential house cleaning/);
+    assert.match(body, /Residential cleaning/);
     assert.match(body, /Every two weeks/);
     assert.match(body, /Deep Cleaning \(required\)/);
     assert.match(body, /100 S Baylen St, Pensacola, FL 32502/);

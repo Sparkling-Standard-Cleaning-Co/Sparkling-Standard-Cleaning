@@ -38,7 +38,6 @@ faqIds:
   - exclusions
 related:
   - /deep-cleaning/
-  - /house-cleaning/
   - /recurring-cleaning/
 ctaLabel: Instant Estimate
 ctaHref: /estimate/

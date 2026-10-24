@@ -182,7 +182,11 @@ for (const [name, width, height] of [
       assert.equal(await isVisible(page, '[data-back]'), false, 'Back hidden on step 1');
       assert.equal(await isVisible(page, '[data-submit]'), false, 'Submit hidden on step 1');
       assert.equal(await isVisible(page, '[data-estimate-live]'), false, 'live panel hidden initially');
-      assert.equal(await isVisible(page, '[data-str-only]'), false, 'STR-only field hidden for standard');
+      assert.equal(
+        await page.locator('[data-str-only]').evaluateAll((nodes) => nodes.every((node) => (node instanceof HTMLElement ? node.hidden : true))),
+        true,
+        'STR-only fields hidden for standard',
+      );
       assert.equal(await isVisible(page, '[data-address-finder]'), true, 'address finder shares step 1');
 
       await fillStepOne(page);

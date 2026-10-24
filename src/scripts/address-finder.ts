@@ -76,6 +76,13 @@ interface ResolvedCandidate {
    * personally and no house number is ever invented.
    */
   streetLevel?: boolean;
+  /**
+   * True when the best available point was the ZIP-reference centre (the
+   * exact house could not be geocoded). Travel stays preliminary; the exact
+   * address is confirmed personally. Never presented as a verified street
+   * location.
+   */
+  approximate?: boolean;
 }
 
 interface ResolveResult {
@@ -88,6 +95,8 @@ interface ResolveResult {
   source?: string;
   /** False when the provider could only manage a street-level match. */
   precise?: boolean;
+  /** True when the server fell back to the ZIP-reference centre. */
+  approximate?: boolean;
 }
 
 type PermissionReason = 'denied' | 'unavailable' | 'timeout' | 'unsupported';
@@ -349,10 +358,12 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     if (confirmedCard) confirmedCard.hidden = true;
     setState('resolved');
     setStatus(
-      resolved.streetLevel
-        ? 'We found the street. Drag the pin to your property, then confirm — we will verify the exact address with you.'
-        : 'Address found — confirm your location on the map.',
-      'success',
+      resolved.approximate
+        ? 'This is the general area for your ZIP — not your exact house. Drag the pin to your property if you can, or confirm and we will verify the exact address with you.'
+        : resolved.streetLevel
+          ? 'We found the street. Drag the pin to your property, then confirm — we will verify the exact address with you.'
+          : 'Address found — confirm your location on the map.',
+      'info',
     );
     void showMap(resolved);
     confirmButton?.focus();
@@ -365,7 +376,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     if (mapCard) mapCard.hidden = true;
     setState('unresolved');
     setStatus(
-      "We couldn't pinpoint the exact address. Pick a street suggestion above and drag the pin to your home — or continue, and we'll confirm the location with you.",
+      "We couldn't pinpoint that address on the map. Everything you typed is saved — try again with any small change (a street abbreviation like Ln/St/Rd, or a nearby cross street), or continue and we'll confirm the location with you personally.",
       'info',
     );
     emit();
@@ -617,6 +628,15 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         const resolved = applyResolvedAddress(data.result);
         if (resolved && data.result.precise === true) {
           showManualCandidate(resolved);
+          return true;
+        }
+        // Owner-directed fallback (Smart Estimate directive, Part 1): a
+        // fully typed address that no provider pinpointed comes back as the
+        // ZIP-reference APPROXIMATE point instead of a dead end. The customer
+        // can drag the pin to the real property or confirm the approximate
+        // spot — never presented as a verified house location.
+        if (resolved && data.result.approximate === true) {
+          showManualCandidate({ ...resolved, approximate: true });
           return true;
         }
       }
@@ -945,7 +965,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         ? { state: manualCandidate.state ?? stateInput?.value ?? '' }
         : {}),
       source: manualCandidate.source,
-      precision: manualCandidate.streetLevel ? 'street' : 'exact',
+      precision: manualCandidate.approximate ? 'approximate' : manualCandidate.streetLevel ? 'street' : 'exact',
       ...(manualCandidate.adjusted ? { adjusted: true } : {}),
       confirmedAt: new Date().toISOString(),
     };
@@ -954,15 +974,19 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     if (confirmedCard) confirmedCard.hidden = false;
     if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(manualConfirmed);
     setTravelNote(
-      manualCandidate.streetLevel
-        ? 'Travel will be estimated from this street-level pin. We will confirm the exact property address with you before your cleaning.'
-        : 'Travel will be calculated from our base to this confirmed pin when your price is prepared.',
+      manualCandidate.approximate
+        ? 'Travel is estimated from this approximate area, not your exact house. Drag the pin to your property for a sharper price, or confirm and we will verify the exact address with you.'
+        : manualCandidate.streetLevel
+          ? 'Travel will be estimated from this street-level pin. We will confirm the exact property address with you before your cleaning.'
+          : 'Travel will be calculated from our base to this confirmed pin when your price is prepared.',
     );
     setState('confirmed');
     setStatus(
-      manualCandidate.streetLevel
-        ? 'Street-level destination confirmed. We will verify the exact address with you.'
-        : 'Destination confirmed. We will calculate travel to this exact location.',
+      manualCandidate.approximate
+        ? 'Approximate area confirmed. We will verify your exact address before booking.'
+        : manualCandidate.streetLevel
+          ? 'Street-level destination confirmed. We will verify the exact address with you.'
+          : 'Destination confirmed. We will calculate travel to this exact location.',
       'success',
     );
     emit();

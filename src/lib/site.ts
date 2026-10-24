@@ -29,10 +29,11 @@ export const primaryNav: NavItem[] = [
 /**
  * Mobile navigation hierarchy (directive §6): a bold "Cleaning Services" group
  * with every service, then top-level pages. Labels are mobile-tuned display
- * names; hrefs always point at the canonical owning pages.
+ * names; hrefs always point at the canonical owning pages. House Cleaning is
+ * NOT a standalone offering (owner directive, 2026-10-24): residential
+ * cleaning lives in Recurring Residential Cleaning and Deep Cleaning.
  */
 export const mobileCleaningNav: NavItem[] = [
-  { label: 'Residential Cleaning', href: '/house-cleaning/' },
   { label: 'Recurring Cleaning', href: '/recurring-cleaning/' },
   { label: 'Deep Cleaning', href: '/deep-cleaning/' },
   { label: 'Move-In / Move-Out', href: '/move-in-move-out-cleaning/' },
@@ -52,7 +53,6 @@ export const mobileTopNav: NavItem[] = [
 /** Footer services column �?" the five primary categories plus the supporting pages. */
 export const footerServicesNav: NavItem[] = [
   ...cleaningTypesNav,
-  { label: 'House Cleaning', href: '/house-cleaning/' },
   { label: 'Church Cleaning', href: '/church-cleaning/' },
 ];
 

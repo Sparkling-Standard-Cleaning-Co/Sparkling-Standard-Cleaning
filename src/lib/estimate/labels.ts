@@ -4,7 +4,7 @@
 import type { Condition, Frequency, LastProfessionalClean, PropertyType, PetSituation, ServiceType } from './types.ts';
 
 export const SERVICE_LABELS: Record<ServiceType, string> = {
-  standard: 'Residential house cleaning',
+  standard: 'Residential cleaning',
   deep: 'Deep cleaning',
   move_in_out: 'Move-in and move-out cleaning',
   str_turnover: 'Short-term rental turnover',

@@ -39,7 +39,6 @@ faqIds:
   - how-estimate-works
   - cancellation-policy
 related:
-  - /house-cleaning/
   - /move-in-move-out-cleaning/
   - /commercial-cleaning/
 ctaLabel: Request Turnover Service

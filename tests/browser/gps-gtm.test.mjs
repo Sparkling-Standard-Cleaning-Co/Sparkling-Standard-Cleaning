@@ -422,7 +422,7 @@ test('an unresolved manual address can still be submitted for confirmation', asy
     await page.waitForSelector('[data-address-finder][data-state="unresolved"]');
     assert.match(
       (await page.locator('[data-address-status]').textContent()) ?? '',
-      /couldn't pinpoint the exact address/i,
+      /couldn't pinpoint (the exact address|that address)/i,
     );
     await completeRemainingSteps(page);
     await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });

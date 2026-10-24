@@ -19,11 +19,11 @@
 //  - The customer's notes are passed through verbatim.
 
 const SERVICE_LABELS: Record<string, string> = {
-  standard: 'Residential house cleaning',
+  standard: 'Residential cleaning',
   deep: 'Deep cleaning',
   move_in_out: 'Move-in and move-out cleaning',
   str_turnover: 'Short-term rental turnover',
-  house: 'Residential house cleaning',
+  house: 'Residential cleaning',
 };
 
 const REQUEST_LABELS: Record<string, string> = {
@@ -108,6 +108,29 @@ const ARRIVAL_LABELS: Record<string, string> = {
   morning: 'Morning window',
   afternoon: 'Afternoon window',
   flexible: 'Flexible',
+};
+
+/** STR turnover linen preferences (informational context; never priced automatically). */
+const LINEN_LABELS: Record<string, string> = {
+  host_provides: 'Host provides fresh linens for each turnover',
+  laundry_on_site: 'Wash and dry used linens on site',
+  laundry_off_site: 'Discuss off-site laundry',
+  not_sure: 'Not sure — advise us',
+};
+
+/** Commercial intake labels (informational; the walkthrough confirms pricing). */
+const BREAKROOM_LABELS: Record<string, string> = {
+  none: 'No kitchen or breakroom',
+  breakroom: 'Small breakroom (sink, counters)',
+  kitchen: 'Full kitchen',
+};
+
+const SPECIALTY_LABELS: Record<string, string> = {
+  post_construction: 'Post-construction cleanup',
+  floor_resurfacing: 'Floor stripping / resurfacing',
+  industrial_kitchen: 'Commercial kitchen deep clean',
+  high_rise: 'Multi-floor / elevator building',
+  other: 'Other (see notes)',
 };
 
 const VERIFICATION_LABELS: Record<string, string> = {
@@ -248,9 +271,11 @@ function locationLines(fields: Record<string, string>): Array<[string, string]> 
     const precisionNote =
       precision === 'street'
         ? ' (street-level pin — exact property to confirm personally)'
-        : precision === 'gps'
-          ? ' (device location pin)'
-          : '';
+        : precision === 'approximate'
+          ? ' (approximate ZIP-area pin — exact address unverified)'
+          : precision === 'gps'
+            ? ' (device location pin)'
+            : '';
     lines.push(['Location — Destination confirmed', `${confirmed === 'yes' ? 'Yes' : 'No'}${precisionNote}`]);
   }
   const coordinate = formatCoordinate(text(fields, 'pin_latitude'), text(fields, 'pin_longitude'));
@@ -458,6 +483,7 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   }
   if (text(fields, 'preferred_date_note')) actions.push('Preferred date was invalid and discarded');
   if (text(fields, 'pin_precision') === 'street') actions.push('Street-level pin — confirm the exact property');
+  if (text(fields, 'pin_precision') === 'approximate') actions.push('Approximate ZIP-area pin — confirm the exact address');
   if (text(fields, 'recipient_name')) {
     actions.push('Gift request — confirm details and send the payment link (no payment taken)');
   }
@@ -525,6 +551,11 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   const property = text(fields, 'property_type');
   add('Home — Property type', PROPERTY_LABELS[property] ?? (property ? humanizeKey(property) : ''), 'property_type');
   add('Home — Approximate size', text(fields, 'square_feet') ? `${text(fields, 'square_feet')} sq ft` : '', 'square_feet');
+  add('Home — Cleanable area', text(fields, 'cleanable_sqft') ? `${text(fields, 'cleanable_sqft')} sq ft cleanable` : '', 'cleanable_sqft');
+  add('Home — Restrooms', text(fields, 'restroom_count'), 'restroom_count');
+  add('Home — Kitchen / breakroom', BREAKROOM_LABELS[text(fields, 'breakroom')] ?? text(fields, 'breakroom'), 'breakroom');
+  add('Home — Commercial condition', CONDITION_LABELS[text(fields, 'condition')] ?? (text(fields, 'condition') ? text(fields, 'condition').replaceAll('_', ' ') : ''), 'condition');
+  add('Home — Specialty needs', SPECIALTY_LABELS[text(fields, 'specialty_services')] ?? text(fields, 'specialty_services'), 'specialty_services');
   const bedrooms = text(fields, 'bedrooms');
   const fullBaths = text(fields, 'full_baths');
   const halfBaths = text(fields, 'half_baths');
@@ -587,6 +618,7 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Scheduling — Time preference', text(fields, 'time_preference'), 'time_preference');
   add('Scheduling — Checkout time', text(fields, 'checkout_time'), 'checkout_time');
   add('Scheduling — Check-in time', text(fields, 'checkin_time'), 'checkin_time');
+  add('Scheduling — Linen / laundry preference', LINEN_LABELS[text(fields, 'linen_preference')] ?? text(fields, 'linen_preference'), 'linen_preference');
   add('Scheduling — Same-day turnovers', text(fields, 'same_day_turnovers'), 'same_day_turnovers');
   add('Scheduling — Laundry', text(fields, 'laundry'), 'laundry');
   add('Scheduling — Consumables', text(fields, 'consumables'), 'consumables');

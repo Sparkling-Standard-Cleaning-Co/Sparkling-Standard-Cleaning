@@ -411,7 +411,7 @@ test('reservation summary carries every answer and the call/text actions work', 
 
     await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
     const summaryText = (await page.locator('[data-reservation-scope]').textContent()) ?? '';
-    assert.match(summaryText, /Residential house cleaning/);
+    assert.match(summaryText, /Residential cleaning/);
     assert.match(summaryText, /One-time/);
     assert.match(summaryText, /1,600 sqft/);
     assert.match(summaryText, /Inside oven/);
@@ -932,7 +932,7 @@ test('the thank-you page shows the single-use request summary exactly once', asy
     assert.equal(await card.isVisible(), true, 'the summary card renders from the stored receipt');
     const text = (await card.textContent()) ?? '';
     assert.match(text, /Reservation request/);
-    assert.match(text, /Residential house cleaning/);
+    assert.match(text, /Residential cleaning/);
     assert.match(text, /Every two weeks/);
     assert.match(text, /100 S Baylen St, Pensacola, FL 32502/);
     assert.match(text, /Tuesday, December 15, 2026/);

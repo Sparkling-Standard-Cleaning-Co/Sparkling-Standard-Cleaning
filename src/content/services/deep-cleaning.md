@@ -39,7 +39,6 @@ faqIds:
   - exclusions
 related:
   - /recurring-cleaning/
-  - /house-cleaning/
   - /move-in-move-out-cleaning/
 ctaLabel: Instant Estimate
 checklistId: deep-clean

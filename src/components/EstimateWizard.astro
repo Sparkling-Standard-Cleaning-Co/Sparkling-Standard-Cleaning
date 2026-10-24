@@ -91,8 +91,8 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
               <input type="radio" name="serviceType" value="standard" required />
               <span class="option__control"></span>
               <span>
-                <span class="option__label">Residential house cleaning</span>
-                <span class="option__desc">A thorough clean of a maintained home, one-time or recurring. New recurring customers begin with a required Deep Cleaning.</span>
+                <span class="option__label">Residential Cleaning</span>
+                <span class="option__desc">One-time or recurring cleaning for your home. New recurring customers begin with a required Deep Cleaning.</span>
               </span>
             </label>
             <label class="option">
@@ -303,6 +303,29 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <input class="input" id="est-beds" name="beds" type="number" inputmode="numeric" min="1" max="30" />
           <span class="hint">Each bed gets fresh linens and a full reset.</span>
         </div>
+        <div class="field-row field-row--2" data-str-only hidden>
+          <div class="field">
+            <label for="est-checkout">Check-out time (optional)</label>
+            <input class="input" id="est-checkout" name="checkoutTime" type="text" placeholder="e.g. 10:00 AM" maxlength="20" />
+            <span class="hint">When guests leave.</span>
+          </div>
+          <div class="field">
+            <label for="est-checkin">Check-in time (optional)</label>
+            <input class="input" id="est-checkin" name="checkinTime" type="text" placeholder="e.g. 4:00 PM" maxlength="20" />
+            <span class="hint">When the next guests arrive.</span>
+          </div>
+        </div>
+        <div class="field" data-str-only hidden>
+          <label for="est-linen">Linen / laundry preference</label>
+          <select class="select" id="est-linen" name="linenPreference">
+            <option value="">Choose one (optional)…</option>
+            <option value="host_provides">We provide fresh linens for each turnover</option>
+            <option value="laundry_on_site">Please wash and dry the used linens on site</option>
+            <option value="laundry_off_site">Please discuss off-site laundry with us</option>
+            <option value="not_sure">Not sure yet — advise us</option>
+          </select>
+          <span class="hint">Hayli confirms the linen plan with you before the first turnover.</span>
+        </div>
       </section>
 
       <!-- Step 3 — condition + frequency -->
@@ -512,8 +535,38 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             id="est-notes"
             name="notes"
             rows="4"
-            placeholder="Anything we should know — pets, parking, priorities, photos you can share later."
+            placeholder="Anything we should know — pets, parking, access details, priorities."
           ></textarea>
+        </div>
+        <div class="photo-upload" data-photo-section hidden>
+          <h3 class="photo-upload__title">Help Us Get to Know Your Space</h3>
+          <p class="photo-upload__hint">
+            If possible, please include three photos: one of your bathroom, one of your kitchen,
+            and one of your main living or work area. Additional photos are welcome. Photos help
+            us understand the property before confirming your scope — please only share photos of
+            the space (no ID documents or personal paperwork).
+          </p>
+          <div class="photo-upload__grid" data-photo-grid></div>
+          <div class="photo-upload__controls">
+            <label class="btn btn--secondary btn--small photo-upload__pick">
+              <Icon name="camera" size={16} />
+              <span data-photo-pick-label>Add photos</span>
+              <input
+                class="photo-upload__input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,.heic,.heif"
+                multiple
+                data-photo-input
+              />
+            </label>
+            <select class="select select--small photo-upload__category" data-photo-category aria-label="Photo category">
+              <option value="bathroom" selected>Bathroom</option>
+              <option value="kitchen">Kitchen</option>
+              <option value="living_area">Main living or work area</option>
+              <option value="additional">Additional photos</option>
+            </select>
+          </div>
+          <div class="photo-upload__status" data-photo-status aria-live="polite"></div>
         </div>
         <TurnstileWidget />
         <div class="honeypot" aria-hidden="true">

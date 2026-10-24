@@ -21,13 +21,16 @@ export interface ConfirmedLocation {
   source: LocationSource;
   /**
    * How specific the confirmed point is:
-   *  - 'exact'  — a resolver returned (or the provider carried) the house number;
-   *  - 'street' — only a street-level match was available; the customer placed
-   *               the pin and the exact property is confirmed personally;
-   *  - 'gps'    — a device location pin.
-   * The exact house number is never fabricated for a street-level match.
+   *  - 'exact'      — a resolver returned (or the provider carried) the house number;
+   *  - 'street'     — only a street-level match was available; the customer placed
+   *                   the pin and the exact property is confirmed personally;
+   *  - 'approximate'— the best available point was the ZIP reference centre
+   *                   (the exact house could not be geocoded). Travel is
+   *                   preliminary and the address needs personal confirmation.
+   *  - 'gps'        — a device location pin.
+   * The exact house number is never fabricated for a non-exact match.
    */
-  precision?: 'exact' | 'street' | 'gps';
+  precision?: 'exact' | 'street' | 'approximate' | 'gps';
   /** True when the customer corrected the pin after resolution. */
   adjusted?: boolean;
   confirmedAt: string;

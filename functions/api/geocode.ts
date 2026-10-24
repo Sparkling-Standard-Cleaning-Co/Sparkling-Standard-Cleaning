@@ -28,6 +28,7 @@ import {
   type GeocodeEnv,
   type PhotonFeature,
 } from '../../src/lib/location/server-geocode.ts';
+import { zipReference } from '../../src/config/geography.ts';
 import {
   rankSuggestions,
   suggestQueryVariants,
@@ -146,7 +147,9 @@ function parseSuggestPayload(data: unknown): RawSuggestion[] {
 }
 
 const PROVIDER_LIMIT = 10;
-const DISPLAY_LIMIT = 6;
+// Owner direction (Smart Estimate directive, Part 1): show three to five
+// useful predictions, never a giant dropdown.
+const DISPLAY_LIMIT = 5;
 
 async function providerSuggest(env: Env, query: string): Promise<RawSuggestion[]> {
   const response = await fetch(
@@ -261,8 +264,33 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       // otherwise the free Census Geocoder. Street-level or POI results are
       // never substituted for a requested house number.
       const resolved = await resolveAddress(env, query).catch(() => null);
-      if (!resolved) return json({ ok: false, error: 'not_found' }, 404);
-      return json({ ok: true, result: resolved });
+      if (resolved) return json({ ok: true, result: resolved });
+      // Owner-directed fallback (Smart Estimate directive, Part 1): a fully
+      // typed address that no provider could pinpoint must not dead-end the
+      // customer. When the query carries a known 5-digit ZIP, return the
+      // ZIP-reference centre as an APPROXIMATE result so the customer can
+      // place the pin themselves or confirm the approximate spot — travel
+      // stays preliminary and the exact house is confirmed personally.
+      // The ZIP centre is never presented as the verified house location.
+      const zip = query.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] ?? '';
+      const reference = zip ? zipReference[zip] : undefined;
+      if (reference) {
+        return json({
+          ok: true,
+          result: {
+            label: `${reference.city} area (ZIP ${zip})`,
+            lat: reference.lat,
+            lng: reference.lng,
+            source: 'census',
+            precise: false,
+            approximate: true,
+            zip,
+            city: reference.city,
+            state: reference.state,
+          },
+        });
+      }
+      return json({ ok: false, error: 'not_found' }, 404);
     }
 
     if (action === 'reverse') {

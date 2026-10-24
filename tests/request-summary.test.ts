@@ -35,7 +35,7 @@ test('a reservation summary carries the submitted facts and the provisional esti
   assert.equal(summary.reference, 'SS-20261002-ABC123');
 
   const byLabel = Object.fromEntries(summary.rows.map((row) => [row.label, row.value]));
-  assert.equal(byLabel['Service'], 'Residential house cleaning');
+  assert.equal(byLabel['Service'], 'Residential cleaning');
   assert.equal(byLabel['Frequency'], 'Every two weeks');
   assert.equal(byLabel['First visit'], 'Deep Cleaning (required)');
   assert.equal(byLabel['Home'], '1600 sq ft · 3 bed · 2 full bath');

@@ -28,6 +28,16 @@ import { serviceAsksFrequency, serviceSupportsFrequency } from '../lib/estimate/
 import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInfo, ServiceType } from '../lib/estimate/types';
 import { locationKey, formatLocationLine, type ConfirmedLocation } from '../lib/location/location';
 import { initAddressFinder, type AddressFinderHandle } from './address-finder';
+import {
+  fetchPhotoUploadConfig,
+  newRequestRef,
+  photoKeysField,
+  uploadPhotos,
+  validatePhotoFile,
+  type PhotoCategory,
+  type UploadedPhoto,
+  type PhotoUploadConfig,
+} from './photo-uploads';
 import { submitLead, recordConversion } from '../lib/forms/submit';
 import { reservationReceipt } from '../lib/forms/verification-copy';
 import { saveSubmissionSummary } from '../lib/forms/submission-receipt';
@@ -127,6 +137,178 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const reserveCall = document.querySelector<HTMLAnchorElement>('[data-reserve-call]');
   const reserveText = document.querySelector<HTMLAnchorElement>('[data-reserve-text]');
   const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
+
+  // ── Customer photos (Smart Estimate directive, Part 2) ────────────────────
+  // The section appears ONLY when the private R2 backend reports itself
+  // provisioned; until then it stays hidden and uploads never pretend to
+  // work. Uploaded references survive wizard navigation (state lives here,
+  // not in the DOM).
+  const photoSection = form.querySelector<HTMLElement>('[data-photo-section]');
+  const photoGrid = form.querySelector<HTMLElement>('[data-photo-grid]');
+  const photoInput = form.querySelector<HTMLInputElement>('[data-photo-input]');
+  const photoCategory = form.querySelector<HTMLSelectElement>('[data-photo-category]');
+  const photoStatus = form.querySelector<HTMLElement>('[data-photo-status]');
+  const photoPickLabel = form.querySelector<HTMLElement>('[data-photo-pick-label]');
+  let photoConfig: PhotoUploadConfig = { enabled: false, maxBytes: 8 * 1024 * 1024, maxCount: 6 };
+  let uploadedPhotos: UploadedPhoto[] = [];
+  const photoRequestRef = newRequestRef();
+  let photoUploading = false;
+
+  function photoCategoryLabel(category: string): string {
+    const option = photoCategory?.querySelector<HTMLOptionElement>(`option[value="${category}"]`);
+    return option?.textContent?.trim() ?? category;
+  }
+
+  function renderPhotos(): void {
+    if (!photoGrid) return;
+    photoGrid.innerHTML = '';
+    for (const [index, photo] of uploadedPhotos.entries()) {
+      const thumb = document.createElement('div');
+      thumb.className = 'photo-upload__thumb';
+      const image = document.createElement('img');
+      image.src = photo.previewUrl;
+      image.alt = `${photoCategoryLabel(photo.category)} photo`;
+      const meta = document.createElement('span');
+      meta.className = 'photo-upload__thumb-meta';
+      const label = document.createElement('span');
+      label.textContent = photoCategoryLabel(photo.category);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'photo-upload__remove';
+      remove.textContent = '✕';
+      remove.setAttribute('aria-label', `Remove ${photoCategoryLabel(photo.category)} photo`);
+      remove.addEventListener('click', () => {
+        URL.revokeObjectURL(photo.previewUrl);
+        uploadedPhotos.splice(index, 1);
+        renderPhotos();
+        setPhotoStatus(`${uploadedPhotos.length} photo${uploadedPhotos.length === 1 ? '' : 's'} attached.`, '');
+      });
+      meta.append(label, remove);
+      thumb.append(image, meta);
+      photoGrid.appendChild(thumb);
+    }
+    if (photoPickLabel) {
+      const remaining = photoConfig.maxCount - uploadedPhotos.length;
+      photoPickLabel.textContent = remaining <= 0 ? 'Photo limit reached' : `Add photos (${remaining} left)`;
+    }
+  }
+
+  function setPhotoStatus(message: string, kind: 'error' | '' ): void {
+    if (!photoStatus) return;
+    photoStatus.textContent = message;
+    photoStatus.dataset.kind = kind;
+  }
+
+  function initPhotoUploads(): void {
+    if (!photoSection || !photoInput || !photoCategory) return;
+    void (async () => {
+      photoConfig = await fetchPhotoUploadConfig();
+      if (!photoConfig.enabled) return;
+      photoSection.hidden = false;
+      // STR turnovers photograph bedrooms/bathrooms/kitchen/laundry areas.
+      const syncCategories = (): void => {
+        const isStr = radioValue('serviceType') === 'str_turnover';
+        const options = [...photoCategory.querySelectorAll<HTMLOptionElement>('option')];
+        for (const option of options) option.remove();
+        const entries: Array<[string, string]> = isStr
+          ? [
+              ['bedroom', 'Bedrooms'],
+              ['bathroom', 'Bathrooms'],
+              ['kitchen', 'Kitchen'],
+              ['laundry', 'Laundry / linens'],
+              ['additional', 'Additional photos'],
+            ]
+          : [
+              ['bathroom', 'Bathroom'],
+              ['kitchen', 'Kitchen'],
+              ['living_area', 'Main living or work area'],
+              ['additional', 'Additional photos'],
+            ];
+        for (const [value, label] of entries) {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = label;
+          photoCategory.appendChild(option);
+        }
+      };
+      syncCategories();
+      form.addEventListener('change', (event) => {
+        if (event.target instanceof HTMLInputElement && event.target.name === 'serviceType') syncCategories();
+      });
+
+      photoInput.addEventListener('change', () => {
+        void handlePhotoSelection();
+      });
+      // Drag-and-drop on the section (desktop nicety).
+      photoSection.addEventListener('dragover', (event) => event.preventDefault());
+      photoSection.addEventListener('drop', (event) => {
+        event.preventDefault();
+        if (photoInput && event.dataTransfer?.files.length) {
+          photoInput.files = event.dataTransfer.files;
+          void handlePhotoSelection();
+        }
+      });
+    })();
+  }
+
+  async function handlePhotoSelection(): Promise<void> {
+    if (!photoInput || !photoCategory || photoUploading) return;
+    const files = [...(photoInput.files ?? [])];
+    photoInput.value = '';
+    if (files.length === 0) return;
+    const room = photoConfig.maxCount - uploadedPhotos.length;
+    if (room <= 0) {
+      setPhotoStatus(`Up to ${photoConfig.maxCount} photos, please. Remove one to add another.`, 'error');
+      return;
+    }
+    const accepted: File[] = [];
+    for (const file of files) {
+      const problem = validatePhotoFile(file, photoConfig.maxBytes);
+      if (problem) {
+        setPhotoStatus(problem, 'error');
+        continue;
+      }
+      if (accepted.length + uploadedPhotos.length >= photoConfig.maxCount) {
+        setPhotoStatus(`Up to ${photoConfig.maxCount} photos, please. Only the first ${room} were added.`, 'error');
+        break;
+      }
+      accepted.push(file);
+    }
+    if (accepted.length === 0) return;
+    photoUploading = true;
+    setPhotoStatus(`Uploading ${accepted.length} photo${accepted.length === 1 ? '' : 's'}…`, '');
+    const category = photoCategory.value as PhotoCategory;
+    const result = await uploadPhotos(accepted, category, photoRequestRef, (percent) => {
+      setPhotoStatus(`Uploading photos… ${percent}%`, '');
+    });
+    photoUploading = false;
+    if (!result.ok || !result.photos) {
+      const reason =
+        result.error === 'file_too_large'
+          ? 'A photo was too large for upload.'
+          : result.error === 'unsupported_format'
+            ? 'One of those files is not a supported photo format.'
+            : result.error === 'rate_limited'
+              ? 'Too many uploads in a short time — try again in a minute.'
+              : 'Upload did not complete — check your connection and try again.';
+      setPhotoStatus(`${reason} Your other details are saved; you can continue without photos.`, 'error');
+      return;
+    }
+    for (const [index, photo] of result.photos.entries()) {
+      const source = accepted[index];
+      if (!source) continue;
+      uploadedPhotos.push({
+        ...photo,
+        previewUrl: URL.createObjectURL(source),
+        label: source.name,
+      });
+    }
+    renderPhotos();
+    setPhotoStatus(
+      `${uploadedPhotos.length} photo${uploadedPhotos.length === 1 ? '' : 's'} attached — uploaded privately for Hayli's review.`,
+      '',
+    );
+  }
 
   let currentStep = 1;
   let location: ConfirmedLocation | null = null;
@@ -279,17 +461,21 @@ function initEstimateWizard(form: HTMLFormElement): void {
     const travel = result.travel;
     const submission = submissionAddress();
     // Routing is only presented as distance-based certainty when the customer
-    // confirmed a street address. A GPS pin, a street-level pin or a ZIP keeps
-    // the preliminary wording: they are locations, not verified postal
-    // addresses.
+    // confirmed a street address. A GPS pin, a street-level pin, an
+    // approximate ZIP-area pin or a bare ZIP keeps the preliminary wording:
+    // they are locations, not verified postal addresses.
     const streetConfirmed =
       submission.location !== null &&
       submission.street.trim().length >= 5 &&
-      submission.location.precision !== 'street';
+      submission.location.precision !== 'street' &&
+      submission.location.precision !== 'approximate';
     if (travel.mode === 'routed' && travel.verified && streetConfirmed) {
       const miles =
         travel.oneWayMiles !== null ? ` (about ${Math.round(travel.oneWayMiles)} miles one way)` : '';
       return `Your proposed price includes travel based on the driving distance to your selected location${miles}.`;
+    }
+    if (submission.location?.precision === 'approximate') {
+      return 'Travel is estimated from the approximate area you confirmed — not your exact house. Drag the pin to your property for a sharper price; we will confirm the exact address before booking.';
     }
     if (travel.mode === 'routed' || travel.mode === 'zone') {
       return 'Your proposed price includes estimated travel. Sparkling Standard will confirm your location and final price before booking.';
@@ -320,7 +506,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const confidenceCopy =
         submissionAddress().location?.precision === 'street'
           ? 'Based on the street-level pin you placed — we will verify the exact property with you.'
-          : result.confidence === 'high'
+          : submissionAddress().location?.precision === 'approximate'
+            ? 'Based on the approximate area you confirmed — drag the pin to your property for a sharper price.'
+            : result.confidence === 'high'
             ? 'Based on your confirmed address and complete details.'
             : result.confidence === 'medium'
               ? 'May shift slightly after we confirm a few details.'
@@ -537,12 +725,15 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     const input = gatherInput();
     // Verified travel wording requires BOTH a live route and a confirmed
-    // street address; a bare GPS pin or ZIP keeps the preliminary copy.
+    // street address; a bare GPS pin, an approximate ZIP-area pin or a bare
+    // ZIP keeps the preliminary copy.
     const summarySubmission = submissionAddress();
     const travelFullyVerified =
       latestQuote.travelVerified &&
       summarySubmission.location !== null &&
-      summarySubmission.street.trim().length >= 5;
+      summarySubmission.street.trim().length >= 5 &&
+      summarySubmission.location.precision !== 'approximate' &&
+      summarySubmission.location.precision !== 'street';
     if (reservationPrice) reservationPrice.textContent = `$${latestQuote.amount.toLocaleString()}`;
     if (reservationEyebrow) reservationEyebrow.textContent = primaryPriceHeading(result);
     if (reservationReference) {
@@ -1169,6 +1360,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
       full_baths: input.fullBaths !== undefined ? String(input.fullBaths) : '',
       half_baths: input.halfBaths !== undefined ? String(input.halfBaths) : '',
       beds: input.beds !== undefined ? String(input.beds) : '',
+      // STR turnover context (informational — never priced without the
+      // owner's confirmation; the per-turnover estimate is the price).
+      checkout_time: input.serviceType === 'str_turnover' ? textValue('checkoutTime') ?? '' : '',
+      checkin_time: input.serviceType === 'str_turnover' ? textValue('checkinTime') ?? '' : '',
+      linen_preference: input.serviceType === 'str_turnover' ? textValue('linenPreference') ?? '' : '',
       frequency: input.frequency ?? '',
       condition: input.condition ?? '',
       last_cleaned: input.lastClean ?? '',
@@ -1232,6 +1428,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
         fields.ongoing_price_per_visit = String(result.ongoing.perVisitPrice);
         fields.ongoing_frequency = result.ongoing.frequency;
       }
+    }
+    // Customer photos (optional): private storage references only — the
+    // owner views them through the authorized photo endpoint, never a
+    // public URL. Empty when no photos were uploaded.
+    const photoKeys = photoKeysField(uploadedPhotos);
+    if (photoKeys) {
+      fields.photo_keys = photoKeys;
+      fields.photo_request_ref = photoRequestRef;
     }
     return { ...fields, ...attributionFields() };
   }
@@ -1464,6 +1668,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   resetWizard();
   applyDateWindow();
+  initPhotoUploads();
 
   // Deep links from marketing pages: /estimate/?frequency=biweekly preselects
   // the recurring rhythm (and ?service=deep preselects the service), so a

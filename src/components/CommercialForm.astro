@@ -71,8 +71,41 @@ const facilityTypes = [
       </select>
     </div>
     <div class="field">
-      <label for="commercial-sqft">Approximate square footage</label>
-      <input class="input" id="commercial-sqft" name="square_feet" type="text" inputmode="numeric" placeholder="e.g. 4,000" />
+      <label for="commercial-sqft">Approximate cleanable square footage</label>
+      <input
+        class="input"
+        id="commercial-sqft"
+        name="cleanable_sqft"
+        type="text"
+        inputmode="numeric"
+        placeholder="e.g. 2,000 (the area we actually clean)"
+      />
+      <span class="hint">Just the floors and rooms that need cleaning — not storage or unused space.</span>
+    </div>
+  </div>
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="commercial-restrooms">Restrooms</label>
+      <input
+        class="input"
+        id="commercial-restrooms"
+        name="restroom_count"
+        type="number"
+        inputmode="numeric"
+        min="0"
+        max="30"
+        placeholder="e.g. 2"
+      />
+    </div>
+    <div class="field">
+      <label for="commercial-breakroom">Kitchen or breakroom?</label>
+      <select class="select" id="commercial-breakroom" name="breakroom">
+        <option value="">Choose one (optional)…</option>
+        <option value="none">No kitchen or breakroom</option>
+        <option value="breakroom">Small breakroom (sink, counters)</option>
+        <option value="kitchen">Full kitchen</option>
+      </select>
     </div>
   </div>
 
@@ -90,6 +123,19 @@ const facilityTypes = [
       </select>
     </div>
     <div class="field">
+      <label for="commercial-condition">Current condition</label>
+      <select class="select" id="commercial-condition" name="condition">
+        <option value="">Choose one (optional)…</option>
+        <option value="maintained">Maintained — cleaned regularly</option>
+        <option value="average">Average — normal use</option>
+        <option value="needs_attention">Needs attention</option>
+        <option value="heavy">Heavy buildup</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field-row field-row--2">
+    <div class="field">
       <label for="commercial-time">Preferred time window</label>
       <select class="select" id="commercial-time" name="time_preference" required>
         <option value="">When should we clean?</option>
@@ -97,6 +143,17 @@ const facilityTypes = [
         <option value="daytime">Daytime</option>
         <option value="evening">Evening (until 7:00 p.m.)</option>
         <option value="flexible">Flexible / discuss</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="commercial-specialty">Specialty needs (optional)</label>
+      <select class="select" id="commercial-specialty" name="specialty_services">
+        <option value="">None</option>
+        <option value="post_construction">Post-construction cleanup</option>
+        <option value="floor_resurfacing">Floor stripping / resurfacing</option>
+        <option value="industrial_kitchen">Commercial kitchen deep clean</option>
+        <option value="high_rise">Multi-floor / elevator building</option>
+        <option value="other">Other — describe in notes</option>
       </select>
     </div>
   </div>

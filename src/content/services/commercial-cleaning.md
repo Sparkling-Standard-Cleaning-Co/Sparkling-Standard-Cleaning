@@ -40,7 +40,6 @@ faqIds:
 related:
   - /church-cleaning/
   - /short-term-rental-cleaning/
-  - /house-cleaning/
 ctaLabel: Request a Walkthrough
 ctaHref: /commercial-cleaning/#walkthrough
 checklistId: commercial-general

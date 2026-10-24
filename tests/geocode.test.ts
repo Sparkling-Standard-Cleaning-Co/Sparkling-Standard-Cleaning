@@ -207,6 +207,67 @@ test('geocode resolve: an unfindable address is honestly not_found', async () =>
   assert.deepEqual(await response.json(), { ok: false, error: 'not_found' });
 });
 
+// ── Owner-directed approximate fallback (Smart Estimate directive, Part 1) ──
+// A fully typed address that no provider could pinpoint must not dead-end
+// the customer: when the query carries a KNOWN 5-digit ZIP, the resolve
+// action returns the ZIP-reference centre as an APPROXIMATE result. It is
+// never presented as the verified house location (precise stays false).
+test('geocode resolve: an unfindable address with a known ZIP returns the approximate ZIP-area point', async () => {
+  const response = await withFetch(
+    async () => jsonResponse({ result: { addressMatches: [] } }),
+    () =>
+      geocodePost({
+        request: request({ action: 'resolve', query: 'Notareal Street 999, Pensacola, FL 32503' }),
+        env: {},
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as {
+    result: { label: string; precise: boolean; approximate?: boolean; zip?: string; lat: number; lng: number };
+  };
+  assert.equal(data.result.approximate, true, 'explicitly marked approximate');
+  assert.equal(data.result.precise, false, 'never a verified house location');
+  assert.equal(data.result.zip, '32503');
+  assert.match(data.result.label, /Pensacola area \(ZIP 32503\)/);
+  // The ZIP reference for 32503.
+  assert.ok(Math.abs(data.result.lat - 30.45) < 0.01 && Math.abs(data.result.lng - (-87.21)) < 0.01);
+});
+
+test('geocode resolve: an unfindable address with an unknown ZIP is still honestly not_found', async () => {
+  const response = await withFetch(
+    async () => jsonResponse({ result: { addressMatches: [] } }),
+    () =>
+      geocodePost({
+        request: request({ action: 'resolve', query: 'Notareal Street 999, Nowhere, ZZ 99999' }),
+        env: {},
+      } as never),
+  );
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { ok: false, error: 'not_found' });
+});
+
+test('geocode resolve: a found exact address never carries the approximate flag', async () => {
+  const response = await withFetch(
+    async () =>
+      jsonResponse({
+        result: {
+          addressMatches: [
+            { matchedAddress: '100 S BAYLEN ST, PENSACOLA, FL, 32502', coordinates: { x: -87.2164, y: 30.4111 } },
+          ],
+        },
+      }),
+    () =>
+      geocodePost({
+        request: request({ action: 'resolve', query: '100 S Baylen St, Pensacola, FL 32502' }),
+        env: {},
+      } as never),
+  );
+  const data = (await response.json()) as { result: { precise: boolean; approximate?: boolean } };
+  assert.equal(response.status, 200);
+  assert.equal(data.result.precise, true);
+  assert.notEqual(data.result.approximate, true);
+});
+
 test('geocode resolve: passes ZIP/city/state through when the provider supplies them', async () => {
   const response = await withFetch(
     async () =>
@@ -349,8 +410,19 @@ test('geocode resolve: a MapMap POI result never replaces the requested house nu
         env: { MAPMAP_API_KEY: 'dummy-key' },
       } as never),
   );
-  assert.equal(response.status, 404);
-  assert.deepEqual(await response.json(), { ok: false, error: 'not_found' });
+  // Owner-directed approximate fallback (Smart Estimate directive, Part 1):
+  // the POI is still NEVER returned as the destination — the honest result is
+  // the APPROXIMATE ZIP-area point, explicitly not a verified house.
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as {
+    result: { label: string; precise: boolean; approximate?: boolean; lat: number; lng: number };
+  };
+  assert.notEqual(data.result.label, 'Molino Volunteer Fire Department', 'the POI is never the destination');
+  assert.equal(data.result.approximate, true);
+  assert.equal(data.result.precise, false);
+  assert.match(data.result.label, /Molino area \(ZIP 32577\)/);
+  // The 32577 reference point, NOT the POI coordinates.
+  assert.ok(Math.abs(data.result.lat - 30.72) < 0.05 && Math.abs(data.result.lng - (-87.33)) < 0.05);
 });
 
 test('geocode suggest: out-of-state rows are filtered out for the selected state', async () => {

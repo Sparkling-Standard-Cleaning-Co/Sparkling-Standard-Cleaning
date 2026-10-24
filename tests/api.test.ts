@@ -204,7 +204,7 @@ test('lead: a successful owner delivery sends exactly one branded customer confi
     assert.deepEqual(body.to, ['synthetic@example.com'], 'correct recipient');
     assert.equal(body.subject, 'We received your Sparkling Standard request', 'correct subject');
     assert.match(String(body.html), /We received your request/, 'HTML body generated');
-    assert.match(String(body.html), /Residential house cleaning/);
+    assert.match(String(body.html), /Residential cleaning/);
     assert.match(String(body.text), /WE RECEIVED YOUR REQUEST/, 'plain-text body generated');
     assert.match(String(body.text), /100 S Baylen St, Pensacola, FL 32502/);
     const headers = resendCalls[0].init?.headers as Record<string, string>;

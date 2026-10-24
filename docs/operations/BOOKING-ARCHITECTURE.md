@@ -1,0 +1,75 @@
+# Future booking & checkout architecture — roadmap (NOT ACTIVE)
+
+Owner directive: Smart Estimate System 2.0, Part 6. This documents how the
+current Astro/Cloudflare architecture can grow into direct booking WITHOUT
+rebuilding the estimator. **Nothing here is activated. No appointments are
+auto-confirmed and no payments are collected today.**
+
+## The state machine (never interchangeable)
+
+```
+ESTIMATE  ── the calculator's proposal (browser) + server recompute
+   │
+REQUEST SUBMITTED ── the lead/email today; nothing is booked
+   │
+OWNER APPROVED ── Hayli reviews scope, photos, travel; sets the real price
+   │
+APPOINTMENT RESERVED ── a held slot with a validity window (a temporary hold,
+   │                      not a promise; expires silently)
+APPOINTMENT CONFIRMED ── the customer accepts; the slot is theirs
+   │
+PAID / PARTIALLY PAID ── deposit or authorization captured through Stripe
+```
+
+Every state is a distinct, persisted record with an audit trail. The current
+system implements exactly ESTIMATE → REQUEST SUBMITTED → (human) OWNER
+APPROVED — everything below is future work.
+
+## What the current architecture already provides
+
+- **Estimate engine** — shared browser/server calculation with
+  reconciliation, quote `configVersion`, SPARKLE100, floor-$5, minimum/margin
+  safeguards, travel verification (`functions/api/lead.ts`).
+- **Lead record + notification** — the flat field map is effectively a
+  proto-booking record; the reservation ledger docs
+  (`docs/operations/RESERVATION-TRACKING.md`) already track statuses.
+- **Payment primitives (dormant)** — Stripe Checkout + a
+  signature-verified webhook exist for gift certificates
+  (`functions/api/gift-checkout.ts`, `functions/api/stripe-webhook.ts`); the
+  same pattern extends to deposits. No new vendor needed.
+- **Scheduling config** — `src/config/scheduling.ts` (60-day window,
+  statuses) is the seed of an availability model.
+- **Private storage** — the R2 photo pipeline (Part 2) demonstrates the
+  server-binding pattern a future booking store would follow (KV or D1 for
+  slot records).
+
+## Recommended additions (in order, each behind its own config flag)
+
+1. **Availability model** — owner-defined working windows in config/KV;
+   travel-aware service windows (start time + route duration + job hours +
+   buffer); a `GET /api/availability?date&zip` function that returns genuine
+   open slots only. Conflict prevention is a uniqueness constraint on
+   (date, slot) — D1 or KV with a conditional put.
+2. **Temporary holds** — a signed, short-lived hold token issued by
+   `/api/hold`; expires silently; one live hold per request reference.
+3. **Deposit / authorization** — reuse the gift-checkout Stripe pattern for a
+   configurable deposit (e.g. a fixed amount or a percentage the owner sets
+   per service). Authorization-only (capture later) keeps cancellations
+   clean.
+4. **Customer confirmation + reminders** — the existing customer-email
+   path (Resend) already sends request confirmations; it extends to booking
+   confirmations and reminder schedules via a cron-triggered Pages Function.
+5. **Owner dashboard** — start as a function-rendered protected page
+   (owner token, same pattern as photo viewing) listing requests by state.
+   Only grow it into a full app when the paper process actually hurts.
+6. **Rescheduling/cancellation** — a state transition + notification pair;
+   policy windows belong in config, not code.
+
+## Non-negotiables carried forward
+
+- A price is still the owner's to confirm; auto-booked prices must remain
+  inside the approved model only, or the feature stays off.
+- The $125 minimum, floor-$5 rounding, SPARKLE100 rules and the 35-mile
+  travel assumption apply unchanged to any booking surface.
+- Every money-touching path goes through server-authoritative state changes —
+  the browser never marks anything paid or booked.

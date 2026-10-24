@@ -361,6 +361,40 @@ collections are intentionally empty — not errors.
   captions read "Project photos are added only with customer approval." Proposed prices round
   **DOWN** to the nearest $5 (owner-approved), and travel assumes a 35-mile round trip
   (17.5 one-way included). Quote `configVersion` is `2026-10-23.floor5-travel35.v1`.
+- **Smart Estimate System 2.0 (2026-10-24, owner directive):**
+  - **Address reliability:** an exact-address resolve that no provider could pinpoint no longer
+    dead-ends — when the typed query carries a KNOWN 5-digit ZIP, the resolve action returns the
+    ZIP-reference centre as an APPROXIMATE result (functions/api/geocode.ts). The customer can
+    drag the pin to the real property or confirm the approximate area; the confirmed location
+    carries `precision: 'approximate'`, travel stays preliminary everywhere (live panel, summary,
+    notification "Approximate ZIP-area pin — confirm the exact address"), and it is NEVER
+    presented as a verified street address. Suggestions show 3–5 rows.
+  - **House Cleaning removed as an offering (additional owner directive):** "House Cleaning" no
+    longer appears in the footer SERVICES column, the navigation dropdowns, or the estimator's
+    service selection (the option reads "Residential Cleaning"). `/house-cleaning/` remains as an
+    SEO information page that routes visitors to Recurring Residential Cleaning and Deep Cleaning
+    — never deleted, never a broken link, never presented as a third service.
+  - **Customer photos (architecture in, production DISABLED):** optional estimator section "Help
+    Us Get to Know Your Space" (bathroom/kitchen/living area; STR switches to bedrooms/laundry
+    categories). Uploads POST directly to functions/api/photo-upload.ts → PRIVATE Cloudflare R2
+    (`PHOTOS_BUCKET` binding) with server-generated keys, magic-byte validation and size caps;
+    owner-only retrieval via functions/api/photo-view.ts + `PHOTO_OWNER_TOKEN`. The section stays
+    hidden until the GET probe reports `enabled: true` — nothing fakes an upload. Provisioning:
+    docs/operations/PHOTO-UPLOADS.md.
+  - **STR turnover context:** the estimator's STR path adds optional check-out/check-in times and
+    a linen/laundry preference (informational — the per-turnover price is unchanged); all three
+    travel with the request into the owner notification.
+  - **Commercial tiers (architecture in, numeric estimates PENDING OWNER APPROVAL):**
+    src/config/commercial-tiers.ts holds the Tier A/B/C model with configurable thresholds
+    (~2,500 sqft Tier A boundary is the owner's PROPOSAL, not approved policy). While
+    `numericEstimatesEnabled: false`, every commercial request routes to Tier C (walkthrough
+    quote). The commercial intake form now collects cleanable sqft, restrooms, kitchen/breakroom,
+    condition and specialty needs — all labeled in the owner notification. Model analysis:
+    docs/launch/COMMERCIAL-ESTIMATE-MODEL.md.
+  - **Future booking roadmap (documentation only):** docs/operations/BOOKING-ARCHITECTURE.md
+    defines the state machine (Estimate → Request Submitted → Owner Approved → Reserved →
+    Confirmed → Paid) and the recommended additions. NOTHING is auto-booked and no payment is
+    collected.
 - **Premium icon collection (2026-10-24, owner-supplied artwork):** the six service icons
   and four company-value icons are the owner's premium vector tiles
   (`src/assets/icons/premium/`, rendered by `src/components/PremiumIcon.astro` with the

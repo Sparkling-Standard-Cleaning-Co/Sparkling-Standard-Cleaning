@@ -39,7 +39,6 @@ faqIds:
   - payment-timing
 related:
   - /deep-cleaning/
-  - /house-cleaning/
   - /short-term-rental-cleaning/
 ctaLabel: Instant Estimate
 checklistId: recurring-maintenance

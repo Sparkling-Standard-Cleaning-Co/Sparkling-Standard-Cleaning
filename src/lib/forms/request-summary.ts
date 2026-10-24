@@ -35,11 +35,11 @@ export interface RequestSummary {
 }
 
 const SERVICE_LABELS: Record<string, string> = {
-  standard: 'Residential house cleaning',
+  standard: 'Residential cleaning',
   deep: 'Deep cleaning',
   move_in_out: 'Move-in and move-out cleaning',
   str_turnover: 'Short-term rental turnover',
-  house: 'Residential house cleaning',
+  house: 'Residential cleaning',
 };
 
 const FREQUENCY_LABELS: Record<string, string> = {
