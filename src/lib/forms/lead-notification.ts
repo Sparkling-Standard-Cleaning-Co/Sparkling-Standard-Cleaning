@@ -355,6 +355,21 @@ function pricingLines(fields: Record<string, string>): Array<[string, string]> {
   if (verdict) {
     lines.push(['Pricing — Verification result', VERIFICATION_LABELS[verdict] ?? humanizeKey(verdict)]);
   }
+  // Direct-provider fallback (no server verification): the client's figures
+  // are explicitly unverified and can never read as a proposed quote.
+  const unverifiedPrice = text(fields, 'unverified_client_price');
+  if (unverifiedPrice) {
+    lines.push(['Pricing — UNVERIFIED client estimate (server verification unavailable — re-quote required)', money(unverifiedPrice)]);
+    const unverifiedRange = text(fields, 'unverified_client_range');
+    if (unverifiedRange) lines.push(['Pricing — UNVERIFIED client range', unverifiedRange]);
+    const unverifiedFirst = text(fields, 'unverified_client_first_visit');
+    if (unverifiedFirst) lines.push(['Pricing — UNVERIFIED client first-visit total', money(unverifiedFirst)]);
+    const unverifiedOngoing = text(fields, 'unverified_client_ongoing_price');
+    if (unverifiedOngoing) {
+      const rhythm = text(fields, 'unverified_client_ongoing_frequency');
+      lines.push(['Pricing — UNVERIFIED client ongoing per-visit figure', `${money(unverifiedOngoing)}${rhythm ? ` per ${rhythm}` : ''}`]);
+    }
+  }
   if (verdict === 'mismatch') {
     lines.push([
       'Pricing — ACTION REQUIRED',
@@ -468,11 +483,18 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   }
   const verdict = text(fields, 'quote_verified');
   if (verdict && VERIFICATION_SHORT[verdict]) summaryPriceParts.push(VERIFICATION_SHORT[verdict] as string);
+  if (text(fields, 'unverified_priced_request') === 'yes') {
+    const unverified = text(fields, 'unverified_client_price');
+    summaryPriceParts.push(unverified ? `UNVERIFIED ${money(unverified)}` : 'UNVERIFIED price');
+  }
   add('Summary — Price', summaryPriceParts.join(' · '));
 
   const actions: string[] = [];
   if (verdict === 'mismatch') {
     actions.push('Price mismatch — confirm the correct price before scheduling');
+  }
+  if (text(fields, 'unverified_priced_request') === 'yes') {
+    actions.push('UNVERIFIED client estimate (server verification unavailable) — re-quote before confirming');
   }
   if (verdict === 'unverifiable' || text(fields, 'verification_status') === 'authoritative_error') {
     actions.push('Verification could not complete — review manually');
@@ -602,6 +624,12 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
     'verified_range',
     'quote_verified',
     'minimum_job_applied',
+    'unverified_client_price',
+    'unverified_client_range',
+    'unverified_client_first_visit',
+    'unverified_client_ongoing_price',
+    'unverified_client_ongoing_frequency',
+    'unverified_priced_request',
   ]);
   addLines(travelLines(fields), [
     'travel_qualification',

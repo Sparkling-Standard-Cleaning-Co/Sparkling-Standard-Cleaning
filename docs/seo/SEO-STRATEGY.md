@@ -6,7 +6,7 @@ One strategy document. Git history is the archive — never create competing "ma
 
 | Query cluster | Owning page | Primary intent |
 | --- | --- | --- |
-| house cleaning pensacola / one-time cleaning | `/house-cleaning/` | Residential standard clean |
+| house cleaning pensacola / one-time cleaning | `/house-cleaning/` | Informational residential landing page (House Cleaning is not a separately bookable service; it routes visitors to Recurring Residential Cleaning and Deep Cleaning) |
 | recurring house cleaning / weekly / biweekly | `/recurring-cleaning/` | Recurring service |
 | deep cleaning | `/deep-cleaning/` | Detail reset |
 | move out cleaning / move in cleaning | `/move-in-move-out-cleaning/` | Walkthrough-driven cleaning |

@@ -126,12 +126,12 @@ test('the circular brand mark carries the full identity and links home', async (
   }
 });
 
-test('Types of Cleanings exposes the six approved cleaning categories', async () => {
+test('Types of Cleanings exposes the seven approved cleaning categories', async () => {
   const { context, page } = await open('/', 1280, 900);
   try {
     await page.locator('.nav-dropdown__trigger').click();
     const links = page.locator('.nav-dropdown__menu a');
-    assert.equal(await links.count(), 6, 'six cleaning categories');
+    assert.equal(await links.count(), 7, 'seven cleaning categories');
     const labels = await links.allTextContents();
     assert.deepEqual(
       labels.map((label) => label.trim()),
@@ -142,7 +142,13 @@ test('Types of Cleanings exposes the six approved cleaning categories', async ()
         'Supportive Home Cleaning',
         'Short-term Rental Turnover Cleaning',
         'Commercial Cleaning',
+        'Church Cleaning',
       ],
+    );
+    // House Cleaning must never appear as a bookable category (owner decision).
+    assert.ok(
+      labels.every((label) => label.trim() !== 'House Cleaning'),
+      'House Cleaning is not a standalone offering',
     );
   } finally {
     await context.close();

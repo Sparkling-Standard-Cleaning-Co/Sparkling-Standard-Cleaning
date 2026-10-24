@@ -32,3 +32,23 @@ jobs:
         run: node scripts/check-fake-testimonials.mjs
       - name: No-fabrication audit
         run: node scripts/audit-facts.mjs
+
+  # Browser regression suite (Playwright) — Sparkling Standard 4.0 §3D.
+  # The full journey/wizard/booking/address/analytics suites run against a
+  # built static preview. This catches UI, estimator and quote-flow regressions
+  # that type checks and DOM-less tests cannot.
+  browser:
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser regression suite (builds the site first)
+        run: npm run test:browser
+

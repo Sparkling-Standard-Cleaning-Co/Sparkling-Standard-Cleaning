@@ -13,6 +13,7 @@ import { business } from '../../config/business';
 import type { AnalyticsEventName } from '../analytics/events';
 import { track } from '../analytics/events';
 import type { FailureReason } from './failure-copy';
+import { directFallbackFields } from './fallback-fields.ts';
 
 export type SubmitOutcome =
   | { ok: true; via: 'relay' | 'provider'; verification?: LeadVerification }
@@ -124,6 +125,11 @@ export function recordConversion<K extends AnalyticsEventName>(
   }
 }
 
+/**
+ * Direct-provider fallback: priced submissions are degraded to nonbinding
+ * inquiries with explicitly unverified figures (see fallback-fields.ts).
+ */
+
 export async function submitLead(
   fields: Record<string, string>,
   subject: string,
@@ -171,26 +177,33 @@ export async function submitLead(
   }
 
   // 2) Static fallback: direct provider submission with the public key. This
-  //    path has no server to verify a quote, so it is labeled unmistakably for
-  //    the owner (verification_path/status/note) and the customer copy stays
-  //    request-only. The browser price is NEVER presented as a validated quote.
+  //    path has no server to verify a quote, so a PRICED submission is
+  //    degraded to a nonbinding estimate request: every quote-claim field is
+  //    stripped, the client's figures are re-labeled as unverified, and the
+  //    subject/request type can never read as a reservation. The browser
+  //    price is NEVER presented as a validated quote (directive 4.0 §3A).
   if (!business.forms.web3formsAccessKey) {
     return { ok: false, reason: 'not_configured' };
   }
+  const fallbackFields = directFallbackFields(fields);
+  const fallbackSubject =
+    fallbackFields === fields
+      ? subject
+      : subject.replace(/^reservation request/i, 'Estimate request (unverified price)');
   try {
     const response = await fetch(business.forms.web3formsEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         access_key: business.forms.web3formsAccessKey,
-        subject,
+        subject: fallbackSubject,
         botcheck: '',
+        ...fallbackFields,
         verification_path: 'direct_provider',
         verification_status: 'unverified_direct_submission',
         verification_note:
-          'UNVERIFIED: submitted directly to the form provider — no authoritative server verification was available for this estimate.',
+          'UNVERIFIED: submitted directly to the form provider -- no authoritative server verification was available for this estimate.',
         submitted_at_client: new Date().toISOString(),
-        ...fields,
       }),
     });
     const data = (await response.json().catch(() => ({}))) as { success?: boolean };

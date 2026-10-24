@@ -4,20 +4,22 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-21** (all 46 owner decisions recorded; brand and policy implementation
-pass; production deployment pending at the time this register was updated).
+Last reviewed: **2026-10-24** (Sparkling Standard 4.0 stabilization pass; release record corrected
+to the actually deployed commit).
 
-**Release status:** production serves GitHub `main`. `origin/main` is **`62a1a46`** — the
-owner-authorized 2026-10-03 release set (the five-commit release `8b8dde4`…`5a4a024`, the
+**Release status:** production serves GitHub `main`. At the last verified deployment `origin/main`
+was **`412ade9`** (Smart Estimate System 2.0: two-price recurring quotes, service-driven estimator,
+approximate ZIP-area address fallback, STR turnover context, disabled commercial tiers, disabled R2
+photo intake, House Cleaning removed as a standing offering). Earlier release notes below are
+historical: the 2026-10-03 set was `62a1a46` (the five-commit release `8b8dde4`…`5a4a024`, the
 documentation closeout `7a51efa`, the six-profile social integration `cdc4971`, the
-deployment-closeout `6ebc3fb` and the logo-only Follow Us redesign `62a1a46`) deployed through
-Cloudflare Pages after green GitHub Actions runs. Live acceptance checks passed: pages load,
-`/brand-preview/` removed, GA4 consent-controlled with one Google tag, gift-certificate/reservation
-behavior unchanged, sitemap and navigation correct, a labeled attribution acceptance submission
-delivered with correct first/latest fields, and all eight Follow Us profiles rendering as 52px
-circular logo-only buttons (one row desktop/tablet, two rows of four on phones, no overflow at
-320px). Evidence: `docs/verification/VERIFICATION.md`. Any later local documentation follow-up
-stays unpublished until the owner authorizes another push.
+deployment-closeout `6ebc3fb` and the logo-only Follow Us redesign `62a1a46`). Every later
+deployment (2026-10-21 owner-decision implementation, 2026-10-23 audit corrections, 2026-10-24
+premium icons and Smart Estimate 2.0) was pushed to `main` and verified live through Cloudflare
+Pages. Live acceptance checks for the current release: homepage, recurring page, estimator two-price
+flow, reviews, footer, navigation and values copy verified on sparkling-standard.com; R2 photo
+intake remains **disabled** (probe reports `enabled:false` until the bucket/secrets are provisioned);
+commercial numeric quotes remain **disabled** (`numericEstimatesEnabled:false`).
 
 Status vocabulary:
 

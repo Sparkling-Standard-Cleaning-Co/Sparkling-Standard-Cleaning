@@ -10,7 +10,7 @@ import Checklist from '../components/Checklist.astro';
 import Reviews from '../components/Reviews.astro';
 import Icon from '../components/Icon.astro';
 import { breadcrumbNode } from '../lib/schema';
-import { cleaningTypesNav } from '../lib/site';
+import { homepageServicePaths } from '../lib/site';
 import type { ImageMetadata } from 'astro';
 import hayliPortrait from '../assets/images/hayli-founder.webp';
 import livingRoomBright from '../assets/images/living-room-bright.jpg';
@@ -28,8 +28,10 @@ if (!home) throw new Error('Missing content entry: src/content/site/home.md');
 const { data } = home;
 
 const allServices = await getCollection('services');
-const services = cleaningTypesNav.flatMap((item) => {
-  const service = allServices.find((entry) => entry.data.path === item.href);
+// Exactly the five primary homepage cards. Church Cleaning is in the
+// navigation/footer but must not become a sixth card (owner direction).
+const services = homepageServicePaths.flatMap((path) => {
+  const service = allServices.find((entry) => entry.data.path === path);
   return service ? [service] : [];
 });
 
