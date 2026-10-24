@@ -1,12 +1,14 @@
 ---
 // Customer reviews — renders ONLY genuine entries from src/content/reviews/.
 // Never fabricate reviews, never invent star ratings or counts. Public
-// attributions are first names only (Initiative 5.0 §8.2); provenance lives
-// in owner records, not in published markup.
+// attributions are first names only (Initiative 5.0); provenance lives in
+// owner records, not in published markup.
 //
-// Presentation is a premium layered 3D carousel (Initiative 5.0 §8.4),
-// progressively enhanced: without JavaScript every review renders as a
-// readable stacked card. No autoplay, no third-party carousel library.
+// Presentation: an editorial layered stage. The active review sits in a
+// prominent center card; its neighbours sit slightly recessed behind it at
+// both sides, still fully readable. Progressively enhanced: without
+// JavaScript every review renders as a readable stacked card. No autoplay,
+// no third-party carousel library.
 
 import { getCollection } from 'astro:content';
 import GoogleG from './GoogleG.astro';
@@ -23,27 +25,39 @@ const { heading = 'Kind Words From Our Customers', eyebrow = 'Reviews' } = Astro
 const reviews = (await getCollection('reviews')).sort((a, b) => a.data.order - b.data.order);
 const profileUrl = isPending(business.reviews.profileUrl) ? null : business.reviews.profileUrl;
 const total = reviews.length;
+
+// Split authentic wording into readable paragraphs on blank lines. The quote
+// itself is never edited, truncated or "improved" — only whitespace between
+// paragraphs is normalized for presentation.
+const paragraphsOf = (quote: string): string[] =>
+  quote
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph.length > 0);
 ---
 
 {
   total > 0 ? (
     <section class="section section--alt" id="reviews" aria-labelledby="reviews-heading">
       <div class="container">
-        <div class="section-head section-head--center">
+        <div class="section-head section-head--center reviews-head">
           <p class="eyebrow">{eyebrow}</p>
           <h2 id="reviews-heading">{heading}</h2>
         </div>
+      </div>
 
-        <div class="review-carousel" data-review-carousel>
-          <div
-            class="review-carousel__stage"
-            role="group"
-            aria-roledescription="carousel"
-            aria-label="Customer reviews"
-          >
-            {reviews.map((review, index) => (
+      <div class="review-carousel" data-review-carousel>
+        <div
+          class="review-carousel__stage"
+          role="group"
+          aria-roledescription="carousel"
+          aria-label="Customer reviews"
+        >
+          {reviews.map((review, index) => {
+            const paragraphs = paragraphsOf(review.data.quote);
+            return (
               <blockquote
-                class="card review-card review-carousel__card"
+                class="review-carousel__card"
                 data-review-card
                 data-index={String(index)}
                 role="group"
@@ -51,47 +65,71 @@ const total = reviews.length;
                 aria-label={`Review ${index + 1} of ${total}${review.data.author ? ` — ${review.data.author}` : ''}`}
                 aria-current={index === 0 ? 'true' : undefined}
               >
-                {review.data.rating && (
-                  <p class="review-card__stars" role="img" aria-label={`Rated ${review.data.rating} out of 5 stars`}>
-                    {Array.from({ length: review.data.rating }).map(() => (
-                      <Icon name="star" size={16} />
-                    ))}
-                  </p>
-                )}
-                <p class="review-carousel__quote">“{review.data.quote}”</p>
-                <footer class="small text-muted">
+                <div class="review-carousel__stars">
+                  {review.data.rating ? (
+                    <p
+                      class="review-card__stars"
+                      role="img"
+                      aria-label={`Rated ${review.data.rating} out of 5 stars`}
+                    >
+                      {Array.from({ length: review.data.rating }).map(() => (
+                        <Icon name="star" size={17} />
+                      ))}
+                    </p>
+                  ) : (
+                    <p class="review-card__stars review-card__stars--unrated">
+                      <span class="visually-hidden">Rating not published</span>
+                      <span aria-hidden="true">Google review</span>
+                    </p>
+                  )}
+                </div>
+
+                <div class="review-carousel__quote">
+                  {paragraphs.map((paragraph, paragraphIndex) => (
+                    <p>
+                      {paragraphIndex === 0 ? '“' : ''}
+                      {paragraph}
+                      {paragraphIndex === paragraphs.length - 1 ? '”' : ''}
+                    </p>
+                  ))}
+                </div>
+
+                <footer class="review-carousel__footer">
                   <strong>{review.data.author}</strong>
-                  {review.data.context ? ` — ${review.data.context}` : ''}
-                  {review.data.source === 'google' ? ' · Google review' : ''}
+                  <span class="review-carousel__meta">
+                    {review.data.source === 'google' ? 'Google review' : 'Customer review'}
+                  </span>
                 </footer>
               </blockquote>
-            ))}
-          </div>
-
-          <div class="review-carousel__controls">
-            <button type="button" class="review-carousel__arrow" data-review-prev aria-label="Previous review">
-              <Icon name="arrow-right" size={20} class="review-carousel__arrow-icon review-carousel__arrow-icon--prev" />
-            </button>
-            <div class="review-carousel__dots" role="group" aria-label="Choose a review">
-              {reviews.map((_review, index) => (
-                <button
-                  type="button"
-                  class="review-carousel__dot"
-                  data-review-dot
-                  data-index={String(index)}
-                  aria-label={`Show review ${index + 1} of ${total}`}
-                  aria-pressed={index === 0 ? 'true' : 'false'}
-                />
-              ))}
-            </div>
-            <button type="button" class="review-carousel__arrow" data-review-next aria-label="Next review">
-              <Icon name="arrow-right" size={20} />
-            </button>
-          </div>
-          <p class="visually-hidden" aria-live="polite" data-review-status></p>
+            );
+          })}
         </div>
 
-        {profileUrl && (
+        <div class="review-carousel__controls">
+          <button type="button" class="review-carousel__arrow" data-review-prev aria-label="Previous review">
+            <Icon name="arrow-right" size={19} class="review-carousel__arrow-icon--prev" />
+          </button>
+          <div class="review-carousel__dots" role="group" aria-label="Choose a review">
+            {reviews.map((_review, index) => (
+              <button
+                type="button"
+                class="review-carousel__dot"
+                data-review-dot
+                data-index={String(index)}
+                aria-label={`Show review ${index + 1} of ${total}`}
+                aria-pressed={index === 0 ? 'true' : 'false'}
+              />
+            ))}
+          </div>
+          <button type="button" class="review-carousel__arrow" data-review-next aria-label="Next review">
+            <Icon name="arrow-right" size={19} />
+          </button>
+        </div>
+        <p class="visually-hidden" aria-live="polite" data-review-status></p>
+      </div>
+
+      {profileUrl && (
+        <div class="container">
           <p class="reviews-more">
             <a
               href={profileUrl}
@@ -104,8 +142,8 @@ const total = reviews.length;
               <GoogleG size={18} /> Read all our reviews on Google
             </a>
           </p>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   ) : (
     profileUrl && (
@@ -141,9 +179,9 @@ const total = reviews.length;
 }
 
 <script>
-  // Layered review carousel — progressive enhancement, no dependencies.
+  // Editorial review stage — progressive enhancement, no dependencies.
   // Without JS all reviews remain readable in normal flow. With JS the active
-  // review sits front-and-center and its neighbours sit recessed behind it.
+  // review sits center stage and its neighbours are recessed left and right.
   // Navigation: card click, previous/next buttons, dots, arrow keys, swipe.
   const root = document.querySelector<HTMLElement>('[data-review-carousel]');
   const cards = [...(root?.querySelectorAll<HTMLElement>('[data-review-card]') ?? [])];

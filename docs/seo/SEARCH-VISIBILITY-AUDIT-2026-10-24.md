@@ -82,8 +82,9 @@ Checked against the live site (HTTP headers + rendered HTML) after the 2026-10-2
    (`tests/seo-checks.test.ts`).
 5. **Reviewer surname exposure**: review cards published full surnames and file names carried
    them. Public attributions are now first names only (Christina · Richard · Laura); the third
-   authentic review (Laura) was added with her exact words and no invented star rating; the
-   two existing reviews are unchanged.
+   authentic review (Laura) was added with her exact words; her five-star rating was verified on
+   the owner-supplied Google Maps contributor profile (2026-10-24) and renders with the other
+   two, whose words and ratings are unchanged.
 6. **Navigation consistency**: Church Cleaning is now reachable from the desktop cleaning
    dropdown and footer (fixed earlier in the same session); the homepage still shows exactly
    five primary service cards.
@@ -234,7 +235,7 @@ and one conversion improvement from evidence. **Never promise rankings.**
 - Fixed robots/noindex validator defect with regression tests.
 - Improved homepage + About/Contact/Supportive titles and homepage description.
 - Internal-link pass (service → service, service → estimate).
-- Three authentic reviews with first-name-only attributions; Laura added verbatim (no invented rating).
+- Three authentic reviews with first-name-only attributions; Laura added verbatim with her verified five-star rating.
 - Premium layered 3D review carousel (keyboard, swipe, reduced motion, no-JS readable, mobile).
 - Playwright browser regression job already in CI (Initiative 4.0 M1).
 - Structured data and sitemap verified healthy; no misleading review markup.

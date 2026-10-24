@@ -414,13 +414,14 @@ collections are intentionally empty — not errors.
   Hayli-confirmation sentence was removed by owner direction). Registry documentation:
   `docs/design/PREMIUM-ICON-REGISTER.md`.
 - **Authentic reviews live (2026-10-24, Initiative 5.0):** the homepage reviews section is a
-  premium layered 3D carousel (`src/components/Reviews.astro`) rendering ONE front review with
-  two recessed-but-readable neighbours; it is progressively enhanced (no-JS shows every review
-  readable), keyboard/swipe navigable, respects `prefers-reduced-motion`, and never autoplays.
+  premium layered editorial carousel (`src/components/Reviews.astro`) rendering ONE prominent
+  center review with two recessed-but-readable equal-height neighbours; it is progressively
+  enhanced (no-JS shows every review readable), keyboard/swipe navigable, respects
+  `prefers-reduced-motion`, and never autoplays.
   Three genuine owner-supplied Google reviews render — **Christina, Richard, Laura** — public
   attributions are **first names only** (never publish surnames in testimonials). Christina and
-  Richard carry their authentic 5-star ratings; Laura's rating is omitted because no numeric
-  rating was independently verified. Review source files are `src/content/reviews/christina.md`,
+  Richard carry their authentic 5-star ratings; Laura's rating is verified as five stars
+  (owner-supplied Google Maps review, checked 2026-10-24). Review source files are `src/content/reviews/christina.md`,
   `richard.md`, `laura.md` (quote text verbatim; never fabricate or "improve" it). Never
   fabricate additional reviews or aggregate/Review schema; new genuine entries render
   automatically and the verified Google reviews link stays intact.

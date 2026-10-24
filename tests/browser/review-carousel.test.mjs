@@ -64,6 +64,26 @@ test('all three authentic reviews render with first-name-only attributions', asy
     for (const surname of ['Sherwin', 'Lionhart', 'Harman']) {
       assert.ok(!text.includes(surname), `surname not published: ${surname}`);
     }
+    // Laura's five-star rating is verified (Google Maps contributor profile),
+    // so every review presents the same intentional star row.
+    const starRows = page.locator('[data-review-card] [aria-label="Rated 5 out of 5 stars"]');
+    assert.equal(await starRows.count(), 3, 'all reviews present five gold stars');
+    for (let index = 0; index < 3; index += 1) {
+      assert.equal(await starRows.nth(index).locator('svg').count(), 5, `review ${index + 1} has five stars`);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test('all cards share one height so the stage never jumps between reviews', async () => {
+  const { context, page } = await open(1280);
+  try {
+    await page.waitForFunction(() => document.querySelector('[data-review-carousel]')?.dataset.enhanced === 'true');
+    const heights = await page
+      .locator('[data-review-card]')
+      .evaluateAll((nodes) => nodes.map((node) => node.offsetHeight));
+    assert.equal(new Set(heights).size, 1, `cards are equal height (${heights.join(', ')})`);
   } finally {
     await context.close();
   }

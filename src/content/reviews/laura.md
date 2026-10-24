@@ -13,5 +13,8 @@ quote: |-
   10/10 would recommend!
 author: Laura
 source: google
+# Rating verified 2026-10-24 on the owner-supplied Google Maps contributor
+# profile (the Sparkling Standard review carries five filled stars).
+rating: 5
 order: 3
 ---

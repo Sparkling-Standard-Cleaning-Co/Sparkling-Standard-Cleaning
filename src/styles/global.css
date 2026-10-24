@@ -3439,10 +3439,34 @@ fieldset.input--invalid {
   margin-bottom: var(--space-3);
 }
 
-/* Layered "3D" review carousel (Initiative 5.0 §8.4).
-   No-JS: every review is a readable stacked card. With JS: one prominent
-   center card with two recessed-but-readable neighbours, no autoplay. */
+/* Editorial review stage (Initiative 5.0 refinement).
+   No-JS: every review renders as a readable stacked card. With JS: the active
+   review is a prominent center card with two slightly recessed, fully readable
+   neighbours. Equal card widths keep text wrapping stable so the stage height
+   never jumps between reviews; all cards stretch to the tallest review. */
+.review-carousel {
+  position: relative;
+  width: min(100% - 2 * var(--gutter), 76rem);
+  margin-inline: auto;
+}
+
+.review-carousel::before {
+  content: '';
+  position: absolute;
+  inset: -2% 12% 6%;
+  z-index: 0;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 45%, rgba(198, 163, 105, 0.13), rgba(198, 163, 105, 0) 68%);
+  pointer-events: none;
+}
+
+.reviews-head {
+  margin-bottom: var(--space-7);
+}
+
 .review-carousel__stage {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: var(--space-5);
 }
@@ -3451,70 +3475,140 @@ fieldset.input--invalid {
   display: none;
 }
 
+.review-carousel__card {
+  display: flex;
+  flex-direction: column;
+  max-width: 40rem;
+  margin-inline: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: clamp(1.5rem, 2.4vw, 2.25rem);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+}
+
+.review-carousel__stars {
+  margin-bottom: var(--space-4);
+}
+
+.review-carousel__stars .review-card__stars {
+  gap: 0.2rem;
+  margin: 0;
+}
+
+.review-card__stars--unrated {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
 .review-carousel__quote {
-  white-space: pre-line;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.review-carousel__quote p {
+  margin: 0 0 0.85em;
+  color: var(--color-ink-700);
+  font-size: var(--text-base);
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+
+.review-carousel__quote p:last-child {
+  margin-bottom: 0;
+}
+
+.review-carousel__footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.review-carousel__footer strong {
+  color: var(--color-ink-900);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-regular);
+  letter-spacing: 0.01em;
+}
+
+.review-carousel__meta {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
 }
 
 .review-carousel[data-enhanced='true'] .review-carousel__stage {
-  display: grid;
   grid-template-columns: minmax(0, 1fr);
-  align-items: center;
-  justify-items: center;
+  align-items: stretch;
   container-type: inline-size;
-  perspective: 1600px;
-  perspective-origin: 50% 40%;
-  padding-block: var(--space-4);
+  perspective: 1800px;
+  perspective-origin: 50% 45%;
+  padding-block: var(--space-5);
 }
 
 .review-carousel[data-enhanced='true'] .review-carousel__card {
   grid-area: 1 / 1;
-  width: 42%;
-  margin: 0;
-  transform: translateX(0) translateZ(0) rotateY(0deg) scale(1);
+  justify-self: center;
+  width: 36%;
+  height: 100%;
   transition:
-    transform 0.55s cubic-bezier(0.22, 0.75, 0.25, 1),
+    transform 0.6s cubic-bezier(0.22, 0.75, 0.25, 1),
     opacity 0.45s ease,
-    box-shadow 0.55s ease;
+    box-shadow 0.6s ease;
+  transform: translateX(0) translateY(0) translateZ(0) rotateY(0deg) scale(1);
   z-index: 3;
   opacity: 1;
-  will-change: transform;
+  box-shadow: var(--shadow-lg);
 }
 
-/* Neighbours are wider than a "peek": enough of each review stays readable
-   (proportions keep roughly a fifth hidden behind the front card), with no
-   blur and no reduced type size. */
+/* Neighbours sit slightly lower, smaller and further back — clearly part of
+   the same card system, still readable, with only a slender overlap. */
 .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'],
 .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
-  width: 38%;
   z-index: 2;
-  opacity: 0.96;
+  opacity: 0.97;
   box-shadow: var(--shadow-md);
   cursor: pointer;
 }
 
 .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'] {
-  transform: translateX(-31cqw) translateY(8px) translateZ(-90px) rotateY(6deg) scale(0.95);
+  transform: translateX(-33.7cqw) translateY(12px) translateZ(-90px) rotateY(5deg) scale(0.94);
 }
 
 .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
-  transform: translateX(31cqw) translateY(8px) translateZ(-90px) rotateY(-6deg) scale(0.95);
+  transform: translateX(33.7cqw) translateY(12px) translateZ(-90px) rotateY(-5deg) scale(0.94);
 }
 
-/* Reviews beyond the immediate neighbours are hidden behind the front pair.
-   They remain reachable through the controls (and fully visible without JS). */
+.review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1']:hover,
+.review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1']:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+/* Reviews beyond the immediate neighbours wait behind the front pair. */
 .review-carousel[data-enhanced='true'] .review-carousel__card:not([data-offset='-1']):not([data-offset='0']):not([data-offset='1']) {
   z-index: 1;
   opacity: 0;
   pointer-events: none;
-  transform: translateX(0) translateZ(-260px) scale(0.6);
+  transform: translateX(0) translateY(0) translateZ(-320px) scale(0.7);
 }
 
 .review-carousel[data-enhanced='true'] .review-carousel__controls {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-4);
-  margin-top: var(--space-5);
+  gap: var(--space-5);
+  margin-top: var(--space-7);
 }
 
 .review-carousel__arrow {
@@ -3531,12 +3625,17 @@ fieldset.input--invalid {
   transition:
     background-color 0.2s ease,
     border-color 0.2s ease,
+    color 0.2s ease,
     transform 0.2s ease;
 }
 
 .review-carousel__arrow:hover {
   background: var(--color-surface-warm);
   border-color: var(--color-accent);
+}
+
+.review-carousel__arrow:active {
+  transform: scale(0.96);
 }
 
 .review-carousel__arrow:focus-visible {
@@ -3555,29 +3654,34 @@ fieldset.input--invalid {
 }
 
 .review-carousel__dot {
-  width: 0.6rem;
-  height: 0.6rem;
+  width: 1.5rem;
+  height: 0.3rem;
   padding: 0;
   border: 0;
   border-radius: var(--radius-full);
   background: var(--color-border-strong);
   cursor: pointer;
   transition:
-    background-color 0.2s ease,
-    transform 0.2s ease;
+    background-color 0.25s ease,
+    width 0.25s ease;
 }
 
 .review-carousel__dot[aria-pressed='true'] {
+  width: 2.1rem;
   background: var(--color-rose-700);
-  transform: scale(1.25);
 }
 
 .review-carousel__dot:focus-visible {
   outline: 2px solid var(--color-primary);
-  outline-offset: 3px;
+  outline-offset: 4px;
 }
 
-/* Tablets and narrow desktops keep ONE fully readable card; the layered 3D
+.reviews-more {
+  margin: var(--space-6) 0 0;
+  text-align: center;
+}
+
+/* Tablets and narrow desktops keep ONE fully readable card; the layered
    composition needs room to breathe without clipping or page overflow. */
 @media (max-width: 1199px) {
   .review-carousel[data-enhanced='true'] .review-carousel__stage {
@@ -3588,14 +3692,37 @@ fieldset.input--invalid {
   .review-carousel[data-enhanced='true'] .review-carousel__card,
   .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'],
   .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
-    width: 100%;
+    width: min(100%, 40rem);
+  }
+
+  .review-carousel[data-enhanced='true'] .review-carousel__quote {
+    justify-content: center;
   }
 
   .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'],
   .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
     opacity: 0;
     pointer-events: none;
-    transform: translateX(0) translateZ(0) rotateY(0deg) scale(0.96);
+    transform: translateX(0) translateY(0) translateZ(0) rotateY(0deg) scale(0.98);
+  }
+
+  .review-carousel[data-enhanced='true'] .review-carousel__controls {
+    margin-top: var(--space-6);
+  }
+}
+
+@media (max-width: 720px) {
+  .review-carousel__card {
+    padding: var(--space-5);
+  }
+
+  .review-carousel__footer {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+  }
+
+  .review-carousel[data-enhanced='true'] .review-carousel__controls {
+    gap: var(--space-4);
   }
 }
 
@@ -3608,11 +3735,6 @@ fieldset.input--invalid {
   .review-carousel__dot {
     transition: none;
   }
-}
-
-.reviews-more {
-  margin: var(--space-5) 0 0;
-  text-align: center;
 }
 
 .reviews-more a {
