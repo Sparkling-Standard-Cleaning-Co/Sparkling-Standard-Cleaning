@@ -105,8 +105,9 @@ These are a labor-efficiency model, **not** a marketing discount.
 
 ### 8. Range and rounding
 - `lowFactor` / `highFactor` — the range shown around the estimate.
-- `roundToNearest` — estimates round **up** to the nearest multiple (default $5) so the site never
-  shows false precision.
+- `roundToNearest` — proposed prices round **DOWN** to the nearest multiple (default $5) so the
+  customer always sees the friendly side of the model price (owner-approved 2026-10-23:
+  $248.45 → $245). The $125 minimum job and the margin safeguard survive the rounding.
 
 ### 9. Add-ons
 Each add-on normally charges `laborHours × the applicable rate`. To charge a **flat dollar price**

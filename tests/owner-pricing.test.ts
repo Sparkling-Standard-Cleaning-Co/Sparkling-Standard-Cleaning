@@ -205,9 +205,9 @@ test('recurring 1600 sqft 3/2 biweekly with two add-ons reconciles client and se
 
   const expectedExtras = (0.6 + 0.7) * p.ratePerLaborHour; // inside_oven + laundry
   const firstSubtotal = round2(firstLabor * p.ratePerLaborHour + round2(expectedExtras));
-  const firstTotal = Math.ceil(firstSubtotal / 5) * 5;
+  const firstTotal = Math.floor(firstSubtotal / 5) * 5;
   const ongoingSubtotal = round2(ongoingLabor * p.ratePerLaborHour + round2(expectedExtras));
-  const ongoingTotal = Math.ceil(ongoingSubtotal / 5) * 5;
+  const ongoingTotal = Math.floor(ongoingSubtotal / 5) * 5;
 
   // First visit reconciles (this is the price the customer submits).
   assert.equal(p.baseLaborHours, round2(firstLabor));
@@ -221,7 +221,7 @@ test('recurring 1600 sqft 3/2 biweekly with two add-ons reconciles client and se
   assert.equal(client.ongoing.pricing.extrasSubtotal, round2(expectedExtras));
   assert.equal(client.ongoing.pricing.subtotal, ongoingSubtotal);
   assert.equal(client.ongoing.perVisitPrice, ongoingTotal);
-  assert.equal(ongoingTotal, 330, 'the representative scenario reflects the $55 billing target');
+  assert.equal(ongoingTotal, 325, 'the representative scenario reflects the $55 billing target at floor-$5 rounding');
   assert.ok(ongoingTotal < firstTotal, 'maintenance visits cost less than the required deep first visit');
 
   // Server path: the same flat fields must reproduce BOTH amounts.

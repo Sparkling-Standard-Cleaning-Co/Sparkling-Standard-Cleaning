@@ -1,15 +1,23 @@
 ---
-import Icon from './Icon.astro';
-import type { IconName } from '../lib/icons';
 import { business } from '../config/business';
 
-// The four owner-approved supporting statements for "The difference, in one
-// thought." Wording is Hayli's; do not rewrite or add claims.
+// The owner's four-value trust banner (audit 2026-10-23). These four items and
+// their icons are owner-specified — do not substitute different headings,
+// icons or interpretations:
+//   Locally Owned          — house-with-heart mark
+//   Flexible Scheduling    — calendar with the numeral 7 (seven days a week)
+//   Christian Values       — a simple, tasteful cross
+//   Competitive Pricing    — four dollar signs, ONE filled and three outlined
+//                            (a one-of-four price scale)
+// The copy is short on purpose; the icons lead.
 
 interface TrustItem {
-  icon: IconName;
   title: string;
   text: string;
+  /** Inline SVG (24-unit grid; the pricing mark uses 28 for four glyphs). */
+  svg: string;
+  /** SVG viewBox when it is not the default 24×24. */
+  viewBox?: string;
 }
 
 interface Props {
@@ -18,24 +26,25 @@ interface Props {
 
 const defaultItems: TrustItem[] = [
   {
-    icon: 'star',
-    title: 'Details matter',
-    text: 'The small things get noticed here — fingerprints, buildup, and neglected areas.',
+    title: 'Locally Owned',
+    text: `Proudly rooted in Pensacola — our customers are our neighbors.`,
+    svg: `<path d="M3 10.5 12 3l9 7.5V20a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 20v-9.5z"/><path fill="currentColor" stroke="none" d="M12 17.4c-2.7-2-4.1-3.5-4.1-5.3a2.2 2.2 0 0 1 4.1-1.1 2.2 2.2 0 0 1 4.1 1.1c0 1.8-1.4 3.3-4.1 5.3z"/>`,
   },
   {
-    icon: 'heart',
-    title: 'Owner operated',
-    text: 'Your cleaning is done by the owner, occasionally alongside a trusted partner — never a rotating crew.',
+    title: 'Flexible Scheduling',
+    text: `Open ${business.hours.days.toLowerCase()} — a rhythm that fits around your life.`,
+    svg: `<path d="M5 4.5h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2zm-2 5h18M16 2.5v4M8 2.5v4"/><text x="12" y="17.6" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor" stroke="none" font-family="inherit">7</text>`,
   },
   {
-    icon: 'clipboard',
-    title: 'Requests reviewed personally',
-    text: 'Appointments are not automatically generated. Dates, scopes, and prices are confirmed by the owner of Sparkling Standard before anything is booked.',
+    title: 'Christian Values',
+    text: `Honest work, real integrity, and treating every neighbor like we would want to be treated.`,
+    svg: `<path d="M12 3v18M6.8 8.4h10.4"/>`,
   },
   {
-    icon: 'calendar',
-    title: 'Flexible scheduling',
-    text: `We are open ${business.hours.days.toLowerCase()}, ${business.hours.residentialWindow}.`,
+    title: 'Competitive Pricing',
+    text: `Quality care at an easy price — one $ out of four on the cost scale.`,
+    viewBox: '0 0 32 24',
+    svg: `<text x="4" y="17.5" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor" stroke="none" font-family="Georgia, serif">$</text><text x="12" y="17.5" text-anchor="middle" font-size="14" font-weight="700" fill="none" stroke="currentColor" stroke-width="1" font-family="Georgia, serif">$</text><text x="20" y="17.5" text-anchor="middle" font-size="14" font-weight="700" fill="none" stroke="currentColor" stroke-width="1" font-family="Georgia, serif">$</text><text x="28" y="17.5" text-anchor="middle" font-size="14" font-weight="700" fill="none" stroke="currentColor" stroke-width="1" font-family="Georgia, serif">$</text>`,
   },
 ];
 
@@ -47,7 +56,7 @@ const { items = defaultItems } = Astro.props;
     {
       items.map((item) => (
         <div class="trust-item">
-          <Icon name={item.icon} />
+          <span class="trust-item__icon" aria-hidden="true" set:html={`<svg viewBox="${item.viewBox ?? '0 0 24 24'}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">${item.svg}</svg>`} />
           <div>
             <p class="trust-item__title">{item.title}</p>
             <p class="trust-item__text">{item.text}</p>

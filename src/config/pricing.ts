@@ -351,7 +351,7 @@ export const pricing = {
      * the server before a reservation is accepted. Bump when pricing logic,
      * rates or policy values change so old quotes cannot be silently reused.
      */
-    configVersion: approved('2026-10-23.recurring-first-visit.v1', 'Quote provenance marker. Incremented for the P12 recurring restructure (a price-affecting change): a new recurring residential arrangement is now quoted as its required first-visit Deep Cleaning, with the ongoing per-visit price shown alongside, on top of the SPARKLE100 campaign rules.'),
+    configVersion: approved('2026-10-23.floor5-travel35.v1', 'Quote provenance marker. Incremented for the owner-approved floor rounding to the nearest $5 and the 35-mile round-trip travel assumption (price-affecting changes) on top of the recurring first-visit restructure.'),
     /**
      * Which value from the calculation becomes the offered price. 'expected' is
      * the model price and never the lowest range value; 'midpoint' and 'high'

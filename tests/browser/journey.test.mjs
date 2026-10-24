@@ -339,10 +339,11 @@ test('the proposed price calculates correctly and extras change it', async () =>
     await addressStep(page);
     await homeStep(page);
     await conditionStep(page);
-    // Baseline: 4.91 labor-hours × $50 = $245.50 → rounded up to $250.
+    // Baseline: 4.91 labor-hours × $55 = $270.05 → floored down to $270
+    // (owner-approved $5 round-down, 2026-10-23).
     await page.waitForSelector('[data-estimate-price]:not(:empty)');
     await page.waitForFunction(
-      () => document.querySelector('[data-estimate-price]')?.textContent === '$275',
+      () => document.querySelector('[data-estimate-price]')?.textContent === '$270',
       undefined,
       { timeout: 10000 },
     );
@@ -354,10 +355,10 @@ test('the proposed price calculates correctly and extras change it', async () =>
     await page.evaluate(() => window.scrollTo(0, 0));
     await shot(page, '02-price-desktop');
 
-    // Inside oven adds 0.6 labor-hours → $275.50 → $280.
+    // Inside oven adds 0.6 labor-hours → $303.05 → floored to $300.
     await extrasStep(page, ['inside_oven']);
     await page.waitForFunction(
-      () => document.querySelector('[data-estimate-price]')?.textContent === '$305',
+      () => document.querySelector('[data-estimate-price]')?.textContent === '$300',
       undefined,
       { timeout: 10000 },
     );
@@ -442,7 +443,7 @@ test('reservation summary carries every answer and the call/text actions work', 
     const fields = captured.payload.fields;
     assert.equal(captured.payload.subject.includes('Reservation request'), true, 'subject marks a reservation');
     assert.equal(fields.request_type, 'reservation_request');
-    assert.equal(fields.quoted_price, '305');
+    assert.equal(fields.quoted_price, '300');
     assert.match(fields.quote_reference, /^SS-\d{8}-[0-9A-Z]{6}$/);
     assert.equal(fields.quote_config_version, pricing.instantQuote.configVersion.value);
     assert.equal(fields.service_address, '100 S Baylen');
@@ -517,7 +518,7 @@ test('client-side price manipulation does not change the submitted price', async
     await page.click('[data-submit]');
     await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'success');
     await delay(150);
-    assert.equal(captured.payload.fields.quoted_price, '275', 'the real calculated price is submitted');
+    assert.equal(captured.payload.fields.quoted_price, '270', 'the real calculated price is submitted');
   } finally {
     await context.close();
   }
@@ -674,7 +675,7 @@ test('eligible add-ons show their calculated price before selection and update w
     const custom = page.locator('label.option:has(input[value="carpet_cleaning"]) .option__price--custom');
     assert.equal(((await custom.textContent()) ?? '').trim(), 'Custom quote');
     assert.equal(await page.locator('[data-addon-price="carpet_cleaning"]').count(), 0);
-    await page.waitForFunction(() => document.querySelector('[data-estimate-price]')?.textContent === '$275');
+    await page.waitForFunction(() => document.querySelector('[data-estimate-price]')?.textContent === '$270');
 
     // Revisit the condition step and switch to recurring → $42/labor-hour.
     await page.click('[data-step-jump="3"]');
@@ -703,14 +704,14 @@ test('the price preview reconciles base, extras, rounding and the proposed total
     assert.match(preview, /Base cleaning \(includes travel\)\$270\.05/);
     assert.match(preview, /Inside oven\+\$33\.00/);
     assert.match(preview, /Laundry\+\$38\.50/);
-    assert.match(preview, /Rounded up to the nearest \$5\+\$3\.45/);
-    assert.match(preview, /Proposed total\$345\.00/);
+    assert.match(preview, /Rounded down to the nearest \$5\u2212\$1\.55/);
+    assert.match(preview, /Proposed total\$340\.00/);
     // The displayed figures agree with the offered price.
     await page.click('[data-next]');
     await page.fill('#est-date', BOOKING_DATE);
     await page.selectOption('#est-arrival', 'morning');
     await page.click('[data-next]');
-    assert.equal(await page.locator('[data-reservation-price]').textContent(), '$345');
+    assert.equal(await page.locator('[data-reservation-price]').textContent(), '$340');
     // Neither proposed promotion is published while disabled.
     assert.equal(await page.locator('[data-addon-incentive]').count(), 0);
     assert.equal(await page.locator('[data-response-guarantee]').count(), 0);

@@ -348,6 +348,20 @@ collections are intentionally empty — not errors.
   7:00 p.m., seven days per week**, sitewide. A new recurring residential maintenance arrangement
   requires a **Deep Cleaning first, without exception**; the estimator requires explicit
   acknowledgment and the lead relay rejects a recurring request without it.
+- **Corrective refinement (2026-10-23, owner audit):** the homepage trust banner carries the
+  owner's four values — **Locally Owned** (house-heart mark), **Flexible Scheduling** (calendar
+  with the numeral 7), **Christian Values** (cross), **Competitive Pricing** (four dollar signs,
+  ONE filled, three outlined) — in a rose-and-cream strip (`src/components/TrustChips.astro`).
+  Both hero CTAs are equal-sized; Explore Services uses the inverse treatment (cream fill, rose
+  lettering) and the script "Sparkling" sits centered on its own headline line. The services
+  section head is centered, and the five service icons are the vibrant pink-and-white theme with
+  owner-selected glyphs (deep cleaning = spray bottle, move-in/out = partially opened box,
+  STR = beach umbrella). The estimate CTA section and the service-area section are centered; the
+  service-area copy ends with "Not sure if you're within range?". The header logo renders at
+  6rem (4.35rem on phones). Founder portrait label reads "Founder / Owner-Operator". Photo
+  captions read "Project photos are added only with customer approval." Proposed prices round
+  **DOWN** to the nearest $5 (owner-approved), and travel assumes a 35-mile round trip
+  (17.5 one-way included). Quote `configVersion` is `2026-10-23.floor5-travel35.v1`.
 - **Two-price recurring quotes (2026-10-23):** a NEW recurring residential arrangement is quoted
   as its required FIRST VISIT (a Deep Cleaning computed at the one-time/deep rate — this is the
   price the customer submits and the server verifies), with the ongoing per-visit rhythm shown
@@ -355,8 +369,7 @@ collections are intentionally empty — not errors.
   `ongoing_price_per_visit` / `ongoing_frequency` submission fields, server-owned in the lead
   relay). The SPARKLE100 campaign discounts ONLY the first visit and only when the customer's
   arrangement is weekly or biweekly (`campaignArrangement` in
-  `src/lib/estimate/promotions.ts`); the ongoing rhythm is never discounted. Quote
-  `configVersion` is `2026-10-23.recurring-first-visit.v1`.
+  `src/lib/estimate/promotions.ts`); the ongoing rhythm is never discounted.
 - **Homepage refinement (2026-10-23):** the homepage hero carries a four-slide representative
   interior carousel (`src/components/HeroCarousel.astro`, auto-advance respects
   prefers-reduced-motion, pauses on hover/focus), the trust strip sits directly under the hero,

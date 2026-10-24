@@ -288,6 +288,22 @@ li + li {
   color: var(--color-rose-800);
 }
 
+/* Inverse presentation (owner-directed 2026-10-23): warm-cream fill, rose
+   lettering and a brand-rose border — the counterpart to the filled rose
+   primary button (the hero's Explore Services). */
+.btn--inverse {
+  background: var(--color-cream-50);
+  border: 1px solid var(--color-rose-300);
+  color: var(--color-rose-600);
+  font-weight: var(--weight-semibold);
+}
+
+.btn--inverse:hover {
+  background: var(--color-cream-100);
+  border-color: var(--color-rose-400);
+  color: var(--color-rose-700);
+}
+
 .btn--ghost {
   background: transparent;
   color: var(--color-ink-800);
@@ -414,12 +430,12 @@ li + li {
 }
 
 /* The circular mark contains the complete wordmark, ring and sparkles.
-   Owner-directed prominence (2026-10-23): the header mark is the brand's
-   anchor — noticeably larger than a plain favicon-sized logo. */
+   Owner-directed prominence (2026-10-23): the mark is the header's anchor —
+   large enough that the script wordmark inside reads clearly. */
 .brand__logo {
   display: block;
-  width: 4.6rem;
-  height: 4.6rem;
+  width: 6rem;
+  height: 6rem;
   flex: none;
 }
 
@@ -605,8 +621,8 @@ li + li {
   }
 
   .brand__logo {
-    width: 3.4rem;
-    height: 3.4rem;
+    width: 4.35rem;
+    height: 4.35rem;
   }
 
   .site-footer .brand__logo {
@@ -945,6 +961,14 @@ li + li {
   white-space: nowrap;
 }
 
+/* Owner direction (audit 2026-10-23): the word "Sparkling" sits centered on
+   its own line inside the hero headline. */
+.hero__sparkle-word--line {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.08em;
+}
+
 .hero__sparkle-icon {
   width: 0.42em;
   height: 0.42em;
@@ -994,8 +1018,46 @@ li + li {
   padding: clamp(1.5rem, 4vw, 2.75rem);
 }
 
-.estimate-card__grid {
-  align-items: center;
+/* Owner direction (audit 2026-10-23): the entire estimate CTA section is
+   CENTERED — heading, copy, button and assurances. */
+.estimate-card__centered {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: var(--space-4);
+}
+
+.estimate-card__centered h2 {
+  margin: 0;
+}
+
+.estimate-card__centered .lead {
+  margin: 0;
+  max-width: 44ch;
+}
+
+.estimate-card__body {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--color-text-muted);
+}
+
+.estimate-card__actions {
+  display: flex;
+  justify-content: center;
+}
+
+.estimate-card__centered .estimate-assurances--inline {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+}
+
+.estimate-card__centered .estimate-assurances--inline li {
+  margin: 0;
+  white-space: nowrap;
 }
 
 .estimate-assurances {
@@ -1061,13 +1123,33 @@ li + li {
 }
 
 @media (min-width: 56rem) {
-  .estimate-card__grid {
-    grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 1fr);
+  .estimate-card__centered {
+    padding-inline: var(--space-7);
   }
 }
 
 .hero .lead {
   margin-bottom: var(--space-6);
+}
+
+/* Owner direction (audit 2026-10-23): both hero CTAs are the SAME size —
+   matching width, height, padding and radius on desktop; on small screens
+   they stack full-width. */
+.hero__actions {
+  flex-wrap: wrap;
+}
+
+.hero__actions .btn {
+  min-width: 13.5rem;
+  justify-content: center;
+  text-align: center;
+}
+
+@media (max-width: 30rem) {
+  .hero__actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .hero__panel {
@@ -1078,21 +1160,31 @@ li + li {
   padding: var(--space-6);
 }
 
-/* ── Trust strip ───────────────────────────────────────────────────────────── */
+/* ── Trust strip — the owner's four-value banner (2026-10-23) ─────────────────
+   Locally Owned · Flexible Scheduling · Christian Values · Competitive
+   Pricing. Rose-and-cream treatment with prominent custom icon marks; four
+   columns on wide screens, two on tablets, one on phones. */
 .trust-strip {
-  border-block: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border-block: 1px solid var(--color-rose-200);
+  background: linear-gradient(120deg, var(--color-rose-50), var(--color-cream-100));
 }
 
 .trust-strip__grid {
   display: grid;
-  gap: var(--space-4);
-  padding-block: var(--space-5);
+  gap: var(--space-5);
+  padding-block: var(--space-6);
+  grid-template-columns: minmax(0, 1fr);
 }
 
-@media (min-width: 48rem) {
+@media (min-width: 40rem) {
   .trust-strip__grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  .trust-strip__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -1102,25 +1194,39 @@ li + li {
   align-items: flex-start;
 }
 
-.trust-item svg {
+.trust-item__icon {
   flex: none;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 3rem;
+  height: 3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  border: 1px solid var(--color-rose-200);
+  box-shadow: var(--shadow-sm);
   color: var(--color-rose-600);
-  margin-top: 0.15rem;
+}
+
+.trust-item__icon svg {
+  width: 2rem;
+  height: 1.75rem;
+  display: block;
 }
 
 .trust-item__title {
   font-weight: var(--weight-bold);
-  color: var(--color-ink-800);
-  margin: 0 0 var(--space-1);
-  font-size: var(--text-sm);
+  color: var(--color-rose-800);
+  margin: 0.35rem 0 var(--space-1);
+  font-size: var(--text-base);
+  line-height: 1.2;
 }
 
 .trust-item__text {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: var(--color-ink-700);
   margin: 0;
+  line-height: 1.5;
 }
 
 /* ── Cards ─────────────────────────────────────────────────────────────────── */
@@ -1314,6 +1420,34 @@ li + li {
   .service-list--photo {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Owner direction (audit 2026-10-23): the service icons are a brighter
+   pink-and-white theme — a rose gradient chip with a warm-white glyph. */
+.service-card--photo .card__icon {
+  width: 3rem;
+  height: 3rem;
+  background: linear-gradient(135deg, var(--color-rose-500), var(--color-rose-700));
+  color: var(--color-cream-50);
+  border: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.service-card--photo .card__icon svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+/* Centered services introduction (owner-directed). */
+.services-intro__lead {
+  max-width: 62ch;
+  margin-inline: auto;
+}
+
+.area-band__actions {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-2);
 }
 
 .service-card--photo {
@@ -2904,7 +3038,9 @@ fieldset.input--invalid {
 
 @media (min-width: 64rem) {
   .site-footer__grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    /* Reviews and Contact run a little wider so their supporting copy never
+       crams into two- or three-word lines (owner direction, 2026-10-23). */
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
   }
 }
 
@@ -2942,19 +3078,30 @@ fieldset.input--invalid {
 }
 
 .site-footer__reviews-card {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: var(--space-3);
-  align-items: flex-start;
+  align-items: start;
+  justify-items: start;
 }
 
-.site-footer__reviews-card .google-g {
-  flex-shrink: 0;
+/* The Google G sits BESIDE the Leave Us a Review text on one line (owner
+   direction, audit 2026-10-23) — one coordinated clickable action. */
+.site-footer .site-footer__review-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.site-footer .site-footer__review-btn .google-g {
+  flex: none;
 }
 
 .site-footer__reviews-note {
-  color: var(--color-taupe-600);
+  color: var(--color-ink-muted);
   margin: 0;
+  max-width: none;
+  font-size: var(--text-sm);
+  line-height: 1.6;
 }
 
 /* Call / text buttons with their icons and the visible number. */
@@ -3117,9 +3264,12 @@ fieldset.input--invalid {
 .site-footer .social-links {
   display: flex;
   flex-wrap: wrap;
+  /* Owner direction (audit 2026-10-23): every row of profile bubbles is
+     CENTERED — including a partial last row — not left-grouped. */
+  justify-content: center;
   gap: var(--space-3);
   list-style: none;
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
 }
 

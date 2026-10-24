@@ -447,8 +447,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
       if (p.discount) lines.push({ label: p.discount.label, value: `−$${p.discount.amount.toFixed(2)}` });
     }
-    if (p.roundingAdjustment > 0) {
-      lines.push({ label: `Rounded up to the nearest $${roundStep}`, value: `+$${p.roundingAdjustment.toFixed(2)}` });
+    if (p.roundingAdjustment < 0) {
+      lines.push({ label: `Rounded down to the nearest $${roundStep}`, value: `−$${Math.abs(p.roundingAdjustment).toFixed(2)}` });
     }
     lines.push({ label: 'Proposed total', value: `$${(p.subtotal + p.roundingAdjustment).toFixed(2)}`, strong: true });
     // P12: a new recurring arrangement shows the ongoing rhythm right under the

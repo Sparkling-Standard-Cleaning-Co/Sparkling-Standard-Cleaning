@@ -246,7 +246,8 @@ export interface OwnerPricingConfig {
     highFactor: number;
   };
   rounding: {
-    /** Estimates round UP to the nearest multiple of this many USD. */
+    /** Presented prices round DOWN to the nearest multiple of this many USD
+     *  (owner-approved floor rounding, 2026-10-23: $248.45 -> $245). */
     roundToNearest: number;
   };
 

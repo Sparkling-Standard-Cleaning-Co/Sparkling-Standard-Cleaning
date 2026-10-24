@@ -98,8 +98,9 @@ function roundToNearest(value: number, step: number): number {
   return Math.round(value / step) * step;
 }
 
-function roundUpToStep(value: number, step: number): number {
-  return Math.ceil(value / step) * step;
+/** Presented prices round DOWN to the owner-approved $5 increment. */
+function floorToStep(value: number, step: number): number {
+  return Math.floor(value / step) * step;
 }
 
 function round2(value: number): number {
@@ -380,7 +381,11 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
   const discount = evaluation.discount;
   const discountedGross = discount ? round2(gross - discount.amount) : gross;
   const expectedPrice = round2(discountedGross + travel.adjustment);
-  const roundingAdjustment = round2(roundUpToStep(expectedPrice, step) - expectedPrice);
+  // Owner-approved (2026-10-23): the presented price rounds DOWN to the
+  // nearest $5 — a negative adjustment that brings the offered price to the
+  // customer-friendly increment. It can never cross below the minimum job
+  // because the minimum ($125) is itself a multiple of the $5 step.
+  const roundingAdjustment = round2(floorToStep(expectedPrice, step) - expectedPrice);
   const basePrice = round2(Math.max(minimumJob, baseRaw) + travel.adjustment);
 
   const pricingBreakdown: PricingBreakdown = {
@@ -413,7 +418,7 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
           },
         ]
       : []),
-    { step: 'price:rounding', detail: `Rounded up to the nearest $${step}`, value: roundingAdjustment },
+    { step: 'price:rounding', detail: `Rounded down to the nearest $${step} (owner-approved)`, value: roundingAdjustment },
     { step: 'price:expected', detail: 'Offered price before the final round-up', value: expectedPrice },
   );
 

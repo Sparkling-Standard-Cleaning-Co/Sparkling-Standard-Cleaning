@@ -17,8 +17,12 @@ export const travelConfig = {
   mpg: 24,
   /** Vehicle wear allowance per mile, USD (fuel excluded). PROVISIONAL. */
   wearPerMile: 0.12,
-  /** One-way miles included in the base price before a travel adjustment. PROVISIONAL. */
-  includedOneWayMiles: 15,
+  /**
+   * One-way miles included in the base price before a travel adjustment.
+   * Owner-directed (audit 2026-10-23): assume a 35-mile ROUND trip — 17.5
+   * miles each way — is part of every job; only the excess is charged.
+   */
+  includedOneWayMiles: 17.5,
   /** Gulf Coast reference gasoline price used when the live feed is unavailable. PROVISIONAL. */
   fallbackGasPrice: 3.1,
   /** Route lookup cache duration for the serverless function, seconds. */

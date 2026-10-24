@@ -57,11 +57,21 @@ test('an eligible home receives one deterministic price', () => {
   assert.equal((first as number) % pricing.rounding.toNearest.value, 0, 'rounded to the configured step');
 });
 
-test('the offered price is never below the model price (margin safeguard)', () => {
+test('the offered price floors to the $5 step without crossing the safeguards', () => {
   const result = calculateEstimate(input(), context);
   const amount = selectInstantAmount(result);
+  const step = pricing.rounding.toNearest.value;
   assert.ok(amount !== null && result.expectedPrice !== null);
-  assert.ok(amount >= result.expectedPrice, 'never below expected price');
+  // Owner-approved floor rounding (2026-10-23): the offered price is the
+  // model price rounded DOWN to the nearest $5 …
+  assert.equal(amount % step, 0, 'multiple of the configured step');
+  assert.ok(amount <= result.expectedPrice, 'never above the model price');
+  assert.ok(amount > result.expectedPrice - step, 'never more than one step below the model price');
+  // … and never below the margin floor or the minimum job value.
+  assert.ok(
+    amount >= Math.min(result.expectedPrice * pricing.instantQuote.marginFloor.value, pricing.minimumJob.value),
+    'the safeguards survive the rounding',
+  );
 });
 
 test('the offered price is never the lowest range value', () => {

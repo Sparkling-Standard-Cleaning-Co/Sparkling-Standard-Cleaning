@@ -25,8 +25,8 @@ founderBand:
   linkLabel: Meet Our Founder
 areaBand:
   eyebrow: Service area
-  heading: Serving Pensacola, Cantonment, and beyond
-  text: Proudly local to the Pensacola/Cantonment area, servicing surrounding Florida and Alabama communities depending on distance.
+  heading: Where We Clean
+  text: From our Pensacola and Cantonment roots, we care for homes and businesses across Northwest Florida and into nearby Alabama communities — it all comes down to drive time from our front door to yours. Not sure if you're within range?
 homeFaqIds:
   - how-estimate-works
   - minimum-and-pricing

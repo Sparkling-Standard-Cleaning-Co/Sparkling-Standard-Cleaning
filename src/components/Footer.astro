@@ -65,7 +65,6 @@ const phone = isPending(business.phone) ? null : business.phone;
         {
           reviewLeaveUrl ? (
             <div class="site-footer__reviews-card">
-              <GoogleG size={22} />
               <a
                 class="btn btn--ghost site-footer__review-btn"
                 href={reviewLeaveUrl}
@@ -75,11 +74,10 @@ const phone = isPending(business.phone) ? null : business.phone;
                 data-review-link="google"
                 data-cta="footer-reviews-leave"
               >
-                Leave Us a Review
+                <GoogleG size={20} /> Leave Us a Review
               </a>
               <p class="small site-footer__reviews-note">
-                Had a great experience? A quick Google review helps your neighbors find a
-                cleaner they can trust — and it means the world to a small local business.
+                Honest reviews from real customers help neighbors find a cleaner they can trust.
               </p>
             </div>
           ) : (

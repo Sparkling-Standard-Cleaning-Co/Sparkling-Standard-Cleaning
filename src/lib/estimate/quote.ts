@@ -5,7 +5,10 @@
 //  - Only an 'estimated' result can produce a price.
 //  - The offered price is selected from the model's own values and can never
 //    fall below expectedPrice × marginFloor, nor below the minimum job value.
-//  - Rounding rounds UP to the configured step so the safeguard survives it.
+//  - Rounding rounds DOWN to the configured $5 step (owner-approved
+//    2026-10-23): the customer-friendly side of the model price. The floor
+//    can never cross below the minimum job value because the minimum ($125)
+//    is itself a multiple of the step.
 //  - The quote carries the pricing configuration version and an internal
 //    display-window marker. It is a PROPOSAL on a non-binding request: binding
 //    offers stay disabled (pricing.instantQuote.binding === false) and every
@@ -41,7 +44,7 @@ export interface InstantQuote {
   configVersion: string;
 }
 
-const roundUpToStep = (value: number, step: number): number => Math.ceil(value / step) * step;
+const floorToStep = (value: number, step: number): number => Math.floor(value / step) * step;
 
 /**
  * Selects the single offered price from an estimate result. Returns null when
@@ -64,9 +67,10 @@ export function selectInstantAmount(
   const minimum = pricing.minimumJob.value;
   const step = pricing.rounding.toNearest.value;
 
-  // Never below the model price (margin safeguard) or the minimum job value.
+  // Never below the model price (margin safeguard) or the minimum job value;
+  // then round DOWN to the customer-friendly $5 increment.
   const floored = Math.max(candidates[selection], marginFloor, minimum);
-  return roundUpToStep(floored, step);
+  return floorToStep(floored, step);
 }
 
 /**
