@@ -10,6 +10,7 @@ import { schedulingConfig } from '../config/scheduling';
 import { taxPresentationForService } from '../lib/estimate/tax';
 import { formatUsd } from '../lib/format';
 import { initAddressFinder } from './address-finder';
+import { initPhotoUploads } from './photo-uploads';
 import { submitLead, recordConversion } from '../lib/forms/submit';
 import { saveSubmissionSummary } from '../lib/forms/submission-receipt';
 import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
@@ -72,6 +73,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   const errorSummaryList = host.querySelector<HTMLElement>('[data-error-summary-list]');
   let currentStep = 1;
   let maxVisitedStep = 1;
+  const photoController = initPhotoUploads(host, { engine: facilityEngine });
   let latestWorkload: FacilityWorkload | null = null;
   let latestPrice: FacilityPrice | null = null;
   let startTracked = false;
@@ -107,6 +109,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   interface FieldRule {
     name: string;
     message: string;
+    /** Optional empty value is allowed; validate() still applies when present. */
+    optional?: boolean;
     /** Optional extra check; return an error message or null. */
     validate?: (value: string) => string | null;
   }
@@ -239,6 +243,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
           { name: 'time_preference', message: 'Choose the service window that works best.' },
           {
             name: 'preferred_date',
+            optional: true,
             message: 'Choose a preferred date within the next 60 days.',
             validate: (value) => {
               if (!value) return null;
@@ -287,7 +292,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       if (!element) continue;
       clearFieldError(rule.name);
       const value = element.value.trim();
-      let message = value === '' ? rule.message : null;
+      let message = value === '' ? (rule.optional ? null : rule.message) : null;
       if (!message && rule.validate) message = rule.validate(value);
       if (message) {
         setFieldError(rule.name, message);
@@ -624,6 +629,10 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       namedElement(invalid.errors[0]!.name)?.focus();
       return;
     }
+    if (photoController.isUploading()) {
+      setStatus('info', 'Please wait for the photos to finish uploading before sending your request.');
+      return;
+    }
 
     const honeypot = host.querySelector<HTMLInputElement>('input[name="extra_ref"]');
     if (honeypot && honeypot.value.trim() !== '') {
@@ -699,6 +708,13 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       partnership_congregation: field('partnership_congregation'),
       partnership_contact: field('partnership_contact'),
       partnership_none: field('partnership_none'),
+      ...(photoController.keys()
+        ? {
+            photo_keys: photoController.keys(),
+            photo_request_ref: photoController.requestRef,
+            photo_count: String(photoController.photoCount()),
+          }
+        : {}),
       ...attributionFields(),
     };
 
@@ -743,6 +759,11 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     const outcome = await submitLead(fields, subject);
 
     if (outcome.ok) {
+      fields.photo_count = String(outcome.photoCount ?? 0);
+      if ((outcome.photoCount ?? 0) === 0) {
+        delete fields.photo_keys;
+        delete fields.photo_request_ref;
+      }
       saveSubmissionSummary(fields);
       const event = facilityEngine === 'church' ? 'church_request_submit' : 'commercial_quote_submit';
       recordConversion(event, { ...(fields.facility_type ? { facility_type: fields.facility_type } : {}) });

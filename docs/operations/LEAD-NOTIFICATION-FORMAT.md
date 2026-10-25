@@ -148,3 +148,19 @@ Pricing — ACTION REQUIRED: The submitted price differs from the server recalcu
   claims and that the origin/credentials never appear in the forwarded payload.
 - Live: after an owner-authorized, clearly labeled test submission, confirm the inbox shows the
   sections above and that replying goes to the customer's address.
+
+## Customer photos
+
+When the lead carries verified photo references, the owner email adds:
+
+- `Photos - Attached` — the exact number of objects confirmed in private storage
+  with an explicit "metadata stripped" note;
+- `Photos - Private owner links` — one time-limited signed link per photo
+  (default 90 days), separated by ` | `;
+- `Photos - Note` — a reminder that the links open privately and must not be
+  forwarded outside Sparkling Standard.
+
+A photo reference that fails the request-prefix or R2 existence check is never
+linked or counted. If all references fail, the notification says so and prompts
+a re-upload; it never claims the photos arrived. Raw keys are not shown in the
+customer-facing summary or confirmation.

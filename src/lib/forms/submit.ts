@@ -16,7 +16,7 @@ import type { FailureReason } from './failure-copy';
 import { directFallbackFields } from './fallback-fields.ts';
 
 export type SubmitOutcome =
-  | { ok: true; via: 'relay' | 'provider'; verification?: LeadVerification }
+  | { ok: true; via: 'relay' | 'provider'; verification?: LeadVerification; photoCount?: number }
   | { ok: false; reason: FailureReason };
 
 /**
@@ -45,7 +45,7 @@ function parseVerification(value: unknown): LeadVerification | undefined {
   };
 }
 
-function turnstileToken(): string | undefined {
+export function turnstileToken(): string | undefined {
   const input = document.querySelector<HTMLInputElement>('input[name="cf-turnstile-response"]');
   return input?.value || undefined;
 }
@@ -60,7 +60,7 @@ function turnstileConfigured(): boolean {
  * attempt the widget is reset so the customer's retry receives a fresh token
  * instead of reusing a consumed/expired one.
  */
-function resetTurnstile(): void {
+export function resetTurnstile(): void {
   try {
     const widget = (window as unknown as { turnstile?: { reset?: () => void } }).turnstile;
     widget?.reset?.();
@@ -75,7 +75,7 @@ function resetTurnstile(): void {
  * appears, the submission is reported as a verification failure so the
  * customer can retry with honest copy.
  */
-async function waitForTurnstileToken(timeoutMs = 10_000): Promise<string | undefined> {
+export async function waitForTurnstileToken(timeoutMs = 10_000): Promise<string | undefined> {
   const existing = turnstileToken();
   if (existing) return existing;
   if (!turnstileConfigured()) return undefined;
@@ -152,9 +152,15 @@ export async function submitLead(
       body: JSON.stringify(payload),
     });
     if (response.ok) {
-      const data = (await response.json().catch(() => ({}))) as { verification?: unknown };
+      const data = (await response.json().catch(() => ({}))) as {
+        verification?: unknown;
+        photoCount?: unknown;
+      };
       const verification = parseVerification(data.verification);
-      return { ok: true, via: 'relay', ...(verification ? { verification } : {}) };
+      const photoCount = typeof data.photoCount === 'number' && Number.isInteger(data.photoCount)
+        ? data.photoCount
+        : 0;
+      return { ok: true, via: 'relay', photoCount, ...(verification ? { verification } : {}) };
     }
     const data = (await response.json().catch(() => ({}))) as { error?: string };
     const error = typeof data.error === 'string' ? data.error : '';

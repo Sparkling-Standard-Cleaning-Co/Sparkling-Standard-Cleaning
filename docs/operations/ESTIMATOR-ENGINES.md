@@ -194,6 +194,7 @@ fee and no invented availability.
   `src/config/pricing.ts`.
 - **Engine definitions/CTAs**: `src/lib/estimate/engines.ts`.
 - **Calibration**: `npm run commercial:calibration` (hypothetical scenarios;
+- **Calibration report**: `npm run calibration:report` regenerates `FACILITY-CALIBRATION.md` and the full-field CSV; 26 commercial + 20 church scenarios completed (`FACILITY-CALIBRATION.md`).
   intended for internal financial review, never published to customers).
 - **Quote preview**: `npm run estimate:quotes`.
 - **Calculation and tax rules**: `ESTIMATE-CALCULATION-ORDER.md` and
@@ -203,12 +204,13 @@ fee and no invented availability.
 
 ## 10. Known pending owner decisions
 
-1. Calibrate the provisional Tier A/B pricing against the first 10–15 real
-   commercial/church jobs (estimated hours vs actual hours and expenses).
+1. Monitor actual job hours against the completed initial calibration
+   (`FACILITY-CALIBRATION.md`, 26 commercial + 20 church scenarios) as a quality
+   check; the model is usable now and does not wait on historical jobs.
 2. Confirm the treatment of unusual specialty work and third-party costs in the
    church discount (currently excluded from the discount base by design).
-3. Review the provisional $60/hour and effective production rates after that
-   calibration evidence exists.
+3. Review the $60/hour and production rates if a sustained pattern of actual-job
+   variance emerges; do not change rates without owner approval.
 4. Verify live receipt of the `church_request_start` / `church_request_submit`
    and promotion events in GTM Version 5 / GA4 DebugView. The owner reports the
    container published; the website-side generation is tested, but receipt of

@@ -6,6 +6,7 @@ import { ESTIMATE_STEPS } from '../lib/estimate/steps';
 import { US_STATES } from '../lib/location/location';
 import Icon from './Icon.astro';
 import TurnstileWidget from './TurnstileWidget.astro';
+import PhotoUploadSection from './PhotoUploadSection.astro';
 import ResponseGuarantee from './ResponseGuarantee.astro';
 import { isFormEnabled } from '../config/business';
 
@@ -589,36 +590,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             placeholder="Anything we should know — pets, parking, access details, priorities."
           ></textarea>
         </div>
-        <div class="photo-upload" data-photo-section hidden>
-          <h3 class="photo-upload__title">Help Us Get to Know Your Space</h3>
-          <p class="photo-upload__hint">
-            If possible, please include three photos: one of your bathroom, one of your kitchen,
-            and one of your main living or work area. Additional photos are welcome. Photos help
-            us understand the property before confirming your scope — please only share photos of
-            the space (no ID documents or personal paperwork).
-          </p>
-          <div class="photo-upload__grid" data-photo-grid></div>
-          <div class="photo-upload__controls">
-            <label class="btn btn--secondary btn--small photo-upload__pick">
-              <Icon name="camera" size={16} />
-              <span data-photo-pick-label>Add photos</span>
-              <input
-                class="photo-upload__input"
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/heic,.heic,.heif"
-                multiple
-                data-photo-input
-              />
-            </label>
-            <select class="select select--small photo-upload__category" data-photo-category aria-label="Photo category">
-              <option value="bathroom" selected>Bathroom</option>
-              <option value="kitchen">Kitchen</option>
-              <option value="living_area">Main living or work area</option>
-              <option value="additional">Additional photos</option>
-            </select>
-          </div>
-          <div class="photo-upload__status" data-photo-status aria-live="polite"></div>
-        </div>
+        <PhotoUploadSection engine="residential" />
         <TurnstileWidget />
         <div class="honeypot" aria-hidden="true">
           <input

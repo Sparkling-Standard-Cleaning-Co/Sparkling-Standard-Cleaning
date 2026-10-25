@@ -32,10 +32,16 @@ import type { Frequency } from '../../src/lib/estimate/types.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
 import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
 import { schedulingConfig } from '../../src/config/scheduling.ts';
+import {
+  normalizePhotoEntries,
+  photoKeysField,
+  sanitizePhotoRequestRef,
+  type PhotoCategory,
+} from '../../src/lib/photos.ts';
+import { buildPhotoViewUrl } from './photo-auth.ts';
 
 interface R2BucketLike {
-  put(key: string, value: unknown, options?: unknown): Promise<unknown>;
-  get(key: string): Promise<unknown>;
+  head?(key: string): Promise<unknown | null>;
 }
 interface Env extends QuoteVerificationEnv {
   WEB3FORMS_ACCESS_KEY?: string;
@@ -49,6 +55,7 @@ interface Env extends QuoteVerificationEnv {
   // binding and the owner viewing token exist only in the function env.
   PHOTOS_BUCKET?: R2BucketLike;
   PHOTO_OWNER_TOKEN?: string;
+  PHOTO_LINK_TTL_DAYS?: string;
 }
 
 // The estimator sends structured scope + quote + attribution fields; the cap
@@ -108,7 +115,8 @@ const SERVER_OWNED_KEYS = new Set([
   'first_visit_total',
   'ongoing_price_per_visit',
   'ongoing_frequency',
-  'photo_request_ref',
+  'photo_count',
+  'photo_note',
 ]);
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -397,27 +405,53 @@ export async function onRequestPost(context: {
     }
   }
 
+  // Customer photos: validate every submitted reference against this request's
+  // server-generated prefix and confirm the object exists in private storage.
+  // A browser can never invent an attachment count or point at another lead.
+  const photoRequestRef = sanitizePhotoRequestRef(clean.photo_request_ref ?? '');
+  const claimedPhotos = normalizePhotoEntries(clean.photo_keys ?? '', photoRequestRef);
+  const verifiedPhotos: Array<{ category: PhotoCategory; key: string }> = [];
+  if (claimedPhotos.length > 0) {
+    if (env.PHOTOS_BUCKET?.head && env.PHOTO_OWNER_TOKEN) {
+      for (const photo of claimedPhotos) {
+        try {
+          const object = await env.PHOTOS_BUCKET.head(photo.key);
+          if (object) verifiedPhotos.push(photo);
+        } catch {
+          // An unreadable reference is not an attachment; continue with the rest.
+        }
+      }
+    }
+    clean.photo_keys = photoKeysField(verifiedPhotos);
+    clean.photo_request_ref = photoRequestRef;
+    clean.photo_count = String(verifiedPhotos.length);
+    if (verifiedPhotos.length === 0) {
+      clean.photo_note =
+        'Photo references could not be verified in private storage. Ask the customer to re-upload if photos were intended.';
+    } else if (verifiedPhotos.length < claimedPhotos.length) {
+      clean.photo_note = `Only ${verifiedPhotos.length} of ${claimedPhotos.length} submitted photo(s) were verified in private storage.`;
+    }
+  }
+
   // Owner notification presentation: the flat field map becomes an ordered,
   // readable summary. The customer's email is set as the provider reply-to and
   // is also shown in the Contact section; every other collected value is
   // preserved (mapped or under "More details").
   const notification = buildLeadNotification(clean);
-  // Customer photos (Smart Estimate directive, Part 2): submitted photo keys
-  // become PRIVATE owner-only viewing links. The owner token exists only in
-  // the function environment — the links ride inside the notification email,
-  // never through frontend code or public URLs.
-  const photoKeys = (clean.photo_keys ?? '').split(',').map((entry) => entry.trim()).filter(Boolean);
-  if (photoKeys.length > 0 && env.PHOTO_OWNER_TOKEN && env.PHOTOS_BUCKET) {
+  if (verifiedPhotos.length > 0 && env.PHOTO_OWNER_TOKEN) {
     const origin = new URL(request.url).origin;
-    const photoLinks = photoKeys
-      .map((entry) => {
-        const key = entry.includes(':') ? (entry.split(':').slice(1).join(':')) : entry;
-        return `${origin}/api/photo-view?key=${encodeURIComponent(key)}&t=${encodeURIComponent(env.PHOTO_OWNER_TOKEN as string)}`;
-      })
-      .join(' | ');
-    notification['Photos — Private owner links'] = photoLinks;
-    notification['Photos — Note'] =
-      'Links open the customer-uploaded photos privately (R2 storage). Do not forward outside Sparkling Standard.';
+    const ttlDays = Math.min(
+      365,
+      Math.max(1, Number(env.PHOTO_LINK_TTL_DAYS ?? '90') || 90),
+    );
+    const links: string[] = [];
+    for (const photo of verifiedPhotos) {
+      links.push(await buildPhotoViewUrl(origin, photo.key, env.PHOTO_OWNER_TOKEN, ttlDays * 86_400));
+    }
+    notification['Photos - Attached'] = `${verifiedPhotos.length} private photo${verifiedPhotos.length === 1 ? '' : 's'} (metadata stripped)`;
+    notification['Photos - Private owner links'] = links.join(' | ');
+    notification['Photos - Note'] =
+      `Links are time-limited (${ttlDays} days) and open the customer-uploaded photos privately. Do not forward outside Sparkling Standard.`;
   }
   const replyTo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean.email ?? '') ? clean.email : undefined;
 
@@ -447,6 +481,7 @@ export async function onRequestPost(context: {
       }
       return json({
         ok: true,
+        ...(verifiedPhotos.length > 0 ? { photoCount: verifiedPhotos.length } : {}),
         ...(clientVerification ? { verification: clientVerification } : {}),
       });
     }

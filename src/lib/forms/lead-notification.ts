@@ -684,6 +684,9 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Facility — Quote check', FACILITY_QUOTE_LABELS[text(fields, 'facility_quote_verified')] ?? text(fields, 'facility_quote_verified'), 'facility_quote_verified');
   add('Facility — Travel status', text(fields, 'facility_travel_status'), 'facility_travel_status');
   add('Facility — Monthly estimate', text(fields, 'monthly_price'), 'monthly_price');
+  add('Photos - Attached', text(fields, 'photo_count') ? `${text(fields, 'photo_count')} private photo(s)` : '', 'photo_count');
+  add('Photos - Attachment note', text(fields, 'photo_note'), 'photo_note');
+  add('Photos - Private references', '', 'photo_keys', 'photo_request_ref');
 
   // ── E. Requested extras ─────────────────────────────────────────────────
   const addonLabels = text(fields, 'addons');

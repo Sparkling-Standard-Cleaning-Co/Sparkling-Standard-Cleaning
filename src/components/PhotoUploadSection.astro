@@ -1,0 +1,43 @@
+---
+// Shared optional customer-photo section for all four estimate engines.
+// Hidden until /api/photo-upload confirms private R2 storage is available.
+import type { PhotoEngine } from '../lib/photos';
+import { PHOTO_CATEGORY_OPTIONS, PHOTO_ENGINE_COPY } from '../lib/photos';
+import Icon from './Icon.astro';
+
+interface Props {
+  engine: PhotoEngine;
+}
+
+const { engine } = Astro.props;
+const copy = PHOTO_ENGINE_COPY[engine];
+const options = PHOTO_CATEGORY_OPTIONS[engine];
+---
+
+<section class="photo-upload" data-photo-section aria-labelledby="photo-upload-title" hidden>
+  <h3 class="photo-upload__title" id="photo-upload-title" data-photo-title>{copy.title}</h3>
+  <p class="photo-upload__hint" data-photo-hint>{copy.hint}</p>
+  <p class="photo-upload__privacy hint" data-photo-privacy>{copy.privacy}</p>
+
+  <div class="photo-upload__grid" data-photo-grid></div>
+
+  <div class="photo-upload__controls">
+    <label class="btn btn--secondary btn--small photo-upload__pick">
+      <Icon name="camera" size={16} />
+      <span data-photo-pick-label>Add photos</span>
+      <input
+        class="photo-upload__input"
+        type="file"
+        name="photos"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+        multiple
+        data-photo-input
+        aria-label="Choose photos of the space"
+      />
+    </label>
+    <select class="select select--small photo-upload__category" data-photo-category aria-label="Photo category">
+      {options.map((option) => <option value={option.value}>{option.label}</option>)}
+    </select>
+  </div>
+  <p class="photo-upload__status" data-photo-status aria-live="polite"></p>
+</section>

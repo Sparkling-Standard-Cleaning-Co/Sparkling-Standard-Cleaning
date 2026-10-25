@@ -46,6 +46,17 @@ Church: same workload with a blended church production rate and the
 owner-directed 10% discount applied to the cleaning subtotal AFTER the minimum
 rule, never stacked, travel/third-party excluded.
 
-## Calibration
-`npm run commercial:calibration` prints 16 hypothetical scenarios. Replace
-assumptions with real job data (estimated hours vs actual) as it accumulates.
+## Calibration (completed initial model, 2026-10-25)
+`npm run commercial:calibration` now exercises **26 commercial** and **20 church**
+hypothetical scenarios across offices, retail, salons, gyms, community
+facilities, restroom-heavy plans, conditions, floors, frequencies, first cleans,
+travel and specialty review. `npm run calibration:report` writes the committed
+matrix (`docs/operations/FACILITY-CALIBRATION.md`) and full-field CSV
+(`docs/verification/FACILITY-CALIBRATION-2026-10-25.csv`).
+
+Results: ordinary Tier A/B jobs are numeric and positive after owner labour and
+the 22% overhead allowance; Tier C/specialty jobs are deliberately custom
+reviews; church rows reconcile the exact 10% discount to the cent. The model is
+complete for initial operation. Monitoring actual job hours against estimates
+continues as a quality check — it is not a prerequisite or an excuse to defer
+the estimator.

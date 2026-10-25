@@ -50,11 +50,13 @@
     "indexnow": "node scripts/indexnow.mjs",
     "indexnow:dry": "node scripts/indexnow.mjs --dry-run",
     "indexnow:all": "node scripts/indexnow.mjs --all",
-    "commercial:calibration": "node scripts/commercial-calibration.mjs"
+    "commercial:calibration": "node scripts/commercial-calibration.ts",
+    "calibration:report": "node scripts/facility-calibration-report.ts"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.4.0",
     "astro": "^5.13.0",
+    "heic2any": "^0.0.4",
     "maplibre-gl": "^6.11.2"
   },
   "devDependencies": {

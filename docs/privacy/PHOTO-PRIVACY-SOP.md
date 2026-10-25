@@ -50,3 +50,19 @@ If it was already published: remove it, regenerate affected assets, and note the
   used. If there's no permission record, the photo doesn't get published.
 - Sanitize screenshots of checklists/reports before they're used as marketing (no customer
   names, addresses or notes visible).
+
+## Customer-submitted estimate photos
+
+Customer photos attached to an estimate are private intake material, not
+marketing content:
+
+- stored only in the private R2 bucket; never public and never indexed;
+- server-strips EXIF/GPS/text metadata before storage;
+- viewed by the owner through time-limited signed links, not a public gallery;
+- retained up to 90 days after upload, then removed by the `/api/photo-cleanup`
+  retention process; deletion can be requested sooner;
+- never reused in marketing, social media or public proof without separate
+  written permission;
+- not sent to analytics, and no photo URL/key reaches GA4.
+
+See `docs/operations/PHOTO-UPLOADS.md` for the exact system and provisioning.

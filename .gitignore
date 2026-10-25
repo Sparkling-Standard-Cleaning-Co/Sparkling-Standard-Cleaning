@@ -1,3 +1,6 @@
+# local Cloudflare/Wrangler state
+.wrangler/
+
 # build output
 dist/
 .astro/

@@ -16,6 +16,7 @@ import { FACILITY_STEPS } from '../lib/estimate/engines';
 import { US_STATES } from '../lib/location/location';
 import Icon from './Icon.astro';
 import TurnstileWidget from './TurnstileWidget.astro';
+import PhotoUploadSection from './PhotoUploadSection.astro';
 
 type FacilityEngine = 'commercial' | 'church';
 
@@ -531,6 +532,7 @@ const commercialFacilityTypes = [
       </p>
     </div>
 
+    <PhotoUploadSection engine={engine} />
     <TurnstileWidget />
     <div class="honeypot" aria-hidden="true">
       <input

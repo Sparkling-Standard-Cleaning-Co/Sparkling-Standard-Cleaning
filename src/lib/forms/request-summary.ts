@@ -272,6 +272,10 @@ export function buildRequestSummary(fields: Record<string, string>): RequestSumm
       `${globalFactor}×${globalAdjustment ? ` (${Number(globalAdjustment) < 0 ? '−' : '+'}${money(String(Math.abs(Number(globalAdjustment))))})` : ''}`,
     );
   }
+  const photoCount = text(fields, 'photo_count');
+  if (photoCount && Number(photoCount) > 0) {
+    add('Photos attached', `${photoCount} private photo${Number(photoCount) === 1 ? '' : 's'}`);
+  }
   const taxNote = text(fields, 'tax_note');
   if (taxNote) add('Sales tax', taxNote);
 

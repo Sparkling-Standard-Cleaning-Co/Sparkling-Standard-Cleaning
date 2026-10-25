@@ -393,7 +393,7 @@ li + li {
 
 .photo-upload__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
   gap: var(--space-2);
 }
 
@@ -403,7 +403,7 @@ li + li {
   overflow: hidden;
   border: 1px solid var(--color-rose-200);
   background: var(--color-surface);
-  aspect-ratio: 1;
+  aspect-ratio: 4 / 3;
 }
 
 .photo-upload__thumb img {
@@ -413,36 +413,53 @@ li + li {
   display: block;
 }
 
+.photo-upload__privacy {
+  margin: 0;
+}
+
 .photo-upload__thumb-meta {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 0.15rem 0.35rem;
-  background: rgba(48, 36, 41, 0.72);
+  padding: 0.2rem 0.35rem;
+  background: rgba(48, 36, 41, 0.82);
   color: var(--color-cream-50);
   font-size: var(--text-xs);
+  display: grid;
+  gap: 0.15rem;
+}
+
+.photo-upload__thumb-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-upload__thumb-actions {
   display: flex;
-  justify-content: space-between;
+  gap: 0.35rem;
   align-items: center;
 }
 
-.photo-upload__remove {
+.photo-upload__thumb-action {
   border: 0;
   background: none;
   color: var(--color-cream-50);
   cursor: pointer;
-  font-size: var(--text-sm);
-  line-height: 1;
-  padding: 0.1rem 0.25rem;
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  padding: 0.05rem 0.2rem;
   border-radius: var(--radius-sm);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
 }
 
-.photo-upload__remove:hover {
+.photo-upload__thumb-action:hover {
   background: rgba(253, 251, 248, 0.2);
 }
 
-.photo-upload__remove:focus-visible {
+.photo-upload__thumb-action:focus-visible {
   outline: 2px solid var(--color-cream-50);
   outline-offset: 1px;
 }

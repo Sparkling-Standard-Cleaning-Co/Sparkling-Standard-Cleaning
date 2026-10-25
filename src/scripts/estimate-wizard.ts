@@ -31,16 +31,7 @@ import { ENGINE_STEPS, parseResidentialServiceParam } from '../lib/estimate/engi
 import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInfo, ServiceType } from '../lib/estimate/types';
 import { locationKey, formatLocationLine, type ConfirmedLocation } from '../lib/location/location';
 import { initAddressFinder, type AddressFinderHandle } from './address-finder';
-import {
-  fetchPhotoUploadConfig,
-  newRequestRef,
-  photoKeysField,
-  uploadPhotos,
-  validatePhotoFile,
-  type PhotoCategory,
-  type UploadedPhoto,
-  type PhotoUploadConfig,
-} from './photo-uploads';
+import { initPhotoUploads } from './photo-uploads';
 import { submitLead, recordConversion } from '../lib/forms/submit';
 import { reservationReceipt } from '../lib/forms/verification-copy';
 import { saveSubmissionSummary } from '../lib/forms/submission-receipt';
@@ -143,178 +134,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
   const engineNote = form.querySelector<HTMLElement>('[data-engine-note]');
   let engine: 'residential' | 'str' = 'residential';
-
-  // ── Customer photos (Smart Estimate directive, Part 2) ────────────────────
-  // The section appears ONLY when the private R2 backend reports itself
-  // provisioned; until then it stays hidden and uploads never pretend to
-  // work. Uploaded references survive wizard navigation (state lives here,
-  // not in the DOM).
-  const photoSection = form.querySelector<HTMLElement>('[data-photo-section]');
-  const photoGrid = form.querySelector<HTMLElement>('[data-photo-grid]');
-  const photoInput = form.querySelector<HTMLInputElement>('[data-photo-input]');
-  const photoCategory = form.querySelector<HTMLSelectElement>('[data-photo-category]');
-  const photoStatus = form.querySelector<HTMLElement>('[data-photo-status]');
-  const photoPickLabel = form.querySelector<HTMLElement>('[data-photo-pick-label]');
-  let photoConfig: PhotoUploadConfig = { enabled: false, maxBytes: 8 * 1024 * 1024, maxCount: 6 };
-  let uploadedPhotos: UploadedPhoto[] = [];
-  const photoRequestRef = newRequestRef();
-  let photoUploading = false;
-
-  function photoCategoryLabel(category: string): string {
-    const option = photoCategory?.querySelector<HTMLOptionElement>(`option[value="${category}"]`);
-    return option?.textContent?.trim() ?? category;
-  }
-
-  function renderPhotos(): void {
-    if (!photoGrid) return;
-    photoGrid.innerHTML = '';
-    for (const [index, photo] of uploadedPhotos.entries()) {
-      const thumb = document.createElement('div');
-      thumb.className = 'photo-upload__thumb';
-      const image = document.createElement('img');
-      image.src = photo.previewUrl;
-      image.alt = `${photoCategoryLabel(photo.category)} photo`;
-      const meta = document.createElement('span');
-      meta.className = 'photo-upload__thumb-meta';
-      const label = document.createElement('span');
-      label.textContent = photoCategoryLabel(photo.category);
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'photo-upload__remove';
-      remove.textContent = '✕';
-      remove.setAttribute('aria-label', `Remove ${photoCategoryLabel(photo.category)} photo`);
-      remove.addEventListener('click', () => {
-        URL.revokeObjectURL(photo.previewUrl);
-        uploadedPhotos.splice(index, 1);
-        renderPhotos();
-        setPhotoStatus(`${uploadedPhotos.length} photo${uploadedPhotos.length === 1 ? '' : 's'} attached.`, '');
-      });
-      meta.append(label, remove);
-      thumb.append(image, meta);
-      photoGrid.appendChild(thumb);
-    }
-    if (photoPickLabel) {
-      const remaining = photoConfig.maxCount - uploadedPhotos.length;
-      photoPickLabel.textContent = remaining <= 0 ? 'Photo limit reached' : `Add photos (${remaining} left)`;
-    }
-  }
-
-  function setPhotoStatus(message: string, kind: 'error' | '' ): void {
-    if (!photoStatus) return;
-    photoStatus.textContent = message;
-    photoStatus.dataset.kind = kind;
-  }
-
-  function initPhotoUploads(): void {
-    if (!photoSection || !photoInput || !photoCategory) return;
-    void (async () => {
-      photoConfig = await fetchPhotoUploadConfig();
-      if (!photoConfig.enabled) return;
-      photoSection.hidden = false;
-      // STR turnovers photograph bedrooms/bathrooms/kitchen/laundry areas.
-      const syncCategories = (): void => {
-        const isStr = radioValue('serviceType') === 'str_turnover';
-        const options = [...photoCategory.querySelectorAll<HTMLOptionElement>('option')];
-        for (const option of options) option.remove();
-        const entries: Array<[string, string]> = isStr
-          ? [
-              ['bedroom', 'Bedrooms'],
-              ['bathroom', 'Bathrooms'],
-              ['kitchen', 'Kitchen'],
-              ['laundry', 'Laundry / linens'],
-              ['additional', 'Additional photos'],
-            ]
-          : [
-              ['bathroom', 'Bathroom'],
-              ['kitchen', 'Kitchen'],
-              ['living_area', 'Main living or work area'],
-              ['additional', 'Additional photos'],
-            ];
-        for (const [value, label] of entries) {
-          const option = document.createElement('option');
-          option.value = value;
-          option.textContent = label;
-          photoCategory.appendChild(option);
-        }
-      };
-      syncCategories();
-      form.addEventListener('change', (event) => {
-        if (event.target instanceof HTMLInputElement && event.target.name === 'serviceType') syncCategories();
-      });
-
-      photoInput.addEventListener('change', () => {
-        void handlePhotoSelection();
-      });
-      // Drag-and-drop on the section (desktop nicety).
-      photoSection.addEventListener('dragover', (event) => event.preventDefault());
-      photoSection.addEventListener('drop', (event) => {
-        event.preventDefault();
-        if (photoInput && event.dataTransfer?.files.length) {
-          photoInput.files = event.dataTransfer.files;
-          void handlePhotoSelection();
-        }
-      });
-    })();
-  }
-
-  async function handlePhotoSelection(): Promise<void> {
-    if (!photoInput || !photoCategory || photoUploading) return;
-    const files = [...(photoInput.files ?? [])];
-    photoInput.value = '';
-    if (files.length === 0) return;
-    const room = photoConfig.maxCount - uploadedPhotos.length;
-    if (room <= 0) {
-      setPhotoStatus(`Up to ${photoConfig.maxCount} photos, please. Remove one to add another.`, 'error');
-      return;
-    }
-    const accepted: File[] = [];
-    for (const file of files) {
-      const problem = validatePhotoFile(file, photoConfig.maxBytes);
-      if (problem) {
-        setPhotoStatus(problem, 'error');
-        continue;
-      }
-      if (accepted.length + uploadedPhotos.length >= photoConfig.maxCount) {
-        setPhotoStatus(`Up to ${photoConfig.maxCount} photos, please. Only the first ${room} were added.`, 'error');
-        break;
-      }
-      accepted.push(file);
-    }
-    if (accepted.length === 0) return;
-    photoUploading = true;
-    setPhotoStatus(`Uploading ${accepted.length} photo${accepted.length === 1 ? '' : 's'}…`, '');
-    const category = photoCategory.value as PhotoCategory;
-    const result = await uploadPhotos(accepted, category, photoRequestRef, (percent) => {
-      setPhotoStatus(`Uploading photos… ${percent}%`, '');
-    });
-    photoUploading = false;
-    if (!result.ok || !result.photos) {
-      const reason =
-        result.error === 'file_too_large'
-          ? 'A photo was too large for upload.'
-          : result.error === 'unsupported_format'
-            ? 'One of those files is not a supported photo format.'
-            : result.error === 'rate_limited'
-              ? 'Too many uploads in a short time — try again in a minute.'
-              : 'Upload did not complete — check your connection and try again.';
-      setPhotoStatus(`${reason} Your other details are saved; you can continue without photos.`, 'error');
-      return;
-    }
-    for (const [index, photo] of result.photos.entries()) {
-      const source = accepted[index];
-      if (!source) continue;
-      uploadedPhotos.push({
-        ...photo,
-        previewUrl: URL.createObjectURL(source),
-        label: source.name,
-      });
-    }
-    renderPhotos();
-    setPhotoStatus(
-      `${uploadedPhotos.length} photo${uploadedPhotos.length === 1 ? '' : 's'} attached — uploaded privately for Hayli's review.`,
-      '',
-    );
-  }
+  const photoController = initPhotoUploads(form, {
+    engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
+  });
 
   let currentStep = 1;
   let location: ConfirmedLocation | null = null;
@@ -1522,12 +1344,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
     }
     // Customer photos (optional): private storage references only — the
-    // owner views them through the authorized photo endpoint, never a
-    // public URL. Empty when no photos were uploaded.
-    const photoKeys = photoKeysField(uploadedPhotos);
+    // owner views them through the signed photo endpoint, never a public URL.
+    const photoKeys = photoController.keys();
     if (photoKeys) {
       fields.photo_keys = photoKeys;
-      fields.photo_request_ref = photoRequestRef;
+      fields.photo_request_ref = photoController.requestRef;
+      fields.photo_count = String(photoController.photoCount());
     }
     return { ...fields, ...attributionFields() };
   }
@@ -1535,6 +1357,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
   async function handleSubmit(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     if (!validateStep(currentStep)) return;
+    if (photoController.isUploading()) {
+      if (status) {
+        status.dataset.state = 'info';
+        status.textContent = 'Please wait for the photos to finish uploading before sending your request.';
+      }
+      return;
+    }
 
     const honeypot = form.querySelector<HTMLInputElement>('input[name="extra_ref"]');
     if (honeypot && honeypot.value.trim() !== '') {
@@ -1593,6 +1422,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     if (fields.preferred_date) {
       recordConversion('booking_request', { service_type: fields.service_type });
+    }
+    // The server's verified attachment count is authoritative; never tell the
+    // customer a photo was attached when the server could not confirm it.
+    fields.photo_count = String(outcome.photoCount ?? 0);
+    if ((outcome.photoCount ?? 0) === 0) {
+      delete fields.photo_keys;
+      delete fields.photo_request_ref;
     }
     // Keep a single-use, sanitized copy so the thank-you page can show the
     // customer exactly what they submitted.
@@ -1760,7 +1596,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   resetWizard();
   applyDateWindow();
-  initPhotoUploads();
+  // Photo uploads are initialized above via photoController.
 
   // Deep links from marketing pages and the estimate hub. Only allowlisted
   // values apply, and they only pre-select — the customer can always change

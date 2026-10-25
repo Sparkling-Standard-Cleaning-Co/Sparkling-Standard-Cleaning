@@ -14,15 +14,18 @@ five-commit release `8b8dde4`…`5a4a024`, the documentation closeout `7a51efa`,
 social integration `cdc4971`, the deployment-closeout `6ebc3fb` and the logo-only Follow Us
 redesign `62a1a46`). Live acceptance checks for the 6.1 release: residential, STR, commercial
 Tier A/B, Tier C scope review, church discount, location/travel, consent, reviews, footer,
-sitemap, robots and canonicals passed on sparkling-standard.com. R2 photo intake remains
-**disabled** (probe reports `enabled:false` until the bucket/secrets are provisioned).
+sitemap, robots and canonicals passed on sparkling-standard.com. Customer photo intake code is
+complete with private-R2 preparation, metadata stripping, signed owner links and retention cleanup,
+but production remains **disabled** until the owner provisions the bucket/binding/token; the probe
+reports `enabled:false` and no real-R2 upload has been claimed as tested.
 
 The **Initiative 6.2 complete-experience release candidate** (`initiative-6.2-complete-experience-audit`)
 is prepared locally and is **not deployed**: it adds the dedicated `/estimate/residential/` route,
 guided facility forms, field-specific validation, the Supportive Home 10% eligibility discount,
 the owner global estimate factor, exact church-discount reconciliation, tax disclosure,
-service-area/reviews/footer/icon refinements, and independent audit fixes. Production continues to
-serve the 6.1 release until the owner authorizes the 6.2 deployment. Confirm the exact deployed
+service-area/reviews/footer/icon refinements, shared photo intake (awaiting R2 provisioning), the
+completed 26-commercial/20-church calibration, and independent audit fixes. Production continues
+to serve the 6.1 release until the owner authorizes the 6.2 deployment. Confirm the exact deployed
 SHA with `git log -1`.
 
 Status vocabulary:

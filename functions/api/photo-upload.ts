@@ -1,53 +1,69 @@
-// POST /api/photo-upload — secure customer-photo intake for cleaning
-// requests (Smart Estimate directive, Part 2).
+// POST /api/photo-upload — secure customer-photo intake for cleaning requests.
 //
 // Architecture:
-//  - Customer photos upload DIRECTLY to this function from the estimator
-//    (multipart/form-data) — provider credentials never touch the browser.
+//  - Customer photos upload directly to this function (multipart/form-data).
 //  - Storage is a PRIVATE Cloudflare R2 bucket bound as `PHOTOS_BUCKET`.
 //    Objects are never public; retrieval happens only through
-//    /api/photo-view with the server-side owner token.
-//  - Object keys are SERVER-GENERATED (crypto random under a per-request
-//    prefix) — a guessed object name can never retrieve a file.
-//  - Validation: magic-byte content sniffing (JPEG/PNG/WebP/HEIC), a hard
-//    per-file size cap, and per-IP throttling. Uploaded files are never
-//    executable content and are always served with a photo content type.
-//  - The upload endpoint reports its own availability via GET so the client
-//    can hide the photo section when R2 is not provisioned (production stays
-//    disabled until uploads genuinely work end to end — owner directive).
+//    /api/photo-view with a time-limited signed owner link.
+//  - Object keys are SERVER-GENERATED (random under the request reference), so
+//    a guessed object name can never retrieve a file.
+//  - Data flows through `photo-utils.ts`: magic-byte identification, metadata
+//    stripping (EXIF/GPS/XMP/text) and a hard cap before R2 `put`.
+//  - iPhone HEIC/HEIF is converted to JPEG in the browser; raw HEIC is rejected
+//    here with an explicit conversion-required response, never silently stored.
+//  - Turnstile is verified when configured. The browser resets its widget after
+//    each upload so the later lead submission still receives a fresh token.
 //
 // Env:
-//  PHOTOS_BUCKET    — R2 bucket binding (missing ⇒ uploads disabled)
-//  PHOTO_OWNER_TOKEN — secret for /api/photo-view (never in frontend code)
-//  PHOTOS_MAX_BYTES — optional per-file cap override (default 8 MiB)
+//  PHOTOS_BUCKET           — private R2 bucket binding
+//  PHOTO_OWNER_TOKEN       — secret for signed links and owner cleanup
+//  TURNSTILE_SECRET_KEY    — optional Turnstile secret for uploads
+//  PHOTOS_MAX_BYTES        — optional per-file cap (default 8 MiB, hard 12 MiB)
 //
-// Responses: 200 | 400 | 404 | 405 | 413 | 415 | 429 | 500 | 503
+// Responses: 200 | 400 | 403 | 405 | 413 | 415 | 429 | 500 | 503
+
+import {
+  PHOTO_ABSOLUTE_MAX_FILE_BYTES,
+  PHOTO_MAX_COUNT,
+  PHOTO_MAX_FILE_BYTES,
+  PHOTO_MAX_TOTAL_BYTES,
+  sanitizePhotoRequestRef,
+  isPhotoCategory,
+  type PhotoCategory,
+} from '../../src/lib/photos.ts';
+import { sanitizePhotoBytes, sniffPhotoFormat } from './photo-utils.ts';
+
+export { sniffPhotoFormat } from './photo-utils.ts';
 
 interface R2Bucket {
-  put(key: string, value: ArrayBuffer | ReadableStream, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
-  head(key: string): Promise<unknown | null>;
+  put(
+    key: string,
+    value: ArrayBuffer | Uint8Array | ReadableStream,
+    options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> },
+  ): Promise<unknown>;
 }
+
 interface Env {
   PHOTOS_BUCKET?: R2Bucket;
   PHOTO_OWNER_TOKEN?: string;
+  TURNSTILE_SECRET_KEY?: string;
   PHOTOS_MAX_BYTES?: string;
 }
 
-const DEFAULT_MAX_BYTES = 8 * 1024 * 1024;
-/** Hard cap regardless of the env override — one photo never exceeds this. */
-const ABSOLUTE_MAX_BYTES = 12 * 1024 * 1024;
-/** Whole-request ceiling across all files (Sparkling Standard 4.0 §2 hardening). */
-const MAX_TOTAL_BYTES = 32 * 1024 * 1024;
-const MAX_PER_REQUEST = 12;
 const WINDOW_MS = 60_000;
 const PER_IP_PER_MINUTE = 10;
+const MAX_REQUEST_BYTES = PHOTO_MAX_TOTAL_BYTES + 2 * 1024 * 1024;
 
 const hits = new Map<string, { count: number; reset: number }>();
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
   });
 }
 
@@ -67,70 +83,65 @@ function throttled(request: Request): boolean {
   return entry.count > PER_IP_PER_MINUTE;
 }
 
-/** Accepted photo formats, identified by magic bytes (never by extension or
- *  client-provided MIME type alone). */
-export function sniffPhotoFormat(head: Uint8Array): { mime: string; ext: string } | null {
-  if (head.length < 12) return null;
-  // JPEG
-  if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return { mime: 'image/jpeg', ext: 'jpg' };
-  // PNG
-  if (head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) {
-    return { mime: 'image/png', ext: 'png' };
+function maxBytesFor(env: Env): number {
+  return Math.min(
+    Number(env.PHOTOS_MAX_BYTES ?? '') || PHOTO_MAX_FILE_BYTES,
+    PHOTO_ABSOLUTE_MAX_FILE_BYTES,
+  );
+}
+
+async function verifyTurnstile(
+  request: Request,
+  token: string,
+  secret: string,
+): Promise<boolean> {
+  if (!token) return false;
+  const body = new URLSearchParams({ secret, response: token });
+  const ip = clientIp(request);
+  if (ip !== 'unknown') body.set('remoteip', ip);
+  try {
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!response.ok) return false;
+    const result = (await response.json()) as { success?: boolean };
+    return result.success === true;
+  } catch {
+    return false;
   }
-  // RIFF....WEBP
-  const riff = String.fromCharCode(head[0] as number, head[1] as number, head[2] as number, head[3] as number);
-  const webp = String.fromCharCode(head[8] as number, head[9] as number, head[10] as number, head[11] as number);
-  if (riff === 'RIFF' && webp === 'WEBP') return { mime: 'image/webp', ext: 'webp' };
-  // ISO Base Media (HEIC/HEIF): bytes 4–7 must be "ftyp" and the brand at
-  // bytes 8–11 must be a HEIF-family brand. This rejects MP4-family files
-  // that merely share a 4-byte box-size prefix (the Rev1 check was too loose).
-  const ftyp = String.fromCharCode(head[4] as number, head[5] as number, head[6] as number, head[7] as number);
-  if (ftyp === 'ftyp') {
-    const brand = String.fromCharCode(head[8] as number, head[9] as number, head[10] as number, head[11] as number);
-    if (['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1'].includes(brand)) {
-      return { mime: 'image/heic', ext: 'heic' };
-    }
+}
+
+function sameOrigin(request: Request): boolean {
+  const origin = request.headers.get('Origin');
+  if (!origin) return true;
+  try {
+    return new URL(origin).origin === new URL(request.url).origin;
+  } catch {
+    return false;
   }
-  return null;
-}
-
-function randomKey(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-function sanitizeRef(value: string): string {
-  const cleaned = value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40);
-  return cleaned.length >= 8 ? cleaned : '';
-}
-
-const ALLOWED_CATEGORIES = new Set([
-  'bathroom',
-  'kitchen',
-  'living_area',
-  'additional',
-  'bedroom',
-  'laundry',
-]);
-
-function sanitizeCategory(value: string): string {
-  const cleaned = value.trim().toLowerCase().slice(0, 20);
-  return ALLOWED_CATEGORIES.has(cleaned as never) ? cleaned : 'additional';
 }
 
 export async function onRequestGet(context: { env: Env }): Promise<Response> {
-  // Availability probe: the estimator hides the photo section when the R2
-  // binding (or the owner token) is missing — production stays disabled
-  // until uploads genuinely work end to end (owner directive). Nothing
-  // sensitive is exposed.
   const enabled = Boolean(context.env.PHOTOS_BUCKET && context.env.PHOTO_OWNER_TOKEN);
-  const maxBytes = Math.min(Number(context.env.PHOTOS_MAX_BYTES ?? '') || DEFAULT_MAX_BYTES, ABSOLUTE_MAX_BYTES);
-  return json({ ok: true, enabled, maxBytes, maxCount: 6 }, 200);
+  return json(
+    {
+      ok: true,
+      enabled,
+      maxBytes: maxBytesFor(context.env),
+      maxCount: PHOTO_MAX_COUNT,
+      maxTotalBytes: PHOTO_MAX_TOTAL_BYTES,
+      turnstileRequired: Boolean(context.env.TURNSTILE_SECRET_KEY),
+      heic: 'client_jpeg_conversion',
+    },
+    200,
+  );
 }
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
+  if (!sameOrigin(request)) return json({ ok: false, error: 'origin_rejected' }, 403);
   if (throttled(request)) return json({ ok: false, error: 'rate_limited' }, 429);
 
   const bucket = env.PHOTOS_BUCKET;
@@ -138,10 +149,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'photo_storage_not_configured' }, 503);
   }
 
-  const maxBytes = Math.min(
-    Number(env.PHOTOS_MAX_BYTES ?? '') || DEFAULT_MAX_BYTES,
-    ABSOLUTE_MAX_BYTES,
-  );
+  const declaredLength = Number(request.headers.get('Content-Length') ?? 0);
+  if (declaredLength > MAX_REQUEST_BYTES) {
+    return json({ ok: false, error: 'request_too_large' }, 413);
+  }
 
   let form: FormData;
   try {
@@ -150,63 +161,101 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
 
-  const requestRef = sanitizeRef(String(form.get('request_ref') ?? ''));
+  const requestRef = sanitizePhotoRequestRef(String(form.get('request_ref') ?? ''));
   if (!requestRef) return json({ ok: false, error: 'invalid_request' }, 400);
-  const category = sanitizeCategory(String(form.get('category') ?? 'additional'));
+
+  if (env.TURNSTILE_SECRET_KEY) {
+    const token = String(form.get('turnstile_token') ?? '').trim();
+    if (!(await verifyTurnstile(request, token, env.TURNSTILE_SECRET_KEY))) {
+      return json({ ok: false, error: 'verification_failed' }, 403);
+    }
+  }
+
+  const category = String(form.get('category') ?? 'additional');
+  if (!isPhotoCategory(category)) return json({ ok: false, error: 'invalid_category' }, 400);
+
   const files = form.getAll('file').filter((entry): entry is File => entry instanceof File);
   if (files.length === 0) return json({ ok: false, error: 'no_file' }, 400);
-  if (files.length > MAX_PER_REQUEST) return json({ ok: false, error: 'too_many_files' }, 400);
+  if (files.length > PHOTO_MAX_COUNT) return json({ ok: false, error: 'too_many_files' }, 400);
 
-  const month = new Date().toISOString().slice(0, 7).replace('-', '/');
-  const results: Array<{ key: string; category: string; bytes: number }> = [];
+  const maxBytes = maxBytesFor(env);
+  const prepared: Array<{ name: string; bytes: Uint8Array; mime: string; ext: string }> = [];
   let totalBytes = 0;
 
+  // Validate and sanitise every file BEFORE writing anything. A bad file in a
+  // batch never leaves a half-uploaded set that the customer cannot see.
   for (const file of files) {
     if (file.size > maxBytes) return json({ ok: false, error: 'file_too_large' }, 413);
-    const buffer = await file.arrayBuffer();
+    const buffer = new Uint8Array(await file.arrayBuffer());
     if (buffer.byteLength > maxBytes) return json({ ok: false, error: 'file_too_large' }, 413);
-    totalBytes += buffer.byteLength;
-    if (totalBytes > MAX_TOTAL_BYTES) return json({ ok: false, error: 'request_too_large' }, 413);
     if (buffer.byteLength < 16) return json({ ok: false, error: 'unsupported_format' }, 415);
+    totalBytes += buffer.byteLength;
+    if (totalBytes > PHOTO_MAX_TOTAL_BYTES) return json({ ok: false, error: 'request_too_large' }, 413);
 
-    const head = new Uint8Array(buffer.slice(0, 16));
-    const format = sniffPhotoFormat(head);
+    const format = sniffPhotoFormat(buffer.slice(0, 16));
     if (!format) return json({ ok: false, error: 'unsupported_format' }, 415);
-
-    const key = `leads/${month}/${requestRef}/${category}-${randomKey()}.${format.ext}`;
+    if (format.ext === 'heic') {
+      return json({ ok: false, error: 'heic_conversion_required' }, 415);
+    }
+    let sanitized: Uint8Array;
     try {
-      await bucket.put(key, buffer, {
-        httpMetadata: { contentType: format.mime },
+      sanitized = sanitizePhotoBytes(buffer);
+    } catch {
+      return json({ ok: false, error: 'unsupported_format' }, 415);
+    }
+    const safeName =
+      file.name
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .replace(/[\\/]/g, '')
+        .slice(0, 120) || `photo.${format.ext}`;
+    prepared.push({ name: safeName, bytes: sanitized, mime: format.mime, ext: format.ext });
+  }
+
+  const month = new Date().toISOString().slice(0, 7).replace('-', '/');
+  const uploaded: Array<{ key: string; category: PhotoCategory; bytes: number; name: string }> = [];
+
+  for (const file of prepared) {
+    const random = crypto.getRandomValues(new Uint8Array(16));
+    const suffix = Array.from(random, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    const key = `leads/${month}/${requestRef}/${category}-${suffix}.${file.ext}`;
+    try {
+      await bucket.put(key, file.bytes, {
+        httpMetadata: { contentType: file.mime },
+        customMetadata: { requestRef, category },
       });
-      // Private metadata sidecar: preserves the ORIGINAL filename and upload
-      // facts without altering the original photo bytes (owner decision:
-      // metadata preservation). The sidecar is never served as an image.
-      const safeName = file.name.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 200);
+      uploaded.push({ key, category, bytes: file.bytes.byteLength, name: file.name });
       const meta = new TextEncoder().encode(
         JSON.stringify({
-          originalName: safeName,
-          bytes: buffer.byteLength,
-          mime: format.mime,
+          originalName: file.name,
+          bytes: file.bytes.byteLength,
+          mime: file.mime,
           category,
           requestRef,
           uploadedAt: new Date().toISOString(),
+          metadataStripped: true,
         }),
       );
-      await bucket.put(`${key}.meta.json`, meta.buffer as ArrayBuffer, {
+      await bucket.put(`${key}.meta.json`, meta, {
         httpMetadata: { contentType: 'application/json' },
       });
     } catch {
-      return json({ ok: false, error: 'storage_failed' }, 500);
+      // Return the files that genuinely reached private storage so the UI can
+      // keep them attached and honestly report the partial result.
+      return json(
+        {
+          ok: false,
+          error: 'storage_failed',
+          photos: uploaded,
+          message: 'Some photos were stored, but not all. Please retry the remaining photos.',
+        },
+        500,
+      );
     }
-    results.push({ key, category, bytes: buffer.byteLength });
   }
 
-  return json({ ok: true, photos: results });
+  return json({ ok: true, photos: uploaded });
 }
 
 export async function onRequestOptions(): Promise<Response> {
-  return new Response(null, {
-    status: 204,
-    headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' },
-  });
+  return new Response(null, { status: 204, headers: { Allow: 'GET, POST, OPTIONS' } });
 }

@@ -51,6 +51,7 @@ const SUMMARY_KEYS = [
   'global_adjustment',
   'tax_status',
   'tax_note',
+  'photo_count',
 ] as const;
 
 export interface StorageLike {

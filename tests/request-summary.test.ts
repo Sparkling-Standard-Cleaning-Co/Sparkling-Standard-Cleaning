@@ -235,3 +235,15 @@ test('date formatting is human-readable and stable', () => {
   assert.equal(formatSummaryDate('2026-12-15'), 'Tuesday, December 15, 2026');
   assert.equal(formatSummaryDate('not-a-date'), 'not-a-date');
 });
+
+test('photo count is acknowledged without exposing private references', () => {
+  const summary = buildRequestSummary({
+    ...reservationFields,
+    photo_count: '2',
+    photo_keys: 'bathroom:leads/2026/10/aaaaaaaaaaaaaaaaaaaaaaaa/bathroom-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg',
+    photo_request_ref: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+  const byLabel = Object.fromEntries(summary.rows.map((row) => [row.label, row.value]));
+  assert.equal(byLabel['Photos attached'], '2 private photos');
+  assert.doesNotMatch(JSON.stringify(summary), /leads\/2026|bbbbbbbb/);
+});

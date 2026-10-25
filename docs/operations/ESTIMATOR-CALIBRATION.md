@@ -1,8 +1,13 @@
 # Estimator calibration
 
-The estimator is a **provisional model**, not a statistically proven one. It is built to be
-recalibrated after real jobs — target: first meaningful pass at **10 completed jobs**, full
-re-evaluation around **30**. Never change formulas on feelings.
+This document covers the **residential** labour model. The commercial/church facility model has a
+separate, completed initial research calibration: `FACILITY-CALIBRATION.md` (26 commercial + 20
+church hypothetical scenarios). Actual completed jobs are a quality check, not a prerequisite for
+using that model.
+
+The residential estimator is a **provisional model**, not a statistically proven one. It is built
+to be recalibrated after real residential jobs — target: first meaningful pass at **10 completed
+jobs**, full re-evaluation around **30**. Never change formulas on feelings.
 
 ## Model anchors (where the numbers come from)
 

@@ -197,11 +197,11 @@ weekly operations; the strategy system above is the reference behind it.
 
 **Launch & operations:** `docs/launch/OWNER-INPUT-REQUIRED.md`,
 `docs/launch/PRICING-PROPOSAL.md`, `docs/launch/REVENUE-READINESS-PLAN.md`,
-`docs/operations/ESTIMATOR-CALIBRATION.md`,
+`docs/operations/ESTIMATOR-CALIBRATION.md`, `docs/operations/FACILITY-CALIBRATION.md`,
 `docs/operations/ESTIMATOR-LOCATION-ENGINE.md`, `docs/operations/OWNER-SETTINGS-GUIDE.md`,
 `docs/operations/SEARCH-CONSOLE-SETUP.md`,
 `docs/operations/SERVICE-SCOPE-MATRIX.md`, `docs/operations/PROPERTY-ACCESS-SECURITY.md`,
-`docs/operations/CAPABILITY-REVIEW.md`.
+`docs/operations/CAPABILITY-REVIEW.md`, `docs/operations/PHOTO-UPLOADS.md`.
 
 **Customer communication & invoicing:** `docs/operations/LEAD-NOTIFICATION-FORMAT.md` (owner
 email), `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md` (customer confirmation: on-page summary,

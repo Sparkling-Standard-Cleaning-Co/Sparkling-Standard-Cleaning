@@ -204,7 +204,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Location selection, geocoding, GPS/manual modes | `src/scripts/address-finder.ts`, `src/lib/location/`, `functions/api/geocode.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`, `facility-verify.ts`, `tax.ts`) | `docs/verification/VERIFICATION.md`, `docs/operations/TAX-TREATMENT.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
 | Four estimate engines (residential `/estimate/residential/`, STR `/estimate/str/`, commercial `/estimate/commercial/`, church `/estimate/church/`) + 10% church discount | `src/lib/estimate/engines.ts`, `commercial.ts`, `church-discount.ts`, `src/components/EstimateHub.astro`, `FacilityEstimateForm.astro`, `src/pages/estimate/` | `docs/operations/ESTIMATOR-ENGINES.md` |
-| Commercial/church facility pricing (provisional Tier A/B) + owner kill switch + calibration | `src/config/commercial-tiers.ts` (`numericEstimatesEnabled`), `src/config/owner-pricing.ts` (`commercialPricing`), `npm run commercial:calibration` | `docs/operations/ESTIMATOR-ENGINES.md`, `docs/operations/COMMERCIAL-PRICING-RESEARCH.md` |
+| Commercial/church facility pricing (provisional Tier A/B) + owner kill switch + completed initial calibration | `src/config/commercial-tiers.ts` (`numericEstimatesEnabled`), `src/config/owner-pricing.ts` (`commercialPricing`), `src/lib/estimate/calibration.ts`, `npm run commercial:calibration`, `npm run calibration:report` | `docs/operations/ESTIMATOR-ENGINES.md`, `docs/operations/COMMERCIAL-PRICING-RESEARCH.md`, `docs/operations/FACILITY-CALIBRATION.md` |
 | Promotions, bundles, Founding-10 (all disabled) | `src/lib/estimate/promotions.ts` + `src/config/owner-pricing.ts` | `docs/launch/PROMOTION-PROPOSALS.md` |
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
 | Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` §4a |
@@ -216,7 +216,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | SEO, structured data, sitemap, robots, page ownership | `src/components/BaseHead.astro`, `src/lib/schema.ts`, page files | `docs/seo/SEO-STRATEGY.md`, `docs/operations/SEARCH-CONSOLE-SETUP.md` |
 | Analytics, consent, event taxonomy, attribution | `src/scripts/consent-controller.ts`, `src/lib/analytics/`, `src/lib/attribution.ts` | `docs/analytics/ANALYTICS-SETUP.md`, `docs/analytics/GTM-CONTAINER-SETUP.md` |
 | Visual design, tokens, images, icons, OG image | `src/styles/`, `public/brand/`, `src/assets/images/` | `docs/design/DESIGN-SYSTEM.md`, `docs/design/IMAGE-GUIDE.md`, `docs/design/IMAGE-SOURCE-REGISTER.md` |
-| Photo privacy rules | `docs/privacy/PHOTO-PRIVACY-SOP.md` |
+| Customer photo intake (private R2, metadata stripping, owner links, retention) | `functions/api/photo-upload.ts`, `photo-view.ts`, `photo-cleanup.ts`, `src/lib/photos.ts`, `src/lib/photo-files.ts`, `src/scripts/photo-uploads.ts`, `src/components/PhotoUploadSection.astro` | `docs/operations/PHOTO-UPLOADS.md` |`n| Photo privacy rules (marketing/field photography) | `docs/privacy/PHOTO-PRIVACY-SOP.md` |
 | UTM links and QR assets | `src/config/marketing-links.ts` | `docs/marketing/UTM-MASTER-LINKS.md`, `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md` |
 | Marketing strategy, growth engines, platform priorities | — | `docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md` (execution front door), `docs/marketing/GROWTH-SYSTEM.md` (spine: flywheel, weekly loop, roadmap; subsystems `COMPETITIVE-STRATEGY.md`, `CONTENT-ENGINE.md`, `FIELD-CONTENT-CAPTURE.md`, `VIDEO-DIRECTING-SHEETS.md`, `CUSTOMER-LIFECYCLE.md`, `ACQUISITION-CHANNELS.md`, `LOCAL-AUTHORITY.md`, `ECONOMIC-MODEL.md`), `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`, `docs/marketing/CONTENT-OPERATING-SYSTEM.md` |
 | Social account setup (owner checklist) | `src/config/business.ts` `socials` | `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`, `docs/marketing/PLATFORM-REGISTER.md` |
@@ -396,8 +396,11 @@ collections are intentionally empty — not errors.
   currency; category-specific Florida sales-tax disclosure (no invented tax amount); service-area
   page restructured to title → description → map; representative-photo captions and the Mark 12:31
   quotation removed; larger review stars; footer review actions split into Read and Leave; and the
-  premium icon set redesigned as white/gold artwork on rose tiles. Research/order/tax records:
-  `docs/operations/ESTIMATE-CALCULATION-ORDER.md`, `docs/operations/TAX-TREATMENT.md`.
+  premium icon set redesigned as white/gold artwork on rose tiles. The customer-photo intake is
+  shared across all four engines with private R2 storage, server-side metadata stripping and
+  signed owner links (activation awaits R2 provisioning). Facility pricing has a completed
+  26-commercial/20-church calibration (`docs/operations/FACILITY-CALIBRATION.md`). Research/order/
+  tax records: `docs/operations/ESTIMATE-CALCULATION-ORDER.md`, `docs/operations/TAX-TREATMENT.md`.
 - **Smart Estimate System 2.0 (2026-10-24, owner directive):**
   - **Address reliability:** an exact-address resolve that no provider could pinpoint no longer
     dead-ends — when the typed query carries a KNOWN 5-digit ZIP, the resolve action returns the
@@ -411,13 +414,17 @@ collections are intentionally empty — not errors.
     service selection (the option reads "Residential Cleaning"). `/house-cleaning/` remains as an
     SEO information page that routes visitors to Recurring Residential Cleaning and Deep Cleaning
     — never deleted, never a broken link, never presented as a third service.
-  - **Customer photos (architecture in, production DISABLED):** optional estimator section "Help
-    Us Get to Know Your Space" (bathroom/kitchen/living area; STR switches to bedrooms/laundry
-    categories). Uploads POST directly to functions/api/photo-upload.ts → PRIVATE Cloudflare R2
-    (`PHOTOS_BUCKET` binding) with server-generated keys, magic-byte validation and size caps;
-    owner-only retrieval via functions/api/photo-view.ts + `PHOTO_OWNER_TOKEN`. The section stays
-    hidden until the GET probe reports `enabled: true` — nothing fakes an upload. Provisioning:
-    docs/operations/PHOTO-UPLOADS.md.
+  - **Customer photos (code complete; activation awaiting R2 provisioning):** optional shared
+    section on residential, STR, commercial and church estimates (engine-specific categories).
+    Uploads POST to functions/api/photo-upload.ts → PRIVATE Cloudflare R2 (`PHOTOS_BUCKET`
+    binding), with server-generated keys, magic-byte validation, server-side EXIF/GPS/text
+    metadata stripping, 6-photo/8MB/32MB limits, same-origin + rate checks and Turnstile when
+    configured. iPhone HEIC converts to JPEG in the browser via heic2any; raw HEIC is rejected.
+    Owner retrieval uses time-limited signed links (default 90 days) via functions/api/photo-view.ts;
+    `/api/photo-cleanup` enforces the documented retention window. `/api/lead` verifies each
+    object with R2 `head` and associates only same-request keys. The section stays hidden until
+    the GET probe reports `enabled: true`; no mock upload is presented as production. Provisioning
+    and exact owner actions: docs/operations/PHOTO-UPLOADS.md.
   - **STR turnover context:** the estimator's STR path adds optional check-out/check-in times and
     a linen/laundry preference (informational — the per-turnover price is unchanged); all three
     travel with the request into the owner notification.
