@@ -151,6 +151,9 @@ test('a street-level suggestion opens pin confirmation without inventing a house
     await page.selectOption('#est-address-state', 'FL');
     await page.fill('#est-zip', '32577');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
+    // Let the debounced suggestion request that includes the ZIP settle; the
+    // list can already be visible from an earlier partial-address request.
+    await page.waitForTimeout(700);
 
     // Autocomplete is built from all entered information.
     const lastSuggest = captured.suggest.at(-1);
