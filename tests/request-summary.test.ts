@@ -112,6 +112,54 @@ test('a commercial request is titled as a walkthrough request', () => {
   assert.equal(byLabel['Service'], 'Commercial — Church');
 });
 
+test('a facility request with a preliminary price is titled as an estimate, with the number', () => {
+  const summary = buildRequestSummary({
+    request_type: 'facility_estimate',
+    estimate_status: 'estimated',
+    organization: 'Example Office',
+    facility_type: 'office',
+    name: 'Facilities Lead',
+    phone: '8500000000',
+    quoted_price: '155',
+    quoted_range: '$140-$175',
+  });
+  assert.equal(summary.kind, 'facility_estimate');
+  assert.equal(summary.title, 'Facility estimate request');
+  assert.equal(summary.estimate?.label, 'Preliminary per-visit estimate');
+  assert.equal(summary.estimate?.value, '$155 per visit');
+  assert.match(summary.estimate?.note ?? '', /\$140-\$175/);
+  assert.match(summary.estimate?.note ?? '', /Nonbinding preliminary estimate/i);
+});
+
+test('a facility request without a price is titled as a scope review', () => {
+  const summary = buildRequestSummary({
+    request_type: 'facility_estimate',
+    estimate_status: 'custom_confirmation_required',
+    organization: 'Example Church',
+    facility_type: 'church',
+    name: 'Facilities Lead',
+    phone: '8500000000',
+  });
+  assert.equal(summary.kind, 'facility_estimate');
+  assert.equal(summary.title, 'Facility scope review request');
+  assert.equal(summary.estimate, null);
+});
+
+test('a facility scope review never surfaces a stale price', () => {
+  const summary = buildRequestSummary({
+    request_type: 'facility_estimate',
+    estimate_status: 'custom_confirmation_required',
+    organization: 'Example Church',
+    facility_type: 'church',
+    name: 'Facilities Lead',
+    phone: '8500000000',
+    quoted_price: '9999',
+    quoted_range: '$9,000-$10,000',
+  });
+  assert.equal(summary.title, 'Facility scope review request');
+  assert.equal(summary.estimate, null);
+});
+
 test('a turnover request labels the turnover rhythm, not a cleaning frequency', () => {
   const summary = buildRequestSummary({
     property_location: '12 Beach Rd, Pensacola Beach, FL 32561',

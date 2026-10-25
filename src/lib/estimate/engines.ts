@@ -3,8 +3,9 @@
 //
 // Residential and Short-Term Rental Turnovers run through the instant
 // calculator; Commercial and Church open the specialized facility request
-// engine. Numeric commercial/church pricing stays gated by
-// `commercialTiers.numericEstimatesEnabled`.
+// engine. Numeric facility pricing is governed by
+// `commercialTierConfig.numericEstimatesEnabled` (enabled: Tier A/B preliminary
+// estimates; disabled: scope review only).
 
 import type { Frequency } from '../../config/pricing.ts';
 import type { ServiceType } from './types.ts';

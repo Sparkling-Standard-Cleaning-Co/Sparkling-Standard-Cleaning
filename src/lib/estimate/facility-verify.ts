@@ -5,8 +5,14 @@
 // facts using the SAME shared module, so a tampered browser price can never be
 // presented as checked. Travel remains a separate, explicitly preliminary
 // component (a live route is not re-requested inside the lead relay).
+//
+// The owner kill switch (`commercialTierConfig.numericEstimatesEnabled`) is
+// enforced here independently of browser state. When it is off, the server
+// returns no prices, no labour hours and no discount amount, and the relay
+// strips any client-supplied facility price fields before the owner notification.
 
 import { pricing } from '../../config/pricing.ts';
+import { commercialTierConfig } from '../../config/commercial-tiers.ts';
 import {
   calculateFacilityPrice,
   calculateFacilityWorkload,
@@ -16,13 +22,47 @@ import {
 } from './commercial.ts';
 
 export interface FacilityVerification {
-  status: 'verified' | 'preliminary' | 'mismatch' | 'unverifiable';
+  status: 'verified' | 'preliminary' | 'mismatch' | 'unverifiable' | 'pricing_disabled';
   expectedCleaning: number | null;
   expectedRange: { low: number; high: number } | null;
   laborHours: number | null;
   discountAmount: number | null;
   configMatch: 'match' | 'mismatch' | 'unknown';
   travelStatus: 'verified' | 'preliminary' | 'manual_review';
+  /** False when the owner has disabled numeric facility pricing. */
+  pricingEnabled: boolean;
+}
+
+export interface FacilityVerifyOptions {
+  /** Owner kill switch override for tests; defaults to the shared config. */
+  numericEstimatesEnabled?: boolean | undefined;
+}
+
+/** Client-supplied facility fields that must never survive a disabled switch. */
+export const FACILITY_PRICING_FIELDS = [
+  'cleaning_subtotal',
+  'quoted_price',
+  'quoted_range',
+  'monthly_price',
+  'church_discount_amount',
+  'church_savings',
+  'commercial_rate',
+  'travel_adjustment',
+  'labor_hours',
+  'quote_config_version',
+  'facility_tier',
+  'estimate_low',
+  'estimate_high',
+  'estimate_confidence',
+] as const;
+
+/**
+ * Removes every client-supplied numeric facility field and marks the request
+ * as a scope review. Called by the relay when the owner switch is off.
+ */
+export function stripFacilityPricingFields(fields: Record<string, string>): void {
+  for (const key of FACILITY_PRICING_FIELDS) delete fields[key];
+  fields.estimate_status = 'custom_confirmation_required';
 }
 
 const TOLERANCE = 10;
@@ -35,7 +75,25 @@ function num(value: string | undefined): number | null {
 
 const FACILITY_TYPES = new Set<FacilityType>(['office', 'retail', 'salon', 'gym', 'community', 'church']);
 
-export function verifyFacilityQuote(fields: Record<string, string>): FacilityVerification {
+export function verifyFacilityQuote(
+  fields: Record<string, string>,
+  options: FacilityVerifyOptions = {},
+): FacilityVerification {
+  const numericEnabled =
+    options.numericEstimatesEnabled ?? commercialTierConfig.numericEstimatesEnabled;
+  if (!numericEnabled) {
+    return {
+      status: 'pricing_disabled',
+      expectedCleaning: null,
+      expectedRange: null,
+      laborHours: null,
+      discountAmount: null,
+      configMatch: 'unknown',
+      travelStatus: 'preliminary',
+      pricingEnabled: false,
+    };
+  }
+
   const sqft = num(fields.cleanable_sqft);
   const clientCleaning = num(fields.cleaning_subtotal);
   const clientVersion = fields.quote_config_version ?? '';
@@ -55,6 +113,7 @@ export function verifyFacilityQuote(fields: Record<string, string>): FacilityVer
       discountAmount: null,
       configMatch,
       travelStatus: 'manual_review',
+      pricingEnabled: true,
     };
   }
 
@@ -85,6 +144,7 @@ export function verifyFacilityQuote(fields: Record<string, string>): FacilityVer
       discountAmount: price.discount?.amount ?? null,
       configMatch,
       travelStatus: fields.travel_verified === 'true' ? 'verified' : 'preliminary',
+      pricingEnabled: true,
     };
   }
 
@@ -100,6 +160,7 @@ export function verifyFacilityQuote(fields: Record<string, string>): FacilityVer
       discountAmount: price.discount?.amount ?? null,
       configMatch,
       travelStatus,
+      pricingEnabled: true,
     };
   }
 
@@ -112,5 +173,6 @@ export function verifyFacilityQuote(fields: Record<string, string>): FacilityVer
     discountAmount: price.discount?.amount ?? null,
     configMatch,
     travelStatus,
+    pricingEnabled: true,
   };
 }

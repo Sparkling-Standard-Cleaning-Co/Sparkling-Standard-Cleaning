@@ -26,7 +26,7 @@ import {
   type QuoteVerificationEnv,
 } from '../../src/lib/estimate/verify.ts';
 import { requiresInitialDeepClean } from '../../src/lib/estimate/frequency.ts';
-import { verifyFacilityQuote } from '../../src/lib/estimate/facility-verify.ts';
+import { verifyFacilityQuote, stripFacilityPricingFields } from '../../src/lib/estimate/facility-verify.ts';
 import type { Frequency } from '../../src/lib/estimate/types.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
 import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
@@ -219,11 +219,18 @@ export async function onRequestPost(context: {
   // Facility estimates (commercial/church): the server rebuilds the workload
   // and cleaning price from the submitted scope facts. The browser price is
   // never trusted; a mismatch is flagged for owner review rather than rejected.
+  // When the owner switch is off, every client-supplied price field is removed
+  // and the request is recorded as a scope review only.
   if (clean.request_type === 'facility_estimate') {
     const facility = verifyFacilityQuote(clean);
+    if (!facility.pricingEnabled) stripFacilityPricingFields(clean);
     clean.facility_quote_verified = facility.status;
     clean.facility_config_match = facility.configMatch;
     clean.facility_travel_status = facility.travelStatus;
+    clean.estimate_status =
+      facility.pricingEnabled && facility.expectedCleaning !== null
+        ? 'estimated'
+        : 'custom_confirmation_required';
     if (facility.expectedCleaning !== null) clean.verified_cleaning_price = String(facility.expectedCleaning);
     if (facility.laborHours !== null) clean.verified_labor_hours = String(facility.laborHours);
     if (facility.discountAmount !== null) clean.verified_church_discount = String(facility.discountAmount);

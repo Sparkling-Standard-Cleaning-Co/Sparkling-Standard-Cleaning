@@ -176,6 +176,9 @@ test('the commercial engine shows a preliminary per-visit price for an ordinary 
     assert.ok(value >= 125, `preliminary per-visit price is at least the minimum (${price})`);
     const note = (await page.locator('[data-facility-estimate-note]').textContent()) ?? '';
     assert.match(note, /Nonbinding preliminary estimate/i);
+    const reviewNote = (await page.locator('[data-facility-review-note]').textContent()) ?? '';
+    assert.match(reviewNote, /nonbinding preliminary estimate/i, 'a priced request is not called a scope review');
+    assert.doesNotMatch(reviewNote, /scope-review request/i);
   } finally {
     await context.close();
   }
@@ -202,6 +205,9 @@ test('the church engine shows the 10% discount and routes very large scopes to r
     );
     const reviewText = (await page.locator('[data-facility-estimate-price]').textContent()) ?? '';
     assert.match(reviewText, /together/i);
+    const reviewNote = (await page.locator('[data-facility-review-note]').textContent()) ?? '';
+    assert.match(reviewNote, /personal review/i, 'Tier C is described as a personal review');
+    assert.doesNotMatch(reviewNote, /nonbinding preliminary estimate/i);
   } finally {
     await context.close();
   }

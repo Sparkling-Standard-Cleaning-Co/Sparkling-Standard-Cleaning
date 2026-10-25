@@ -10,7 +10,7 @@
 // Only values the customer themselves submitted are presented; every field is
 // optional and empty rows are omitted.
 
-export type RequestKind = 'reservation' | 'estimate' | 'commercial' | 'str' | 'gift' | 'contact';
+export type RequestKind = 'reservation' | 'estimate' | 'commercial' | 'facility_estimate' | 'str' | 'gift' | 'contact';
 
 export interface SummaryRow {
   label: string;
@@ -110,6 +110,7 @@ function money(value: string): string {
 
 function kindOf(fields: Record<string, string>): RequestKind {
   if (text(fields, 'recipient_name')) return 'gift';
+  if (text(fields, 'request_type') === 'facility_estimate') return 'facility_estimate';
   if (text(fields, 'facility_type') || text(fields, 'organization')) return 'commercial';
   if (text(fields, 'turnover_frequency') || text(fields, 'property_location') || text(fields, 'checkout_time')) {
     return 'str';
@@ -124,6 +125,7 @@ const TITLES: Record<RequestKind, string> = {
   reservation: 'Reservation request',
   estimate: 'Estimate request',
   commercial: 'Commercial walkthrough request',
+  facility_estimate: 'Facility estimate request',
   str: 'Short-term rental turnover request',
   gift: 'Gift certificate request',
   contact: 'Website message',
@@ -159,7 +161,29 @@ function addressValue(fields: Record<string, string>): string {
 }
 
 function estimateFor(fields: Record<string, string>, kind: RequestKind): EstimateLine | null {
-  if (kind !== 'reservation' && kind !== 'estimate') return null;
+  if (kind !== 'reservation' && kind !== 'estimate' && kind !== 'facility_estimate') return null;
+  if (kind === 'facility_estimate') {
+    if (text(fields, 'estimate_status') !== 'estimated') return null;
+    const facilityQuote = text(fields, 'quoted_price');
+    const facilityRange = text(fields, 'quoted_range');
+    if (facilityQuote) {
+      return {
+        label: 'Preliminary per-visit estimate',
+        value: `${money(facilityQuote)} per visit`,
+        note: facilityRange
+          ? `Nonbinding preliminary estimate (typical range ${facilityRange}) — final scope, travel and price are confirmed personally before anything is scheduled.`
+          : 'Nonbinding preliminary estimate — final scope, travel and price are confirmed personally before anything is scheduled.',
+      };
+    }
+    if (facilityRange) {
+      return {
+        label: 'Preliminary per-visit range',
+        value: facilityRange,
+        note: 'Nonbinding preliminary estimate — final scope, travel and price are confirmed personally before anything is scheduled.',
+      };
+    }
+    return null;
+  }
   const verifiedRange = text(fields, 'verified_range');
   if (verifiedRange) {
     return {
@@ -232,11 +256,17 @@ export function buildRequestSummary(fields: Record<string, string>): RequestSumm
   const arrival = text(fields, 'arrival_preference');
   if (arrival) add('Arrival preference', ARRIVAL_LABELS[arrival] ?? humanizeKey(arrival));
 
+  const estimate = estimateFor(fields, kind);
+  const title =
+    kind === 'facility_estimate' && !estimate
+      ? 'Facility scope review request'
+      : TITLES[kind];
+
   return {
     kind,
-    title: TITLES[kind],
+    title,
     rows,
     reference: text(fields, 'quote_reference'),
-    estimate: estimateFor(fields, kind),
+    estimate,
   };
 }

@@ -84,7 +84,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   verified); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); eight confirmed
   social profiles rendering (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-10-21):** the 46-decision owner implementation is the current production release set. Verify the exact deployed SHA with git log -1; Cloudflare Pages and the live site are verified after each push. The historical release note follows.
+- **Current release (2026-10-21):** the 46-decision owner implementation is the current production release set. Verify the exact deployed SHA with git log -1; Cloudflare Pages and the live site are verified after each push. The **Initiative 6.1 facility-pricing release candidate** is prepared on `release-6.1`; it is not deployed until the owner authorizes it (see `docs/operations/PLATFORM-STATUS.md`). The historical release note follows.
 - **Prior release status:** the 2026-10-03 release was **deployed to production** — `origin/main` =
   `62a1a46` (the five-commit release `8b8dde4`/`03d6ba8`/`53a85aa`/`0f3c38c`/`5a4a024`, the
   documentation closeout `7a51efa`, the social integration `cdc4971`, the deployment-closeout
@@ -204,7 +204,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Location selection, geocoding, GPS/manual modes | `src/scripts/address-finder.ts`, `src/lib/location/`, `functions/api/geocode.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`) | `docs/verification/VERIFICATION.md` |
 | Four estimate engines (residential, commercial, STR, church) + 10% church discount | `src/lib/estimate/engines.ts`, `commercial.ts`, `church-discount.ts`, `src/components/EstimateHub.astro`, `FacilityEstimateForm.astro`, `src/pages/estimate/` | `docs/operations/ESTIMATOR-ENGINES.md` |
-| Commercial/church numeric-pricing gate + calibration | `src/config/commercial-tiers.ts`, `npm run commercial:calibration` | `docs/operations/ESTIMATOR-ENGINES.md`, `docs/launch/COMMERCIAL-ESTIMATE-MODEL.md` |
+| Commercial/church facility pricing (provisional Tier A/B) + owner kill switch + calibration | `src/config/commercial-tiers.ts` (`numericEstimatesEnabled`), `src/config/owner-pricing.ts` (`commercialPricing`), `npm run commercial:calibration` | `docs/operations/ESTIMATOR-ENGINES.md`, `docs/operations/COMMERCIAL-PRICING-RESEARCH.md` |
 | Promotions, bundles, Founding-10 (all disabled) | `src/lib/estimate/promotions.ts` + `src/config/owner-pricing.ts` | `docs/launch/PROMOTION-PROPOSALS.md` |
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
 | Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` §4a |
@@ -369,12 +369,18 @@ collections are intentionally empty — not errors.
   (`/estimate/str/`) runs the live per-turnover model; Commercial (`/estimate/commercial/`) and
   Church (`/estimate/church/`) run the shared facility request engine with the SAME address finder,
   travel lookup, relay, owner notification and Turnstile controls. The old embedded StrForm and
-  CommercialForm were retired — one request pipeline only. **Commercial/church dollar pricing is
-  calibration-gated** (`numericEstimatesEnabled: false`) and shown as an honest scope review.
+  CommercialForm were retired — one request pipeline only. **Facility pricing (Initiative 6.1,
+  2026-10-24):** commercial and church numerical pricing is enabled as nonbinding provisional
+  estimates — Tier A (≤3 labour hours) shows a single price, Tier B (≤8 hours) a ±15% range, and
+  Tier C (larger, specialty or high-fixture) remains a personal scope review. The owner kill switch
+  is `commercialTierConfig.numericEstimatesEnabled`; when false, the customer sees a scope-review
+  experience and no numeric price survives in the UI, request, owner notification or server
+  verification. The server independently enforces the switch in
+  `src/lib/estimate/facility-verify.ts`.
   **Church discount:** owner-directed **10% off eligible church cleaning**, applied after the
   minimum-job rule, never stacked, never on travel/third-party costs, explicitly not a donation or
-  tithe; terms `2026-10-24.church10.v1` (`src/lib/estimate/church-discount.ts`). Facility/church
-  requests record the entitlement; numeric church pricing activates with the calibration gate.
+  tithe; terms `2026-10-24.church10.v1` (`src/lib/estimate/church-discount.ts`). Tier A/B show the
+  discount and preliminary price; Tier C shows the entitlement and the owner confirms it personally.
   Optional church partnership checkboxes are never preselected and never affect pricing. See
   `docs/operations/ESTIMATOR-ENGINES.md`.
 - **Smart Estimate System 2.0 (2026-10-24, owner directive):**
@@ -400,13 +406,18 @@ collections are intentionally empty — not errors.
   - **STR turnover context:** the estimator's STR path adds optional check-out/check-in times and
     a linen/laundry preference (informational — the per-turnover price is unchanged); all three
     travel with the request into the owner notification.
-  - **Commercial tiers (architecture in, numeric estimates PENDING OWNER APPROVAL):**
-    src/config/commercial-tiers.ts holds the Tier A/B/C model with configurable thresholds
-    (~2,500 sqft Tier A boundary is the owner's PROPOSAL, not approved policy). While
-    `numericEstimatesEnabled: false`, every commercial request routes to Tier C (walkthrough
-    quote). The commercial intake form now collects cleanable sqft, restrooms, kitchen/breakroom,
-    condition and specialty needs — all labeled in the owner notification. Model analysis:
-    docs/launch/COMMERCIAL-ESTIMATE-MODEL.md.
+  - **Facility pricing (2026-10-24, Initiative 6.1):** commercial and church numerical pricing is
+    enabled as nonbinding provisional estimates for Tier A/B using ISSA-based workloading,
+    fixture-based restrooms and a $60/hour gross labour rate. Tier thresholds are workload hours
+    (`pricing.commercialPricing.tierAHours` / `tierBHours`); the square-foot values in
+    `src/config/commercial-tiers.ts` are legacy reference only. Tier C remains a personal scope
+    review. The owner kill switch is `numericEstimatesEnabled` in the same file; it is enforced in
+    the browser engine and server verification. The commercial intake form collects cleanable sqft,
+    restroom fixtures, flooring, first-clean status, condition and specialty needs — all labeled in
+    the owner notification. Research and model analysis:
+    `docs/operations/COMMERCIAL-PRICING-RESEARCH.md` and
+    `docs/operations/ESTIMATOR-ENGINES.md` (the older
+    `docs/launch/COMMERCIAL-ESTIMATE-MODEL.md` is historical).
   - **Future booking roadmap (documentation only):** docs/operations/BOOKING-ARCHITECTURE.md
     defines the state machine (Estimate → Request Submitted → Owner Approved → Reserved →
     Confirmed → Paid) and the recommended additions. NOTHING is auto-booked and no payment is

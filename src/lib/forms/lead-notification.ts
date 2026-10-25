@@ -95,6 +95,15 @@ const YES_NO_LABELS: Record<string, string> = {
   no: 'No',
 };
 
+/** Owner-facing interpretation of the server's facility quote verdict. */
+const FACILITY_QUOTE_LABELS: Record<string, string> = {
+  verified: 'Verified server calculation',
+  preliminary: 'Preliminary — travel/scope confirmation required',
+  mismatch: 'MISMATCH — server calculation differs; re-quote',
+  pricing_disabled: 'Numeric pricing disabled by owner — scope review only',
+  unverifiable: 'Could not verify — manual review required',
+};
+
 /** Contact-form inquiry type (optional context, never a booking selection). */
 const INQUIRY_TYPE_LABELS: Record<string, string> = {
   general_question: 'General question',
@@ -200,6 +209,11 @@ function money(value: string): string {
 
 function requestType(fields: Record<string, string>): string {
   const explicit = text(fields, 'request_type');
+  if (explicit === 'facility_estimate') {
+    return text(fields, 'estimate_status') === 'estimated'
+      ? 'Facility estimate request — preliminary price, not a booking'
+      : 'Facility estimate request — scope review, not a booking';
+  }
   if (explicit && REQUEST_LABELS[explicit]) return REQUEST_LABELS[explicit] as string;
   if (text(fields, 'recipient_name')) {
     return 'Gift certificate request — confirm details and send a payment link (no payment taken yet)';
@@ -220,7 +234,11 @@ function requestTypeShort(fields: Record<string, string>): string {
   const explicit = text(fields, 'request_type');
   if (explicit === 'reservation_request') return 'Reservation request';
   if (explicit === 'residential_estimate') return 'Estimate request';
-  if (explicit === 'facility_estimate') return 'Scope review request';
+  if (explicit === 'facility_estimate') {
+    return text(fields, 'estimate_status') === 'estimated'
+      ? 'Facility estimate request'
+      : 'Facility scope review request';
+  }
   if (explicit === 'commercial') return 'Commercial walkthrough request';
   if (explicit === 'str') return 'STR turnover request';
   if (explicit === 'contact') return 'Website message';
@@ -532,6 +550,9 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   if (text(fields, 'facility_quote_verified') === 'preliminary') {
     actions.push('Facility estimate is preliminary — confirm travel and the final scope');
   }
+  if (text(fields, 'facility_quote_verified') === 'pricing_disabled') {
+    actions.push('Facility numeric pricing is disabled — complete a personal scope review and quote');
+  }
   if (text(fields, 'initial_deep_clean_required') === 'yes') {
     actions.push('Initial Deep Cleaning required before recurring maintenance service');
   }
@@ -646,7 +667,7 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Facility — Tier', text(fields, 'facility_tier'), 'facility_tier');
   add('Facility — Server cleaning price', text(fields, 'verified_cleaning_price'), 'verified_cleaning_price');
   add('Facility — Server labour hours', text(fields, 'verified_labor_hours'), 'verified_labor_hours');
-  add('Facility — Quote check', text(fields, 'facility_quote_verified'), 'facility_quote_verified');
+  add('Facility — Quote check', FACILITY_QUOTE_LABELS[text(fields, 'facility_quote_verified')] ?? text(fields, 'facility_quote_verified'), 'facility_quote_verified');
   add('Facility — Travel status', text(fields, 'facility_travel_status'), 'facility_travel_status');
   add('Facility — Monthly estimate', text(fields, 'monthly_price'), 'monthly_price');
 

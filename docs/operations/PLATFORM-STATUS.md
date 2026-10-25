@@ -7,25 +7,24 @@ owner-reported setting into a code-verified fact. Historical records stay histor
 Last reviewed: **2026-10-24** (Sparkling Standard 4.0 stabilization pass; release record corrected
 to the actually deployed commit).
 
-**Release status:** production serves GitHub `main`. At the last verified deployment `origin/main`
-was **`412ade9`** (Smart Estimate System 2.0); the **Initiative 5.0 search-visibility release
-(2026-10-24)** followed it with the three-review premium carousel (first-name-only attributions,
-Laura added verbatim), homepage/service metadata improvements, contextual internal links, the
-robots/noindex validator fix and the search-visibility audit — see `git log -1` for the exact
-deployed SHA. Earlier release notes below are
+**Release status:** production serves GitHub `main`; the last verified deployed baseline is
+**`3aa04c7`** (Initiative 6.0 four-engine release, 2026-10-24). Earlier release notes below are
 historical: the 2026-10-03 set was `62a1a46` (the five-commit release `8b8dde4`…`5a4a024`, the
 documentation closeout `7a51efa`, the six-profile social integration `cdc4971`, the
 deployment-closeout `6ebc3fb` and the logo-only Follow Us redesign `62a1a46`). Every later
 deployment (2026-10-21 owner-decision implementation, 2026-10-23 audit corrections, 2026-10-24
-premium icons and Smart Estimate 2.0) was pushed to `main` and verified live through Cloudflare
-Pages. Live acceptance checks for the current release: homepage, recurring page, estimator two-price
-flow, reviews, footer, navigation and values copy verified on sparkling-standard.com; R2 photo
-intake remains **disabled** (probe reports `enabled:false` until the bucket/secrets are provisioned);
-commercial numeric quotes remain **disabled** (`numericEstimatesEnabled:false`). The **Initiative 6.0
-four-engine release (2026-10-24)** added the estimate hub, dedicated commercial / STR / church
-estimate paths, the owner-directed 10% church discount, Supportive Home integration into the
-residential engine, and retired the duplicate embedded request forms. Numeric commercial/church
-prices remain gated pending calibration. Verify the exact deployed SHA with `git log -1`.
+premium icons, Smart Estimate 2.0 and Initiative 6.0) was pushed to `main` and verified live
+through Cloudflare Pages. Live acceptance checks for the current production release: homepage,
+recurring page, estimator two-price flow, reviews, footer, navigation and values copy verified on
+sparkling-standard.com; R2 photo intake remains **disabled** (probe reports `enabled:false` until
+the bucket/secrets are provisioned).
+
+The **Initiative 6.1 facility-pricing release candidate** (`release-6.1`) is prepared locally and
+is **not deployed**: it enables nonbinding Tier A/B commercial/church preliminary estimates,
+keeps Tier C as a personal scope review, applies the 10% church discount after the minimum, and
+enforces the owner kill switch (`commercialTierConfig.numericEstimatesEnabled`) in both the
+browser and the server. Production continues to serve the 6.0 behaviour until the owner authorizes
+the 6.1 deployment. Confirm the exact deployed SHA with `git log -1`.
 
 Status vocabulary:
 

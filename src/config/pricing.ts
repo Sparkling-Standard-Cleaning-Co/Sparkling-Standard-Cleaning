@@ -122,9 +122,9 @@ export const pricing = {
   // normal price is calculated first; the discount applies to the cleaning
   // subtotal AFTER the minimum-job rule, so the promised benefit is never
   // silently erased by the floor. It never stacks with another promotion and
-  // never applies to travel or third-party costs. Numeric church estimates
-  // remain gated by the commercial calibration decision; the entitlement is
-  // recorded on scope-review requests until then.
+  // never applies to travel or third-party costs. Initiative 6.1 applies it to
+  // the numeric Tier A/B preliminary estimate; when the owner kill switch is
+  // off, only the entitlement is recorded and the owner confirms it personally.
   churchDiscount: {
     state: 'approved' as ApprovalState,
     termsVersion: approved('2026-10-24.church10.v1', 'Version marker for the owner-directed 10% church discount terms.'),
@@ -137,9 +137,10 @@ export const pricing = {
   },
 
   // ── Commercial / church workload model (owner-approved baseline) ───────────
-  // Planning constants from the owner-approved commercial blueprint. The
-  // numeric gate lives in src/config/commercial-tiers.ts and MUST stay closed
-  // until calibration against real jobs (10–15 scenarios) is reviewed.
+  // Research-based planning constants implemented in Initiative 6.1. The owner
+  // kill switch lives in src/config/commercial-tiers.ts
+  // (`numericEstimatesEnabled`): false returns the facility request to a
+  // scope-review experience with no numeric prices.
   commercialPricing: {
     state: 'approved' as ApprovalState,
     configVersion: approved('2026-10-25.facility-workload.v1', 'Facility estimate provenance marker (Initiative 6.1).'),

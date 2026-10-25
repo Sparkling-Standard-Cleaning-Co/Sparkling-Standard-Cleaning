@@ -110,6 +110,41 @@ test('a gift request states plainly that no payment has been taken', () => {
   assert.match(confirmation.text, /secure payment link/i);
 });
 
+test('a priced facility request follows up on its preliminary estimate, not a walkthrough', () => {
+  const confirmation = buildCustomerConfirmation(
+    {
+      request_type: 'facility_estimate',
+      estimate_status: 'estimated',
+      organization: 'Example Office',
+      facility_type: 'office',
+      name: 'Facilities Lead',
+      phone: '8500000000',
+      quoted_price: '155',
+    },
+    business,
+  );
+  assert.equal(confirmation.subject, 'We received your Sparkling Standard request');
+  assert.match(confirmation.introText, /facility estimate request/i);
+  assert.match(confirmation.text, /preliminary/i);
+  assert.doesNotMatch(confirmation.text, /arrange a walkthrough/i);
+});
+
+test('a facility scope-review request keeps scope-review language', () => {
+  const confirmation = buildCustomerConfirmation(
+    {
+      request_type: 'facility_estimate',
+      estimate_status: 'custom_confirmation_required',
+      organization: 'Example Church',
+      facility_type: 'church',
+      name: 'Facilities Lead',
+      phone: '8500000000',
+    },
+    business,
+  );
+  assert.match(confirmation.introText, /facility scope-review request/i);
+  assert.match(confirmation.text, /written scope and quote/i);
+});
+
 test('a commercial request follows up with a walkthrough, not a booking claim', () => {
   const confirmation = buildCustomerConfirmation(
     { organization: 'Example Church', facility_type: 'church', name: 'Facilities Lead', phone: '8500000000' },

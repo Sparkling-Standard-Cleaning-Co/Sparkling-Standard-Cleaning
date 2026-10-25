@@ -202,6 +202,41 @@ test('commercial form fields are grouped for a walkthrough request', () => {
   assert.equal(notification['Notes — Current situation'], 'Currently using a rotating crew.');
 });
 
+test('a priced facility request is labeled as an estimate, while a disabled switch is a scope review', () => {
+  const priced = buildLeadNotification({
+    request_type: 'facility_estimate',
+    estimate_status: 'estimated',
+    engine_type: 'commercial',
+    organization: 'Example Office',
+    facility_type: 'office',
+    name: 'Facilities Lead',
+    phone: '8500000000',
+    quoted_price: '155',
+    quoted_range: '$140-$175',
+    facility_quote_verified: 'verified',
+    verified_cleaning_price: '155',
+  });
+  assert.match(priced['Inquiry — Type'] ?? '', /preliminary price/i);
+  assert.match(priced['Summary — Request'] ?? '', /Facility estimate request/i);
+  assert.equal(priced['Facility — Quote check'], 'Verified server calculation');
+
+  const disabled = buildLeadNotification({
+    request_type: 'facility_estimate',
+    estimate_status: 'custom_confirmation_required',
+    engine_type: 'commercial',
+    organization: 'Example Office',
+    facility_type: 'office',
+    name: 'Facilities Lead',
+    phone: '8500000000',
+    facility_quote_verified: 'pricing_disabled',
+  });
+  assert.match(disabled['Inquiry — Type'] ?? '', /scope review/i);
+  assert.match(disabled['Summary — Request'] ?? '', /Facility scope review request/i);
+  assert.equal(disabled['Facility — Quote check'], 'Numeric pricing disabled by owner — scope review only');
+  assert.match(disabled['Summary — Action'] ?? '', /numeric pricing is disabled/i);
+  assert.equal(disabled['Facility — Server cleaning price'], undefined);
+});
+
 test('short-term-rental form fields are grouped for a turnover request', () => {
   const notification = buildLeadNotification({
     name: 'Host',

@@ -18,17 +18,20 @@ import { pricing } from './pricing.ts';
 export type CommercialTier = 'A' | 'B' | 'C';
 
 export interface CommercialTierConfig {
-  /** Owner approval gate for Tier A/B numeric estimates. FALSE = all Tier C. */
+  /**
+   * Owner kill switch for numeric facility pricing. TRUE = Tier A/B show
+   * nonbinding preliminary numbers (Tier C remains scope review). FALSE = every
+   * commercial/church request is a scope review and no numeric price survives
+   * in the UI, request, owner notification or server verification.
+   */
   numericEstimatesEnabled: boolean;
   /**
-   * Tier A ceiling: the largest CLEANABLE square footage eligible for a
-   * single calculated preliminary estimate. PROPOSED (owner's ~2,500 sqft
-   * starting point) — confirm against the labor model before enabling.
+   * LEGACY square-foot reference only. Runtime tiering is by workload hours
+   * (`pricing.commercialPricing.tierAHours` / `tierBHours`), not square feet.
    */
   tierA_maxCleanableSqft: number;
   /**
-   * Tier B ceiling: above Tier A up to this size shows a calculated RANGE.
-   * Anything larger (or any specialty/high-risk factor) is Tier C.
+   * LEGACY square-foot reference only (see above).
    */
   tierB_maxCleanableSqft: number;
   /** Conditions that force Tier C regardless of size. */
@@ -41,12 +44,10 @@ export interface CommercialTierConfig {
 }
 
 export const commercialTierConfig: CommercialTierConfig = {
-  // Enabled 2026-10-25 (Initiative 6.1) under explicit owner delegation for
-  // evidence-based PROVISIONAL estimates. Final scope and price remain owner-
-  // confirmed. When true, Tier A/B
-  // flow through the approved residential labor-hour economics adapted for
-  // commercial density (see the model document); when false everything is
-  // Tier C and NO number is invented.
+  // Enabled 2026-10-24 (Initiative 6.1) for nonbinding preliminary Tier A/B
+  // estimates. This flag is enforced in commercial.ts (browser pricing) and
+  // facility-verify.ts (server). Set false for a scope-review-only experience
+  // with no numeric prices anywhere.
   numericEstimatesEnabled: true,
   tierA_maxCleanableSqft: 2500,
   tierB_maxCleanableSqft: 6000,
@@ -78,11 +79,9 @@ export interface CommercialTierOutcome {
 }
 
 /**
- * Resolves the estimate tier for a commercial intake. Pure function — the
- * wizard and any future server path share it. Numeric content (the Tier A
- * estimate or Tier B range) is produced by the estimator engine ONLY when
- * numericEstimatesEnabled is true; otherwise the outcome always describes a
- * request-a-quote flow.
+ * LEGACY square-foot resolver retained as reference. The live facility form and
+ * server verification use the workload-hour engine in `commercial.ts`; the
+ * owner kill switch above still governs both.
  */
 export function resolveCommercialTier(
   intake: CommercialIntakeInput,

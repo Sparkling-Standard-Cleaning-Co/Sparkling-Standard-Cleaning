@@ -1,11 +1,20 @@
 # Commercial estimate tier model — PROPOSAL for owner review
 
-Status: **numeric commercial estimates are DISABLED pending owner approval.**
-`src/config/commercial-tiers.ts` carries the full tier architecture with
-`numericEstimatesEnabled: false`. Until the owner approves the model below in
-writing, every commercial request routes to **Tier C — Request a Custom Cleaning
-Quote** (the existing honest walkthrough flow). Nothing in this document is an
-approved price policy yet.
+> **SUPERSEDED 2026-10-24 by Initiative 6.1.** The implemented model is the
+> evidence-based facility workload estimate described in
+> `docs/operations/COMMERCIAL-PRICING-RESEARCH.md` and
+> `docs/operations/ESTIMATOR-ENGINES.md`: **$60 gross labour/hour**, **$125
+> minimum job**, **workload-hour tiers** (A ≤3 hours, B ≤8 hours, C scope
+> review), fixture-based restrooms, and the 10% church discount. This document
+> is retained as the PRE-6.1 proposal and historical analysis; its $55 rate,
+> square-foot thresholds, rounding direction and "disabled" status are no
+> longer current. Do not use it to configure or quote prices.
+
+Status: **historical proposal — superseded by Initiative 6.1.** The current
+implementation is enabled as nonbinding provisional Tier A/B pricing, with the
+owner kill switch `commercialTierConfig.numericEstimatesEnabled` enforcing a
+scope-review-only experience when false. The historical methodology below is
+kept only for the decision record.
 
 ## Tiers (customer-facing language is owner-specified)
 
@@ -53,21 +62,22 @@ owner should confirm:
    frequency-efficiency factor (as residential does) or flat.
 3. The Tier A/B sqft ceilings after reviewing real local jobs.
 
-**Until those constants are owner-approved, no number is shown.** The intake
-form already collects the data (cleanable sqft, restrooms, breakroom,
-condition, specialty needs) so the owner notification carries a complete
-picture even in Tier C.
+**Historical note (pre-6.1): no number was shown until those constants were
+owner-approved.** The intake form already collected the data (cleanable sqft,
+restrooms, breakroom, condition, specialty needs) so the owner notification
+carried a complete picture even in Tier C.
 
-## What is live today
+## What was live before Initiative 6.1 (historical)
 
 - Commercial/Church request flow: enhanced intake (cleanable sqft, restrooms,
   kitchen/breakroom, condition, specialty needs) → owner notification with
-  every field labeled. Customer-facing heading remains "Request a Walkthrough"
-  — an honest Tier C.
-- `resolveCommercialTier()` (pure, unit-testable) drives any future UI and
-  returns Tier C for everything while `numericEstimatesEnabled` is false.
+  every field labeled. Customer-facing heading was "Request a Walkthrough" —
+  an honest Tier C.
+- The legacy `resolveCommercialTier()` square-foot resolver returned Tier C for
+  everything while `numericEstimatesEnabled` was false. It is retained as
+  reference only; the live 6.1 engine tiers by workload hours.
 
-## Enabling numeric tiers later (checklist)
+## Original enablement checklist (completed and superseded by Initiative 6.1)
 
 1. Owner approves the labor constants + ceilings (this document, in writing).
 2. Add `commercial` to the estimator service matrix with the approved
@@ -76,3 +86,7 @@ picture even in Tier C.
 4. Flip `numericEstimatesEnabled: true`, wire Tier A/B rendering into the
    estimator, extend server validation, add reconciliation tests, bump the
    quote `configVersion`.
+
+The implemented 6.1 model uses $60/hour, a $125 minimum, workload-hour tiers
+and fixture-based restrooms as documented in
+`docs/operations/COMMERCIAL-PRICING-RESEARCH.md`.

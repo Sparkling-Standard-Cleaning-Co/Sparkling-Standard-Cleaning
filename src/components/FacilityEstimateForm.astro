@@ -1,14 +1,15 @@
 ---
-// Facility estimate engine — Commercial and Church (Initiative 6.0).
+// Facility estimate engine — Commercial and Church (Initiative 6.0; pricing 6.1).
 //
 // One shared facility request experience with engine-specific questions and
 // the SAME address finder, travel lookup, lead pipeline, and owner
 // notification as the residential estimator. Numeric facility pricing is
-// deliberately gated (commercial-tiers.numericEstimatesEnabled) until
-// calibration is approved: the customer receives an honest scope-review
-// request, never an invented dollar figure. Churches additionally receive the
-// owner-directed 10% discount commitment, subject to scope review.
+// controlled by the owner kill switch (`commercialTierConfig.numericEstimatesEnabled`):
+// enabled = Tier A single preliminary price / Tier B range / Tier C personal
+// scope review; disabled = a professional scope-review experience with no
+// numbers in the UI, request, notification or server verification.
 import { isFormEnabled } from '../config/business';
+import { commercialTierConfig } from '../config/commercial-tiers';
 import { pricing } from '../config/pricing';
 import { schedulingConfig } from '../config/scheduling';
 import { US_STATES } from '../lib/location/location';
@@ -26,6 +27,7 @@ const configured = isFormEnabled();
 const church = engine === 'church';
 const discountPercent = pricing.churchDiscount.percent.value;
 const discountEnabled = pricing.churchDiscount.enabled.value;
+const numericEstimatesEnabled = commercialTierConfig.numericEstimatesEnabled;
 
 const commercialFacilityTypes = [
   { value: 'office', label: 'Office' },
@@ -466,9 +468,9 @@ const commercialFacilityTypes = [
       <ul class="summary-list" data-facility-review-lines>
         <li>Choose your facility details to see the summary.</li>
       </ul>
-      <p class="facility-review__note">
-        {church
-          ? `This is a scope-review request, not a confirmed contract. Sparkling Standard confirms the scope and your ${discountEnabled ? `${discountPercent}% church discount` : 'price'} personally before anything is scheduled.`
+      <p class="facility-review__note" data-facility-review-note>
+        {numericEstimatesEnabled
+          ? 'A preliminary estimate is not a confirmed contract. Sparkling Standard confirms the scope, travel and final price personally before anything is scheduled.'
           : 'This is a scope-review request, not a confirmed contract. Sparkling Standard confirms the scope and price personally before anything is scheduled.'}
       </p>
     </div>

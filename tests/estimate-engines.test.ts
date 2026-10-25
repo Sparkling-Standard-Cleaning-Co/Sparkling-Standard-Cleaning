@@ -108,6 +108,45 @@ test('commercial pricing is enabled with a defensible rate and minimum', () => {
   assert.equal(price.travelAdjustment, 0);
 });
 
+test('the owner kill switch suppresses every numeric facility price', () => {
+  const input = {
+    cleanableSqft: 2000,
+    restroomFixtures: 6,
+    breakroom: true,
+    facilityType: 'office' as const,
+    condition: 'average' as const,
+    traffic: 'average' as const,
+    flooring: 'mixed' as const,
+  };
+  const workload = calculateFacilityWorkload(input);
+  const price = calculateFacilityPrice(workload, 'weekly', { numericEstimatesEnabled: false });
+  assert.equal(price.priced, false);
+  assert.equal(price.cleaningSubtotal, 0);
+  assert.equal(price.perVisit, 0);
+  assert.equal(price.total, 0);
+  assert.equal(price.travelAdjustment, 0);
+  assert.equal(price.range, null);
+  assert.equal(price.monthly, null);
+  assert.equal(price.discount, null);
+  // The workload is still available for the scope review, but no number is
+  // presented to the customer as a price.
+  assert.ok(workload.laborHours > 0);
+});
+
+test('the kill switch suppresses the church discount amount as well', () => {
+  const church = calculateChurchEstimate({
+    cleanableSqft: 4000,
+    restroomFixtures: 6,
+    breakroom: true,
+    frequency: 'weekly',
+    numericEstimatesEnabled: false,
+  });
+  assert.equal(church.price.priced, false);
+  assert.equal(church.price.discount, null);
+  assert.equal(church.price.perVisit, 0);
+  assert.equal(church.price.total, 0);
+});
+
 test('church estimates apply the 10% discount transparently after the minimum', () => {
   const church = calculateChurchEstimate({ cleanableSqft: 4000, restroomFixtures: 6, breakroom: true, frequency: 'weekly' });
   assert.ok(church.price.cleaningSubtotal >= 125, 'minimum applies before the discount');

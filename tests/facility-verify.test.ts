@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { calculateFacilityPrice, calculateFacilityWorkload } from '../src/lib/estimate/commercial.ts';
-import { verifyFacilityQuote } from '../src/lib/estimate/facility-verify.ts';
+import {
+  stripFacilityPricingFields,
+  verifyFacilityQuote,
+} from '../src/lib/estimate/facility-verify.ts';
 import { pricing } from '../src/config/pricing.ts';
 
 const baseInput = {
@@ -83,4 +86,63 @@ test('unverifiable input fails closed', () => {
   const result = verifyFacilityQuote(fieldsFor({ cleanable_sqft: '0' }));
   assert.equal(result.status, 'unverifiable');
   assert.equal(result.expectedCleaning, null);
+});
+
+test('the server enforces the owner kill switch even when a client submits prices', () => {
+  const result = verifyFacilityQuote(
+    fieldsFor({
+      cleaning_subtotal: '9999',
+      quoted_price: '9999',
+      quoted_range: '$9,000-$10,000',
+      church_discount_amount: '999',
+      facility_tier: 'A',
+    }),
+    { numericEstimatesEnabled: false },
+  );
+  assert.equal(result.status, 'pricing_disabled');
+  assert.equal(result.pricingEnabled, false);
+  assert.equal(result.expectedCleaning, null);
+  assert.equal(result.expectedRange, null);
+  assert.equal(result.laborHours, null);
+  assert.equal(result.discountAmount, null);
+  assert.equal(result.configMatch, 'unknown');
+});
+
+test('disabled pricing strips every client-supplied facility price field', () => {
+  const fields = fieldsFor({
+    cleaning_subtotal: '9999',
+    quoted_price: '9999',
+    quoted_range: '$9,000-$10,000',
+    monthly_price: '39996',
+    church_discount_amount: '999',
+    church_savings: '999',
+    commercial_rate: '9999',
+    travel_adjustment: '9999',
+    labor_hours: '1',
+    quote_config_version: 'forged',
+    facility_tier: 'A',
+    estimate_low: '1',
+    estimate_high: '9999',
+    estimate_confidence: 'high',
+  });
+  stripFacilityPricingFields(fields);
+  assert.equal(fields.cleaning_subtotal, undefined);
+  assert.equal(fields.quoted_price, undefined);
+  assert.equal(fields.quoted_range, undefined);
+  assert.equal(fields.monthly_price, undefined);
+  assert.equal(fields.church_discount_amount, undefined);
+  assert.equal(fields.church_savings, undefined);
+  assert.equal(fields.commercial_rate, undefined);
+  assert.equal(fields.travel_adjustment, undefined);
+  assert.equal(fields.labor_hours, undefined);
+  assert.equal(fields.quote_config_version, undefined);
+  assert.equal(fields.facility_tier, undefined);
+  assert.equal(fields.estimate_low, undefined);
+  assert.equal(fields.estimate_high, undefined);
+  assert.equal(fields.estimate_confidence, undefined);
+  assert.equal(fields.estimate_status, 'custom_confirmation_required');
+  // Scope facts survive for the owner's manual review.
+  assert.equal(fields.cleanable_sqft, '2000');
+  assert.equal(fields.frequency, 'weekly');
+  assert.equal(fields.request_type, 'facility_estimate');
 });

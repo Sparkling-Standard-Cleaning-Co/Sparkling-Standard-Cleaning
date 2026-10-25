@@ -72,11 +72,15 @@ function contactLines(business: ConfirmationBusiness): string[] {
   ].filter(Boolean);
 }
 
-function introFor(kind: RequestSummary['kind']): string {
+function introFor(kind: RequestSummary['kind'], priced: boolean): string {
   switch (kind) {
     case 'reservation':
     case 'estimate':
       return 'Thank you — we received your request. The details you submitted are below, and we will review them personally before anything is scheduled.';
+    case 'facility_estimate':
+      return priced
+        ? 'Thank you — we received your facility estimate request. The preliminary details you submitted are below, and we will confirm the scope, condition, travel and final price with you personally before anything is scheduled.'
+        : 'Thank you — we received your facility scope-review request. We will review the facility details and follow up to confirm the scope with you.';
     case 'commercial':
       return 'Thank you — we received your walkthrough request. We will review the facility details and follow up to arrange a time that works for your team.';
     case 'str':
@@ -88,8 +92,20 @@ function introFor(kind: RequestSummary['kind']): string {
   }
 }
 
-function nextStepsFor(kind: RequestSummary['kind']): string[] {
+function nextStepsFor(kind: RequestSummary['kind'], priced: boolean): string[] {
   switch (kind) {
+    case 'facility_estimate':
+      return priced
+        ? [
+            'We review the facility details and your preliminary estimate.',
+            'We confirm the scope, condition, access and travel with you personally.',
+            'After you approve the confirmed scope and price, we schedule your service.',
+          ]
+        : [
+            'We review the facility details you shared.',
+            'We follow up to confirm the scope with you personally.',
+            'You receive a written scope and quote to approve.',
+          ];
     case 'commercial':
       return [
         'We review the facility details you shared.',
@@ -292,8 +308,8 @@ export function buildCustomerConfirmation(
   business: ConfirmationBusiness,
 ): CustomerConfirmation {
   const summary = buildRequestSummary(fields);
-  const intro = introFor(summary.kind);
-  const steps = nextStepsFor(summary.kind);
+  const intro = introFor(summary.kind, summary.estimate !== null);
+  const steps = nextStepsFor(summary.kind, summary.estimate !== null);
   return {
     // Fixed subject for every request type — never "booking confirmed",
     // "your receipt" or "your invoice" (see docs/operations/FINANCIAL-WORKFLOW.md).

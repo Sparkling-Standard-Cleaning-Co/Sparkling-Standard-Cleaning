@@ -40,7 +40,12 @@ for (const [name, sqft, fixtures, breakroom, condition, traffic, type, frequency
     firstClean: false,
   };
   const workload = calculateFacilityWorkload(input);
-  const price = calculateFacilityPrice(workload, frequency, { church: type === 'church' });
+  // Internal financial model: always compute the researched economics, even
+  // when the customer-facing numeric pricing switch is off.
+  const price = calculateFacilityPrice(workload, frequency, {
+    church: type === 'church',
+    numericEstimatesEnabled: true,
+  });
   const revenue = price.perVisit;
   const laborCost = workload.laborHours * laborRate;
   const laborContribution = revenue - laborCost;

@@ -16,6 +16,7 @@ export const SUMMARY_STORAGE_KEY = 'pcc-request-summary';
 /** The only submission keys that may be kept client-side for the summary. */
 const SUMMARY_KEYS = [
   'request_type',
+  'estimate_status',
   'service_type',
   'frequency',
   'turnover_frequency',

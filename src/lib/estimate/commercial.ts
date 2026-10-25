@@ -17,9 +17,14 @@
 // All figures are NONBINDING preliminary estimates; final scope and price are
 // confirmed personally. The church discount is applied after the minimum-job
 // rule to the cleaning subtotal only (see church-discount.ts).
+//
+// The owner kill switch (`commercialTierConfig.numericEstimatesEnabled`) is
+// enforced here and in facility-verify.ts: when false, no numeric facility
+// price is produced for the customer, the request or the owner notification.
 
 import type { Condition } from '../../config/pricing.ts';
 import { pricing } from '../../config/pricing.ts';
+import { commercialTierConfig } from '../../config/commercial-tiers.ts';
 import { calculateChurchDiscount, type ChurchDiscountResult } from './church-discount.ts';
 
 export type FacilityType = 'office' | 'retail' | 'salon' | 'gym' | 'community' | 'church';
@@ -116,6 +121,8 @@ export interface FacilityQuoteOptions {
   oneWayMiles?: number | null | undefined;
   church?: boolean | undefined;
   otherDiscountApplied?: boolean | undefined;
+  /** Owner kill switch override for tests; defaults to the shared config. */
+  numericEstimatesEnabled?: boolean | undefined;
 }
 
 export interface FacilityPrice {
@@ -134,7 +141,7 @@ export interface FacilityPrice {
   visitsPerMonth: number | null;
   discount: ChurchDiscountResult | null;
   tier: 'A' | 'B' | 'C';
-  /** True when a numeric estimate can be shown (Tiers A/B). */
+  /** True when a numeric estimate can be shown (Tiers A/B and the owner switch on). */
   priced: boolean;
 }
 
@@ -167,6 +174,24 @@ export function calculateFacilityPrice(
   frequency: string,
   options: FacilityQuoteOptions = {},
 ): FacilityPrice {
+  const numericEnabled =
+    options.numericEstimatesEnabled ?? commercialTierConfig.numericEstimatesEnabled;
+  if (!numericEnabled) {
+    return {
+      cleaningSubtotal: 0,
+      perVisit: 0,
+      range: null,
+      travelAdjustment: 0,
+      travelIncluded: false,
+      total: 0,
+      monthly: null,
+      visitsPerMonth: null,
+      discount: null,
+      tier: workload.tier,
+      priced: false,
+    };
+  }
+
   const rate = pricing.commercialPricing.grossRatePerHour.value;
   const rawCleaning = workload.laborHours * rate;
   const cleaningSubtotal = Math.max(pricing.minimumJob.value, roundUpToStep(rawCleaning));
@@ -207,6 +232,7 @@ export interface ChurchEstimateInput extends FacilityWorkloadInput {
   frequency?: string;
   oneWayMiles?: number | null;
   otherDiscountApplied?: boolean;
+  numericEstimatesEnabled?: boolean | undefined;
 }
 
 export interface ChurchEstimateSummary {
@@ -223,6 +249,7 @@ export function calculateChurchEstimate(input: ChurchEstimateInput): ChurchEstim
       church: true,
       oneWayMiles: input.oneWayMiles,
       otherDiscountApplied: input.otherDiscountApplied,
+      numericEstimatesEnabled: input.numericEstimatesEnabled,
     }),
   };
 }
