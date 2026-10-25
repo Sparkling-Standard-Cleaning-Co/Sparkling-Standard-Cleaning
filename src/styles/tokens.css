@@ -46,6 +46,7 @@
 
   /* ── Color: functional ────────────────────────────────────────────────── */
   --color-white: #ffffff;
+  --color-google-gold: #fbbc04; /* authentic Google review stars */
   --color-success-100: #e8f3ea;
   --color-success-700: #2f6b3d;
   --color-warning-100: #fbf0dd;

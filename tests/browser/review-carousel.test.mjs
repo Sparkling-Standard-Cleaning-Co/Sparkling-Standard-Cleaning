@@ -76,6 +76,39 @@ test('all three authentic reviews render with first-name-only attributions', asy
   }
 });
 
+test('stars are centered in authentic Google gold and reviewer names sit at the card bottom', async () => {
+  const { context, page } = await open(1280);
+  try {
+    await page.waitForFunction(() => document.querySelector('[data-review-carousel]')?.dataset.enhanced === 'true');
+    const stars = page.locator('[data-review-card] .review-card__stars').first();
+    const svg = stars.locator('svg').first();
+    const color = await svg.evaluate((el) => getComputedStyle(el).color);
+    const fill = await svg.evaluate((el) => getComputedStyle(el).fill);
+    assert.equal(color, 'rgb(251, 188, 4)', 'stars use Google review gold');
+    assert.equal(fill, 'rgb(251, 188, 4)', 'star fill uses Google review gold');
+    assert.equal(await stars.evaluate((el) => getComputedStyle(el).justifyContent), 'center');
+    assert.equal(
+      await page.locator('.review-carousel__stars').first().evaluate((el) => getComputedStyle(el).alignItems),
+      'center',
+    );
+    const footerJustify = await page
+      .locator('[data-review-card] footer')
+      .first()
+      .evaluate((el) => getComputedStyle(el).justifyContent);
+    assert.equal(footerJustify, 'center', 'reviewer name is centered');
+
+    const bottoms = await page.locator('[data-review-card]').evaluateAll((cards) =>
+      cards.map((card) => {
+        const footer = card.querySelector('footer');
+        return footer ? card.offsetTop + card.offsetHeight - (footer.offsetTop + footer.offsetHeight) : -1;
+      }),
+    );
+    assert.equal(new Set(bottoms.map((value) => Math.round(value))).size, 1, 'names share one bottom rhythm');
+  } finally {
+    await context.close();
+  }
+});
+
 test('all cards share one height so the stage never jumps between reviews', async () => {
   const { context, page } = await open(1280);
   try {

@@ -22,14 +22,14 @@ import vacationBedroom from '../assets/images/vacation-bedroom.jpg';
 import emptyRoomMoveout from '../assets/images/empty-room-moveout.jpg';
 import officePlanted from '../assets/images/office-planted.jpg';
 import kitchenSinkDetail from '../assets/images/kitchen-sink-detail.jpg';
+import churchSanctuary from '../assets/images/church-sanctuary.jpg';
 
 const home = await getEntry('site', 'home');
 if (!home) throw new Error('Missing content entry: src/content/site/home.md');
 const { data } = home;
 
 const allServices = await getCollection('services');
-// Exactly the five primary homepage cards. Church Cleaning is in the
-// navigation/footer but must not become a sixth card (owner direction).
+// The six core service cards, in owner-approved order.
 const services = homepageServicePaths.flatMap((path) => {
   const service = allServices.find((entry) => entry.data.path === path);
   return service ? [service] : [];
@@ -66,6 +66,10 @@ const SERVICE_PHOTOS: Record<string, { image: ImageMetadata; alt: string } | und
     image: officePlanted,
     alt: 'The clean interior of a modern office with plants.',
   },
+  '/church-cleaning/': {
+    image: churchSanctuary,
+    alt: 'A quiet church sanctuary with wooden pews, an altar and warm natural light.',
+  },
 };
 
 const allFaqs = await getCollection('faqs');
@@ -76,6 +80,8 @@ const faqs = data.homeFaqIds.flatMap((id) => {
 
 const site = Astro.site ?? new URL('https://pending-website-url.invalid');
 const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
+
+const communityIcons = ['user', 'shield', 'heart', 'users'] as const;
 ---
 
 <BaseLayout title={data.metaTitle} description={data.metaDescription} schema={schema}>
@@ -183,6 +189,43 @@ const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
       </div>
     </div>
   </section>
+
+  {
+    data.communityBand && (
+      <section class="section community-support" aria-labelledby="community-support-heading">
+        <div class="container">
+          <div class="community-support__panel">
+            <div class="community-support__copy">
+              <p class="eyebrow">{data.communityBand.eyebrow}</p>
+              <h2 id="community-support-heading">{data.communityBand.heading}</h2>
+              <p>{data.communityBand.text}</p>
+              {data.communityBand.note && <p class="community-support__note">{data.communityBand.note}</p>}
+              <a
+                class="btn btn--primary btn--large community-support__cta"
+                href={data.communityBand.ctaHref}
+                data-cta="home-community-support"
+              >
+                {data.communityBand.ctaLabel} <Icon name="arrow-right" size={18} />
+              </a>
+            </div>
+            <ul class="community-support__list">
+              {data.communityBand.groups.map((group, index) => (
+                <li class="community-support__item">
+                  <span class="community-support__icon">
+                    <Icon name={communityIcons[index] ?? 'users'} size={20} />
+                  </span>
+                  <div>
+                    <strong>{group.title}</strong>
+                    <span>{group.text}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   {
     data.estimateBand && (

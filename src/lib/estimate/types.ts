@@ -42,7 +42,8 @@ export interface EstimateInput {
   pets?: PetSituation;
   /**
    * Customer self-attestation that they qualify for the Supportive Home 10%
-   * discount (65+, veteran, or disability). Optional; never inferred from a
+   * discount (65+, first responder, veteran, disability, or another eligible
+   * community category). Optional; never inferred from a
    * sensitive category and never required to receive ordinary cleaning.
    */
   supportiveEligible?: boolean;

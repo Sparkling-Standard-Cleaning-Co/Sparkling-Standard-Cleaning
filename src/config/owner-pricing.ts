@@ -216,7 +216,8 @@ export interface OwnerPricingConfig {
 
   /**
    * 10% appreciation discount for eligible Supportive Home customers:
-   * adults aged 65+, military veterans, and people with disabilities.
+   * adults aged 65+, first responders, military veterans, people with
+   * disabilities, and other eligible community members.
    * Self-attested at the estimate; the owner confirms eligibility before
    * booking. Residential cleaning remains available to every customer; only
    * the special discount requires eligibility. Never stacks with another
@@ -399,7 +400,7 @@ export const ownerPricing: OwnerPricingConfig = {
   supportiveHomeDiscount: {
     enabled: true,
     percent: 10,
-    termsVersion: '2026-10-25.supportive10.v1',
+    termsVersion: '2026-10-25.supportive10.v2',
     eligibleServices: ['standard', 'deep', 'move_in_out'],
   },
 

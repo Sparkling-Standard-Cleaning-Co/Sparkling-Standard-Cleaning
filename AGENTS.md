@@ -390,8 +390,9 @@ collections are intentionally empty — not errors.
 - **Initiative 6.2 (complete-experience release candidate):** dedicated `/estimate/residential/`
   route and a selection-only `/estimate/` hub; legacy residential/STR query links, SPARKLE100
   claims and UTM context forward correctly; a four-step guided facility wizard with field-specific
-  validation; Supportive Home 10% eligibility discount (65+, veterans, disabilities; self-attested,
-  no sensitive records; never stacked); owner-editable `globalEstimateFactor` applied to the pre-tax
+  validation; Supportive Home 10% eligibility discount (65+, first responders, veterans,
+  disabilities, and other eligible community members; self-attested, no sensitive records; never
+  stacked); owner-editable `globalEstimateFactor` applied to the pre-tax
   service subtotal across every engine; exact church-discount reconciliation and two-decimal
   currency; category-specific Florida sales-tax disclosure (no invented tax amount); service-area
   page restructured to title → description → map; representative-photo captions and the Mark 12:31
@@ -502,7 +503,8 @@ collections are intentionally empty — not errors.
 - **Homepage refinement (2026-10-23):** the homepage hero carries a four-slide representative
   interior carousel (`src/components/HeroCarousel.astro`, auto-advance respects
   prefers-reduced-motion, pauses on hover/focus), the trust strip sits directly under the hero,
-  a Southern-hospitality section follows, and the five service cards are photo cards
+  a Southern-hospitality section follows, a community-support spotlight follows the services,
+  and the six core service cards are photo cards
   (honest licensed interiors; see `docs/design/IMAGE-SOURCE-REGISTER.md`). The recurring page
   has its own dedicated `src/pages/recurring-cleaning.astro` (owner-directed structure) and is
   excluded from `[service].astro`. The footer is a centered masthead (logo + slogan with the

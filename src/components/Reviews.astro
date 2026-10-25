@@ -83,7 +83,8 @@ const paragraphsOf = (quote: string): string[] =>
                     </p>
                   )}
                   <span class="review-carousel__source">
-                    {review.data.source === 'google' ? 'Google review' : 'Customer review'}
+                    {review.data.source === 'google' && <GoogleG size={14} />}
+                    <span>{review.data.source === 'google' ? 'Google review' : 'Customer review'}</span>
                   </span>
                 </div>
 

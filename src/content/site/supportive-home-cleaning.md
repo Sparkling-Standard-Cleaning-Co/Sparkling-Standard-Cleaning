@@ -1,15 +1,16 @@
 ---
 metaTitle: Supportive Home Cleaning in Pensacola | 10% Eligibility Discount
-metaDescription: Supportive Home Cleaning is ordinary residential cleaning with a 10% appreciation discount for adults 65+, military veterans, and people with disabilities in Pensacola and Cantonment. No diagnosis or documentation required.
+metaDescription: Supportive Home Cleaning is ordinary residential cleaning with a 10% appreciation discount for adults 65+, first responders, military veterans, people with disabilities, and other eligible community members in Pensacola and Cantonment. No diagnosis or documentation required.
 hero:
   headline: 'A Cleaner Home.'
   accent: ' A Little More Peace of Mind.'
   lead: >-
     Supportive Home Cleaning is the same dependable residential cleaning we
     provide every day, with a 10% appreciation discount for adults aged 65 or
-    older, military veterans, and people with disabilities. No diagnosis,
-    medical record, or documentation is required — just a simple self-attestation
-    and a conversation about what would help.
+    older, first responders, military veterans, people with disabilities, and
+    other eligible community members. No diagnosis, medical record, or
+    documentation is required — just a simple self-attestation and a
+    conversation about what would help.
   ctaLabel: Start My Estimate
 sections:
   - eyebrow: Who qualifies
@@ -21,6 +22,8 @@ sections:
     items:
       - title: Adults aged 65 or older
         text: A straightforward appreciation discount for senior households.
+      - title: First responders
+        text: For firefighters, law enforcement, EMS and other responders who serve our community.
       - title: Military veterans
         text: For veterans and their households, with our thanks for your service.
       - title: People with disabilities

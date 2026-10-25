@@ -60,8 +60,9 @@ query intact. There is ONE submission pipeline
   (acknowledgement enforced in the browser and the server).
 - Two-price recurring presentation: first visit + ongoing per-visit amount.
 - **Supportive Home Cleaning** is an optional RESIDENTIAL pathway: the customer
-  self-attests eligibility (65+, veteran, living with a disability; the checked
-  category is recorded only as an eligibility reason). The owner-directed
+  self-attests eligibility (65+, first responder, veteran, living with a
+  disability, or another eligible community category; the checked category is
+  recorded only as an eligibility reason). The owner-directed
   **10% Supportive Home discount** applies once, never stacks with another
   promotion, and is applied to the pre-tax residential service subtotal. It is
   never automatic: the customer must check the eligibility box. The pathway

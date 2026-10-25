@@ -153,8 +153,10 @@ test('supportive home page explains eligibility and never selects the discount a
     const text = await page.locator('main').innerText();
     assert.match(text, /10%/);
     assert.match(text, /65 or older|65\b/i);
+    assert.match(text, /first responder/i);
     assert.match(text, /veteran/i);
     assert.match(text, /disabilit/i);
+    assert.match(text, /other eligible community members/i);
     assert.match(text, /No diagnosis/i);
     assert.match(text, /not a charitable donation|not medical|cleaning only/i);
     const cta = page.locator('a[data-cta="supportive-estimate"]').first();

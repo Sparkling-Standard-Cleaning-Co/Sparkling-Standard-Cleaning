@@ -38,6 +38,7 @@ export type IconName =
   | 'card'
   | 'info'
   | 'alert-circle'
+  | 'search'
   | 'building'
   | 'send'
   | 'external';

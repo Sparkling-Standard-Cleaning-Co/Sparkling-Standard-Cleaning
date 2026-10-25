@@ -30,3 +30,11 @@ Automated coverage for these areas is in `tests/browser/initiative-6.2-content.t
 `tests/browser/estimate-engines.test.mjs`, `tests/browser/journey.test.mjs`,
 `tests/pricing-adjustments.test.ts`, `tests/facility-verify.test.ts` and the rest of
 the release verification suite.
+
+
+## 2026-10-25 audit corrections
+
+Focused evidence for the owner's follow-up audit (six service cards, Community Support,
+review polish, footer icon and contact copy) lives in
+[`audit-2026-10-25/`](audit-2026-10-25/README.md). Those captures were taken from the later local
+production build, not the original 6.2 release candidate.

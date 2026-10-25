@@ -3,6 +3,8 @@ title: Church Cleaning
 metaTitle: Church Cleaning in Pensacola | 10% Church Discount
 metaDescription: Church cleaning for Pensacola-area congregations — sanctuaries, fellowship halls, nurseries, restrooms and offices, scheduled around services and church life. Sparkling Standard offers churches 10% off eligible cleaning.
 summary: Careful cleaning for church facilities — sanctuaries and fellowship halls treated with the respect the space deserves, scheduled around services and events.
+homepageParagraphs:
+  - A complete church cleaning service for sanctuaries, fellowship halls, nurseries, restrooms, and offices — scheduled around services and church life.
 icon: church-cleaning
 order: 7
 path: /church-cleaning/

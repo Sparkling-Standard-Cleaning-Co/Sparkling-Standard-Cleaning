@@ -255,6 +255,19 @@ const site = defineCollection({
         ctaLabel: z.string(),
       })
       .optional(),
+    communityBand: z
+      .object({
+        eyebrow: z.string(),
+        heading: z.string(),
+        text: z.string(),
+        note: z.string().optional(),
+        ctaLabel: z.string(),
+        ctaHref: z.string(),
+        groups: z
+          .array(z.object({ title: z.string(), text: z.string() }))
+          .default([]),
+      })
+      .optional(),
     /** FAQ ids shown on the homepage, in the owner-approved order. */
     homeFaqIds: z.array(z.string()).default([]),
     recurringBand: z

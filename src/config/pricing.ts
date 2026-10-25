@@ -153,7 +153,7 @@ export const pricing = {
     ),
     appliesTo: 'cleaning_subtotal' as const,
     stacking: false as const,
-    note: 'Eligibility categories: adults aged 65+, military veterans, and people with disabilities. Self-attested; no diagnosis or documentation is collected.',
+    note: 'Eligibility categories: adults aged 65+, first responders, military veterans, people with disabilities, and other eligible community members. Self-attested; no diagnosis or documentation is collected.',
   },
 
   // ── Church discount (owner-directed 2026-10-24) ────────────────────────────

@@ -10,8 +10,8 @@ export interface NavItem {
  * The cleaning categories shown in the desktop "Types of Cleanings" dropdown
  * and the footer services column, in the owner-approved order. Church
  * Cleaning is a legitimate offering and appears here (Sparkling Standard 4.0
- * §3B). The HOMEPAGE still renders exactly the five primary cards — see the
- * explicit filter in src/pages/index.astro.
+ * §3B). The homepage renders all six core service cards — see the explicit
+ * path list below and src/pages/index.astro.
  */
 export const cleaningTypesNav: NavItem[] = [
   { label: 'Recurring Residential Cleaning', href: '/recurring-cleaning/' },
@@ -24,9 +24,8 @@ export const cleaningTypesNav: NavItem[] = [
 ];
 
 /**
- * Paths that render as homepage service cards (the five primary categories).
- * Church Cleaning stays in navigation/footer only — it must not become a
- * sixth homepage card.
+ * Paths that render as homepage service cards, in owner-approved order.
+ * Church Cleaning is a core service and renders as the sixth card.
  */
 export const homepageServicePaths: string[] = [
   '/recurring-cleaning/',
@@ -34,6 +33,7 @@ export const homepageServicePaths: string[] = [
   '/move-in-move-out-cleaning/',
   '/short-term-rental-cleaning/',
   '/commercial-cleaning/',
+  '/church-cleaning/',
 ];
 
 /** Desktop primary navigation: the Types of Cleanings dropdown plus About. */
@@ -70,7 +70,7 @@ export const mobileTopNav: NavItem[] = [
   { label: 'Contact', href: '/contact/' },
 ];
 
-/** Footer services column �?" the five primary categories plus the supporting pages. */
+/** Footer services column — every service category, including Supportive Home. */
 export const footerServicesNav: NavItem[] = [...cleaningTypesNav];
 
 export const footerCompanyNav: NavItem[] = [

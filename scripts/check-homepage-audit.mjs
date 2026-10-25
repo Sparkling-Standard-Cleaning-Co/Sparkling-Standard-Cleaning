@@ -1,7 +1,7 @@
 // Regression guard for Hayli's six-page homepage audit.
 //
 // Reads the RENDERED homepage output (dist/index.html) and verifies that the
-// five complete approved service descriptions are actually present — including
+// six complete approved service descriptions are actually present — including
 // the mandatory Deep Cleaning prerequisite, which the prior implementation
 // silently omitted from the homepage card.
 //
@@ -60,6 +60,11 @@ const required = [
     label: 'Commercial Cleaning',
     copy:
       'Recurring or one-time commercial cleaning for local businesses and facilities. Each service is professionally scoped to your space, with scheduling tailored to your operation’s needs.',
+  },
+  {
+    label: 'Church Cleaning',
+    copy:
+      'A complete church cleaning service for sanctuaries, fellowship halls, nurseries, restrooms, and offices — scheduled around services and church life.',
   },
 ];
 
