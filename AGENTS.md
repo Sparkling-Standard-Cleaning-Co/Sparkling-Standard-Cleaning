@@ -422,9 +422,11 @@ collections are intentionally empty — not errors.
     configured. iPhone HEIC converts to JPEG in the browser via heic2any; raw HEIC is rejected.
     Owner retrieval uses time-limited signed links (default 90 days) via functions/api/photo-view.ts;
     `/api/photo-cleanup` enforces the documented retention window. `/api/lead` verifies each
-    object with R2 `head` and associates only same-request keys. The section stays hidden until
-    the GET probe reports `enabled: true`; no mock upload is presented as production. Provisioning
-    and exact owner actions: docs/operations/PHOTO-UPLOADS.md.
+    object with R2 `head`, reads the validated bytes with R2 `get`, and sends the owner a Resend
+    notification with real MIME attachments (numbered, request-ID-labelled emails within a
+    21.5 MB Base64 budget); Web3Forms remains the links-only fallback. The section stays hidden
+    until the GET probe reports `enabled: true`; no mock upload is presented as production.
+    Provisioning and exact owner actions: docs/operations/PHOTO-UPLOADS.md.
   - **STR turnover context:** the estimator's STR path adds optional check-out/check-in times and
     a linen/laundry preference (informational — the per-turnover price is unchanged); all three
     travel with the request into the owner notification.

@@ -36,12 +36,28 @@ import {
   normalizePhotoEntries,
   photoKeysField,
   sanitizePhotoRequestRef,
+  PHOTO_MAX_FILE_BYTES,
   type PhotoCategory,
 } from '../../src/lib/photos.ts';
+import {
+  buildOwnerEmailMessages,
+  bytesToBase64,
+  describeOwnerEmailOutcome,
+  ownerAttachmentFilename,
+  sendOwnerEmailMessages,
+  type OwnerEmailAttachment,
+} from '../../src/lib/forms/owner-email.ts';
 import { buildPhotoViewUrl } from './photo-auth.ts';
 
+interface R2ObjectLike {
+  arrayBuffer?(): Promise<ArrayBuffer>;
+  body?: ReadableStream;
+  size?: number;
+  httpMetadata?: { contentType?: string };
+}
 interface R2BucketLike {
   head?(key: string): Promise<unknown | null>;
+  get?(key: string): Promise<R2ObjectLike | null>;
 }
 interface Env extends QuoteVerificationEnv {
   WEB3FORMS_ACCESS_KEY?: string;
@@ -56,6 +72,7 @@ interface Env extends QuoteVerificationEnv {
   PHOTOS_BUCKET?: R2BucketLike;
   PHOTO_OWNER_TOKEN?: string;
   PHOTO_LINK_TTL_DAYS?: string;
+  OWNER_NOTIFICATION_EMAIL?: string;
 }
 
 // The estimator sends structured scope + quote + attribution fields; the cap
@@ -438,6 +455,7 @@ export async function onRequestPost(context: {
   // is also shown in the Contact section; every other collected value is
   // preserved (mapped or under "More details").
   const notification = buildLeadNotification(clean);
+  const attachmentRequestId = (clean.quote_reference || (photoRequestRef ? `PHOTO-${photoRequestRef}` : 'request')).trim();
   if (verifiedPhotos.length > 0 && env.PHOTO_OWNER_TOKEN) {
     const origin = new URL(request.url).origin;
     const ttlDays = Math.min(
@@ -453,42 +471,143 @@ export async function onRequestPost(context: {
     notification['Photos - Note'] =
       `Links are time-limited (${ttlDays} days) and open the customer-uploaded photos privately. Do not forward outside Sparkling Standard.`;
   }
-  const replyTo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean.email ?? '') ? clean.email : undefined;
 
-  const endpoint = env.WEB3FORMS_ENDPOINT ?? 'https://api.web3forms.com/submit';
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        access_key: env.WEB3FORMS_ACCESS_KEY,
-        subject,
-        from_name: 'Sparkling Standard Website',
-        ...(replyTo ? { replyto: replyTo } : {}),
-        botcheck: '',
-        ...notification,
-      }),
-    });
-    const data = (await response.json().catch(() => ({}))) as { success?: boolean };
-    if (response.ok && data.success === true) {
-      // The owner notification is delivered — the lead is safe. The customer
-      // confirmation is a best-effort second path (Resend): a failure here is
-      // logged server-side (no PII, no secrets) and never turns a successful
-      // lead into a failed submission. At most one send per server request.
-      const customerEmail = await sendCustomerConfirmation(clean, env);
-      if (customerEmail.status === 'failed') {
-        console.error(describeCustomerEmailOutcome(customerEmail));
+  // Read the metadata-stripped bytes from R2 for real MIME email attachments.
+  // A failed read is reported, never silently treated as an attachment.
+  const attachments: OwnerEmailAttachment[] = [];
+  let attachmentReadFailures = 0;
+  const attachmentContentTypes: Record<string, string> = {
+    jpg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    heic: 'image/heic',
+  };
+  if (verifiedPhotos.length > 0) {
+    notification['Photos - Attachment request ID'] = attachmentRequestId;
+    if (env.PHOTOS_BUCKET?.get) {
+      for (const [index, photo] of verifiedPhotos.entries()) {
+        try {
+          const object = await env.PHOTOS_BUCKET.get(photo.key);
+          if (!object) {
+            attachmentReadFailures += 1;
+            continue;
+          }
+          const bytes = object.arrayBuffer
+            ? new Uint8Array(await object.arrayBuffer())
+            : object.body
+              ? new Uint8Array(await new Response(object.body).arrayBuffer())
+              : null;
+          if (!bytes || bytes.byteLength === 0 || bytes.byteLength > PHOTO_MAX_FILE_BYTES) {
+            attachmentReadFailures += 1;
+            continue;
+          }
+          const extension = (photo.key.split('.').pop() ?? 'jpg').toLowerCase();
+          const contentType = object.httpMetadata?.contentType?.startsWith('image/')
+            ? object.httpMetadata.contentType
+            : attachmentContentTypes[extension] ?? 'application/octet-stream';
+          attachments.push({
+            filename: ownerAttachmentFilename(attachmentRequestId, index, photo.category, photo.key),
+            contentType,
+            contentBase64: bytesToBase64(bytes),
+            rawBytes: bytes.byteLength,
+          });
+        } catch {
+          attachmentReadFailures += 1;
+        }
       }
-      return json({
-        ok: true,
-        ...(verifiedPhotos.length > 0 ? { photoCount: verifiedPhotos.length } : {}),
-        ...(clientVerification ? { verification: clientVerification } : {}),
-      });
+    } else {
+      attachmentReadFailures = verifiedPhotos.length;
     }
-    return json({ ok: false, error: 'provider_failed' }, 502);
-  } catch {
-    return json({ ok: false, error: 'provider_failed' }, 502);
+    if (attachments.length > 0) {
+      notification['Photos - Attached files'] = attachments.map((attachment) => attachment.filename).join(', ');
+    }
+    if (attachmentReadFailures > 0) {
+      notification['Photos - Attachment note'] =
+        `Only ${attachments.length} of ${verifiedPhotos.length} verified photo(s) could be read for email attachment. Use the private links for every photo.`;
+    }
   }
+  const replyTo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean.email ?? '') ? clean.email : undefined;
+  let ownerDelivered = false;
+  let attachmentDelivery: 'none' | 'attached' | 'partial' | 'links_only' =
+    verifiedPhotos.length > 0 ? 'links_only' : 'none';
+
+  // Photo leads use Resend for the owner notification because it supports real
+  // attachments on the existing free plan. Web3Forms remains the lead fallback
+  // whenever Resend is unavailable or rejects every attachment email.
+  if (verifiedPhotos.length > 0 && attachments.length > 0) {
+    if (env.RESEND_API_KEY) {
+      const messages = buildOwnerEmailMessages({
+        notification,
+        subject,
+        requestId: attachmentRequestId,
+        attachments,
+        ...(env.RESEND_FROM_EMAIL?.trim() ? { from: env.RESEND_FROM_EMAIL.trim() } : {}),
+        ...(env.OWNER_NOTIFICATION_EMAIL?.trim() ? { to: env.OWNER_NOTIFICATION_EMAIL.trim() } : {}),
+        ...(replyTo ? { replyTo } : {}),
+      });
+      const ownerEmail = await sendOwnerEmailMessages(messages, {
+        RESEND_API_KEY: env.RESEND_API_KEY,
+        ...(env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: env.RESEND_FROM_EMAIL } : {}),
+      });
+      if (ownerEmail.status === 'accepted' || ownerEmail.status === 'partial') {
+        ownerDelivered = true;
+        attachmentDelivery = ownerEmail.status === 'accepted' ? 'attached' : 'partial';
+        if (ownerEmail.status === 'partial') console.error(describeOwnerEmailOutcome(ownerEmail));
+      } else {
+        console.error(describeOwnerEmailOutcome(ownerEmail));
+        notification['Photos - Attachment delivery'] =
+          ownerEmail.status === 'not_configured'
+            ? 'NOT CONFIGURED — email attachments were not sent. Use the private links below.'
+            : 'FAILED — the email provider did not accept the attachment email(s). Use the private links below.';
+      }
+    } else {
+      notification['Photos - Attachment delivery'] =
+        'NOT CONFIGURED — RESEND_API_KEY is not set, so attachments were not sent. Use the private links below.';
+    }
+  } else if (verifiedPhotos.length > 0) {
+    notification['Photos - Attachment delivery'] =
+      'FAILED — no photo content could be read for attachment. Use the private links below.';
+  }
+
+  if (!ownerDelivered) {
+    const endpoint = env.WEB3FORMS_ENDPOINT ?? 'https://api.web3forms.com/submit';
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          access_key: env.WEB3FORMS_ACCESS_KEY,
+          subject,
+          from_name: 'Sparkling Standard Website',
+          ...(replyTo ? { replyto: replyTo } : {}),
+          botcheck: '',
+          ...notification,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { success?: boolean };
+      if (!response.ok || data.success !== true) {
+        return json({ ok: false, error: 'provider_failed' }, 502);
+      }
+      ownerDelivered = true;
+    } catch {
+      return json({ ok: false, error: 'provider_failed' }, 502);
+    }
+  }
+
+  if (!ownerDelivered) return json({ ok: false, error: 'provider_failed' }, 502);
+
+  // The owner notification was accepted (not necessarily inbox-delivered).
+  // The customer confirmation is a best-effort second path; its failure never
+  // turns a successful lead into a failed submission.
+  const customerEmail = await sendCustomerConfirmation(clean, env);
+  if (customerEmail.status === 'failed') {
+    console.error(describeCustomerEmailOutcome(customerEmail));
+  }
+  return json({
+    ok: true,
+    ...(verifiedPhotos.length > 0 ? { photoCount: verifiedPhotos.length, photoDelivery: attachmentDelivery } : {}),
+    ...(clientVerification ? { verification: clientVerification } : {}),
+  });
 }
 
 export async function onRequestGet(): Promise<Response> {

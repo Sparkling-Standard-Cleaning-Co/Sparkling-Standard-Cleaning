@@ -15,9 +15,10 @@ social integration `cdc4971`, the deployment-closeout `6ebc3fb` and the logo-onl
 redesign `62a1a46`). Live acceptance checks for the 6.1 release: residential, STR, commercial
 Tier A/B, Tier C scope review, church discount, location/travel, consent, reviews, footer,
 sitemap, robots and canonicals passed on sparkling-standard.com. Customer photo intake code is
-complete with private-R2 preparation, metadata stripping, signed owner links and retention cleanup,
-but production remains **disabled** until the owner provisions the bucket/binding/token; the probe
-reports `enabled:false` and no real-R2 upload has been claimed as tested.
+complete with private-R2 preparation, metadata stripping, Resend owner emails carrying real MIME
+attachments, signed links and retention cleanup, but production remains **disabled** until the owner
+provisions the bucket/binding/token; the probe reports `enabled:false` and no real-R2 upload has
+been claimed as tested.
 
 The **Initiative 6.2 complete-experience release candidate** (`initiative-6.2-complete-experience-audit`)
 is prepared locally and is **not deployed**: it adds the dedicated `/estimate/residential/` route,

@@ -135,7 +135,7 @@ a commit) before the built pages and Functions see it.
 | Secret | Required | Read by | Effect when missing |
 | --- | --- | --- | --- |
 | `WEB3FORMS_ACCESS_KEY` | Yes | `functions/api/lead.ts` | `/api/lead` returns `503`; client falls back to direct Web3Forms submit when the public key is set |
-| `RESEND_API_KEY` | Optional (customer email) | `functions/api/lead.ts` → `src/lib/forms/customer-email.ts` | The customer confirmation is skipped; the lead, the owner notification and the on-page summary are unaffected. Server-side only — never a `PUBLIC_*` value |
+| `RESEND_API_KEY` | Optional; required for photo attachments | `functions/api/lead.ts` → `src/lib/forms/owner-email.ts`, `customer-email.ts` | The customer confirmation and owner photo attachments are skipped; photo leads fall back to Web3Forms with private links and an explicit failure note. Server-side only — never a `PUBLIC_*` value |
 | `TRAVEL_ORIGIN` | Yes for routed travel | `functions/api/travel.ts` | `/api/travel` returns `503`; estimator stays in offline zone mode |
 | `TURNSTILE_SECRET_KEY` | Optional | `functions/api/lead.ts` | Turnstile check skipped; honeypot + timing still apply |
 | `ROUTES_API_KEY` | Optional | `functions/api/travel.ts` | Straight-line × 1.18 distance estimate labeled as such |
@@ -150,14 +150,15 @@ a commit) before the built pages and Functions see it.
 | `TRAVEL_CACHE_SECONDS` | `21600` | Per-isolate route cache |
 | `RESEND_FROM_EMAIL` | `Sparkling Standard <notifications@sparkling-standard.com>` | Sender for the customer confirmation; change only to another **verified** sender in Resend |
 | `RESEND_REPLY_TO` | `owner@sparkling-standard.com` | Customer replies reach the owner directly |
+| `OWNER_NOTIFICATION_EMAIL` | `owner@sparkling-standard.com` | Owner recipient for Resend attachment emails; use a verified/owner-controlled inbox |
 
-### 4a. Customer confirmation email (Resend) — owner setup
+### 4a. Customer confirmation + owner photo attachments (Resend) — owner setup
 
 The customer confirmation is sent by `functions/api/lead.ts` through Resend **after** the owner
 notification is accepted. Until the setup below is complete, the code path is inert
 (`skipped_not_configured` / provider rejection) and the lead flow is unaffected.
 
-**Status 2026-10-08 (owner-confirmed + live-tested):** steps 1–3 are complete —
+**Status 2026-10-08 (owner-confirmed + live-tested); owner attachments added 2026-10-25:** steps 1–3 are complete —
 `RESEND_API_KEY` is set in Cloudflare as a runtime Secret and `sparkling-standard.com` is verified
 in Resend (DNS complete; no `PUBLIC_RESEND_*` variable exists). Step 5 is done (deployed via
 `c8a9723`, with the ZIP fix `f92719c`); step 6's controlled live test was submitted through the
@@ -182,7 +183,7 @@ events once, no errors). **Inbox delivery of the two emails is the remaining own
    using an address the owner controls (e.g. the owner's own email as the "customer" address) and
    confirm: the owner notification arrives, the customer confirmation arrives from the verified
    sender, the subject is `We received your Sparkling Standard request`, and replying to it
-   reaches `owner@sparkling-standard.com`. No other live test email is ever sent.
+   reaches `owner@sparkling-standard.com`. No other live test email is ever sent. For the photo-attachment acceptance check, submit one request with a real JPEG and one with an iPhone HEIC, then confirm both arrive as downloadable files in the owner inbox and the numbered attachment sets share the request ID.
    ✅ submitted 2026-10-08 (`SS Live Form Test`, both emails addressed to the owner inbox) —
    **awaiting the owner's inbox confirmation**.
 

@@ -24,7 +24,9 @@ production site (6.1 remains deployed until the owner approves 6.2).
 | `14-photo-upload-church.jpg` | Shared church photo section and category set | 1200px |
 | `15-photo-upload-mobile.jpg` | Photo section on a 390px phone viewport | 390px |
 
-The photo screenshots (13–15) use a local mocked upload endpoint plus the CC0 HEIC test fixture to show the UI; they are not proof of a real Cloudflare R2 upload.\n\nAutomated coverage for these areas is in `tests/browser/initiative-6.2-content.test.mjs`,
+The photo screenshots (13–15) use a local mocked upload endpoint plus the CC0 HEIC test fixture to show the UI; they are not proof of a real Cloudflare R2 upload.
+
+Automated coverage for these areas is in `tests/browser/initiative-6.2-content.test.mjs`,
 `tests/browser/estimate-engines.test.mjs`, `tests/browser/journey.test.mjs`,
 `tests/pricing-adjustments.test.ts`, `tests/facility-verify.test.ts` and the rest of
 the release verification suite.

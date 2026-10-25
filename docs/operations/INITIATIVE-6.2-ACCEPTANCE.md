@@ -93,12 +93,16 @@ Status vocabulary:
 | 45 | iPhone HEIC/HEIF handling | Real CC0 HEIC fixture converted to JPEG in Chromium via `heic2any`; conversion failure gives explicit iPhone instructions; raw HEIC rejected server-side | `tests/photo-client.test.ts`, browser photo suite, `tests/photo-format.test.ts` | Verified |
 | 46 | Private storage and server-side metadata stripping | Private R2 binding; magic-byte validation; JPEG APP1/APP13/COM, PNG text/EXIF and WebP EXIF/XMP removal; opaque server keys | `tests/photo-format.test.ts`, `tests/photo-intake.test.ts`; local R2 smoke | Verified (code/local R2) |
 | 47 | Secure owner access and retention | HMAC-signed, time-limited links (90-day default); authenticated cleanup endpoint; no public object URLs | `tests/photo-intake.test.ts`, `docs/operations/PHOTO-UPLOADS.md` | Verified |
-| 48 | Correct attachment association and honest notifications | `/api/lead` validates request prefix + R2 `head`; count/links in owner notification; customer summary uses server-verified count | `tests/photo-intake.test.ts`, `tests/request-summary.test.ts` | Verified |
+| 48 | Correct attachment association and honest notifications | `/api/lead` validates request prefix + R2 `head`/`get`; owner notification carries real MIME attachments through Resend; count/links are retained; customer summary uses server-verified count | `tests/photo-intake.test.ts`, `tests/owner-email.test.ts`, `tests/request-summary.test.ts` | Verified (provider acceptance pending real e2e) |
+| 53 | Owner attachment email provider | Web3Forms free has no attachments; existing Resend account supports attachments on its free tier, so no new account/DNS/cost is needed. Web3Forms remains the links-only fallback | `docs/operations/PHOTO-UPLOADS.md`, `docs/deployment/DEPLOYMENT.md` | Verified decision; production key/inbox e2e pending |
+| 54 | Handle 6 photos and 32 MB / Base64 / inbox limits without omission | 21.5 MB Base64 per email, numbered `[Photos n/N]` emails sharing the request ID, full summary + all links in every part; six 8 MB photos → up to 3 emails | `tests/owner-email.test.ts` | Verified |
+| 55 | Retries, duplicate prevention and honest status | One retry on retryable provider/network errors, stable `Idempotency-Key`, `accepted`/`partial`/`failed`/`not_configured` statuses, Web3Forms fallback with failure note | `tests/owner-email.test.ts`, `tests/photo-intake.test.ts` | Verified |
 | 49 | Turnstile and abuse controls | Optional Turnstile verification, per-IP throttle, same-origin, count/size/total limits | `tests/photo-intake.test.ts` | Verified |
 | 50 | Commercial calibration | 26 scenarios covering sizes, types, fixtures, conditions, floors, schedules, travel and specialty; report + CSV | `npm run commercial:calibration`, `npm run calibration:report`; `FACILITY-CALIBRATION.md` | Verified |
 | 51 | Church calibration | 20 scenarios; exact 10% discount to the cent, global factor, tax disclosure, Tier A/B/C, browser/server reconciliation | `tests/facility-calibration.test.ts`; `FACILITY-CALIBRATION.md` | Verified |
-| 52 | Real R2 activation | Source/bindings/owner actions complete. No Cloudflare credentials in this environment; a local Pages/R2-compatible Miniflare upload and signed retrieval passed, but the real production bucket is **not provisioned** | `docs/operations/PHOTO-UPLOADS.md`; local smoke evidence | Pending external owner action |
-| 53 | Optional facility date bug found during acceptance | Step 3 required a preferred date despite the rule being optional; `optional: true` added and browser flow now advances without one | Browser photo suite (advances without a date) | Verified |
+| 56 | Real R2 activation | Source/bindings/owner actions complete. No Cloudflare credentials in this environment; a local Pages/R2-compatible Miniflare upload and signed retrieval passed, but the real production bucket is **not provisioned** | `docs/operations/PHOTO-UPLOADS.md`; local smoke evidence | Pending external owner action |
+| 57 | Production attachment e2e | A real production Resend send with a real inbox receipt was not possible: no `RESEND_API_KEY` is available locally and no deployment is authorized | This document; deployment checklist | Blocked on owner-run live test |
+| 58 | Optional facility date bug found during acceptance | Step 3 required a preferred date despite the rule being optional; `optional: true` added and browser flow now advances without one | Browser photo suite (advances without a date) | Verified |
 
 The photo feature is **implemented and tested**, but the production section remains hidden
 until the private R2 binding and `PHOTO_OWNER_TOKEN` exist. This is the one genuine external
@@ -109,14 +113,15 @@ dependency, not a deferred implementation.
 | Command | Result |
 | --- | --- |
 | `npm run check` | Passed — 0 errors, 0 warnings, 0 hints |
-| `npm test` | **479 tests: 478 passed, 1 skipped, 0 failed** (the skip is the print-output test when no print build exists) |
+| `npm test` | **489 tests: 488 passed, 1 skipped, 0 failed** (the skip is the print-output test when no print build exists) |
 | `npm run test:browser` | **124/124 passed** (including the new photo intake suite) |
 | `npm run verify` | Passed: 0 diagnostics, 26 pages built, 1,670 internal links, SEO and GTM/QR checks |
 | `npm run smoke` | Passed across 21 required pages |
 | `npm run pending` | Passed: no PENDING placeholder facts across 30 built files |
 | `npm run testimonials` | Passed: no fake testimonial or fixture markers |
 | `npm run audit:facts` | No unsupported factual claims; 15 terms flagged for human context review |
-| `npm run commercial:calibration` | Passed: **26 commercial + 20 church** hypothetical scenarios; exact church discount/reconciliation checks |`n| `npm run calibration:report` | Generated `FACILITY-CALIBRATION.md` and full-field CSV |
+| `npm run commercial:calibration` | Passed: **26 commercial + 20 church** hypothetical scenarios; exact church discount/reconciliation checks |
+| `npm run calibration:report` | Generated `FACILITY-CALIBRATION.md` and full-field CSV |
 | `npm run analytics:gtm:verify` | Passed: generated GTM import artifacts match |
 | `npm run estimate:scenarios` | Ran successfully; representative residential, STR, commercial and church scenarios printed |
 | Layout audit | 0 overflow, broken-image or duplicate-H1 issues across 22 routes × 320/375/390/768/1440 |

@@ -7,8 +7,9 @@ and owner token. The customer section stays hidden until
 presented to a customer as production storage.
 
 No Cloudflare credentials were available in this environment, so no bucket was
-created and **no upload has been tested against real R2**. The exact owner
-actions are below.
+created and **no upload has been tested against real R2**. No real production
+Resend attachment email has been sent or confirmed in the owner inbox yet.
+The exact owner actions are below.
 
 ## Customer experience
 
@@ -73,6 +74,51 @@ sets:
   Default 90 days; orphaned uploads from abandoned forms are removed by the same
   cutoff. Customer deletion requests can be honoured earlier.
 
+## Owner email attachments
+
+**Provider decision (2026-10-25):**
+
+- **Web3Forms free plan does not support file attachments.** Attachments are a
+  Pro feature (single file 5 MB by default; 5 GB storage), priced at
+  **$15/month or $149/year** at the time of evaluation. It is not required for
+  this implementation.
+- **Resend** is already configured for this domain and supports attachments on
+  its free tier (2026: **3,000 emails/month, 100/day, 40 MB per email after
+  Base64**). No new account, API key, DNS record, or recurring cost is required.
+  If the existing Resend account/key is not active, photo leads fall back to
+  Web3Forms with private links and an explicit attachment-failure note.
+
+**Delivery design:**
+
+- `/api/lead` verifies each photo with R2 `head`, reads the validated,
+  metadata-stripped bytes with R2 `get`, and sends the owner email through
+  Resend with real MIME attachments.
+- Filenames contain the request ID, sequence and category, e.g.
+  `SS-20261025-ABC123_01_kitchen.jpg`.
+- Attachment emails use a conservative **21.5 MB Base64 budget per email**
+  (below Resend's 40 MB and common 25 MB inbox limits). Two 8 MB photos fit one
+  email; the maximum six 8 MB photos arrive as up to three numbered emails
+  sharing the same request ID. Each part carries the full summary and all
+  private links.
+- Resend retries once on retryable network/429/5xx errors and uses a stable
+  `Idempotency-Key` per request part. Provider acceptance is reported as
+  `accepted`, never as confirmed inbox delivery.
+- If every Resend attachment email fails or is not configured, the lead is
+  preserved through Web3Forms with `Photos - Attachment delivery: FAILED/NOT
+  CONFIGURED` and all private links. Partial Resend delivery is reported as
+  `partial`; accepted emails still contain every link. Images are never silently
+  omitted.
+- No photo bytes, attachment names, customer email or API key appear in logs.
+
+`OWNER_NOTIFICATION_EMAIL` optionally overrides the recipient (default
+`owner@sparkling-standard.com`). `RESEND_FROM_EMAIL` must remain a verified
+sender.
+
+Provider references: <https://resend.com/pricing>,
+<https://resend.com/docs/dashboard/emails/attachments>,
+<https://web3forms.com/pricing>,
+<https://docs.web3forms.com/getting-started/pro-features/file-attachments>.
+
 ## Required Cloudflare provisioning (exact owner actions)
 
 These are the only external actions that remain:
@@ -97,23 +143,41 @@ These are the only external actions that remain:
    - Optional: `PHOTO_LINK_TTL_DAYS` = `90` (1–365).
    - Optional: `PHOTOS_MAX_BYTES` = `8388608` (hard-capped at 12 MiB).
 
-4. **Turnstile**
+4. **Confirm Resend is active** — `RESEND_API_KEY` and the verified sending domain already used for customer confirmations. No new account/DNS/cost is required. Optionally set `OWNER_NOTIFICATION_EMAIL`; default `owner@sparkling-standard.com`.
+
+5. **Turnstile**
    - If `TURNSTILE_SECRET_KEY` is already configured for the lead form, photo
      uploads verify Turnstile too; no additional key is needed.
    - If it is not configured, uploads use the per-IP throttle and limits. The
      lead form remains independently protected.
 
-5. **Redeploy** the Pages project. Then verify:
+6. **Redeploy** the Pages project. Then verify:
    - `GET https://sparkling-standard.com/api/photo-upload` returns
      `{ "enabled": true, ... }`.
    - The estimator shows the photo section on all four engines.
    - Upload one real JPEG and one real iPhone HEIC photo; confirm the HEIC
-     becomes a JPEG, the owner email contains signed links, and the photo
-     opens privately.
+     becomes a JPEG, the owner inbox contains **downloadable image attachments**
+     with the request-ID filenames, every numbered attachment set arrives, and
+     the private links also work.
 
 The optional `wrangler.toml.example` documents the same binding for a
 CLI-driven deployment. Do not commit a real `wrangler.toml` containing secrets.
 
+## Production acceptance checklist
+
+- [ ] Private R2 bucket exists; public access is off.
+- [ ] `PHOTOS_BUCKET` binding and `PHOTO_OWNER_TOKEN` secret exist in the production Pages environment.
+- [ ] `RESEND_API_KEY` is present and the sending domain is verified in Resend.
+- [ ] `GET /api/photo-upload` reports `enabled: true` on production.
+- [ ] A real JPEG upload appears in the owner email as a downloadable attachment with the request-ID filename.
+- [ ] A real iPhone HEIC photo converts to JPEG and arrives as a downloadable attachment.
+- [ ] A request with six photos either arrives complete or in clearly numbered attachment sets; no image is missing.
+- [ ] The private signed links still open every photo.
+- [ ] A simulated provider failure produces the Web3Forms fallback with an explicit failure note and links.
+- [ ] No public bucket URL, credential, photo bytes, or customer PII appears in logs or analytics.
+- [ ] `/api/photo-cleanup?days=90&dry=1` reports the expected retention window.
+
+The first four are infrastructure prerequisites; the remaining items are the owner-run production acceptance test.
 ## Owner photo access
 
 - Open the signed private link in the owner notification. The link is valid for
@@ -149,7 +213,8 @@ by the same rule.
 
 - Unit tests cover magic bytes, metadata stripping, limits, Turnstile gating,
   partial storage failure, signed/expired/tampered links, cleanup auth/dry-run,
-  and lead association.
+  lead association, attachment splitting, Resend request shape, retries,
+  idempotency and provider-failure fallback.
 - A local Cloudflare Pages / R2-compatible Miniflare smoke test passed: a real
   JPEG upload wrote a private object; the stored JPEG was 141,502 bytes
   (metadata-stripped from 141,758); and the signed retrieval returned

@@ -13,7 +13,7 @@ deployment was performed.
 | --- | --- | --- |
 | TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints (131 files) |
 | Production build | `npm run build` | 26 pages + sitemap; only the expected empty `proof` collection notice and the lazy MapLibre chunk-size warning |
-| Unit suite | `npm test` | **479 tests: 478 passed, 1 skipped, 0 failed**; the skip is the print-output test when no print build exists |
+| Unit suite | `npm test` | **489 tests: 488 passed, 1 skipped, 0 failed**; the skip is the print-output test when no print build exists |
 | Browser regression suite | `npm run test:browser` | **124 passed, 0 failed** (includes the photo intake suite) |
 | Static validation | `npm run verify` | 1,670 internal links across 26 pages resolve; SEO, homepage copy, marketing/QR, GTM artifacts and checklist-leak checks passed |
 | Smoke test | `npm run smoke` | 21 required pages passed |
@@ -23,6 +23,7 @@ deployment was performed.
 | Financial scenarios | `npm run estimate:scenarios` | passed (residential, STR, commercial, church, global factor, Supportive Home, tax notes) |
 | Facility calibration | `npm run commercial:calibration` / `npm run calibration:report` | **26 commercial + 20 church** hypothetical scenarios; exact church discount, Tier A/B/C, global factor, travel and CSV matrix |
 | Photo intake | `tests/photo-*` + local Pages/R2 smoke | all four engines, HEIC conversion, metadata stripping, limits, signed links, cleanup, association; local R2-compatible smoke passed |
+| Owner attachment email | `tests/owner-email.test.ts`, `tests/photo-intake.test.ts` | Resend request shape, Base64 splitting, 2×8 MB per part, retry/idempotency, partial/failure fallback; provider acceptance simulated, **no real provider send** |
 | Layout audit | Playwright route sweep | 0 overflow, broken-image or duplicate-H1 issues across 22 routes at 320/375/390/768/1440 |
 | Visual evidence | `docs/verification/6.2/` | 15 local-build screenshots (desktop + mobile, including photo intake) plus README |
 

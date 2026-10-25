@@ -1,18 +1,19 @@
 # Lead notification format
 
-How a website inquiry arrives in the owner's inbox. The form provider (Web3Forms, free plan)
-renders the submitted field labels and values in order and does **not** support custom HTML
-templates on the free plan, so the presentation is built in code: `functions/api/lead.ts` passes
-the sanitized field map through `src/lib/forms/lead-notification.ts`, which produces an ordered,
-readable summary. Every collected value is preserved — unmapped fields appear under
-“More details” — and the customer's email becomes the provider **reply-to** address.
+How a website inquiry arrives in the owner's inbox. The presentation is built in code:
+`functions/api/lead.ts` passes the sanitized field map through
+`src/lib/forms/lead-notification.ts`, producing an ordered, readable summary. Every collected value
+is preserved — unmapped fields appear under “More details” — and the customer's email becomes the
+reply-to address.
 
 The email opens with an **at-a-glance summary** (request, customer, location, price/verdict, and a
 next-action line when something needs attention) so the owner can triage from the inbox preview
 before scrolling. The detail sections follow in reading order.
 
-This owner notification is unchanged by the customer confirmation path: after Web3Forms accepts
-it, the function sends the customer a separate branded email through Resend
+**Photo leads:** Web3Forms free does not support attachments, so a lead with photos is sent through
+Resend with the actual metadata-stripped images attached. Web3Forms remains the fallback lead
+channel with links and an explicit attachment-failure note. A no-photo lead keeps the existing
+Web3Forms notification. The customer confirmation is always a separate Resend email
 (`docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`).
 
 ## Section order
@@ -144,23 +145,42 @@ Pricing — ACTION REQUIRED: The submitted price differs from the server recalcu
 - Browser: `tests/browser/attribution.test.mjs` proves the full chain — a Facebook campaign
   arrival, internal navigation to the estimator, and the first/latest fields in the submitted
   lead payload.
+- Resend attachment contract: `tests/owner-email.test.ts` covers Base64 splitting, request-ID filenames, retries, idempotency keys, partial/failed provider outcomes, and the no-PII log line; `tests/photo-intake.test.ts` covers the full R2-to-owner-email path and Web3Forms fallback.
 - Server contract: `tests/api-verification.test.ts` asserts the server verdict replaces forged
   claims and that the origin/credentials never appear in the forwarded payload.
 - Live: after an owner-authorized, clearly labeled test submission, confirm the inbox shows the
   sections above and that replying goes to the customer's address.
 
-## Customer photos
+## Customer photos and owner attachments
 
-When the lead carries verified photo references, the owner email adds:
+Photo leads are sent to the owner through **Resend** so the actual
+metadata-stripped image files are MIME attachments. Web3Forms remains the
+fallback lead channel when Resend is unavailable or rejects every attachment
+email.
+
+The owner email adds:
 
 - `Photos - Attached` — the exact number of objects confirmed in private storage
   with an explicit "metadata stripped" note;
+- `Photos - Attached files` — meaningful filenames containing the request ID,
+  sequence and category (for example `SS-20261025-ABC123_01_kitchen.jpg`);
 - `Photos - Private owner links` — one time-limited signed link per photo
   (default 90 days), separated by ` | `;
-- `Photos - Note` — a reminder that the links open privately and must not be
+- `Photos - Note` — a reminder that the files/links are private and must not be
   forwarded outside Sparkling Standard.
 
-A photo reference that fails the request-prefix or R2 existence check is never
-linked or counted. If all references fail, the notification says so and prompts
-a re-upload; it never claims the photos arrived. Raw keys are not shown in the
-customer-facing summary or confirmation.
+Attachment emails are numbered (`[Photos 1/3] …`) with the same request ID.
+Each part carries the full summary and every private link. The organization
+uses a conservative 21.5 MB Base64 budget per email so two 8 MB photos fit
+under common inbox limits; six 8 MB photos may therefore arrive as three
+clearly labelled emails. No image is silently omitted.
+
+If Resend rejects an attachment email, the lead is preserved through
+Web3Forms with an explicit `FAILED — …` note and the private links. If Resend
+accepts only some parts, the operation is reported as `partial` and every
+accepted email still contains links to all photos. Provider acceptance is not
+proof of inbox delivery.
+
+A photo reference that fails the request-prefix, R2 existence, or R2 read check
+is never counted as an attachment. Raw keys are not shown in the customer-facing
+summary or confirmation.

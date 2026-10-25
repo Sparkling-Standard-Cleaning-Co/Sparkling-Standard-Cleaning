@@ -334,3 +334,174 @@ test('cleanup requires owner authentication, supports dry runs and removes expir
   assert.equal(((await real.json()) as { deleted: number }).deleted, 1);
   assert.deepEqual(deleted, [keys[0]]);
 });
+
+test('sends verified photos as real Resend attachments and skips the Web3Forms fallback', async () => {
+  const bucket = mockBucket();
+  const key = keyFor();
+  await bucket.put(key, JPEG);
+  const resendCalls: Array<{ body: string; headers: Record<string, string> }> = [];
+  const web3Calls: string[] = [];
+  const fetchStub = async (url: string | URL, init?: RequestInit): Promise<Response> => {
+    if (String(url).includes('api.resend.com')) {
+      resendCalls.push({
+        body: String(init?.body ?? ''),
+        headers: (init?.headers ?? {}) as Record<string, string>,
+      });
+      return new Response(JSON.stringify({ id: 're_attachment_1' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (String(url).includes('api.web3forms.com')) {
+      web3Calls.push('unexpected');
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    }
+    return new Response('unexpected', { status: 500 });
+  };
+  const request = new Request('https://example.test/api/lead', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      subject: 'Photo attachment delivery test',
+      fields: {
+        request_type: 'contact',
+        name: 'Photo Test',
+        phone: '8500000000',
+        service_type: 'standard',
+        quote_reference: 'SS-20261025-ABC123',
+        photo_request_ref: REF,
+        photo_keys: `bathroom:${key}`,
+      },
+    }),
+  });
+  const response = await withFetch(fetchStub as typeof fetch, () =>
+    leadPost({
+      request,
+      env: {
+        WEB3FORMS_ACCESS_KEY: 'test',
+        PHOTOS_BUCKET: bucket,
+        PHOTO_OWNER_TOKEN: OWNER,
+        RESEND_API_KEY: 'dummy-resend-key',
+      },
+    }),
+  );
+  assert.equal(response.status, 200);
+  const result = (await response.json()) as { photoCount: number; photoDelivery: string };
+  assert.equal(result.photoCount, 1);
+  assert.equal(result.photoDelivery, 'attached');
+  assert.equal(web3Calls.length, 0, 'attachments go through Resend, not the attachment-less Web3Forms plan');
+  assert.equal(resendCalls.length, 1);
+  assert.match(resendCalls[0]?.headers['Idempotency-Key'] ?? '', /^owner-notification\/SS-20261025-ABC123\/part-1\/v1$/);
+  const body = JSON.parse(resendCalls[0]?.body ?? '{}') as {
+    to: string[];
+    subject: string;
+    attachments: Array<{ filename: string; content: string; content_type: string }>;
+  };
+  assert.deepEqual(body.to, ['owner@sparkling-standard.com']);
+  assert.match(body.subject, /SS-20261025-ABC123/);
+  assert.equal(body.attachments.length, 1);
+  assert.match(body.attachments[0]?.filename ?? '', /^SS-20261025-ABC123_01_bathroom\.jpg$/);
+  assert.equal(body.attachments[0]?.content_type, 'image/jpeg');
+  assert.equal(body.attachments[0]?.content, Buffer.from(JPEG).toString('base64'));
+});
+
+test('falls back to Web3Forms with an explicit attachment-failure note when Resend rejects photos', async () => {
+  const bucket = mockBucket();
+  const key = keyFor();
+  await bucket.put(key, JPEG);
+  const web3: Array<Record<string, unknown>> = [];
+  let resendAttempts = 0;
+  const fetchStub = async (url: string | URL, init?: RequestInit): Promise<Response> => {
+    if (String(url).includes('api.resend.com')) {
+      resendAttempts += 1;
+      return new Response('{}', { status: 422 });
+    }
+    if (String(url).includes('api.web3forms.com')) {
+      web3.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    }
+    return new Response('unexpected', { status: 500 });
+  };
+  const request = new Request('https://example.test/api/lead', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      subject: 'Photo fallback test',
+      fields: {
+        request_type: 'contact',
+        name: 'Photo Test',
+        phone: '8500000000',
+        service_type: 'standard',
+        photo_request_ref: REF,
+        photo_keys: `bathroom:${key}`,
+      },
+    }),
+  });
+  const response = await withFetch(fetchStub as typeof fetch, () =>
+    leadPost({
+      request,
+      env: {
+        WEB3FORMS_ACCESS_KEY: 'test',
+        PHOTOS_BUCKET: bucket,
+        PHOTO_OWNER_TOKEN: OWNER,
+        RESEND_API_KEY: 'dummy-resend-key',
+      },
+    }),
+  );
+  assert.equal(response.status, 200);
+  const body = (await response.json()) as { photoDelivery: string };
+  assert.equal(body.photoDelivery, 'links_only');
+  assert.equal(resendAttempts, 1, '422 is not retried');
+  assert.equal(web3.length, 1);
+  assert.match(String(web3[0]?.['Photos - Attachment delivery'] ?? ''), /FAILED/i);
+  assert.match(String(web3[0]?.['Photos - Private owner links'] ?? ''), /sig=/);
+});
+test('a missing R2 body is not reported as an attachment and falls back honestly', async () => {
+  const base = mockBucket();
+  const key = keyFor();
+  await base.put(key, JPEG);
+  const bucket = {
+    ...base,
+    async get() {
+      return null;
+    },
+  };
+  const web3: Array<Record<string, unknown>> = [];
+  const fetchStub = async (url: string | URL, init?: RequestInit): Promise<Response> => {
+    if (String(url).includes('api.web3forms.com')) {
+      web3.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    }
+    return new Response('unexpected', { status: 500 });
+  };
+  const request = new Request('https://example.test/api/lead', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      subject: 'Missing R2 body test',
+      fields: {
+        request_type: 'contact',
+        name: 'Photo Test',
+        phone: '8500000000',
+        service_type: 'standard',
+        photo_request_ref: REF,
+        photo_keys: `bathroom:${key}`,
+      },
+    }),
+  });
+  const response = await withFetch(fetchStub as typeof fetch, () =>
+    leadPost({
+      request,
+      env: {
+        WEB3FORMS_ACCESS_KEY: 'test',
+        PHOTOS_BUCKET: bucket,
+        PHOTO_OWNER_TOKEN: OWNER,
+        RESEND_API_KEY: 'dummy-resend-key',
+      },
+    }),
+  );
+  assert.equal(response.status, 200);
+  const result = (await response.json()) as { photoDelivery: string };
+  assert.equal(result.photoDelivery, 'links_only');
+  assert.match(String(web3[0]?.['Photos - Attachment delivery'] ?? ''), /FAILED/);
+});

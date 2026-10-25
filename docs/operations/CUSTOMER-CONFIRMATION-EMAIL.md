@@ -48,14 +48,20 @@ wording cannot drift apart.
 ```
 Customer form
   → /api/lead (validate, spam-check, Turnstile, quote verification)
-  → Web3Forms owner notification          ← the lead
+  → photo lead + Resend configured? → Resend owner email with MIME photo attachments
+  → otherwise Web3Forms owner notification (photo failure/links note)
   → (only after that succeeds) Resend customer confirmation
   → on-page success + thank-you summary (immediate, independent)
 ```
 
+Photo attachments now use the same Resend account/domain already configured for
+the customer confirmation. The Web3Forms owner notification remains the
+fallback lead channel but cannot carry attachments on its free plan.
+
 | Case | Behavior |
 | --- | --- |
 | Owner delivery fails | The submission is a delivery failure (`502 provider_failed`); the client shows honest failure copy with call/email alternatives. **No customer confirmation is sent.** |
+| Photo lead, Resend attachment email fails | Web3Forms fallback sends the full summary with `Photos - Attachment delivery: FAILED` and private links; the lead succeeds. The owner can recover every image from the links. |
 | Owner delivery succeeds, customer email fails (provider rejection, network, unverified domain) | The lead is **successful** (`200 { ok: true }`). The failure is logged server-side as `customer-confirmation: failed (provider N)` — no PII, no secrets. The customer is never asked to resubmit. |
 | No customer email in the request (phone-only) | The confirmation is skipped (`skipped_no_email`); the lead succeeds. |
 | Invalid customer email | Skipped server-side (`skipped_invalid_email`); the client forms already block invalid emails natively. |
