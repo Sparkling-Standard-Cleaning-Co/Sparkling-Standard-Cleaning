@@ -1,7 +1,7 @@
 ---
 title: Commercial Cleaning
-metaTitle: Commercial Cleaning in Pensacola | Request a Walkthrough
-metaDescription: Commercial cleaning for Pensacola-area offices, churches, salons, gyms, medical offices, retail spaces and property portfolios. Request a walkthrough and get a custom quote.
+metaTitle: Commercial Cleaning Estimate in Pensacola
+metaDescription: Commercial cleaning for Pensacola-area offices, retail spaces, salons, gyms, medical offices and property portfolios. Tell us about your facility and receive a personally reviewed scope and price.
 summary: Recurring or one-time commercial cleaning for local businesses and facilities. Each service is professionally scoped to your space, with scheduling tailored to your operation’s needs.
 homepageParagraphs:
   - Recurring or one-time commercial cleaning for local businesses and facilities. Each service is professionally scoped to your space, with scheduling tailored to your operation’s needs.
