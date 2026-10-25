@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { pricing, pricingValue, type ConfigValue } from '../src/config/pricing.ts';
 import { zipReference, zonePolicy, normalizeZip } from '../src/config/geography.ts';
-import { travelConfig } from '../src/config/travel.ts';
+import { travelConfig } from '../src/config/estimators/travel.ts';
 
 function collectConfigValues(node: unknown, found: ConfigValue<unknown>[] = []): ConfigValue<unknown>[] {
   if (node && typeof node === 'object') {

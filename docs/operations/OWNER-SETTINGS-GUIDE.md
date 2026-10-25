@@ -4,11 +4,13 @@ This guide is for the business owner. It explains where every price lives, how t
 phone or computer using GitHub, and how to check the result before customers see it. No coding
 knowledge is required beyond editing numbers in one file.
 
+For the complete owner map, start at START-HERE-OWNER-CONTROL-CENTER.md and docs/ESTIMATOR-CONTROL-CENTER.md.
+
 Everything on the website is calculated from **one settings file**:
 
-> **`src/config/owner-pricing.ts`**
-> Open it: https://github.com/Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning/blob/main/src/config/owner-pricing.ts
-> Edit it directly: https://github.com/Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning/edit/main/src/config/owner-pricing.ts
+> **`src/config/estimators/pricing-values.ts`**
+> Open it: https://github.com/Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning/blob/main/src/config/estimators/pricing-values.ts
+> Edit it directly: https://github.com/Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning/edit/main/src/config/estimators/pricing-values.ts
 
 **This repository is public.** Internal rates and assumptions are visible to anyone who looks. Never
 put passwords, customer information or genuinely confidential business data in the file.
@@ -19,10 +21,10 @@ put passwords, customer information or genuinely confidential business data in t
 
 | File | What it is | Who edits it |
 | --- | --- | --- |
-| `src/config/owner-pricing.ts` | The raw numbers: hourly rates, labor times, add-ons, rounding. One clearly grouped block per topic. | **You (the owner)** |
+| `src/config/estimators/pricing-values.ts` | The raw numbers: hourly rates, labor times, add-ons, rounding. One clearly grouped block per topic. | **You (the owner)** |
 | `src/config/pricing.ts` | The same values wearing their "approval badge" — `provisional` (a starting point) or `approved` (owner-approved) — plus the notes explaining each one. | A developer; change only the approval state or a note |
 
-You only ever need `owner-pricing.ts`. The website's calculator, the customer's instant price, the
+You only ever need `estimators/pricing-values.ts`. The website's calculator, the customer's instant price, the
 server's independent re-check and the owner notification all read the same values through
 `pricing.ts`, so there is nothing to keep in sync by hand.
 
@@ -159,7 +161,7 @@ Public pages never print hourly rates or labor hours — only the proposed custo
 
 ## 5a. The global estimate factor (one number across the business)
 
-In `src/config/owner-pricing.ts` find:
+In `src/config/estimators/pricing-values.ts` find:
 
 ```ts
 globalEstimateFactor: 1.0,
@@ -207,7 +209,7 @@ before changing it.
 
 ## 8. Quick reference — where to change common things
 
-| I want to change… | Edit in `owner-pricing.ts` |
+| I want to change… | Edit in `estimators/pricing-values.ts` |
 | --- | --- |
 | Recurring cleaning price level | `hourlyRates.recurring` |
 | One-time / deep price level | `hourlyRates.otherServices` |

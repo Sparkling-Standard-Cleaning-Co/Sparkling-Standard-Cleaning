@@ -7,12 +7,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { pricing } from '../src/config/pricing.ts';
-import { ownerPricing } from '../src/config/owner-pricing.ts';
+import { ownerPricing } from '../src/config/estimators/pricing-values.ts';
 import { calculateEstimate, type EstimateContext } from '../src/lib/estimate/calculate.ts';
 import { evaluatePromotions, type PromotionInput } from '../src/lib/estimate/promotions.ts';
 import { mapReservationFields } from '../src/lib/estimate/verify.ts';
 import type { EstimateInput } from '../src/lib/estimate/types.ts';
-import type { CampaignPromotionConfig } from '../src/config/owner-pricing.ts';
+import type { CampaignPromotionConfig } from '../src/config/estimators/pricing-values.ts';
 
 const campaignConfig: CampaignPromotionConfig = {
   code: 'SPARKLE100',

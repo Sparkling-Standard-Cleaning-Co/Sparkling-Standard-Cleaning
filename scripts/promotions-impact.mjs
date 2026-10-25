@@ -19,7 +19,7 @@
 
 import { calculateEstimate } from '../src/lib/estimate/calculate.ts';
 import { pricing, pricingValue } from '../src/config/pricing.ts';
-import { travelConfig } from '../src/config/travel.ts';
+import { travelConfig } from '../src/config/estimators/travel.ts';
 
 const ownerTarget = pricingValue(pricing.laborEconomics.ownerLaborTargetPerHour);
 const minimumJob = pricingValue(pricing.minimumJob);

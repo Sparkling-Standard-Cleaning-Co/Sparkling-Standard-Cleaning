@@ -41,6 +41,7 @@ test('no private origin value is committed', () => {
   const originValue = /TRAVEL_ORIGIN\s*=\s*[-0-9]/;
   for (const file of tracked) {
     if (!textExtensions.test(file)) continue;
+    if (!fs.existsSync(file)) continue;
     const text = fs.readFileSync(file, 'utf8');
     assert.equal(originValue.test(text), false, `origin value in ${file}`);
   }
@@ -51,6 +52,7 @@ test('no tracked file carries a canvass-style address+coordinate record', () => 
   const latitudeField = /"?Latitude"?\s*[:=]\s*-?\d/;
   for (const file of tracked) {
     if (!textExtensions.test(file)) continue;
+    if (!fs.existsSync(file)) continue;
     if (file.startsWith('tests/routes/')) continue; // synthetic fixtures only
     const text = fs.readFileSync(file, 'utf8');
     if (addressField.test(text) && latitudeField.test(text)) {

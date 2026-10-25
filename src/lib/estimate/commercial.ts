@@ -24,7 +24,7 @@
 
 import type { Condition } from '../../config/pricing.ts';
 import { pricing, resolveGlobalEstimateFactor } from '../../config/pricing.ts';
-import { commercialTierConfig } from '../../config/commercial-tiers.ts';
+import { commercialTierConfig } from '../../config/estimators/commercial.ts';
 import { calculateChurchDiscount, type ChurchDiscountResult } from './church-discount.ts';
 
 export type FacilityType = 'office' | 'retail' | 'salon' | 'gym' | 'community' | 'church';

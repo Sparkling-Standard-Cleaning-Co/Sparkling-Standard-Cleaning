@@ -4,6 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import CtaBand from '../components/CtaBand.astro';
 import Icon from '../components/Icon.astro';
+import PremiumIcon from '../components/PremiumIcon.astro';
 import { breadcrumbNode, serviceNode } from '../lib/schema';
 import { business, contactPhone, isPending } from '../config/business';
 
@@ -25,6 +26,14 @@ const schema = [
     { name: 'Supportive Home Cleaning', path: '/supportive-home-cleaning/' },
   ]),
 ];
+
+const eligibilityIcons = [
+  'seniors',
+  'first-responders',
+  'military-veterans',
+  'disability-support',
+  'other-community',
+] as const;
 
 const phone = contactPhone();
 const showCall = phone !== null && !isPending(phone.href);
@@ -67,9 +76,13 @@ const showText = phone !== null && business.flags.smsEnabled && !isPending(phone
       </div>
       <div class="grid grid--3 readable">
         {
-          data.sections[0]?.items.map((item) => (
-            <div class="card">
-              <span class="card__icon"><Icon name="heart" /></span>
+          data.sections[0]?.items.map((item, index) => (
+            <div class="card supportive-eligibility__card">
+              <PremiumIcon
+                name={eligibilityIcons[index] ?? 'other-community'}
+                size={4.5}
+                class="supportive-eligibility__icon"
+              />
               <h3 class="card__title">{item.title}</h3>
               <p class="card__text">{item.text}</p>
             </div>

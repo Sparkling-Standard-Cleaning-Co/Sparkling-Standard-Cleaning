@@ -9,8 +9,8 @@ import { glob } from 'astro/loaders';
 // they come from src/config/business.ts and src/config/pricing.ts.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Service icon slugs — the OWNER-SUPPLIED premium vector collection
-// (src/assets/icons/premium/, provided 2026-10-24). One slug per service;
+// Service icon slugs — the OWNER-SUPPLIED white-tile collection
+// (src/assets/icons/white-tile/, provided 2026-10-25). One slug per service;
 // rendered by PremiumIcon.astro. Never substitute stock icons for these.
 const iconEnum = z.enum([
   'recurring-residential',

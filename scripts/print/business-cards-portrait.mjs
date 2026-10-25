@@ -3,7 +3,7 @@
 //
 // Rebuilds the business card from the owner's approved reference
 // ("Elegant Sparkling Standard Business Cards.png"): an elegant warm-cream
-// card led by Hayli's GENUINE high-resolution portrait (public/Headshot.jpg —
+// card led by Hayli's GENUINE high-resolution portrait (assets/owner/Headshot.jpg —
 // never an AI likeness), the owner-approved circular logo (the flower-like
 // crest motif is retired from this piece), and the REAL instant-estimate QR
 // from the verified marketing registry.
@@ -37,7 +37,7 @@ const TRIM_H = 2;
 const BLEED = 0.125;
 const SAFE = 0.12;
 
-const PORTRAIT = pathToFileURL(path.resolve('public/Headshot.jpg')).href;
+const PORTRAIT = pathToFileURL(path.resolve('assets/owner/Headshot.jpg')).href;
 const QR_SVG = readQrSvg('business-card');
 
 const founderRole = 'Founder / Owner-Operator';

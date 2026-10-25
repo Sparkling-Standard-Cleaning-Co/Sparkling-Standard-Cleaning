@@ -53,7 +53,7 @@ integration results, distinct from the mocked unit/browser suites.
 
 **Implemented and tested on this branch:**
 
-- Shared travel economics + driving policy: `src/config/travel.ts` (single source for client and
+- Shared travel economics + driving policy: `src/config/estimators/travel.ts` (single source for client and
   the Pages Function; pricing re-exports it, removing the duplicated constants).
 - Real driving duration: `functions/api/travel.ts` requests `routes.duration` (Google) and reads
   MapMap/Mapbox `duration`; all return rounded `durationMinutes`. The function also accepts
@@ -209,7 +209,7 @@ core/surrounding ZIPs used the provisional zone math. **Since resolved:** MapMap
 
 **Shared configuration (removes the duplicated-constant defect):**
 
-- Create one shared travel-economics module (e.g. `src/config/travel.ts`) consumed by **both**
+- Create one shared travel-economics module (e.g. `src/config/estimators/travel.ts`) consumed by **both**
   the client estimator and the Pages Function (Functions are bundled from source at deploy, so a
   shared TS module works).
 - `TRAVEL_ORIGIN` and provider keys remain server-only environment values; the shared module

@@ -10,7 +10,7 @@ import {
 } from '../src/lib/estimate/engines.ts';
 import { calculateChurchDiscount } from '../src/lib/estimate/church-discount.ts';
 import { calculateChurchEstimate, calculateFacilityPrice, calculateFacilityWorkload } from '../src/lib/estimate/commercial.ts';
-import { commercialTierConfig } from '../src/config/commercial-tiers.ts';
+import { commercialTierConfig } from '../src/config/estimators/commercial.ts';
 
 test('engine parameter is allowlisted and defaults to residential', () => {
   for (const engine of ESTIMATE_ENGINES) assert.equal(parseEngineParam(engine.id), engine.id);

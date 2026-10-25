@@ -2,16 +2,16 @@
 // Central pricing configuration — the TYPED CONFIG consumed by the estimator
 // and every price/policy decision the site presents.
 //
-// RAW OWNER-EDITABLE VALUES live in `src/config/owner-pricing.ts` and are
+// RAW OWNER-EDITABLE VALUES live in `src/config/estimators/pricing-values.ts` and are
 // imported below, wrapped here with their approval state and explanation.
-// Edit pricing values in owner-pricing.ts; edit this file only to add a new
+// Edit pricing values in estimators/pricing-values.ts; edit this file only to add a new
 // policy or change an approval state/note.
 //
 // Travel economics are shared with the serverless function via
-// `src/config/travel.ts` (imported below) — do not duplicate those numbers.
+// `src/config/estimators/travel.ts` (imported below) — do not duplicate those numbers.
 
-import { travelConfig } from './travel.ts';
-import { ownerPricing } from './owner-pricing.ts';
+import { travelConfig } from './estimators/travel.ts';
+import { ownerPricing } from './estimators/pricing-values.ts';
 
 // ── WHAT IS PUBLIC vs INTERNAL ───────────────────────────────────────────────
 // PUBLIC (may be shown to customers):
@@ -70,7 +70,7 @@ export interface AddonDefinition {
   /** Labor-hours this add-on adds when included in the same visit. */
   laborHours?: number;
   /**
-   * Optional fixed charge in USD (owner-set in owner-pricing.ts). When a
+   * Optional fixed charge in USD (owner-set in estimators/pricing-values.ts). When a
    * positive finite number, it replaces `laborHours × rate` for the CHARGE
    * only; the add-on's labor-hours still count toward scheduled labor time.
    * Leave unset for the standard labor-based pricing.
@@ -177,7 +177,7 @@ export const pricing = {
 
   // ── Commercial / church workload model (owner-approved baseline) ───────────
   // Research-based planning constants implemented in Initiative 6.1. The owner
-  // kill switch lives in src/config/commercial-tiers.ts
+  // kill switch lives in src/config/estimators/commercial.ts
   // (`numericEstimatesEnabled`): false returns the facility request to a
   // scope-review experience with no numeric prices.
   commercialPricing: {
@@ -274,7 +274,7 @@ export const pricing = {
   // add-on amounts therefore always reconcile with the proposed total.
   addons: {
     state: 'provisional' as ApprovalState,
-    // Raw items (including any optional fixedPriceUsd) live in owner-pricing.ts.
+    // Raw items (including any optional fixedPriceUsd) live in estimators/pricing-values.ts.
     items: ownerPricing.addons,
     note: 'Add-on amounts are calculated from labor-hours × the applicable approved rate (or the owner-set fixed price when one exists). Specialty items show “Custom quote” and are never priced instantly.',
   },
@@ -362,12 +362,12 @@ export const pricing = {
   travel: {
     /**
      * Miles included (one way) in the base price before a travel adjustment.
-     * Numbers come from the shared travel config (src/config/travel.ts) so the
+     * Numbers come from the shared travel config (src/config/estimators/travel.ts) so the
      * client and the serverless function cannot drift apart.
      */
     includedOneWayMiles: provisional(
       travelConfig.includedOneWayMiles,
-      'Shared with functions/api/travel.ts via src/config/travel.ts. Directive §31 starting point.',
+      'Shared with functions/api/travel.ts via src/config/estimators/travel.ts. Directive §31 starting point.',
     ),
     /** Per-mile vehicle cost (fuel excluded; fuel is priced live) in USD. */
     perMileWearCost: provisional(

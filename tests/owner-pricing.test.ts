@@ -3,7 +3,7 @@
 // Two jobs:
 //  1. Consistency guard — every ownerPricing value consumed by pricing.ts must
 //     equal the effective `.value` of its typed config entry, so an edit in
-//     owner-pricing.ts never silently drifts from the engine's config.
+//     estimators/pricing-values.ts never silently drifts from the engine's config.
 //  2. Fixed-price add-on resolution — the single charge resolver honors a
 //     fixed price, falls back to labor-hours × rate, and never prices
 //     specialty work.
@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ownerPricing } from '../src/config/owner-pricing.ts';
+import { ownerPricing } from '../src/config/estimators/pricing-values.ts';
 import { pricing, pricingValue, type ConfigValue } from '../src/config/pricing.ts';
 import { calculateEstimate, type EstimateContext } from '../src/lib/estimate/calculate.ts';
 import { resolveAddonCharge } from '../src/lib/estimate/addons.ts';

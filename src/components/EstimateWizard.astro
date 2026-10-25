@@ -1,5 +1,17 @@
 ---
 import { pricing } from '../config/pricing';
+import {
+  ARRIVAL_PREFERENCE_OPTIONS,
+  CONDITION_OPTIONS,
+  FREQUENCY_OPTIONS,
+  LAST_CLEAN_OPTIONS,
+  LINEN_PREFERENCE_OPTIONS,
+  PET_OPTIONS,
+  PROPERTY_TYPE_OPTIONS,
+  RESIDENTIAL_INPUT_LIMITS,
+  RESIDENTIAL_SERVICE_OPTIONS,
+  TURNOVER_FREQUENCY_OPTIONS,
+} from '../config/estimators/input-definitions';
 import { schedulingConfig } from '../config/scheduling';
 import { business, contactPhone, isPending } from '../config/business';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
@@ -91,38 +103,18 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         <fieldset class="field" data-service-fieldset data-group-error="serviceType" data-group-message="Please select a cleaning service.">
           <legend>What kind of cleaning are you looking for?</legend>
           <div class="option-grid option-grid--2">
-            <label class="option">
-              <input type="radio" name="serviceType" value="standard" required />
-              <span class="option__control"></span>
-              <span>
-                <span class="option__label">Residential Cleaning</span>
-                <span class="option__desc">One-time or recurring cleaning for your home. New recurring customers begin with a required Deep Cleaning.</span>
-              </span>
-            </label>
-            <label class="option">
-              <input type="radio" name="serviceType" value="deep" required />
-              <span class="option__control"></span>
-              <span>
-                <span class="option__label">Deep cleaning</span>
-                <span class="option__desc">Detail work — baseboards, frames, buildup and more.</span>
-              </span>
-            </label>
-            <label class="option">
-              <input type="radio" name="serviceType" value="move_in_out" required />
-              <span class="option__control"></span>
-              <span>
-                <span class="option__label">Move-in / move-out</span>
-                <span class="option__desc">Empty-home cleaning built around a walkthrough.</span>
-              </span>
-            </label>
-            <label class="option">
-              <input type="radio" name="serviceType" value="str_turnover" required />
-              <span class="option__control"></span>
-              <span>
-                <span class="option__label">Short-term rental turnover</span>
-                <span class="option__desc">Guest-ready resets for Airbnb / VRBO hosts.</span>
-              </span>
-            </label>
+            {
+              RESIDENTIAL_SERVICE_OPTIONS.map((option) => (
+                <label class="option">
+                  <input type="radio" name="serviceType" value={option.value} required />
+                  <span class="option__control"></span>
+                  <span>
+                    <span class="option__label">{option.label}</span>
+                    <span class="option__desc">{option.description}</span>
+                  </span>
+                </label>
+              ))
+            }
           </div>
         </fieldset>
 
@@ -131,10 +123,6 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             <button type="button" class="btn btn--primary btn--large btn--block" data-address-gps>
               <Icon name="map-pin" size={18} /> Use My Current Location
             </button>
-            <p class="hint address-gps__hint">
-              Best if you are physically at the property you want cleaned. We'll use your device's
-              location to find the address and ask you to confirm it — nothing is sent until you do.
-            </p>
 
             <div class="address-permission" data-address-permission hidden>
               <p class="address-permission__title" data-permission-title>Location access is off.</p>
@@ -275,54 +263,50 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <label for="est-property">Property type</label>
           <select class="select" id="est-property" name="propertyType" required>
             <option value="">Choose one…</option>
-            <option value="house">House</option>
-            <option value="apartment">Apartment</option>
-            <option value="condo">Condo</option>
-            <option value="townhome">Townhome</option>
-            <option value="other">Other</option>
+            {PROPERTY_TYPE_OPTIONS.map((option) => (
+              <option value={option.value}>{option.label}</option>
+            ))}
           </select>
         </div>
         <div class="field-row field-row--2">
           <div class="field">
             <label for="est-sqft">Approximate square footage</label>
-            <input class="input" id="est-sqft" name="squareFeet" type="number" inputmode="numeric" min="200" max="20000" step="50" placeholder="e.g. 1600" required />
+            <input class="input" id="est-sqft" name="squareFeet" type="number" inputmode="numeric" min={RESIDENTIAL_INPUT_LIMITS.squareFeet.min} max={RESIDENTIAL_INPUT_LIMITS.squareFeet.max} step={RESIDENTIAL_INPUT_LIMITS.squareFeet.step} placeholder="e.g. 1600" required />
           </div>
           <div class="field">
             <label for="est-bedrooms">Bedrooms</label>
-            <input class="input" id="est-bedrooms" name="bedrooms" type="number" inputmode="numeric" min="0" max="12" required />
+            <input class="input" id="est-bedrooms" name="bedrooms" type="number" inputmode="numeric" min={RESIDENTIAL_INPUT_LIMITS.bedrooms.min} max={RESIDENTIAL_INPUT_LIMITS.bedrooms.max} required />
           </div>
         </div>
         <div class="field-row field-row--2">
           <div class="field">
             <label for="est-full-baths">Full bathrooms</label>
-            <input class="input" id="est-full-baths" name="fullBaths" type="number" inputmode="numeric" min="0" max="12" required />
+            <input class="input" id="est-full-baths" name="fullBaths" type="number" inputmode="numeric" min={RESIDENTIAL_INPUT_LIMITS.fullBaths.min} max={RESIDENTIAL_INPUT_LIMITS.fullBaths.max} required />
           </div>
           <div class="field">
             <label for="est-half-baths">Half bathrooms</label>
-            <input class="input" id="est-half-baths" name="halfBaths" type="number" inputmode="numeric" min="0" max="12" value="0" required />
+            <input class="input" id="est-half-baths" name="halfBaths" type="number" inputmode="numeric" min={RESIDENTIAL_INPUT_LIMITS.halfBaths.min} max={RESIDENTIAL_INPUT_LIMITS.halfBaths.max} value="0" required />
           </div>
         </div>
         <div class="field-row field-row--2" data-str-only hidden>
           <div class="field">
             <label for="est-rental-properties">How many rental properties do you manage?</label>
-            <input class="input" id="est-rental-properties" name="rentalProperties" type="number" inputmode="numeric" min="1" max="50" value="1" />
+            <input class="input" id="est-rental-properties" name="rentalProperties" type="number" inputmode="numeric" min={RESIDENTIAL_INPUT_LIMITS.rentalProperties.min} max={RESIDENTIAL_INPUT_LIMITS.rentalProperties.max} value="1" />
             <span class="hint">Start with the property below; we can discuss the portfolio after your first turnover.</span>
           </div>
           <div class="field">
             <label for="est-turnover-frequency">How often are turnovers needed?</label>
             <select class="select" id="est-turnover-frequency" name="turnoverFrequency">
               <option value="">Choose one (optional)…</option>
-              <option value="per_stay">Between every stay</option>
-              <option value="weekly">Weekly</option>
-              <option value="biweekly">Every two weeks</option>
-              <option value="occasional">Occasional / backup cleaner</option>
-              <option value="seasonal">Seasonal</option>
+              {TURNOVER_FREQUENCY_OPTIONS.map((option) => (
+                <option value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
         </div>
         <div class="field" data-str-only hidden>
           <label for="est-beds">Beds to reset (turnovers)</label>
-          <input class="input" id="est-beds" name="beds" type="number" inputmode="numeric" min="1" max="30" required />
+          <input class="input" id="est-beds" name="beds" type="number" inputmode="numeric" min={RESIDENTIAL_INPUT_LIMITS.beds.min} max={RESIDENTIAL_INPUT_LIMITS.beds.max} required />
           <span class="hint">Each bed gets fresh linens and a full reset.</span>
         </div>
         <div class="field-row field-row--2" data-str-only hidden>
@@ -341,10 +325,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <label for="est-linen">Linen / laundry preference</label>
           <select class="select" id="est-linen" name="linenPreference">
             <option value="">Choose one (optional)…</option>
-            <option value="host_provides">We provide fresh linens for each turnover</option>
-            <option value="laundry_on_site">Please wash and dry the used linens on site</option>
-            <option value="laundry_off_site">Please discuss off-site laundry with us</option>
-            <option value="not_sure">Not sure yet — advise us</option>
+            {LINEN_PREFERENCE_OPTIONS.map((option) => (
+              <option value={option.value}>{option.label}</option>
+            ))}
           </select>
           <span class="hint">Hayli confirms the linen plan with you before the first turnover.</span>
         </div>
@@ -357,10 +340,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <label for="est-frequency">How often should we clean?</label>
           <select class="select" id="est-frequency" name="frequency" required>
             <option value="">Choose one…</option>
-            <option value="weekly">Weekly</option>
-            <option value="biweekly">Every two weeks</option>
-            <option value="monthly">Monthly</option>
-            <option value="one_time">One-time</option>
+            {FREQUENCY_OPTIONS.map((option) => (
+              <option value={option.value}>{option.label}</option>
+            ))}
           </select>
           <span class="hint">Recurring homes stay more maintainable, so per-visit value improves.</span>
         </div>
@@ -411,51 +393,35 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         <fieldset class="field" data-group-error="condition" data-group-message="Please choose the home's current condition.">
           <legend>What condition is the home in today?</legend>
           <div class="option-grid">
-            <label class="option">
-              <input type="radio" name="condition" value="maintained" required />
-              <span class="option__control"></span>
-              <span><span class="option__label">Maintained</span><span class="option__desc">Cleaned regularly; generally in good shape.</span></span>
-            </label>
-            <label class="option">
-              <input type="radio" name="condition" value="average" required />
-              <span class="option__control"></span>
-              <span><span class="option__label">Average</span><span class="option__desc">Normal lived-in buildup.</span></span>
-            </label>
-            <label class="option">
-              <input type="radio" name="condition" value="needs_attention" required />
-              <span class="option__control"></span>
-              <span><span class="option__label">Needs attention</span><span class="option__desc">Overdue for a good clean.</span></span>
-            </label>
-            <label class="option">
-              <input type="radio" name="condition" value="heavy" required />
-              <span class="option__control"></span>
-              <span><span class="option__label">Heavy buildup</span><span class="option__desc">A lot of catching up to do.</span></span>
-            </label>
-            <label class="option">
-              <input type="radio" name="condition" value="severe" required />
-              <span class="option__control"></span>
-              <span><span class="option__label">Severe</span><span class="option__desc">Needs an in-person review before pricing.</span></span>
-            </label>
+            {
+              CONDITION_OPTIONS.map((option) => (
+                <label class="option">
+                  <input type="radio" name="condition" value={option.value} required />
+                  <span class="option__control"></span>
+                  <span>
+                    <span class="option__label">{option.label}</span>
+                    <span class="option__desc">{option.description}</span>
+                  </span>
+                </label>
+              ))
+            }
           </div>
         </fieldset>
         <div class="field">
           <label for="est-last-clean">When was the home last professionally cleaned?</label>
           <select class="select" id="est-last-clean" name="lastClean" required>
             <option value="">Choose one…</option>
-            <option value="within_month">Within the last month</option>
-            <option value="one_to_three_months">1–3 months ago</option>
-            <option value="three_to_twelve_months">3–12 months ago</option>
-            <option value="over_a_year">More than a year ago</option>
-            <option value="never_professional">Never professionally cleaned</option>
-            <option value="not_sure">Not sure</option>
+            {LAST_CLEAN_OPTIONS.map((option) => (
+              <option value={option.value}>{option.label}</option>
+            ))}
           </select>
         </div>
         <div class="field">
           <label for="est-pets">Pets in the home</label>
           <select class="select" id="est-pets" name="pets" required>
-            <option value="none">No pets</option>
-            <option value="one">One pet</option>
-            <option value="multiple_shedding">Multiple pets / heavy shedding</option>
+            {PET_OPTIONS.map((option) => (
+              <option value={option.value}>{option.label}</option>
+            ))}
           </select>
         </div>
       </section>
@@ -520,10 +486,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             <label for="est-arrival">Arrival preference</label>
             <select class="select" id="est-arrival" name="arrivalPreference" required>
               <option value="">Choose one…</option>
-              <option value="first-appointment">First appointment of the day (exact time)</option>
-              <option value="morning">Morning window</option>
-              <option value="afternoon">Afternoon window</option>
-              <option value="flexible">Flexible — any reasonable window</option>
+              {ARRIVAL_PREFERENCE_OPTIONS.map((option) => (
+                <option value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
         </div>

@@ -9,6 +9,7 @@ import FaqItem from '../components/FaqItem.astro';
 import Checklist from '../components/Checklist.astro';
 import Reviews from '../components/Reviews.astro';
 import Icon from '../components/Icon.astro';
+import PremiumIcon from '../components/PremiumIcon.astro';
 import { breadcrumbNode } from '../lib/schema';
 import { homepageServicePaths } from '../lib/site';
 import type { ImageMetadata } from 'astro';
@@ -81,7 +82,13 @@ const faqs = data.homeFaqIds.flatMap((id) => {
 const site = Astro.site ?? new URL('https://pending-website-url.invalid');
 const schema = [breadcrumbNode(site, [{ name: 'Home', path: '/' }])];
 
-const communityIcons = ['user', 'shield', 'heart', 'users'] as const;
+const communityIcons = [
+  'seniors',
+  'first-responders',
+  'military-veterans',
+  'disability-support',
+  'other-community',
+] as const;
 ---
 
 <BaseLayout title={data.metaTitle} description={data.metaDescription} schema={schema}>
@@ -196,7 +203,10 @@ const communityIcons = ['user', 'shield', 'heart', 'users'] as const;
         <div class="container">
           <div class="community-support__panel">
             <div class="community-support__copy">
-              <p class="eyebrow">{data.communityBand.eyebrow}</p>
+              <div class="community-support__intro">
+                <PremiumIcon name="community-support" size={5} />
+                <p class="eyebrow">{data.communityBand.eyebrow}</p>
+              </div>
               <h2 id="community-support-heading">{data.communityBand.heading}</h2>
               <p>{data.communityBand.text}</p>
               {data.communityBand.note && <p class="community-support__note">{data.communityBand.note}</p>}
@@ -212,7 +222,7 @@ const communityIcons = ['user', 'shield', 'heart', 'users'] as const;
               {data.communityBand.groups.map((group, index) => (
                 <li class="community-support__item">
                   <span class="community-support__icon">
-                    <Icon name={communityIcons[index] ?? 'users'} size={20} />
+                    <PremiumIcon name={communityIcons[index] ?? 'other-community'} size={3.5} />
                   </span>
                   <div>
                     <strong>{group.title}</strong>

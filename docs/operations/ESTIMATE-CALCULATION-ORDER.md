@@ -43,7 +43,7 @@ silently changed.
 
 ## Where to change values
 
-- `src/config/owner-pricing.ts` — global factor, discount percentages, rates and minimums.
+- `src/config/estimators/pricing-values.ts` — global factor, discount percentages, rates and minimums.
 - `src/config/pricing.ts` — typed config and approval notes.
 - Bump the relevant `configVersion` when a price-affecting value changes.
 - Rebuild/deploy for the change to take effect. The server uses the same configuration, so a

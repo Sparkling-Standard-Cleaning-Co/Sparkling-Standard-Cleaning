@@ -18,7 +18,7 @@ import {
 import { calculateEstimate, type EstimateContext } from '../src/lib/estimate/calculate.ts';
 import { selectInstantAmount } from '../src/lib/estimate/quote.ts';
 import { pricing } from '../src/config/pricing.ts';
-import { travelConfig } from '../src/config/travel.ts';
+import { travelConfig } from '../src/config/estimators/travel.ts';
 import type { EstimateInput } from '../src/lib/estimate/types.ts';
 
 const ORIGIN = '30.6100,-87.3400';

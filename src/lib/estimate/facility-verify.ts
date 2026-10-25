@@ -12,7 +12,7 @@
 // strips any client-supplied facility price fields before the owner notification.
 
 import { pricing } from '../../config/pricing.ts';
-import { commercialTierConfig } from '../../config/commercial-tiers.ts';
+import { commercialTierConfig } from '../../config/estimators/commercial.ts';
 import {
   calculateFacilityPrice,
   calculateFacilityWorkload,

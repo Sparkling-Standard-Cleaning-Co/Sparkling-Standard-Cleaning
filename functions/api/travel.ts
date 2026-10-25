@@ -37,7 +37,7 @@ interface Env {
 
 import { zoneForZip } from '../../src/config/geography.ts';
 import { zipReference } from '../../src/config/geography.ts';
-import { travelConfig } from '../../src/config/travel.ts';
+import { travelConfig } from '../../src/config/estimators/travel.ts';
 import {
   configuredReferenceGasPrice,
   gulfCoastGasPrice,

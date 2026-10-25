@@ -14,7 +14,7 @@ import {
 import { taxPresentationForService } from '../src/lib/estimate/tax.ts';
 import { formatUsd } from '../src/lib/format.ts';
 import { pricing, resolveGlobalEstimateFactor } from '../src/config/pricing.ts';
-import { ownerPricing } from '../src/config/owner-pricing.ts';
+import { ownerPricing } from '../src/config/estimators/pricing-values.ts';
 import type { EstimateInput } from '../src/lib/estimate/types.ts';
 
 function context(overrides: Partial<EstimateContext> = {}): EstimateContext {

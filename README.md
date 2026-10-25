@@ -5,6 +5,8 @@ Standard LLC), an owner-operated residential and commercial cleaning company bas
 Cantonment and serving Pensacola, surrounding communities within about an hour of Cantonment, and
 select nearby areas into Alabama.
 
+**Owner front door:** [START HERE — OWNER CONTROL CENTER](START-HERE-OWNER-CONTROL-CENTER.md) · [Owner Operations Manual](docs/OWNER-OPERATIONS-MANUAL.md) · [Estimator Control Center](docs/ESTIMATOR-CONTROL-CENTER.md).
+
 This is **not** a brochure site. It is the beginning of a full operating loop:
 
 ```

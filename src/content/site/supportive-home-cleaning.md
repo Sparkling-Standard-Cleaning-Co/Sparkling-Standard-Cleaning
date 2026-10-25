@@ -28,6 +28,8 @@ sections:
         text: For veterans and their households, with our thanks for your service.
       - title: People with disabilities
         text: For households where a disability or mobility limitation makes cleaning harder to manage.
+      - title: Other eligible community members
+        text: If circumstances in your household make cleaning harder to manage, tell us — eligibility and any discount are confirmed personally.
   - eyebrow: What is included
     heading: Ordinary residential cleaning, within an agreed scope
     lead: >-

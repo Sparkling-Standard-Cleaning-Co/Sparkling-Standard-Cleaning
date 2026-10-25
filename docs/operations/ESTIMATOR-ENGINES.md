@@ -44,7 +44,7 @@ query intact. There is ONE submission pipeline
 
 - Location finder: `src/scripts/address-finder.ts` (GPS, manual entry,
   autocomplete, map-pin confirmation, approximate ZIP fallback).
-- Travel: `src/lib/travel/`, `src/config/travel.ts`, `/api/travel`; the private
+- Travel: `src/lib/travel/`, `src/config/estimators/travel.ts`, `/api/travel`; the private
   operating origin is server-only and never exposed.
 - Validation and pricing: `src/lib/estimate/` (`validation.ts`, `calculate.ts`,
   `quote.ts`, `verify.ts`), with server recalc in `functions/api/lead.ts`.
@@ -77,9 +77,9 @@ query intact. There is ONE submission pipeline
 `src/lib/estimate/commercial.ts` implements a facility workload model:
 setup + cleanable area + restroom fixtures + breakroom, adjusted by flooring,
 condition, traffic and first-clean factors. It reuses the baseline constants in
-`src/config/owner-pricing.ts` (`commercialPricing`) and the workload-hour tier
+`src/config/estimators/pricing-values.ts` (`commercialPricing`) and the workload-hour tier
 boundaries in `src/config/pricing.ts` (`tierAHours` / `tierBHours`). The legacy
-square-foot thresholds in `src/config/commercial-tiers.ts` are reference only.
+square-foot thresholds in `src/config/estimators/commercial.ts` are reference only.
 
 **Numeric commercial pricing is enabled for Tier A/B** as nonbinding
 preliminary estimates. Tier C (larger, specialty, high-fixture or high-risk)
@@ -182,16 +182,16 @@ fee and no invented availability.
 ## 9. Owner controls
 
 - **Prices, labour model, travel, church discount, Supportive Home discount,
-  global estimate factor, facility baseline**: `src/config/owner-pricing.ts`
+  global estimate factor, facility baseline**: `src/config/estimators/pricing-values.ts`
   (typed state in `src/config/pricing.ts`). Values outside the supported
   `0.50–1.50` global-factor range fail closed to `1.00`.
 - **Facility numeric pricing kill switch**:
-  `src/config/commercial-tiers.ts` (`numericEstimatesEnabled`). FALSE returns
+  `src/config/estimators/commercial.ts` (`numericEstimatesEnabled`). FALSE returns
   every commercial/church request to a scope review with no numeric prices in
   the UI, request, owner notification or server verification. Enforced in
   `src/lib/estimate/commercial.ts` and `src/lib/estimate/facility-verify.ts`.
 - **Facility rate and workload constants**:
-  `src/config/owner-pricing.ts` (`commercialPricing`) with typed state in
+  `src/config/estimators/pricing-values.ts` (`commercialPricing`) with typed state in
   `src/config/pricing.ts`.
 - **Engine definitions/CTAs**: `src/lib/estimate/engines.ts`.
 - **Calibration**: `npm run commercial:calibration` (hypothetical scenarios;

@@ -3,14 +3,14 @@ import { business } from '../config/business';
 import PremiumIcon from './PremiumIcon.astro';
 
 // The owner's four-value trust banner. Headings and icons are owner-specified
-// (premium vector collection, 2026-10-24) — never substitute different
-// headings, icons or interpretations:
-//   Locally Owned          — premium tile artwork
-//   Flexible Scheduling    — premium tile artwork
-//   Christian Values       — premium cross tile + two KJV New Testament
-//                            excerpts (owner-supplied verbatim, 2026-10-24)
-//   Competitive Pricing    — WIDE premium tile: four dollar signs, ONE filled
-//                            and three outlined, with the owner's exact copy.
+// (white-tile collection, 2026-10-25) — never substitute different headings,
+// icons or interpretations:
+//   Locally Owned          — white-tile house + location marker
+//   Flexible Scheduling    — white-tile calendar + clock
+//   Christian Values       — white-tile gold cross + heart, with two KJV New
+//                            Testament excerpts (owner-supplied verbatim)
+//   Competitive Pricing    — exact four-dollar-sign tile: first filled gold,
+//                            remaining three outlined, with the exact copy.
 
 interface Verse {
   quote: string;
@@ -32,7 +32,7 @@ const CHRISTIAN_VALUES_VERSES: Verse[] = [
 <div class="trust-strip">
   <div class="container trust-strip__grid">
     <div class="trust-item">
-      <PremiumIcon name="locally-owned" size={3} />
+      <PremiumIcon name="locally-owned" size={4} />
       <div>
         <p class="trust-item__title">Locally Owned</p>
         <p class="trust-item__text">Proudly rooted in Pensacola — our customers are our neighbors.</p>
@@ -40,7 +40,7 @@ const CHRISTIAN_VALUES_VERSES: Verse[] = [
     </div>
 
     <div class="trust-item">
-      <PremiumIcon name="flexible-scheduling" size={3} />
+      <PremiumIcon name="flexible-scheduling" size={4} />
       <div>
         <p class="trust-item__title">Flexible Scheduling</p>
         <p class="trust-item__text">
@@ -50,7 +50,7 @@ const CHRISTIAN_VALUES_VERSES: Verse[] = [
     </div>
 
     <div class="trust-item">
-      <PremiumIcon name="christian-values" size={3} />
+      <PremiumIcon name="christian-values" size={4} />
       <div>
         <p class="trust-item__title">Christian Values</p>
         <ul class="trust-item__verses">
@@ -67,7 +67,7 @@ const CHRISTIAN_VALUES_VERSES: Verse[] = [
     </div>
 
     <div class="trust-item trust-item--pricing">
-      <PremiumIcon name="competitive-pricing" size={4.4} />
+      <PremiumIcon name="competitive-pricing" size={4.2} />
       <div>
         <p class="trust-item__title">Competitive Pricing</p>
         <p class="trust-item__text">Quality service at an affordable price</p>

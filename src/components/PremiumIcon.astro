@@ -1,63 +1,84 @@
 ---
-// PremiumIcon — renders the OWNER-SUPPLIED premium vector icon collection
-// (Sparkling Standard Premium Icon Collection, provided 2026-10-24) as real
-// inline SVG artwork. The tiles carry their own rose/ivory gradient
-// backgrounds, drop shadows and gold accents — they are used verbatim and
-// never redrawn. Because the tiles are self-contained, the surrounding
-// component must NOT add a second colored background (no gradient chip
-// inside a gradient tile).
+// White-tile premium icon collection (owner-supplied 2026-10-25).
+// The 17 raster tiles are used verbatim; never recolour, crop or replace the
+// white tile background. PNG masters live in the local master asset archive;
+// the WebP files here are the optimized web renditions.
 //
-// Source assets: src/assets/icons/premium/*.svg (real SVG files, the
-// authoritative copies). This component is the ONE icon registry for the
-// premium collection — do not add parallel registries or approximate the
-// artwork with stock icons.
+// The full semantic registry lives in src/lib/premium-icons.ts. Adjacent text
+// already names each concept in every current placement, so icons are
+// decorative by default. Pass `label` only when the icon alone carries meaning.
 
-import locallyOwned from '../assets/icons/premium/v2-locally-owned.svg?raw';
-import flexibleScheduling from '../assets/icons/premium/v2-flexible-scheduling.svg?raw';
-import christianValues from '../assets/icons/premium/v2-christian-values.svg?raw';
-import competitivePricingWide from '../assets/icons/premium/v2-competitive-pricing-wide.svg?raw';
-import recurringResidential from '../assets/icons/premium/v2-recurring-residential.svg?raw';
-import deepCleaning from '../assets/icons/premium/v2-deep-cleaning.svg?raw';
-import moveInOut from '../assets/icons/premium/v2-move-in-move-out.svg?raw';
-import shortTermRental from '../assets/icons/premium/v2-short-term-rental.svg?raw';
-import commercialCleaning from '../assets/icons/premium/v2-commercial-cleaning.svg?raw';
-import churchCleaning from '../assets/icons/premium/v2-church-cleaning.svg?raw';
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
 import type { PremiumIconName } from '../lib/premium-icons.ts';
 
-const ART: Record<PremiumIconName, { svg: string }> = {
-  'locally-owned': { svg: locallyOwned },
-  'flexible-scheduling': { svg: flexibleScheduling },
-  'christian-values': { svg: christianValues },
-  // The owner-recommended WIDE treatment keeps all four dollar signs
-  // individually readable at card size.
-  'competitive-pricing': { svg: competitivePricingWide },
-  'recurring-residential': { svg: recurringResidential },
-  'deep-cleaning': { svg: deepCleaning },
-  'move-in-move-out': { svg: moveInOut },
-  'short-term-rental': { svg: shortTermRental },
-  'commercial-cleaning': { svg: commercialCleaning },
-  'church-cleaning': { svg: churchCleaning },
+import residentialCleaning from '../assets/icons/white-tile/01_residential-cleaning.webp';
+import deepCleaning from '../assets/icons/white-tile/02_deep-cleaning.webp';
+import moveInMoveOut from '../assets/icons/white-tile/03_move-in-move-out.webp';
+import strTurnover from '../assets/icons/white-tile/04_str-turnover.webp';
+import commercialCleaning from '../assets/icons/white-tile/05_commercial-cleaning.webp';
+import churchCleaning from '../assets/icons/white-tile/06_church-cleaning.webp';
+import communitySupport from '../assets/icons/white-tile/07_community-support.webp';
+import readReviews from '../assets/icons/white-tile/08_read-reviews.webp';
+import locallyOwned from '../assets/icons/white-tile/09_locally-owned.webp';
+import christianValues from '../assets/icons/white-tile/10_christian-values.webp';
+import flexibleScheduling from '../assets/icons/white-tile/11_flexible-scheduling.webp';
+import competitivePricing from '../assets/icons/white-tile/12_competitive-pricing.webp';
+import seniors from '../assets/icons/white-tile/13_seniors.webp';
+import firstResponders from '../assets/icons/white-tile/14_first-responders.webp';
+import militaryVeterans from '../assets/icons/white-tile/15_military-veterans.webp';
+import disabilitySupport from '../assets/icons/white-tile/16_disability-support.webp';
+import otherCommunity from '../assets/icons/white-tile/17_other-community.webp';
+
+const ART: Record<PremiumIconName, ImageMetadata> = {
+  'recurring-residential': residentialCleaning,
+  'deep-cleaning': deepCleaning,
+  'move-in-move-out': moveInMoveOut,
+  'short-term-rental': strTurnover,
+  'commercial-cleaning': commercialCleaning,
+  'church-cleaning': churchCleaning,
+  'community-support': communitySupport,
+  'read-reviews': readReviews,
+  'locally-owned': locallyOwned,
+  'christian-values': christianValues,
+  'flexible-scheduling': flexibleScheduling,
+  'competitive-pricing': competitivePricing,
+  seniors,
+  'first-responders': firstResponders,
+  'military-veterans': militaryVeterans,
+  'disability-support': disabilitySupport,
+  'other-community': otherCommunity,
 };
 
 interface Props {
   name: PremiumIconName;
-  /** Rendered width in CSS rem. The tile's aspect ratio is preserved. */
+  /** Rendered width and height in CSS rem. */
   size?: number;
   /** Extra classes for the wrapper. */
   class?: string;
-  /** Accessible label; omit when a neighboring heading already names it. */
+  /** Accessible label; omit when adjacent text already names the concept. */
   label?: string;
 }
 
-const { name, size = 3, class: className = '', label } = Astro.props;
+const { name, size = 5, class: className = '', label } = Astro.props;
 const art = ART[name];
-const wide = name === 'competitive-pricing';
-const hiddenAttr = label ? '' : ' aria-hidden="true"';
-const roleAttr = label ? ` role="img" aria-label="${label}"` : '';
+const pixels = Math.max(24, Math.round(size * 16));
 ---
 
 <span
-  class:list={['premium-icon', wide && 'premium-icon--wide', className]}
-  style={`width:${size}rem;height:${wide ? size / 2 : size}rem`}
-  set:html={art.svg.replace('<svg ', `<svg class="premium-icon__svg" focusable="false"${roleAttr}${hiddenAttr} `)}
-/>
+  class:list={['premium-icon', className]}
+  style={`width:${size}rem;height:${size}rem;`}
+  aria-hidden={label ? undefined : 'true'}
+>
+  <Image
+    src={art}
+    alt={label ?? ''}
+    width={pixels}
+    height={pixels}
+    widths={[pixels, Math.min(pixels * 2, 384)]}
+    sizes={`${size}rem`}
+    loading="lazy"
+    decoding="async"
+    class="premium-icon__image"
+  />
+</span>

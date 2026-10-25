@@ -16,7 +16,7 @@
 // and are never included in any returned value.
 
 import { pricing } from '../../config/pricing.ts';
-import { travelConfig } from '../../config/travel.ts';
+import { travelConfig } from '../../config/estimators/travel.ts';
 import { zipReference } from '../../config/geography.ts';
 import { calculateEstimate, type EstimateContext } from './calculate.ts';
 import { requiresInitialDeepClean } from './frequency.ts';

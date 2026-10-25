@@ -6,6 +6,7 @@ estimate system, lead handling, analytics, marketing system, deployment and main
 A new developer, marketer or agency should be able to start here and find the authoritative
 source for every system without asking the owner about anything already documented.
 
+- **Owner front door:** `START-HERE-OWNER-CONTROL-CENTER.md` → `docs/OWNER-OPERATIONS-MANUAL.md` → `docs/ESTIMATOR-CONTROL-CENTER.md`
 - Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 - Production domain: `https://sparkling-standard.com` (**live**)
 - Business facts source of truth: `src/config/business.ts`

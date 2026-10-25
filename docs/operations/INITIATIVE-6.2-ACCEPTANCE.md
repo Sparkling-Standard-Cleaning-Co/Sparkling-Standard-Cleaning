@@ -49,7 +49,7 @@ Status vocabulary:
 
 | # | Requested outcome | Correction shipped | Evidence | Status |
 | --- | --- | --- | --- | --- |
-| 19 | One owner-editable global factor | `globalEstimateFactor` in `src/config/owner-pricing.ts`, default `1.00`, supported `0.50–1.50`; invalid values fail closed to `1.00` | `tests/pricing-adjustments.test.ts`, `tests/owner-pricing.test.ts` | Verified |
+| 19 | One owner-editable global factor | `globalEstimateFactor` in `src/config/estimators/pricing-values.ts`, default `1.00`, supported `0.50–1.50`; invalid values fail closed to `1.00` | `tests/pricing-adjustments.test.ts`, `tests/owner-pricing.test.ts` | Verified |
 | 20 | Global factor applies consistently | Applied to the pre-tax service subtotal after the single discount, never to travel or tax; shared by residential, STR, commercial and church | `tests/pricing-adjustments.test.ts`, `tests/facility-verify.test.ts`, `npm run estimate:scenarios` | Verified |
 | 21 | Correct arithmetic order and no hidden round-up | Base/minimum → $5 base rounding → one discount → global factor → travel → cents; no reapplied minimum after discount/factor; factor-below-floor is flagged, not silently changed | `docs/operations/ESTIMATE-CALCULATION-ORDER.md`; unit/browser tests; scenario matrix | Verified |
 | 22 | Tax is disclosed, not invented | Residential/STR host-billed: no sales tax; commercial: `+ applicable tax`; church: `+ applicable tax unless exempt` (DR-14); no numeric rate or amount fabricated | `src/lib/estimate/tax.ts`, `docs/operations/TAX-TREATMENT.md`, `tests/request-summary.test.ts`, browser tax tests | Verified |

@@ -26,7 +26,9 @@ communityBand:
       text: A little extra support for the households that mean so much to us.
     - title: First responders
       text: A thank-you for the neighbors who show up when others need them most.
-    - title: Veterans and people with disabilities
+    - title: Military veterans
+      text: For veterans and their households, with our thanks for your service.
+    - title: People with disabilities
       text: Thoughtful help for households where cleaning can be harder to manage.
     - title: Other eligible community members
       text: Not sure whether you qualify? Reach out and we will confirm it personally.

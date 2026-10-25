@@ -145,7 +145,8 @@ test('the community support spotlight links to the program and is not a seventh 
     const text = normalize((await page.locator('.community-support').innerText()) ?? '');
     assert.match(text, /Seniors and elderly residents/);
     assert.match(text, /First responders/);
-    assert.match(text, /Veterans and people with disabilities/);
+    assert.match(text, /Military veterans/);
+    assert.match(text, /People with disabilities/);
     assert.match(text, /Other eligible community members/);
     assert.doesNotMatch(text, /10%|\$\d/, 'no invented discount percentage or price');
     assert.equal(await page.locator('.community-support .service-card').count(), 0);
@@ -215,6 +216,41 @@ test('the contact form privacy note stays concise and keeps the policy link', as
     assert.doesNotMatch(text, /never for analytics/i);
     assert.match(text, /By sending this message you agree to our privacy policy\./);
     assert.equal(await form.locator('a[href="/privacy/"]').count(), 1);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the GPS helper paragraphs are removed from every estimator form', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  try {
+    for (const path of ['/estimate/residential/', '/estimate/str/', '/estimate/commercial/', '/estimate/church/']) {
+      await page.goto(BASE + path, { waitUntil: 'load' });
+      const body = normalize((await page.textContent('body')) ?? '');
+      assert.doesNotMatch(body, /Best if you are physically at the property/i, `${path} residential helper removed`);
+      assert.doesNotMatch(body, /Only use this if you are physically at the facility/i, `${path} facility helper removed`);
+      assert.equal(await page.locator('[data-address-gps]').count(), 1, `${path} keeps the location button`);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test('the 17-icon system is rendered on the mapped homepage surfaces', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(BASE + '/', { waitUntil: 'load' });
+    assert.equal(await page.locator('.service-card .premium-icon__image').count(), 6, 'six service icons');
+    assert.equal(await page.locator('.trust-item .premium-icon__image').count(), 4, 'four value icons');
+    assert.equal(await page.locator('.community-support__list .premium-icon__image').count(), 5, 'five community group icons');
+    assert.equal(await page.locator('.community-support__intro .premium-icon__image').count(), 1, 'community support icon');
+    assert.equal(await page.locator('.reviews-head__icon .premium-icon__image').count(), 1, 'reviews icon');
+    assert.equal(await page.locator('.premium-icon__svg').count(), 0, 'retired vector icons are gone');
+
+    await page.goto(BASE + '/supportive-home-cleaning/', { waitUntil: 'load' });
+    assert.equal(await page.locator('.supportive-eligibility__icon').count(), 5, 'five eligibility icons');
   } finally {
     await context.close();
   }

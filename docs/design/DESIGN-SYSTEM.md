@@ -83,10 +83,11 @@ alt text.
 Add new names to the union; never inline one-off SVGs. Social glyphs live in
 `SocialIcon.astro` and render only when a real profile URL is configured.
 
-**Service and company-value icons are different:** they use the owner-supplied premium
-vector tile collection (`src/assets/icons/premium/`, rendered by `PremiumIcon.astro`).
-Those tiles carry their own gradient backgrounds — never wrap them in a CSS chip, and
-never substitute stock icons. See `PREMIUM-ICON-REGISTER.md`.
+**Service, value and community icons are different:** they use the owner-supplied
+white-tile collection (`src/assets/icons/white-tile/`, rendered by `PremiumIcon.astro`).
+Those raster tiles carry their own white background and shadow — never wrap them in a CSS
+chip, recolour or crop them, and never substitute stock icons. See
+`docs/design/WHITE-TILE-ICON-INVENTORY.md`.
 
 ## Motion & accessibility
 

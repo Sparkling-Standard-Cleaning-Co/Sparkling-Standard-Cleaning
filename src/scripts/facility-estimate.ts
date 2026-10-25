@@ -4,7 +4,7 @@
 // Tier C scope review; disabled = scope-review only with no numeric fields sent
 // to the server or the owner notification.
 import { business, contactPhone, isPending } from '../config/business';
-import { commercialTierConfig } from '../config/commercial-tiers';
+import { commercialTierConfig } from '../config/estimators/commercial';
 import { pricing } from '../config/pricing';
 import { schedulingConfig } from '../config/scheduling';
 import { taxPresentationForService } from '../lib/estimate/tax';

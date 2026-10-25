@@ -8,7 +8,7 @@
 //  - Every provider failure falls back to a labeled straight-line estimate; a
 //    routing failure must never break an estimate or discard a customer lead.
 
-import { travelConfig } from '../../config/travel.ts';
+import { travelConfig } from '../../config/estimators/travel.ts';
 
 export interface RoutingEnv {
   TRAVEL_ORIGIN?: string;

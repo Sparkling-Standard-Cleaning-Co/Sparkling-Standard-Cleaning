@@ -16,7 +16,7 @@ const { title, summary, href, icon, cta = 'Learn more', featured = false } = Ast
 ---
 
 <article class:list={['card', 'card--link', 'service-card', featured && 'card--feature']}>
-  <PremiumIcon name={icon} size={3} />
+  <PremiumIcon name={icon} size={5} />
   <h3 class="card__title"><a href={href}>{title}</a></h3>
   <p class="card__text">{summary}</p>
   <a class="card__more" href={href}>{cta} <Icon name="arrow-right" size={16} /></a>

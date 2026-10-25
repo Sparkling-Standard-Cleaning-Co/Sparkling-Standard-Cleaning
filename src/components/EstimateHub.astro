@@ -69,7 +69,7 @@ function hrefFor(engine: EstimateEngine): string {
           aria-current={current === engine.id ? 'true' : undefined}
         >
           <span class="estimate-hub__icon">
-            <PremiumIcon name={iconFor[engine.id]} />
+            <PremiumIcon name={iconFor[engine.id]} size={5} />
           </span>
           <span class="estimate-hub__body">
             <span class="estimate-hub__label">{engine.label}</span>

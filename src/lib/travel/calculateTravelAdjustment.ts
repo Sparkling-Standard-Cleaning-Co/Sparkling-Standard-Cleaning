@@ -6,7 +6,7 @@
 // estimate total. Customers are never shown a gas-surcharge line item.
 
 import { zonePolicy } from '../../config/geography.ts';
-import { travelConfig } from '../../config/travel.ts';
+import { travelConfig } from '../../config/estimators/travel.ts';
 import type { ServiceZone, TravelEstimate, RoutedTravelInfo } from '../estimate/types.ts';
 
 export interface TravelCalculationInput {

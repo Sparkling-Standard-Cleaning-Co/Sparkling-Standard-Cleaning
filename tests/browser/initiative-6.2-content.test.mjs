@@ -166,13 +166,13 @@ test('supportive home page explains eligibility and never selects the discount a
   }
 });
 
-test('premium icons render as complete inline artwork on the homepage cards and values', async () => {
+test('white-tile icons render as complete artwork on the homepage cards and values', async () => {
   const { context, page } = await open('/');
   try {
-    const tiles = page.locator('.premium-icon__svg');
+    const tiles = page.locator('.premium-icon__image');
     assert.ok((await tiles.count()) >= 9, 'service and value tiles render');
     const clipped = await page.evaluate(() =>
-      [...document.querySelectorAll('.premium-icon__svg')].some((svg) => {
+      [...document.querySelectorAll('.premium-icon__image')].some((svg) => {
         const box = svg.getBoundingClientRect();
         return box.width < 20 || box.height < 20;
       }),

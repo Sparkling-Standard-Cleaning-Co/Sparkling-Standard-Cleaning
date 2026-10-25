@@ -22,7 +22,7 @@ import type {
   PromotionCustomerKind,
   PromotionEligibility,
   PromotionTerms,
-} from '../../config/owner-pricing.ts';
+} from '../../config/estimators/pricing-values.ts';
 import type { Frequency, PricingServiceType } from '../../config/pricing.ts';
 
 export type PromotionSource = 'addon_incentive' | 'addon_bundle' | 'appreciation' | 'founding' | 'campaign' | 'supportive';

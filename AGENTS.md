@@ -148,15 +148,18 @@ Never publish unapproved promotional promises or activate binding pricing withou
 - **Single sources of truth** (never hard-code these facts elsewhere):
   - `src/config/business.ts` — every business fact, contact channel, socials, launch flags,
     publication flags.
-  - `src/config/pricing.ts` — pricing, labor model, add-ons, promotions, discounts, policies,
-    publication flags (`provisional` / `approved`).
-  - `src/config/travel.ts` — shared client/server travel economics.
+  - `src/config/estimators/pricing-values.ts` — raw owner-editable pricing, labor model, add-ons,
+    promotions, discounts and thresholds.
+  - `src/config/pricing.ts` — typed approval/notes wrapper consumed by the estimator.
+  - `src/config/estimators/input-definitions.ts` — customer input options and validation limits.
+  - `src/config/estimators/commercial.ts` — commercial/church pricing switch and tier triggers.
+  - `src/config/estimators/travel.ts` — shared client/server travel economics.
   - `src/config/geography.ts` — ZIP→zone reference and zone policy (preliminary, not addresses).
   - `src/config/marketing-links.ts` — inbound UTM links and QR assets.
 - **Content collections** (`src/content.config.ts`, Zod-validated): `services` (seven owning
   pages), `faqs`, `checklists` (`public | internal`; internal must never render publicly),
-  `proof` (intentionally empty until genuine material exists), `reviews` (carries the two
-  authentic owner-supplied Google reviews since 2026-10-23 — never fabricate more), `site` (page copy).
+  `proof` (intentionally empty until genuine material exists), `reviews` (carries the three
+  authentic owner-supplied Google reviews since 2026-10-24 — never fabricate more), `site` (page copy).
 - Pages are thin wrappers. The estimator engine lives in `src/lib/estimate/`; travel logic in
   `src/lib/travel/`; address/location logic in `src/lib/location/`. Arithmetic never lives in pages.
 - The estimate flow collects a **confirmed destination**: GPS "Use My Current Location" first, with
@@ -199,13 +202,14 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | System | Source of truth | Detailed docs |
 | --- | --- | --- |
 | Business facts, contact, socials, launch/publication flags | `src/config/business.ts`, `.env` | `docs/launch/OWNER-INPUT-REQUIRED.md` |
-| Pricing, labor model, add-ons, promotions, discounts, global estimate factor, Supportive Home discount | `src/config/owner-pricing.ts` (owner-editable values) + `src/config/pricing.ts` (typed config/flags) | `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/OWNER-SETTINGS-GUIDE.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
-| Travel economics, included miles, zone adjustments | `src/config/travel.ts`, `src/config/geography.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
+| Pricing, labor model, add-ons, promotions, discounts, global estimate factor, Supportive Home discount | `src/config/estimators/pricing-values.ts` (owner-editable values) + `src/config/pricing.ts` (typed config/flags) | `START-HERE-OWNER-CONTROL-CENTER.md`, `docs/ESTIMATOR-CONTROL-CENTER.md`, `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
+| Customer input options, labels and limits | `src/config/estimators/input-definitions.ts` + the two estimator form components | `docs/ESTIMATOR-CONTROL-CENTER.md` |
+| Travel economics, included miles, zone adjustments | `src/config/estimators/travel.ts`, `src/config/geography.ts` | `docs/ESTIMATOR-CONTROL-CENTER.md`, `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Location selection, geocoding, GPS/manual modes | `src/scripts/address-finder.ts`, `src/lib/location/`, `functions/api/geocode.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`, `facility-verify.ts`, `tax.ts`) | `docs/verification/VERIFICATION.md`, `docs/operations/TAX-TREATMENT.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
 | Four estimate engines (residential `/estimate/residential/`, STR `/estimate/str/`, commercial `/estimate/commercial/`, church `/estimate/church/`) + 10% church discount | `src/lib/estimate/engines.ts`, `commercial.ts`, `church-discount.ts`, `src/components/EstimateHub.astro`, `FacilityEstimateForm.astro`, `src/pages/estimate/` | `docs/operations/ESTIMATOR-ENGINES.md` |
-| Commercial/church facility pricing (provisional Tier A/B) + owner kill switch + completed initial calibration | `src/config/commercial-tiers.ts` (`numericEstimatesEnabled`), `src/config/owner-pricing.ts` (`commercialPricing`), `src/lib/estimate/calibration.ts`, `npm run commercial:calibration`, `npm run calibration:report` | `docs/operations/ESTIMATOR-ENGINES.md`, `docs/operations/COMMERCIAL-PRICING-RESEARCH.md`, `docs/operations/FACILITY-CALIBRATION.md` |
-| Promotions, bundles, Founding-10 (all disabled) | `src/lib/estimate/promotions.ts` + `src/config/owner-pricing.ts` | `docs/launch/PROMOTION-PROPOSALS.md` |
+| Commercial/church facility pricing (provisional Tier A/B) + owner kill switch + completed initial calibration | `src/config/estimators/commercial.ts` (`numericEstimatesEnabled`), `src/config/estimators/pricing-values.ts` (`commercialPricing`), `src/lib/estimate/calibration.ts`, `npm run commercial:calibration`, `npm run calibration:report` | `docs/operations/ESTIMATOR-ENGINES.md`, `docs/operations/COMMERCIAL-PRICING-RESEARCH.md`, `docs/operations/FACILITY-CALIBRATION.md` |
+| Promotions, bundles, Founding-10 (all disabled) | `src/lib/estimate/promotions.ts` + `src/config/estimators/pricing-values.ts` | `docs/launch/PROMOTION-PROPOSALS.md` |
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
 | Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` §4a |
 | Reservation window, statuses, ledger | `src/config/scheduling.ts` + `src/scripts/estimate-wizard.ts` | `docs/operations/RESERVATION-TRACKING.md` |
@@ -435,36 +439,29 @@ collections are intentionally empty — not errors.
     enabled as nonbinding provisional estimates for Tier A/B using ISSA-based workloading,
     fixture-based restrooms and a $60/hour gross labour rate. Tier thresholds are workload hours
     (`pricing.commercialPricing.tierAHours` / `tierBHours`); the square-foot values in
-    `src/config/commercial-tiers.ts` are legacy reference only. Tier C remains a personal scope
+    `src/config/estimators/commercial.ts` are legacy reference only. Tier C remains a personal scope
     review. The owner kill switch is `numericEstimatesEnabled` in the same file; it is enforced in
     the browser engine and server verification. The commercial intake form collects cleanable sqft,
     restroom fixtures, flooring, first-clean status, condition and specialty needs — all labeled in
     the owner notification. Research and model analysis:
     `docs/operations/COMMERCIAL-PRICING-RESEARCH.md` and
     `docs/operations/ESTIMATOR-ENGINES.md` (the older
-    `docs/launch/COMMERCIAL-ESTIMATE-MODEL.md` is historical).
+    `docs/archive/launch/COMMERCIAL-ESTIMATE-MODEL-2026-10-24.md` is historical).
   - **Future booking roadmap (documentation only):** docs/operations/BOOKING-ARCHITECTURE.md
     defines the state machine (Estimate → Request Submitted → Owner Approved → Reserved →
     Confirmed → Paid) and the recommended additions. NOTHING is auto-booked and no payment is
     collected.
-- **Premium icon collection (2026-10-24, owner-supplied artwork):** the six service icons
-  and four company-value icons are the owner's premium vector tiles
-  (`src/assets/icons/premium/`, rendered by `src/components/PremiumIcon.astro` with the
-  type registry in `src/lib/premium-icons.ts`). The tiles carry their own rose/ivory
-  gradients, drop shadows and gold accents — **never add a CSS chip/plate background
-  around them (no nested tiles) and never substitute stock or redrawn icons**. The
-  services content `icon` field holds the premium slugs (`recurring-residential`,
-  `deep-cleaning`, `move-in-move-out`, `short-term-rental`, `commercial-cleaning`,
-  `church-cleaning`). Competitive Pricing uses the WIDE recommended asset (four dollar
-  signs, ONE filled, three outlined) with the exact copy "Quality service at an
-  affordable price"; Christian Values carries the three owner-supplied KJV New Testament
-  excerpts (Galatians 5:13, Mark 12:31, Colossians 3:23 — shortened passages marked as
-  excerpts); Locally Owned and Flexible Scheduling keep their approved copy. The trust
-  banner is a 2-column grid from tablet up to give the verses room. Church Cleaning's
-  tile renders on the church page (no sixth homepage card). The estimator's Preferred
-  date helper reads exactly "Requests can be made up to 60 days in advance." (the
-  Hayli-confirmation sentence was removed by owner direction). Registry documentation:
-  `docs/design/PREMIUM-ICON-REGISTER.md`.
+- **White-tile icon collection (2026-10-25, owner-supplied artwork):** the 17 approved
+  white-tile icons replace the earlier vector set. Optimized 384px WebP renditions live in
+  `src/assets/icons/white-tile/`; the 1254px PNG masters are preserved in the local master
+  archive. `PremiumIcon.astro` is the only renderer and `src/lib/premium-icons.ts` the only
+  name registry. The tiles keep their white background, rounded border and soft shadow —
+  **never recolour, crop, stretch or wrap them in another chip/plate**. The six services use
+  01–06; Community Support uses 07; the Reviews heading uses 08; the trust banner uses
+  09–12; the five Supportive Home/community groups use 13–17. Competitive Pricing keeps
+  the exact four-dollar-sign design (first filled gold, three outlined). The small footer review
+  button keeps the simple vector magnifying glass per the owner pack. Church Cleaning is the
+  sixth homepage card. Registry: `docs/design/WHITE-TILE-ICON-INVENTORY.md`.
 - **Authentic reviews live (2026-10-24, Initiative 5.0):** the homepage reviews section is a
   premium layered editorial carousel (`src/components/Reviews.astro`) rendering ONE prominent
   center review with two recessed-but-readable equal-height neighbours; it is progressively
@@ -574,7 +571,7 @@ collections are intentionally empty — not errors.
   classification or Turnstile retry handling from the submission fix.
 - **Founder portrait + representative imagery (2026-10-03):** the About page presents the
   owner-supplied portrait of Hayli (`src/assets/images/hayli-founder.webp`, converted from the
-  owner's `public/Headshot.jpg`) with the visible identification "Hayli, Founder & Owner-Operator"
+  owner's `assets/owner/Headshot.jpg`) with the visible identification "Hayli, Founder & Owner-Operator"
   and natural portrait proportions — genuine owner material, never cropped to a stock ratio and
   not reused on unrelated pages. Licensed stock interiors (Pexels License, no cost) remain on the
   homepage, labeled representative — never presented as our work. Source/licence register:

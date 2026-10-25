@@ -9,8 +9,22 @@
 // scope review; disabled = a professional scope-review experience with no
 // numbers in the UI, request, notification or server verification.
 import { isFormEnabled } from '../config/business';
-import { commercialTierConfig } from '../config/commercial-tiers';
+import { commercialTierConfig } from '../config/estimators/commercial';
 import { pricing } from '../config/pricing';
+import {
+  CHURCH_BREAKROOM_OPTIONS,
+  CHURCH_PARTNERSHIP_OPTIONS,
+  COMMERCIAL_BREAKROOM_OPTIONS,
+  COMMERCIAL_FACILITY_TYPES,
+  FACILITY_CONDITION_OPTIONS,
+  FACILITY_FREQUENCY_OPTIONS,
+  FACILITY_INPUT_LIMITS,
+  FIRST_CLEAN_OPTIONS,
+  FLOORING_OPTIONS,
+  SERVICE_WINDOW_OPTIONS,
+  SPECIALTY_OPTIONS,
+  TRAFFIC_OPTIONS,
+} from '../config/estimators/input-definitions';
 import { schedulingConfig } from '../config/scheduling';
 import { FACILITY_STEPS } from '../lib/estimate/engines';
 import { US_STATES } from '../lib/location/location';
@@ -45,16 +59,6 @@ const facilityStepDescriptions = church
       'Review the preliminary estimate and send your request.',
     ];
 
-const commercialFacilityTypes = [
-  { value: 'office', label: 'Office' },
-  { value: 'professional', label: 'Professional office / suite' },
-  { value: 'retail', label: 'Retail' },
-  { value: 'salon', label: 'Salon / barbershop' },
-  { value: 'gym', label: 'Gym / fitness studio' },
-  { value: 'apartment', label: 'Apartment community / common areas' },
-  { value: 'property-management', label: 'Property management portfolio' },
-  { value: 'small-business', label: 'Other small business facility' },
-];
 ---
 
 <form
@@ -162,10 +166,6 @@ const commercialFacilityTypes = [
         <button type="button" class="btn btn--primary btn--block" data-address-gps>
           <Icon name="map-pin" size={18} /> Use My Current Location
         </button>
-        <p class="hint address-gps__hint">
-          Only use this if you are physically at the facility. The address is shown for confirmation
-          before anything is submitted.
-        </p>
 
         <div class="address-permission" data-address-permission hidden>
           <p class="address-permission__title" data-permission-title>Location access is off.</p>
@@ -266,17 +266,17 @@ const commercialFacilityTypes = [
             </div>
             <div class="field">
               <label for="fac-seats">Sanctuary seating (approx.)</label>
-              <input class="input" id="fac-seats" name="sanctuary_seats" type="number" min="0" max="5000" inputmode="numeric" placeholder="e.g. 250" />
+              <input class="input" id="fac-seats" name="sanctuary_seats" type="number" min={FACILITY_INPUT_LIMITS.sanctuarySeats.min} max={FACILITY_INPUT_LIMITS.sanctuarySeats.max} inputmode="numeric" placeholder="e.g. 250" />
             </div>
           </div>
           <div class="field-row field-row--3">
             <div class="field">
               <label for="fac-restrooms">Restroom fixtures (toilets, urinals, sinks)</label>
-              <input class="input" id="fac-restrooms" name="restroom_fixtures" type="number" min="0" max="60" inputmode="numeric" placeholder="e.g. 8" required />
+              <input class="input" id="fac-restrooms" name="restroom_fixtures" type="number" min={FACILITY_INPUT_LIMITS.restroomFixtures.min} max={FACILITY_INPUT_LIMITS.restroomFixtures.max} inputmode="numeric" placeholder="e.g. 8" required />
             </div>
             <div class="field">
               <label for="fac-classrooms">Classrooms</label>
-              <input class="input" id="fac-classrooms" name="classroom_count" type="number" min="0" max="60" inputmode="numeric" placeholder="e.g. 6" />
+              <input class="input" id="fac-classrooms" name="classroom_count" type="number" min={FACILITY_INPUT_LIMITS.restroomFixtures.min} max={FACILITY_INPUT_LIMITS.restroomFixtures.max} inputmode="numeric" placeholder="e.g. 6" />
             </div>
             <div class="field">
               <label for="fac-nursery">Nursery / children's spaces?</label>
@@ -290,9 +290,9 @@ const commercialFacilityTypes = [
             <div class="field">
               <label for="fac-kitchen">Kitchen / fellowship hall?</label>
               <select class="select" id="fac-kitchen" name="breakroom">
-                <option value="none">No kitchen or fellowship hall</option>
-                <option value="breakroom">Fellowship hall / small kitchen</option>
-                <option value="kitchen">Full kitchen</option>
+                {CHURCH_BREAKROOM_OPTIONS.map((option) => (
+                  <option value={option.value}>{option.label}</option>
+                ))}
               </select>
             </div>
             <div class="field">
@@ -308,7 +308,7 @@ const commercialFacilityTypes = [
               <label for="fac-type">Facility type</label>
               <select class="select" id="fac-type" name="facility_type" required>
                 <option value="">Choose the closest match…</option>
-                {commercialFacilityTypes.map((type) => (<option value={type.value}>{type.label}</option>))}
+                {COMMERCIAL_FACILITY_TYPES.map((type) => (<option value={type.value}>{type.label}</option>))}
               </select>
             </div>
             <div class="field">
@@ -320,18 +320,18 @@ const commercialFacilityTypes = [
           <div class="field-row field-row--3">
             <div class="field">
               <label for="fac-restrooms">Restroom fixtures (toilets, urinals, sinks)</label>
-              <input class="input" id="fac-restrooms" name="restroom_fixtures" type="number" min="0" max="60" inputmode="numeric" placeholder="e.g. 6" required />
+              <input class="input" id="fac-restrooms" name="restroom_fixtures" type="number" min={FACILITY_INPUT_LIMITS.restroomFixtures.min} max={FACILITY_INPUT_LIMITS.restroomFixtures.max} inputmode="numeric" placeholder="e.g. 6" required />
             </div>
             <div class="field">
               <label for="fac-workstations">Workstations / offices</label>
-              <input class="input" id="fac-workstations" name="workstations" type="number" min="0" max="500" inputmode="numeric" placeholder="Optional" />
+              <input class="input" id="fac-workstations" name="workstations" type="number" min={FACILITY_INPUT_LIMITS.workstations.min} max={FACILITY_INPUT_LIMITS.workstations.max} inputmode="numeric" placeholder="Optional" />
             </div>
             <div class="field">
               <label for="fac-breakroom">Kitchen or breakroom?</label>
               <select class="select" id="fac-breakroom" name="breakroom">
-                <option value="none">No kitchen or breakroom</option>
-                <option value="breakroom">Small breakroom</option>
-                <option value="kitchen">Full kitchen</option>
+                {COMMERCIAL_BREAKROOM_OPTIONS.map((option) => (
+                  <option value={option.value}>{option.label}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -339,20 +339,18 @@ const commercialFacilityTypes = [
             <div class="field">
               <label for="fac-traffic">Average traffic</label>
               <select class="select" id="fac-traffic" name="traffic">
-                <option value="average">Ordinary</option>
-                <option value="low">Light</option>
-                <option value="high">High / customer-facing</option>
+                {TRAFFIC_OPTIONS.map((option) => (
+                  <option value={option.value}>{option.label}</option>
+                ))}
               </select>
             </div>
             <div class="field">
               <label for="fac-specialty">Specialty needs (optional)</label>
               <select class="select" id="fac-specialty" name="specialty_services">
                 <option value="">None</option>
-                <option value="post_construction">Post-construction cleanup</option>
-                <option value="floor_resurfacing">Floor stripping / resurfacing</option>
-                <option value="industrial_kitchen">Commercial kitchen deep clean</option>
-                <option value="high_rise">Multi-floor / elevator building</option>
-                <option value="other">Other — describe in notes</option>
+                {SPECIALTY_OPTIONS.map((option) => (
+                  <option value={option.value}>{option.label}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -364,22 +362,18 @@ const commercialFacilityTypes = [
       <div class="field">
         <label for="fac-condition">Current condition</label>
         <select class="select" id="fac-condition" name="condition">
-          <option value="maintained">Maintained — cleaned regularly</option>
-          <option value="average" selected>Average — normal use</option>
-          <option value="needs_attention">Needs attention</option>
-          <option value="heavy">Heavy buildup</option>
+          {FACILITY_CONDITION_OPTIONS.map((option) => (
+            <option value={option.value} selected={option.value === 'average'}>{option.label}</option>
+          ))}
         </select>
       </div>
       <div class="field">
         <label for="fac-frequency">Desired cleaning frequency</label>
         <select class="select" id="fac-frequency" name="frequency" required>
           <option value="">Choose one…</option>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="biweekly">Every two weeks</option>
-          <option value="monthly">Monthly</option>
-          <option value="one-time">One-time / project</option>
-          <option value="not-sure">Not sure yet — advise us</option>
+          {FACILITY_FREQUENCY_OPTIONS.map((option) => (
+            <option value={option.value}>{option.label}</option>
+          ))}
         </select>
       </div>
     </div>
@@ -387,16 +381,17 @@ const commercialFacilityTypes = [
       <div class="field">
         <label for="fac-flooring">Dominant flooring</label>
         <select class="select" id="fac-flooring" name="flooring">
-          <option value="mixed" selected>Mixed carpet and hard floors</option>
-          <option value="carpet">Mostly carpet</option>
-          <option value="hard">Mostly hard floors</option>
+          {FLOORING_OPTIONS.map((option) => (
+            <option value={option.value} selected={option.value === 'mixed'}>{option.label}</option>
+          ))}
         </select>
       </div>
       <div class="field">
         <label for="fac-first-clean">Is this an initial detail clean?</label>
         <select class="select" id="fac-first-clean" name="first_clean">
-          <option value="no" selected>No — routine maintenance clean</option>
-          <option value="yes">Yes — first clean / overdue detail reset</option>
+          {FIRST_CLEAN_OPTIONS.map((option) => (
+            <option value={option.value} selected={option.value === 'no'}>{option.label}</option>
+          ))}
         </select>
       </div>
     </div>
@@ -425,11 +420,9 @@ const commercialFacilityTypes = [
         <label for="fac-window">Service window</label>
         <select class="select" id="fac-window" name="time_preference" required>
           <option value="">When should we clean?</option>
-          <option value="early-morning">Early morning (from 7:00 a.m.)</option>
-          <option value="daytime">Daytime</option>
-          <option value="evening">Evening (until 7:00 p.m.)</option>
-          <option value="after-hours">After hours (discuss access)</option>
-          <option value="flexible">Flexible / discuss</option>
+          {SERVICE_WINDOW_OPTIONS.map((option) => (
+            <option value={option.value}>{option.label}</option>
+          ))}
         </select>
       </div>
     </div>
@@ -478,31 +471,13 @@ const commercialFacilityTypes = [
               support one another's work. Nothing here affects your estimate or discount.
             </p>
             <div class="option-grid option-grid--2">
-              <label class="option">
-                <input type="checkbox" name="partnership_volunteering" value="yes" />
-                <span class="option__control"></span>
-                <span><span class="option__label">Open to discussing community volunteering</span></span>
-              </label>
-              <label class="option">
-                <input type="checkbox" name="partnership_initiatives" value="yes" />
-                <span class="option__control"></span>
-                <span><span class="option__label">Explore future community initiatives together</span></span>
-              </label>
-              <label class="option">
-                <input type="checkbox" name="partnership_congregation" value="yes" />
-                <span class="option__control"></span>
-                <span><span class="option__label">Discuss introducing Sparkling Standard to our congregation</span></span>
-              </label>
-              <label class="option">
-                <input type="checkbox" name="partnership_contact" value="yes" />
-                <span class="option__control"></span>
-                <span><span class="option__label">Please contact us about potential partnerships</span></span>
-              </label>
-              <label class="option">
-                <input type="checkbox" name="partnership_none" value="yes" />
-                <span class="option__control"></span>
-                <span><span class="option__label">Not at this time</span></span>
-              </label>
+              {CHURCH_PARTNERSHIP_OPTIONS.map((option) => (
+                <label class="option">
+                  <input type="checkbox" name={option.value} value="yes" />
+                  <span class="option__control"></span>
+                  <span><span class="option__label">{option.label}</span></span>
+                </label>
+              ))}
             </div>
           </div>
         </div>

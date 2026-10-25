@@ -92,7 +92,7 @@ fails, tell the customer honestly and price the job without the discount. When b
 honor the $100 off the first clean exactly as quoted and note `SPARKLE100 redeemed` plus the
 date on the ledger row. Never stack it with another promotion; never apply it retroactively;
 never apply it to commercial/STR/one-time work. If the campaign is ever retracted, set
-`enabled: false` in `src/config/owner-pricing.ts` — the site, verification and print builds
+`enabled: false` in `src/config/estimators/pricing-values.ts` — the site, verification and print builds
 all fail closed automatically.
 
 ## 6. Gift-certificate redemption inside a reservation

@@ -129,7 +129,7 @@ the customer the larger effective reduction.
 ## Activation checklist (per program)
 
 - [ ] Owner approves exact written terms (value, cap, eligibility, expiry).
-- [ ] Terms recorded in `src/config/owner-pricing.ts`; `enabled: true` set in the same change.
+- [ ] Terms recorded in `src/config/estimators/pricing-values.ts`; `enabled: true` set in the same change.
 - [ ] `pricing.instantQuote.configVersion` bumped.
 - [ ] `npm run promotions:impact` reviewed; floors verified for representative homes.
 - [ ] Customer-facing copy reviewed (no guarantees, no “limited slots” claims).

@@ -13,6 +13,7 @@
 import { getCollection } from 'astro:content';
 import GoogleG from './GoogleG.astro';
 import Icon from './Icon.astro';
+import PremiumIcon from './PremiumIcon.astro';
 import { business, isPending } from '../config/business';
 
 interface Props {
@@ -41,6 +42,9 @@ const paragraphsOf = (quote: string): string[] =>
     <section class="section section--alt" id="reviews" aria-labelledby="reviews-heading">
       <div class="container">
         <div class="section-head section-head--center reviews-head">
+          <div class="reviews-head__icon">
+            <PremiumIcon name="read-reviews" size={4.5} />
+          </div>
           <p class="eyebrow">{eyebrow}</p>
           <h2 id="reviews-heading">{heading}</h2>
         </div>

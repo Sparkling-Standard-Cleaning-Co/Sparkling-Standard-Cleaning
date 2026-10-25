@@ -10,7 +10,7 @@
 
 import { pricing, resolveGlobalEstimateFactor } from '../../config/pricing.ts';
 import { zoneForZip } from '../../config/geography.ts';
-import type { AddonBundleDefinition, CampaignPromotionConfig, FoundingTenConfig, PromotionCustomerKind, PromotionTerms } from '../../config/owner-pricing.ts';
+import type { AddonBundleDefinition, CampaignPromotionConfig, FoundingTenConfig, PromotionCustomerKind, PromotionTerms } from '../../config/estimators/pricing-values.ts';
 import { calculateTravelAdjustment } from '../travel/calculateTravelAdjustment.ts';
 import { resolveAddonCharge, selectAddons } from './addons.ts';
 import { computeLaborHours } from './labor.ts';

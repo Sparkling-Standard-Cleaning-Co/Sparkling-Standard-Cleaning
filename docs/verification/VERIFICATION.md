@@ -342,7 +342,7 @@ Screenshots (kept outside the repository): `%TEMP%\opencode\social-redesign-shot
 
 ## Verified — founder portrait on the About page (2026-10-03)
 
-The owner supplied a professional portrait (`public/Headshot.jpg`) and requested it be displayed
+The owner supplied a professional portrait (`assets/owner/Headshot.jpg`) and requested it be displayed
 prominently on `/about/`. It was converted to `src/assets/images/hayli-founder.webp`
 (1164 × 1351, 42.9 KB, metadata stripped) for Astro's image pipeline and replaces the
 representative cleaning photograph beside the founder narrative.
