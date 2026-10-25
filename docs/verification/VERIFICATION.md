@@ -3,6 +3,47 @@
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
+## Verified — 2026-10-25 audit-correction production deployment
+
+**Live branch/commit:** `main` at `13fa860` (preceded by `3abf2a9`). **Cloudflare Pages
+deployment:** `29c28a52-9669-43e5-9f65-72890d4cc4e8`. GitHub `validate`, `browser` and Cloudflare
+Pages checks completed successfully. Documentation closeout follows this code release.
+
+The release adds the sixth core service card (Church Cleaning), the Community Support spotlight,
+centered Google-gold review stars with bottom-anchored names, the footer magnifying-glass icon and
+the concise contact privacy note. Pricing, estimator mathematics, R2 photo storage and Resend
+attachment delivery were not changed.
+
+### Predeployment verification
+
+| Check | Command | Result |
+| --- | --- | --- |
+| TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints (139 files) |
+| Production build | `npm run build` | 26 pages + sitemap; only the expected empty `proof` notice and lazy MapLibre chunk-size warning |
+| Unit suite | `npm test` | **489 tests: 488 passed, 1 skipped, 0 failed** |
+| Browser regression suite | `npm run test:browser` | **129 passed, 0 failed** |
+| Static validation | `npm run verify` | 1,675 internal links across 26 pages; SEO, homepage copy, marketing/QR, GTM and checklist-leak checks passed |
+| Smoke test | `npm run smoke` | 21 required pages passed |
+| PENDING-fact gate | `npm run pending` | no PENDING placeholders across 30 built files |
+| Fake-testimonial gate | `npm run testimonials` | passed |
+| No-fabrication audit | `npm run audit:facts` | no unsupported factual claims |
+| Visual evidence | `docs/verification/6.2/audit-2026-10-25` | 12 Chromium captures at 1440, 1024, 820 and 390 px |
+
+### Production live verification
+
+| Check | Result |
+| --- | --- |
+| Cloudflare deployment | `29c28a52-9669-43e5-9f65-72890d4cc4e8` — successful |
+| Homepage | HTTP 200; **six service cards**, Church card with representative photo and `/church-cleaning/` CTA |
+| Community Support | Heading, four eligibility groups and `/supportive-home-cleaning/` CTA present on desktop and phone; no page or panel overflow at 390 px |
+| Review cards | Three authentic reviews; stars computed as Google gold `rgb(251, 188, 4)`; names first-name only |
+| Footer | Read Our Reviews renders the search/magnifying-glass icon; Leave Us a Review unchanged |
+| Contact | The analytics sentence is absent; “By sending this message you agree to our privacy policy.” and the policy link remain |
+| Church page | `/church-cleaning/` HTTP 200 with the expected title and heading |
+| Photo upload | `GET /api/photo-upload` returns `200` with `enabled:true`, 6 photos, 8 MiB each, 32 MiB total |
+| Live reachability | `node scripts/live-check.mjs https://sparkling-standard.com` passed with 0 warnings |
+| Owner photo inbox | **Owner-confirmed**: actual customer-photo attachments reach the business inbox (2026-10-25) |
+
 ## Verified — 2026-10-25 Initiative 6.2 production deployment
 
 **Live branch/commit:** `main` at `e635d7f` (fast-forwarded from `af46db4`; previous 6.2 commits
@@ -38,14 +79,14 @@ completed successfully.
 | Live engine pages | `/estimate/`, `/estimate/residential/`, `/estimate/str/`, `/estimate/commercial/`, `/estimate/church/` all returned 200 with initialized forms and no page errors |
 | Live pricing | Commercial 2,000 sqft = **$125.00**; Church 4,000 sqft = **$130.50** (10% exact) |
 | Live reachability | `node scripts/live-check.mjs https://sparkling-standard.com` passed with 0 warnings; travel configured and lead function validating |
-| Owner inbox attachments | **Not independently confirmed**; owner must confirm actual inbox receipt and downloadable images |
+| Owner inbox attachments | **Owner-confirmed 2026-10-25** — actual customer-photo attachments reached the business inbox |
 
 **Known residuals:** GTM Version 5 is owner-reported; live receipt of the church/promotion events
-is not yet fully proven. The owner still needs to confirm inbox receipt of the production Resend
-attachment email(s); provider acceptance is not inbox delivery. R2 signed-link retrieval in
-production was not independently tested because the owner token is not available locally (the
-email links and local signed-link tests were generated/successful). Commercial/church pricing is
-initial-calibrated; actual job hours remain a quality check.
+is not yet fully proven. The owner confirmed actual customer-photo attachments reach the business
+inbox (2026-10-25). R2 signed-link retrieval in production was not independently tested because the
+owner token is not available locally (the email links and local signed-link tests were
+generated/successful). Commercial/church pricing is initial-calibrated; actual job hours remain a
+quality check.
 
 ## Verified - 2026-10-21 owner-decision implementation
 

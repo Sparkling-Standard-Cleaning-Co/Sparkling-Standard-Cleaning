@@ -4,20 +4,22 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-25** (Initiative 6.2 deployed and live-verified; R2/photo intake enabled).
+Last reviewed: **2026-10-25** (audit-correction release deployed and live-verified; R2/photo intake enabled and owner-confirmed).
 
-**Release status:** production serves GitHub `main`; the **Initiative 6.2 complete-experience
-release is live at `e635d7f`**, deployed to Cloudflare Pages on 2026-10-25 (deployment
-`877a241a-863b-423b-875b-1284182dcd39`). Live checks passed for the four estimate engines,
-commercial/church preliminary pricing, travel/geocode, form rendering, SEO, consent and the public
-marketing pages. The earlier 6.1 release at `af46db4` and the 2026-10-03 set at `62a1a46` are
-historical.
+**Release status:** production serves GitHub `main`; the **2026-10-25 audit-correction release is
+live at `13fa860`**, deployed to Cloudflare Pages on 2026-10-25 (deployment
+`29c28a52-9669-43e5-9f65-72890d4cc4e8`). It adds the sixth Church Cleaning card, the Supportive Home
+spotlight, centered Google-gold review stars, the footer search icon and the concise contact
+privacy note. Live checks passed for the homepage, church page, contact copy, six service cards,
+reviews, photo upload availability and the four estimate engines. The prior Initiative 6.2 release
+at `e635d7f` and the earlier 6.1 release at `af46db4` are historical.
 
 **Customer photos are live:** production `/api/photo-upload` reports `enabled:true`; the private R2
 bucket, `PHOTOS_BUCKET` binding and `PHOTO_OWNER_TOKEN` are active. Real JPEG and converted iPhone
 HEIC uploads stored successfully, and `/api/lead` returned `photoDelivery:"attached"` after Resend
-accepted owner emails with real MIME attachments. The owner still needs to confirm actual inbox
-receipt and attachment download; provider acceptance is not inbox proof.
+accepted owner emails with real MIME attachments. The owner confirmed actual customer-photo
+attachments are reaching the business inbox (2026-10-25); provider acceptance and inbox receipt are
+now both recorded.
 
 **GTM/GA4:** the owner reports Version 5 published (20 tags, 19 triggers, 13 variables). Earlier
 Version 3 receipt of page views, `estimate_start` and the three inquiry events was verified; live
@@ -38,7 +40,7 @@ Status vocabulary:
 | Cloudflare DNS for the domain | **owner-confirmed** | Domain active on Cloudflare nameservers (owner screenshots, Oct 2026) | None | `docs/deployment/DEPLOYMENT.md` |
 | Cloudflare Pages project | **live (verified)** | `sparkling-standard-cleaning` is Git-connected: every `main` push produces a Cloudflare Pages deployment; custom domain serving. Production commit at the start of the 2026-10-02 review was `1287a763` (owner-stated) | None | `docs/deployment/DEPLOYMENT.md` |
 | Production website | **live (verified)** | `https://sparkling-standard.com` — all 18 pages return 200 with correct canonicals; mobile-throttled LCP 1.26–1.65 s, CLS ≤ 0.038; axe 0 violations (2026-10-01) | None | `docs/verification/VERIFICATION.md` |
-| Production release (deployed) | **live — `origin/main` `62a1a46`** | The deployed production tree includes the address-reliability rebuild, recurring-conversion homepage sections, licensed representative imagery, the prepared-disabled promotion engine, the advance-reservation + gift-certificate (request-only) experience, the owner-published GTM/GA4 configuration (account-side), the attribution repair with first/latest lead-notification labels, the six-profile social integration, and the compact logo-only Follow Us redesign (eight 52px circular buttons with official brand marks). Live acceptance checks passed 2026-10-03. Preview environments, Preview secrets and Cloudflare Access are **not used** by owner decision; production deploys from `main` only | Maintain; decisions outstanding in `docs/launch/PROMOTION-PROPOSALS.md` and `docs/launch/OWNER-INPUT-REQUIRED.md` (M2–M7) | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md`, `docs/verification/VERIFICATION.md` |
+| Production release (deployed) | **live — `13fa860`** | The 2026-10-25 audit-correction release: six core service cards including Church Cleaning, Community Support spotlight, Google-gold review polish, footer search icon and concise contact privacy copy. GitHub `validate`, `browser` and Cloudflare Pages checks passed. The prior Initiative 6.2 release at `e635d7f` and earlier releases are historical. | Maintain; verify lead delivery after any form change | `docs/verification/VERIFICATION.md`, `docs/operations/ESTIMATOR-ENGINES.md` |
 | Indexing status | **live — owner-approved** | Owner explicitly approves public search-engine indexing (2026-10-01). `robots.txt` = `Allow: /` + sitemap; every page meta robots = `index, follow`; `PUBLIC_PREVIEW_MODE` is NOT set | Maintain. Never introduce noindex/disallow, and never enable indexing on intentionally excluded utility pages | `docs/deployment/DEPLOYMENT.md` §11 |
 | Domain registration | **owner-confirmed** | Registered via Squarespace following Google Workspace purchase | None | — |
 | Google Workspace email | **owner-confirmed** | `owner@sparkling-standard.com` operational; MX/SPF/DKIM imported. Do **not** modify or enable Email Routing | None | `docs/deployment/DEPLOYMENT.md` |
