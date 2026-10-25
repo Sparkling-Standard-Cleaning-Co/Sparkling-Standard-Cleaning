@@ -1,15 +1,13 @@
 # Customer photo uploads — secure intake, owner access and retention
 
-**Implementation status:** code complete and tested with a mock R2 binding.
-**Production activation:** awaiting the private Cloudflare R2 bucket binding
-and owner token. The customer section stays hidden until
-`GET /api/photo-upload` reports `enabled: true`; no mock or local storage is
-presented to a customer as production storage.
+**Implementation status:** **live in production** at `e635d7f` (Cloudflare Pages deployment
+`877a241a-863b-423b-875b-1284182dcd39`). The private R2 bucket, `PHOTOS_BUCKET` binding and
+`PHOTO_OWNER_TOKEN` are active. Real JPEGs and a converted iPhone HEIC uploaded successfully;
+`/api/lead` returned `photoDelivery:"attached"` after Resend accepted owner emails with real MIME
+attachments. The owner inbox receipt/download remains the final acceptance check.
 
-No Cloudflare credentials were available in this environment, so no bucket was
-created and **no upload has been tested against real R2**. No real production
-Resend attachment email has been sent or confirmed in the owner inbox yet.
-The exact owner actions are below.
+Production `/api/photo-upload` reports `enabled:true`; the section is visible in all four
+applicable estimate forms. No mock or local storage is presented as production storage.
 
 ## Customer experience
 
@@ -230,7 +228,7 @@ by the same rule.
 
 ## Current limitations / owner decisions
 
-1. R2 must be provisioned and verified before the feature is live.
+1. R2 is provisioned and live; the owner must confirm inbox receipt/download for the final acceptance.
 2. Retention is 90 days by default; confirm or change it and keep the privacy
    page consistent.
 3. HEIC conversion happens in the browser. If a particular device/browser

@@ -1,9 +1,9 @@
 # Initiative 6.2 acceptance matrix
 
-**Status:** release candidate, **not deployed**. Production remains Initiative 6.1 at `af46db4`.
-**Branch:** `initiative-6.2-complete-experience-audit` (from `af46db4`).
-**Evidence:** local production build, Playwright Chromium, unit/browser suites, and the screenshots
-in `docs/verification/6.2/`. This document does not claim live-production verification.
+**Status:** **deployed and live** on `main` at `e635d7f` (Cloudflare Pages deployment
+`877a241a-863b-423b-875b-1284182dcd39`).
+**Evidence:** predeployment local suites, production upload/lead tests, live engine/price checks,
+and the screenshots in `docs/verification/6.2/`. Owner inbox attachment receipt remains pending.
 
 Status vocabulary:
 
@@ -80,7 +80,7 @@ Status vocabulary:
 | 37 | Tax guidance is sourced, not invented | Florida DOR references recorded; no fabricated rate; category-specific disclosure only | `docs/operations/TAX-TREATMENT.md` | Verified |
 | 38 | GTM full event set documented | 19 event mappings incl. church and promotion events; import/verification docs updated | `docs/analytics/GTM-CONTAINER-SETUP.md`, `npm run analytics:gtm:verify` | Verified |
 | 39 | GTM Version 5 | Owner reports Version 5 published (20 tags, 19 triggers, 13 variables); new-event receipt not fully proven | Owner report 2026-10-25; docs updated | Owner-reported / pending receipt verification |
-| 40 | Photo intake is finished and safe to activate | Shared intake, metadata stripping, signed owner links and cleanup are implemented; the section remains hidden until the probe returns `enabled:true` and no mock upload is reported as production | Photo suites; `docs/operations/PHOTO-UPLOADS.md` | Implemented; production activation pending R2 |
+| 40 | Photo intake is finished and live | Shared intake, metadata stripping, signed owner links, retention cleanup and Resend owner attachments are active; production probe reports `enabled:true` | Photo suites; live production checks; `docs/operations/PHOTO-UPLOADS.md` | **Verified live** |
 | 41 | Owner independence | Owner settings guide, calculation order and tax doc identify where to change values, dependencies, approval needs and rebuild steps | `docs/operations/OWNER-SETTINGS-GUIDE.md`, `ESTIMATE-CALCULATION-ORDER.md`, `TAX-TREATMENT.md` | Verified |
 | 42 | Deployment gate | Branch is local; production remains 6.1; no push/merge/deploy performed | `git status`, `git log`; this document | Verified local-only |
 
@@ -100,13 +100,12 @@ Status vocabulary:
 | 49 | Turnstile and abuse controls | Optional Turnstile verification, per-IP throttle, same-origin, count/size/total limits | `tests/photo-intake.test.ts` | Verified |
 | 50 | Commercial calibration | 26 scenarios covering sizes, types, fixtures, conditions, floors, schedules, travel and specialty; report + CSV | `npm run commercial:calibration`, `npm run calibration:report`; `FACILITY-CALIBRATION.md` | Verified |
 | 51 | Church calibration | 20 scenarios; exact 10% discount to the cent, global factor, tax disclosure, Tier A/B/C, browser/server reconciliation | `tests/facility-calibration.test.ts`; `FACILITY-CALIBRATION.md` | Verified |
-| 56 | Real R2 activation | Source/bindings/owner actions complete. No Cloudflare credentials in this environment; a local Pages/R2-compatible Miniflare upload and signed retrieval passed, but the real production bucket is **not provisioned** | `docs/operations/PHOTO-UPLOADS.md`; local smoke evidence | Pending external owner action |
-| 57 | Production attachment e2e | A real production Resend send with a real inbox receipt was not possible: no `RESEND_API_KEY` is available locally and no deployment is authorized | This document; deployment checklist | Blocked on owner-run live test |
+| 56 | Real R2 activation | Private bucket, `PHOTOS_BUCKET`, `PHOTO_OWNER_TOKEN` active. Production uploads of JPEG/HEIC succeeded and were read by `/api/lead` | Production `GET /api/photo-upload` = `enabled:true`; production lead responses | **Verified live** |
+| 57 | Production attachment e2e | A production contact lead with 2 JPEGs and a facility estimate with 1 JPEG both returned `photoDelivery:"attached"`; Resend accepted the owner messages | Production lead responses; this document | **Provider accepted; owner inbox confirmation pending** |
 | 58 | Optional facility date bug found during acceptance | Step 3 required a preferred date despite the rule being optional; `optional: true` added and browser flow now advances without one | Browser photo suite (advances without a date) | Verified |
 
-The photo feature is **implemented and tested**, but the production section remains hidden
-until the private R2 binding and `PHOTO_OWNER_TOKEN` exist. This is the one genuine external
-dependency, not a deferred implementation.
+The photo feature is **live**; production R2 and Resend provider acceptance are verified. The only
+remaining check is owner inbox receipt/download.
 
 ## 7. Verification commands and actual results
 
@@ -127,19 +126,34 @@ dependency, not a deferred implementation.
 | Layout audit | 0 overflow, broken-image or duplicate-H1 issues across 22 routes × 320/375/390/768/1440 |
 | `git diff --check` | Only CRLF normalization warnings on `src/scripts/facility-estimate.ts` and `tests/browser/service-matrix.test.mjs`; no whitespace errors |
 
-These results are from the final local verification run on the release candidate, before commit.
-The 6.2 visual evidence is from the same local production build, not live production.
+These are the predeployment local results. Production deployment and live checks are recorded below.
+The 6.2 screenshots remain local-build visual evidence.
+
+### Production live checks
+
+| Check | Result |
+| --- | --- |
+| Cloudflare Pages | Deployment `877a241a-863b-423b-875b-1284182dcd39` completed successfully |
+| `/api/photo-upload` | `enabled:true`, max 6, 8 MiB/file, 32 MiB total |
+| Real R2 upload | 2 JPEGs and a converted HEIC stored under production `leads/...` keys |
+| Owner email attachments | Contact lead (2 JPEGs) and facility estimate (1 JPEG) both returned `photoDelivery:"attached"`; Resend accepted |
+| Live engines | All four dedicated estimate routes and the hub returned 200 with initialized forms and no page errors |
+| Live pricing | Commercial $125.00; Church $130.50 (exact 10% discount) |
+| Live reachability | `live-check` passed with 0 warnings; travel configured |
+| Owner inbox | Pending owner confirmation/download |
 
 ## 8. Deliberately not claimed
 
-- 6.2 is **not live**. The screenshots are from the local production build.
+- 6.2 is **live**; the screenshots are from the predeployment local build.
+- Owner inbox receipt/download of the production Resend attachments is **not yet independently confirmed**.
 - GTM Version 5 is **owner-reported**, not independently verified; new church/promotion event
   receipt still needs GA4 DebugView/Realtime confirmation.
 - Commercial/church pricing remains provisional in customer language, but the **initial research
   calibration is complete** (26 commercial + 20 church scenarios); actual jobs are a quality check,
   not a blocker.
-- Customer photo intake code is complete, but the production R2 bucket/token are **not provisioned**;
-  the section stays hidden until they are. A local R2-compatible smoke test passed.
+- Customer photo intake is live: production R2 is provisioned and JPEG/HEIC uploads, server reads
+  and Resend provider acceptance passed. Signed-link retrieval still needs owner confirmation from
+  the received email.
 - No booking, payment or automatic scheduling is active.
 - No fabricated reviews, customers, certifications, prices, tax rates or response guarantees were
   added.

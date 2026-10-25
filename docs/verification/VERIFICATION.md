@@ -3,35 +3,49 @@
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
-## Verified — 2026-10-25 Initiative 6.2 release candidate (local, not deployed)
+## Verified — 2026-10-25 Initiative 6.2 production deployment
 
-Branch: `initiative-6.2-complete-experience-audit`, created from production `af46db4`.
-This evidence is from the local production build. Production still serves 6.1; no push, merge or
-deployment was performed.
+**Live branch/commit:** `main` at `e635d7f` (fast-forwarded from `af46db4`; previous 6.2 commits
+`5919cbc` and `f3ed6f7`). **Cloudflare Pages deployment:** `877a241a-863b-423b-875b-1284182dcd39`
+(check run completed successfully). GitHub `validate`, `browser`, and Cloudflare Pages checks all
+completed successfully.
+
+### Predeployment verification
 
 | Check | Command | Result |
 | --- | --- | --- |
-| TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints (131 files) |
-| Production build | `npm run build` | 26 pages + sitemap; only the expected empty `proof` collection notice and the lazy MapLibre chunk-size warning |
+| TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints (139 files) |
+| Production build | `npm run build` | 26 pages + sitemap; only the expected empty `proof` collection notice and lazy MapLibre chunk-size warning |
 | Unit suite | `npm test` | **489 tests: 488 passed, 1 skipped, 0 failed**; the skip is the print-output test when no print build exists |
-| Browser regression suite | `npm run test:browser` | **124 passed, 0 failed** (includes the photo intake suite) |
-| Static validation | `npm run verify` | 1,670 internal links across 26 pages resolve; SEO, homepage copy, marketing/QR, GTM artifacts and checklist-leak checks passed |
+| Browser regression suite | `npm run test:browser` | **124 passed, 0 failed** (includes photo intake) |
+| Static validation | `npm run verify` | 1,670 internal links across 26 pages; SEO, homepage copy, marketing/QR, GTM artifacts and checklist-leak checks passed |
 | Smoke test | `npm run smoke` | 21 required pages passed |
 | PENDING-fact gate | `npm run pending` | no PENDING placeholders across 30 built files |
 | Fake-testimonial gate | `npm run testimonials` | passed |
-| No-fabrication audit | `npm run audit:facts` | no unsupported factual claims; 15 terms need human context review |
-| Financial scenarios | `npm run estimate:scenarios` | passed (residential, STR, commercial, church, global factor, Supportive Home, tax notes) |
-| Facility calibration | `npm run commercial:calibration` / `npm run calibration:report` | **26 commercial + 20 church** hypothetical scenarios; exact church discount, Tier A/B/C, global factor, travel and CSV matrix |
-| Photo intake | `tests/photo-*` + local Pages/R2 smoke | all four engines, HEIC conversion, metadata stripping, limits, signed links, cleanup, association; local R2-compatible smoke passed |
-| Owner attachment email | `tests/owner-email.test.ts`, `tests/photo-intake.test.ts` | Resend request shape, Base64 splitting, 2×8 MB per part, retry/idempotency, partial/failure fallback; provider acceptance simulated, **no real provider send** |
-| Layout audit | Playwright route sweep | 0 overflow, broken-image or duplicate-H1 issues across 22 routes at 320/375/390/768/1440 |
-| Visual evidence | `docs/verification/6.2/` | 15 local-build screenshots (desktop + mobile, including photo intake) plus README |
+| No-fabrication audit | `npm run audit:facts` | no unsupported factual claims |
+| Facility calibration | `npm run commercial:calibration` / `npm run calibration:report` | **26 commercial + 20 church** scenarios; exact discount/reconciliation |
+| Owner attachment email | `tests/owner-email.test.ts`, `tests/photo-intake.test.ts` | attachment splitting, Resend shape, retries/idempotency, partial/failure fallback |
 
-**Known residuals:** GTM Version 5 is owner-reported; live receipt of the new church/promotion
-events is not yet fully proven. Customer photo intake code is complete but the **real Cloudflare R2
-bucket is not provisioned** (a local R2-compatible smoke test passed); the section stays hidden
-until the owner creates the private bucket, binding and token. Commercial/church pricing is
-initial-calibrated; actual job hours remain a quality check. 6.2 is not deployed.
+### Production live verification
+
+| Check | Result |
+| --- | --- |
+| Cloudflare deployment | `877a241a-863b-423b-875b-1284182dcd39` — successful |
+| `/api/photo-upload` | **enabled:true**, max 6, max 8 MiB/file, 32 MiB total |
+| Private R2 upload | Real JPEGs stored; returned opaque keys under `leads/2026/10/...` |
+| Owner attachment delivery | A production lead with 2 JPEGs and a facility estimate with 1 JPEG both returned **`photoDelivery:"attached"`**; Resend accepted the messages |
+| iPhone HEIC | Production `/estimate/commercial/` converted and uploaded the CC0 HEIC fixture as a JPEG |
+| Live engine pages | `/estimate/`, `/estimate/residential/`, `/estimate/str/`, `/estimate/commercial/`, `/estimate/church/` all returned 200 with initialized forms and no page errors |
+| Live pricing | Commercial 2,000 sqft = **$125.00**; Church 4,000 sqft = **$130.50** (10% exact) |
+| Live reachability | `node scripts/live-check.mjs https://sparkling-standard.com` passed with 0 warnings; travel configured and lead function validating |
+| Owner inbox attachments | **Not independently confirmed**; owner must confirm actual inbox receipt and downloadable images |
+
+**Known residuals:** GTM Version 5 is owner-reported; live receipt of the church/promotion events
+is not yet fully proven. The owner still needs to confirm inbox receipt of the production Resend
+attachment email(s); provider acceptance is not inbox delivery. R2 signed-link retrieval in
+production was not independently tested because the owner token is not available locally (the
+email links and local signed-link tests were generated/successful). Commercial/church pricing is
+initial-calibrated; actual job hours remain a quality check.
 
 ## Verified - 2026-10-21 owner-decision implementation
 

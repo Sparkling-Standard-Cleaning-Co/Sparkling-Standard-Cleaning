@@ -84,7 +84,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); eight confirmed
   social profiles rendering (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release:** the **Initiative 6.1 facility-pricing release is live** at `af46db4` (see `docs/operations/PLATFORM-STATUS.md` and `git log -1`). The **Initiative 6.2 complete-experience release candidate** is prepared locally on `initiative-6.2-complete-experience-audit`; it is **not deployed** until the owner authorizes it. The historical release note follows.
+- **Current release:** the **Initiative 6.2 complete-experience release is live** at `e635d7f` (deployed to Cloudflare Pages 2026-10-25; deployment `877a241a-863b-423b-875b-1284182dcd39`). Production `/api/photo-upload` reports `enabled:true`; real R2 JPEG/HEIC uploads and Resend provider acceptance passed. The owner inbox confirmation of attachment receipt remains the single acceptance check. The historical 6.1 release note follows.
 - **Prior release status:** the 2026-10-03 release was **deployed to production** — `origin/main` =
   `62a1a46` (the five-commit release `8b8dde4`/`03d6ba8`/`53a85aa`/`0f3c38c`/`5a4a024`, the
   documentation closeout `7a51efa`, the social integration `cdc4971`, the deployment-closeout
@@ -398,7 +398,7 @@ collections are intentionally empty — not errors.
   quotation removed; larger review stars; footer review actions split into Read and Leave; and the
   premium icon set redesigned as white/gold artwork on rose tiles. The customer-photo intake is
   shared across all four engines with private R2 storage, server-side metadata stripping and
-  signed owner links (activation awaits R2 provisioning). Facility pricing has a completed
+  signed owner links and Resend owner attachments (live). Facility pricing has a completed
   26-commercial/20-church calibration (`docs/operations/FACILITY-CALIBRATION.md`). Research/order/
   tax records: `docs/operations/ESTIMATE-CALCULATION-ORDER.md`, `docs/operations/TAX-TREATMENT.md`.
 - **Smart Estimate System 2.0 (2026-10-24, owner directive):**
@@ -414,7 +414,7 @@ collections are intentionally empty — not errors.
     service selection (the option reads "Residential Cleaning"). `/house-cleaning/` remains as an
     SEO information page that routes visitors to Recurring Residential Cleaning and Deep Cleaning
     — never deleted, never a broken link, never presented as a third service.
-  - **Customer photos (code complete; activation awaiting R2 provisioning):** optional shared
+  - **Customer photos (live):** optional shared
     section on residential, STR, commercial and church estimates (engine-specific categories).
     Uploads POST to functions/api/photo-upload.ts → PRIVATE Cloudflare R2 (`PHOTOS_BUCKET`
     binding), with server-generated keys, magic-byte validation, server-side EXIF/GPS/text

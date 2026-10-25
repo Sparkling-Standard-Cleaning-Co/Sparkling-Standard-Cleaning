@@ -4,30 +4,24 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-25** (Initiative 6.1 live; Initiative 6.2 release candidate prepared; release record corrected
-to the actually deployed commit).
+Last reviewed: **2026-10-25** (Initiative 6.2 deployed and live-verified; R2/photo intake enabled).
 
-**Release status:** production serves GitHub `main`; the **Initiative 6.1 facility-pricing release
-is live at `af46db4`** (2026-10-24), with owner-authorized deployment and live acceptance checks
-passing. Earlier release notes below are historical: the 2026-10-03 set was `62a1a46` (the
-five-commit release `8b8dde4`…`5a4a024`, the documentation closeout `7a51efa`, the six-profile
-social integration `cdc4971`, the deployment-closeout `6ebc3fb` and the logo-only Follow Us
-redesign `62a1a46`). Live acceptance checks for the 6.1 release: residential, STR, commercial
-Tier A/B, Tier C scope review, church discount, location/travel, consent, reviews, footer,
-sitemap, robots and canonicals passed on sparkling-standard.com. Customer photo intake code is
-complete with private-R2 preparation, metadata stripping, Resend owner emails carrying real MIME
-attachments, signed links and retention cleanup, but production remains **disabled** until the owner
-provisions the bucket/binding/token; the probe reports `enabled:false` and no real-R2 upload has
-been claimed as tested.
+**Release status:** production serves GitHub `main`; the **Initiative 6.2 complete-experience
+release is live at `e635d7f`**, deployed to Cloudflare Pages on 2026-10-25 (deployment
+`877a241a-863b-423b-875b-1284182dcd39`). Live checks passed for the four estimate engines,
+commercial/church preliminary pricing, travel/geocode, form rendering, SEO, consent and the public
+marketing pages. The earlier 6.1 release at `af46db4` and the 2026-10-03 set at `62a1a46` are
+historical.
 
-The **Initiative 6.2 complete-experience release candidate** (`initiative-6.2-complete-experience-audit`)
-is prepared locally and is **not deployed**: it adds the dedicated `/estimate/residential/` route,
-guided facility forms, field-specific validation, the Supportive Home 10% eligibility discount,
-the owner global estimate factor, exact church-discount reconciliation, tax disclosure,
-service-area/reviews/footer/icon refinements, shared photo intake (awaiting R2 provisioning), the
-completed 26-commercial/20-church calibration, and independent audit fixes. Production continues
-to serve the 6.1 release until the owner authorizes the 6.2 deployment. Confirm the exact deployed
-SHA with `git log -1`.
+**Customer photos are live:** production `/api/photo-upload` reports `enabled:true`; the private R2
+bucket, `PHOTOS_BUCKET` binding and `PHOTO_OWNER_TOKEN` are active. Real JPEG and converted iPhone
+HEIC uploads stored successfully, and `/api/lead` returned `photoDelivery:"attached"` after Resend
+accepted owner emails with real MIME attachments. The owner still needs to confirm actual inbox
+receipt and attachment download; provider acceptance is not inbox proof.
+
+**GTM/GA4:** the owner reports Version 5 published (20 tags, 19 triggers, 13 variables). Earlier
+Version 3 receipt of page views, `estimate_start` and the three inquiry events was verified; live
+receipt of the newer church/promotion events still needs DebugView/Realtime confirmation.
 
 Status vocabulary:
 

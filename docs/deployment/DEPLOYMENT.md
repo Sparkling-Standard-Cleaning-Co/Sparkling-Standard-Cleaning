@@ -158,7 +158,7 @@ The customer confirmation is sent by `functions/api/lead.ts` through Resend **af
 notification is accepted. Until the setup below is complete, the code path is inert
 (`skipped_not_configured` / provider rejection) and the lead flow is unaffected.
 
-**Status 2026-10-08 (owner-confirmed + live-tested); owner attachments added 2026-10-25:** steps 1–3 are complete —
+**Status 2026-10-25:** Initiative 6.2 is deployed live at `e635d7f`; production Resend owner attachment emails were accepted for real R2 uploads. The owner still needs to confirm actual inbox receipt/download. The original Resend setup was **owner-confirmed + live-tested 2026-10-08**; owner attachments were added 2026-10-25. Steps 1–3 are complete —
 `RESEND_API_KEY` is set in Cloudflare as a runtime Secret and `sparkling-standard.com` is verified
 in Resend (DNS complete; no `PUBLIC_RESEND_*` variable exists). Step 5 is done (deployed via
 `c8a9723`, with the ZIP fix `f92719c`); step 6's controlled live test was submitted through the
