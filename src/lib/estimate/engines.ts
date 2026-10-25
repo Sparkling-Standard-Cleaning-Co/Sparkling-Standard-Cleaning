@@ -36,7 +36,7 @@ export const ESTIMATE_ENGINES: readonly EngineDefinition[] = [
     ctaLabel: 'Get My Cleaning Estimate',
     requestLabel: 'Residential cleaning request',
     wizard: 'residential',
-    href: '/estimate/',
+    href: '/estimate/residential/',
   },
   {
     id: 'commercial',
@@ -115,10 +115,18 @@ export function parseResidentialServiceParam(value: string | null | undefined): 
 }
 
 /** Build a hub/contextual link without ever exposing arbitrary query state. */
-export function engineEstimateHref(engine: EstimateEngine, service?: string): string {
+export function engineEstimateHref(
+  engine: EstimateEngine,
+  service?: string | null,
+  extraParams: Record<string, string | null | undefined> = {},
+): string {
   const base = engineDefinition(engine).href;
-  if (!service) return base;
-  return `${base}&service=${encodeURIComponent(service)}`;
+  const url = new URL(base, 'https://sparkling-standard.invalid');
+  if (service) url.searchParams.set('service', service);
+  for (const [key, value] of Object.entries(extraParams)) {
+    if (typeof value === 'string' && value.trim() !== '') url.searchParams.set(key, value);
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 /**

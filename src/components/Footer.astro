@@ -62,28 +62,38 @@ const phone = isPending(business.phone) ? null : business.phone;
 
       <div>
         <h3>Reviews</h3>
-        {
-          reviewLeaveUrl ? (
-            <div class="site-footer__reviews-card">
-              <a
-                class="btn btn--ghost site-footer__review-btn"
-                href={reviewLeaveUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Leave us a review on Google (opens in a new tab)"
-                data-review-link="google"
-                data-cta="footer-reviews-leave"
-              >
-                <GoogleG size={20} /> Leave Us a Review
-              </a>
-              <p class="small site-footer__reviews-note">
-                Honest reviews from real customers help neighbors find a cleaner they can trust.
-              </p>
-            </div>
-          ) : (
-            <p class="small site-footer__reviews-note">Review links are being set up.</p>
-          )
-        }
+        <div class="site-footer__reviews-card">
+          <div class="site-footer__review-actions">
+            <a
+              class="btn btn--ghost site-footer__review-btn"
+              href="/#reviews"
+              data-review-link="site"
+              data-cta="footer-reviews-read"
+            >
+              <Icon name="star" size={18} /> Read Our Reviews
+            </a>
+            {
+              reviewLeaveUrl ? (
+                <a
+                  class="btn btn--ghost site-footer__review-btn"
+                  href={reviewLeaveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Leave us a review on Google (opens in a new tab)"
+                  data-review-link="google"
+                  data-cta="footer-reviews-leave"
+                >
+                  <GoogleG size={20} /> Leave Us a Review
+                </a>
+              ) : (
+                <p class="small site-footer__reviews-note">Review submission is being set up.</p>
+              )
+            }
+          </div>
+          <p class="small site-footer__reviews-note">
+            Your review could help neighbors find Sparkling Standard, a cleaning service they can depend on.
+          </p>
+        </div>
       </div>
 
       <div>

@@ -4,7 +4,7 @@
 // keep the chosen engine in the URL.
 import PremiumIcon from './PremiumIcon.astro';
 import type { EstimateEngine } from '../lib/estimate/engines';
-import { ESTIMATE_ENGINES } from '../lib/estimate/engines';
+import { ESTIMATE_ENGINES, engineEstimateHref } from '../lib/estimate/engines';
 import type { PremiumIconName } from '../lib/premium-icons';
 
 interface Props {
@@ -19,6 +19,34 @@ const iconFor: Record<EstimateEngine, PremiumIconName> = {
   str: 'short-term-rental',
   church: 'church-cleaning',
 };
+
+// Preserve campaign/attribution context when moving from the hub into an
+// engine. Residential-specific state (service, frequency, supportive, promo)
+// only follows the Residential card; UTMs and ad click ids follow every card.
+const ATTRIBUTION_KEYS = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_content',
+  'utm_term',
+  'utm_id',
+  'gclid',
+  'gbraid',
+  'wbraid',
+  'fbclid',
+  'msclkid',
+] as const;
+const RESIDENTIAL_KEYS = ['service', 'frequency', 'supportive', 'promo'] as const;
+
+function hrefFor(engine: EstimateEngine): string {
+  const residential = engine === 'residential';
+  const extra: Record<string, string | null> = {};
+  for (const key of ATTRIBUTION_KEYS) extra[key] = Astro.url.searchParams.get(key);
+  if (residential) {
+    for (const key of RESIDENTIAL_KEYS) extra[key] = Astro.url.searchParams.get(key);
+  }
+  return engineEstimateHref(engine, residential ? Astro.url.searchParams.get('service') : null, extra);
+}
 ---
 
 <section class="estimate-hub" aria-labelledby="estimate-hub-heading">
@@ -36,7 +64,8 @@ const iconFor: Record<EstimateEngine, PremiumIconName> = {
       ESTIMATE_ENGINES.map((engine) => (
         <a
           class:list={['estimate-hub__card', current === engine.id && 'estimate-hub__card--current']}
-          href={engine.href}
+          href={hrefFor(engine.id)}
+          data-estimate-engine={engine.id}
           aria-current={current === engine.id ? 'true' : undefined}
         >
           <span class="estimate-hub__icon">
@@ -56,3 +85,40 @@ const iconFor: Record<EstimateEngine, PremiumIconName> = {
     }
   </div>
 </section>
+
+<script>
+  // Preserve campaign/attribution context when a visitor chooses an engine.
+  // The static build cannot know the request query, so this runs in the browser
+  // and only appends allowlisted values to each card's clean fallback href.
+  const hubParams = new URLSearchParams(window.location.search);
+  const attributionKeys = [
+    'utm_source',
+    'utm_medium',
+    'utm_campaign',
+    'utm_content',
+    'utm_term',
+    'utm_id',
+    'gclid',
+    'gbraid',
+    'wbraid',
+    'fbclid',
+    'msclkid',
+  ];
+  const residentialKeys = ['service', 'frequency', 'supportive', 'promo'];
+  for (const link of document.querySelectorAll<HTMLAnchorElement>('[data-estimate-engine]')) {
+    const href = link.getAttribute('href');
+    if (!href) continue;
+    const url = new URL(href, window.location.origin);
+    for (const key of attributionKeys) {
+      const value = hubParams.get(key);
+      if (value) url.searchParams.set(key, value);
+    }
+    if (link.dataset.estimateEngine === 'residential') {
+      for (const key of residentialKeys) {
+        const value = hubParams.get(key);
+        if (value) url.searchParams.set(key, value);
+      }
+    }
+    link.setAttribute('href', `${url.pathname}${url.search}${url.hash}`);
+  }
+</script>

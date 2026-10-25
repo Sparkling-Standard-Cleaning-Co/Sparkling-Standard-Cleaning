@@ -25,7 +25,7 @@ import type {
 } from '../../config/owner-pricing.ts';
 import type { Frequency, PricingServiceType } from '../../config/pricing.ts';
 
-export type PromotionSource = 'addon_incentive' | 'addon_bundle' | 'appreciation' | 'founding' | 'campaign';
+export type PromotionSource = 'addon_incentive' | 'addon_bundle' | 'appreciation' | 'founding' | 'campaign' | 'supportive';
 
 export interface PromotionCandidate {
   id: string;
@@ -94,6 +94,18 @@ export interface PromotionInput {
    * service/frequency (every other case).
    */
   campaignArrangement?: { serviceType: PricingServiceType; frequency: Frequency } | null;
+  /**
+   * Supportive Home eligibility discount (owner-directed 2026-10-25). It is
+   * one of the single-discount candidates; it never stacks. The customer's
+   * self-attestation is the eligibility signal, confirmed by the owner before
+   * booking. It applies only to the configured residential services.
+   */
+  supportiveDiscount?: {
+    enabled: boolean;
+    percent: number;
+    eligibleServices: PricingServiceType[];
+  } | null;
+  supportiveEligible?: boolean;
 }
 
 function round2(value: number): number {
@@ -359,9 +371,37 @@ function campaignCandidate(input: PromotionInput): PromotionCandidate | null {
 }
 
 /**
+ * Supportive Home eligibility discount. Unlike the prepared promotion
+ * programs this is an owner-directed customer benefit, so it is allowed to
+ * reduce a minimum-price job below the minimum; the advertised 10% is never
+ * silently erased by the floor. It still participates in the SAME single-
+ * discount policy: the largest effective discount wins.
+ */
+function supportiveCandidate(input: PromotionInput): PromotionCandidate | null {
+  const config = input.supportiveDiscount;
+  if (!config?.enabled || input.supportiveEligible !== true) return null;
+  if (!config.eligibleServices.includes(input.serviceType)) return null;
+  if (!Number.isFinite(config.percent) || config.percent <= 0) return null;
+  const fraction = Math.min(config.percent, 100) / 100;
+  const amount = round2(Math.min(input.gross, input.gross * fraction));
+  if (amount <= 0) return null;
+  return {
+    id: 'supportive-home',
+    source: 'supportive',
+    label: `Supportive Home discount (${config.percent}%)`,
+    percent: fraction,
+    amount,
+  };
+}
+
+/**
  * Evaluates every enabled program and returns at most one discount — the
  * largest effective reduction — plus an optional complimentary-upgrade grant.
  * With every program disabled (and no campaign claim) this returns nulls.
+ *
+ * Tie-break policy (documented in docs/operations/ESTIMATE-CALCULATION-ORDER.md):
+ * the largest customer benefit wins; on an exact tie the Supportive Home
+ * eligibility discount wins, then the claimed campaign, then other programs.
  */
 export function evaluatePromotions(input: PromotionInput): PromotionEvaluation {
   const candidates: PromotionCandidate[] = [];
@@ -379,8 +419,18 @@ export function evaluatePromotions(input: PromotionInput): PromotionEvaluation {
   if (founding.discount) candidates.push(founding.discount);
   const campaign = campaignCandidate(input);
   if (campaign) candidates.push(campaign);
+  const supportive = supportiveCandidate(input);
+  if (supportive) candidates.push(supportive);
 
   if (candidates.length === 0) return { discount: null, grant: founding.grant };
-  candidates.sort((a, b) => b.amount - a.amount);
+  const priority: Record<PromotionSource, number> = {
+    supportive: 0,
+    campaign: 1,
+    addon_incentive: 2,
+    addon_bundle: 3,
+    appreciation: 4,
+    founding: 5,
+  };
+  candidates.sort((a, b) => b.amount - a.amount || priority[a.source] - priority[b.source]);
   return { discount: candidates[0] ?? null, grant: founding.grant };
 }

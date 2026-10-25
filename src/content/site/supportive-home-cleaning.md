@@ -1,39 +1,37 @@
 ---
-metaTitle: Supportive Home Cleaning in Pensacola | Sparkling Standard
-metaDescription: Thoughtful, dependable home cleaning for seniors, people with disabilities, and households that could use an extra helping hand in Pensacola and Cantonment. No diagnosis required — just tell us what would help.
+metaTitle: Supportive Home Cleaning in Pensacola | 10% Eligibility Discount
+metaDescription: Supportive Home Cleaning is ordinary residential cleaning with a 10% appreciation discount for adults 65+, military veterans, and people with disabilities in Pensacola and Cantonment. No diagnosis or documentation required.
 hero:
   headline: 'A Cleaner Home.'
   accent: ' A Little More Peace of Mind.'
   lead: >-
-    Thoughtful cleaning for seniors, people with disabilities, and households
-    that could use an extra helping hand. Ordinary residential cleaning,
-    delivered with extra care, clear communication and respect for your home.
-  ctaLabel: Request Service
+    Supportive Home Cleaning is the same dependable residential cleaning we
+    provide every day, with a 10% appreciation discount for adults aged 65 or
+    older, military veterans, and people with disabilities. No diagnosis,
+    medical record, or documentation is required — just a simple self-attestation
+    and a conversation about what would help.
+  ctaLabel: Start My Estimate
 sections:
-  - eyebrow: Who this serves
-    heading: For households that could use a helping hand
+  - eyebrow: Who qualifies
+    heading: A 10% discount for eligible households
     lead: >-
-      Anyone can request this service — no forms about your health, no
-      diagnosis to share, and nothing you need to prove. It is simply
-      residential cleaning shaped around what your household needs.
+      The discount is a genuine thank-you for neighbors who may appreciate a
+      little extra support. Ordinary residential cleaning remains available to
+      every customer; only this special discount requires eligibility.
     items:
-      - title: Seniors
-        text: Keeping a home comfortable and safe without the strain of doing it all yourself.
-      - title: People with disabilities or mobility limitations
-        text: Cleaning tasks sized to what is practical for your home, on your schedule.
-      - title: Recovery and temporary limitations
-        text: Steady help while you focus on getting better, for as long as it is useful.
-      - title: Families arranging help for a loved one
-        text: Coordinate with us directly, or with a family member or caregiver you authorize.
-      - title: Any household that values considerate service
-        text: If reliable, respectful cleaning would make life easier, this service is for you.
-  - eyebrow: Cleaning tasks and options
-    heading: Ordinary cleaning services, within an agreed scope
+      - title: Adults aged 65 or older
+        text: A straightforward appreciation discount for senior households.
+      - title: Military veterans
+        text: For veterans and their households, with our thanks for your service.
+      - title: People with disabilities
+        text: For households where a disability or mobility limitation makes cleaning harder to manage.
+  - eyebrow: What is included
+    heading: Ordinary residential cleaning, within an agreed scope
     lead: >-
-      This is the same dependable residential cleaning we provide every day —
-      kitchens, bathrooms, floors, dusting and general tidying — planned around
-      your priorities. Together we agree on what each visit covers before any
-      work begins.
+      This is the same residential cleaning we provide every day — kitchens,
+      bathrooms, floors, dusting and general tidying — planned around your
+      priorities. Together we agree on what each visit covers before any work
+      begins.
     items:
       - title: Regular home cleaning
         text: Kitchens, baths, floors, dusting and surfaces on the schedule you choose.
@@ -43,23 +41,21 @@ sections:
         text: Tell us which areas matter most right now; the plan follows the household.
       - title: Light, honest boundaries
         text: We do not provide medical, nursing or personal-care services — cleaning only, done well.
-  - eyebrow: How we accommodate
-    heading: Small things that make service easier
+  - eyebrow: The 10% discount
+    heading: How the discount appears and is confirmed
     lead: >-
-      Tell us what would make a visit work better for you. We accommodate what
-      we reasonably can, and we will always tell you plainly if something is
-      not feasible rather than leave you guessing.
+      We keep the program simple and transparent. The discount is applied to
+      eligible cleaning charges on your estimate, and eligibility is confirmed
+      personally before booking.
     items:
-      - title: Communication your way
-        text: Call, text, email or through a family member — whichever is easiest for you.
-      - title: Access and mobility considerations
-        text: Ground-floor priorities, adjusted task lists, extra time for getting set up.
-      - title: Privacy respected
-        text: We move carefully through your home, and we do not ask about private matters.
-      - title: A consistent, familiar cleaner
-        text: The same small team whenever scheduling allows, so visits feel predictable.
-      - title: Coordination with people you trust
-        text: With your permission, we can coordinate scheduling or access with a caregiver.
+      - title: Shown clearly on the estimate
+        text: The estimate shows a “Supportive Home discount (10%)” line with the exact savings.
+      - title: Simple self-attestation
+        text: Check the eligibility box if you qualify. We never ask for diagnoses, VA records, disability certifications or ID uploads.
+      - title: Confirmed before booking
+        text: We confirm eligibility with you personally before the discounted price is finalized.
+      - title: One discount at a time
+        text: It does not combine with SPARKLE100, the church discount or another promotion. If more than one applies, the larger single discount wins.
   - eyebrow: What to expect
     heading: Service values you can hold us to
     lead: >-
@@ -78,27 +74,27 @@ process:
   eyebrow: Getting started
   heading: Three simple steps
   steps:
-    - title: Reach out
+    - title: Choose your cleaning
       text: >-
-        Call, text, or start an instant estimate online. No medical questions —
-        just tell us about your home and what would help.
-    - title: Agree on the plan
+        Start an instant residential estimate, choose the cleaning you need and
+        check the Supportive Home eligibility box if it applies to you.
+    - title: See the discount
       text: >-
-        We confirm the tasks, schedule and price together — with a family
-        member or caregiver if that is easier for you.
-    - title: Enjoy a cared-for home
+        The estimate shows the 10% Supportive Home discount and the exact
+        savings on eligible cleaning charges.
+    - title: Confirm together
       text: >-
-        We clean on the schedule you chose, keep communication clear, and
-        adjust the plan whenever your needs change.
+        We confirm eligibility, scope and schedule with you personally before
+        anything is booked or the discounted price is finalized.
 finalCta:
   heading: Could a cleaner home make things a little easier?
   text: >-
-    Start with a conversation — by phone, by text, or with an instant estimate.
-    We will listen first and keep the rest simple.
+    Start with an instant estimate, or call or text us directly. We will listen
+    first and keep the rest simple.
 ctaBand:
   heading: Ready when you are
   text: >-
     Request service online, or call or text us directly — whichever feels
     easiest. Estimates are free, and there is never any pressure.
-  label: Get an Estimate
+  label: Start My Estimate
 ---

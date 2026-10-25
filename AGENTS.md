@@ -80,11 +80,11 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
 - **Operational as of October 2026:** production deployment pipeline; MapMap geocoding + routing
   with the private `TRAVEL_ORIGIN` configured in Cloudflare; Web3Forms lead delivery (owner-
   confirmed); Cloudflare Turnstile optional; **GA4 analytics owner-confirmed operational**
-  (`GTM-KSQ26HMG` / `G-LG222LQRQ2`, GTM Version 3 published, all three inquiry key events
-  verified); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); eight confirmed
+  (`GTM-KSQ26HMG` / `G-LG222LQRQ2`; owner reports GTM Version 5, earlier Version 3 receipt of all
+  three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); eight confirmed
   social profiles rendering (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-10-21):** the 46-decision owner implementation is the current production release set. Verify the exact deployed SHA with git log -1; Cloudflare Pages and the live site are verified after each push. The **Initiative 6.1 facility-pricing release candidate** is prepared on `release-6.1`; it is not deployed until the owner authorizes it (see `docs/operations/PLATFORM-STATUS.md`). The historical release note follows.
+- **Current release:** the **Initiative 6.1 facility-pricing release is live** at `af46db4` (see `docs/operations/PLATFORM-STATUS.md` and `git log -1`). The **Initiative 6.2 complete-experience release candidate** is prepared locally on `initiative-6.2-complete-experience-audit`; it is **not deployed** until the owner authorizes it. The historical release note follows.
 - **Prior release status:** the 2026-10-03 release was **deployed to production** — `origin/main` =
   `62a1a46` (the five-commit release `8b8dde4`/`03d6ba8`/`53a85aa`/`0f3c38c`/`5a4a024`, the
   documentation closeout `7a51efa`, the social integration `cdc4971`, the deployment-closeout
@@ -199,11 +199,11 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | System | Source of truth | Detailed docs |
 | --- | --- | --- |
 | Business facts, contact, socials, launch/publication flags | `src/config/business.ts`, `.env` | `docs/launch/OWNER-INPUT-REQUIRED.md` |
-| Pricing, labor model, add-ons, promotions, discounts | `src/config/owner-pricing.ts` (owner-editable values) + `src/config/pricing.ts` (typed config/flags) | `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/OWNER-SETTINGS-GUIDE.md` |
+| Pricing, labor model, add-ons, promotions, discounts, global estimate factor, Supportive Home discount | `src/config/owner-pricing.ts` (owner-editable values) + `src/config/pricing.ts` (typed config/flags) | `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/OWNER-SETTINGS-GUIDE.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
 | Travel economics, included miles, zone adjustments | `src/config/travel.ts`, `src/config/geography.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Location selection, geocoding, GPS/manual modes | `src/scripts/address-finder.ts`, `src/lib/location/`, `functions/api/geocode.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
-| Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`) | `docs/verification/VERIFICATION.md` |
-| Four estimate engines (residential, commercial, STR, church) + 10% church discount | `src/lib/estimate/engines.ts`, `commercial.ts`, `church-discount.ts`, `src/components/EstimateHub.astro`, `FacilityEstimateForm.astro`, `src/pages/estimate/` | `docs/operations/ESTIMATOR-ENGINES.md` |
+| Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`, `facility-verify.ts`, `tax.ts`) | `docs/verification/VERIFICATION.md`, `docs/operations/TAX-TREATMENT.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
+| Four estimate engines (residential `/estimate/residential/`, STR `/estimate/str/`, commercial `/estimate/commercial/`, church `/estimate/church/`) + 10% church discount | `src/lib/estimate/engines.ts`, `commercial.ts`, `church-discount.ts`, `src/components/EstimateHub.astro`, `FacilityEstimateForm.astro`, `src/pages/estimate/` | `docs/operations/ESTIMATOR-ENGINES.md` |
 | Commercial/church facility pricing (provisional Tier A/B) + owner kill switch + calibration | `src/config/commercial-tiers.ts` (`numericEstimatesEnabled`), `src/config/owner-pricing.ts` (`commercialPricing`), `npm run commercial:calibration` | `docs/operations/ESTIMATOR-ENGINES.md`, `docs/operations/COMMERCIAL-PRICING-RESEARCH.md` |
 | Promotions, bundles, Founding-10 (all disabled) | `src/lib/estimate/promotions.ts` + `src/config/owner-pricing.ts` | `docs/launch/PROMOTION-PROPOSALS.md` |
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
@@ -360,16 +360,20 @@ collections are intentionally empty — not errors.
   section head is centered. The estimate CTA section and the service-area section are centered;
   the service-area copy ends with "Not sure if you're within range?". The header logo renders at
   6rem (4.35rem on phones). Founder portrait label reads "Founder / Owner-Operator". Photo
-  captions read "Project photos are added only with customer approval." Proposed prices round
+  captions were removed by owner direction in 6.2; image licensing records remain in
+  `docs/design/IMAGE-SOURCE-REGISTER.md`. Proposed prices round
   **DOWN** to the nearest $5 (owner-approved), and travel assumes a 35-mile round trip
-  (17.5 one-way included). Quote `configVersion` is `2026-10-23.floor5-travel35.v1`.
-- **Four estimate engines (2026-10-24, Initiative 6.0):** `/estimate/` is a hub with four cards.
-  Residential (`/estimate/`) keeps the live instant estimate (including the optional Supportive
-  Home pathway and presets `?service=recurring|deep|move-out|supportive`); STR
+  (17.5 one-way included). Quote `configVersion` is `2026-10-25.global-factor-supportive-tax.v1`.
+- **Four estimate engines (Initiative 6.0; dedicated routes 6.2):** `/estimate/` is a clean selection hub with four cards. The **residential estimator lives at `/estimate/residential/`**; STR at `/estimate/str/`; Commercial at `/estimate/commercial/`; Church at `/estimate/church/`.
+  Residential keeps the live instant estimate (including the optional Supportive Home pathway
+  and presets `?service=recurring|deep|move-out|supportive`); legacy `/estimate/?service=` and
+  `?promo=` links forward to the dedicated route with their query intact. STR
   (`/estimate/str/`) runs the live per-turnover model; Commercial (`/estimate/commercial/`) and
   Church (`/estimate/church/`) run the shared facility request engine with the SAME address finder,
   travel lookup, relay, owner notification and Turnstile controls. The old embedded StrForm and
-  CommercialForm were retired — one request pipeline only. **Facility pricing (Initiative 6.1,
+  CommercialForm were retired — one request pipeline only. Facility forms are four-step guided
+  experiences with progress, back/continue, per-step field-specific validation and keyboard focus
+  management. **Facility pricing (Initiative 6.1,
   2026-10-24):** commercial and church numerical pricing is enabled as nonbinding provisional
   estimates — Tier A (≤3 labour hours) shows a single price, Tier B (≤8 hours) a ±15% range, and
   Tier C (larger, specialty or high-fixture) remains a personal scope review. The owner kill switch
@@ -383,6 +387,17 @@ collections are intentionally empty — not errors.
   discount and preliminary price; Tier C shows the entitlement and the owner confirms it personally.
   Optional church partnership checkboxes are never preselected and never affect pricing. See
   `docs/operations/ESTIMATOR-ENGINES.md`.
+- **Initiative 6.2 (complete-experience release candidate):** dedicated `/estimate/residential/`
+  route and a selection-only `/estimate/` hub; legacy residential/STR query links, SPARKLE100
+  claims and UTM context forward correctly; a four-step guided facility wizard with field-specific
+  validation; Supportive Home 10% eligibility discount (65+, veterans, disabilities; self-attested,
+  no sensitive records; never stacked); owner-editable `globalEstimateFactor` applied to the pre-tax
+  service subtotal across every engine; exact church-discount reconciliation and two-decimal
+  currency; category-specific Florida sales-tax disclosure (no invented tax amount); service-area
+  page restructured to title → description → map; representative-photo captions and the Mark 12:31
+  quotation removed; larger review stars; footer review actions split into Read and Leave; and the
+  premium icon set redesigned as white/gold artwork on rose tiles. Research/order/tax records:
+  `docs/operations/ESTIMATE-CALCULATION-ORDER.md`, `docs/operations/TAX-TREATMENT.md`.
 - **Smart Estimate System 2.0 (2026-10-24, owner directive):**
   - **Address reliability:** an exact-address resolve that no provider could pinpoint no longer
     dead-ends — when the typed query carries a KNOWN 5-digit ZIP, the resolve action returns the
@@ -516,14 +531,17 @@ collections are intentionally empty — not errors.
   favicon/PWA/social assets with `node scripts/generate-logo-assets.mjs`. The full legal name
   remains in metadata, structured data and the footer copyright. Do not add symbols, descriptors
   or slogans to the mark without a new owner decision.
-- **GA4 operational (owner-confirmed 2026-10-03):** after the container was found empty, the owner
-  published GTM Version 3 (`GTM-KSQ26HMG`) with one Google tag, 12 event tags, 12 triggers and 7
-  data-layer variables. GA4 `G-LG222LQRQ2` receives page views, `estimate_start` and all three
-  inquiry events end-to-end (site confirmation + owner email + GA4 event); all three are key
-  events; Enhanced Measurement form interactions are disabled; consent tests passed. The prepared
-  import files (`docs/analytics/gtm-import/*.json`, generated by `scripts/generate-gtm-import.mjs`,
-  checked by `npm run validate`) remain a rebuild reference. The live account configuration is
-  authoritative — never republish/overwrite it or add a second Google tag.
+- **GA4 operational (owner-confirmed 2026-10-03; Version 5 owner-reported 2026-10-25):** after the
+  container was found empty, the owner published GTM Version 3 (`GTM-KSQ26HMG`) with one Google
+  tag, 12 event tags, 12 triggers and 7 data-layer variables. The owner now reports **Version 5**
+  with one Google tag, 19 event tags, 19 triggers and 13 variables, adding the church and
+  promotion events. GA4 `G-LG222LQRQ2` received page views, `estimate_start` and all three inquiry
+  events end-to-end under Version 3; all three are key events; Enhanced Measurement form
+  interactions are disabled; consent tests passed. Live receipt of the new church/promotion events
+  is not yet fully proven; verify in DebugView/Realtime. The prepared import files
+  (`docs/analytics/gtm-import/*.json`, generated by `scripts/generate-gtm-import.mjs`, checked by
+  `npm run validate`) remain a rebuild reference. The live account configuration is authoritative
+  — never republish/overwrite it or add a second Google tag.
 - **Attribution repair (2026-10-03):** first-touch is captured once; latest-touch updates only for
   a genuinely new campaign/ad click. Internal navigation, refreshes and direct views never erase
   campaign context, and same-domain referrers are never referrals. Lead emails label first-touch

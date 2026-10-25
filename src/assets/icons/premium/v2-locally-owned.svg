@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+ <defs>
+  <linearGradient id="v2-bg-local" x1=".1" y1="0" x2=".95" y2="1"><stop offset="0" stop-color="#d99aaa"/><stop offset=".44" stop-color="#a94f6e"/><stop offset="1" stop-color="#6b2a47"/></linearGradient>
+  <linearGradient id="v2-gold-local" x1="0" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="#ffe7b8"/><stop offset=".5" stop-color="#efc28b"/><stop offset="1" stop-color="#cf9861"/></linearGradient>
+  <filter id="v2-shadow-local" x="-25%" y="-25%" width="150%" height="155%"><feDropShadow dx="0" dy="2.4" stdDeviation="2.8" flood-color="#4f2038" flood-opacity=".2"/></filter>
+ </defs>
+ <rect x="4" y="4" width="120" height="120" rx="26" fill="url(#v2-bg-local)" filter="url(#v2-shadow-local)"/>
+ <rect x="9" y="9" width="110" height="110" rx="21" fill="none" stroke="#fff6f1" stroke-width="1.5" opacity=".35"/>
+ <path d="M27 16 Q64 7 101 20" fill="none" stroke="#fffaf7" stroke-width="2.4" opacity=".22"/>
+ <g fill="none" stroke="#fffaf7" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M29 59 L64 30 L99 59"/>
+  <path d="M39 57 V95 Q39 101 45 101 H83 Q89 101 89 95 V57"/>
+ </g>
+ <path d="M64 91 C52 83 44 76 44 67 Q44 59 51 59 Q58 59 64 66 Q70 59 77 59 Q84 59 84 67 Q84 76 64 91Z" fill="#fffaf7" stroke="url(#v2-gold-local)" stroke-width="2.4" stroke-linejoin="round"/>
+ <path d="M98 23 L100.3 29.9 L107 32.2 L100.3 34.5 L98 41.4 L95.7 34.5 L89 32.2 L95.7 29.9Z" fill="url(#v2-gold-local)"/>
+</svg>

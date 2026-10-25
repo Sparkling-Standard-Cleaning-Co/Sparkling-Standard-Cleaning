@@ -168,6 +168,8 @@ test('a Facebook campaign arrival survives navigation to the estimator and reach
     // Real internal navigation through the site to the estimator.
     await page.locator('a[href="/estimate/"]').first().click();
     await page.waitForURL('**/estimate/');
+    await page.locator('.estimate-hub__card').first().click();
+    await page.waitForURL('**/estimate/residential/');
     await hideConsent(page);
     const afterNav = await readAttribution(page, 'pcc-attribution-latest');
     assert.equal(afterNav.source, 'facebook', 'campaign survives internal navigation');

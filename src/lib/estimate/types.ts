@@ -40,6 +40,12 @@ export interface EstimateInput {
    */
   destinationConfirmed?: boolean;
   pets?: PetSituation;
+  /**
+   * Customer self-attestation that they qualify for the Supportive Home 10%
+   * discount (65+, veteran, or disability). Optional; never inferred from a
+   * sensitive category and never required to receive ordinary cleaning.
+   */
+  supportiveEligible?: boolean;
 }
 
 /** Form-collected draft: any field may be absent or explicitly undefined. */
@@ -69,7 +75,8 @@ export interface EstimateFlag {
     | 'MULTIPLE_PETS_NOTE'
     | 'STR_SAME_DAY_NOTE'
     | 'NO_GAS_PRICE_REFERENCE'
-    | 'FOUNDING_UPGRADE_GRANTED';
+    | 'FOUNDING_UPGRADE_GRANTED'
+    | 'GLOBAL_FACTOR_BELOW_FLOOR';
   message: string;
   severity: FlagSeverity;
 }
@@ -109,8 +116,10 @@ export interface PricingBreakdown {
   baseLaborHours: number;
   addonLaborHours: number;
   totalLaborHours: number;
-  /** Base cleaning price including the travel adjustment, exact cents. */
+  /** Base cleaning price after the minimum, rounded to the presentation step. */
   basePrice: number;
+  /** Separately stated travel pass-through; never discounted or factored. */
+  travelAdjustment: number;
   /** Every add-on with its charge at the current service/scope. */
   addonPrices: AddonPriceLine[];
   /** Selected eligible extras (subset of addonPrices), exact cents. */
@@ -132,6 +141,10 @@ export interface PricingBreakdown {
   roundingAdjustment: number;
   /** The offered price before the $5 round-up (expectedPrice equivalent). */
   subtotal: number;
+  /** Owner-controlled global estimate factor applied to the service subtotal. */
+  globalFactor: number;
+  /** Dollar effect of the global factor (negative = reduction). */
+  globalAdjustment: number;
   /** True when the minimum job value raised the price. */
   minimumApplied: boolean;
 }

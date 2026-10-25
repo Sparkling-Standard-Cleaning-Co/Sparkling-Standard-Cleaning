@@ -84,6 +84,7 @@ export function validateEstimateInput(
   const propertyType =
     raw.propertyType === undefined ? undefined : asEnum<PropertyType>(raw.propertyType, PROPERTY_TYPES);
   const pets = raw.pets === undefined ? undefined : asEnum<PetSituation>(raw.pets, PET_SITUATIONS);
+  const supportiveEligible = raw.supportiveEligible === true;
 
   const normalizedZip = normalizeZip(raw.zip ?? null);
   const destinationConfirmed = raw.destinationConfirmed === true;
@@ -134,6 +135,7 @@ export function validateEstimateInput(
       ...(lastClean ? { lastClean } : {}),
       ...(beds !== undefined ? { beds } : {}),
       ...(pets ? { pets } : {}),
+      ...(supportiveEligible ? { supportiveEligible: true } : {}),
     },
   };
 }

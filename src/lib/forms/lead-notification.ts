@@ -398,6 +398,17 @@ function pricingLines(fields: Record<string, string>): Array<[string, string]> {
       'The submitted price differs from the server recalculation. Review the scope and confirm the correct price with the customer before scheduling.',
     ]);
   }
+  const globalAdjustment = text(fields, 'global_adjustment');
+  const globalFactor = text(fields, 'global_factor');
+  if (globalFactor && globalFactor !== '1' && globalFactor !== '1.00') {
+    const direction = Number(globalAdjustment) < 0 ? '−' : '+';
+    lines.push([
+      'Pricing — Owner estimate adjustment',
+      `${globalFactor}×${globalAdjustment ? ` (${direction}${money(String(Math.abs(Number(globalAdjustment))))})` : ''}`,
+    ]);
+  }
+  const taxNote = text(fields, 'tax_note');
+  if (taxNote) lines.push(['Pricing — Sales tax', taxNote]);
   const minimum = text(fields, 'minimum_job_applied');
   if (minimum === 'true') lines.push(['Pricing — Minimum job applied', 'Yes']);
   return lines;
@@ -536,10 +547,12 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   }
   if (text(fields, 'turnover_frequency')) actions.push('Confirm turnover details and the first date');
   if (text(fields, 'service_type') === 'church_cleaning') {
-    actions.push('Church request — apply the 10% church discount to the confirmed cleaning quote');
+    actions.push('Church request — 10% discount applied after the minimum; confirm scope and any tax exemption');
   }
-  if (text(fields, 'supportive_home')) {
-    actions.push('Supportive Home Cleaning requested — review practical accommodations, no pricing change by category');
+  if (text(fields, 'supportive_eligible') === 'yes') {
+    actions.push('Supportive Home eligibility discount claimed — confirm eligibility before booking; 10% applies to eligible cleaning');
+  } else if (text(fields, 'supportive_home')) {
+    actions.push('Supportive Home Cleaning requested — review practical accommodations');
   }
   if (text(fields, 'engine_type') === 'commercial' || text(fields, 'engine_type') === 'church') {
     actions.push('Confirm the facility scope and final price personally before scheduling');
@@ -661,6 +674,7 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Church partnership — Contact requested', YES_NO_LABELS[text(fields, 'partnership_contact')] ?? text(fields, 'partnership_contact'), 'partnership_contact');
   add('Church partnership — Not now', YES_NO_LABELS[text(fields, 'partnership_none')] ?? text(fields, 'partnership_none'), 'partnership_none');
   add('Supportive home — Requested', text(fields, 'supportive_home'), 'supportive_home');
+  add('Supportive home — 10% eligibility claimed', YES_NO_LABELS[text(fields, 'supportive_eligible')] ?? text(fields, 'supportive_eligible'), 'supportive_eligible');
   add('Supportive home — What would help', text(fields, 'supportive_support'), 'supportive_support');
   add('Supportive home — Practical notes', text(fields, 'supportive_notes'), 'supportive_notes');
   add('Turnover — Rental properties', text(fields, 'rental_properties'), 'rental_properties');

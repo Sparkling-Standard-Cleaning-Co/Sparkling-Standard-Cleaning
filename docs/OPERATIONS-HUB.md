@@ -110,13 +110,11 @@ the owner inbox (four marked tests confirmed). Details:
 - Nothing analytics-related loads before an explicit analytics consent choice; advertising
   consent is never granted. Both services are gated by the same consent controller.
 - The GTM container (`GTM-KSQ26HMG`) loads only after an explicit analytics choice. The owner
-  published GTM Version 3 on 2026-10-03 (one Google tag, 12 event tags, 12 triggers, 7 variables);
-  GA4 `G-LG222LQRQ2` is **owner-confirmed operational** — page views, `estimate_start` and the
-  three inquiry key events verified end-to-end, Enhanced Measurement form interactions disabled,
-  consent tests passed. The import files in `docs/analytics/gtm-import/` remain a rebuild
-  reference; the live account configuration is authoritative. Umami is implemented but **has no
-  website ID yet**. Never republish/overwrite the container, add a second Google tag, or reuse
-  another business's IDs.
+  published Version 3 on 2026-10-03 and reports **Version 5** published on 2026-10-25 (one Google
+  tag, 19 event tags, 19 triggers, 13 variables, including church and promotion events). Page
+  views, `estimate_start` and the three inquiry key events were verified end-to-end under Version
+  3; live receipt of the new events still needs GA4 DebugView/Realtime confirmation. Never
+  republish/overwrite the container, add a second Google tag, or reuse another business's IDs.
 - Event names are a closed, fixed taxonomy (`src/lib/analytics/events.ts`); payloads are
   allowlisted. **Never send names, emails, phones, addresses, form contents or any PII to
   analytics.**

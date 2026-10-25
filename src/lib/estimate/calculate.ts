@@ -8,7 +8,7 @@
 //  - the minimum job value is applied silently to every estimate;
 //  - prices are never negative or nonsensical.
 
-import { pricing } from '../../config/pricing.ts';
+import { pricing, resolveGlobalEstimateFactor } from '../../config/pricing.ts';
 import { zoneForZip } from '../../config/geography.ts';
 import type { AddonBundleDefinition, CampaignPromotionConfig, FoundingTenConfig, PromotionCustomerKind, PromotionTerms } from '../../config/owner-pricing.ts';
 import { calculateTravelAdjustment } from '../travel/calculateTravelAdjustment.ts';
@@ -35,6 +35,8 @@ import type {
 } from './types.ts';
 
 export interface EstimateContext {
+  /** Test/owner override for the global estimate factor; defaults to config. */
+  globalEstimateFactor?: number;
   travel: {
     /** Present only when the serverless routing function answered. */
     routed?: RoutedTravelInfo;
@@ -128,12 +130,15 @@ const EMPTY_PRICING: PricingBreakdown = {
   addonLaborHours: 0,
   totalLaborHours: 0,
   basePrice: 0,
+  travelAdjustment: 0,
   addonPrices: [],
   selectedExtras: [],
   extrasSubtotal: 0,
   discount: null,
   roundingAdjustment: 0,
   subtotal: 0,
+  globalFactor: 1,
+  globalAdjustment: 0,
   minimumApplied: false,
 };
 
@@ -351,6 +356,10 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
   const rawPrice = round2(baseRaw + addonRaw);
   const gross = Math.max(minimumJob, rawPrice);
   const minimumApplied = gross > rawPrice;
+  // 1. Base service price after the minimum, rounded to the owner-approved
+  //     presentation step BEFORE any discount or global adjustment. This
+  //    keeps a  campaign exactly  off the displayed base price.
+  const baseRounded = floorToStep(gross, step);
 
   const incentive = context.addonIncentive ?? {
     enabled: pricing.addonIncentive.enabled.value,
@@ -366,7 +375,7 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
     eligibleAddonIds: selectedExtras.map((extra) => extra.id),
     addonChargesById: Object.fromEntries(selectedExtras.map((extra) => [extra.id, extra.charge])),
     addonSubtotal: addonRaw,
-    gross,
+    gross: baseRounded,
     minimumJob,
     todayIso: context.promotions?.todayIso ?? new Date().toISOString().slice(0, 10),
     customerKind: context.promotions?.customerKind ?? 'unknown',
@@ -377,16 +386,28 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
     campaign: context.promotions?.campaign !== undefined ? context.promotions.campaign : pricing.promotions.campaign.value,
     claimedCampaignCode: context.promotions?.claimedCampaignCode ?? null,
     campaignArrangement: context.promotions?.campaignArrangement ?? null,
+    supportiveDiscount: {
+      enabled: pricing.supportiveHomeDiscount.enabled.value,
+      percent: pricing.supportiveHomeDiscount.percent.value,
+      eligibleServices: pricing.supportiveHomeDiscount.eligibleServices.value,
+    },
+    supportiveEligible: input.supportiveEligible === true,
   });
   const discount = evaluation.discount;
-  const discountedGross = discount ? round2(gross - discount.amount) : gross;
-  const expectedPrice = round2(discountedGross + travel.adjustment);
-  // Owner-approved (2026-10-23): the presented price rounds DOWN to the
-  // nearest $5 — a negative adjustment that brings the offered price to the
-  // customer-friendly increment. It can never cross below the minimum job
-  // because the minimum ($125) is itself a multiple of the $5 step.
-  const roundingAdjustment = round2(floorToStep(expectedPrice, step) - expectedPrice);
-  const basePrice = round2(Math.max(minimumJob, baseRaw) + travel.adjustment);
+  // 2. One discount (never stacked) applies to the rounded base.
+  const discountedBase = discount ? round2(baseRounded - discount.amount) : baseRounded;
+  // 3. The owner global factor applies to the discounted service subtotal.
+  const globalFactor = resolveGlobalEstimateFactor(context.globalEstimateFactor);
+  const adjustedBase = round2(discountedBase * globalFactor);
+  const globalAdjustment = round2(adjustedBase - discountedBase);
+  // 4. Travel is a separately stated pass-through; tax is never included here.
+  const expectedPrice = round2(adjustedBase + travel.adjustment);
+  const hasAdjustment = discount !== null || globalFactor !== 1;
+  // 5. The base was rounded before discounts. The breakdown presents the
+  //    unrounded base + extras + the presentation adjustment separately so
+  //    the customer can reconcile every line exactly.
+  const roundingAdjustment = minimumApplied ? 0 : round2(baseRounded - baseRaw - addonRaw);
+  const basePrice = minimumApplied ? baseRounded : round2(baseRaw);
 
   const pricingBreakdown: PricingBreakdown = {
     ratePerLaborHour: rate,
@@ -399,8 +420,11 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
     selectedExtras,
     extrasSubtotal,
     discount,
+    travelAdjustment: travel.adjustment,
     roundingAdjustment,
     subtotal: expectedPrice,
+    globalFactor,
+    globalAdjustment,
     minimumApplied,
   };
 
@@ -413,14 +437,33 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
       ? [
           {
             step: 'price:promotion',
-            detail: `Applied promotion "${discount.label}" [${discount.id}] (single promotion, never stacked)`,
+            detail: `Applied discount "${discount.label}" [${discount.id}] (single discount, never stacked)`,
             value: discount.amount,
           },
         ]
       : []),
-    { step: 'price:rounding', detail: `Rounded down to the nearest $${step} (owner-approved)`, value: roundingAdjustment },
-    { step: 'price:expected', detail: 'Offered price before the final round-up', value: expectedPrice },
+    ...(globalFactor !== 1
+      ? [
+          {
+            step: 'price:global_factor',
+            detail: `Owner global estimate factor × ${globalFactor.toFixed(2)} applied to the pre-tax service subtotal`,
+            value: globalAdjustment,
+          },
+        ]
+      : []),
+    { step: 'price:base_rounding', detail: `Base service rounded down to the nearest $${step}`, value: round2(baseRounded - gross) },
+    { step: 'price:rounding', detail: 'Discounts and the owner factor are preserved to the cent; no upward rounding or reapplied minimum', value: roundingAdjustment },
+    { step: 'price:expected', detail: 'Offered price before travel/tax presentation', value: expectedPrice },
   );
+
+  if (globalFactor < 1 && adjustedBase < minimumJob) {
+    flags.push({
+      code: 'GLOBAL_FACTOR_BELOW_FLOOR',
+      severity: 'review',
+      message:
+        'The owner global estimate factor takes this service subtotal below the standard minimum; review before confirming.',
+    });
+  }
 
   if (minimumApplied) {
     flags.push({
@@ -472,8 +515,12 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
     };
   }
 
-  const low = Math.max(minimumJob, roundToNearest(expectedPrice * pricing.range.lowFactor.value, step));
-  const high = Math.max(low, roundToNearest(expectedPrice * pricing.range.highFactor.value, step));
+  const low = hasAdjustment
+    ? round2(expectedPrice * pricing.range.lowFactor.value)
+    : Math.max(minimumJob, roundToNearest(expectedPrice * pricing.range.lowFactor.value, step));
+  const high = hasAdjustment
+    ? round2(expectedPrice * pricing.range.highFactor.value)
+    : Math.max(low, roundToNearest(expectedPrice * pricing.range.highFactor.value, step));
 
   // ── Confidence ─────────────────────────────────────────────────────────────
   let score = 1;

@@ -1,11 +1,12 @@
 # GTM container setup for GA4 (owner guide)
 
-**Status 2026-10-03 — COMPLETED by the owner (owner-confirmed).** The website side loads the GTM
-container `GTM-KSQ26HMG` only after an explicit analytics consent choice and pushes the fixed
-events below into `window.dataLayer`. The container initially held zero tags, so GA4 received
-nothing; the owner then published **GTM Version 3** (one Google tag, twelve event tags, twelve
-triggers, seven data-layer variables) and confirmed GA4 receipt of page views, `estimate_start`
-and all three inquiry key events, plus the three key-event settings.
+**Status 2026-10-25 — GTM Version 5 owner-reported; receipt verification in progress.** The website
+side loads the GTM container `GTM-KSQ26HMG` only after an explicit analytics consent choice and
+pushes the fixed events below into `window.dataLayer`. The owner reports **Version 5** with
+**20 tags** (one Google tag + **19 event tags**), **19 triggers** and **13 variables**, including
+the church and promotion events. The earlier Version 3 receipt of page views, `estimate_start` and
+the three inquiry key events was owner-confirmed. Live receipt of the newer church/promotion events
+is **not fully proven** yet; verify it in GTM Preview and GA4 DebugView/Realtime.
 
 This document is retained as the **rebuild reference** (exact mapping, manual steps and
 verification procedure). The live account configuration is authoritative — never republish or
@@ -57,6 +58,13 @@ Tag type for every row: **Google Analytics: GA4 Event**, Measurement ID `G-LG222
 | 10 | `str_request_submit` | STR request delivered | `CE - str_request_submit` | `GA4 - Event - str_request_submit` | — | **primary** |
 | 11 | `booking_request` | Request included a preferred date | `CE - booking_request` | `GA4 - Event - booking_request` | `service_type` | secondary |
 | 12 | `review_link_click` | A review link was clicked (review link captured 2026-10-08) | `CE - review_link_click` | `GA4 - Event - review_link_click` | `platform` | no — engagement |
+| 13 | `church_request_start` | First interaction with the church form | `CE - church_request_start` | `GA4 - Event - church_request_start` | — | no — funnel entry |
+| 14 | `church_request_submit` | Church request delivered | `CE - church_request_submit` | `GA4 - Event - church_request_submit` | — | **primary** |
+| 15 | `promotion_displayed` | Welcome offer displayed | `CE - promotion_displayed` | `GA4 - Event - promotion_displayed` | `code` | no — engagement |
+| 16 | `promotion_dismissed` | Welcome offer dismissed | `CE - promotion_dismissed` | `GA4 - Event - promotion_dismissed` | `code` | no — engagement |
+| 17 | `promotion_claimed` | Welcome offer claimed | `CE - promotion_claimed` | `GA4 - Event - promotion_claimed` | `code` | no — engagement |
+| 18 | `promotion_estimate_applied` | Promotion applied to an estimate | `CE - promotion_estimate_applied` | `GA4 - Event - promotion_estimate_applied` | `code`, `service_type` | secondary |
+| 19 | `promotion_request_submit` | Request delivered with a promotion claim | `CE - promotion_request_submit` | `GA4 - Event - promotion_request_submit` | `code`, `service_type` | secondary |
 
 Also required once, on **Initialization – All Pages**:
 
@@ -72,9 +80,9 @@ Hayli confirms each job personally, and payment happens after the cleaning. Neve
 these events as a scheduled or completed job, and never rename or repurpose them to imply one.
 
 Each parameter needs a Data Layer Variable in GTM: `DLV - cta_slot`, `DLV - service_type`,
-`DLV - step`, `DLV - outcome`, `DLV - journey`, `DLV - facility_type`, `DLV - platform`.
+`DLV - step`, `DLV - outcome`, `DLV - journey`, `DLV - facility_type`, `DLV - platform`, `DLV - code`.
 
-## 4. Import the prepared configuration (completed 2026-10-03; retained for rebuilds)
+## 4. Import the prepared configuration (Version 3 completed 2026-10-03; Version 5 owner-reported 2026-10-25)
 
 Two import files are generated from this repository by `scripts/generate-gtm-import.mjs` and kept
 in sync by `npm run validate`:
@@ -153,12 +161,14 @@ Use GTM **Preview** (Tag Assistant) and GA4 **DebugView**:
 - Google Ads auto-tagging (`gclid`/`gbraid`/`wbraid`) is preserved on lead records; never add
   manual Google Ads UTMs.
 
-## 8. Status (owner-confirmed 2026-10-03)
+## 8. Status
 
-- ✅ Import completed and GTM Version 3 published.
-- ✅ GA4 receives page views, `estimate_start` and all three inquiry events end-to-end.
-- ✅ The three primary key events are configured; Enhanced Measurement form interactions are off;
-  consent tests passed.
-- ⏳ Optional and open: internal-traffic filter for owner devices.
-- ✅ Google Business Profile **verified with its profile + review links captured** (owner-supplied
+- Version 3 import/publication and receipt of page views, `estimate_start` and all three inquiry
+  events were owner-confirmed on 2026-10-03.
+- The owner reports **Version 5** published with 20 tags, 19 triggers and 13 variables, including
+  the church and promotion events (2026-10-25).
+- Verify live receipt of the new church/promotion events in GTM Preview and GA4 DebugView/Realtime
+  before treating the new event set as proven.
+- Optional and open: internal-traffic filter for owner devices.
+- Google Business Profile **verified with its profile + review links captured** (owner-supplied
   2026-10-08; independent of analytics).

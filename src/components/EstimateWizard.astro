@@ -78,6 +78,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         <p class="estimate-result__range" data-estimate-range hidden></p>
         <p class="estimate-result__ongoing" data-estimate-ongoing hidden></p>
         <p class="estimate-result__note" data-estimate-note></p>
+        <p class="estimate-result__tax small text-muted" data-estimate-tax></p>
         <p class="estimate-result__travel" data-estimate-travel></p>
         <p class="estimate-result__reference" data-estimate-reference hidden></p>
         <ul class="estimate-flags" data-estimate-flags></ul>
@@ -320,7 +321,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         </div>
         <div class="field" data-str-only hidden>
           <label for="est-beds">Beds to reset (turnovers)</label>
-          <input class="input" id="est-beds" name="beds" type="number" inputmode="numeric" min="1" max="30" />
+          <input class="input" id="est-beds" name="beds" type="number" inputmode="numeric" min="1" max="30" required />
           <span class="hint">Each bed gets fresh linens and a full reset.</span>
         </div>
         <div class="field-row field-row--2" data-str-only hidden>
@@ -377,39 +378,22 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         </div>
 
         <div class="supportive-block" data-supportive-section hidden>
-          <h3 class="supportive-block__title">Would you like to request our Supportive Home Cleaning approach?</h3>
+          <h3 class="supportive-block__title">Supportive Home Cleaning — 10% appreciation discount</h3>
           <p class="hint">
-            For households that may appreciate additional care, patience, communication or
-            flexibility — including senior, veteran, military and first-responder households.
-            Completely optional, and no diagnosis or documentation is ever required.
+            For adults aged 65 or older, military veterans, and people with disabilities.
+            Ordinary residential cleaning is available to every customer; this optional discount
+            requires eligibility. No diagnosis, medical record or documentation is ever requested.
+            <a href="/supportive-home-cleaning/">See eligibility and program details</a>.
           </p>
-          <div class="field-row field-row--2">
-            <div class="field">
-              <label for="est-supportive-home">Supportive home cleaning</label>
-              <select class="select" id="est-supportive-home" name="supportiveHome">
-                <option value="">No preference</option>
-                <option value="senior">Senior household</option>
-                <option value="veteran">Veteran or military household</option>
-                <option value="first_responder">First responder household</option>
-                <option value="practical_support">Household needing additional practical support</option>
-                <option value="other">Other</option>
-                <option value="prefer_not">Prefer not to specify</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="est-supportive-support">What would help most? (optional)</label>
-              <select class="select" id="est-supportive-support" name="supportiveSupport">
-                <option value="">Choose one…</option>
-                <option value="scheduling_flexibility">Additional scheduling flexibility</option>
-                <option value="communication">Communication preferences</option>
-                <option value="family_coordination">Coordination with an authorized family member</option>
-                <option value="access">Special access instructions</option>
-                <option value="priority_areas">Priority areas</option>
-                <option value="extra_time">Extra time or assistance</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-          </div>
+          <label class="policy-notice__confirm">
+            <input type="checkbox" name="supportiveEligible" value="yes" data-supportive-eligible />
+            <span>I qualify for Sparkling Standard&rsquo;s 10% Supportive Home discount.*</span>
+          </label>
+          <p class="hint">
+            *Eligibility is confirmed personally before booking. The discount applies to eligible
+            cleaning charges and never stacks with another promotion — the larger single discount
+            applies.
+          </p>
           <div class="field">
             <label for="est-supportive-notes">Anything practical we should know? (optional)</label>
             <textarea

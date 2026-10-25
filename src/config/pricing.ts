@@ -117,6 +117,45 @@ export const pricing = {
     'Directive §22 initial provisional minimum. One setting only. Applied silently to the estimate range; the number is not advertised unless the owner approves.',
   ),
 
+  /**
+   * ONE owner-controlled adjustment to the pre-tax cleaning/service subtotal.
+   * Applies after the minimum and any single eligible discount, before travel
+   * and tax. 1.00 = unchanged, 0.90 = 10% lower, 1.10 = 10% higher.
+   */
+  globalEstimateFactor: approved(
+    ownerPricing.globalEstimateFactor,
+    'Owner-directed global estimate adjustment (2026-10-25). Applies to the pre-tax service subtotal across all engines; travel and tax are separate. Supported range 0.50–1.50.',
+  ),
+
+  // ── Supportive Home discount (owner-directed 2026-10-25) ────────────────────
+  // A 10% appreciation discount for eligible Supportive Home customers. It is
+  // self-attested at the estimate and confirmed by the owner before booking.
+  // It is one discount in the single-discount policy (never stacked with a
+  // campaign or other promotion). It applies to eligible residential cleaning
+  // services only and never to travel or tax.
+  supportiveHomeDiscount: {
+    state: 'approved' as ApprovalState,
+    termsVersion: approved(
+      ownerPricing.supportiveHomeDiscount.termsVersion,
+      'Version marker for the Supportive Home eligibility-discount terms.',
+    ),
+    enabled: approved(
+      ownerPricing.supportiveHomeDiscount.enabled,
+      'Owner-directed Supportive Home 10% discount (2026-10-25).',
+    ),
+    percent: approved(
+      ownerPricing.supportiveHomeDiscount.percent,
+      'Owner-directed 10% appreciation discount for eligible Supportive Home customers.',
+    ),
+    eligibleServices: approved(
+      ownerPricing.supportiveHomeDiscount.eligibleServices,
+      'Residential services eligible for the Supportive Home discount (never commercial, church or STR).',
+    ),
+    appliesTo: 'cleaning_subtotal' as const,
+    stacking: false as const,
+    note: 'Eligibility categories: adults aged 65+, military veterans, and people with disabilities. Self-attested; no diagnosis or documentation is collected.',
+  },
+
   // ── Church discount (owner-directed 2026-10-24) ────────────────────────────
   // A genuine, transparent 10% reduction for qualifying church cleaning. The
   // normal price is calculated first; the discount applies to the cleaning
@@ -143,7 +182,7 @@ export const pricing = {
   // scope-review experience with no numeric prices.
   commercialPricing: {
     state: 'approved' as ApprovalState,
-    configVersion: approved('2026-10-25.facility-workload.v1', 'Facility estimate provenance marker (Initiative 6.1).'),
+    configVersion: approved('2026-10-25.facility-workload.v2', 'Facility estimate provenance marker (Initiative 6.2: global factor, exact discount reconciliation and tax presentation).'),
     grossRatePerHour: approved(ownerPricing.commercialPricing.grossRatePerHour, 'Middle of the published Pensacola market range (-75/hr); sustains owner labour, overhead and a modest margin.'),
     productionSqftPerHour: {
       office: approved(ownerPricing.commercialPricing.productionSqftPerHour.office, 'Conservative effective rate for a DETAILED office standard (ISSA routine benchmark is ~4,200 sqft/hr; lowered for quality, obstacle density and nonproductive time).'),
@@ -398,7 +437,7 @@ export const pricing = {
      * the server before a reservation is accepted. Bump when pricing logic,
      * rates or policy values change so old quotes cannot be silently reused.
      */
-    configVersion: approved('2026-10-23.floor5-travel35.v1', 'Quote provenance marker. Incremented for the owner-approved floor rounding to the nearest $5 and the 35-mile round-trip travel assumption (price-affecting changes) on top of the recurring first-visit restructure.'),
+    configVersion: approved('2026-10-25.global-factor-supportive-tax.v1', 'Quote provenance marker. Incremented for the Initiative 6.2 global estimate factor, Supportive Home eligibility discount, exact discount reconciliation and tax presentation.'),
     /**
      * Which value from the calculation becomes the offered price. 'expected' is
      * the model price and never the lowest range value; 'midpoint' and 'high'
@@ -458,4 +497,22 @@ export type PricingConfig = typeof pricing;
 /** Convenience accessor that keeps call sites readable. */
 export function pricingValue<T>(configValue: ConfigValue<T>): T {
   return configValue.value;
+}
+
+/** Supported bounds for the owner-controlled global estimate factor. */
+export const GLOBAL_ESTIMATE_FACTOR_MIN = 0.5;
+export const GLOBAL_ESTIMATE_FACTOR_MAX = 1.5;
+
+/**
+ * Returns the validated global estimate factor. An invalid/nonfinite/out-of-
+ * range value fails CLOSED to 1.00 (no silent surprise adjustment) and the
+ * configuration test reports the bad value. Callers never accept a client
+ * factor; this reads the owner configuration only.
+ */
+export function resolveGlobalEstimateFactor(
+  value: number = pricing.globalEstimateFactor.value,
+): number {
+  if (!Number.isFinite(value)) return 1;
+  if (value < GLOBAL_ESTIMATE_FACTOR_MIN || value > GLOBAL_ESTIMATE_FACTOR_MAX) return 1;
+  return value;
 }

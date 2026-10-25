@@ -69,11 +69,17 @@ test('church verification recomputes the 10% discount', () => {
       service_type: 'church_cleaning',
       facility_type: 'church',
       cleaning_subtotal: String(price.cleaningSubtotal),
+      quoted_price: String(price.total),
       church_discount_percent: '10',
     }),
   );
   assert.notEqual(result.status, 'mismatch');
   assert.equal(result.discountAmount, price.discount?.amount);
+});
+
+test('a tampered final facility price is a mismatch even when the cleaning subtotal matches', () => {
+  const result = verifyFacilityQuote(fieldsFor({ quoted_price: '1' }));
+  assert.equal(result.status, 'mismatch');
 });
 
 test('a very large facility cannot be verified as a firm price', () => {

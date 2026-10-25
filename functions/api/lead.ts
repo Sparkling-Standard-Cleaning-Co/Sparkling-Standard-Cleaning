@@ -27,6 +27,7 @@ import {
 } from '../../src/lib/estimate/verify.ts';
 import { requiresInitialDeepClean } from '../../src/lib/estimate/frequency.ts';
 import { verifyFacilityQuote, stripFacilityPricingFields } from '../../src/lib/estimate/facility-verify.ts';
+import { taxPresentationForService } from '../../src/lib/estimate/tax.ts';
 import type { Frequency } from '../../src/lib/estimate/types.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
 import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
@@ -79,6 +80,11 @@ const SERVER_OWNED_KEYS = new Set([
   'extras_detail',
   'addon_incentive',
   'discount_amount',
+  'discount_label',
+  'global_factor',
+  'global_adjustment',
+  'tax_status',
+  'tax_note',
   'promotion_source',
   'rounding_adjustment',
   'facility_quote_verified',
@@ -200,6 +206,14 @@ export async function onRequestPost(context: {
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
 
+  // Sales-tax presentation: server-derived from the service type, never from
+  // a client amount. No rate is invented; the final invoice confirms any tax.
+  if (clean.service_type) {
+    const tax = taxPresentationForService(clean.service_type);
+    clean.tax_status = tax.treatment;
+    clean.tax_note = tax.note;
+  }
+
   // Owner policy (2026-10-19): a new recurring residential maintenance
   // arrangement must begin with a Deep Cleaning. The server derives the policy
   // from the sanitized scope and fails closed when the customer did not
@@ -234,6 +248,14 @@ export async function onRequestPost(context: {
     if (facility.expectedCleaning !== null) clean.verified_cleaning_price = String(facility.expectedCleaning);
     if (facility.laborHours !== null) clean.verified_labor_hours = String(facility.laborHours);
     if (facility.discountAmount !== null) clean.verified_church_discount = String(facility.discountAmount);
+    if (facility.discountLabel) {
+      clean.discount_label = facility.discountLabel;
+      clean.discount_amount = String(facility.discountAmount ?? 0);
+    }
+    if (facility.globalFactor !== null && facility.globalFactor !== 1) {
+      clean.global_factor = String(facility.globalFactor);
+      clean.global_adjustment = String(facility.globalAdjustment ?? 0);
+    }
   }
 
   // Turnstile verification when the secret is configured.
@@ -322,12 +344,17 @@ export async function onRequestPost(context: {
             : 'None';
         if (breakdown.discount) {
           clean.addon_incentive = breakdown.discount.label;
+          clean.discount_label = breakdown.discount.label;
           clean.discount_amount = breakdown.discount.amount.toFixed(2);
           if (breakdown.discount.source) {
             clean.promotion_source = breakdown.discount.source;
           }
         } else {
           clean.addon_incentive = 'None';
+        }
+        if (breakdown.globalFactor !== 1) {
+          clean.global_factor = breakdown.globalFactor.toFixed(2);
+          clean.global_adjustment = breakdown.globalAdjustment.toFixed(2);
         }
         clean.rounding_adjustment = breakdown.roundingAdjustment.toFixed(2);
         clean.proposed_total = (breakdown.subtotal + breakdown.roundingAdjustment).toFixed(2);

@@ -133,9 +133,9 @@ async function mockApis(page, { leadStatus = 200 } = {}) {
 }
 
 async function openEstimate(page) {
-  await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
+  await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
   await acceptAnalytics(page);
-  await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
+  await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner,.promo-popup{display:none!important}' });
   await page.click('label.option:has(input[name="serviceType"][value="standard"])');
 }
 

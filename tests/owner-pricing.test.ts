@@ -205,24 +205,27 @@ test('recurring 1600 sqft 3/2 biweekly with two add-ons reconciles client and se
 
   const expectedExtras = (0.6 + 0.7) * p.ratePerLaborHour; // inside_oven + laundry
   const firstSubtotal = round2(firstLabor * p.ratePerLaborHour + round2(expectedExtras));
-  const firstTotal = Math.floor(firstSubtotal / 5) * 5;
+  const firstRounded = Math.floor(firstSubtotal / 5) * 5;
   const ongoingSubtotal = round2(ongoingLabor * p.ratePerLaborHour + round2(expectedExtras));
-  const ongoingTotal = Math.floor(ongoingSubtotal / 5) * 5;
+  const ongoingRounded = Math.floor(ongoingSubtotal / 5) * 5;
 
-  // First visit reconciles (this is the price the customer submits).
+  // First visit reconciles (this is the price the customer submits). The base
+  // is rounded to the $5 presentation step before any discount/factor.
   assert.equal(p.baseLaborHours, round2(firstLabor));
   assert.equal(p.addonLaborHours, 1.3);
   assert.equal(p.extrasSubtotal, round2(expectedExtras));
-  assert.equal(p.subtotal, firstSubtotal);
-  assert.equal(selectInstantAmount(client), firstTotal);
+  assert.equal(p.basePrice, round2(firstLabor * p.ratePerLaborHour));
+  assert.equal(p.roundingAdjustment, round2(firstRounded - firstSubtotal));
+  assert.equal(p.subtotal, firstRounded);
+  assert.equal(selectInstantAmount(client), firstRounded);
 
   // Ongoing per-visit rhythm reconciles and stays cheaper than the deep visit.
   assert.equal(client.ongoing.pricing.baseLaborHours, round2(ongoingLabor));
   assert.equal(client.ongoing.pricing.extrasSubtotal, round2(expectedExtras));
-  assert.equal(client.ongoing.pricing.subtotal, ongoingSubtotal);
-  assert.equal(client.ongoing.perVisitPrice, ongoingTotal);
-  assert.equal(ongoingTotal, 325, 'the representative scenario reflects the $55 billing target at floor-$5 rounding');
-  assert.ok(ongoingTotal < firstTotal, 'maintenance visits cost less than the required deep first visit');
+  assert.equal(client.ongoing.pricing.subtotal, ongoingRounded);
+  assert.equal(client.ongoing.perVisitPrice, ongoingRounded);
+  assert.equal(ongoingRounded, 325, 'the representative scenario reflects the $55 billing target at the $5 presentation step');
+  assert.ok(ongoingRounded < firstRounded, 'maintenance visits cost less than the required deep first visit');
 
   // Server path: the same flat fields must reproduce BOTH amounts.
   const server = calculateEstimate(

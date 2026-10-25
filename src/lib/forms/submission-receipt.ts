@@ -43,6 +43,14 @@ const SUMMARY_KEYS = [
   'gift_value',
   'facility_type',
   'organization',
+  'supportive_eligible',
+  'supportive_notes',
+  'discount_label',
+  'discount_amount',
+  'global_factor',
+  'global_adjustment',
+  'tax_status',
+  'tax_note',
 ] as const;
 
 export interface StorageLike {

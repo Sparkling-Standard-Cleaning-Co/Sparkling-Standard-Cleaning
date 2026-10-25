@@ -38,6 +38,7 @@
     "validate:production": "node scripts/validate-production-env.mjs",
     "deploy:secrets": "node scripts/generate-deploy-secrets.mjs",
     "estimate:quotes": "node scripts/quote-preview.mjs",
+    "estimate:scenarios": "node scripts/estimate-scenarios.mjs",
     "estimate:discount-impact": "node scripts/discount-impact.mjs",
     "promotions:impact": "node scripts/promotions-impact.mjs",
     "gift:certificate": "node scripts/gift-certificate.mjs",

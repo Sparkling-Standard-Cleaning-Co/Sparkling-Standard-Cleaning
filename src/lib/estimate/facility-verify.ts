@@ -27,6 +27,12 @@ export interface FacilityVerification {
   expectedRange: { low: number; high: number } | null;
   laborHours: number | null;
   discountAmount: number | null;
+  /** Human label when a church discount applies. */
+  discountLabel: string | null;
+  /** Owner global factor applied to the service subtotal (null when disabled/unpriced). */
+  globalFactor: number | null;
+  /** Dollar effect of the owner factor. */
+  globalAdjustment: number | null;
   configMatch: 'match' | 'mismatch' | 'unknown';
   travelStatus: 'verified' | 'preliminary' | 'manual_review';
   /** False when the owner has disabled numeric facility pricing. */
@@ -88,6 +94,9 @@ export function verifyFacilityQuote(
       expectedRange: null,
       laborHours: null,
       discountAmount: null,
+      discountLabel: null,
+      globalFactor: null,
+      globalAdjustment: null,
       configMatch: 'unknown',
       travelStatus: 'preliminary',
       pricingEnabled: false,
@@ -96,6 +105,7 @@ export function verifyFacilityQuote(
 
   const sqft = num(fields.cleanable_sqft);
   const clientCleaning = num(fields.cleaning_subtotal);
+  const clientFinal = num(fields.quoted_price);
   const clientVersion = fields.quote_config_version ?? '';
   const configMatch =
     clientVersion === ''
@@ -111,6 +121,9 @@ export function verifyFacilityQuote(
       expectedRange: null,
       laborHours: null,
       discountAmount: null,
+      discountLabel: null,
+      globalFactor: null,
+      globalAdjustment: null,
       configMatch,
       travelStatus: 'manual_review',
       pricingEnabled: true,
@@ -141,7 +154,10 @@ export function verifyFacilityQuote(
       expectedCleaning: null,
       expectedRange: null,
       laborHours: workload.laborHours,
-      discountAmount: price.discount?.amount ?? null,
+      discountAmount: price.discount?.applied ? price.discount.amount : null,
+      discountLabel: price.discount?.applied ? `Church discount (${pricing.churchDiscount.percent.value}%)` : null,
+      globalFactor: price.globalFactor,
+      globalAdjustment: price.globalAdjustment,
       configMatch,
       travelStatus: fields.travel_verified === 'true' ? 'verified' : 'preliminary',
       pricingEnabled: true,
@@ -151,26 +167,36 @@ export function verifyFacilityQuote(
   const travelStatus =
     fields.travel_verified === 'true' ? 'verified' : fields.travel_verified === 'false' && fields.travel_qualification === 'manual_review' ? 'manual_review' : 'preliminary';
 
-  if (clientCleaning === null) {
+  if (clientCleaning === null || clientFinal === null) {
     return {
       status: 'unverifiable',
       expectedCleaning: price.perVisit,
       expectedRange: price.range,
       laborHours: workload.laborHours,
-      discountAmount: price.discount?.amount ?? null,
+      discountAmount: price.discount?.applied ? price.discount.amount : null,
+      discountLabel: price.discount?.applied ? `Church discount (${pricing.churchDiscount.percent.value}%)` : null,
+      globalFactor: price.globalFactor,
+      globalAdjustment: price.globalAdjustment,
       configMatch,
       travelStatus,
       pricingEnabled: true,
     };
   }
 
-  const matches = Math.abs(clientCleaning - price.perVisit) <= TOLERANCE;
+  // Verify BOTH the submitted cleaning subtotal and the final per-visit price
+  // against the server rebuild. A client cannot tamper one while leaving the
+  // other intact and still receive a matching verdict.
+  const cleaningMatches = Math.abs(clientCleaning - price.cleaningSubtotal) <= TOLERANCE;
+  const finalMatches = Math.abs(clientFinal - price.total) <= TOLERANCE;
   return {
-    status: configMatch === 'mismatch' || !matches ? 'mismatch' : travelStatus === 'verified' ? 'verified' : 'preliminary',
+    status: configMatch === 'mismatch' || !cleaningMatches || !finalMatches ? 'mismatch' : travelStatus === 'verified' ? 'verified' : 'preliminary',
     expectedCleaning: price.perVisit,
     expectedRange: price.range,
     laborHours: workload.laborHours,
-    discountAmount: price.discount?.amount ?? null,
+    discountAmount: price.discount?.applied ? price.discount.amount : null,
+    discountLabel: price.discount?.applied ? `Church discount (${pricing.churchDiscount.percent.value}%)` : null,
+    globalFactor: price.globalFactor,
+    globalAdjustment: price.globalAdjustment,
     configMatch,
     travelStatus,
     pricingEnabled: true,

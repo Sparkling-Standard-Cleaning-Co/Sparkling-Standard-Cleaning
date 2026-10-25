@@ -1,10 +1,10 @@
 ---
 metaTitle: Service Area | Pensacola, Cantonment & Surrounding Communities
-metaDescription: We serve Pensacola, Cantonment and surrounding communities, with select nearby service into Alabama. Check your ZIP in the instant estimate to see coverage.
+metaDescription: Sparkling Standard serves Pensacola, Cantonment and surrounding Northwest Florida communities, with select nearby Alabama locations available by arrangement.
 hero:
   headline: Serving Pensacola, Cantonment, and beyond
-  lead: Proudly local to the Pensacola/Cantonment area, servicing surrounding Florida and Alabama communities depending on distance.
-  ctaLabel: Check Your ZIP in the Estimate
+  lead: Based in the Pensacola–Cantonment area, Sparkling Standard serves homes and businesses throughout surrounding Northwest Florida communities, with select nearby Alabama locations available by arrangement.
+  ctaLabel: Get an Estimate
 communities:
   heading: Where we clean
   lead: The confirmed service area today, stated exactly as it is — no fake maps, no invented radius claims.

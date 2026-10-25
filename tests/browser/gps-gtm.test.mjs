@@ -126,7 +126,7 @@ async function openEstimate({ geolocation, permissions, width = 1280, height = 9
   const context = await browser.newContext({ viewport: { width, height }, geolocation, permissions });
   const page = await context.newPage();
   const captured = await mockApis(page, mockOptions);
-  await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
+  await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
   await page.click('label.option:has(input[name="serviceType"][value="standard"])');
   return { context, page, ...captured };
@@ -365,7 +365,7 @@ test('missing required fields show an error summary, field errors and focus', as
   const page = await context.newPage();
   try {
     await mockApis(page, {});
-    await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
+    await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
     await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
     await page.click('[data-next]');
     await page.waitForSelector('[data-error-summary]', { state: 'visible' });

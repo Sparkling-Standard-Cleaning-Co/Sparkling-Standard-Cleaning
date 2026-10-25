@@ -96,7 +96,7 @@ async function mockProviders(page) {
   await page.route('**tiles.openfreemap.org/**', (route) => route.abort());
 }
 
-async function openEstimate(width, height, path = '/estimate/') {
+async function openEstimate(width, height, path = '/estimate/residential/') {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   await mockProviders(page);
@@ -113,6 +113,9 @@ async function openEstimate(width, height, path = '/estimate/') {
     });
   });
   await page.goto(BASE + path, { waitUntil: 'load' });
+  if (path.startsWith('/estimate/?')) {
+    await page.waitForURL(/\/estimate\/(residential|str)\//);
+  }
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
   await page.click('[data-address-manual-summary]');
   return { context, page, captured };
@@ -329,6 +332,7 @@ test('the legacy STR deep link opens the isolated turnover engine', async () => 
     assert.equal(headings[0].trim(), 'Property & Address');
     // Residential pages never offer or submit stale STR details.
     await page.goto(BASE + '/estimate/?service=deep', { waitUntil: 'load' });
+    await page.waitForURL(/\/estimate\/residential\//);
     await page.waitForFunction(() => document.querySelector('[data-engine-note]')?.hidden === true);
     assert.equal(await page.locator('input[name="beds"]').inputValue(), '');
     assert.equal(

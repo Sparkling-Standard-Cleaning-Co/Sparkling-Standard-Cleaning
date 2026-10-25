@@ -54,7 +54,7 @@ Date: **2026-10-01**.
    axe WCAG scan — the exact checks already run during recovery, made repeatable in CI.
 2. **Maintenance schedule** — monthly/quarterly cadence: dependency health, estimator
    recalibration, marketing registry refresh, platform-status review, backup/export checks.
-3. **Analytics activation — complete (owner-confirmed 2026-10-03).** GTM Version 3 published; GA4
+3. **Analytics activation — complete (owner-confirmed 2026-10-03).** GTM Version 5 owner-reported; GA4
    receives page views, `estimate_start` and the three inquiry key events; Enhanced Measurement
    form interactions disabled. Optional remaining: internal-traffic filter; Umami still needs a
    website ID. Reference: `docs/analytics/GTM-CONTAINER-SETUP.md`.

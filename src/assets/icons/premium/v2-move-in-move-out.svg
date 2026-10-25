@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+ <defs>
+  <linearGradient id="v2-bg-move" x1=".1" y1="0" x2=".95" y2="1"><stop offset="0" stop-color="#d99aaa"/><stop offset=".44" stop-color="#a94f6e"/><stop offset="1" stop-color="#6b2a47"/></linearGradient>
+  <linearGradient id="v2-gold-move" x1="0" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="#ffe7b8"/><stop offset=".5" stop-color="#efc28b"/><stop offset="1" stop-color="#cf9861"/></linearGradient>
+  <filter id="v2-shadow-move" x="-25%" y="-25%" width="150%" height="155%"><feDropShadow dx="0" dy="2.4" stdDeviation="2.8" flood-color="#4f2038" flood-opacity=".2"/></filter>
+ </defs>
+ <rect x="4" y="4" width="120" height="120" rx="26" fill="url(#v2-bg-move)" filter="url(#v2-shadow-move)"/>
+ <rect x="9" y="9" width="110" height="110" rx="21" fill="none" stroke="#fff6f1" stroke-width="1.5" opacity=".35"/>
+ <path d="M27 16 Q64 7 101 20" fill="none" stroke="#fffaf7" stroke-width="2.4" opacity=".22"/>
+ <g fill="none" stroke="#fffaf7" stroke-width="5.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M33 56 L64 32 L95 56"/>
+  <path d="M41 54 V82 Q41 87 46 87 H82 Q87 87 87 82 V54"/>
+  <path d="M57 87 V70 H71 V87"/>
+ </g>
+ <g fill="none" stroke="url(#v2-gold-move)" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M53 99 H29 M29 99 L37 92 M29 99 L37 106"/>
+  <path d="M75 99 H99 M99 99 L91 92 M99 99 L91 106"/>
+ </g>
+ <path d="M95 22 L97.2 28.4 L103.5 30.6 L97.2 32.8 L95 39.2 L92.8 32.8 L86.5 30.6 L92.8 28.4Z" fill="#fffaf7" opacity=".9"/>
+</svg>

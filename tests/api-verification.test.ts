@@ -191,6 +191,28 @@ test('lead: selected extras are itemized with their actual server-calculated cha
   assert.equal(sent['Internal — Rate per labor hour'], '$55');
 });
 
+test('lead: a Supportive Home attestation is recomputed and disclosed without sensitive detail', async () => {
+  const { stub, forwarded } = verificationStub();
+  await withFetch(stub, () =>
+    leadPost({
+      request: jsonRequest({
+        subject: 'Reservation',
+        fields: reservationFields({ supportive_eligible: 'yes', quoted_price: '999' }),
+      }),
+      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', TRAVEL_ORIGIN: '30.6100,-87.3400' },
+    } as never),
+  );
+  const sent = forwarded[0] as Record<string, string>;
+  const entries = Object.entries(sent);
+  const discount = entries.find(([label]) => label.includes('Discount applied'))?.[1] ?? '';
+  assert.match(discount, /Supportive Home discount/i);
+  assert.match(discount, /10%/);
+  const tax = entries.find(([label]) => label.includes('Sales tax'))?.[1] ?? '';
+  assert.match(tax, /residential/i);
+  assert.equal(sent['Supportive home — 10% eligibility claimed'], 'Yes');
+  assert.doesNotMatch(JSON.stringify(sent), /diagnosis|medical record|disability certification/i);
+});
+
 test('lead: a new recurring reservation shows the server-owned first-visit and ongoing prices', async () => {
   const { stub, forwarded } = verificationStub();
   await withFetch(stub, () =>

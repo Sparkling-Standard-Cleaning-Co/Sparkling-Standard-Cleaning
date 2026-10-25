@@ -256,6 +256,25 @@ export function buildRequestSummary(fields: Record<string, string>): RequestSumm
   const arrival = text(fields, 'arrival_preference');
   if (arrival) add('Arrival preference', ARRIVAL_LABELS[arrival] ?? humanizeKey(arrival));
 
+  const discountLabel = text(fields, 'discount_label', 'addon_incentive');
+  const discountAmount = text(fields, 'discount_amount');
+  if (discountLabel && discountLabel !== 'None') {
+    add(
+      'Discount',
+      discountAmount ? `${discountLabel} — −${money(discountAmount)}` : discountLabel,
+    );
+  }
+  const globalFactor = text(fields, 'global_factor');
+  const globalAdjustment = text(fields, 'global_adjustment');
+  if (globalFactor && globalFactor !== '1.00' && globalFactor !== '1') {
+    add(
+      'Owner estimate adjustment',
+      `${globalFactor}×${globalAdjustment ? ` (${Number(globalAdjustment) < 0 ? '−' : '+'}${money(String(Math.abs(Number(globalAdjustment))))})` : ''}`,
+    );
+  }
+  const taxNote = text(fields, 'tax_note');
+  if (taxNote) add('Sales tax', taxNote);
+
   const estimate = estimateFor(fields, kind);
   const title =
     kind === 'facility_estimate' && !estimate

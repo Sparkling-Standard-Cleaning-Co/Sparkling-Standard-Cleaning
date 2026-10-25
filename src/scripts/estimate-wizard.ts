@@ -22,6 +22,8 @@ import { business, contactPhone, isPending } from '../config/business';
 import { schedulingConfig } from '../config/scheduling';
 import { calculateEstimate, type EstimateContext } from '../lib/estimate/calculate';
 import { buildInstantQuote, type InstantQuote } from '../lib/estimate/quote';
+import { taxPresentationForService } from '../lib/estimate/tax';
+import { formatUsd } from '../lib/format';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
 import { SERVICE_LABELS, SERVICE_SHORT, FREQUENCY_LABELS, FREQUENCY_RHYTHMS } from '../lib/estimate/labels';
 import { serviceAsksFrequency, serviceSupportsFrequency } from '../lib/estimate/service-matrix';
@@ -117,6 +119,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const liveRange = form.querySelector<HTMLElement>('[data-estimate-range]');
   const liveOngoing = form.querySelector<HTMLElement>('[data-estimate-ongoing]');
   const liveNote = form.querySelector<HTMLElement>('[data-estimate-note]');
+  const liveTax = form.querySelector<HTMLElement>('[data-estimate-tax]');
   const liveTravel = form.querySelector<HTMLElement>('[data-estimate-travel]');
   const liveReference = form.querySelector<HTMLElement>('[data-estimate-reference]');
   const liveFlags = form.querySelector<HTMLElement>('[data-estimate-flags]');
@@ -379,6 +382,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
       zip: submission.zip,
       ...(submission.location ? { destinationConfirmed: true } : {}),
       pets: textValue('pets') as EstimateInput['pets'],
+      ...(form.querySelector<HTMLInputElement>('input[name="supportiveEligible"]')?.checked
+        ? { supportiveEligible: true }
+        : {}),
     };
   }
 
@@ -503,9 +509,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
     livePanel.hidden = summaryTakesOver;
 
     if (result.status === 'estimated') {
-      const amount = latestQuote ? `$${latestQuote.amount.toLocaleString()}` : '—';
+      const amount = latestQuote ? formatUsd(latestQuote.amount) : '—';
       if (liveLabel) liveLabel.textContent = primaryPriceHeading(result);
       livePrice.textContent = amount;
+      const tax = taxPresentationForService(currentServiceType());
+      if (liveTax) {
+        liveTax.hidden = false;
+        liveTax.textContent = `${tax.label}. ${tax.note}`;
+      }
       const confidenceCopy =
         submissionAddress().location?.precision === 'street'
           ? 'Based on the street-level pin you placed — we will verify the exact property with you.'
@@ -522,14 +533,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
         liveRange.hidden = false;
         liveRange.textContent =
           result.low !== null && result.high !== null
-            ? `Typical range for this scope: $${result.low.toLocaleString()} – $${result.high.toLocaleString()}`
+            ? `Typical range for this scope: ${formatUsd(result.low)} — ${formatUsd(result.high)}`
             : '';
       }
       if (liveOngoing) {
         const ongoing = result.ongoing;
         if (ongoing) {
           liveOngoing.hidden = false;
-          liveOngoing.textContent = `After the required first-visit Deep Cleaning above, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are $${ongoing.perVisitPrice.toLocaleString()} each.`;
+          liveOngoing.textContent = `After the required first-visit Deep Cleaning above, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are ${formatUsd(ongoing.perVisitPrice)} each.`;
         } else {
           liveOngoing.hidden = true;
           liveOngoing.textContent = '';
@@ -596,7 +607,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         node.textContent = usable ? 'Custom quote' : '—';
         continue;
       }
-      node.textContent = `+$${line.charge.toFixed(2)}`;
+      node.textContent = `+${formatUsd(line.charge, { forceCents: true })}`;
       if (result.pricing.minimumApplied) {
         node.title = 'Included in the minimum visit price';
       } else {
@@ -621,29 +632,50 @@ function initEstimateWizard(form: HTMLFormElement): void {
   function priceLines(result: EstimateResult): Array<{ label: string; value: string; strong?: boolean }> {
     const p = result.pricing;
     if (result.status !== 'estimated' || p.subtotal <= 0) return [];
-    const roundStep = pricing.rounding.toNearest.value;
+    const tax = taxPresentationForService(radioValue('serviceType'));
     const lines: Array<{ label: string; value: string; strong?: boolean }> = [];
     if (p.minimumApplied) {
-      lines.push({ label: 'Minimum visit price', value: `$${p.subtotal.toFixed(2)}` });
+      lines.push({ label: 'Minimum visit price', value: formatUsd(p.basePrice) });
       if (p.selectedExtras.length > 0) lines.push({ label: 'Selected extras', value: 'Included' });
-      if (p.discount) lines.push({ label: p.discount.label, value: `−$${p.discount.amount.toFixed(2)}` });
     } else {
-      lines.push({ label: 'Base cleaning (includes travel)', value: `$${p.basePrice.toFixed(2)}` });
+      lines.push({ label: 'Base cleaning', value: formatUsd(p.basePrice) });
       for (const extra of p.selectedExtras) {
-        lines.push({ label: extra.label, value: `+$${extra.charge.toFixed(2)}` });
+        lines.push({ label: extra.label, value: `+${formatUsd(extra.charge, { forceCents: true })}` });
       }
-      if (p.discount) lines.push({ label: p.discount.label, value: `−$${p.discount.amount.toFixed(2)}` });
+      if (p.roundingAdjustment !== 0) {
+        lines.push({
+          label: 'Rounded to the nearest $5',
+          value: `${p.roundingAdjustment < 0 ? '\u2212' : '+'}${formatUsd(Math.abs(p.roundingAdjustment), { forceCents: true })}`,
+        });
+      }
     }
-    if (p.roundingAdjustment < 0) {
-      lines.push({ label: `Rounded down to the nearest $${roundStep}`, value: `−$${Math.abs(p.roundingAdjustment).toFixed(2)}` });
+    if (p.discount) {
+      lines.push({
+        label: p.discount.label,
+        value: `\u2212${formatUsd(Math.abs(p.discount.amount), { forceCents: true })}`,
+      });
     }
-    lines.push({ label: 'Proposed total', value: `$${(p.subtotal + p.roundingAdjustment).toFixed(2)}`, strong: true });
+    if (p.globalFactor !== 1) {
+      lines.push({
+        label: `Owner estimate adjustment (\u00d7${p.globalFactor.toFixed(2)})`,
+        value: `${p.globalAdjustment < 0 ? '\u2212' : '+'}${formatUsd(Math.abs(p.globalAdjustment), { forceCents: true })}`,
+      });
+    }
+    if (p.travelAdjustment > 0) {
+      lines.push({ label: 'Travel', value: formatUsd(p.travelAdjustment, { forceCents: true }) });
+    }
+    lines.push({
+      label: 'Proposed total',
+      value: formatUsd(p.subtotal),
+      strong: true,
+    });
+    lines.push({ label: 'Sales tax', value: tax.label });
     // P12: a new recurring arrangement shows the ongoing rhythm right under the
     // first-visit total — informational, never part of the sum above.
     if (result.ongoing) {
       lines.push({
         label: `Then ongoing ${FREQUENCY_RHYTHMS[result.ongoing.frequency]} visits (after the required first deep clean)`,
-        value: `$${result.ongoing.perVisitPrice.toLocaleString()} each`,
+        value: `${formatUsd(result.ongoing.perVisitPrice)} each`,
       });
     }
     return lines;
@@ -737,7 +769,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       summarySubmission.street.trim().length >= 5 &&
       summarySubmission.location.precision !== 'approximate' &&
       summarySubmission.location.precision !== 'street';
-    if (reservationPrice) reservationPrice.textContent = `$${latestQuote.amount.toLocaleString()}`;
+    if (reservationPrice) reservationPrice.textContent = formatUsd(latestQuote.amount);
     if (reservationEyebrow) reservationEyebrow.textContent = primaryPriceHeading(result);
     if (reservationReference) {
       reservationReference.hidden = false;
@@ -781,7 +813,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
           addSummaryRow(
             cleaningRows,
             'Ongoing visits',
-            `$${result.ongoing.perVisitPrice.toLocaleString()} per ${FREQUENCY_RHYTHMS[result.ongoing.frequency]} visit`,
+            `${formatUsd(result.ongoing.perVisitPrice)} per ${FREQUENCY_RHYTHMS[result.ongoing.frequency]} visit`,
           );
         }
         const homeParts = [
@@ -832,7 +864,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       if (phone) {
         const ongoing = result.ongoing;
         const pricePhrase = ongoing
-          ? `a proposed first-visit price of $${latestQuote.amount}, then $${ongoing.perVisitPrice} per ${FREQUENCY_RHYTHMS[ongoing.frequency]} visit`
+          ? `a proposed first-visit price of ${formatUsd(latestQuote.amount)}, then ${formatUsd(ongoing.perVisitPrice)} per ${FREQUENCY_RHYTHMS[ongoing.frequency]} visit`
           : `a proposed price of $${latestQuote.amount}`;
         const body = `Hi! I'd like to reserve a cleaning. My estimate reference is ${latestQuote.reference} with ${pricePhrase}${location ? ` at ${formatLocationLine(location)}` : ''}. Sparkling Standard will confirm the final price.`;
         reserveText.href = `${phone.sms}?&body=${encodeURIComponent(body)}`;
@@ -927,6 +959,29 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   // ── Inline validation ─────────────────────────────────────────────────────
   const attemptedSteps = new Set<number>();
+  const REQUIRED_FIELD_MESSAGES: Record<string, string> = {
+    propertyType: 'Choose the type of property you need cleaned.',
+    squareFeet: 'Enter the approximate square footage.',
+    bedrooms: 'Tell us how many bedrooms the home has.',
+    fullBaths: 'Tell us how many full bathrooms the home has.',
+    halfBaths: 'Tell us how many half bathrooms the home has.',
+    frequency: 'Select how often you would like cleaning.',
+    lastClean: 'Choose when the home was last professionally cleaned.',
+    pets: 'Tell us whether there are pets in the home.',
+    beds: 'Tell us how many beds the rental has.',
+    preferredDate: 'Choose a preferred date for the cleaning.',
+    arrivalPreference: 'Choose the arrival window that works best.',
+    name: 'Enter your name.',
+    phone: 'Enter a phone number so we can confirm your estimate.',
+    email: 'Enter an email address so we can send your confirmation.',
+  };
+  const NUMBER_FIELD_MESSAGES: Record<string, string> = {
+    squareFeet: 'Enter a square footage between 200 and 20,000.',
+    bedrooms: 'Enter a bedroom count between 0 and 12.',
+    fullBaths: 'Enter a full-bathroom count between 0 and 12.',
+    halfBaths: 'Enter a half-bathroom count between 0 and 12.',
+    beds: 'Enter a bed count between 1 and 30.',
+  };
   const errorSummary = form.querySelector<HTMLElement>('[data-error-summary]');
   const errorSummaryList = form.querySelector<HTMLElement>('[data-error-summary-list]');
 
@@ -1020,16 +1075,20 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     const required = field.hasAttribute('required') || field.dataset.errorRequired !== undefined;
     if (value === '') {
-      return required ? field.dataset.errorRequired ?? 'This field is required.' : null;
+      return required
+        ? REQUIRED_FIELD_MESSAGES[field.name] ??
+            field.dataset.errorRequired ??
+            'Please complete this field.'
+        : null;
     }
     if (field instanceof HTMLInputElement && field.type === 'email' && !field.validity.valid) {
-      return 'Please enter a valid email address.';
+      return 'Enter a complete email address with an @ and a domain.';
     }
     if (field instanceof HTMLInputElement && field.type === 'tel' && value.replace(/\D/g, '').length < 10) {
-      return 'Please enter a valid phone number.';
+      return 'Enter a phone number with at least 10 digits.';
     }
     if (field instanceof HTMLInputElement && field.type === 'number' && !field.validity.valid) {
-      return field.dataset.errorRange ?? 'Please enter a valid number.';
+      return NUMBER_FIELD_MESSAGES[field.name] ?? field.dataset.errorRange ?? 'Please enter a valid number.';
     }
     if (field instanceof HTMLInputElement && field.type === 'date') {
       // The configurable advance-reservation window (no priority pricing —
@@ -1352,6 +1411,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   // ── Submission ────────────────────────────────────────────────────────────
   function buildSubmissionFields(result: EstimateResult): Record<string, string> {
     const input = gatherInput();
+    const tax = taxPresentationForService(input.serviceType);
     // The selected address method is the ONLY source of the submitted
     // destination: GPS never merges stale manual fields and vice versa.
     const submission = submissionAddress();
@@ -1376,8 +1436,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
       engine_type: engine,
       rental_properties: input.serviceType === 'str_turnover' ? textValue('rentalProperties') ?? '' : '',
       turnover_frequency: input.serviceType === 'str_turnover' ? textValue('turnoverFrequency') ?? '' : '',
-      supportive_home: input.serviceType === 'str_turnover' ? '' : textValue('supportiveHome') ?? '',
-      supportive_support: input.serviceType === 'str_turnover' ? '' : textValue('supportiveSupport') ?? '',
+      supportive_home: input.serviceType === 'str_turnover' ? '' : input.supportiveEligible ? 'yes' : '',
+      supportive_eligible: input.serviceType === 'str_turnover' ? 'no' : input.supportiveEligible ? 'yes' : 'no',
       supportive_notes: input.serviceType === 'str_turnover' ? '' : textValue('supportiveNotes') ?? '',
       frequency: input.frequency ?? '',
       condition: input.condition ?? '',
@@ -1388,6 +1448,24 @@ function initEstimateWizard(form: HTMLFormElement): void {
       estimate_low: result.low !== null ? String(result.low) : 'custom',
       estimate_high: result.high !== null ? String(result.high) : 'custom',
       estimate_confidence: result.confidence,
+      tax_status: tax.treatment,
+      tax_note: tax.note,
+      ...(result.status === 'estimated'
+        ? {
+            ...(result.pricing.discount
+              ? {
+                  discount_label: result.pricing.discount.label,
+                  discount_amount: result.pricing.discount.amount.toFixed(2),
+                }
+              : {}),
+            ...(result.pricing.globalFactor !== 1
+              ? {
+                  global_factor: result.pricing.globalFactor.toFixed(2),
+                  global_adjustment: result.pricing.globalAdjustment.toFixed(2),
+                }
+              : {}),
+          }
+        : {}),
       travel_mode: result.travel.mode,
       travel_zone: result.travel.zone,
       travel_verified: String(result.travel.verified),
@@ -1751,13 +1829,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
           select.dispatchEvent(new Event('change', { bubbles: true }));
         }
       }
-      if (preset?.supportive || params.get('supportive') === 'yes') {
-        const supportive = form.querySelector<HTMLSelectElement>('#est-supportive-home');
-        if (supportive && supportive.value === '') {
-          supportive.value = 'prefer_not';
-          supportive.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      }
+      // The Supportive Home eligibility checkbox is NEVER preselected. A
+      // `?service=supportive&supportive=yes` deep link only selects ordinary
+      // residential cleaning; the customer makes the self-attestation.
     }
 
     const frequency = params.get('frequency');

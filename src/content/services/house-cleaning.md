@@ -38,7 +38,7 @@ related:
   - /deep-cleaning/
   - /move-in-move-out-cleaning/
 ctaLabel: Get My Cleaning Estimate
-ctaHref: /estimate/
+ctaHref: /estimate/residential/
 ---
 
 ## Residential cleaning, two clear ways
@@ -49,7 +49,7 @@ Sparkling Standard does not sell a vague "house cleaning" visit. Your home gets 
 
 **[Deep Cleaning](/deep-cleaning/)** — the intensive, detail-first reset: hand-wiped baseboards and blinds, detailed walls and doors, and the buildup a quick clean misses. It is also the right standalone choice for a home that needs real attention, whether or not you continue to recurring service.
 
-Not sure which one your home needs? Run the [instant estimate](/estimate/) — it asks a few quick questions about your home and tells you plainly, including when a Deep Cleaning is the honest recommendation.
+Not sure which one your home needs? Run the [instant estimate](/estimate/residential/) — it asks a few quick questions about your home and tells you plainly, including when a Deep Cleaning is the honest recommendation.
 
 ## What every residential visit has in common
 
@@ -61,4 +61,4 @@ We start with your estimate and a quick conversation about your home's condition
 
 A home that is generally maintained gets the most from recurring service: consistent attention, the same cleaner who learns your home, and the best per-visit value over time. If your home hasn't been professionally cleaned in a while — or ever — the required first Deep Cleaning brings it up to the standard maintenance is designed to keep, and the estimate reflects the real work honestly instead of promising a price the home can't support.
 
-Start with [Recurring Residential Cleaning](/recurring-cleaning/) or talk it through in the [estimate](/estimate/) — both end with a clear, personally confirmed plan for your home.
+Start with [Recurring Residential Cleaning](/recurring-cleaning/) or talk it through in the [estimate](/estimate/residential/) — both end with a clear, personally confirmed plan for your home.

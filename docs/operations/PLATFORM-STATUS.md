@@ -4,27 +4,26 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-24** (Sparkling Standard 4.0 stabilization pass; release record corrected
+Last reviewed: **2026-10-25** (Initiative 6.1 live; Initiative 6.2 release candidate prepared; release record corrected
 to the actually deployed commit).
 
-**Release status:** production serves GitHub `main`; the last verified deployed baseline is
-**`3aa04c7`** (Initiative 6.0 four-engine release, 2026-10-24). Earlier release notes below are
-historical: the 2026-10-03 set was `62a1a46` (the five-commit release `8b8dde4`…`5a4a024`, the
-documentation closeout `7a51efa`, the six-profile social integration `cdc4971`, the
-deployment-closeout `6ebc3fb` and the logo-only Follow Us redesign `62a1a46`). Every later
-deployment (2026-10-21 owner-decision implementation, 2026-10-23 audit corrections, 2026-10-24
-premium icons, Smart Estimate 2.0 and Initiative 6.0) was pushed to `main` and verified live
-through Cloudflare Pages. Live acceptance checks for the current production release: homepage,
-recurring page, estimator two-price flow, reviews, footer, navigation and values copy verified on
-sparkling-standard.com; R2 photo intake remains **disabled** (probe reports `enabled:false` until
-the bucket/secrets are provisioned).
+**Release status:** production serves GitHub `main`; the **Initiative 6.1 facility-pricing release
+is live at `af46db4`** (2026-10-24), with owner-authorized deployment and live acceptance checks
+passing. Earlier release notes below are historical: the 2026-10-03 set was `62a1a46` (the
+five-commit release `8b8dde4`…`5a4a024`, the documentation closeout `7a51efa`, the six-profile
+social integration `cdc4971`, the deployment-closeout `6ebc3fb` and the logo-only Follow Us
+redesign `62a1a46`). Live acceptance checks for the 6.1 release: residential, STR, commercial
+Tier A/B, Tier C scope review, church discount, location/travel, consent, reviews, footer,
+sitemap, robots and canonicals passed on sparkling-standard.com. R2 photo intake remains
+**disabled** (probe reports `enabled:false` until the bucket/secrets are provisioned).
 
-The **Initiative 6.1 facility-pricing release candidate** (`release-6.1`) is prepared locally and
-is **not deployed**: it enables nonbinding Tier A/B commercial/church preliminary estimates,
-keeps Tier C as a personal scope review, applies the 10% church discount after the minimum, and
-enforces the owner kill switch (`commercialTierConfig.numericEstimatesEnabled`) in both the
-browser and the server. Production continues to serve the 6.0 behaviour until the owner authorizes
-the 6.1 deployment. Confirm the exact deployed SHA with `git log -1`.
+The **Initiative 6.2 complete-experience release candidate** (`initiative-6.2-complete-experience-audit`)
+is prepared locally and is **not deployed**: it adds the dedicated `/estimate/residential/` route,
+guided facility forms, field-specific validation, the Supportive Home 10% eligibility discount,
+the owner global estimate factor, exact church-discount reconciliation, tax disclosure,
+service-area/reviews/footer/icon refinements, and independent audit fixes. Production continues to
+serve the 6.1 release until the owner authorizes the 6.2 deployment. Confirm the exact deployed
+SHA with `git log -1`.
 
 Status vocabulary:
 
@@ -48,7 +47,7 @@ Status vocabulary:
 | Web3Forms | **live (verified)** | 2026-10-01: public key present in the deployed bundle; `/api/lead` returns `200 {"ok":true}`; one marked test per funnel (residential, estimate, commercial, STR) accepted by the provider — **all four arrived in the owner inbox (owner-confirmed)**. Lead delivery is operational. **Re-verified 2026-10-08** by the controlled live estimate test: `200` with `verification.status: verified`, `travel_verified: true`, `travel_method: route`, `config_match: match` | Maintain; re-test after any form change | `docs/verification/VERIFICATION.md` |
 | Resend (customer confirmation email) | **live (deployed) — controlled live test passed; inbox delivery owner-side** | Owner setup complete (2026-10-08): `RESEND_API_KEY` set in Cloudflare and `sparkling-standard.com` verified in Resend. Deployed with `c8a9723` (+ `f92719c`); the controlled production live test submitted a clearly marked request through the estimate wizard — submission accepted (`200`, server-verified quote), the customer-email send path exercised exactly once, no duplicate send, no console/page errors, thank-you summary and analytics events all correct. **Not yet claimed: inbox delivery** — the owner notification and the customer confirmation were both addressed to the owner inbox and their arrival must be confirmed by the owner (not verifiable from the repository) | Confirm the two emails arrived and check the Resend dashboard; report any failure | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/deployment/DEPLOYMENT.md` §4a |
 | Stripe | **owner-confirmed (2026-10-21)** | Account established; owner confirms cards, Apple Pay, Google Pay and ACH are enabled. The site lists all four. Dashboard/checkout evidence remains to be recorded | Retain Stripe evidence; verify the intended checkout flow when it is used | `docs/launch/OWNER-INPUT-REQUIRED.md` #4 |
-| GTM / GA4 | **live (owner-confirmed external verification, 2026-10-03)** | Container `GTM-KSQ26HMG` is the configured default (`business.ts` `analytics.gtm.containerId`; `PUBLIC_GTM_CONTAINER_ID` overrides) and loads exactly once, only after an explicit analytics consent choice. Owner-published **GTM Version 3**: one Google tag, twelve custom event tags, twelve triggers, seven data-layer variables. GA4 `G-LG222LQRQ2` received page views, `estimate_start` and all three inquiry events end-to-end (site confirmation + owner email + GA4 event); the three primary key events are configured; Enhanced Measurement form interactions are disabled; consent tests passed | Never republish/overwrite the owner's container or add a second Google tag; keep the website event taxonomy unchanged; optionally add an internal-traffic filter | `docs/analytics/ANALYTICS-SETUP.md`, `docs/analytics/GTM-CONTAINER-SETUP.md` |
+| GTM / GA4 | **owner-reported Version 5 published (2026-10-25); receipt verification incomplete** | Container `GTM-KSQ26HMG` loads exactly once and only after explicit analytics consent. The owner reports **Version 5** with 20 tags (one Google tag + 19 event tags), 19 triggers and 13 variables, including the church and promotion events. Earlier Version 3 receipt of page views, `estimate_start` and the three inquiry events was owner-confirmed. The new church/promotion event receipt is **not fully proven** in GA4 yet; verify in DebugView/Realtime | Do not reimport the old container or add a second Google tag; verify live event receipt for the new events; optionally add an internal-traffic filter | `docs/analytics/ANALYTICS-SETUP.md`, `docs/analytics/GTM-CONTAINER-SETUP.md` |
 | Umami | **deferred by owner (2026-10-21)** | Not adding Umami; GA4/GTM remains the analytics stack. | None | `docs/analytics/ANALYTICS-SETUP.md` |
 | Google Business Profile | **verified — profile + review links captured (owner-supplied 2026-10-08)** | The profile is verified by Google and publicly visible. The exact public profile URL is configured in `business.socials.googleProfile` / `business.reviews.profileUrl`; the exact "Ask for reviews" link is configured in `business.reviews.submissionUrl` (`https://g.page/r/CXAcv1Pp7OI2ECE/review`). Never modify, shorten or substitute them; the `/leave-review/` page is live | Paste the four tracked GBP links (`gbp_home`, `gbp_estimate`, `gbp_deep_clean`, `gbp_gift_post`); begin the weekly GBP rhythm and review requests (`docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md`) | `docs/marketing/PLATFORM-REGISTER.md`, `docs/marketing/LOCAL-AUTHORITY.md`, `docs/marketing/REVIEW-GROWTH-SYSTEM.md` |
 | Bing Places | **pending owner** | No listing yet; imports from Google Business — **GBP is verified, so creation is unblocked** | Create/import from Google Business; use the tracked Bing Places link | `docs/marketing/PLATFORM-REGISTER.md` |

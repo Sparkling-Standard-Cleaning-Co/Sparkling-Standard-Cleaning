@@ -73,7 +73,7 @@ const paragraphsOf = (quote: string): string[] =>
                       aria-label={`Rated ${review.data.rating} out of 5 stars`}
                     >
                       {Array.from({ length: review.data.rating }).map(() => (
-                        <Icon name="star" size={17} />
+                        <Icon name="star" size={22} />
                       ))}
                     </p>
                   ) : (
@@ -82,6 +82,9 @@ const paragraphsOf = (quote: string): string[] =>
                       <span aria-hidden="true">Google review</span>
                     </p>
                   )}
+                  <span class="review-carousel__source">
+                    {review.data.source === 'google' ? 'Google review' : 'Customer review'}
+                  </span>
                 </div>
 
                 <div class="review-carousel__quote">
@@ -96,9 +99,6 @@ const paragraphsOf = (quote: string): string[] =>
 
                 <footer class="review-carousel__footer">
                   <strong>{review.data.author}</strong>
-                  <span class="review-carousel__meta">
-                    {review.data.source === 'google' ? 'Google review' : 'Customer review'}
-                  </span>
                 </footer>
               </blockquote>
             );

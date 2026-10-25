@@ -12,6 +12,7 @@ import { isFormEnabled } from '../config/business';
 import { commercialTierConfig } from '../config/commercial-tiers';
 import { pricing } from '../config/pricing';
 import { schedulingConfig } from '../config/scheduling';
+import { FACILITY_STEPS } from '../lib/estimate/engines';
 import { US_STATES } from '../lib/location/location';
 import Icon from './Icon.astro';
 import TurnstileWidget from './TurnstileWidget.astro';
@@ -28,6 +29,20 @@ const church = engine === 'church';
 const discountPercent = pricing.churchDiscount.percent.value;
 const discountEnabled = pricing.churchDiscount.enabled.value;
 const numericEstimatesEnabled = commercialTierConfig.numericEstimatesEnabled;
+const facilitySteps = FACILITY_STEPS[engine];
+const facilityStepDescriptions = church
+  ? [
+      'Tell us about your church or ministry and confirm the facility location.',
+      'A few facts about the spaces you need cleaned and how often.',
+      'When should we clean, and how should we access the building?',
+      'Review the preliminary estimate and send your request.',
+    ]
+  : [
+      'Tell us about your business and confirm the facility location.',
+      'A few facts about the space and the cleaning workload.',
+      'When should we clean, and how should we access the facility?',
+      'Review the preliminary estimate and send your request.',
+    ];
 
 const commercialFacilityTypes = [
   { value: 'office', label: 'Office' },
@@ -59,6 +74,42 @@ const commercialFacilityTypes = [
       Four short sections. A confirmed address lets us verify travel and service eligibility; the
       final scope and price are always confirmed personally.
     </p>
+    <nav class="facility-steps" data-facility-steps aria-label="Facility estimate steps">
+      <ol class="facility-steps__list">
+        {facilitySteps.map((title, index) => (
+          <li class="facility-steps__item">
+            <button
+              type="button"
+              class="facility-steps__button"
+              data-facility-step-jump={index + 1}
+              aria-current={index === 0 ? 'step' : undefined}
+              disabled={index !== 0}
+            >
+              <span class="facility-steps__number" aria-hidden="true">{index + 1}</span>
+              <span class="facility-steps__title">{title}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </nav>
+    <div
+      class="facility-progress"
+      role="progressbar"
+      aria-label="Facility estimate progress"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow="25"
+      data-facility-progress
+    >
+      <div class="facility-progress__fill" data-facility-progress-fill></div>
+    </div>
+    <p class="small text-muted facility-progress__label">
+      <span data-facility-step-label>Step 1 of 4 — {facilitySteps[0]}</span>
+      <span data-facility-progress-percent>25%</span>
+    </p>
+    <p class="small facility-step-description" data-facility-step-description>
+      {facilityStepDescriptions[0]}
+    </p>
   </div>
 
   {
@@ -71,7 +122,7 @@ const commercialFacilityTypes = [
   }
 
   <div class="error-summary" data-error-summary hidden role="alert" tabindex="-1">
-    <p class="error-summary__title">Please review these details before sending:</p>
+    <p class="error-summary__title" data-error-summary-title>Please review these details before sending:</p>
     <ul data-error-summary-list></ul>
   </div>
 
@@ -82,8 +133,9 @@ const commercialFacilityTypes = [
   </div>
 
   <!-- 1. Facility & address -->
-  <section class="facility-form__section" data-facility-section="1">
-    <h2 class="wizard__step-heading">{church ? 'Your ministry & location' : 'Your facility & location'}</h2>
+  <section class="facility-form__section" data-facility-section="1" data-facility-step-panel="1">
+    <h2 class="wizard__step-heading" tabindex="-1" data-facility-step-title>{church ? 'Your ministry & location' : 'Your facility & location'}</h2>
+    <p class="small text-muted facility-step-description">{facilityStepDescriptions[0]}</p>
     <div class="field-row field-row--2">
       <div class="field">
         <label for="fac-org">{church ? 'Church / ministry name' : 'Business / organization'}</label>
@@ -198,8 +250,9 @@ const commercialFacilityTypes = [
   </section>
 
   <!-- 2. Space & workload -->
-  <section class="facility-form__section" data-facility-section="2">
-    <h2 class="wizard__step-heading">{church ? 'Spaces & weekly life' : 'Space & cleaning scope'}</h2>
+  <section class="facility-form__section" data-facility-section="2" data-facility-step-panel="2" hidden>
+    <h2 class="wizard__step-heading" tabindex="-1" data-facility-step-title>{church ? 'Spaces & weekly life' : 'Space & cleaning scope'}</h2>
+    <p class="small text-muted facility-step-description">{facilityStepDescriptions[1]}</p>
 
     {
       church ? (
@@ -354,11 +407,13 @@ const commercialFacilityTypes = [
     <p class="facility-estimate__range" data-facility-estimate-range hidden></p>
     <ul class="summary-list facility-estimate__lines" data-facility-estimate-lines></ul>
     <p class="facility-estimate__note" data-facility-estimate-note></p>
+    <p class="facility-estimate__tax small text-muted" data-facility-estimate-tax></p>
   </div>
 
   <!-- 3. Schedule & access -->
-  <section class="facility-form__section" data-facility-section="3">
-    <h2 class="wizard__step-heading">Schedule & access</h2>
+  <section class="facility-form__section" data-facility-section="3" data-facility-step-panel="3" hidden>
+    <h2 class="wizard__step-heading" tabindex="-1" data-facility-step-title>Schedule & access</h2>
+    <p class="small text-muted facility-step-description">{facilityStepDescriptions[2]}</p>
     <div class="field-row field-row--2">
       <div class="field">
         <label for="fac-start">Preferred start date</label>
@@ -394,8 +449,9 @@ const commercialFacilityTypes = [
   </section>
 
   <!-- 4. Contact & review -->
-  <section class="facility-form__section" data-facility-section="4">
-    <h2 class="wizard__step-heading">Contact & review</h2>
+  <section class="facility-form__section" data-facility-section="4" data-facility-step-panel="4" hidden>
+    <h2 class="wizard__step-heading" tabindex="-1" data-facility-step-title>Contact & review</h2>
+    <p class="small text-muted facility-step-description">{facilityStepDescriptions[3]}</p>
 
     {
       church && (
@@ -493,11 +549,20 @@ const commercialFacilityTypes = [
       Sending this request does not book anything. See our <a href="/privacy/">privacy policy</a>.
     </p>
 
-    <button class="btn btn--primary btn--large btn--block" type="submit" data-cta={church ? 'church-submit' : 'commercial-submit'}>
+  </section>
+
+  <div class="facility-form__actions">
+    <button class="btn btn--secondary" type="button" data-facility-back hidden>
+      <Icon name="arrow-right" size={18} class="facility-back-icon" /> Back
+    </button>
+    <button class="btn btn--primary" type="button" data-facility-next>
+      Continue <Icon name="arrow-right" size={18} />
+    </button>
+    <button class="btn btn--primary btn--large btn--block" type="submit" data-facility-submit data-cta={church ? 'church-submit' : 'commercial-submit'} hidden>
       <Icon name="send" size={18} /> {church ? 'Request Our Church Estimate' : 'Request My Facility Estimate'}
     </button>
-    <p class="form-status" data-form-status role="status" aria-live="polite"></p>
-  </section>
+  </div>
+  <p class="form-status" data-form-status role="status" aria-live="polite"></p>
 </form>
 
 <script>

@@ -26,7 +26,7 @@ Properties examined:
 | Gift certificates | Not offered (Phase 7 assessment) | **Yes** — $200, purchased via Venmo/CashApp/PayPal | Not offered |
 | Payments | Stripe confirmed; method list pending owner confirmation | Venmo, CashApp, PayPal | Card/ACH etc. |
 | Booking semantics | Honest: requests confirmed personally; no instant-booking claim | "Book Today!" button leads to Facebook | Request form |
-| Analytics/consent | Consent-gated architecture; GA4 owner-confirmed operational via GTM Version 3 (`GTM-KSQ26HMG` / `G-LG222LQRQ2`) — page views, `estimate_start` and all three inquiry key events verified; Umami awaiting an ID | None observable | Full GTM/GA4 + Umami, consent-gated |
+| Analytics/consent | Consent-gated architecture; GA4 owner-confirmed operational; owner reports GTM Version 5 (`GTM-KSQ26HMG` / `G-LG222LQRQ2`) — page views, `estimate_start` and all three inquiry key events verified; Umami awaiting an ID | None observable | Full GTM/GA4 + Umami, consent-gated |
 | Attribution/QR system | Registry + 13 decode-verified QR groups | None | Full UTM/QR registry + verification |
 | SEO infrastructure | Canonicals, sitemap, JSON-LD, page ownership, verify scripts | Basic (Mobirise builder; little structure observable) | Extensive SEO documentation + verification |
 | Accessibility (measured) | axe WCAG 2.0/2.1/2.2 A+AA: **0 violations** across 15 pages (2026-10-01) | Not measured here | Documented target |

@@ -1,6 +1,6 @@
 ---
-metaTitle: Instant Estimate | Six Short Steps to Your Cleaning Price
-metaDescription: Enter your address, answer six short steps and see a proposed cleaning price from Sparkling Standard — with the final scope, price and appointment confirmed personally before anything is scheduled.
+metaTitle: Residential Cleaning Estimate | Sparkling Standard
+metaDescription: Get a residential cleaning estimate from Sparkling Standard. Enter your address, answer six short steps, see a proposed price, and confirm the final scope personally before anything is scheduled.
 hero:
   headline: Six Short Steps to a
   accent: Sparkling Standard!

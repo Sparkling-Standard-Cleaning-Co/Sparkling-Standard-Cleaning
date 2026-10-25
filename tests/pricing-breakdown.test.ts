@@ -68,12 +68,19 @@ test('every eligible add-on has a labor-derived charge and the figures reconcile
   }
 
   // base + extras − discount + rounding = proposed total, exactly.
-  const total = p.subtotal + p.roundingAdjustment;
-  assert.equal(
-    Math.round((p.basePrice + p.extrasSubtotal - (p.discount?.amount ?? 0) + p.roundingAdjustment) * 100) / 100,
-    Math.round(total * 100) / 100,
-  );
-  assert.equal(selectInstantAmount(result), total, 'the offered price equals the breakdown total');
+  // base + extras + base rounding - discount + global factor + travel = total.
+  const expectedTotal =
+    Math.round(
+      (p.basePrice +
+        p.extrasSubtotal +
+        p.roundingAdjustment -
+        (p.discount?.amount ?? 0) +
+        p.globalAdjustment +
+        p.travelAdjustment) *
+        100,
+    ) / 100;
+  assert.equal(expectedTotal, p.subtotal);
+  assert.equal(selectInstantAmount(result), p.subtotal, 'the offered price equals the breakdown total');
 });
 
 test('recurring maintenance drives the recurring rate and its add-on charges', () => {
@@ -138,7 +145,7 @@ test('the incentive never discounts the base, travel or the minimum, and numbers
   // Discount cannot exceed the eligible extras or push the job below base.
   assert.ok((withExtras.pricing.discount?.amount ?? 0) <= withExtras.pricing.extrasSubtotal);
   assert.ok(withExtras.pricing.subtotal >= withExtras.pricing.basePrice);
-  const total = withExtras.pricing.subtotal + withExtras.pricing.roundingAdjustment;
+  const total = withExtras.pricing.subtotal;
   assert.equal(selectInstantAmount(withExtras), total);
 });
 
@@ -166,7 +173,7 @@ test('minimum-price jobs never show an effective discount and still reconcile', 
   // P12: the required first-visit Deep Cleaning clears the minimum on its own.
   assert.equal(tiny.pricing.minimumApplied, false);
   assert.equal(tiny.pricing.discount, null);
-  assert.equal(selectInstantAmount(tiny), tiny.pricing.subtotal + tiny.pricing.roundingAdjustment);
+  assert.equal(selectInstantAmount(tiny), tiny.pricing.subtotal);
   // The smaller ongoing rhythm is floored at the minimum and shows no discount.
   assert.ok(tiny.ongoing);
   assert.equal(tiny.ongoing.pricing.minimumApplied, true);

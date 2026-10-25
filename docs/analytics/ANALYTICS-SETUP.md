@@ -4,7 +4,7 @@ Analytics are **consent-gated, PII-free, and optional**. Empty IDs disable each 
 completely (no banner, no requests, no storage). This document covers dashboard setup; the
 privacy page must stay in sync with whatever is actually enabled.
 
-## 0. Current verified state (2026-10-03, updated)
+## 0. Current verified state (2026-10-25, updated)
 
 - **GTM container `GTM-KSQ26HMG`** is installed on the site and live. Production browser
   verification: zero Google requests before a consent choice, zero after declining, and **exactly
@@ -13,16 +13,16 @@ privacy page must stay in sync with whatever is actually enabled.
   pushes the fixed events (section 3) into `window.dataLayer`; submit events fire only after the
   provider acknowledges a request.
 - **GA4 `G-LG222LQRQ2` is operational (owner-confirmed external verification, 2026-10-03).** The
-  container initially had zero tags; the owner then published their reviewed GTM configuration —
-  **GTM Version 3**, containing **one Google tag, twelve custom event tags, twelve custom event
-  triggers and seven data-layer variables**. GA4 receives page views, `estimate_start` and all
-  three successful inquiry events (`cleaning_request_submit`, `commercial_quote_submit`,
-  `str_request_submit`). For each inquiry event the owner confirmed the full chain: the website
-  showed the success confirmation, the owner inbox received the email, and GA4 registered the
-  event. The three primary key events are configured; automatic Enhanced Measurement **form
-  interactions were disabled** so the site's explicit, honest submit events are the only form
-  signal. Analytics consent testing passed (no Google requests before consent or after refusal;
-  requests appear after acceptance).
+  container initially had zero tags; the owner then published their reviewed GTM configuration.
+  The current owner report is **GTM Version 5**: **one Google tag, 19 event tags, 19 triggers and
+  13 data-layer variables**, adding the church and promotion events to the earlier Version 3 set.
+  The earlier receipt of page views, `estimate_start` and all three inquiry events
+  (`cleaning_request_submit`, `commercial_quote_submit`, `str_request_submit`) was owner-confirmed
+  end-to-end. Live receipt of the new church/promotion events is **not yet fully proven**; verify
+  in GTM Preview and GA4 DebugView/Realtime. Enhanced Measurement **form interactions remain
+  disabled** so the site's explicit submit events are the only form signal. Analytics consent
+  testing passed (no Google requests before consent or after refusal; requests appear after
+  acceptance).
 - These are **owner-confirmed external results**, not automated tests performed by this
   repository. The repository-side generation tests and the owner-confirmed dashboard results
   together form the evidence.
@@ -86,20 +86,20 @@ the data layer but not GA4.
 **Never sent to analytics:** names, emails, phones, addresses, ZIP codes, photos, freeform
 notes, or any form content. Lead details live only in the owner's inbox/records.
 
-## 4. GTM / GA4 dashboard setup — completed (owner-confirmed)
+## 4. GTM / GA4 dashboard setup — owner-reported Version 5
 
-The owner completed this setup on 2026-10-03 (GTM Version 3 published; see section 0). The exact
-procedure is retained in **`docs/analytics/GTM-CONTAINER-SETUP.md`** (tag/trigger names,
-parameters, import files, verification and key events) as the rebuild reference. Summary of what
-was done:
+The owner completed the original setup on 2026-10-03 (Version 3) and reports Version 5 published
+on 2026-10-25. The exact procedure is retained in
+**`docs/analytics/GTM-CONTAINER-SETUP.md`** (tag/trigger names, parameters, import files,
+verification and key events) as the rebuild reference. Summary:
 
-1. The prepared container configuration was imported/created in GTM (`GTM-KSQ26HMG`): one Google
-   tag (`G-LG222LQRQ2`), twelve custom-event triggers, twelve GA4 event tags, seven data-layer
-   variables.
-2. Verified in GTM Preview and GA4 DebugView before publishing; published as Version 3 with owner
-   authorization.
-3. Marked `cleaning_request_submit` / `commercial_quote_submit` / `str_request_submit` as GA4 key
-   events. `estimate_start`, `estimate_complete` and `booking_request` remain secondary.
+1. The prepared container configuration in GTM (`GTM-KSQ26HMG`): one Google tag
+   (`G-LG222LQRQ2`), 19 custom-event triggers, 19 GA4 event tags and 13 data-layer variables.
+2. Version 3 was verified in GTM Preview and GA4 DebugView before publishing. Version 5 is
+   owner-reported; verify the new church/promotion events before treating the full set as proven.
+3. `cleaning_request_submit` / `commercial_quote_submit` / `str_request_submit` are GA4 key
+   events. `estimate_start`, `estimate_complete`, `booking_request` and the promotion events remain
+   secondary; `church_request_submit` is primary.
 4. In the GA4 web stream, **"Form interactions" under Enhanced Measurement is disabled**; the
    site's explicit, consent-gated submit events (fired only after provider acknowledgment) are
    the only form signal.

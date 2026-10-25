@@ -10,7 +10,7 @@
  *    VISIBLE (not total time open) this tab session.
  *  - sessionStorage `pcc-promo-shown-session` — shown-once guard per session.
  *
- * Suppression: form/checkout surfaces (/estimate/, /gift-certificates/,
+ * Suppression: estimator/form/checkout surfaces (/estimate/*, /gift-certificates/,
  * /thank-you/, /contact/, /commercial/, /privacy/, /leave-review/) and while
  * the analytics consent banner is waiting for a choice.
  */
@@ -22,6 +22,10 @@ const SHOWN_KEY = 'pcc-promo-shown-session';
 
 const EXCLUDED_PATHS = new Set([
   '/estimate/',
+  '/estimate/residential/',
+  '/estimate/str/',
+  '/estimate/commercial/',
+  '/estimate/church/',
   '/gift-certificates/',
   '/thank-you/',
   '/contact/',

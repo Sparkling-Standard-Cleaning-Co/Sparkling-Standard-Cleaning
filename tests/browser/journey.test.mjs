@@ -136,7 +136,7 @@ async function openEstimate(width, height, options = {}) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   const travelRequests = await mockProviders(page, options);
-  await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
+  await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
   await page.click('[data-address-manual-summary]');
   return { context, page, travelRequests };
@@ -556,7 +556,7 @@ test('a mismatch verdict is shown honestly and never claims the price was accept
     assert.match(text, /needs a personal review/i);
     assert.match(text, /confirm the correct price/i);
     assert.doesNotMatch(text, /verified this price/i);
-    assert.match(page.url(), /\/estimate\/$/, 'an unverified receipt stays on screen (no redirect away)');
+    assert.match(page.url(), /\/estimate\/residential\/$/, 'an unverified receipt stays on screen (no redirect away)');
   } finally {
     await context.close();
   }
@@ -690,6 +690,27 @@ test('eligible add-ons show their calculated price before selection and update w
   }
 });
 
+test('the Supportive Home 10% discount and tax disclosure are explicit in the quote', async () => {
+  const { context, page } = await openEstimate(1440, 900);
+  try {
+    await step1(page);
+    await addressStep(page);
+    await homeStep(page);
+    const eligible = page.locator('input[name="supportiveEligible"]');
+    assert.equal(await eligible.isChecked(), false, 'eligibility starts unchecked');
+    await eligible.check();
+    await conditionStep(page);
+    await extrasStep(page);
+    await timingStep(page);
+    const breakdown = (await page.locator('[data-price-breakdown]').textContent()) ?? '';
+    assert.match(breakdown, /Supportive Home discount \(10%\)/);
+    assert.match(breakdown, /no sales tax applicable/i);
+    assert.match(breakdown, /Proposed total/);
+  } finally {
+    await context.close();
+  }
+});
+
 test('the price preview reconciles base, extras, rounding and the proposed total', async () => {
   const { context, page } = await openEstimate(1440, 900);
   try {
@@ -701,11 +722,11 @@ test('the price preview reconciles base, extras, rounding and the proposed total
     await page.click('label.option:has(input[name="addons"][value="laundry"])');
     await page.waitForSelector('[data-price-preview]', { state: 'visible' });
     const preview = (await page.locator('[data-price-preview-lines]').textContent()) ?? '';
-    assert.match(preview, /Base cleaning \(includes travel\)\$270\.05/);
+    assert.match(preview, /Base cleaning\$270\.05/);
     assert.match(preview, /Inside oven\+\$33\.00/);
     assert.match(preview, /Laundry\+\$38\.50/);
-    assert.match(preview, /Rounded down to the nearest \$5\u2212\$1\.55/);
-    assert.match(preview, /Proposed total\$340\.00/);
+    assert.match(preview, /Rounded to the nearest \$5\u2212\$1\.55/);
+    assert.match(preview, /Proposed total\$340/);
     // The displayed figures agree with the offered price.
     await page.click('[data-next]');
     await page.fill('#est-date', BOOKING_DATE);

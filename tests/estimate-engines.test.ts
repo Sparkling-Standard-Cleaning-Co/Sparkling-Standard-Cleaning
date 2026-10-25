@@ -22,9 +22,23 @@ test('engine parameter is allowlisted and defaults to residential', () => {
 });
 
 test('engine links and residential presets stay inside the registry', () => {
+  assert.equal(engineEstimateHref('residential'), '/estimate/residential/');
   assert.equal(engineEstimateHref('church'), '/estimate/church/');
   assert.equal(engineEstimateHref('commercial'), '/estimate/commercial/');
   assert.equal(engineEstimateHref('str'), '/estimate/str/');
+  assert.equal(engineEstimateHref('residential', 'deep'), '/estimate/residential/?service=deep');
+  assert.equal(
+    engineEstimateHref('residential', 'move-out', { promo: 'SPARKLE100' }),
+    '/estimate/residential/?service=move-out&promo=SPARKLE100',
+  );
+  assert.equal(
+    engineEstimateHref('commercial', null, { utm_source: 'facebook', utm_campaign: 'fall' }),
+    '/estimate/commercial/?utm_source=facebook&utm_campaign=fall',
+  );
+  assert.equal(
+    engineEstimateHref('church', 'a b', { utm_content: 'a&b' }),
+    '/estimate/church/?service=a+b&utm_content=a%26b',
+  );
   assert.deepEqual(parseResidentialServiceParam('deep'), { serviceType: 'deep', frequency: 'one_time' });
   assert.deepEqual(parseResidentialServiceParam('move-out'), { serviceType: 'move_in_out', frequency: 'one_time' });
   assert.deepEqual(parseResidentialServiceParam('supportive'), { serviceType: 'standard', supportive: true });
@@ -151,8 +165,10 @@ test('church estimates apply the 10% discount transparently after the minimum', 
   const church = calculateChurchEstimate({ cleanableSqft: 4000, restroomFixtures: 6, breakroom: true, frequency: 'weekly' });
   assert.ok(church.price.cleaningSubtotal >= 125, 'minimum applies before the discount');
   assert.equal(church.price.discount?.applied, true);
+  assert.equal(church.price.discount?.amount, Math.round(church.price.cleaningSubtotal * 0.1 * 100) / 100);
   assert.ok(church.price.perVisit < church.price.cleaningSubtotal, 'the church discount reduces the customer price');
-  const expected = Math.ceil((church.price.cleaningSubtotal * 0.9 - 0.01) / 5) * 5;
+  // The discounted amount is NOT rounded upward again; the exact 10% survives.
+  const expected = Math.round((church.price.cleaningSubtotal * 0.9 + Number.EPSILON) * 100) / 100;
   assert.equal(church.price.perVisit, expected);
   assert.ok(church.price.total >= church.price.perVisit);
 });

@@ -77,7 +77,7 @@ async function openWizard(width, height) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   await mockApis(page);
-  await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
+  await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
   await page.click('[data-address-manual-summary]');
   return { context, page };
@@ -296,6 +296,8 @@ test('navigating away and back through site navigation starts a fresh estimate',
     await page.goto(BASE + '/about/', { waitUntil: 'load' });
     await page.click('[data-cta="header-estimate"]');
     await page.waitForURL('**/estimate/');
+    await page.locator('.estimate-hub__card').first().click();
+    await page.waitForURL('**/estimate/residential/');
     assert.equal(await activeStep(page), 1, 'a fresh visit starts at step 1');
     assert.equal(await page.inputValue('#est-zip'), '');
   } finally {

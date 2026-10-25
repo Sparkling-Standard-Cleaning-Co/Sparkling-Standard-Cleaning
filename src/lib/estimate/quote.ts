@@ -44,8 +44,6 @@ export interface InstantQuote {
   configVersion: string;
 }
 
-const floorToStep = (value: number, step: number): number => Math.floor(value / step) * step;
-
 /**
  * Selects the single offered price from an estimate result. Returns null when
  * the result is not estimable (custom confirmation / invalid).
@@ -63,14 +61,18 @@ export function selectInstantAmount(
     high: result.high,
   };
 
+  // The base service price is already presented at the owner-approved $5 step
+  // before discounts and the global factor. The default 'expected' selection
+  // is therefore the final offered price; never floor or reapply the minimum
+  // after an explicit discount/factor.
+  if (selection === 'expected') {
+    return Math.round((result.expectedPrice + Number.EPSILON) * 100) / 100;
+  }
+  const hasAdjustment = result.pricing.discount !== null || result.pricing.globalFactor !== 1;
+  if (hasAdjustment) return Math.round((result.expectedPrice + Number.EPSILON) * 100) / 100;
   const marginFloor = result.expectedPrice * pricing.instantQuote.marginFloor.value;
-  const minimum = pricing.minimumJob.value;
-  const step = pricing.rounding.toNearest.value;
-
-  // Never below the model price (margin safeguard) or the minimum job value;
-  // then round DOWN to the customer-friendly $5 increment.
-  const floored = Math.max(candidates[selection], marginFloor, minimum);
-  return floorToStep(floored, step);
+  const candidate = Math.max(candidates[selection], marginFloor, pricing.minimumJob.value);
+  return Math.round((candidate + Number.EPSILON) * 100) / 100;
 }
 
 /**

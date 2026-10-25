@@ -10,6 +10,15 @@
 > request, owner notification or server verification. The 10% church discount
 > is applied to the numeric cleaning subtotal after the minimum. Method,
 > sources and benchmarks: `COMMERCIAL-PRICING-RESEARCH.md`.
+>
+> **2026-10-25 (Initiative 6.2) update:** the residential estimator now lives at
+> `/estimate/residential/`; `/estimate/` is a clean four-engine selection hub.
+> Legacy residential/STR query links and campaign claims forward with their
+> query intact. Commercial and church forms are four-step guided experiences
+> with field-specific validation. The owner-editable `globalEstimateFactor`,
+> Supportive Home 10% eligibility discount, exact church-discount
+> reconciliation, two-decimal currency and tax disclosure are documented in
+> `ESTIMATE-CALCULATION-ORDER.md` and `TAX-TREATMENT.md`.
 
 Initiative 6.0 restructured the customer estimate experience into **four
 specialized engines unified by one system**. This is the authoritative guide to
@@ -20,13 +29,15 @@ them.
 
 | Engine | Entry | Customer | Pricing state |
 | --- | --- | --- | --- |
-| **Residential Cleaning** | `/estimate/` (hub + wizard) | Homes, apartments, condos, recurring/deep/move-in-out/supportive | **Live instant estimate** (owner-approved labour model) |
+| **Residential Cleaning** | `/estimate/residential/` (wizard) | Homes, apartments, condos, recurring/deep/move-in-out/supportive | **Live instant estimate** (owner-approved labour model) |
 | **Commercial Cleaning** | `/estimate/commercial/` | Offices, retail, salons, gyms, small facilities | **Live provisional estimate** — Tier A single price, Tier B range, Tier C scope review |
 | **Short-Term Rental Turnovers** | `/estimate/str/` | Airbnb/Vrbo hosts | **Live per-turnover estimate** (existing approved STR model) |
 | **Church Cleaning** | `/estimate/church/` | Churches and faith facilities | **Live provisional estimate** with the owner-directed **10% church discount**; Tier C scope review |
 
-The `/estimate/` hub displays the four cards. Service pages are contextual entry
-points that bypass the hub. There is ONE submission pipeline
+The `/estimate/` hub is **selection only**; it displays the four cards and no wizard. Service
+pages are contextual entry points that bypass the hub. The residential wizard is
+`/estimate/residential/`; legacy `/estimate/?service=` and `?promo=` links forward there with the
+query intact. There is ONE submission pipeline
 (`submitLead` → `/api/lead` → Web3Forms + Resend).
 
 ## 2. Shared components (never duplicate)
@@ -48,11 +59,15 @@ points that bypass the hub. There is ONE submission pipeline
 - New recurring arrangements still require the **first-visit Deep Cleaning**
   (acknowledgement enforced in the browser and the server).
 - Two-price recurring presentation: first visit + ongoing per-visit amount.
-- **Supportive Home Cleaning** is an optional RESIDENTIAL pathway (step 3):
-  senior / veteran / first-responder / practical support / other / prefer not to
-  specify, plus an optional "what would help" and practical notes. It is never
-  required, never asks for medical details, and **never changes the price by
-  category**. Practical extra scope is priced transparently by the normal model.
+- **Supportive Home Cleaning** is an optional RESIDENTIAL pathway: the customer
+  self-attests eligibility (65+, veteran, living with a disability; the checked
+  category is recorded only as an eligibility reason). The owner-directed
+  **10% Supportive Home discount** applies once, never stacks with another
+  promotion, and is applied to the pre-tax residential service subtotal. It is
+  never automatic: the customer must check the eligibility box. The pathway
+  never asks for medical records, proof documents or sensitive details, and
+  the discount does not reduce travel or third-party costs. See
+  `ESTIMATE-CALCULATION-ORDER.md`.
 - Contextual presets: `?service=recurring|deep|move|move-out|one-time|supportive`
   (allowlisted) and `?frequency=weekly|biweekly|monthly|one_time`.
 
@@ -73,6 +88,14 @@ and the server: when false, no numeric price is shown, sent in the request, or
 recorded in the owner notification, and the server returns a scope-review
 verdict.
 
+**Facility customer experience (6.2):** `/estimate/commercial/` and
+`/estimate/church/` use the same four-step guided form (`FacilityEstimateForm.astro`
++ `facility-estimate.ts`): Your facility → Cleaning needs → Schedule & access →
+Contact. Each step validates its own fields, keeps a visible progress state,
+supports Back/Continue, moves focus to the first invalid field and exposes an
+accessible error summary. The address, travel, tax and global-factor rules are
+identical to residential; facility requests are never automatically booked.
+
 ## 5. Short-term rental engine
 
 `/estimate/str/` runs the turnover questionnaire (property, beds, baths,
@@ -91,18 +114,22 @@ fee and no invented availability.
   Terms implemented in `src/lib/estimate/church-discount.ts` and configured in
   `src/config/pricing.ts` (`churchDiscount`, terms version
   `2026-10-24.church10.v1`):
-  - the normal cleaning subtotal is calculated first;
-  - the discount applies to the cleaning subtotal **after** the minimum-job
-    rule, so the benefit is never silently erased by the floor;
+  - the normal cleaning subtotal is calculated first, including the $125
+    minimum and the facility $5 presentation step;
+  - the discount applies to that rounded cleaning subtotal and is retained to
+    the cent — it is **not** rounded upward again;
+  - example: `$145.00 − $14.50 = $130.50`;
+  - the owner global factor, when configured, is applied after the discount to
+    the cleaning subtotal only;
   - travel and third-party costs are excluded;
   - it never stacks with another promotion;
   - it applies only to church requests;
   - it is a service discount — **not** a charitable donation or tax-deductible
     tithe.
 - With numeric pricing enabled for Tier A/B, the customer sees the 10% discount
-  applied to the cleaning subtotal after the minimum, with the preliminary
-  price and savings. Tier C shows the discount entitlement and the owner
-  confirms it personally. The owner notification records
+  applied to the rounded cleaning subtotal, with the preliminary price and
+  the exact savings to the cent. Tier C shows the discount entitlement and the
+  owner confirms it personally. The owner notification records
   `church_discount_percent=10` + the terms version; the server recomputes the
   discount when pricing is enabled. When the kill switch is off, no discount
   amount is calculated or sent.
@@ -115,11 +142,11 @@ fee and no invented availability.
 
 | Source | Destination | CTA |
 | --- | --- | --- |
-| `/estimate/` hub | four engine cards | engine labels |
-| Recurring page | `/estimate/?service=recurring` | Get My Cleaning Estimate |
-| Deep page | `/estimate/?service=deep` | Get My Cleaning Estimate |
-| Move-in/out page | `/estimate/?service=move-out` | Get My Moving Clean Estimate |
-| Supportive page | `/estimate/?service=supportive&supportive=yes` | Get My Cleaning Estimate |
+| `/estimate/` hub | four engine cards → Residential `/estimate/residential/` | engine labels |
+| Recurring page | `/estimate/residential/?service=recurring` | Get My Cleaning Estimate |
+| Deep page | `/estimate/residential/?service=deep` | Get My Cleaning Estimate |
+| Move-in/out page | `/estimate/residential/?service=move-out` | Get My Moving Clean Estimate |
+| Supportive page | `/estimate/residential/?service=supportive&supportive=yes` | Get My Cleaning Estimate |
 | STR page | `/estimate/str/` | Get a Turnover Estimate |
 | Commercial page | `/estimate/commercial/` | Estimate My Facility Cleaning |
 | Church page | `/estimate/church/` | Estimate Church Cleaning |
@@ -142,11 +169,21 @@ fee and no invented availability.
   Turnstile/honeypot/contact checks; they are explicitly labelled scope reviews.
 - `travel_verified=true` only for a real provider route. Never trust client
   travel values.
+- The server independently re-derives the Supportive Home eligibility discount
+  and the owner global factor; a client-supplied discount, factor, tax amount
+  or final total is never trusted.
+- The verified final total and pre-discount cleaning subtotal must reconcile to
+  the cent; the owner notification and customer receipt carry the same
+  breakdown. A mismatch is a review action, not a silently accepted price.
+- Tax is disclosed from the category policy in `TAX-TREATMENT.md`; no server
+  or client path invents a numeric tax rate or amount.
 
 ## 9. Owner controls
 
-- **Prices, labour model, travel, church discount, facility baseline**:
-  `src/config/owner-pricing.ts` (typed state in `src/config/pricing.ts`).
+- **Prices, labour model, travel, church discount, Supportive Home discount,
+  global estimate factor, facility baseline**: `src/config/owner-pricing.ts`
+  (typed state in `src/config/pricing.ts`). Values outside the supported
+  `0.50–1.50` global-factor range fail closed to `1.00`.
 - **Facility numeric pricing kill switch**:
   `src/config/commercial-tiers.ts` (`numericEstimatesEnabled`). FALSE returns
   every commercial/church request to a scope review with no numeric prices in
@@ -159,6 +196,10 @@ fee and no invented availability.
 - **Calibration**: `npm run commercial:calibration` (hypothetical scenarios;
   intended for internal financial review, never published to customers).
 - **Quote preview**: `npm run estimate:quotes`.
+- **Calculation and tax rules**: `ESTIMATE-CALCULATION-ORDER.md` and
+  `TAX-TREATMENT.md`.
+- **Financial scenarios**: `npm run estimate:scenarios` (global factor,
+  Supportive Home nonstacking, church exact cents, taxable vs exempt).
 
 ## 10. Known pending owner decisions
 
@@ -168,5 +209,7 @@ fee and no invented availability.
    church discount (currently excluded from the discount base by design).
 3. Review the provisional $60/hour and effective production rates after that
    calibration evidence exists.
-4. GTM registration of the new `church_request_start` / `church_request_submit`
-   events (the website emits them; the owner's container needs matching tags).
+4. Verify live receipt of the `church_request_start` / `church_request_submit`
+   and promotion events in GTM Version 5 / GA4 DebugView. The owner reports the
+   container published; the website-side generation is tested, but receipt of
+   the new events is not yet fully proven.

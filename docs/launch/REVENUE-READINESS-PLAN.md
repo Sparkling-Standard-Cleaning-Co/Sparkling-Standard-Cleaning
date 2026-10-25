@@ -97,7 +97,7 @@ Order matters: delivery → local presence → measurement → content.
    shorten or hand-build the URLs.
 3. **Google Search Console** — verify the domain property, submit
    `https://sparkling-standard.com/sitemap-index.xml`, confirm coverage.
-4. **GTM + GA4 — done (owner-confirmed 2026-10-03).** Container `GTM-KSQ26HMG` (GTM Version 3) and
+4. **GTM + GA4 — done (owner-confirmed 2026-10-03).** Container `GTM-KSQ26HMG` (Version 5 owner-reported; Version 3 receipt verified) and
    GA4 `G-LG222LQRQ2` are operational: page views, `estimate_start` and the three inquiry key
    events verified end-to-end; Enhanced Measurement form interactions disabled; consent tests
    passed. Rebuild reference: `docs/analytics/GTM-CONTAINER-SETUP.md`.

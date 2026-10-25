@@ -57,7 +57,7 @@ test('the estimate hub presents the four engines with the right destinations', a
     assert.equal(await cards.count(), 4, 'four engine cards');
     const hrefs = await cards.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')));
     assert.deepEqual(hrefs, [
-      '/estimate/',
+      '/estimate/residential/',
       '/estimate/commercial/',
       '/estimate/str/',
       '/estimate/church/',
@@ -78,7 +78,7 @@ test('the estimate hub presents the four engines with the right destinations', a
 });
 
 test('a residential service preset preselects the service, frequency and supportive pathway', async () => {
-  const { context, page } = await open('/estimate/?service=deep');
+  const { context, page } = await open('/estimate/residential/?service=deep');
   try {
     assert.equal(await page.locator('input[name="serviceType"][value="deep"]').isChecked(), true);
     assert.equal(await page.locator('#est-frequency').inputValue(), 'one_time');
@@ -91,12 +91,15 @@ test('a residential service preset preselects the service, frequency and support
   }
 });
 
-test('the supportive preset activates the optional pathway without requiring sensitive details', async () => {
-  const { context, page } = await open('/estimate/?service=supportive&supportive=yes');
+test('the supportive preset opens the optional 10% pathway without preselecting eligibility', async () => {
+  const { context, page } = await open('/estimate/residential/?service=supportive&supportive=yes');
   try {
     assert.equal(await page.locator('input[name="serviceType"][value="standard"]').isChecked(), true);
-    const value = await page.locator('#est-supportive-home').inputValue();
-    assert.ok(value !== '', 'a supportive option is preselected');
+    assert.equal(await page.locator('[data-supportive-section]').evaluate((el) => el.hidden), false);
+    const eligible = page.locator('input[name="supportiveEligible"]');
+    assert.equal(await eligible.count(), 1);
+    assert.equal(await eligible.isChecked(), false, 'eligibility is never preselected');
+    assert.equal(await page.locator('a[href="/supportive-home-cleaning/"]').count() >= 1, true);
     const notes = page.locator('#est-supportive-notes');
     assert.equal(await notes.getAttribute('required'), null, 'supportive notes are optional');
   } finally {
@@ -161,9 +164,38 @@ test('the church engine presents the owner-directed 10% discount and optional pa
   }
 });
 
+async function completeFacilityStepOne(page, organization = 'Test facility (please ignore)') {
+  await page.fill('#fac-org', organization);
+  await page.fill('#fac-name', 'Test Contact');
+  await page.click('[data-address-manual-summary]');
+  await page.fill('#est-address', '100 S Baylen St');
+  await page.fill('#est-zip', '32502');
+  await page.click('[data-facility-next]');
+  await page.waitForFunction(() => document.querySelector('[data-facility-step-panel="2"]')?.hidden === false);
+}
+
+test('the facility form validates the current step with field-specific messages', async () => {
+  const { context, page } = await open('/estimate/commercial/');
+  try {
+    await page.click('[data-facility-next]');
+    const summary = (await page.locator('[data-error-summary]').innerText()) ?? '';
+    assert.match(summary, /Enter the business or organization name/i);
+    assert.match(summary, /Enter the contact name for this request/i);
+    assert.match(summary, /Enter the facility ZIP code/i);
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'fac-org');
+    assert.equal(await page.locator('[data-facility-step-panel="2"]').evaluate((el) => el.hidden), true);
+    await completeFacilityStepOne(page);
+    assert.equal(await page.locator('[data-facility-step-panel="2"]').evaluate((el) => el.hidden), false);
+    assert.equal(await page.locator('[data-facility-step-panel="1"]').evaluate((el) => el.hidden), true);
+  } finally {
+    await context.close();
+  }
+});
+
 test('the commercial engine shows a preliminary per-visit price for an ordinary office', async () => {
   const { context, page } = await open('/estimate/commercial/');
   try {
+    await completeFacilityStepOne(page);
     await page.selectOption('#fac-type', 'office');
     await page.fill('#fac-sqft', '2000');
     await page.fill('#fac-restrooms', '6');
@@ -176,6 +208,8 @@ test('the commercial engine shows a preliminary per-visit price for an ordinary 
     assert.ok(value >= 125, `preliminary per-visit price is at least the minimum (${price})`);
     const note = (await page.locator('[data-facility-estimate-note]').textContent()) ?? '';
     assert.match(note, /Nonbinding preliminary estimate/i);
+    const tax = (await page.locator('[data-facility-estimate-tax]').textContent()) ?? '';
+    assert.match(tax, /applicable tax/i);
     const reviewNote = (await page.locator('[data-facility-review-note]').textContent()) ?? '';
     assert.match(reviewNote, /nonbinding preliminary estimate/i, 'a priced request is not called a scope review');
     assert.doesNotMatch(reviewNote, /scope-review request/i);
@@ -184,19 +218,22 @@ test('the commercial engine shows a preliminary per-visit price for an ordinary 
   }
 });
 
-test('the church engine shows the 10% discount and routes very large scopes to review', async () => {
+test('the church engine reconciles the 10% discount and routes very large scopes to review', async () => {
   const { context, page } = await open('/estimate/church/');
   try {
-    await page.fill('#fac-org', 'Test Church (please ignore)');
+    await completeFacilityStepOne(page, 'Test Church (please ignore)');
     await page.fill('#fac-sqft', '4000');
     await page.fill('#fac-restrooms', '6');
     await page.selectOption('#fac-frequency', 'weekly');
     await page.waitForSelector('[data-facility-estimate]:not([hidden])');
     const lines = (await page.locator('[data-facility-estimate-lines]').innerText()) ?? '';
-    assert.match(lines, /Church discount — 10%/i);
-    assert.match(lines, /Savings/i);
+    assert.match(lines, /Church discount \(10%\)/i);
+    assert.match(lines, /Subtotal after discount/i);
+    assert.match(lines, /\$14\.50/);
     const priceText = (await page.locator('[data-facility-estimate-price]').textContent()) ?? '';
-    assert.match(priceText, /^\$\d+/);
+    assert.equal(priceText, '$130.50', 'the exact discounted price reconciles');
+    const tax = (await page.locator('[data-facility-estimate-tax]').textContent()) ?? '';
+    assert.match(tax, /unless exempt/i);
     // A very large facility must not receive an invented number.
     await page.fill('#fac-sqft', '30000');
     await page.fill('#fac-restrooms', '24');

@@ -21,7 +21,7 @@ const schema = [
 ---
 
 <BaseLayout title={data.metaTitle} description={data.metaDescription} schema={schema}>
-  <section class="section section--tight">
+  <section class="section section--tight area-intro">
     <div class="container">
       <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Service Area', path: '/service-area/' }]} />
       <div class="section-head mt-4">
@@ -30,19 +30,13 @@ const schema = [
           {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
         </h1>
         <p class="lead">{data.hero.lead}</p>
-        <a class="btn btn--primary btn--large mt-4" href="/estimate/" data-cta="area-estimate">
-          {data.hero.ctaLabel ?? 'Check Your ZIP in the Estimate'}
-        </a>
       </div>
     </div>
   </section>
 
-  <section class="section section--tight">
+  <section class="section section--tight area-map-section">
     <div class="container">
-      <div class="section-head">
-        <p class="eyebrow">Our coverage at a glance</p>
-        <h2>Where Sparkling Standard cleans</h2>
-      </div>
+      <h2 class="visually-hidden">Sparkling Standard service-area map</h2>
       <ServiceAreaMap />
     </div>
   </section>

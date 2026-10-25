@@ -3,7 +3,7 @@
 // This environment cannot run a real browser, so the smoke test asserts the
 // structural guarantees that matter (documented in docs/VERIFICATION.md):
 // required pages exist, every page has the layout shell, the estimate flow
-// has all seven steps and the request/submit states, and no obviously broken
+// has all six steps and the request/submit states, the hub is selection-only, and no obviously broken
 // interactive markup ships. Run: npm run smoke (after npm run build).
 
 import fs from 'node:fs';
@@ -27,6 +27,10 @@ const REQUIRED_PAGES = [
   'commercial-cleaning/index.html',
   'church-cleaning/index.html',
   'estimate/index.html',
+  'estimate/residential/index.html',
+  'estimate/str/index.html',
+  'estimate/commercial/index.html',
+  'estimate/church/index.html',
   'about/index.html',
   'service-area/index.html',
   'contact/index.html',
@@ -59,8 +63,11 @@ for (const page of REQUIRED_PAGES) {
   if (/href="#"/.test(html)) problems.push(`${page}: contains an empty href="#" link`);
 }
 
-// Estimate flow structure.
-const estimate = fs.readFileSync(path.join(DIST, 'estimate', 'index.html'), 'utf8');
+// Residential estimate flow structure (the hub is selection-only).
+const hub = fs.readFileSync(path.join(DIST, 'estimate', 'index.html'), 'utf8');
+if (hub.includes('data-estimate-form')) problems.push('estimate hub: embeds the residential wizard');
+
+const estimate = fs.readFileSync(path.join(DIST, 'estimate', 'residential', 'index.html'), 'utf8');
 for (const [label, needle] of [
   ['estimate form', 'data-estimate-form'],
   ['progress indicator', 'data-progress-fill'],
@@ -128,7 +135,7 @@ const robots = fs.readFileSync(path.join(DIST, 'robots.txt'), 'utf8');
 if (!robots.includes('Sitemap: https://sparkling-standard.com/sitemap-index.xml')) {
   problems.push('robots.txt: missing the production sitemap reference');
 }
-if (/noindex/i.test(fs.readFileSync(path.join(DIST, 'estimate', 'index.html'), 'utf8'))) {
+if (/noindex/i.test(fs.readFileSync(path.join(DIST, 'estimate', 'residential', 'index.html'), 'utf8'))) {
   problems.push('estimate page: accidental noindex directive');
 }
 

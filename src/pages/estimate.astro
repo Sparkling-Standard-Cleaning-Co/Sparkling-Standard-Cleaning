@@ -1,48 +1,31 @@
 ---
-import { getEntry, getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import EstimateWizard from '../components/EstimateWizard.astro';
-import EstimateHub from '../components/EstimateHub.astro';
-import FaqItem from '../components/FaqItem.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
-import { faqNode, breadcrumbNode } from '../lib/schema';
-import { ESTIMATE_STEPS } from '../lib/estimate/steps';
-
-const entry = await getEntry('site', 'estimate');
-if (!entry) throw new Error('Missing content entry: src/content/site/estimate.md');
-const { data } = entry;
-
-const faqs = await getCollection('faqs');
-const pageFaqs = faqs
-  .filter((faq) => data.estimateFaqIds.includes(faq.id))
-  .sort((a, b) => a.data.order - b.data.order);
-
-// The "what to expect" section derives from the ONE shared six-step
-// definition used by the wizard navigator, headings and progress bar.
-const steps = ESTIMATE_STEPS;
+import EstimateHub from '../components/EstimateHub.astro';
+import { breadcrumbNode } from '../lib/schema';
 
 const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const title = 'Cleaning Estimate Options | Sparkling Standard';
+const description =
+  'Choose the estimate that fits your space: residential cleaning, short-term rental turnovers, commercial facilities or church cleaning. Each path asks only what matters.';
 const schema = [
   breadcrumbNode(site, [
     { name: 'Home', path: '/' },
     { name: 'Instant Estimate', path: '/estimate/' },
   ]),
-  ...(pageFaqs.length > 0
-    ? [faqNode(pageFaqs.map((faq) => ({ question: faq.data.question, answer: faq.data.answer })))]
-    : []),
 ];
 ---
 
-<BaseLayout title={data.metaTitle} description={data.metaDescription} schema={schema}>
+<BaseLayout title={title} description={description} schema={schema}>
   <section class="section section--tight estimate-intro">
     <div class="container">
       <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Instant Estimate', path: '/estimate/' }]} />
       <div class="section-head mt-4">
-        <h1>
-          {data.hero.headline}
-          {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
-        </h1>
-        <p class="lead">{data.hero.lead}</p>
+        <h1>Find the right estimate.</h1>
+        <p class="lead">
+          Choose the cleaning that matches your space. Each path asks only what matters for that
+          kind of cleaning — no account and no obligation.
+        </p>
       </div>
     </div>
   </section>
@@ -50,44 +33,32 @@ const schema = [
   <div class="container" style="margin-bottom: var(--space-8)">
     <EstimateHub />
   </div>
-
-  <div class="container" style="margin-bottom: var(--space-8)">
-    <EstimateWizard />
-  </div>
-
-  <section class="section section--alt">
-    <div class="container">
-      <div class="section-head">
-        <p class="eyebrow">What to expect</p>
-        <h2>Six short steps, no interrogation</h2>
-      </div>
-      <ol class="steps steps--3" style="display:grid">
-        {steps.map((step, index) => (
-          <li class="step">
-            <h3 class="step__title">{index + 1}. {step.title}</h3>
-            <p class="step__text">{step.blurb}</p>
-          </li>
-        ))}
-      </ol>
-      {data.estimateNote && <p class="small text-muted mt-4">{data.estimateNote}</p>}
-    </div>
-  </section>
-
-  {
-    pageFaqs.length > 0 && (
-      <section class="section">
-        <div class="container container--narrow">
-          <div class="section-head">
-            <p class="eyebrow">Estimate questions</p>
-            <h2>Good to know before you start</h2>
-          </div>
-          <div class="faq-list">
-            {pageFaqs.map((faq) => (
-              <FaqItem question={faq.data.question} answer={faq.data.answer} />
-            ))}
-          </div>
-        </div>
-      </section>
-    )
-  }
 </BaseLayout>
+
+<script>
+  // Backward-compatible forwarding for the pre-6.2 deep links that used the
+  // hub URL for a specific engine. The hub itself stays a clean selection
+  // page; no redirect happens for a plain /estimate/ visit.
+  const params = new URLSearchParams(window.location.search);
+  const service = (params.get('service') ?? '').trim().toLowerCase();
+  const residentialServices = new Set([
+    'recurring',
+    'deep',
+    'move',
+    'move-in',
+    'move-out',
+    'supportive',
+    'one-time',
+    'standard',
+    'house',
+    'residential',
+    'str_turnover',
+  ]);
+  const hasResidentialState = ['frequency', 'supportive', 'promo'].some((key) => params.has(key));
+  let target = '';
+  if (service === 'str_turnover' || service === 'str') target = '/estimate/str/';
+  else if (service === 'commercial' || service === 'commercial_cleaning') target = '/estimate/commercial/';
+  else if (service === 'church' || service === 'church_cleaning') target = '/estimate/church/';
+  else if ((service && residentialServices.has(service)) || hasResidentialState) target = '/estimate/residential/';
+  if (target) window.location.replace(`${target}${window.location.search}${window.location.hash}`);
+</script>

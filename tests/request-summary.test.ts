@@ -131,6 +131,25 @@ test('a facility request with a preliminary price is titled as an estimate, with
   assert.match(summary.estimate?.note ?? '', /Nonbinding preliminary estimate/i);
 });
 
+test('the customer summary carries the discount and tax disclosure', () => {
+  const summary = buildRequestSummary({
+    request_type: 'facility_estimate',
+    estimate_status: 'estimated',
+    organization: 'Example Church',
+    facility_type: 'church',
+    name: 'Facilities Lead',
+    phone: '8500000000',
+    quoted_price: '130.50',
+    discount_label: 'Church discount (10%)',
+    discount_amount: '14.5',
+    tax_note: '+ applicable tax unless exempt. Bring a current DR-14 certificate to confirm.',
+  });
+  const byLabel = Object.fromEntries(summary.rows.map((row) => [row.label, row.value]));
+  assert.match(byLabel['Discount'] ?? '', /Church discount \(10%\)/);
+  assert.match(byLabel['Discount'] ?? '', /\$14\.50/);
+  assert.match(byLabel['Sales tax'] ?? '', /DR-14/);
+});
+
 test('a facility request without a price is titled as a scope review', () => {
   const summary = buildRequestSummary({
     request_type: 'facility_estimate',

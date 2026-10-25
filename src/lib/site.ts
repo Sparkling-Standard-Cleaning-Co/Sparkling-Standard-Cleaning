@@ -76,7 +76,6 @@ export const footerServicesNav: NavItem[] = [...cleaningTypesNav];
 export const footerCompanyNav: NavItem[] = [
   { label: 'About Us', href: '/about/' },
   { label: 'Service Area', href: '/service-area/' },
-  { label: 'Reviews', href: '/#reviews' },
   { label: 'Get an Estimate', href: '/estimate/' },
   { label: 'FAQ', href: '/faq/' },
   { label: 'Privacy Policy', href: '/privacy/' },
@@ -102,6 +101,10 @@ export const publicPaths: string[] = [
   '/church-cleaning/',
   '/supportive-home-cleaning/',
   '/estimate/',
+  '/estimate/residential/',
+  '/estimate/str/',
+  '/estimate/commercial/',
+  '/estimate/church/',
   '/about/',
   '/service-area/',
   '/contact/',

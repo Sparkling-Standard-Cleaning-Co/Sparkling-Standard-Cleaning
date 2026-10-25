@@ -3,6 +3,32 @@
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
+## Verified — 2026-10-25 Initiative 6.2 release candidate (local, not deployed)
+
+Branch: `initiative-6.2-complete-experience-audit`, created from production `af46db4`.
+This evidence is from the local production build. Production still serves 6.1; no push, merge or
+deployment was performed.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints (131 files) |
+| Production build | `npm run build` | 26 pages + sitemap; only the expected empty `proof` collection notice and the lazy MapLibre chunk-size warning |
+| Unit suite | `npm test` | **455 tests: 454 passed, 1 skipped, 0 failed**; the skip is the print-output test when no print build exists |
+| Browser regression suite | `npm run test:browser` | **120 passed, 0 failed** |
+| Static validation | `npm run verify` | 1,670 internal links across 26 pages resolve; SEO, homepage copy, marketing/QR, GTM artifacts and checklist-leak checks passed |
+| Smoke test | `npm run smoke` | 21 required pages passed |
+| PENDING-fact gate | `npm run pending` | no PENDING placeholders across 30 built files |
+| Fake-testimonial gate | `npm run testimonials` | passed |
+| No-fabrication audit | `npm run audit:facts` | no unsupported factual claims; 15 terms need human context review |
+| Commercial calibration | `npm run commercial:calibration` | passed (hypothetical scenarios) |
+| Financial scenarios | `npm run estimate:scenarios` | passed (residential, STR, commercial, church, global factor, Supportive Home, tax notes) |
+| Layout audit | Playwright route sweep | 0 overflow, broken-image or duplicate-H1 issues across 22 routes at 320/375/390/768/1440 |
+| Visual evidence | `docs/verification/6.2/` | 12 local-build screenshots (desktop + mobile) plus README |
+
+**Known residuals:** GTM Version 5 is owner-reported; live receipt of the new church/promotion
+events is not yet fully proven. R2 photo intake remains disabled. Commercial/church pricing is
+provisional and still requires calibration against real jobs. 6.2 is not deployed.
+
 ## Verified - 2026-10-21 owner-decision implementation
 
 | Check | Command | Result |

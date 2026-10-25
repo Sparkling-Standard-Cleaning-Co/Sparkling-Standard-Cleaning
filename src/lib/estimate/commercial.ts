@@ -23,7 +23,7 @@
 // price is produced for the customer, the request or the owner notification.
 
 import type { Condition } from '../../config/pricing.ts';
-import { pricing } from '../../config/pricing.ts';
+import { pricing, resolveGlobalEstimateFactor } from '../../config/pricing.ts';
 import { commercialTierConfig } from '../../config/commercial-tiers.ts';
 import { calculateChurchDiscount, type ChurchDiscountResult } from './church-discount.ts';
 
@@ -123,6 +123,8 @@ export interface FacilityQuoteOptions {
   otherDiscountApplied?: boolean | undefined;
   /** Owner kill switch override for tests; defaults to the shared config. */
   numericEstimatesEnabled?: boolean | undefined;
+  /** Test/owner override for the global estimate factor; defaults to config. */
+  globalFactor?: number | undefined;
 }
 
 export interface FacilityPrice {
@@ -140,6 +142,10 @@ export interface FacilityPrice {
   monthly: number | null;
   visitsPerMonth: number | null;
   discount: ChurchDiscountResult | null;
+  /** Owner global estimate factor applied to the cleaning subtotal. */
+  globalFactor: number;
+  /** Dollar effect of the owner factor (negative = reduction). */
+  globalAdjustment: number;
   tier: 'A' | 'B' | 'C';
   /** True when a numeric estimate can be shown (Tiers A/B and the owner switch on). */
   priced: boolean;
@@ -169,6 +175,10 @@ function roundUpToStep(value: number): number {
   return Math.ceil((value - 0.01) / step) * step;
 }
 
+function round2(value: number): number {
+  return Math.round((value + 1e-9) * 100) / 100;
+}
+
 export function calculateFacilityPrice(
   workload: FacilityWorkload,
   frequency: string,
@@ -187,6 +197,8 @@ export function calculateFacilityPrice(
       monthly: null,
       visitsPerMonth: null,
       discount: null,
+      globalFactor: 1,
+      globalAdjustment: 0,
       tier: workload.tier,
       priced: false,
     };
@@ -199,16 +211,22 @@ export function calculateFacilityPrice(
   const discount = church
     ? calculateChurchDiscount(cleaningSubtotal, { otherDiscountApplied: options.otherDiscountApplied === true })
     : null;
-  const perVisitCore = discount?.applied ? roundUpToStep(discount.discountedSubtotal) : cleaningSubtotal;
-  const travelAdjustment = roundUpToStep(facilityTravelAdjustment(options.oneWayMiles ?? null));
-  const total = perVisitCore + travelAdjustment;
+  // The church discount is applied to the already-rounded cleaning subtotal and
+  // is NOT rounded upward again; the full 10% benefit survives to the cent.
+  const discountedSubtotal = discount?.applied ? discount.discountedSubtotal : cleaningSubtotal;
+  const globalFactor = resolveGlobalEstimateFactor(options.globalFactor);
+  const adjustedService = round2(discountedSubtotal * globalFactor);
+  const globalAdjustment = round2(adjustedService - discountedSubtotal);
+  const perVisitCore = adjustedService;
+  const travelAdjustment = round2(facilityTravelAdjustment(options.oneWayMiles ?? null));
+  const total = round2(perVisitCore + travelAdjustment);
 
   const spread = pricing.commercialPricing.rangeSpreadPercent.value / 100;
   const range =
     workload.tier === 'B'
       ? {
-          low: roundUpToStep(Math.max(pricing.minimumJob.value, perVisitCore * (1 - spread))),
-          high: roundUpToStep(perVisitCore * (1 + spread)),
+          low: round2(total * (1 - spread)),
+          high: round2(total * (1 + spread)),
         }
       : null;
 
@@ -220,9 +238,11 @@ export function calculateFacilityPrice(
     travelAdjustment,
     travelIncluded: travelAdjustment > 0,
     total,
-    monthly: visitsPerMonth ? roundUpToStep(total * visitsPerMonth) : null,
+    monthly: visitsPerMonth ? round2(total * visitsPerMonth) : null,
     visitsPerMonth,
     discount,
+    globalFactor,
+    globalAdjustment,
     tier: workload.tier,
     priced: workload.tier !== 'C',
   };
@@ -233,6 +253,7 @@ export interface ChurchEstimateInput extends FacilityWorkloadInput {
   oneWayMiles?: number | null;
   otherDiscountApplied?: boolean;
   numericEstimatesEnabled?: boolean | undefined;
+  globalFactor?: number | undefined;
 }
 
 export interface ChurchEstimateSummary {
@@ -250,6 +271,7 @@ export function calculateChurchEstimate(input: ChurchEstimateInput): ChurchEstim
       oneWayMiles: input.oneWayMiles,
       otherDiscountApplied: input.otherDiscountApplied,
       numericEstimatesEnabled: input.numericEstimatesEnabled,
+      globalFactor: input.globalFactor,
     }),
   };
 }

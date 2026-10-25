@@ -206,6 +206,32 @@ export interface OwnerPricingConfig {
   /** Smallest job value, applied silently to every estimate range. */
   minimumJob: number;
 
+  /**
+   * ONE owner-controlled adjustment applied to the pre-tax cleaning/service
+   * subtotal across every engine. 1.00 = unchanged, 0.90 = 10% lower,
+   * 1.10 = 10% higher. Travel and tax are always separate and are never
+   * multiplied by this factor. Supported range: 0.50–1.50.
+   */
+  globalEstimateFactor: number;
+
+  /**
+   * 10% appreciation discount for eligible Supportive Home customers:
+   * adults aged 65+, military veterans, and people with disabilities.
+   * Self-attested at the estimate; the owner confirms eligibility before
+   * booking. Residential cleaning remains available to every customer; only
+   * the special discount requires eligibility. Never stacks with another
+   * promotion (the larger single discount wins).
+   */
+  supportiveHomeDiscount: {
+    enabled: boolean;
+    /** Percent value (10 = 10%). */
+    percent: number;
+    /** Terms version recorded on every quote/lead that uses it. */
+    termsVersion: string;
+    /** Residential services eligible for the discount. */
+    eligibleServices: PricingServiceType[];
+  };
+
   // ── Church discount (owner-directed 2026-10-24) ──────────────────────────
   /**
    * 10% off eligible CHURCH cleaning services. This is a real, owner-directed
@@ -365,6 +391,17 @@ export const ownerPricing: OwnerPricingConfig = {
 
   // ── 2. Minimum job ────────────────────────────────────────────────────────
   minimumJob: 125,
+
+  // Owner-controlled global adjustment. Edit this ONE number.
+  globalEstimateFactor: 1.0,
+
+  // Supportive Home 10% eligibility discount (owner-directed 2026-10-25).
+  supportiveHomeDiscount: {
+    enabled: true,
+    percent: 10,
+    termsVersion: '2026-10-25.supportive10.v1',
+    eligibleServices: ['standard', 'deep', 'move_in_out'],
+  },
 
   // ── Church discount (owner-directed 2026-10-24) ──────────────────────────
   churchDiscount: {

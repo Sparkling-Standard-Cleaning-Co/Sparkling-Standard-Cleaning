@@ -178,6 +178,7 @@ export function mapReservationFields(fields: Record<string, string>): EstimateIn
     // verified verdict on its own.
     ...(isGpsPinDestination(fields) ? { destinationConfirmed: true } : {}),
     pets: fields.pets as EstimateInputDraft['pets'],
+    ...(fields.supportive_eligible === 'yes' ? { supportiveEligible: true } : {}),
   };
 }
 
