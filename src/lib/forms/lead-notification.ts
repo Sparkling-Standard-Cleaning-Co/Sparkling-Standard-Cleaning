@@ -524,7 +524,13 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
     actions.push('Supportive Home Cleaning requested — review practical accommodations, no pricing change by category');
   }
   if (text(fields, 'engine_type') === 'commercial' || text(fields, 'engine_type') === 'church') {
-    actions.push('Scope review required before quoting (facility pricing is calibration-gated)');
+    actions.push('Confirm the facility scope and final price personally before scheduling');
+  }
+  if (text(fields, 'facility_quote_verified') === 'mismatch') {
+    actions.push('Facility price MISMATCH — the server price differs; re-quote before confirming');
+  }
+  if (text(fields, 'facility_quote_verified') === 'preliminary') {
+    actions.push('Facility estimate is preliminary — confirm travel and the final scope');
   }
   if (text(fields, 'initial_deep_clean_required') === 'yes') {
     actions.push('Initial Deep Cleaning required before recurring maintenance service');
@@ -637,6 +643,12 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Supportive home — What would help', text(fields, 'supportive_support'), 'supportive_support');
   add('Supportive home — Practical notes', text(fields, 'supportive_notes'), 'supportive_notes');
   add('Turnover — Rental properties', text(fields, 'rental_properties'), 'rental_properties');
+  add('Facility — Tier', text(fields, 'facility_tier'), 'facility_tier');
+  add('Facility — Server cleaning price', text(fields, 'verified_cleaning_price'), 'verified_cleaning_price');
+  add('Facility — Server labour hours', text(fields, 'verified_labor_hours'), 'verified_labor_hours');
+  add('Facility — Quote check', text(fields, 'facility_quote_verified'), 'facility_quote_verified');
+  add('Facility — Travel status', text(fields, 'facility_travel_status'), 'facility_travel_status');
+  add('Facility — Monthly estimate', text(fields, 'monthly_price'), 'monthly_price');
 
   // ── E. Requested extras ─────────────────────────────────────────────────
   const addonLabels = text(fields, 'addons');

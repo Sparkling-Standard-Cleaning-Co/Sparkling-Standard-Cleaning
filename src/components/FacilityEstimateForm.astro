@@ -215,8 +215,8 @@ const commercialFacilityTypes = [
           </div>
           <div class="field-row field-row--3">
             <div class="field">
-              <label for="fac-restrooms">Restrooms</label>
-              <input class="input" id="fac-restrooms" name="restroom_count" type="number" min="0" max="30" inputmode="numeric" placeholder="e.g. 4" required />
+              <label for="fac-restrooms">Restroom fixtures (toilets, urinals, sinks)</label>
+              <input class="input" id="fac-restrooms" name="restroom_fixtures" type="number" min="0" max="60" inputmode="numeric" placeholder="e.g. 8" required />
             </div>
             <div class="field">
               <label for="fac-classrooms">Classrooms</label>
@@ -263,8 +263,8 @@ const commercialFacilityTypes = [
           </div>
           <div class="field-row field-row--3">
             <div class="field">
-              <label for="fac-restrooms">Restrooms</label>
-              <input class="input" id="fac-restrooms" name="restroom_count" type="number" min="0" max="30" inputmode="numeric" placeholder="e.g. 2" required />
+              <label for="fac-restrooms">Restroom fixtures (toilets, urinals, sinks)</label>
+              <input class="input" id="fac-restrooms" name="restroom_fixtures" type="number" min="0" max="60" inputmode="numeric" placeholder="e.g. 6" required />
             </div>
             <div class="field">
               <label for="fac-workstations">Workstations / offices</label>
@@ -327,7 +327,32 @@ const commercialFacilityTypes = [
         </select>
       </div>
     </div>
+    <div class="field-row field-row--2">
+      <div class="field">
+        <label for="fac-flooring">Dominant flooring</label>
+        <select class="select" id="fac-flooring" name="flooring">
+          <option value="mixed" selected>Mixed carpet and hard floors</option>
+          <option value="carpet">Mostly carpet</option>
+          <option value="hard">Mostly hard floors</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fac-first-clean">Is this an initial detail clean?</label>
+        <select class="select" id="fac-first-clean" name="first_clean">
+          <option value="no" selected>No — routine maintenance clean</option>
+          <option value="yes">Yes — first clean / overdue detail reset</option>
+        </select>
+      </div>
+    </div>
   </section>
+
+  <div class="facility-estimate" data-facility-estimate hidden aria-live="polite">
+    <p class="facility-estimate__eyebrow" data-facility-estimate-label>Preliminary estimate</p>
+    <p class="facility-estimate__price" data-facility-estimate-price>—</p>
+    <p class="facility-estimate__range" data-facility-estimate-range hidden></p>
+    <ul class="summary-list facility-estimate__lines" data-facility-estimate-lines></ul>
+    <p class="facility-estimate__note" data-facility-estimate-note></p>
+  </div>
 
   <!-- 3. Schedule & access -->
   <section class="facility-form__section" data-facility-section="3">

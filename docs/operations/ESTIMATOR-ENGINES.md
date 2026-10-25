@@ -1,5 +1,13 @@
 # Estimate engines — architecture and owner controls
 
+> **2026-10-25 (Initiative 6.1) update:** commercial and church numerical
+> pricing is now ENABLED as nonbinding provisional estimates for Tier A/B
+> (ISSA-based workloading, fixture-based restrooms, $60/hr, calibration-aware
+> tiers). Very large/specialty facilities still route to a custom scope review.
+> The 10% church discount is applied to the numeric cleaning subtotal after the
+> minimum. Method, sources and benchmarks: `COMMERCIAL-PRICING-RESEARCH.md`.
+> Earlier "gated" statements below are historical context.
+
 Initiative 6.0 restructured the customer estimate experience into **four
 specialized engines unified by one system**. This is the authoritative guide to
 how they work, which parts are production-enabled, and how the owner changes

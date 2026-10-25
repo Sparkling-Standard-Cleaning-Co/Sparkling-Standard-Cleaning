@@ -10,6 +10,14 @@ import { saveSubmissionSummary } from '../lib/forms/submission-receipt';
 import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { attributionFields } from '../lib/attribution';
 import { track } from '../lib/analytics/events';
+import {
+  calculateFacilityPrice,
+  calculateFacilityWorkload,
+  type FacilityPrice,
+  type FacilityType,
+  type FacilityWorkload,
+  type FacilityWorkloadInput,
+} from '../lib/estimate/commercial';
 
 type Engine = 'commercial' | 'church';
 
@@ -36,6 +44,14 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   const resultTitle = host.querySelector<HTMLElement>('[data-facility-result-title]');
   const resultNote = host.querySelector<HTMLElement>('[data-facility-result-note]');
   const confirmedTravel = host.querySelector<HTMLElement>('[data-address-confirmed-travel]');
+  const estimatePanel = host.querySelector<HTMLElement>('[data-facility-estimate]');
+  const estimateLabel = host.querySelector<HTMLElement>('[data-facility-estimate-label]');
+  const estimatePrice = host.querySelector<HTMLElement>('[data-facility-estimate-price]');
+  const estimateRange = host.querySelector<HTMLElement>('[data-facility-estimate-range]');
+  const estimateLines = host.querySelector<HTMLElement>('[data-facility-estimate-lines]');
+  const estimateNote = host.querySelector<HTMLElement>('[data-facility-estimate-note]');
+  let latestWorkload: FacilityWorkload | null = null;
+  let latestPrice: FacilityPrice | null = null;
   let startTracked = false;
   let travel: RoutedTravel | null = null;
   let travelKey = '';
@@ -92,31 +108,135 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         if (confirmedTravel) {
           confirmedTravel.textContent = `${data.oneWayMiles.toFixed(1)} miles one way from our operating area — travel is included in the review of your request.`;
         }
+        renderSummary();
       }
     } catch {
       // Travel stays preliminary; the owner confirms eligibility personally.
     }
   }
 
+  function facilityTypeFor(engine: Engine, raw: string): FacilityType {
+    if (engine === 'church') return 'church';
+    switch (raw) {
+      case 'retail':
+        return 'retail';
+      case 'salon':
+        return 'salon';
+      case 'gym':
+        return 'gym';
+      case 'apartment':
+      case 'property-management':
+        return 'community';
+      default:
+        return 'office';
+    }
+  }
+
+  function numberFromField(name: string): number | null {
+    const raw = field(name).replaceAll(',', '').replaceAll(' ', '');
+    if (raw === '') return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function readWorkloadInput(): FacilityWorkloadInput {
+    return {
+      cleanableSqft: numberFromField('cleanable_sqft'),
+      restroomFixtures: numberFromField('restroom_fixtures'),
+      breakroom: field('breakroom') === 'breakroom' || field('breakroom') === 'kitchen',
+      facilityType: facilityTypeFor(facilityEngine, field('facility_type')),
+      condition: (field('condition') || 'average') as NonNullable<FacilityWorkloadInput['condition']>,
+      traffic: (field('traffic') || 'average') as NonNullable<FacilityWorkloadInput['traffic']>,
+      flooring: (field('flooring') || 'mixed') as NonNullable<FacilityWorkloadInput['flooring']>,
+      firstClean: field('first_clean') === 'yes',
+      specialty: field('specialty_services') !== '',
+    };
+  }
+
+  function renderEstimate(priceLines: string[]): void {
+    if (!estimatePanel || !estimatePrice || !estimateLabel || !estimateNote || !estimateLines) return;
+    const price = latestPrice;
+    const workload = latestWorkload;
+    if (!workload || !price) {
+      estimatePanel.hidden = true;
+      return;
+    }
+    estimatePanel.hidden = false;
+    estimateLines.innerHTML = priceLines.join('');
+    if (!price.priced) {
+      estimateLabel.textContent = 'Custom scope review';
+      estimatePrice.textContent = 'Let’s confirm this together';
+      if (estimateRange) estimateRange.hidden = true;
+      estimateNote.textContent =
+        'This facility has enough scope or special detail that a responsible price needs a personal review. Send the details and Sparkling Standard will confirm an exact quote.';
+      return;
+    }
+    estimateLabel.textContent = price.tier === 'B' ? 'Preliminary price range' : 'Preliminary per-visit estimate';
+    estimatePrice.textContent = `$${price.total.toLocaleString()}`;
+    if (estimateRange) {
+      if (price.range) {
+        estimateRange.hidden = false;
+        estimateRange.textContent = `Typical range $${price.range.low.toLocaleString()}–$${price.range.high.toLocaleString()} per visit`;
+      } else {
+        estimateRange.hidden = true;
+      }
+    }
+    estimateNote.textContent =
+      'Nonbinding preliminary estimate based on the scope you entered. Final scope, condition, access and travel are confirmed personally before anything is booked.';
+  }
+
   function renderSummary(): void {
-    if (!reviewLines) return;
     const lines: string[] = [];
     const organization = field('organization');
     const sqft = field('cleanable_sqft');
-    const restrooms = field('restroom_count');
+    const fixtures = field('restroom_fixtures');
     const frequency = field('frequency');
     const zip = field('zip');
     if (organization) lines.push(`<li><span>${facilityEngine === 'church' ? 'Ministry' : 'Facility'}</span><strong>${escapeHtml(organization)}</strong></li>`);
     if (sqft) lines.push(`<li><span>Cleanable area</span><strong>${escapeHtml(sqft)} sq ft</strong></li>`);
-    if (restrooms) lines.push(`<li><span>Restrooms</span><strong>${escapeHtml(restrooms)}</strong></li>`);
+    if (fixtures) lines.push(`<li><span>Restroom fixtures</span><strong>${escapeHtml(fixtures)}</strong></li>`);
     if (frequency) lines.push(`<li><span>Frequency</span><strong>${escapeHtml(frequency.replaceAll('_', ' '))}</strong></li>`);
     if (zip) lines.push(`<li><span>Service ZIP</span><strong>${escapeHtml(zip)}</strong></li>`);
+
+    const input = readWorkloadInput();
+    if (input.cleanableSqft && input.cleanableSqft >= 200) {
+      latestWorkload = calculateFacilityWorkload(input);
+      latestPrice = calculateFacilityPrice(latestWorkload, field('frequency') || 'weekly', {
+        oneWayMiles: travel?.oneWayMiles ?? null,
+        church: facilityEngine === 'church',
+      });
+      const priceLines: string[] = [];
+      if (latestPrice.priced) {
+        priceLines.push(`<li><span>Cleaning (${latestWorkload.laborHours} labor hrs)</span><strong>$${latestPrice.cleaningSubtotal.toLocaleString()}</strong></li>`);
+        if (latestPrice.discount?.applied) {
+          priceLines.push(
+            `<li><span>Church discount — 10%</span><strong>−$${latestPrice.discount.amount.toLocaleString()}</strong></li>`,
+          );
+          priceLines.push(`<li><span>Savings</span><strong>$${latestPrice.discount.amount.toLocaleString()} off</strong></li>`);
+        }
+        if (latestPrice.travelAdjustment > 0) {
+          priceLines.push(`<li><span>Travel adjustment</span><strong>$${latestPrice.travelAdjustment.toLocaleString()}</strong></li>`);
+        }
+        if (latestPrice.monthly) {
+          priceLines.push(`<li><span>Estimated monthly</span><strong>$${latestPrice.monthly.toLocaleString()}</strong></li>`);
+        }
+        lines.push(`<li><span>Preliminary estimate</span><strong>$${latestPrice.total.toLocaleString()} per visit</strong></li>`);
+      } else {
+        lines.push('<li><span>Estimate type</span><strong>Custom scope review</strong></li>');
+      }
+      renderEstimate(priceLines);
+    } else {
+      latestWorkload = null;
+      latestPrice = null;
+      renderEstimate([]);
+    }
+
     if (facilityEngine === 'church') {
       const percent = pricing.churchDiscount.percent.value;
-      lines.push(`<li><span>Church discount</span><strong>${percent}% off eligible cleaning (applied to your confirmed quote)</strong></li>`);
+      lines.push(`<li><span>Church discount</span><strong>${percent}% off eligible cleaning, applied to the cleaning subtotal</strong></li>`);
     }
-    lines.push('<li><span>Estimate type</span><strong>Scope review — price confirmed personally</strong></li>');
-    reviewLines.innerHTML = lines.join('');
+    lines.push('<li><span>Final price</span><strong>Confirmed personally before booking</strong></li>');
+    if (reviewLines) reviewLines.innerHTML = lines.join('');
   }
 
   function escapeHtml(value: string): string {
@@ -204,7 +324,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       email: field('email'),
       facility_type: field('facility_type') || (facilityEngine === 'church' ? 'church' : ''),
       cleanable_sqft: field('cleanable_sqft'),
-      restroom_count: field('restroom_count'),
+      restroom_fixtures: field('restroom_fixtures'),
+      flooring: field('flooring'),
+      first_clean: field('first_clean'),
       workstations: field('workstations'),
       breakroom: field('breakroom'),
       traffic: field('traffic'),
@@ -248,6 +370,29 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       if (pricing.churchDiscount.enabled.value) {
         fields.church_discount_percent = String(pricing.churchDiscount.percent.value);
         fields.church_discount_terms_version = pricing.churchDiscount.termsVersion.value;
+      }
+    }
+
+    if (latestPrice && latestWorkload) {
+      fields.facility_tier = latestPrice.tier;
+      fields.cleaning_subtotal = String(latestPrice.cleaningSubtotal);
+      fields.labor_hours = String(latestWorkload.laborHours);
+      fields.commercial_rate = String(pricing.commercialPricing.grossRatePerHour.value);
+      fields.travel_adjustment = String(latestPrice.travelAdjustment);
+      fields.quote_config_version = pricing.commercialPricing.configVersion.value;
+      if (latestPrice.priced) {
+        fields.quoted_price = String(latestPrice.total);
+        fields.quoted_range = latestPrice.range
+          ? `$${latestPrice.range.low}-$${latestPrice.range.high}`
+          : '';
+        if (latestPrice.monthly) fields.monthly_price = String(latestPrice.monthly);
+        if (latestPrice.discount?.applied) {
+          fields.church_discount_amount = String(latestPrice.discount.amount);
+          fields.church_savings = String(latestPrice.discount.amount);
+        }
+        fields.estimate_status = 'estimated';
+      } else {
+        fields.estimate_status = 'custom_confirmation_required';
       }
     }
 

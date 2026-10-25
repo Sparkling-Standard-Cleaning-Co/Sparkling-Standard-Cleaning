@@ -9,7 +9,7 @@ import {
   parseResidentialServiceParam,
 } from '../src/lib/estimate/engines.ts';
 import { calculateChurchDiscount } from '../src/lib/estimate/church-discount.ts';
-import { calculateChurchEstimate, calculateFacilityWorkload } from '../src/lib/estimate/commercial.ts';
+import { calculateChurchEstimate, calculateFacilityPrice, calculateFacilityWorkload } from '../src/lib/estimate/commercial.ts';
 import { commercialTierConfig } from '../src/config/commercial-tiers.ts';
 
 test('engine parameter is allowlisted and defaults to residential', () => {
@@ -59,27 +59,69 @@ test('church discount can bring a minimum-job subtotal below the floor (benefit 
   assert.equal(result.discountedSubtotal, 112.5);
 });
 
-test('facility workload uses the owner baseline, condition and traffic assumptions', () => {
+test('facility workloading follows the ISSA area + fixture method, not per-room time', () => {
   const workload = calculateFacilityWorkload({
     cleanableSqft: 2000,
-    restrooms: 2,
+    restroomFixtures: 6,
     breakroom: true,
     condition: 'average',
     traffic: 'average',
+    flooring: 'mixed',
   });
-  // 20 setup + 60 area + 6 restrooms + 10 breakroom = 96 workload minutes;
-  // the owner-approved average-condition factor (1.1) applies → 105.6 min.
-  assert.equal(workload.totalMinutes, 106);
-  assert.equal(workload.laborHours, 1.76);
-  assert.equal(workload.numericPricingEnabled, commercialTierConfig.numericEstimatesEnabled);
+  // area 2000/4200 = .476h; fixtures 6×3min = .3h; breakroom 10min = .167h;
+  // setup 20min = .333h; × mixed 1.04 × average 1.1.
+  assert.ok(Math.abs(workload.laborHours - 1.68) < 0.05, `labour hours ${workload.laborHours}`);
+  assert.equal(workload.tier, 'A');
 });
 
-test('numeric facility pricing stays gated until calibration is approved', () => {
-  assert.equal(commercialTierConfig.numericEstimatesEnabled, false);
-  const workload = calculateFacilityWorkload({ cleanableSqft: 1200, restrooms: 1, breakroom: false });
-  assert.equal(workload.numericPricingEnabled, false);
-  assert.equal(workload.scopeReviewRequired, true);
-  const church = calculateChurchEstimate({ cleanableSqft: 4000, restrooms: 3, breakroom: true });
-  assert.equal(church.preliminaryTotal, null);
-  assert.equal(church.discount.applied, false, 'no dollar discount is fabricated while gated');
+test('more restroom fixtures increase labour independently of floor area', () => {
+  const low = calculateFacilityWorkload({ cleanableSqft: 2000, restroomFixtures: 2, breakroom: false });
+  const high = calculateFacilityWorkload({ cleanableSqft: 2000, restroomFixtures: 12, breakroom: false });
+  assert.ok(high.laborHours > low.laborHours + 0.4);
+});
+
+test('workload tiers escalate to a range and then a custom scope review', () => {
+  const small = calculateFacilityWorkload({ cleanableSqft: 1200, restroomFixtures: 4, breakroom: false });
+  const mid = calculateFacilityWorkload({ cleanableSqft: 9000, restroomFixtures: 10, breakroom: true });
+  const large = calculateFacilityWorkload({ cleanableSqft: 18000, restroomFixtures: 24, breakroom: true });
+  assert.equal(small.tier, 'A');
+  assert.equal(mid.tier, 'B');
+  assert.equal(large.tier, 'C');
+});
+
+test('commercial pricing is enabled with a defensible rate and minimum', () => {
+  assert.equal(commercialTierConfig.numericEstimatesEnabled, true);
+  const input = {
+    cleanableSqft: 2000,
+    restroomFixtures: 6,
+    breakroom: true,
+    facilityType: 'office' as const,
+    condition: 'average' as const,
+    traffic: 'average' as const,
+    flooring: 'mixed' as const,
+  };
+  const workload = calculateFacilityWorkload(input);
+  const price = calculateFacilityPrice(workload, 'weekly');
+  assert.equal(price.priced, true);
+  assert.ok(price.perVisit >= 125);
+  assert.ok(price.monthly && price.monthly > price.perVisit);
+  assert.equal(price.travelAdjustment, 0);
+});
+
+test('church estimates apply the 10% discount transparently after the minimum', () => {
+  const church = calculateChurchEstimate({ cleanableSqft: 4000, restroomFixtures: 6, breakroom: true, frequency: 'weekly' });
+  assert.ok(church.price.cleaningSubtotal >= 125, 'minimum applies before the discount');
+  assert.equal(church.price.discount?.applied, true);
+  assert.ok(church.price.perVisit < church.price.cleaningSubtotal, 'the church discount reduces the customer price');
+  const expected = Math.ceil((church.price.cleaningSubtotal * 0.9 - 0.01) / 5) * 5;
+  assert.equal(church.price.perVisit, expected);
+  assert.ok(church.price.total >= church.price.perVisit);
+});
+
+test('specialty scopes route to a custom scope review without a price', () => {
+  const input = { cleanableSqft: 2000, restroomFixtures: 4, breakroom: false, specialty: true };
+  const workload = calculateFacilityWorkload(input);
+  const price = calculateFacilityPrice(workload, 'weekly');
+  assert.equal(price.tier, 'C');
+  assert.equal(price.priced, false);
 });

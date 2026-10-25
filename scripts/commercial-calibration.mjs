@@ -1,90 +1,94 @@
-// Commercial / church calibration planner — Initiative 6.0 §17.
-//
-// Runs representative HYPOTHETICAL facility scenarios through the shared
-// workload model and prints the labour economics the owner needs before
-// enabling numeric facility pricing. These are planning scenarios, NOT
-// completed jobs, and no result is published on the website while
-// commercialTiers.numericEstimatesEnabled is false.
-//
-// Run: npm run commercial:calibration
+// Financial audit + calibration planner — Initiative 6.1 hardening.
+// HYPOTHETICAL scenarios, not completed jobs. Shows revenue, direct labour,
+// labour contribution, conservative overhead and estimated net profit.
 
-import { COMMERCIAL_ECONOMICS } from '../src/config/commercial-tiers.ts';
 import { pricing } from '../src/config/pricing.ts';
-import { calculateFacilityWorkload } from '../src/lib/estimate/commercial.ts';
-
-const rate = COMMERCIAL_ECONOMICS.laborRatePerHour;
-const minimum = COMMERCIAL_ECONOMICS.minimumJob;
-const rounding = COMMERCIAL_ECONOMICS.roundingStep;
+import { calculateFacilityPrice, calculateFacilityWorkload } from '../src/lib/estimate/commercial.ts';
 
 const scenarios = [
-  ['Small office', 1200, 2, false, 'maintained', 'low', 'weekly'],
-  ['Medium office', 3500, 4, true, 'average', 'average', 'weekly'],
-  ['Large office', 9000, 8, true, 'average', 'average', 'weekly'],
-  ['Retail', 2500, 2, false, 'average', 'high', 'weekly'],
-  ['Salon', 1400, 2, false, 'average', 'high', 'weekly'],
-  ['Fitness studio', 4000, 4, false, 'average', 'high', 'weekly'],
-  ['Multi-restroom facility', 3000, 8, true, 'needs_attention', 'high', 'weekly'],
-  ['Small church', 3000, 3, true, 'maintained', 'low', 'weekly'],
-  ['Medium church', 8000, 6, true, 'average', 'average', 'weekly'],
-  ['Large multi-space church', 18000, 12, true, 'average', 'average', 'weekly'],
-  ['High-traffic common areas', 2200, 4, false, 'heavy', 'high', 'daily'],
-  ['Recurring multi-day schedule', 6000, 5, true, 'average', 'average', 'weekly'],
+  ['1,000 sqft office', 1000, 4, false, 'maintained', 'low', 'office', 'weekly'],
+  ['2,000 sqft office', 2000, 6, true, 'average', 'average', 'office', 'weekly'],
+  ['2,500 sqft office', 2500, 6, true, 'average', 'average', 'office', 'weekly'],
+  ['4,000 sqft office', 4000, 8, true, 'average', 'average', 'office', 'weekly'],
+  ['6,000 sqft office', 6000, 10, true, 'average', 'average', 'office', 'weekly'],
+  ['Small retail', 2000, 4, false, 'average', 'high', 'retail', 'weekly'],
+  ['Salon', 1400, 4, false, 'average', 'high', 'salon', 'weekly'],
+  ['Fitness studio', 4000, 6, false, 'average', 'high', 'gym', 'weekly'],
+  ['Multi-restroom facility', 3000, 18, true, 'needs_attention', 'high', 'office', 'weekly'],
+  ['Small church', 3000, 6, true, 'maintained', 'low', 'church', 'weekly'],
+  ['Medium church', 8000, 12, true, 'average', 'average', 'church', 'weekly'],
+  ['Large church', 18000, 24, true, 'average', 'average', 'church', 'weekly'],
+  ['Church + nursery/classrooms', 9000, 14, true, 'average', 'average', 'church', 'weekly'],
+  ['Fellowship hall + kitchen', 6000, 10, true, 'average', 'high', 'church', 'weekly'],
+  ['Heavily soiled office', 2500, 6, true, 'heavy', 'high', 'office', 'weekly'],
+  ['Monthly office', 4000, 8, true, 'average', 'average', 'office', 'monthly'],
 ];
 
-const format = (value) => `$${value.toLocaleString('en-US')}`;
+const format = (value) => `$${Math.round(value).toLocaleString('en-US')}`;
+const laborRate = pricing.laborEconomics.ownerLaborTargetPerHour.value;
+const overheadRate = pricing.commercialPricing.overheadRatePercent.value / 100;
 const rows = [];
 
-for (const [name, sqft, restrooms, breakroom, condition, traffic] of scenarios) {
-  const workload = calculateFacilityWorkload({
+for (const [name, sqft, fixtures, breakroom, condition, traffic, type, frequency] of scenarios) {
+  const input = {
     cleanableSqft: sqft,
-    restrooms,
+    restroomFixtures: fixtures,
     breakroom,
+    facilityType: type,
     condition,
     traffic,
-  });
-  const raw = workload.laborHours * rate;
-  const gross = Math.max(minimum, Math.round(raw / rounding) * rounding);
-  const profit = gross - workload.laborHours * pricing.laborEconomics.ownerLaborTargetPerHour.value;
+    firstClean: false,
+  };
+  const workload = calculateFacilityWorkload(input);
+  const price = calculateFacilityPrice(workload, frequency, { church: type === 'church' });
+  const revenue = price.perVisit;
+  const laborCost = workload.laborHours * laborRate;
+  const laborContribution = revenue - laborCost;
+  const overhead = revenue * overheadRate;
+  const net = revenue - laborCost - overhead;
   rows.push({
     scenario: name,
-    sqft,
-    restrooms,
-    condition,
-    traffic,
     hours: workload.laborHours,
-    gross,
-    ownerProfit: Math.round(profit),
-    marginPct: gross > 0 ? Math.round((profit / gross) * 100) : 0,
     tier: workload.tier,
+    revenue,
+    laborCost,
+    laborContribution,
+    overhead,
+    net,
+    netPct: revenue > 0 ? Math.round((net / revenue) * 100) : 0,
+    monthly: price.monthly,
+    discount: price.discount?.amount ?? 0,
   });
 }
 
-console.log('HYPOTHETICAL facility calibration (not completed jobs; numeric pricing remains gated)\n');
+console.log('HYPOTHETICAL facility scenarios — research-based, not completed jobs\n');
 console.log(
-  ['Scenario', 'Sqft', 'Restr.', 'Cond.', 'Traffic', 'Labour h', 'Gross', 'Owner profit', 'Margin', 'Tier']
-    .map((label, index) => label.padEnd([28, 7, 7, 8, 8, 9, 8, 13, 7, 5][index]))
-    .join(''),
+  'Scenario'.padEnd(29) +
+    'Hrs'.padEnd(6) +
+    'Tier'.padEnd(5) +
+    'Revenue'.padEnd(9) +
+    'Labor'.padEnd(8) +
+    'Contrib.'.padEnd(9) +
+    'Overhead'.padEnd(9) +
+    'Net'.padEnd(7) +
+    'Net%'.padEnd(6) +
+    'Monthly',
 );
 for (const row of rows) {
   console.log(
-    [
-      row.scenario,
-      String(row.sqft),
-      String(row.restrooms),
-      row.condition,
-      row.traffic,
-      row.hours.toFixed(2),
-      format(row.gross),
-      format(row.ownerProfit),
-      `${row.marginPct}%`,
-      row.tier,
-    ]
-      .map((value, index) => String(value).padEnd([28, 7, 7, 8, 8, 9, 8, 13, 7, 5][index]))
-      .join(''),
+    row.scenario.padEnd(29) +
+      row.hours.toFixed(2).padEnd(6) +
+      row.tier.padEnd(5) +
+      format(row.revenue).padEnd(9) +
+      format(row.laborCost).padEnd(8) +
+      format(row.laborContribution).padEnd(9) +
+      format(row.overhead).padEnd(9) +
+      format(row.net).padEnd(7) +
+      `${row.netPct}%`.padEnd(6) +
+      (row.monthly ? format(row.monthly) : '—'),
   );
 }
 console.log(
-  `\nAssumptions: ${format(rate)} gross revenue per labour-hour, ${format(minimum)} minimum job, ` +
-    `$${rounding} rounding, owner labour target $${pricing.laborEconomics.ownerLaborTargetPerHour.value}/h.`,
+  `\nRate: ${format(pricing.commercialPricing.grossRatePerHour.value)}/hr gross · minimum ${format(pricing.minimumJob.value)} · owner labour ${format(laborRate)}/hr · overhead ${Math.round(overheadRate * 100)}% of revenue (travel additional) · prices round UP to $${pricing.rounding.toNearest.value}`,
 );
-console.log('Enable numeric pricing only after the owner reviews this table and real-job calibration.');
+console.log('Church rows include the 10% discount in revenue. Labour contribution is NOT profit.');

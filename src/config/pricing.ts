@@ -140,18 +140,27 @@ export const pricing = {
   // Planning constants from the owner-approved commercial blueprint. The
   // numeric gate lives in src/config/commercial-tiers.ts and MUST stay closed
   // until calibration against real jobs (10–15 scenarios) is reviewed.
-  commercialWorkload: {
+  commercialPricing: {
     state: 'approved' as ApprovalState,
-    setupMinutes: approved(ownerPricing.commercialWorkload.setupMinutes, 'Fixed setup/arrival overhead per visit (owner-approved baseline).'),
-    minutesPerThousandSqft: approved(ownerPricing.commercialWorkload.minutesPerThousandSqft, 'Cleanable-area workload baseline: 30 minutes per 1,000 sqft (owner-approved).'),
-    minutesPerRestroom: approved(ownerPricing.commercialWorkload.minutesPerRestroom, 'Per-restroom workload baseline (ISSA-informed, owner-approved).'),
-    minutesPerBreakroom: approved(ownerPricing.commercialWorkload.minutesPerBreakroom, 'Breakroom/kitchen workload baseline (owner-approved).'),
-    trafficFactors: {
-      low: approved(ownerPricing.commercialWorkload.trafficFactors.low, 'Light-traffic facility factor.'),
-      average: approved(ownerPricing.commercialWorkload.trafficFactors.average, 'Ordinary traffic factor.'),
-      high: approved(ownerPricing.commercialWorkload.trafficFactors.high, 'High-traffic facility factor.'),
+    configVersion: approved('2026-10-25.facility-workload.v1', 'Facility estimate provenance marker (Initiative 6.1).'),
+    grossRatePerHour: approved(ownerPricing.commercialPricing.grossRatePerHour, 'Middle of the published Pensacola market range (-75/hr); sustains owner labour, overhead and a modest margin.'),
+    productionSqftPerHour: {
+      office: approved(ownerPricing.commercialPricing.productionSqftPerHour.office, 'Conservative effective rate for a DETAILED office standard (ISSA routine benchmark is ~4,200 sqft/hr; lowered for quality, obstacle density and nonproductive time).'),
+      retail: approved(ownerPricing.commercialPricing.productionSqftPerHour.retail, 'Conservative retail production rate.'),
+      salon: approved(ownerPricing.commercialPricing.productionSqftPerHour.salon, 'Salon/barbershop: denser fixtures and detail.'),
+      gym: approved(ownerPricing.commercialPricing.productionSqftPerHour.gym, 'Gym/fitness: dense high-touch and floor work.'),
+      community: approved(ownerPricing.commercialPricing.productionSqftPerHour.community, 'Apartment common areas and community spaces.'),
+      church: approved(ownerPricing.commercialPricing.productionSqftPerHour.church, 'Church facilities: pews, classrooms and mixed spaces.'),
     },
-    note: 'Powers the calibration model and the gated commercial/church engine. Never presented as a live price while numericEstimatesEnabled is false.',
+    fixtureMinutes: approved(ownerPricing.commercialPricing.fixtureMinutes, 'ISSA fixture method: restroom cleaning measured per fixture, not per room (3 min fixture routine).'),
+    breakroomMinutes: approved(ownerPricing.commercialPricing.breakroomMinutes, 'Supplemental breakroom/kitchen detail beyond the area rate.'),
+    setupMinutes: approved(ownerPricing.commercialPricing.setupMinutes, 'Arrival, equipment and close-out overhead per visit.'),
+    firstCleanFactor: approved(ownerPricing.commercialPricing.firstCleanFactor, 'Initial detail clean takes longer than routine maintenance.'),
+    rangeSpreadPercent: approved(ownerPricing.commercialPricing.rangeSpreadPercent, 'Tier B uncertainty band.'),
+    tierAHours: approved(ownerPricing.commercialPricing.tierAHours, 'Up to ~3 labour hours for a single preliminary price.'),
+    tierBHours: approved(ownerPricing.commercialPricing.tierBHours, 'Up to ~8 labour hours for a preliminary range; above is custom scope review.'),
+    overheadRatePercent: approved(22, 'Conservative operating overhead allowance (supplies, admin, insurance, payment processing, rework) used for the financial audit. Travel is additional.'),
+    note: 'Enables nonbinding preliminary facility estimates. Owner review and final scope confirmation remain required. Commercial prices round UP to the next $5.',
   },
 
   // ── Labor-hour model (directive §20 anchors) ───────────────────────────────

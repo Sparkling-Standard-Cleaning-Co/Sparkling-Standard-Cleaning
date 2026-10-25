@@ -26,6 +26,7 @@ import {
   type QuoteVerificationEnv,
 } from '../../src/lib/estimate/verify.ts';
 import { requiresInitialDeepClean } from '../../src/lib/estimate/frequency.ts';
+import { verifyFacilityQuote } from '../../src/lib/estimate/facility-verify.ts';
 import type { Frequency } from '../../src/lib/estimate/types.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
 import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
@@ -80,6 +81,12 @@ const SERVER_OWNED_KEYS = new Set([
   'discount_amount',
   'promotion_source',
   'rounding_adjustment',
+  'facility_quote_verified',
+  'facility_config_match',
+  'facility_travel_status',
+  'verified_cleaning_price',
+  'verified_labor_hours',
+  'verified_church_discount',
   'proposed_total',
   'estimated_labor_hours',
   'applied_rate_per_labor_hour',
@@ -207,6 +214,19 @@ export async function onRequestPost(context: {
       return json({ ok: false, error: 'deep_clean_required' }, 400);
     }
     clean.initial_deep_clean_required = 'yes';
+  }
+
+  // Facility estimates (commercial/church): the server rebuilds the workload
+  // and cleaning price from the submitted scope facts. The browser price is
+  // never trusted; a mismatch is flagged for owner review rather than rejected.
+  if (clean.request_type === 'facility_estimate') {
+    const facility = verifyFacilityQuote(clean);
+    clean.facility_quote_verified = facility.status;
+    clean.facility_config_match = facility.configMatch;
+    clean.facility_travel_status = facility.travelStatus;
+    if (facility.expectedCleaning !== null) clean.verified_cleaning_price = String(facility.expectedCleaning);
+    if (facility.laborHours !== null) clean.verified_labor_hours = String(facility.laborHours);
+    if (facility.discountAmount !== null) clean.verified_church_discount = String(facility.discountAmount);
   }
 
   // Turnstile verification when the secret is configured.

@@ -5,15 +5,13 @@
 //   Tier B — Estimated Price Range (a low/high band)
 //   Tier C — Request a Custom Cleaning Quote (walkthrough)
 //
-// NUMERIC TIERS ARE DISABLED until the owner approves the commercial pricing
-// methodology in writing (docs/launch/COMMERCIAL-ESTIMATE-MODEL.md). The
-// threshold below is the owner's PROPOSED starting boundary (~2,500
-// cleanable sqft) prepared for analysis — it is configurable, NOT a buried
-// constant, and enabling `numericEstimatesEnabled` is a separate owner
-// decision. While false, every commercial request routes to Tier C with
-// honest "preliminary" language, exactly as today.
+// NUMERIC TIERS ARE ENABLED provisionally (Initiative 6.1, 2026-10-25) under
+// explicit owner delegation for evidence-based preliminary estimates. Tier A/B
+// prices are nonbinding and owner-confirmed; Tier C remains a custom scope
+// review. The workload-hour tier boundaries live in `pricing.commercialPricing`.
+// The legacy square-foot thresholds below remain for reference only.
 //
-// All thresholds live here so the owner can tune them in one place.
+// Thresholds remain configurable in one place.
 
 import { pricing } from './pricing.ts';
 
@@ -43,11 +41,13 @@ export interface CommercialTierConfig {
 }
 
 export const commercialTierConfig: CommercialTierConfig = {
-  // Owner approval required before flipping to true. When true, Tier A/B
+  // Enabled 2026-10-25 (Initiative 6.1) under explicit owner delegation for
+  // evidence-based PROVISIONAL estimates. Final scope and price remain owner-
+  // confirmed. When true, Tier A/B
   // flow through the approved residential labor-hour economics adapted for
   // commercial density (see the model document); when false everything is
   // Tier C and NO number is invented.
-  numericEstimatesEnabled: false,
+  numericEstimatesEnabled: true,
   tierA_maxCleanableSqft: 2500,
   tierB_maxCleanableSqft: 6000,
   tierC_triggers: {

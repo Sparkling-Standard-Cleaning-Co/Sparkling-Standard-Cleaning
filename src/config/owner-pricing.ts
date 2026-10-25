@@ -221,18 +221,22 @@ export interface OwnerPricingConfig {
 
   // ── Commercial / church workload model (owner-approved baseline) ─────────
   /**
-   * The blueprint's owner-approved baseline for facility workloading:
-   * 30 minutes per 1,000 cleanable sqft, 20-minute setup, 3 minutes per
-   * restroom, 10 minutes for a breakroom/kitchen. NUMERIC COMMERCIAL/CHURCH
-   * QUOTES REMAIN DISABLED until calibration against real jobs
-   * (`commercial-tiers.ts`). These numbers power the calibration tool only.
+   * Evidence-based commercial pricing (research 2026-10-25):
+   * ISSA task-production method, fixture-based restrooms (3 min/fixture),
+   * routine office 4,200 sqft/hr, local market $50-75/hr and $0.11-0.25/sqft.
+   * $60/hr selected (middle of the local range) to sustain owner labor,
+   * overhead and a small margin. Tier thresholds are workload hours.
    */
-  commercialWorkload: {
+  commercialPricing: {
+    grossRatePerHour: number;
+    productionSqftPerHour: Record<string, number>;
+    fixtureMinutes: number;
+    breakroomMinutes: number;
     setupMinutes: number;
-    minutesPerThousandSqft: number;
-    minutesPerRestroom: number;
-    minutesPerBreakroom: number;
-    trafficFactors: { low: number; average: number; high: number };
+    firstCleanFactor: number;
+    rangeSpreadPercent: number;
+    tierAHours: number;
+    tierBHours: number;
   };
 
   // ── 3. Base labor-hours per service type (before size and rooms) ──────────
@@ -368,13 +372,24 @@ export const ownerPricing: OwnerPricingConfig = {
     percent: 10,
   },
 
-  // ── Commercial / church workload model (owner-approved baseline) ─────────
-  commercialWorkload: {
+  // ── Commercial / church pricing (evidence-based, 2026-10-25) ─────────────
+  commercialPricing: {
+    grossRatePerHour: 60,
+    productionSqftPerHour: {
+      office: 3000,
+      retail: 3200,
+      salon: 2800,
+      gym: 2500,
+      community: 3000,
+      church: 2800,
+    },
+    fixtureMinutes: 3,
+    breakroomMinutes: 10,
     setupMinutes: 20,
-    minutesPerThousandSqft: 30,
-    minutesPerRestroom: 3,
-    minutesPerBreakroom: 10,
-    trafficFactors: { low: 0.95, average: 1, high: 1.15 },
+    firstCleanFactor: 1.35,
+    rangeSpreadPercent: 15,
+    tierAHours: 3,
+    tierBHours: 8,
   },
 
   // ── 3. Base labor-hours per service type ──────────────────────────────────

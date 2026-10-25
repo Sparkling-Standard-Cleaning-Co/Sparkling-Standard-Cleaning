@@ -161,6 +161,52 @@ test('the church engine presents the owner-directed 10% discount and optional pa
   }
 });
 
+test('the commercial engine shows a preliminary per-visit price for an ordinary office', async () => {
+  const { context, page } = await open('/estimate/commercial/');
+  try {
+    await page.selectOption('#fac-type', 'office');
+    await page.fill('#fac-sqft', '2000');
+    await page.fill('#fac-restrooms', '6');
+    await page.selectOption('#fac-frequency', 'weekly');
+    await page.selectOption('#fac-condition', 'average');
+    await page.waitForSelector('[data-facility-estimate]:not([hidden])');
+    const price = (await page.locator('[data-facility-estimate-price]').textContent()) ?? '';
+    assert.match(price, /^\$\d+/);
+    const value = Number(price.replace(/[^0-9]/g, ''));
+    assert.ok(value >= 125, `preliminary per-visit price is at least the minimum (${price})`);
+    const note = (await page.locator('[data-facility-estimate-note]').textContent()) ?? '';
+    assert.match(note, /Nonbinding preliminary estimate/i);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the church engine shows the 10% discount and routes very large scopes to review', async () => {
+  const { context, page } = await open('/estimate/church/');
+  try {
+    await page.fill('#fac-org', 'Test Church (please ignore)');
+    await page.fill('#fac-sqft', '4000');
+    await page.fill('#fac-restrooms', '6');
+    await page.selectOption('#fac-frequency', 'weekly');
+    await page.waitForSelector('[data-facility-estimate]:not([hidden])');
+    const lines = (await page.locator('[data-facility-estimate-lines]').innerText()) ?? '';
+    assert.match(lines, /Church discount — 10%/i);
+    assert.match(lines, /Savings/i);
+    const priceText = (await page.locator('[data-facility-estimate-price]').textContent()) ?? '';
+    assert.match(priceText, /^\$\d+/);
+    // A very large facility must not receive an invented number.
+    await page.fill('#fac-sqft', '30000');
+    await page.fill('#fac-restrooms', '24');
+    await page.waitForFunction(
+      () => document.querySelector('[data-facility-estimate-price]')?.textContent?.includes('together'),
+    );
+    const reviewText = (await page.locator('[data-facility-estimate-price]').textContent()) ?? '';
+    assert.match(reviewText, /together/i);
+  } finally {
+    await context.close();
+  }
+});
+
 test('mobile hub and church form stay inside the viewport', async () => {
   for (const path of ['/estimate/', '/estimate/church/']) {
     const { context, page } = await open(path, 390, 844);
