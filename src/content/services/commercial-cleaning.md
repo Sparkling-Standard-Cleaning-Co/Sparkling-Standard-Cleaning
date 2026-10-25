@@ -40,8 +40,8 @@ faqIds:
 related:
   - /church-cleaning/
   - /short-term-rental-cleaning/
-ctaLabel: Request a Walkthrough
-ctaHref: /commercial-cleaning/#walkthrough
+ctaLabel: Estimate My Facility Cleaning
+ctaHref: /estimate/commercial/
 checklistId: commercial-general
 embedForm: commercial
 ---

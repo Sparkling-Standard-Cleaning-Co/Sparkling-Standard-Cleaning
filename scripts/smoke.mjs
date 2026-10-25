@@ -132,15 +132,22 @@ if (/noindex/i.test(fs.readFileSync(path.join(DIST, 'estimate', 'index.html'), '
   problems.push('estimate page: accidental noindex directive');
 }
 
-// Lead forms with correct variants.
-const variants = [
-  ['contact/index.html', 'data-variant="contact"'],
-  ['commercial-cleaning/index.html', 'data-variant="commercial"'],
-  ['short-term-rental-cleaning/index.html', 'data-variant="str"'],
-];
+// Lead forms with correct variants. Commercial, STR and church are estimate
+// engines now, so those pages must link to their engine instead of embedding
+// a second request form (Initiative 6.0).
+const variants = [['contact/index.html', 'data-variant="contact"']];
 for (const [page, needle] of variants) {
   if (!fs.readFileSync(path.join(DIST, page), 'utf8').includes(needle)) {
     problems.push(`${page}: missing lead form (${needle})`);
+  }
+}
+for (const [page, needle] of [
+  ['commercial-cleaning/index.html', '/estimate/commercial/'],
+  ['short-term-rental-cleaning/index.html', '/estimate/str/'],
+  ['church-cleaning/index.html', '/estimate/church/'],
+]) {
+  if (!fs.readFileSync(path.join(DIST, page), 'utf8').includes(needle)) {
+    problems.push(`${page}: missing estimate engine link (${needle})`);
   }
 }
 

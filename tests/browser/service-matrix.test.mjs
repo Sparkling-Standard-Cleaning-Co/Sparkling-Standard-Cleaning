@@ -96,7 +96,7 @@ async function mockProviders(page) {
   await page.route('**tiles.openfreemap.org/**', (route) => route.abort());
 }
 
-async function openEstimate(width, height) {
+async function openEstimate(width, height, path = '/estimate/') {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   await mockProviders(page);
@@ -112,7 +112,7 @@ async function openEstimate(width, height) {
       }),
     });
   });
-  await page.goto(BASE + '/estimate/', { waitUntil: 'load' });
+  await page.goto(BASE + path, { waitUntil: 'load' });
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
   await page.click('[data-address-manual-summary]');
   return { context, page, captured };
@@ -236,9 +236,9 @@ test('deep cleaning is one-time: no rhythm question, one_time in the payload', a
 });
 
 test('STR turnover: beds are asked, the rhythm is not, and the payload is per-turnover', async () => {
-  const { context, page, captured } = await openEstimate(1440, 900);
+  const { context, page, captured } = await openEstimate(1440, 900, '/estimate/str/');
   try {
-    await page.click('label.option:has(input[name="serviceType"][value="str_turnover"])');
+    await page.waitForFunction(() => document.querySelector('[data-engine-note]')?.hidden === false);
     await page.click('[data-next]');
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
@@ -315,44 +315,46 @@ test('switching services mid-wizard clears stale rhythm and STR values', async (
   }
 });
 
-test('switching away from STR clears the bed count', async () => {
-  const { context, page } = await openEstimate(1440, 900);
+test('the legacy STR deep link opens the isolated turnover engine', async () => {
+  const { context, page } = await openEstimate(1440, 900, '/estimate/?service=str_turnover');
   try {
-    await page.click('label.option:has(input[name="serviceType"][value="str_turnover"])');
-    await page.click('[data-next]');
-    await page.fill('#est-address', '100 S Baylen');
-    await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
-    await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    await page.waitForFunction(() => document.querySelector('#est-zip')?.value === '32502');
-    await page.click('[data-address-confirm]');
-    await page.click('[data-next]');
-    const bedsInput = page.locator('input[name="beds"]');
-    await bedsInput.waitFor({ state: 'visible' });
-    await bedsInput.fill('3');
-    // Switch back to residential on step 1.
-    await page.click('[data-step-jump="1"]');
-    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
-    await page.click('[data-next]');
-    await page.click('[data-next]');
-    assert.equal(await bedsInput.inputValue(), '', 'the stale STR bed count was cleared');
-    assert.equal(await bedsInput.isVisible(), false, 'the beds field is hidden for residential cleaning');
+    await page.waitForFunction(() => document.querySelector('[data-engine-note]')?.hidden === false);
+    assert.equal(
+      await page.locator('input[name="serviceType"][value="str_turnover"]').isChecked(),
+      true,
+      'the turnover engine is selected',
+    );
+    assert.equal(await page.locator('[data-service-fieldset]').isVisible(), false, 'no duplicate service picker');
+    const headings = await page.locator('[data-step-title]').allTextContents();
+    assert.equal(headings[0].trim(), 'Property & Address');
+    // Residential pages never offer or submit stale STR details.
+    await page.goto(BASE + '/estimate/?service=deep', { waitUntil: 'load' });
+    await page.waitForFunction(() => document.querySelector('[data-engine-note]')?.hidden === true);
+    assert.equal(await page.locator('input[name="beds"]').inputValue(), '');
+    assert.equal(
+      await page.locator('#est-rental-properties').evaluate((el) => el.closest('[data-str-only]').hidden),
+      true,
+      'turnover fields are hidden for residential cleaning',
+    );
   } finally {
     await context.close();
   }
 });
 
-test('commercial cleaning uses the walkthrough request route, not the instant estimator', async () => {
+test('commercial cleaning routes into the dedicated facility estimate engine', async () => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   try {
     await page.goto(BASE + '/commercial-cleaning/', { waitUntil: 'load' });
     await page.addStyleTag({ content: '.consent-banner{display:none!important}' });
-    // The commercial page offers a walkthrough request form, not the wizard.
-    const walkthroughForm = page.locator('[data-lead-form][data-variant="commercial"]');
-    assert.ok((await walkthroughForm.count()) >= 1, 'the commercial walkthrough request form renders');
-    const estimateWizard = await page.locator('[data-estimate-form]').count();
-    assert.equal(estimateWizard, 0, 'no instant estimator on the commercial page');
+    // One authoritative request path: no duplicate embedded form.
+    assert.equal(
+      await page.locator('[data-lead-form][data-variant="commercial"]').count(),
+      0,
+      'no duplicate commercial form',
+    );
+    const cta = page.locator('a[href="/estimate/commercial/"]').first();
+    assert.equal((await cta.count()) >= 1, true, 'the facility estimate CTA renders');
   } finally {
     await context.close();
   }

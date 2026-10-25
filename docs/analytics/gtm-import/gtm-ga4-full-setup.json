@@ -592,6 +592,76 @@
         "accountId": "0",
         "containerId": "0",
         "tagId": "12",
+        "name": "GA4 - Event - church_request_start",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "type": "BOOLEAN",
+            "key": "sendEcommerceData",
+            "value": "false"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "eventName",
+            "value": "church_request_start"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "measurementIdOverride",
+            "value": "G-LG222LQRQ2"
+          }
+        ],
+        "firingTriggerId": [
+          "11"
+        ],
+        "tagFiringOption": "ONCE_PER_EVENT",
+        "monitoringMetadata": {
+          "type": "MAP"
+        },
+        "consentSettings": {
+          "consentStatus": "NOT_SET"
+        },
+        "fingerprint": "0"
+      },
+      {
+        "accountId": "0",
+        "containerId": "0",
+        "tagId": "13",
+        "name": "GA4 - Event - church_request_submit",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "type": "BOOLEAN",
+            "key": "sendEcommerceData",
+            "value": "false"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "eventName",
+            "value": "church_request_submit"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "measurementIdOverride",
+            "value": "G-LG222LQRQ2"
+          }
+        ],
+        "firingTriggerId": [
+          "12"
+        ],
+        "tagFiringOption": "ONCE_PER_EVENT",
+        "monitoringMetadata": {
+          "type": "MAP"
+        },
+        "consentSettings": {
+          "consentStatus": "NOT_SET"
+        },
+        "fingerprint": "0"
+      },
+      {
+        "accountId": "0",
+        "containerId": "0",
+        "tagId": "14",
         "name": "GA4 - Event - booking_request",
         "type": "gaawe",
         "parameter": [
@@ -633,7 +703,7 @@
           }
         ],
         "firingTriggerId": [
-          "11"
+          "13"
         ],
         "tagFiringOption": "ONCE_PER_EVENT",
         "monitoringMetadata": {
@@ -647,7 +717,7 @@
       {
         "accountId": "0",
         "containerId": "0",
-        "tagId": "13",
+        "tagId": "15",
         "name": "GA4 - Event - review_link_click",
         "type": "gaawe",
         "parameter": [
@@ -689,118 +759,6 @@
           }
         ],
         "firingTriggerId": [
-          "12"
-        ],
-        "tagFiringOption": "ONCE_PER_EVENT",
-        "monitoringMetadata": {
-          "type": "MAP"
-        },
-        "consentSettings": {
-          "consentStatus": "NOT_SET"
-        },
-        "fingerprint": "0"
-      },
-      {
-        "accountId": "0",
-        "containerId": "0",
-        "tagId": "14",
-        "name": "GA4 - Event - promotion_displayed",
-        "type": "gaawe",
-        "parameter": [
-          {
-            "type": "BOOLEAN",
-            "key": "sendEcommerceData",
-            "value": "false"
-          },
-          {
-            "type": "TEMPLATE",
-            "key": "eventName",
-            "value": "promotion_displayed"
-          },
-          {
-            "type": "LIST",
-            "key": "eventParameters",
-            "list": [
-              {
-                "type": "MAP",
-                "map": [
-                  {
-                    "type": "TEMPLATE",
-                    "key": "name",
-                    "value": "code"
-                  },
-                  {
-                    "type": "TEMPLATE",
-                    "key": "value",
-                    "value": "{{DLV - code}}"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "type": "TEMPLATE",
-            "key": "measurementIdOverride",
-            "value": "G-LG222LQRQ2"
-          }
-        ],
-        "firingTriggerId": [
-          "13"
-        ],
-        "tagFiringOption": "ONCE_PER_EVENT",
-        "monitoringMetadata": {
-          "type": "MAP"
-        },
-        "consentSettings": {
-          "consentStatus": "NOT_SET"
-        },
-        "fingerprint": "0"
-      },
-      {
-        "accountId": "0",
-        "containerId": "0",
-        "tagId": "15",
-        "name": "GA4 - Event - promotion_dismissed",
-        "type": "gaawe",
-        "parameter": [
-          {
-            "type": "BOOLEAN",
-            "key": "sendEcommerceData",
-            "value": "false"
-          },
-          {
-            "type": "TEMPLATE",
-            "key": "eventName",
-            "value": "promotion_dismissed"
-          },
-          {
-            "type": "LIST",
-            "key": "eventParameters",
-            "list": [
-              {
-                "type": "MAP",
-                "map": [
-                  {
-                    "type": "TEMPLATE",
-                    "key": "name",
-                    "value": "code"
-                  },
-                  {
-                    "type": "TEMPLATE",
-                    "key": "value",
-                    "value": "{{DLV - code}}"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "type": "TEMPLATE",
-            "key": "measurementIdOverride",
-            "value": "G-LG222LQRQ2"
-          }
-        ],
-        "firingTriggerId": [
           "14"
         ],
         "tagFiringOption": "ONCE_PER_EVENT",
@@ -816,7 +774,7 @@
         "accountId": "0",
         "containerId": "0",
         "tagId": "16",
-        "name": "GA4 - Event - promotion_claimed",
+        "name": "GA4 - Event - promotion_displayed",
         "type": "gaawe",
         "parameter": [
           {
@@ -827,7 +785,7 @@
           {
             "type": "TEMPLATE",
             "key": "eventName",
-            "value": "promotion_claimed"
+            "value": "promotion_displayed"
           },
           {
             "type": "LIST",
@@ -872,6 +830,118 @@
         "accountId": "0",
         "containerId": "0",
         "tagId": "17",
+        "name": "GA4 - Event - promotion_dismissed",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "type": "BOOLEAN",
+            "key": "sendEcommerceData",
+            "value": "false"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "eventName",
+            "value": "promotion_dismissed"
+          },
+          {
+            "type": "LIST",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "code"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{DLV - code}}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "measurementIdOverride",
+            "value": "G-LG222LQRQ2"
+          }
+        ],
+        "firingTriggerId": [
+          "16"
+        ],
+        "tagFiringOption": "ONCE_PER_EVENT",
+        "monitoringMetadata": {
+          "type": "MAP"
+        },
+        "consentSettings": {
+          "consentStatus": "NOT_SET"
+        },
+        "fingerprint": "0"
+      },
+      {
+        "accountId": "0",
+        "containerId": "0",
+        "tagId": "18",
+        "name": "GA4 - Event - promotion_claimed",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "type": "BOOLEAN",
+            "key": "sendEcommerceData",
+            "value": "false"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "eventName",
+            "value": "promotion_claimed"
+          },
+          {
+            "type": "LIST",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "code"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{DLV - code}}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "measurementIdOverride",
+            "value": "G-LG222LQRQ2"
+          }
+        ],
+        "firingTriggerId": [
+          "17"
+        ],
+        "tagFiringOption": "ONCE_PER_EVENT",
+        "monitoringMetadata": {
+          "type": "MAP"
+        },
+        "consentSettings": {
+          "consentStatus": "NOT_SET"
+        },
+        "fingerprint": "0"
+      },
+      {
+        "accountId": "0",
+        "containerId": "0",
+        "tagId": "19",
         "name": "GA4 - Event - promotion_estimate_applied",
         "type": "gaawe",
         "parameter": [
@@ -928,7 +998,7 @@
           }
         ],
         "firingTriggerId": [
-          "16"
+          "18"
         ],
         "tagFiringOption": "ONCE_PER_EVENT",
         "monitoringMetadata": {
@@ -942,7 +1012,7 @@
       {
         "accountId": "0",
         "containerId": "0",
-        "tagId": "18",
+        "tagId": "20",
         "name": "GA4 - Event - promotion_request_submit",
         "type": "gaawe",
         "parameter": [
@@ -999,7 +1069,7 @@
           }
         ],
         "firingTriggerId": [
-          "17"
+          "19"
         ],
         "tagFiringOption": "ONCE_PER_EVENT",
         "monitoringMetadata": {
@@ -1266,6 +1336,56 @@
         "accountId": "0",
         "containerId": "0",
         "triggerId": "11",
+        "name": "CE - church_request_start",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{_event}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "church_request_start"
+              }
+            ]
+          }
+        ],
+        "fingerprint": "0"
+      },
+      {
+        "accountId": "0",
+        "containerId": "0",
+        "triggerId": "12",
+        "name": "CE - church_request_submit",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{_event}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "church_request_submit"
+              }
+            ]
+          }
+        ],
+        "fingerprint": "0"
+      },
+      {
+        "accountId": "0",
+        "containerId": "0",
+        "triggerId": "13",
         "name": "CE - booking_request",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [
@@ -1290,7 +1410,7 @@
       {
         "accountId": "0",
         "containerId": "0",
-        "triggerId": "12",
+        "triggerId": "14",
         "name": "CE - review_link_click",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [
@@ -1315,7 +1435,7 @@
       {
         "accountId": "0",
         "containerId": "0",
-        "triggerId": "13",
+        "triggerId": "15",
         "name": "CE - promotion_displayed",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [
@@ -1340,7 +1460,7 @@
       {
         "accountId": "0",
         "containerId": "0",
-        "triggerId": "14",
+        "triggerId": "16",
         "name": "CE - promotion_dismissed",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [
@@ -1365,7 +1485,7 @@
       {
         "accountId": "0",
         "containerId": "0",
-        "triggerId": "15",
+        "triggerId": "17",
         "name": "CE - promotion_claimed",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [
@@ -1390,7 +1510,7 @@
       {
         "accountId": "0",
         "containerId": "0",
-        "triggerId": "16",
+        "triggerId": "18",
         "name": "CE - promotion_estimate_applied",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [
@@ -1415,7 +1535,7 @@
       {
         "accountId": "0",
         "containerId": "0",
-        "triggerId": "17",
+        "triggerId": "19",
         "name": "CE - promotion_request_submit",
         "type": "CUSTOM_EVENT",
         "customEventFilter": [

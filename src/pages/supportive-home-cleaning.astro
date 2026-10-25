@@ -47,7 +47,7 @@ const showText = phone !== null && business.flags.smsEnabled && !isPending(phone
         </h1>
         <p class="lead">{data.hero.lead}</p>
         <div class="btn-row mt-4">
-          <a class="btn btn--primary btn--large" href="/estimate/" data-cta="supportive-estimate">
+          <a class="btn btn--primary btn--large" href="/estimate/?service=supportive&supportive=yes" data-cta="supportive-estimate">
             {data.hero.ctaLabel ?? 'Request Service'}
           </a>
           {showCall && (
@@ -174,7 +174,7 @@ const showText = phone !== null && business.flags.smsEnabled && !isPending(phone
         <p class="lead">{data.finalCta?.text}</p>
       </div>
       <div class="btn-row readable-cta">
-        <a class="btn btn--primary btn--large" href="/estimate/" data-cta="supportive-estimate-final">
+        <a class="btn btn--primary btn--large" href="/estimate/?service=supportive&supportive=yes" data-cta="supportive-estimate-final">
           {data.hero.ctaLabel ?? 'Request Service'}
         </a>
         {showCall && (

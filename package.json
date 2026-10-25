@@ -48,7 +48,8 @@
     "audit:facts": "node scripts/audit-facts.mjs",
     "indexnow": "node scripts/indexnow.mjs",
     "indexnow:dry": "node scripts/indexnow.mjs --dry-run",
-    "indexnow:all": "node scripts/indexnow.mjs --all"
+    "indexnow:all": "node scripts/indexnow.mjs --all",
+    "commercial:calibration": "node scripts/commercial-calibration.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.4.0",

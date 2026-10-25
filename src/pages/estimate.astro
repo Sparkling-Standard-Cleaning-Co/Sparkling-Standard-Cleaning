@@ -2,6 +2,7 @@
 import { getEntry, getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import EstimateWizard from '../components/EstimateWizard.astro';
+import EstimateHub from '../components/EstimateHub.astro';
 import FaqItem from '../components/FaqItem.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { faqNode, breadcrumbNode } from '../lib/schema';
@@ -45,6 +46,10 @@ const schema = [
       </div>
     </div>
   </section>
+
+  <div class="container" style="margin-bottom: var(--space-8)">
+    <EstimateHub />
+  </div>
 
   <div class="container" style="margin-bottom: var(--space-8)">
     <EstimateWizard />

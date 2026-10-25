@@ -1,0 +1,58 @@
+---
+// The estimate hub — ONE service-selection surface shared by every estimate
+// entry point. Cards are ordinary links so they work without JavaScript and
+// keep the chosen engine in the URL.
+import PremiumIcon from './PremiumIcon.astro';
+import type { EstimateEngine } from '../lib/estimate/engines';
+import { ESTIMATE_ENGINES } from '../lib/estimate/engines';
+import type { PremiumIconName } from '../lib/premium-icons';
+
+interface Props {
+  current?: EstimateEngine;
+}
+
+const { current } = Astro.props;
+
+const iconFor: Record<EstimateEngine, PremiumIconName> = {
+  residential: 'recurring-residential',
+  commercial: 'commercial-cleaning',
+  str: 'short-term-rental',
+  church: 'church-cleaning',
+};
+---
+
+<section class="estimate-hub" aria-labelledby="estimate-hub-heading">
+  <div class="section-head">
+    <p class="eyebrow">Instant estimate</p>
+    <h2 id="estimate-hub-heading">What would you like us to clean?</h2>
+    <p class="lead">
+      Choose the option that fits your space. Each path asks only what matters for that kind of
+      cleaning — and nothing else.
+    </p>
+  </div>
+
+  <div class="estimate-hub__grid">
+    {
+      ESTIMATE_ENGINES.map((engine) => (
+        <a
+          class:list={['estimate-hub__card', current === engine.id && 'estimate-hub__card--current']}
+          href={engine.href}
+          aria-current={current === engine.id ? 'true' : undefined}
+        >
+          <span class="estimate-hub__icon">
+            <PremiumIcon name={iconFor[engine.id]} />
+          </span>
+          <span class="estimate-hub__body">
+            <span class="estimate-hub__label">{engine.label}</span>
+            <span class="estimate-hub__desc">{engine.description}</span>
+            <span class="estimate-hub__includes">{engine.includes}</span>
+          </span>
+          <span class="estimate-hub__cta">
+            {current === engine.id ? 'Selected' : engine.ctaLabel}
+            <span aria-hidden="true">→</span>
+          </span>
+        </a>
+      ))
+    }
+  </div>
+</section>

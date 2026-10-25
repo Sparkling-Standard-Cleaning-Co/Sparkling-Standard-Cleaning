@@ -41,8 +41,8 @@ faqIds:
 related:
   - /move-in-move-out-cleaning/
   - /commercial-cleaning/
-ctaLabel: Request Turnover Service
-ctaHref: /short-term-rental-cleaning/#turnover-request
+ctaLabel: Get a Turnover Estimate
+ctaHref: /estimate/str/
 checklistId: str-turnover
 embedForm: str
 ---

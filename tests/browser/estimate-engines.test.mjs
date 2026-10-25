@@ -1,0 +1,176 @@
+// Browser tests — Initiative 6.0 four-engine estimate architecture.
+// Run with: npm run test:browser (preview server on :4419).
+
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
+import { chromium } from 'playwright';
+
+const PORT = 4419;
+const BASE = `http://localhost:${PORT}`;
+
+let server;
+let browser;
+
+before(async () => {
+  server = spawn(process.execPath, ['node_modules/astro/astro.js', 'preview', '--port', String(PORT)], {
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    try {
+      const response = await fetch(BASE + '/', { signal: AbortSignal.timeout(1500) });
+      if (response.ok) {
+        browser = await chromium.launch();
+        return;
+      }
+    } catch {
+      // not ready yet
+    }
+    await delay(500);
+  }
+  throw new Error('preview server did not become ready on ' + BASE);
+});
+
+after(async () => {
+  await browser?.close();
+  server?.kill();
+});
+
+async function open(path, width = 1280, height = 900) {
+  const context = await browser.newContext({ viewport: { width, height } });
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    localStorage.setItem('pcc-consent-v1', JSON.stringify({ analytics: false, ads: false, v: 1 }));
+    localStorage.setItem('pcc-promo-state', JSON.stringify({ state: 'dismissed', at: new Date().toISOString() }));
+    sessionStorage.setItem('pcc-promo-shown-session', '1');
+  });
+  await page.goto(BASE + path, { waitUntil: 'load' });
+  return { context, page };
+}
+
+test('the estimate hub presents the four engines with the right destinations', async () => {
+  const { context, page } = await open('/estimate/');
+  try {
+    const cards = page.locator('.estimate-hub__card');
+    assert.equal(await cards.count(), 4, 'four engine cards');
+    const hrefs = await cards.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')));
+    assert.deepEqual(hrefs, [
+      '/estimate/',
+      '/estimate/commercial/',
+      '/estimate/str/',
+      '/estimate/church/',
+    ]);
+    const text = await page.locator('.estimate-hub').innerText();
+    for (const label of ['Residential Cleaning', 'Commercial Cleaning', 'Short-Term Rental Turnovers', 'Church Cleaning']) {
+      assert.ok(text.includes(label), `${label} card present`);
+    }
+    // One authoritative turnover pathway: the residential wizard does not
+    // offer STR as a fourth service choice.
+    const strChoice = page.locator('[data-service-fieldset] label.option', {
+      has: page.locator('input[value="str_turnover"]'),
+    });
+    assert.equal(await strChoice.isVisible(), false, 'STR is not offered in the residential service grid');
+  } finally {
+    await context.close();
+  }
+});
+
+test('a residential service preset preselects the service, frequency and supportive pathway', async () => {
+  const { context, page } = await open('/estimate/?service=deep');
+  try {
+    assert.equal(await page.locator('input[name="serviceType"][value="deep"]').isChecked(), true);
+    assert.equal(await page.locator('#est-frequency').inputValue(), 'one_time');
+    // The supportive block lives on step 3; assert its visibility state rather
+    // than its on-screen presence while step 1 is active.
+    assert.equal(await page.locator('[data-supportive-section]').evaluate((el) => el.hidden), false);
+    assert.equal(await page.locator('[data-engine-note]').isVisible(), false);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the supportive preset activates the optional pathway without requiring sensitive details', async () => {
+  const { context, page } = await open('/estimate/?service=supportive&supportive=yes');
+  try {
+    assert.equal(await page.locator('input[name="serviceType"][value="standard"]').isChecked(), true);
+    const value = await page.locator('#est-supportive-home').inputValue();
+    assert.ok(value !== '', 'a supportive option is preselected');
+    const notes = page.locator('#est-supportive-notes');
+    assert.equal(await notes.getAttribute('required'), null, 'supportive notes are optional');
+  } finally {
+    await context.close();
+  }
+});
+
+test('the STR page runs the turnover engine without a second service choice', async () => {
+  const { context, page } = await open('/estimate/str/');
+  try {
+    assert.equal(await page.locator('[data-estimate-form]').count(), 1, 'one wizard');
+    await page.waitForFunction(() => document.querySelector('[data-engine-note]')?.hidden === false);
+    assert.equal(await page.locator('input[name="serviceType"][value="str_turnover"]').isChecked(), true);
+    assert.equal(await page.locator('[data-service-fieldset]').isVisible(), false, 'no duplicate service picker');
+    const headings = await page.locator('[data-step-title]').allTextContents();
+    assert.equal(headings[0].trim(), 'Property & Address');
+    assert.equal(headings[5].trim(), 'Your Turnover Estimate');
+    // Turnover-specific facts are enabled; the residential supportive block is not.
+    assert.equal(
+      await page.locator('#est-rental-properties').evaluate((el) => el.closest('[data-str-only]').hidden),
+      false,
+    );
+    assert.equal(
+      await page.locator('#est-turnover-frequency').evaluate((el) => el.closest('[data-str-only]').hidden),
+      false,
+    );
+    assert.equal(await page.locator('[data-supportive-section]').evaluate((el) => el.hidden), true);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the commercial engine uses the shared address finder and has no church content', async () => {
+  const { context, page } = await open('/estimate/commercial/');
+  try {
+    assert.equal(await page.locator('[data-facility-form][data-engine="commercial"]').count(), 1);
+    assert.equal(await page.locator('[data-address-finder]').count(), 1, 'shared location finder present');
+    assert.equal(await page.locator('[data-estimate-form]').count(), 0, 'no residential wizard');
+    assert.equal(await page.locator('.church-commitment').count(), 0, 'no church discount block');
+    assert.equal(await page.locator('a[href="/estimate/"][href]').count() >= 1, true);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the church engine presents the owner-directed 10% discount and optional partnership', async () => {
+  const { context, page } = await open('/estimate/church/');
+  try {
+    const commitment = page.locator('.church-commitment');
+    assert.equal(await commitment.count(), 1);
+    const text = await commitment.innerText();
+    assert.match(text, /10% off eligible cleaning services/);
+    assert.match(text, /not a charitable donation/);
+    const partnership = page.locator('input[name^="partnership_"]');
+    assert.equal(await partnership.count(), 5, 'five optional partnership choices');
+    for (let index = 0; index < 5; index += 1) {
+      assert.equal(await partnership.nth(index).isChecked(), false, 'none preselected');
+    }
+    assert.equal(await page.locator('[data-address-finder]').count(), 1);
+  } finally {
+    await context.close();
+  }
+});
+
+test('mobile hub and church form stay inside the viewport', async () => {
+  for (const path of ['/estimate/', '/estimate/church/']) {
+    const { context, page } = await open(path, 390, 844);
+    try {
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      assert.ok(overflow <= 1, `${path} has no horizontal overflow (${overflow}px)`);
+    } finally {
+      await context.close();
+    }
+  }
+});

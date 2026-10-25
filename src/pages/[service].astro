@@ -6,8 +6,6 @@ import Checklist from '../components/Checklist.astro';
 import FaqItem from '../components/FaqItem.astro';
 import ServiceCard from '../components/ServiceCard.astro';
 import CtaBand from '../components/CtaBand.astro';
-import CommercialForm from '../components/CommercialForm.astro';
-import StrForm from '../components/StrForm.astro';
 import PremiumIcon from '../components/PremiumIcon.astro';
 import { serviceNode, breadcrumbNode, faqNode } from '../lib/schema';
 
@@ -50,6 +48,37 @@ const related = services
 const checklist = data.checklistId
   ? checklists.find((item) => item.id === data.checklistId && item.data.visibility === 'public')
   : undefined;
+
+// ONE authoritative request path per service family (Initiative 6.0). The old
+// embedded STR and walkthrough forms are retired: every CTA enters the same
+// estimate system with the right engine selected.
+const engineRequest =
+  data.embedForm === 'str'
+    ? {
+        href: '/estimate/str/',
+        label: 'Get a Turnover Estimate',
+        eyebrow: 'Turnover estimate',
+        heading: 'One turnover request, priced for your property',
+        lead: 'Tell us about the property, linen plan and guest windows. Sparkling Standard reviews every turnover request personally and confirms scope, schedule and price before anything is booked.',
+        cta: 'estimate-engine-str',
+      }
+    : entry.id === 'church-cleaning'
+      ? {
+          href: '/estimate/church/',
+          label: 'Estimate Church Cleaning',
+          eyebrow: 'Church estimate',
+          heading: 'A church estimate with our 10% church discount',
+          lead: 'Tell us about your sanctuary, classrooms, fellowship spaces and schedule. Sparkling Standard confirms the scope and your 10% church discount personally before anything is scheduled.',
+          cta: 'estimate-engine-church',
+        }
+      : {
+          href: '/estimate/commercial/',
+          label: 'Estimate My Facility Cleaning',
+          eyebrow: 'Facility estimate',
+          heading: 'A cleaning estimate built around your facility',
+          lead: 'Tell us about your space and access needs. Sparkling Standard reviews the scope and confirms a clear commercial price with you before any work begins.',
+          cta: 'estimate-engine-commercial',
+        };
 
 const schema = [
   serviceNode({
@@ -158,25 +187,19 @@ const schema = [
 
   {
     data.embedForm && (
-      <section
-        class="section"
-        id={data.embedForm === 'str' ? 'turnover-request' : 'walkthrough'}
-      >
+      <section class="section" id="engine-request">
         <div class="container container--narrow">
           <div class="section-head">
-            <p class="eyebrow">{data.embedForm === 'str' ? 'Turnover requests' : 'Walkthrough requests'}</p>
-            <h2>{data.embedForm === 'str' ? 'Request Turnover Service' : 'Request a Walkthrough'}</h2>
-            <p class="lead">
-              {data.embedForm === 'str'
-                ? 'Tell us about the property and how turnovers run. Sparkling Standard reviews every request personally and confirms scope, schedule and price before anything is booked.'
-                : 'Tell us about your facility. We schedule a walkthrough, prepare a clear scope and quote, and confirm with you before any work begins.'}
-            </p>
+            <p class="eyebrow">{engineRequest.eyebrow}</p>
+            <h2>{engineRequest.heading}</h2>
+            <p class="lead">{engineRequest.lead}</p>
           </div>
-          {data.embedForm === 'str' ? (
-            <StrForm />
-          ) : (
-            <CommercialForm churchPreset={entry.id === 'church-cleaning'} />
-          )}
+          <div class="btn-row">
+            <a class="btn btn--primary btn--large" href={engineRequest.href} data-cta={engineRequest.cta}>
+              {engineRequest.label}
+            </a>
+            <a class="btn btn--ghost" href="/contact/">Prefer to talk it through?</a>
+          </div>
         </div>
       </section>
     )

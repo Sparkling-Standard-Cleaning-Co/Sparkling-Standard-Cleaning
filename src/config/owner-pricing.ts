@@ -206,6 +206,35 @@ export interface OwnerPricingConfig {
   /** Smallest job value, applied silently to every estimate range. */
   minimumJob: number;
 
+  // ── Church discount (owner-directed 2026-10-24) ──────────────────────────
+  /**
+   * 10% off eligible CHURCH cleaning services. This is a real, owner-directed
+   * commitment, not a promotion experiment. It applies to the cleaning
+   * subtotal only (never travel or third-party costs), never stacks with
+   * another promotion, and the normal price is calculated honestly before the
+   * reduction. Set `enabled: false` only on a later owner decision.
+   */
+  churchDiscount: {
+    enabled: boolean;
+    percent: number;
+  };
+
+  // ── Commercial / church workload model (owner-approved baseline) ─────────
+  /**
+   * The blueprint's owner-approved baseline for facility workloading:
+   * 30 minutes per 1,000 cleanable sqft, 20-minute setup, 3 minutes per
+   * restroom, 10 minutes for a breakroom/kitchen. NUMERIC COMMERCIAL/CHURCH
+   * QUOTES REMAIN DISABLED until calibration against real jobs
+   * (`commercial-tiers.ts`). These numbers power the calibration tool only.
+   */
+  commercialWorkload: {
+    setupMinutes: number;
+    minutesPerThousandSqft: number;
+    minutesPerRestroom: number;
+    minutesPerBreakroom: number;
+    trafficFactors: { low: number; average: number; high: number };
+  };
+
   // ── 3. Base labor-hours per service type (before size and rooms) ──────────
   baseLaborHours: Record<PricingServiceType, number>;
 
@@ -332,6 +361,21 @@ export const ownerPricing: OwnerPricingConfig = {
 
   // ── 2. Minimum job ────────────────────────────────────────────────────────
   minimumJob: 125,
+
+  // ── Church discount (owner-directed 2026-10-24) ──────────────────────────
+  churchDiscount: {
+    enabled: true,
+    percent: 10,
+  },
+
+  // ── Commercial / church workload model (owner-approved baseline) ─────────
+  commercialWorkload: {
+    setupMinutes: 20,
+    minutesPerThousandSqft: 30,
+    minutesPerRestroom: 3,
+    minutesPerBreakroom: 10,
+    trafficFactors: { low: 0.95, average: 1, high: 1.15 },
+  },
 
   // ── 3. Base labor-hours per service type ──────────────────────────────────
   baseLaborHours: {

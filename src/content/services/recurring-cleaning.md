@@ -40,7 +40,8 @@ faqIds:
 related:
   - /deep-cleaning/
   - /short-term-rental-cleaning/
-ctaLabel: Instant Estimate
+ctaLabel: Get My Cleaning Estimate
+ctaHref: /estimate/?service=recurring
 checklistId: recurring-maintenance
 deepFirstBand:
   heading: Why our first visit is a deep clean, every time

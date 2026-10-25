@@ -203,6 +203,8 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Travel economics, included miles, zone adjustments | `src/config/travel.ts`, `src/config/geography.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Location selection, geocoding, GPS/manual modes | `src/scripts/address-finder.ts`, `src/lib/location/`, `functions/api/geocode.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`) | `docs/verification/VERIFICATION.md` |
+| Four estimate engines (residential, commercial, STR, church) + 10% church discount | `src/lib/estimate/engines.ts`, `commercial.ts`, `church-discount.ts`, `src/components/EstimateHub.astro`, `FacilityEstimateForm.astro`, `src/pages/estimate/` | `docs/operations/ESTIMATOR-ENGINES.md` |
+| Commercial/church numeric-pricing gate + calibration | `src/config/commercial-tiers.ts`, `npm run commercial:calibration` | `docs/operations/ESTIMATOR-ENGINES.md`, `docs/launch/COMMERCIAL-ESTIMATE-MODEL.md` |
 | Promotions, bundles, Founding-10 (all disabled) | `src/lib/estimate/promotions.ts` + `src/config/owner-pricing.ts` | `docs/launch/PROMOTION-PROPOSALS.md` |
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
 | Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` §4a |
@@ -361,6 +363,20 @@ collections are intentionally empty — not errors.
   captions read "Project photos are added only with customer approval." Proposed prices round
   **DOWN** to the nearest $5 (owner-approved), and travel assumes a 35-mile round trip
   (17.5 one-way included). Quote `configVersion` is `2026-10-23.floor5-travel35.v1`.
+- **Four estimate engines (2026-10-24, Initiative 6.0):** `/estimate/` is a hub with four cards.
+  Residential (`/estimate/`) keeps the live instant estimate (including the optional Supportive
+  Home pathway and presets `?service=recurring|deep|move-out|supportive`); STR
+  (`/estimate/str/`) runs the live per-turnover model; Commercial (`/estimate/commercial/`) and
+  Church (`/estimate/church/`) run the shared facility request engine with the SAME address finder,
+  travel lookup, relay, owner notification and Turnstile controls. The old embedded StrForm and
+  CommercialForm were retired — one request pipeline only. **Commercial/church dollar pricing is
+  calibration-gated** (`numericEstimatesEnabled: false`) and shown as an honest scope review.
+  **Church discount:** owner-directed **10% off eligible church cleaning**, applied after the
+  minimum-job rule, never stacked, never on travel/third-party costs, explicitly not a donation or
+  tithe; terms `2026-10-24.church10.v1` (`src/lib/estimate/church-discount.ts`). Facility/church
+  requests record the entitlement; numeric church pricing activates with the calibration gate.
+  Optional church partnership checkboxes are never preselected and never affect pricing. See
+  `docs/operations/ESTIMATOR-ENGINES.md`.
 - **Smart Estimate System 2.0 (2026-10-24, owner directive):**
   - **Address reliability:** an exact-address resolve that no provider could pinpoint no longer
     dead-ends — when the typed query carries a KNOWN 5-digit ZIP, the resolve action returns the

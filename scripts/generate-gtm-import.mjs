@@ -43,6 +43,8 @@ const EVENTS = [
   { name: 'commercial_quote_submit', parameters: ['facility_type'] },
   { name: 'str_request_start', parameters: [] },
   { name: 'str_request_submit', parameters: [] },
+  { name: 'church_request_start', parameters: [] },
+  { name: 'church_request_submit', parameters: [] },
   { name: 'booking_request', parameters: ['service_type'] },
   { name: 'review_link_click', parameters: ['platform'] },
   { name: 'promotion_displayed', parameters: ['code'] },

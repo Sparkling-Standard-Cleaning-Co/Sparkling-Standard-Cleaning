@@ -21,7 +21,11 @@ premium icons and Smart Estimate 2.0) was pushed to `main` and verified live thr
 Pages. Live acceptance checks for the current release: homepage, recurring page, estimator two-price
 flow, reviews, footer, navigation and values copy verified on sparkling-standard.com; R2 photo
 intake remains **disabled** (probe reports `enabled:false` until the bucket/secrets are provisioned);
-commercial numeric quotes remain **disabled** (`numericEstimatesEnabled:false`).
+commercial numeric quotes remain **disabled** (`numericEstimatesEnabled:false`). The **Initiative 6.0
+four-engine release (2026-10-24)** added the estimate hub, dedicated commercial / STR / church
+estimate paths, the owner-directed 10% church discount, Supportive Home integration into the
+residential engine, and retired the duplicate embedded request forms. Numeric commercial/church
+prices remain gated pending calibration. Verify the exact deployed SHA with `git log -1`.
 
 Status vocabulary:
 

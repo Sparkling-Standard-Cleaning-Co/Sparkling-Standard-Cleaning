@@ -36,8 +36,8 @@ related:
   - /commercial-cleaning/
   - /deep-cleaning/
   - /about/
-ctaLabel: Request a Walkthrough
-ctaHref: /church-cleaning/#walkthrough
+ctaLabel: Estimate Church Cleaning
+ctaHref: /estimate/church/
 checklistId: church-cleaning
 embedForm: commercial
 ---

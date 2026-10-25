@@ -41,7 +41,8 @@ Checked against the live site (HTTP headers + rendered HTML) after the 2026-10-2
   and `FAQPage` where applicable. **No** `AggregateRating` or `Review` markup is emitted
   (correct: Sparkling Standard does not manufacture star-rich snippets).
 - The hidden private address is absent from structured data (`hasAddress: false`).
-- Sitemap contains 17 URLs and excludes `/thank-you/`, `/leave-review/`,
+- Sitemap contains 20 URLs (the 2026-10-24 estimate-engine release added
+  `/estimate/commercial/`, `/estimate/str/` and `/estimate/church/`) and excludes `/thank-you/`, `/leave-review/`,
   `/gift-certificates/redeem/`, `/gift-certificates/success/` and `404`.
 - All four utility pages deliberately carry effective `noindex, nofollow`.
 - Preview builds remain `noindex` (`PUBLIC_PREVIEW_MODE`), canonicals always use

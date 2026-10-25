@@ -37,7 +37,8 @@ related:
   - /recurring-cleaning/
   - /deep-cleaning/
   - /move-in-move-out-cleaning/
-ctaLabel: Get Instant Estimate
+ctaLabel: Get My Cleaning Estimate
+ctaHref: /estimate/
 ---
 
 ## Residential cleaning, two clear ways

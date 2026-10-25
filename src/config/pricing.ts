@@ -117,6 +117,43 @@ export const pricing = {
     'Directive §22 initial provisional minimum. One setting only. Applied silently to the estimate range; the number is not advertised unless the owner approves.',
   ),
 
+  // ── Church discount (owner-directed 2026-10-24) ────────────────────────────
+  // A genuine, transparent 10% reduction for qualifying church cleaning. The
+  // normal price is calculated first; the discount applies to the cleaning
+  // subtotal AFTER the minimum-job rule, so the promised benefit is never
+  // silently erased by the floor. It never stacks with another promotion and
+  // never applies to travel or third-party costs. Numeric church estimates
+  // remain gated by the commercial calibration decision; the entitlement is
+  // recorded on scope-review requests until then.
+  churchDiscount: {
+    state: 'approved' as ApprovalState,
+    termsVersion: approved('2026-10-24.church10.v1', 'Version marker for the owner-directed 10% church discount terms.'),
+    enabled: approved(ownerPricing.churchDiscount.enabled, 'Owner directed the church discount on 2026-10-24.'),
+    percent: approved(ownerPricing.churchDiscount.percent, 'Owner-directed 10% off eligible church cleaning services.'),
+    appliesTo: 'cleaning_subtotal' as const,
+    stacking: false as const,
+    minimumRule: 'applied_after_minimum' as const,
+    note: 'Rooted in the founder’s faith and respect for local congregations. This is a service discount — never described as a charitable donation or tax-deductible tithe.',
+  },
+
+  // ── Commercial / church workload model (owner-approved baseline) ───────────
+  // Planning constants from the owner-approved commercial blueprint. The
+  // numeric gate lives in src/config/commercial-tiers.ts and MUST stay closed
+  // until calibration against real jobs (10–15 scenarios) is reviewed.
+  commercialWorkload: {
+    state: 'approved' as ApprovalState,
+    setupMinutes: approved(ownerPricing.commercialWorkload.setupMinutes, 'Fixed setup/arrival overhead per visit (owner-approved baseline).'),
+    minutesPerThousandSqft: approved(ownerPricing.commercialWorkload.minutesPerThousandSqft, 'Cleanable-area workload baseline: 30 minutes per 1,000 sqft (owner-approved).'),
+    minutesPerRestroom: approved(ownerPricing.commercialWorkload.minutesPerRestroom, 'Per-restroom workload baseline (ISSA-informed, owner-approved).'),
+    minutesPerBreakroom: approved(ownerPricing.commercialWorkload.minutesPerBreakroom, 'Breakroom/kitchen workload baseline (owner-approved).'),
+    trafficFactors: {
+      low: approved(ownerPricing.commercialWorkload.trafficFactors.low, 'Light-traffic facility factor.'),
+      average: approved(ownerPricing.commercialWorkload.trafficFactors.average, 'Ordinary traffic factor.'),
+      high: approved(ownerPricing.commercialWorkload.trafficFactors.high, 'High-traffic facility factor.'),
+    },
+    note: 'Powers the calibration model and the gated commercial/church engine. Never presented as a live price while numericEstimatesEnabled is false.',
+  },
+
   // ── Labor-hour model (directive §20 anchors) ───────────────────────────────
   // Anchors: a maintained 3/2 home ≈ 4.5–5.0 labor-hours for the founder alone;
   // a first clean of a similar home ≈ 6 labor-hours. The base + per-unit model

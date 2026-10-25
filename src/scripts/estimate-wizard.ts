@@ -25,6 +25,7 @@ import { buildInstantQuote, type InstantQuote } from '../lib/estimate/quote';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
 import { SERVICE_LABELS, SERVICE_SHORT, FREQUENCY_LABELS, FREQUENCY_RHYTHMS } from '../lib/estimate/labels';
 import { serviceAsksFrequency, serviceSupportsFrequency } from '../lib/estimate/service-matrix';
+import { ENGINE_STEPS, parseResidentialServiceParam } from '../lib/estimate/engines';
 import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInfo, ServiceType } from '../lib/estimate/types';
 import { locationKey, formatLocationLine, type ConfirmedLocation } from '../lib/location/location';
 import { initAddressFinder, type AddressFinderHandle } from './address-finder';
@@ -91,7 +92,7 @@ const contact = {
   smsEnabled: business.flags.smsEnabled,
 };
 
-const STEP_LABELS = ESTIMATE_STEPS.map((step) => step.title);
+let STEP_LABELS: readonly string[] = ESTIMATE_STEPS.map((step) => step.title);
 
 const formHost = document.querySelector<HTMLFormElement>('[data-estimate-form]');
 if (formHost) {
@@ -137,6 +138,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const reserveCall = document.querySelector<HTMLAnchorElement>('[data-reserve-call]');
   const reserveText = document.querySelector<HTMLAnchorElement>('[data-reserve-text]');
   const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
+  const engineNote = form.querySelector<HTMLElement>('[data-engine-note]');
+  let engine: 'residential' | 'str' = 'residential';
 
   // ── Customer photos (Smart Estimate directive, Part 2) ────────────────────
   // The section appears ONLY when the private R2 backend reports itself
@@ -1212,6 +1215,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
       acknowledged.required = deepRequired;
       if (!deepRequired) acknowledged.checked = false;
     }
+
+    // Supportive Home Cleaning is a RESIDENTIAL pathway, never offered inside
+    // the turnover engine and never priced differently by category.
+    const supportiveSection = form.querySelector<HTMLElement>('[data-supportive-section]');
+    if (supportiveSection) supportiveSection.hidden = engine === 'str' || isStr;
   }
 
   // ── Travel lookup ─────────────────────────────────────────────────────────
@@ -1365,6 +1373,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
       checkout_time: input.serviceType === 'str_turnover' ? textValue('checkoutTime') ?? '' : '',
       checkin_time: input.serviceType === 'str_turnover' ? textValue('checkinTime') ?? '' : '',
       linen_preference: input.serviceType === 'str_turnover' ? textValue('linenPreference') ?? '' : '',
+      engine_type: engine,
+      rental_properties: input.serviceType === 'str_turnover' ? textValue('rentalProperties') ?? '' : '',
+      turnover_frequency: input.serviceType === 'str_turnover' ? textValue('turnoverFrequency') ?? '' : '',
+      supportive_home: input.serviceType === 'str_turnover' ? '' : textValue('supportiveHome') ?? '',
+      supportive_support: input.serviceType === 'str_turnover' ? '' : textValue('supportiveSupport') ?? '',
+      supportive_notes: input.serviceType === 'str_turnover' ? '' : textValue('supportiveNotes') ?? '',
       frequency: input.frequency ?? '',
       condition: input.condition ?? '',
       last_cleaned: input.lastClean ?? '',
@@ -1670,10 +1684,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
   applyDateWindow();
   initPhotoUploads();
 
-  // Deep links from marketing pages: /estimate/?frequency=biweekly preselects
-  // the recurring rhythm (and ?service=deep preselects the service), so a
-  // campaign CTA lands one step closer to conversion. Values are validated
-  // against the known vocabulary and never trusted for anything else.
+  // Deep links from marketing pages and the estimate hub. Only allowlisted
+  // values apply, and they only pre-select — the customer can always change
+  // the service. `engine=str` turns the wizard into the turnover engine.
   function applyDeepLinkSelections(): void {
     let params: URLSearchParams;
     try {
@@ -1681,14 +1694,72 @@ function initEstimateWizard(form: HTMLFormElement): void {
     } catch {
       return;
     }
-    const service = params.get('service');
-    if (service && ['standard', 'deep', 'move_in_out', 'str_turnover'].includes(service)) {
-      const radio = form.querySelector<HTMLInputElement>(`input[name="serviceType"][value="${service}"]`);
+
+    const isStrPage = window.location.pathname.replace(/\/+$/, '').endsWith('/estimate/str');
+    const legacyStr = params.get('service') === 'str_turnover' || params.get('engine') === 'str';
+    const nextEngine: 'residential' | 'str' =
+      isStrPage || legacyStr ? 'str' : 'residential';
+    engine = nextEngine;
+    STEP_LABELS = [...ENGINE_STEPS[nextEngine].titles];
+    const serviceFieldset = form.querySelector<HTMLElement>('[data-service-fieldset]');
+    if (serviceFieldset) serviceFieldset.hidden = nextEngine === 'str';
+    // One authoritative turnover pathway: the general residential wizard must
+    // not offer STR as a service choice.
+    const strOption = form.querySelector<HTMLElement>('input[name="serviceType"][value="str_turnover"]')?.closest('label');
+    if (strOption) strOption.hidden = nextEngine === 'residential';
+    if (engineNote) {
+      engineNote.hidden = nextEngine !== 'str';
+      engineNote.textContent =
+        nextEngine === 'str'
+          ? 'Short-term rental turnover estimate — one turnover, priced for this property.'
+          : '';
+    }
+    for (const heading of form.querySelectorAll<HTMLElement>('[data-step-title]')) {
+      const index = Number(heading.dataset.stepTitle ?? '0');
+      heading.textContent = STEP_LABELS[index] ?? '';
+    }
+    for (const [index, item] of stepItems.entries()) {
+      const title = item.querySelector<HTMLElement>('.wizard-steps__title');
+      if (title) title.textContent = STEP_LABELS[index] ?? '';
+      const jump = item.querySelector<HTMLButtonElement>('[data-step-jump]');
+      if (jump) jump.setAttribute('aria-label', `Step ${index + 1}: ${STEP_LABELS[index] ?? ''}`);
+    }
+
+    if (nextEngine === 'str') {
+      const radio = form.querySelector<HTMLInputElement>('input[name="serviceType"][value="str_turnover"]');
       if (radio) {
         radio.checked = true;
         radio.dispatchEvent(new Event('change', { bubbles: true }));
       }
+    } else {
+      const service = params.get('service');
+      const preset = parseResidentialServiceParam(service);
+      // Legacy allowlisted values keep working for old campaigns.
+      const legacy = service && ['standard', 'deep', 'move_in_out', 'str_turnover'].includes(service) ? service : null;
+      const serviceValue = preset?.serviceType ?? legacy;
+      if (serviceValue) {
+        const radio = form.querySelector<HTMLInputElement>(`input[name="serviceType"][value="${serviceValue}"]`);
+        if (radio) {
+          radio.checked = true;
+          radio.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+      if (preset?.frequency) {
+        const select = form.querySelector<HTMLSelectElement>('#est-frequency');
+        if (select) {
+          select.value = preset.frequency;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+      if (preset?.supportive || params.get('supportive') === 'yes') {
+        const supportive = form.querySelector<HTMLSelectElement>('#est-supportive-home');
+        if (supportive && supportive.value === '') {
+          supportive.value = 'prefer_not';
+          supportive.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
     }
+
     const frequency = params.get('frequency');
     if (frequency && ['weekly', 'biweekly', 'monthly', 'one_time'].includes(frequency)) {
       // A deep-linked rhythm only applies when the selected service genuinely
@@ -1703,6 +1774,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
         }
       }
     }
+
+    syncConditionalFields();
+    showStep(currentStep);
   }
   applyDeepLinkSelections();
   recalc();

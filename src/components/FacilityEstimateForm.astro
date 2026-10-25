@@ -1,0 +1,478 @@
+---
+// Facility estimate engine — Commercial and Church (Initiative 6.0).
+//
+// One shared facility request experience with engine-specific questions and
+// the SAME address finder, travel lookup, lead pipeline, and owner
+// notification as the residential estimator. Numeric facility pricing is
+// deliberately gated (commercial-tiers.numericEstimatesEnabled) until
+// calibration is approved: the customer receives an honest scope-review
+// request, never an invented dollar figure. Churches additionally receive the
+// owner-directed 10% discount commitment, subject to scope review.
+import { isFormEnabled } from '../config/business';
+import { pricing } from '../config/pricing';
+import { schedulingConfig } from '../config/scheduling';
+import { US_STATES } from '../lib/location/location';
+import Icon from './Icon.astro';
+import TurnstileWidget from './TurnstileWidget.astro';
+
+type FacilityEngine = 'commercial' | 'church';
+
+interface Props {
+  engine: FacilityEngine;
+}
+
+const { engine } = Astro.props;
+const configured = isFormEnabled();
+const church = engine === 'church';
+const discountPercent = pricing.churchDiscount.percent.value;
+const discountEnabled = pricing.churchDiscount.enabled.value;
+
+const commercialFacilityTypes = [
+  { value: 'office', label: 'Office' },
+  { value: 'professional', label: 'Professional office / suite' },
+  { value: 'retail', label: 'Retail' },
+  { value: 'salon', label: 'Salon / barbershop' },
+  { value: 'gym', label: 'Gym / fitness studio' },
+  { value: 'apartment', label: 'Apartment community / common areas' },
+  { value: 'property-management', label: 'Property management portfolio' },
+  { value: 'small-business', label: 'Other small business facility' },
+];
+---
+
+<form
+  class="wizard facility-form"
+  id={church ? 'church-estimate-form' : 'commercial-estimate-form'}
+  data-facility-form
+  data-engine={engine}
+  action="#"
+  method="post"
+  autocomplete="off"
+  novalidate
+>
+  <div class="facility-form__progress">
+    <p class="facility-form__progress-title">
+      {church ? 'Church cleaning estimate' : 'Commercial cleaning estimate'}
+    </p>
+    <p class="small text-muted">
+      Four short sections. A confirmed address lets us verify travel and service eligibility; the
+      final scope and price are always confirmed personally.
+    </p>
+  </div>
+
+  {
+    !configured && (
+      <p class="form-status" data-state="info" style="display:block">
+        Request delivery is not connected on this preview build. This form shows the real request
+        experience; submissions in preview cannot be delivered.
+      </p>
+    )
+  }
+
+  <div class="error-summary" data-error-summary hidden role="alert" tabindex="-1">
+    <p class="error-summary__title">Please review these details before sending:</p>
+    <ul data-error-summary-list></ul>
+  </div>
+
+  <div class="estimate-result facility-form__result" data-facility-result hidden aria-live="polite">
+    <p class="estimate-result__label">Your request</p>
+    <p class="estimate-result__price" data-facility-result-title>Scope review</p>
+    <p class="estimate-result__note" data-facility-result-note></p>
+  </div>
+
+  <!-- 1. Facility & address -->
+  <section class="facility-form__section" data-facility-section="1">
+    <h2 class="wizard__step-heading">{church ? 'Your ministry & location' : 'Your facility & location'}</h2>
+    <div class="field-row field-row--2">
+      <div class="field">
+        <label for="fac-org">{church ? 'Church / ministry name' : 'Business / organization'}</label>
+        <input class="input" id="fac-org" name="organization" type="text" autocomplete="organization" required />
+      </div>
+      <div class="field">
+        <label for="fac-name">Contact name</label>
+        <input class="input" id="fac-name" name="name" type="text" autocomplete="name" required />
+      </div>
+    </div>
+
+    {
+      church && (
+        <div class="field">
+          <label for="fac-role">Contact role (optional)</label>
+          <input class="input" id="fac-role" name="contact_role" type="text" placeholder="e.g. Church administrator, trustee, pastor" />
+        </div>
+      )
+    }
+
+    <div class="address-finder" data-address-finder data-state="idle" data-method="manual">
+      <div class="address-gps">
+        <button type="button" class="btn btn--primary btn--block" data-address-gps>
+          <Icon name="map-pin" size={18} /> Use My Current Location
+        </button>
+        <p class="hint address-gps__hint">
+          Only use this if you are physically at the facility. The address is shown for confirmation
+          before anything is submitted.
+        </p>
+
+        <div class="address-permission" data-address-permission hidden>
+          <p class="address-permission__title" data-permission-title>Location access is off.</p>
+          <p class="hint" data-permission-message></p>
+          <ol class="address-permission__steps" data-permission-steps></ol>
+          <div class="address-finder__actions">
+            <button type="button" class="btn btn--secondary btn--small" data-address-gps-retry>Try Location Again</button>
+            <button type="button" class="btn btn--ghost btn--small" data-address-manual-open>Enter Address Manually</button>
+          </div>
+        </div>
+      </div>
+
+      <details class="address-manual" data-address-manual-details>
+        <summary class="address-manual__summary" data-address-manual-summary>Or enter the facility address manually</summary>
+        <div class="address-manual__body">
+          <div class="field-row field-row--2">
+            <div class="field field--grow">
+              <label for="est-address">Street address</label>
+              <input
+                class="input"
+                id="est-address"
+                name="serviceAddress"
+                type="text"
+                autocomplete="address-line1"
+                placeholder="e.g. 123 Main Street"
+                role="combobox"
+                aria-expanded="false"
+                aria-autocomplete="list"
+                aria-controls="est-address-suggestions"
+              />
+            </div>
+            <div class="field field--unit">
+              <label for="est-address-unit">Suite / unit</label>
+              <input class="input" id="est-address-unit" name="addressUnit" type="text" autocomplete="address-line2" maxlength="30" placeholder="Optional" />
+            </div>
+          </div>
+          <div class="field-row field-row--3">
+            <div class="field field--grow">
+              <label for="est-address-city">City</label>
+              <input class="input" id="est-address-city" name="addressCity" type="text" autocomplete="address-level2" placeholder="e.g. Pensacola" />
+            </div>
+            <div class="field">
+              <label for="est-address-state">State</label>
+              <select class="select" id="est-address-state" name="addressState" autocomplete="address-level1">
+                {US_STATES.map((state) => (
+                  <option value={state.code} selected={state.code === 'FL'}>{state.name}</option>
+                ))}
+              </select>
+            </div>
+            <div class="field field--zip">
+              <label for="est-zip">ZIP code</label>
+              <input class="input" id="est-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" placeholder="e.g. 32503" required pattern="[0-9]{5}(-[0-9]{4})?" />
+            </div>
+          </div>
+          <ul class="address-suggestions" id="est-address-suggestions" role="listbox" aria-label="Address suggestions" data-address-suggestions hidden></ul>
+          <p class="hint address-finder__status" data-address-status aria-live="polite">
+            Start typing the facility address — suggestions appear as you type.
+          </p>
+          <div class="address-finder__actions">
+            <button type="button" class="btn btn--secondary btn--small" data-address-resolve>Find This Address</button>
+          </div>
+        </div>
+      </details>
+
+      <div class="address-map" data-address-map hidden>
+        <div class="address-map__canvas" data-address-map-canvas></div>
+        <p class="hint">Confirm this is the right destination, or drag the pin to correct it.</p>
+        <p class="hint address-map__fallback" data-address-map-fallback hidden>
+          Map preview is unavailable right now — the confirmed coordinates still work. You can continue.
+        </p>
+        <div class="address-finder__actions">
+          <button type="button" class="btn btn--primary btn--small" data-address-confirm>Confirm this location</button>
+          <button type="button" class="btn btn--ghost btn--small" data-address-change>Change address</button>
+        </div>
+      </div>
+
+      <div class="address-confirmed" data-address-confirmed hidden>
+        <p class="address-confirmed__title"><Icon name="check" size={16} /> Destination confirmed</p>
+        <p class="address-confirmed__label" data-address-confirmed-label></p>
+        <p class="hint" data-address-confirmed-travel></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Space & workload -->
+  <section class="facility-form__section" data-facility-section="2">
+    <h2 class="wizard__step-heading">{church ? 'Spaces & weekly life' : 'Space & cleaning scope'}</h2>
+
+    {
+      church ? (
+        <>
+          <div class="field-row field-row--2">
+            <div class="field">
+              <label for="fac-sqft">Approximate cleanable square footage</label>
+              <input class="input" id="fac-sqft" name="cleanable_sqft" type="text" inputmode="numeric" placeholder="e.g. 8,000 (the area we actually clean)" required />
+              <span class="hint">Floors and rooms that need cleaning — not storage or unused space.</span>
+            </div>
+            <div class="field">
+              <label for="fac-seats">Sanctuary seating (approx.)</label>
+              <input class="input" id="fac-seats" name="sanctuary_seats" type="number" min="0" max="5000" inputmode="numeric" placeholder="e.g. 250" />
+            </div>
+          </div>
+          <div class="field-row field-row--3">
+            <div class="field">
+              <label for="fac-restrooms">Restrooms</label>
+              <input class="input" id="fac-restrooms" name="restroom_count" type="number" min="0" max="30" inputmode="numeric" placeholder="e.g. 4" required />
+            </div>
+            <div class="field">
+              <label for="fac-classrooms">Classrooms</label>
+              <input class="input" id="fac-classrooms" name="classroom_count" type="number" min="0" max="60" inputmode="numeric" placeholder="e.g. 6" />
+            </div>
+            <div class="field">
+              <label for="fac-nursery">Nursery / children's spaces?</label>
+              <select class="select" id="fac-nursery" name="nursery" required>
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-row field-row--2">
+            <div class="field">
+              <label for="fac-kitchen">Kitchen / fellowship hall?</label>
+              <select class="select" id="fac-kitchen" name="breakroom">
+                <option value="none">No kitchen or fellowship hall</option>
+                <option value="breakroom">Fellowship hall / small kitchen</option>
+                <option value="kitchen">Full kitchen</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="fac-events">Weekly services / events (approx.)</label>
+              <input class="input" id="fac-events" name="weekly_events" type="text" placeholder="e.g. Sunday services, Wednesday night, one monthly event" />
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div class="field-row field-row--2">
+            <div class="field">
+              <label for="fac-type">Facility type</label>
+              <select class="select" id="fac-type" name="facility_type" required>
+                <option value="">Choose the closest match…</option>
+                {commercialFacilityTypes.map((type) => (<option value={type.value}>{type.label}</option>))}
+              </select>
+            </div>
+            <div class="field">
+              <label for="fac-sqft">Approximate cleanable square footage</label>
+              <input class="input" id="fac-sqft" name="cleanable_sqft" type="text" inputmode="numeric" placeholder="e.g. 2,000 (the area we actually clean)" required />
+              <span class="hint">Floors and rooms that need cleaning — not storage or unused space.</span>
+            </div>
+          </div>
+          <div class="field-row field-row--3">
+            <div class="field">
+              <label for="fac-restrooms">Restrooms</label>
+              <input class="input" id="fac-restrooms" name="restroom_count" type="number" min="0" max="30" inputmode="numeric" placeholder="e.g. 2" required />
+            </div>
+            <div class="field">
+              <label for="fac-workstations">Workstations / offices</label>
+              <input class="input" id="fac-workstations" name="workstations" type="number" min="0" max="500" inputmode="numeric" placeholder="Optional" />
+            </div>
+            <div class="field">
+              <label for="fac-breakroom">Kitchen or breakroom?</label>
+              <select class="select" id="fac-breakroom" name="breakroom">
+                <option value="none">No kitchen or breakroom</option>
+                <option value="breakroom">Small breakroom</option>
+                <option value="kitchen">Full kitchen</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-row field-row--2">
+            <div class="field">
+              <label for="fac-traffic">Average traffic</label>
+              <select class="select" id="fac-traffic" name="traffic">
+                <option value="average">Ordinary</option>
+                <option value="low">Light</option>
+                <option value="high">High / customer-facing</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="fac-specialty">Specialty needs (optional)</label>
+              <select class="select" id="fac-specialty" name="specialty_services">
+                <option value="">None</option>
+                <option value="post_construction">Post-construction cleanup</option>
+                <option value="floor_resurfacing">Floor stripping / resurfacing</option>
+                <option value="industrial_kitchen">Commercial kitchen deep clean</option>
+                <option value="high_rise">Multi-floor / elevator building</option>
+                <option value="other">Other — describe in notes</option>
+              </select>
+            </div>
+          </div>
+        </>
+      )
+    }
+
+    <div class="field-row field-row--2">
+      <div class="field">
+        <label for="fac-condition">Current condition</label>
+        <select class="select" id="fac-condition" name="condition">
+          <option value="maintained">Maintained — cleaned regularly</option>
+          <option value="average" selected>Average — normal use</option>
+          <option value="needs_attention">Needs attention</option>
+          <option value="heavy">Heavy buildup</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fac-frequency">Desired cleaning frequency</label>
+        <select class="select" id="fac-frequency" name="frequency" required>
+          <option value="">Choose one…</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Every two weeks</option>
+          <option value="monthly">Monthly</option>
+          <option value="one-time">One-time / project</option>
+          <option value="not-sure">Not sure yet — advise us</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Schedule & access -->
+  <section class="facility-form__section" data-facility-section="3">
+    <h2 class="wizard__step-heading">Schedule & access</h2>
+    <div class="field-row field-row--2">
+      <div class="field">
+        <label for="fac-start">Preferred start date</label>
+        <input class="input" id="fac-start" name="preferred_date" type="date" />
+        <span class="hint">Requests can be made up to {schedulingConfig.advanceReservationDays} days in advance.</span>
+      </div>
+      <div class="field">
+        <label for="fac-window">Service window</label>
+        <select class="select" id="fac-window" name="time_preference" required>
+          <option value="">When should we clean?</option>
+          <option value="early-morning">Early morning (from 7:00 a.m.)</option>
+          <option value="daytime">Daytime</option>
+          <option value="evening">Evening (until 7:00 p.m.)</option>
+          <option value="after-hours">After hours (discuss access)</option>
+          <option value="flexible">Flexible / discuss</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row field-row--2">
+      <div class="field">
+        <label for="fac-days">Preferred days (optional)</label>
+        <input class="input" id="fac-days" name="preferred_days" type="text" placeholder="e.g. Tuesday & Friday mornings" />
+      </div>
+      <div class="field">
+        <label for="fac-access">Access notes (optional)</label>
+        <input class="input" id="fac-access" name="access_notes" type="text" placeholder="Keys, alarm codes process, parking, freight elevator…" />
+      </div>
+    </div>
+    <div class="field">
+      <label for="fac-notes">Anything else we should know?</label>
+      <textarea class="textarea" id="fac-notes" name="notes" rows="4" placeholder="Surfaces, restrictions, events, priorities, current cleaning arrangement…"></textarea>
+    </div>
+  </section>
+
+  <!-- 4. Contact & review -->
+  <section class="facility-form__section" data-facility-section="4">
+    <h2 class="wizard__step-heading">Contact & review</h2>
+
+    {
+      church && (
+        <div class="church-commitment">
+          <p class="church-commitment__title">Our Commitment to Local Churches</p>
+          {discountEnabled ? (
+            <p class="church-commitment__text">
+              Rooted in our faith and our respect for the work local congregations do, Sparkling
+              Standard offers churches <strong>{discountPercent}% off eligible cleaning services</strong>.
+              It is one way we give back to the communities we serve. This is a service discount on
+              your cleaning — it is not a charitable donation or a tax-deductible tithe.
+            </p>
+          ) : (
+            <p class="church-commitment__text">
+              We value the work local congregations do and welcome a conversation about the right
+              scope for your facilities.
+            </p>
+          )}
+          <div class="field">
+            <label for="fac-partnership">More than a cleaning relationship (optional)</label>
+            <p class="hint">
+              We'd welcome conversations about community service, volunteering and ways we might
+              support one another's work. Nothing here affects your estimate or discount.
+            </p>
+            <div class="option-grid option-grid--2">
+              <label class="option">
+                <input type="checkbox" name="partnership_volunteering" value="yes" />
+                <span class="option__control"></span>
+                <span><span class="option__label">Open to discussing community volunteering</span></span>
+              </label>
+              <label class="option">
+                <input type="checkbox" name="partnership_initiatives" value="yes" />
+                <span class="option__control"></span>
+                <span><span class="option__label">Explore future community initiatives together</span></span>
+              </label>
+              <label class="option">
+                <input type="checkbox" name="partnership_congregation" value="yes" />
+                <span class="option__control"></span>
+                <span><span class="option__label">Discuss introducing Sparkling Standard to our congregation</span></span>
+              </label>
+              <label class="option">
+                <input type="checkbox" name="partnership_contact" value="yes" />
+                <span class="option__control"></span>
+                <span><span class="option__label">Please contact us about potential partnerships</span></span>
+              </label>
+              <label class="option">
+                <input type="checkbox" name="partnership_none" value="yes" />
+                <span class="option__control"></span>
+                <span><span class="option__label">Not at this time</span></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    <div class="field-row field-row--2">
+      <div class="field">
+        <label for="fac-phone">Phone</label>
+        <input class="input" id="fac-phone" name="phone" type="tel" autocomplete="tel" required />
+      </div>
+      <div class="field">
+        <label for="fac-email">Email</label>
+        <input class="input" id="fac-email" name="email" type="email" autocomplete="email" required />
+      </div>
+    </div>
+
+    <div class="facility-review" data-facility-review aria-live="polite">
+      <h3 class="facility-review__title">Your request summary</h3>
+      <ul class="summary-list" data-facility-review-lines>
+        <li>Choose your facility details to see the summary.</li>
+      </ul>
+      <p class="facility-review__note">
+        {church
+          ? `This is a scope-review request, not a confirmed contract. Sparkling Standard confirms the scope and your ${discountEnabled ? `${discountPercent}% church discount` : 'price'} personally before anything is scheduled.`
+          : 'This is a scope-review request, not a confirmed contract. Sparkling Standard confirms the scope and price personally before anything is scheduled.'}
+      </p>
+    </div>
+
+    <TurnstileWidget />
+    <div class="honeypot" aria-hidden="true">
+      <input
+        id="fac-extra-ref"
+        name="extra_ref"
+        type="text"
+        tabindex="-1"
+        autocomplete="off"
+        data-lpignore="true"
+        data-1p-ignore
+        data-bwignore
+        data-protonpass-ignore
+      />
+    </div>
+    <p class="small text-muted">
+      Sending this request does not book anything. See our <a href="/privacy/">privacy policy</a>.
+    </p>
+
+    <button class="btn btn--primary btn--large btn--block" type="submit" data-cta={church ? 'church-submit' : 'commercial-submit'}>
+      <Icon name="send" size={18} /> {church ? 'Request Our Church Estimate' : 'Request My Facility Estimate'}
+    </button>
+    <p class="form-status" data-form-status role="status" aria-live="polite"></p>
+  </section>
+</form>
+
+<script>
+  import '../scripts/facility-estimate';
+</script>

@@ -65,6 +65,8 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         )
       }
 
+      <p class="estimate-engine-note" data-engine-note hidden></p>
+
       <div class="error-summary" data-error-summary hidden role="alert" tabindex="-1">
         <p class="error-summary__title" data-error-summary-title>Please fix the following before continuing:</p>
         <ul data-error-summary-list></ul>
@@ -83,8 +85,8 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
       <!-- Step 1 — service & address -->
       <section class="wizard__step" data-step="1" data-active="true" aria-label={stepTitle(0)}>
-        <h2 class="wizard__step-heading">{stepTitle(0)}</h2>
-        <fieldset class="field" data-group-error="serviceType" data-group-message="Please select a cleaning service.">
+        <h2 class="wizard__step-heading" data-step-title={0}>{stepTitle(0)}</h2>
+        <fieldset class="field" data-service-fieldset data-group-error="serviceType" data-group-message="Please select a cleaning service.">
           <legend>What kind of cleaning are you looking for?</legend>
           <div class="option-grid option-grid--2">
             <label class="option">
@@ -266,7 +268,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
       <!-- Step 2 — the home -->
       <section class="wizard__step" data-step="2" aria-label={stepTitle(1)}>
-        <h2 class="wizard__step-heading">{stepTitle(1)}</h2>
+        <h2 class="wizard__step-heading" data-step-title={1}>{stepTitle(1)}</h2>
         <div class="field">
           <label for="est-property">Property type</label>
           <select class="select" id="est-property" name="propertyType" required>
@@ -296,6 +298,24 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <div class="field">
             <label for="est-half-baths">Half bathrooms</label>
             <input class="input" id="est-half-baths" name="halfBaths" type="number" inputmode="numeric" min="0" max="12" value="0" required />
+          </div>
+        </div>
+        <div class="field-row field-row--2" data-str-only hidden>
+          <div class="field">
+            <label for="est-rental-properties">How many rental properties do you manage?</label>
+            <input class="input" id="est-rental-properties" name="rentalProperties" type="number" inputmode="numeric" min="1" max="50" value="1" />
+            <span class="hint">Start with the property below; we can discuss the portfolio after your first turnover.</span>
+          </div>
+          <div class="field">
+            <label for="est-turnover-frequency">How often are turnovers needed?</label>
+            <select class="select" id="est-turnover-frequency" name="turnoverFrequency">
+              <option value="">Choose one (optional)…</option>
+              <option value="per_stay">Between every stay</option>
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Every two weeks</option>
+              <option value="occasional">Occasional / backup cleaner</option>
+              <option value="seasonal">Seasonal</option>
+            </select>
           </div>
         </div>
         <div class="field" data-str-only hidden>
@@ -330,7 +350,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
       <!-- Step 3 — condition + frequency -->
       <section class="wizard__step" data-step="3" aria-label={stepTitle(2)}>
-        <h2 class="wizard__step-heading">{stepTitle(2)}</h2>
+        <h2 class="wizard__step-heading" data-step-title={2}>{stepTitle(2)}</h2>
         <div class="field" data-frequency-field>
           <label for="est-frequency">How often should we clean?</label>
           <select class="select" id="est-frequency" name="frequency" required>
@@ -355,6 +375,53 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             <span>I understand my first recurring visit will be a Deep Cleaning.</span>
           </label>
         </div>
+
+        <div class="supportive-block" data-supportive-section hidden>
+          <h3 class="supportive-block__title">Would you like to request our Supportive Home Cleaning approach?</h3>
+          <p class="hint">
+            For households that may appreciate additional care, patience, communication or
+            flexibility — including senior, veteran, military and first-responder households.
+            Completely optional, and no diagnosis or documentation is ever required.
+          </p>
+          <div class="field-row field-row--2">
+            <div class="field">
+              <label for="est-supportive-home">Supportive home cleaning</label>
+              <select class="select" id="est-supportive-home" name="supportiveHome">
+                <option value="">No preference</option>
+                <option value="senior">Senior household</option>
+                <option value="veteran">Veteran or military household</option>
+                <option value="first_responder">First responder household</option>
+                <option value="practical_support">Household needing additional practical support</option>
+                <option value="other">Other</option>
+                <option value="prefer_not">Prefer not to specify</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="est-supportive-support">What would help most? (optional)</label>
+              <select class="select" id="est-supportive-support" name="supportiveSupport">
+                <option value="">Choose one…</option>
+                <option value="scheduling_flexibility">Additional scheduling flexibility</option>
+                <option value="communication">Communication preferences</option>
+                <option value="family_coordination">Coordination with an authorized family member</option>
+                <option value="access">Special access instructions</option>
+                <option value="priority_areas">Priority areas</option>
+                <option value="extra_time">Extra time or assistance</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="est-supportive-notes">Anything practical we should know? (optional)</label>
+            <textarea
+              class="textarea"
+              id="est-supportive-notes"
+              name="supportiveNotes"
+              rows="3"
+              placeholder="For example: a family member helps coordinate, please allow extra time, or a particular room matters most. No medical details needed."
+            ></textarea>
+          </div>
+        </div>
+
         <fieldset class="field" data-group-error="condition" data-group-message="Please choose the home's current condition.">
           <legend>What condition is the home in today?</legend>
           <div class="option-grid">
@@ -409,7 +476,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
       <!-- Step 4 — add-ons -->
       <section class="wizard__step" data-step="4" aria-label={stepTitle(3)}>
-        <h2 class="wizard__step-heading">{stepTitle(3)}</h2>
+        <h2 class="wizard__step-heading" data-step-title={3}>{stepTitle(3)}</h2>
         <fieldset class="field">
           <legend>Any extras? (optional)</legend>
           <p class="hint" style="margin-bottom: var(--space-3)">
@@ -454,7 +521,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
       <!-- Step 5 — scheduling -->
       <section class="wizard__step" data-step="5" aria-label={stepTitle(4)}>
-        <h2 class="wizard__step-heading">{stepTitle(4)}</h2>
+        <h2 class="wizard__step-heading" data-step-title={4}>{stepTitle(4)}</h2>
         <div class="field-row field-row--2">
             <div class="field">
               <label for="est-date">Preferred date</label>
@@ -482,7 +549,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
       <!-- Step 6 — estimate + reservation + details -->
       <section class="wizard__step" data-step="6" aria-label={stepTitle(5)}>
-        <h2 class="wizard__step-heading">{stepTitle(5)}</h2>
+        <h2 class="wizard__step-heading" data-step-title={5}>{stepTitle(5)}</h2>
         <div class="reservation-summary" data-reservation-summary hidden>
           <p class="reservation-summary__eyebrow" data-reservation-eyebrow>Your proposed cleaning price</p>
           <p class="reservation-summary__price" data-reservation-price>—</p>

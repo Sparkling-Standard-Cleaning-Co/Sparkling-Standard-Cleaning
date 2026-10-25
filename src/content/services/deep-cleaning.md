@@ -40,7 +40,8 @@ faqIds:
 related:
   - /recurring-cleaning/
   - /move-in-move-out-cleaning/
-ctaLabel: Instant Estimate
+ctaLabel: Get My Cleaning Estimate
+ctaHref: /estimate/?service=deep
 checklistId: deep-clean
 ---
 

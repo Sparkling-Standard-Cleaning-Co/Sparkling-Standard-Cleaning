@@ -24,6 +24,8 @@ const SERVICE_LABELS: Record<string, string> = {
   move_in_out: 'Move-in and move-out cleaning',
   str_turnover: 'Short-term rental turnover',
   house: 'Residential cleaning',
+  commercial_cleaning: 'Commercial cleaning',
+  church_cleaning: 'Church cleaning',
 };
 
 const REQUEST_LABELS: Record<string, string> = {
@@ -32,6 +34,7 @@ const REQUEST_LABELS: Record<string, string> = {
   commercial: 'Commercial walkthrough request',
   str: 'Short-term rental turnover request',
   contact: 'Website message',
+  facility_estimate: 'Facility estimate request — scope review, not a booking',
 };
 
 const FREQUENCY_LABELS: Record<string, string> = {
@@ -217,6 +220,7 @@ function requestTypeShort(fields: Record<string, string>): string {
   const explicit = text(fields, 'request_type');
   if (explicit === 'reservation_request') return 'Reservation request';
   if (explicit === 'residential_estimate') return 'Estimate request';
+  if (explicit === 'facility_estimate') return 'Scope review request';
   if (explicit === 'commercial') return 'Commercial walkthrough request';
   if (explicit === 'str') return 'STR turnover request';
   if (explicit === 'contact') return 'Website message';
@@ -513,6 +517,15 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
     actions.push('Schedule the walkthrough');
   }
   if (text(fields, 'turnover_frequency')) actions.push('Confirm turnover details and the first date');
+  if (text(fields, 'service_type') === 'church_cleaning') {
+    actions.push('Church request — apply the 10% church discount to the confirmed cleaning quote');
+  }
+  if (text(fields, 'supportive_home')) {
+    actions.push('Supportive Home Cleaning requested — review practical accommodations, no pricing change by category');
+  }
+  if (text(fields, 'engine_type') === 'commercial' || text(fields, 'engine_type') === 'church') {
+    actions.push('Scope review required before quoting (facility pricing is calibration-gated)');
+  }
   if (text(fields, 'initial_deep_clean_required') === 'yes') {
     actions.push('Initial Deep Cleaning required before recurring maintenance service');
   }
@@ -594,6 +607,36 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Home — Last professional clean', LAST_CLEAN_LABELS[lastClean] ?? (lastClean ? humanizeKey(lastClean) : ''), 'last_cleaned');
   const pets = text(fields, 'pets');
   add('Home — Pets', PET_LABELS[pets] ?? (pets ? humanizeKey(pets) : ''), 'pets');
+
+  // ── D2. Facility / church / supportive / turnover context ───────────────
+  add('Engine — Track', text(fields, 'engine_type'), 'engine_type');
+  add('Facility — Workstations', text(fields, 'workstations'), 'workstations');
+  add('Facility — Traffic', text(fields, 'traffic'), 'traffic');
+  add('Facility — Preferred days', text(fields, 'preferred_days'), 'preferred_days');
+  add('Facility — Access notes', text(fields, 'access_notes'), 'access_notes');
+  add('Facility — Weekly events', text(fields, 'weekly_events'), 'weekly_events');
+  add('Church — Contact role', text(fields, 'contact_role'), 'contact_role');
+  add('Church — Sanctuary seats', text(fields, 'sanctuary_seats'), 'sanctuary_seats');
+  add('Church — Classrooms', text(fields, 'classroom_count'), 'classroom_count');
+  add('Church — Nursery / children spaces', YES_NO_LABELS[text(fields, 'nursery')] ?? text(fields, 'nursery'), 'nursery');
+  const churchDiscount = text(fields, 'church_discount_percent');
+  add(
+    'Church — Discount',
+    churchDiscount
+      ? `${churchDiscount}% off eligible church cleaning (applied to the confirmed quote; terms ${text(fields, 'church_discount_terms_version') || 'church10'})`
+      : '',
+    'church_discount_percent',
+    'church_discount_terms_version',
+  );
+  add('Church partnership — Volunteering', YES_NO_LABELS[text(fields, 'partnership_volunteering')] ?? text(fields, 'partnership_volunteering'), 'partnership_volunteering');
+  add('Church partnership — Community initiatives', YES_NO_LABELS[text(fields, 'partnership_initiatives')] ?? text(fields, 'partnership_initiatives'), 'partnership_initiatives');
+  add('Church partnership — Congregation introduction', YES_NO_LABELS[text(fields, 'partnership_congregation')] ?? text(fields, 'partnership_congregation'), 'partnership_congregation');
+  add('Church partnership — Contact requested', YES_NO_LABELS[text(fields, 'partnership_contact')] ?? text(fields, 'partnership_contact'), 'partnership_contact');
+  add('Church partnership — Not now', YES_NO_LABELS[text(fields, 'partnership_none')] ?? text(fields, 'partnership_none'), 'partnership_none');
+  add('Supportive home — Requested', text(fields, 'supportive_home'), 'supportive_home');
+  add('Supportive home — What would help', text(fields, 'supportive_support'), 'supportive_support');
+  add('Supportive home — Practical notes', text(fields, 'supportive_notes'), 'supportive_notes');
+  add('Turnover — Rental properties', text(fields, 'rental_properties'), 'rental_properties');
 
   // ── E. Requested extras ─────────────────────────────────────────────────
   const addonLabels = text(fields, 'addons');

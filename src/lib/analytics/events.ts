@@ -18,6 +18,8 @@ export type AnalyticsEventName =
   | 'commercial_quote_submit'
   | 'str_request_start'
   | 'str_request_submit'
+  | 'church_request_start'
+  | 'church_request_submit'
   | 'booking_request'
   | 'review_link_click'
   | 'promotion_displayed'
@@ -38,6 +40,8 @@ export interface EventPayloads {
   commercial_quote_submit: { facility_type?: string };
   str_request_start: Record<string, never>;
   str_request_submit: Record<string, never>;
+  church_request_start: Record<string, never>;
+  church_request_submit: Record<string, never>;
   booking_request: { service_type?: string };
   review_link_click: { platform?: string };
   // Campaign events carry the public code only — never any customer data.

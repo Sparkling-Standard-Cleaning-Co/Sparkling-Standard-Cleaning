@@ -1,0 +1,46 @@
+---
+import { getEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import FacilityEstimateForm from '../../components/FacilityEstimateForm.astro';
+import { breadcrumbNode } from '../../lib/schema';
+
+const entry = await getEntry('site', 'estimate-commercial');
+if (!entry) throw new Error('Missing content entry: src/content/site/estimate-commercial.md');
+const { data } = entry;
+
+const site = Astro.site ?? new URL('https://pending-website-url.invalid');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Instant Estimate', path: '/estimate/' },
+    { name: 'Commercial Cleaning', path: '/estimate/commercial/' },
+  ]),
+];
+---
+
+<BaseLayout title={data.metaTitle} description={data.metaDescription} schema={schema}>
+  <section class="section section--tight estimate-intro">
+    <div class="container">
+      <Breadcrumbs
+        trail={[
+          { name: 'Home', path: '/' },
+          { name: 'Instant Estimate', path: '/estimate/' },
+          { name: 'Commercial Cleaning', path: '/estimate/commercial/' },
+        ]}
+      />
+      <div class="section-head mt-4">
+        <h1>
+          {data.hero.headline}
+          {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
+        </h1>
+        <p class="lead">{data.hero.lead}</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="container container--narrow" style="margin-bottom: var(--space-9)">
+    <p><a href="/estimate/">Estimating something else? See all estimate options →</a></p>
+    <FacilityEstimateForm engine="commercial" />
+  </div>
+</BaseLayout>
