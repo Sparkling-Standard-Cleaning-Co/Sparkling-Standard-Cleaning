@@ -22,10 +22,10 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
   Parler, Locals), and **GA4 analytics** (`GTM-KSQ26HMG` / `G-LG222LQRQ2` —
   page views, `estimate_start` and all three inquiry key events verified; Enhanced Measurement
   form interactions disabled).
-- **Release status:** the 2026-10-03 release (GTM import package + Brand A2, UTM count correction,
-  GTM doc cleanup, attribution repair, marketing documentation, the six-profile social
-  integration, and the compact logo-only Follow Us redesign) is **deployed** — `origin/main` =
-  `62a1a46`, owner-authorized, live acceptance checks passed. See
+- **Release status:** **Initiative 6.3** is **live** at `2b64f0e` (Cloudflare Pages deployment
+  `18162d08-3d71-4f0e-874a-06ada6fbd2d7`). It installs the 17 white-tile icons, removes the GPS
+  helper paragraphs, centralizes estimator settings and adds the owner control-center
+  documentation. Pricing and estimator mathematics were not changed. See
   `docs/verification/VERIFICATION.md`.
 - **Remaining owner items:** formal launch checklist (legal entity spelling, insurance/bonding/
   licensing claims, genuine reviews, final cancellation percentages), Instagram verification,

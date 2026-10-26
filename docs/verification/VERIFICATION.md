@@ -3,6 +3,54 @@
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
+## Verified — 2026-10-25 Initiative 6.3 production deployment
+
+**Live branch/commit:** `main` at `2b64f0e` (code release; documentation closeout follows).
+**Cloudflare Pages deployment:** `18162d08-3d71-4f0e-874a-06ada6fbd2d7`. GitHub `validate`,
+`browser` and Cloudflare Pages checks completed successfully.
+
+The release installs the owner's 17 white-tile icons, removes the GPS helper paragraphs from every
+estimator form, centralizes owner-editable estimator values under `src/config/estimators/`, adds
+the Owner Control Center/Operations Manual and completes repository and local-master organization.
+**No pricing value, formula, minimum, discount, calibration or production assumption was changed.**
+
+### Predeployment verification
+
+| Check | Command | Result |
+| --- | --- | --- |
+| TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints (140 files) |
+| Production build | `npm run build` | 26 pages + sitemap; only expected empty `proof` notice and lazy MapLibre chunk warning |
+| Unit suite | `npm test` | **499 tests: 498 passed, 1 skipped, 0 failed** |
+| Browser regression suite | `npm run test:browser` | **131 passed, 0 failed** |
+| Static validation | `npm run verify` | **1,720 internal links** across 26 pages; SEO, homepage copy, marketing/QR, GTM and checklist checks passed |
+| Smoke test | `npm run smoke` | 21 required pages passed |
+| PENDING / fake-testimonial / fact audit | `npm run pending`, `npm run testimonials`, `npm run audit:facts` | all passed |
+| Pricing parity | `tests/estimator-config-integrity.test.ts` + full unit suite | all owner rates, labour units, factors, discounts, travel, tiers and limits unchanged |
+| Calibration | `npm run commercial:calibration` / `npm run calibration:report` | 26 commercial + 20 church scenarios; exact discount reconciliation |
+| Visual evidence | `docs/verification/6.3/` | 11 screenshots including before/after location helper and the labeled 17-icon inventory |
+
+The internal quote preview still returns the same representative figures (for example, 3/2 1600 sqft
+one-time at **$270** and biweekly at **$335**, before add-ons), confirming the organizational refactor
+did not reprice the company.
+
+### Production live verification
+
+| Check | Result |
+| --- | --- |
+| Cloudflare deployment | `18162d08-3d71-4f0e-874a-06ada6fbd2d7` — successful |
+| Homepage white-tile icons | 6 service, 4 value, 5 community-list, 1 review and 1 community-support icon rendered; retired SVG count 0 |
+| Competitive Pricing | Exact four-dollar-sign tile present in the trust banner |
+| Location helper | No “physically at the property” or facility helper text on any estimator; location button remains |
+| Supportive Home | Five eligibility icons and the “Other eligible community members” card present |
+| Reviews | Authentic review carousel and Read Our Reviews icon present; Google CTA intact |
+| Photo upload | `GET /api/photo-upload` returns 200 with `enabled:true`; R2/Resend path unchanged |
+| Live reachability | `node scripts/live-check.mjs https://sparkling-standard.com` passed with 0 warnings |
+| Console/page errors | None observed on the live homepage and residential/supportive checks |
+
+**Known residuals:** GTM Version 5 church/promotion event receipt still needs DebugView/Realtime
+confirmation; production R2 signed-link retrieval was not independently tested locally. The owner's
+local master directory is outside Git and is intentionally not deployed. Pricing is unchanged.
+
 ## Verified — 2026-10-25 audit-correction production deployment
 
 **Live branch/commit:** `main` at `13fa860` (preceded by `3abf2a9`). **Cloudflare Pages
