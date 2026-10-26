@@ -14,7 +14,7 @@ church calibration 1.00.
   breakroom, then flooring, condition, traffic and first-clean factors.
 - All rows use the **same shared functions** used by the website and
   `facility-verify.ts`; they are not a separate spreadsheet.
-- The church discount is applied after the $125 minimum and the $5 facility
+- The church discount is applied after the $125.00 minimum and the $5 facility
   presentation step, then retained to the cent. The matching engine calibration
   factor applies after the discount and never to travel.
 - Tier A = one preliminary number; Tier B = ±15% range; Tier C = custom review
@@ -101,8 +101,7 @@ offered; their labour estimate remains visible for planning.
    and overhead; Tier B spans roughly 3–8 labour hours.
 2. Higher-restroom, larger or specialty scopes correctly become custom reviews
    rather than misleading numbers.
-3. Ordinary church scenarios use the exact 10% discount. Example:
-   $145.00 − $14.50 = $130.50. No upward re-rounding occurs.
+3. Ordinary church scenarios apply the configured 10% discount exactly; no upward re-rounding occurs.
 4. The matching engine calibration factor scales service revenue without
    changing the church discount or travel charge; the shared tests cover
    0.90/1.00/1.10 for each engine.

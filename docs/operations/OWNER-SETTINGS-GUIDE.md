@@ -63,7 +63,7 @@ Run these on your computer from the project folder (a developer can set this up 
 | `npm test` | Runs the pricing and calculator tests. If a number breaks the model, it fails here. |
 | `npm run check` | Catches typos and invalid values before the site rebuilds. |
 
-Always run `npm run estimate:quotes` **before and after** a change and compare the rows. If a row
+Always run `npm run pricing:impact -- --compare HEAD` before committing and compare the rows. If a row
 moved by more than you intended, adjust the number and run it again.
 
 ---
@@ -141,8 +141,8 @@ writing.** Additional rules:
 - The Founding-10 cap is **owner-tracked**, never counted by the website. Never write a
   customer-facing claim like “3 spots left.”
 - Read `docs/launch/PROMOTION-PROPOSALS.md` before enabling anything; it contains the financial
-  scenarios, safeguards and the activation checklist (including the required `configVersion`
-  bump).
+  scenarios, safeguards and the activation checklist. The automatic effective-pricing
+  fingerprint changes when approved terms change.
 
 ---
 
@@ -194,12 +194,14 @@ The Community Support 10% discount is configured in the same file under
 
 ---
 
-## 6. When the quote version must change
+## 6. How the quote version changes
 
-`pricing.instantQuote.configVersion` is the marker the server uses to prove a quote was built on the
-current rules. **Any change that moves a customer price requires bumping it.** A typo fix, a comment,
-or adding fixed-price support without changing a price does not. When in doubt, ask a developer
-before changing it.
+`pricing.instantQuote.configVersion` is now computed automatically from the effective pricing
+values, shared travel economics and the developer calculation-schema marker. **Do not edit a version
+field for a routine price change.** The suffix changes when a price-affecting owner value changes,
+so old quotes are not silently treated as current. Cosmetic labels and documentation do not change
+it. A developer changing the calculation algorithm must bump the schema marker in
+`src/config/estimators/calculation-schema.ts`.
 
 ---
 

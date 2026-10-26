@@ -6,7 +6,7 @@ import {
   stripFacilityPricingFields,
   verifyFacilityQuote,
 } from '../src/lib/estimate/facility-verify.ts';
-import { pricing } from '../src/config/pricing.ts';
+import { pricing, pricingValue } from '../src/config/pricing.ts';
 
 const baseInput = {
   cleanableSqft: 2000,
@@ -46,7 +46,7 @@ test('server recomputation matches the browser facility price', () => {
   const result = verifyFacilityQuote(fieldsFor());
   assert.notEqual(result.status, 'mismatch');
   assert.equal(result.configMatch, 'match');
-  assert.ok(result.expectedCleaning && result.expectedCleaning >= 125);
+  assert.ok(result.expectedCleaning && result.expectedCleaning >= pricingValue(pricing.minimumJob));
 });
 
 test('a tampered cleaning price is flagged as a mismatch', () => {
@@ -60,7 +60,7 @@ test('a stale configuration version is flagged', () => {
   assert.equal(result.status, 'mismatch');
 });
 
-test('church verification recomputes the 10% discount', () => {
+test('church verification recomputes the configured discount', () => {
   const workload = calculateFacilityWorkload({ ...baseInput, facilityType: 'church' });
   const price = calculateFacilityPrice(workload, 'weekly', { church: true });
   const result = verifyFacilityQuote(
@@ -70,7 +70,7 @@ test('church verification recomputes the 10% discount', () => {
       facility_type: 'church',
       cleaning_subtotal: String(price.cleaningSubtotal),
       quoted_price: String(price.total),
-      church_discount_percent: '10',
+      church_discount_percent: String(pricing.churchDiscount.percent.value),
     }),
   );
   assert.notEqual(result.status, 'mismatch');

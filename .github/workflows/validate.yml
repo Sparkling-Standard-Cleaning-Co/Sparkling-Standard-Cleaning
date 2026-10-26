@@ -1,5 +1,7 @@
-# Validation pipeline — runs on every push and pull request.
-# Deployment is handled by the owner's Cloudflare project, not by this workflow.
+# Validation pipeline - runs on every push and pull request.
+# Cloudflare Pages deploys independently from main, but its `npm run build`
+# executes the same config:validate prebuild gate, so invalid owner pricing
+# cannot be published even if this workflow is still running.
 
 name: validate
 
@@ -13,17 +15,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Validate estimator configuration
+        run: npm run config:validate
       - name: Type check
         run: npm run check
       - name: Estimator unit tests
         run: npm test
       - name: Build
         run: npm run build
+      - name: Pricing impact preview
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: npm run pricing:impact -- --compare HEAD^
       - name: Static site validation (links, SEO, QRs, checklist leaks)
         run: npm run validate
       - name: Smoke test

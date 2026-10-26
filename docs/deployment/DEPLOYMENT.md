@@ -32,8 +32,12 @@ production deployment: treat every commit to `main` as publishing.
 | Functions | `functions/` at the repository root is picked up automatically (`/api/lead`, `/api/travel`, `/api/geocode`) |
 | Build cache | May be enabled; no adverse effect |
 
-`npm run build` runs `astro build` only. It does not run tests or validation — run those locally
-before pushing (section 8).
+`npm run build` runs the `prebuild` hook first: `npm run config:validate`. If
+the owner pricing configuration is invalid, the build stops before Astro
+produces `dist`, so Cloudflare Pages cannot publish that commit. This is the
+deployment gate independent of GitHub Actions. GitHub `validate` runs in
+parallel with Cloudflare's build; do not describe it alone as the gate. The
+full test and browser suites still run locally or in GitHub Actions.
 
 ## 2. Fix "Production branch → No labels found" (owner, ~5 minutes)
 
@@ -251,6 +255,7 @@ npm run verify                 # astro check + build + links/SEO/QR/checklist va
 npm test                       # full unit suite (estimator, API, promotion, address ranking)
 npm run test:browser           # Playwright browser regression suite (builds first)
 npm run address:check          # live address-pipeline check (needs the local .env provider key)
+npm run config:validate        # validates owner pricing before build
 npm run pending                # no PENDING placeholder facts in the built output
 node scripts/validate-production-env.mjs   # production gate — formal owner checklist items
 ```

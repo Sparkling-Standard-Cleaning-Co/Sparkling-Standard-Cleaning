@@ -51,7 +51,10 @@
     "indexnow:dry": "node scripts/indexnow.mjs --dry-run",
     "indexnow:all": "node scripts/indexnow.mjs --all",
     "commercial:calibration": "node scripts/commercial-calibration.ts",
-    "calibration:report": "node scripts/facility-calibration-report.ts"
+    "calibration:report": "node scripts/facility-calibration-report.ts",
+    "config:validate": "node --experimental-strip-types scripts/validate-estimator-config.mjs",
+    "prebuild": "npm run config:validate",
+    "pricing:impact": "node --experimental-strip-types scripts/pricing-impact.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.4.0",

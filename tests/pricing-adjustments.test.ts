@@ -60,15 +60,12 @@ function baseRounded(result: ReturnType<typeof calculateEstimate>): number {
 }
 
 test('four independent owner calibration factors are configured and validated', () => {
-  assert.deepEqual(ownerPricing.estimatorCalibration, {
-    residential: 1,
-    str: 1,
-    commercial: 1,
-    church: 1,
-  });
   for (const engine of ['residential', 'str', 'commercial', 'church'] as const) {
-    assert.equal(pricing.estimatorCalibration[engine].value, ownerPricing.estimatorCalibration[engine]);
-    assert.equal(resolveEstimatorCalibration(engine), 1);
+    const value = ownerPricing.estimatorCalibration[engine];
+    assert.equal(Number.isFinite(value), true, `${engine} must be finite`);
+    assert.ok(value >= 0.5 && value <= 1.5, `${engine} must be within 0.50–1.50`);
+    assert.equal(pricing.estimatorCalibration[engine].value, value);
+    assert.equal(resolveEstimatorCalibration(engine), value);
   }
   assert.equal(resolveEstimatorCalibration('commercial', 1.1), 1.1);
   assert.equal(resolveEstimatorCalibration('church', 0.9), 0.9);
@@ -129,31 +126,61 @@ test('residential totals scale exactly at 0.85, 0.90, 1.00, 1.10 and 1.25', () =
   }
 });
 
-test('Community Support eligibility applies exactly 10% and never requires sensitive details', () => {
+test('STR totals scale exactly at 0.85, 0.90, 1.00, 1.10 and 1.25', () => {
+  const strInput = input({
+    serviceType: 'str_turnover',
+    propertyType: 'condo',
+    squareFeet: 900,
+    bedrooms: 2,
+    fullBaths: 2,
+    beds: 2,
+  });
+  const baseline = calculateEstimate(strInput, context());
+  const base = baseRounded(baseline);
+  const travel = baseline.pricing.travelAdjustment;
+
+  for (const factor of [0.85, 0.9, 1.0, 1.1, 1.25]) {
+    const result = calculateEstimate(strInput, context({ globalFactorOverride: factor }));
+    assert.equal(result.status, 'estimated');
+    assert.equal(result.pricing.globalFactor, factor);
+    assert.equal(result.pricing.subtotal, round2(base * factor + travel));
+    assert.equal(selectInstantAmount(result), result.pricing.subtotal);
+  }
+});
+
+test('Community Support eligibility applies the configured percentage and never requires sensitive details', () => {
   const base = calculateEstimate(input(), context());
   const eligible = calculateEstimate(input({ supportiveEligible: true }), context());
   const ineligible = calculateEstimate(input({ supportiveEligible: false }), context());
   assert.equal(ineligible.pricing.discount, null);
+  if (!pricing.supportiveHomeDiscount.enabled.value) {
+    assert.equal(eligible.pricing.discount, null, 'a disabled program must not discount');
+    return;
+  }
+  const percent = pricing.supportiveHomeDiscount.percent.value / 100;
   assert.equal(eligible.pricing.discount?.id, 'supportive-home');
   assert.equal(eligible.pricing.discount?.source, 'supportive');
-  assert.equal(eligible.pricing.discount?.percent, 0.1);
-  assert.equal(eligible.pricing.discount?.amount, round2(baseRounded(base) * 0.1));
+  assert.equal(eligible.pricing.discount?.percent, percent);
+  assert.equal(eligible.pricing.discount?.amount, round2(baseRounded(base) * percent));
   assert.equal(
     eligible.pricing.subtotal,
-    round2(baseRounded(base) * 0.9 + base.pricing.travelAdjustment),
+    round2(baseRounded(base) * (1 - percent) + base.pricing.travelAdjustment),
   );
 });
 
 test('a Community Support discount is not erased by the minimum job', () => {
+  if (!pricing.supportiveHomeDiscount.enabled.value) return;
   const tiny = calculateEstimate(
     input({ squareFeet: 200, bedrooms: 0, fullBaths: 0, propertyType: 'apartment', supportiveEligible: true }),
     context(),
   );
+  const percent = pricing.supportiveHomeDiscount.percent.value / 100;
+  const base = tiny.pricing.basePrice + tiny.pricing.extrasSubtotal + tiny.pricing.roundingAdjustment;
   assert.equal(tiny.status, 'estimated');
-  assert.equal(tiny.pricing.basePrice + tiny.pricing.extrasSubtotal + tiny.pricing.roundingAdjustment, 125);
-  assert.equal(tiny.pricing.discount?.amount, 12.5);
-  assert.equal(tiny.pricing.subtotal, 112.5);
-  assert.equal(selectInstantAmount(tiny), 112.5, 'the benefit is not re-floored');
+  assert.ok(base >= pricing.minimumJob.value);
+  assert.equal(tiny.pricing.discount?.amount, round2(base * percent));
+  assert.equal(tiny.pricing.subtotal, round2(base * (1 - percent)));
+  assert.equal(selectInstantAmount(tiny), round2(base * (1 - percent)), 'the benefit is not re-floored');
 });
 
 test('Community Support never applies to STR and never stacks with SPARKLE100', () => {
@@ -167,8 +194,10 @@ test('Community Support never applies to STR and never stacks with SPARKLE100', 
     input({ frequency: 'weekly', supportiveEligible: true }),
     context({ promotions: { claimedCampaignCode: 'SPARKLE100' } }),
   );
-  assert.equal(claimed.pricing.discount?.source, 'campaign', 'the larger single discount wins');
-  assert.equal(claimed.pricing.discount?.amount, 100);
+  if (pricing.promotions.campaign.value.enabled) {
+    assert.equal(claimed.pricing.discount?.source, 'campaign', 'the larger single discount wins');
+    assert.equal(claimed.pricing.discount?.amount, pricing.promotions.campaign.value.value);
+  }
 });
 
 test('commercial Tier A/B and church totals apply the engine calibration factor exactly', () => {
@@ -205,8 +234,14 @@ test('commercial Tier A/B and church totals apply the engine calibration factor 
     frequency: 'weekly',
     globalFactorOverride: 0.9,
   });
-  assert.equal(church.price.discount?.amount, round2(church.price.cleaningSubtotal * 0.1));
-  assert.equal(church.price.perVisit, round2(church.price.cleaningSubtotal * 0.9 * 0.9));
+  if (pricing.churchDiscount.enabled.value) {
+    const percent = pricing.churchDiscount.percent.value / 100;
+    assert.equal(church.price.discount?.amount, round2(church.price.cleaningSubtotal * percent));
+    assert.equal(church.price.perVisit, round2(church.price.cleaningSubtotal * (1 - percent) * 0.9));
+  } else {
+    assert.equal(church.price.discount, null);
+    assert.equal(church.price.perVisit, round2(church.price.cleaningSubtotal * 0.9));
+  }
 });
 
 test('Tier C never fabricates a price even with the engine calibration factor', () => {

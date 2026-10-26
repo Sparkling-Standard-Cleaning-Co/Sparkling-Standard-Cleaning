@@ -14,7 +14,11 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
-import { pricing } from '../../src/config/pricing.ts';
+import { pricing, pricingValue } from '../../src/config/pricing.ts';
+import { calculateEstimate } from '../../src/lib/estimate/calculate.ts';
+import { selectInstantAmount } from '../../src/lib/estimate/quote.ts';
+import { resolveAddonCharge } from '../../src/lib/estimate/addons.ts';
+import { formatUsd } from '../../src/lib/format.ts';
 
 const PORT = 4400;
 const BASE = `http://localhost:${PORT}`;
@@ -29,6 +33,59 @@ const ADDRESS = {
   city: 'Pensacola',
   state: 'FL',
 };
+
+const routeContext = {
+  travel: {
+    routed: {
+      oneWayMiles: 15,
+      durationMinutes: 30,
+      gasPrice: 3.1,
+      gasPriceSource: 'configured_reference',
+      provider: 'mapmap',
+      method: 'route',
+      verified: true,
+    },
+    includedOneWayMiles: pricingValue(pricing.travel.includedOneWayMiles),
+    mpg: pricingValue(pricing.travel.clientDefaults.mpg),
+    wearPerMile: pricingValue(pricing.travel.perMileWearCost),
+    referenceGasPrice: pricingValue(pricing.travel.fallbackGasPrice),
+    zoneAdjustments: {
+      core: 0,
+      surrounding: pricingValue(pricing.travel.zoneAdjustments.surrounding),
+    },
+    maxInstantDistanceMiles: pricingValue(pricing.travel.clientDefaults.maxInstantDistanceMiles),
+    maxDrivingMinutes: pricingValue(pricing.drivingPolicy.maxDrivingMinutes),
+    reviewBandMinutes: pricingValue(pricing.drivingPolicy.reviewBandMinutes),
+  },
+};
+
+const residentialInput = (overrides = {}) => ({
+  serviceType: 'standard',
+  propertyType: 'house',
+  squareFeet: 1600,
+  bedrooms: 3,
+  fullBaths: 2,
+  halfBaths: 0,
+  frequency: 'one_time',
+  condition: 'maintained',
+  lastClean: 'within_month',
+  addonIds: [],
+  zip: '32502',
+  pets: 'none',
+  ...overrides,
+});
+
+function expectedResidentialPrice(overrides = {}) {
+  const amount = selectInstantAmount(calculateEstimate(residentialInput(overrides), routeContext));
+  assert.ok(amount !== null);
+  return amount;
+}
+
+function addonCharge(id, rate) {
+  const addon = pricing.addons.items.find((item) => item.id === id);
+  assert.ok(addon, `${id} must exist`);
+  return resolveAddonCharge(addon, rate);
+}
 
 let server;
 let browser;
@@ -184,8 +241,8 @@ async function homeStep(page) {
 }
 
 async function conditionStep(page) {
-  // One-time standard cleans use the $50/labor-hour category, which keeps the
-  // expected test prices explicit; recurring rates are covered by unit tests.
+  // Expected prices are derived from the current pricing configuration in the
+  // price assertions; no owner value is hard-coded here.
   await page.selectOption('#est-frequency', 'one_time');
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
@@ -339,12 +396,11 @@ test('the proposed price calculates correctly and extras change it', async () =>
     await addressStep(page);
     await homeStep(page);
     await conditionStep(page);
-    // Baseline: 4.91 labor-hours × $55 = $270.05 → floored down to $270
-    // (owner-approved $5 round-down, 2026-10-23).
+    const basePrice = expectedResidentialPrice();
     await page.waitForSelector('[data-estimate-price]:not(:empty)');
     await page.waitForFunction(
-      () => document.querySelector('[data-estimate-price]')?.textContent === '$270',
-      undefined,
+      (expected) => document.querySelector('[data-estimate-price]')?.textContent === expected,
+      formatUsd(basePrice),
       { timeout: 10000 },
     );
     assert.match(
@@ -355,11 +411,11 @@ test('the proposed price calculates correctly and extras change it', async () =>
     await page.evaluate(() => window.scrollTo(0, 0));
     await shot(page, '02-price-desktop');
 
-    // Inside oven adds 0.6 labor-hours → $303.05 → floored to $300.
+    const withOven = expectedResidentialPrice({ addonIds: ['inside_oven'] });
     await extrasStep(page, ['inside_oven']);
     await page.waitForFunction(
-      () => document.querySelector('[data-estimate-price]')?.textContent === '$300',
-      undefined,
+      (expected) => document.querySelector('[data-estimate-price]')?.textContent === expected,
+      formatUsd(withOven),
       { timeout: 10000 },
     );
   } finally {
@@ -669,22 +725,37 @@ test('eligible add-ons show their calculated price before selection and update w
     await homeStep(page);
     await conditionStep(page); // one-time standard → $50/labor-hour
     await page.waitForSelector('[data-addon-price="inside_oven"]:not(:empty)');
-    assert.equal(await page.locator('[data-addon-price="inside_oven"]').textContent(), '+$33.00');
-    assert.equal(await page.locator('[data-addon-price="laundry"]').textContent(), '+$38.50');
+    const otherRate = pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour);
+    const ovenCharge = addonCharge('inside_oven', otherRate);
+    const laundryCharge = addonCharge('laundry', otherRate);
+    assert.equal(
+      await page.locator('[data-addon-price="inside_oven"]').textContent(),
+      `+${formatUsd(ovenCharge, { forceCents: true })}`,
+    );
+    assert.equal(
+      await page.locator('[data-addon-price="laundry"]').textContent(),
+      `+${formatUsd(laundryCharge, { forceCents: true })}`,
+    );
     // Specialty work is labelled, never a misleading $0.
     const custom = page.locator('label.option:has(input[value="carpet_cleaning"]) .option__price--custom');
     assert.equal(((await custom.textContent()) ?? '').trim(), 'Custom quote');
     assert.equal(await page.locator('[data-addon-price="carpet_cleaning"]').count(), 0);
-    await page.waitForFunction(() => document.querySelector('[data-estimate-price]')?.textContent === '$270');
+    await page.waitForFunction(
+      (expected) => document.querySelector('[data-estimate-price]')?.textContent === expected,
+      formatUsd(expectedResidentialPrice()),
+    );
 
-    // Revisit the condition step and switch to recurring → $42/labor-hour.
+    // Revisit the condition step and switch to recurring.
     await page.click('[data-step-jump="3"]');
     await page.selectOption('#est-frequency', 'biweekly');
     const deepAck = page.locator('input[name="initialDeepCleanAcknowledged"]');
     if (await deepAck.isVisible()) await deepAck.check();
     await page.click('[data-next]');
     await page.waitForSelector('[data-addon-price="inside_oven"]:not(:empty)');
-    assert.equal(await page.locator('[data-addon-price="inside_oven"]').textContent(), '+$33.00');
+    assert.equal(
+      await page.locator('[data-addon-price="inside_oven"]').textContent(),
+      `+${formatUsd(ovenCharge, { forceCents: true })}`,
+    );
   } finally {
     await context.close();
   }
@@ -703,7 +774,10 @@ test('the Community Support 10% discount and tax disclosure are explicit in the 
     await extrasStep(page);
     await timingStep(page);
     const breakdown = (await page.locator('[data-price-breakdown]').textContent()) ?? '';
-    assert.match(breakdown, /Community Support discount \(10%\)/);
+    if (pricing.supportiveHomeDiscount.enabled.value) {
+      const percent = pricing.supportiveHomeDiscount.percent.value;
+      assert.match(breakdown, new RegExp(`Community Support discount \\(${percent}%\\)`));
+    }
     assert.match(breakdown, /no sales tax applicable/i);
     assert.match(breakdown, /Proposed total/);
   } finally {
@@ -722,17 +796,22 @@ test('the price preview reconciles base, extras, rounding and the proposed total
     await page.click('label.option:has(input[name="addons"][value="laundry"])');
     await page.waitForSelector('[data-price-preview]', { state: 'visible' });
     const preview = (await page.locator('[data-price-preview-lines]').textContent()) ?? '';
-    assert.match(preview, /Base cleaning\$270\.05/);
-    assert.match(preview, /Inside oven\+\$33\.00/);
-    assert.match(preview, /Laundry\+\$38\.50/);
-    assert.match(preview, /Rounded to the nearest \$5\u2212\$1\.55/);
-    assert.match(preview, /Proposed total\$340/);
+    const otherRate = pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour);
+    const ovenCharge = addonCharge('inside_oven', otherRate);
+    const laundryCharge = addonCharge('laundry', otherRate);
+    const expectedTotal = expectedResidentialPrice({ addonIds: ['inside_oven', 'laundry'] });
+    const step = pricingValue(pricing.rounding.toNearest);
+    assert.match(preview, /Base cleaning\$\d/);
+    assert.ok(preview.includes(`Inside oven+${formatUsd(ovenCharge, { forceCents: true })}`));
+    assert.ok(preview.includes(`Laundry+${formatUsd(laundryCharge, { forceCents: true })}`));
+    assert.match(preview, new RegExp(`Rounded to the nearest \\$${step}[−-]\\$`));
+    assert.ok(preview.includes(`Proposed total${formatUsd(expectedTotal)}`));
     // The displayed figures agree with the offered price.
     await page.click('[data-next]');
     await page.fill('#est-date', BOOKING_DATE);
     await page.selectOption('#est-arrival', 'morning');
     await page.click('[data-next]');
-    assert.equal(await page.locator('[data-reservation-price]').textContent(), '$340');
+    assert.equal(await page.locator('[data-reservation-price]').textContent(), formatUsd(expectedTotal));
     // Neither proposed promotion is published while disabled.
     assert.equal(await page.locator('[data-addon-incentive]').count(), 0);
     assert.equal(await page.locator('[data-response-guarantee]').count(), 0);

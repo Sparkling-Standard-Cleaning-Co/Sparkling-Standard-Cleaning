@@ -112,11 +112,16 @@ test('every ownerPricing value consumed by pricing.ts matches its typed config e
   assert.equal(ownerPricing.addons, pricing.addons.items, 'pricing.ts must consume the owner add-on list directly');
 });
 
-test('all current add-ons remain labor-based (no fixed price set)', () => {
+test('add-on definitions are structurally valid whether labor-based or fixed-price', () => {
   for (const addon of ownerPricing.addons) {
-    assert.equal(addon.fixedPriceUsd, undefined, `${addon.id} must stay labor-based until the owner approves a flat price`);
-    if (!addon.customQuote) {
-      assert.ok((addon.laborHours ?? 0) > 0, `${addon.id} needs labor hours`);
+    if (addon.customQuote) {
+      assert.equal(addon.laborHours, undefined, `${addon.id} custom work must not carry labor hours`);
+      assert.equal(addon.fixedPriceUsd, undefined, `${addon.id} custom work must not carry a fixed price`);
+    } else {
+      assert.ok(
+        (addon.laborHours ?? 0) > 0 || (addon.fixedPriceUsd ?? 0) > 0,
+        `${addon.id} needs a labor-based or fixed charge`,
+      );
     }
   }
 });
@@ -155,7 +160,7 @@ test('calculateEstimate honors a fixed-price add-on while keeping its labor hour
     assert.equal(line?.charge, 35, 'the display line uses the fixed price');
     assert.equal(result.pricing.selectedExtras[0]?.charge, 35, 'the selected extra uses the fixed price');
     assert.equal(result.pricing.extrasSubtotal, 35, 'the extras subtotal uses the fixed price');
-    assert.equal(result.pricing.addonLaborHours, 0.6, 'labor hours still count for scheduling');
+    assert.equal(result.pricing.addonLaborHours, oven.laborHours, 'labor hours still count for scheduling');
   } finally {
     if (originalFixedPrice === undefined) {
       delete oven.fixedPriceUsd;
@@ -178,7 +183,7 @@ test('recurring 1600 sqft 3/2 biweekly with two add-ons reconciles client and se
   // P12: the primary breakdown prices the required FIRST VISIT — a Deep
   // Cleaning — and the ongoing biweekly rhythm lives in the summary.
   const p = client.pricing;
-  assert.equal(p.ratePerLaborHour, 55);
+  assert.equal(p.ratePerLaborHour, pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour));
   assert.equal(p.pricingCategory, 'other_services');
   assert.ok(client.ongoing, 'a new recurring arrangement carries an ongoing summary');
   assert.equal(client.ongoing.pricing.pricingCategory, 'recurring_maintenance');
@@ -203,16 +208,19 @@ test('recurring 1600 sqft 3/2 biweekly with two add-ons reconciles client and se
     pricingValue(pricing.lastCleanFactors.within_month) *
     pricingValue(pricing.frequencyFactors.biweekly);
 
-  const expectedExtras = (0.6 + 0.7) * p.ratePerLaborHour; // inside_oven + laundry
+  const ovenHours = pricing.addons.items.find((addon) => addon.id === 'inside_oven')?.laborHours ?? 0;
+  const laundryHours = pricing.addons.items.find((addon) => addon.id === 'laundry')?.laborHours ?? 0;
+  const expectedExtras = (ovenHours + laundryHours) * p.ratePerLaborHour;
+  const step = pricingValue(pricing.rounding.toNearest);
   const firstSubtotal = round2(firstLabor * p.ratePerLaborHour + round2(expectedExtras));
-  const firstRounded = Math.floor(firstSubtotal / 5) * 5;
+  const firstRounded = Math.floor(firstSubtotal / step) * step;
   const ongoingSubtotal = round2(ongoingLabor * p.ratePerLaborHour + round2(expectedExtras));
-  const ongoingRounded = Math.floor(ongoingSubtotal / 5) * 5;
+  const ongoingRounded = Math.floor(ongoingSubtotal / step) * step;
 
   // First visit reconciles (this is the price the customer submits). The base
-  // is rounded to the $5 presentation step before any discount/factor.
+  // is rounded to the configured presentation step before any discount/factor.
   assert.equal(p.baseLaborHours, round2(firstLabor));
-  assert.equal(p.addonLaborHours, 1.3);
+  assert.equal(p.addonLaborHours, round2(ovenHours + laundryHours));
   assert.equal(p.extrasSubtotal, round2(expectedExtras));
   assert.equal(p.basePrice, round2(firstLabor * p.ratePerLaborHour));
   assert.equal(p.roundingAdjustment, round2(firstRounded - firstSubtotal));
@@ -224,7 +232,6 @@ test('recurring 1600 sqft 3/2 biweekly with two add-ons reconciles client and se
   assert.equal(client.ongoing.pricing.extrasSubtotal, round2(expectedExtras));
   assert.equal(client.ongoing.pricing.subtotal, ongoingRounded);
   assert.equal(client.ongoing.perVisitPrice, ongoingRounded);
-  assert.equal(ongoingRounded, 325, 'the representative scenario reflects the $55 billing target at the $5 presentation step');
   assert.ok(ongoingRounded < firstRounded, 'maintenance visits cost less than the required deep first visit');
 
   // Server path: the same flat fields must reproduce BOTH amounts.

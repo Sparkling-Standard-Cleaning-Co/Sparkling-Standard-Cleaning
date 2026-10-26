@@ -18,7 +18,12 @@
 // WORKFLOW: edit a value → save → run `npm test` and `npm run check` (they
 // catch typos and invalid structures) → commit → rebuild/deploy. Run
 // `npm run estimate:quotes` first to see the economic impact on representative
-// homes. Config changes take effect only after a new build.
+// homes. Config changes take effect only after a new validated build.
+//
+// OWNER-EDIT CONTRACT (Initiative 6.5): a legitimate numeric change here does
+// not require editing tests, calculation code or a quote-version field. The
+// build gate validates this file, tests derive expectations from the current
+// values, and the effective pricing fingerprint changes automatically.
 //
 // APPROVAL DISCIPLINE: every value below is either PROVISIONAL (a starting
 // point that may change) or APPROVED (owner-approved; do not change without a
@@ -26,9 +31,9 @@
 // Promotion and publication flags MUST stay off until the owner approves the
 // exact terms in writing — never publish a promise the business has not made.
 //
-// QUOTE CONFIG VERSION: `pricing.instantQuote.configVersion` must be bumped
-// whenever an EFFECTIVE pricing rule below changes a price; the fixed-price
-// add-on support added here changes no effective rule, so it is NOT bumped.
+// QUOTE CONFIG VERSION: computed automatically from the effective pricing
+// values + travel economics + the calculation-schema marker. Never edit a
+// version field for an ordinary owner price change.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type {

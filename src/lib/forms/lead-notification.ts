@@ -547,10 +547,10 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   }
   if (text(fields, 'turnover_frequency')) actions.push('Confirm turnover details and the first date');
   if (text(fields, 'service_type') === 'church_cleaning') {
-    actions.push('Church request — 10% discount applied after the minimum; confirm scope and any tax exemption');
+    actions.push('Church request — configured church discount applied after the minimum; confirm scope and any tax exemption');
   }
   if (text(fields, 'supportive_eligible') === 'yes') {
-    actions.push('Community Support eligibility discount claimed — confirm eligibility before booking; 10% applies to eligible cleaning');
+    actions.push('Community Support eligibility discount claimed — confirm eligibility before booking');
   } else if (text(fields, 'supportive_home')) {
     actions.push('Community Support Cleaning requested — review practical accommodations');
   }
@@ -674,7 +674,7 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Church partnership — Contact requested', YES_NO_LABELS[text(fields, 'partnership_contact')] ?? text(fields, 'partnership_contact'), 'partnership_contact');
   add('Church partnership — Not now', YES_NO_LABELS[text(fields, 'partnership_none')] ?? text(fields, 'partnership_none'), 'partnership_none');
   add('Supportive home — Requested', text(fields, 'supportive_home'), 'supportive_home');
-  add('Supportive home — 10% eligibility claimed', YES_NO_LABELS[text(fields, 'supportive_eligible')] ?? text(fields, 'supportive_eligible'), 'supportive_eligible');
+  add('Supportive home — eligibility claimed', YES_NO_LABELS[text(fields, 'supportive_eligible')] ?? text(fields, 'supportive_eligible'), 'supportive_eligible');
   add('Supportive home — What would help', text(fields, 'supportive_support'), 'supportive_support');
   add('Supportive home — Practical notes', text(fields, 'supportive_notes'), 'supportive_notes');
   add('Turnover — Rental properties', text(fields, 'rental_properties'), 'rental_properties');

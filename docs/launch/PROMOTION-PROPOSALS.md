@@ -3,7 +3,7 @@
 **Status: ALL PROGRAMS DISABLED.** Nothing in this document is published or active. The
 promotion engine (`src/lib/estimate/promotions.ts`) ships with every program `enabled: false`
 and `value: null`; a program with no approved value can never apply. Enabling any program
-requires explicit written owner approval of exact terms **and** a `pricing.instantQuote.configVersion`
+requires explicit written owner approval of exact terms **and** the automatic effective-pricing version
 bump so old quotes cannot be silently reused under new rules.
 
 Regenerate the numbers any time with:
@@ -124,13 +124,13 @@ the customer the larger effective reduction.
 5. How the owner will track Founding enrollments (owner-manual list) and what the customer-facing
    wording should say; **never** a live slot count until real tracking exists.
 6. Supplies/overhead per-job figures if margin is to be modeled beyond the owner labor floor.
-7. Approval of the required `configVersion` bump at activation time.
+7. Approval of the exact terms; the configuration fingerprint updates automatically at activation.
 
 ## Activation checklist (per program)
 
 - [ ] Owner approves exact written terms (value, cap, eligibility, expiry).
 - [ ] Terms recorded in `src/config/estimators/pricing-values.ts`; `enabled: true` set in the same change.
-- [ ] `pricing.instantQuote.configVersion` bumped.
+- [ ] Exact terms recorded; automatic effective-pricing version confirms the change.
 - [ ] `npm run promotions:impact` reviewed; floors verified for representative homes.
 - [ ] Customer-facing copy reviewed (no guarantees, no “limited slots” claims).
 - [ ] `npm test`, `npm run verify` and the browser suite green before publication.

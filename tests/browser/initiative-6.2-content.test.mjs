@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { pricing } from '../../src/config/pricing.ts';
 
 const PORT = 4418;
 const BASE = `http://localhost:${PORT}`;
@@ -151,7 +152,7 @@ test('supportive home page explains eligibility and never selects the discount a
   const { context, page } = await open('/supportive-home-cleaning/');
   try {
     const text = await page.locator('main').innerText();
-    assert.match(text, /10%/);
+    assert.match(text, new RegExp(`${pricing.supportiveHomeDiscount.percent.value}%`));
     assert.match(text, /65 or older|65\b/i);
     assert.match(text, /first responder/i);
     assert.match(text, /veteran/i);

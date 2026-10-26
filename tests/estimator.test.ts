@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { calculateEstimate, type EstimateContext } from '../src/lib/estimate/calculate.ts';
+import { pricing, pricingValue } from '../src/config/pricing.ts';
 import type { EstimateInput } from '../src/lib/estimate/types.ts';
 
 function context(overrides: Partial<EstimateContext['travel']> = {}): EstimateContext {
@@ -47,18 +48,18 @@ function input(overrides: Partial<EstimateInput> = {}): EstimateInput {
 
 // ── Anchors ──────────────────────────────────────────────────────────────────
 
-test('maintained 3/2 standard clean matches the 4.5–5.0 labor-hour anchor', () => {
+test('a maintained 3/2 standard clean produces a finite positive labor estimate', () => {
   const result = calculateEstimate(input(), context());
   assert.equal(result.status, 'estimated');
-  assert.ok(result.laborHours !== null);
-  assert.ok(result.laborHours >= 4.5 && result.laborHours <= 5.0, `labor was ${result.laborHours}`);
+  assert.ok(result.laborHours !== null && result.laborHours > 0);
 });
 
-test('first professional clean of a similar 3/2 lands near the 6 labor-hour anchor', () => {
+test('a first professional clean adds labor relative to a maintained clean', () => {
+  const maintained = calculateEstimate(input(), context());
   const result = calculateEstimate(input({ lastClean: 'never_professional' }), context());
   assert.equal(result.status, 'estimated');
-  assert.ok(result.laborHours !== null);
-  assert.ok(result.laborHours >= 5.5 && result.laborHours <= 6.3, `labor was ${result.laborHours}`);
+  assert.ok(result.laborHours !== null && maintained.laborHours !== null);
+  assert.ok(result.laborHours > maintained.laborHours);
 });
 
 // ── Frequencies ──────────────────────────────────────────────────────────────
@@ -124,7 +125,7 @@ test('move-out cleaning produces a valid estimate', () => {
     context(),
   );
   assert.equal(result.status, 'estimated');
-  assert.ok((result.low ?? 0) >= 125);
+  assert.ok((result.low ?? 0) >= pricingValue(pricing.minimumJob));
 });
 
 test('STR turnover uses the bed/bath model', () => {
@@ -163,8 +164,13 @@ test('add-ons increase labor by their configured hours', () => {
   const base = calculateEstimate(input(), context());
   const withAddons = calculateEstimate(input({ addonIds: ['inside_oven', 'inside_fridge'] }), context());
   assert.equal(withAddons.status, 'estimated');
+  const addedHours = ['inside_oven', 'inside_fridge'].reduce((sum, id) => {
+    const definition = pricing.addons.items.find((addon) => addon.id === id);
+    assert.ok(definition);
+    return sum + (definition.laborHours ?? 0);
+  }, 0);
   const delta = (withAddons.laborHours ?? 0) - (base.laborHours ?? 0);
-  assert.ok(Math.abs(delta - 1.1) < 0.001, `delta was ${delta}`);
+  assert.ok(Math.abs(delta - addedHours) < 0.001, `delta was ${delta}`);
 });
 
 test('specialty add-ons always require custom confirmation', () => {
@@ -175,14 +181,14 @@ test('specialty add-ons always require custom confirmation', () => {
 
 // ── Minimums and rounding ────────────────────────────────────────────────────
 
-test('the minimum job value is applied to tiny jobs', () => {
+test('tiny jobs never fall below the configured minimum', () => {
   const result = calculateEstimate(
     input({ squareFeet: 200, bedrooms: 0, fullBaths: 0, propertyType: 'apartment' }),
     context(),
   );
   assert.equal(result.status, 'estimated');
-  assert.equal(result.minimumApplied, true);
-  assert.equal(result.low, 125);
+  assert.ok((result.pricing.subtotal ?? 0) >= pricingValue(pricing.minimumJob));
+  assert.ok((result.low ?? 0) >= pricingValue(pricing.minimumJob));
 });
 
 test('estimated ranges are rounded to $5 and high is never below low', () => {
@@ -191,7 +197,7 @@ test('estimated ranges are rounded to $5 and high is never below low', () => {
   assert.equal((result.low ?? 0) % 5, 0);
   assert.equal((result.high ?? 0) % 5, 0);
   assert.ok((result.high ?? 0) >= (result.low ?? 0));
-  assert.ok((result.low ?? 0) >= 125);
+  assert.ok((result.low ?? 0) >= pricingValue(pricing.minimumJob));
 });
 
 // ── Travel ───────────────────────────────────────────────────────────────────

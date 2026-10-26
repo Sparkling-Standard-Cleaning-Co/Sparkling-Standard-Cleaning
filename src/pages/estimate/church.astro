@@ -4,10 +4,11 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import FacilityEstimateForm from '../../components/FacilityEstimateForm.astro';
 import { breadcrumbNode } from '../../lib/schema';
+import { replacePricingTokens } from '../../lib/content/pricing-text';
 
 const entry = await getEntry('site', 'estimate-church');
 if (!entry) throw new Error('Missing content entry: src/content/site/estimate-church.md');
-const { data } = entry;
+const data = replacePricingTokens(entry.data);
 
 const site = Astro.site ?? new URL('https://pending-website-url.invalid');
 const schema = [

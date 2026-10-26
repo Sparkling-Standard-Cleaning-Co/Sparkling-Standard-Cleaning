@@ -53,6 +53,10 @@ function table(rows: FacilityCalibrationRow[]): string {
   return lines.join('\n');
 }
 
+const churchPercent = pricing.churchDiscount.percent.value;
+const minimum = money(pricing.minimumJob.value);
+const roundingStep = pricing.rounding.toNearest.value;
+
 const markdown = `# Facility pricing calibration (Initiative 6.4 completion)
 
 **Date:** 2026-10-25
@@ -69,7 +73,7 @@ church calibration ${pricing.estimatorCalibration.church.value.toFixed(2)}.
   breakroom, then flooring, condition, traffic and first-clean factors.
 - All rows use the **same shared functions** used by the website and
   \`facility-verify.ts\`; they are not a separate spreadsheet.
-- The church discount is applied after the $125 minimum and the $5 facility
+- The church discount is applied after the ${minimum} minimum and the $${roundingStep} facility
   presentation step, then retained to the cent. The matching engine calibration
   factor applies after the discount and never to travel.
 - Tier A = one preliminary number; Tier B = ±15% range; Tier C = custom review
@@ -86,7 +90,7 @@ church calibration ${pricing.estimatorCalibration.church.value.toFixed(2)}.
 | Engine | Scenarios | Tiers | Numeric | Minimum-floor | Aggregate operating margin | Average per-visit $/sqft |
 | --- | ---: | --- | ---: | ---: | ---: | ---: |
 ${summary('Commercial', commercial)}
-${summary('Church (10% discount)', church)}
+${summary('Church (' + churchPercent + '% discount)', church)}
 
 The modelled margin is operating profit after owner-labour cost and the 22%
 overhead allowance; it is not a promise of net profit. Minimum-floor rows are
@@ -98,18 +102,17 @@ offered; their labour estimate remains visible for planning.
 
 ${table(commercial)}
 
-## Church scenario matrix (10% discount applied)
+## Church scenario matrix (${churchPercent}% discount applied)
 
 ${table(church)}
 
 ## Findings
 
 1. Ordinary Tier A/B commercial scenarios are numeric and positive after labour
-   and overhead; Tier B spans roughly 3–8 labour hours.
+   and overhead; Tier B spans roughly ${pricing.commercialPricing.tierAHours.value}–${pricing.commercialPricing.tierBHours.value} labour hours.
 2. Higher-restroom, larger or specialty scopes correctly become custom reviews
    rather than misleading numbers.
-3. Ordinary church scenarios use the exact 10% discount. Example:
-   $145.00 − $14.50 = $130.50. No upward re-rounding occurs.
+3. Ordinary church scenarios apply the configured ${churchPercent}% discount exactly; no upward re-rounding occurs.
 4. The matching engine calibration factor scales service revenue without
    changing the church discount or travel charge; the shared tests cover
    0.90/1.00/1.10 for each engine.

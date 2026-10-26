@@ -49,6 +49,6 @@ compatibility). The factor is never silently changed.
 
 - `src/config/estimators/pricing-values.ts` — engine calibration factors, discount percentages, rates and minimums.
 - `src/config/pricing.ts` — typed config and approval notes.
-- Bump the relevant `configVersion` when a price-affecting value changes.
+- Do not edit a version field; the effective pricing fingerprint changes automatically. Only a developer calculation-schema change updates the schema marker.
 - Rebuild/deploy for the change to take effect. The server uses the same configuration, so a
   deployed build and its function endpoints stay aligned.

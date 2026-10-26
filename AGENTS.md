@@ -173,7 +173,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
   estimator and server verification: at most ONE promotion per quote, owner-gated, term-gated,
   minimum-job floor enforced, specialty work excluded, customer-kind programs fail closed. All
   shipped programs are disabled — never enable or publish one without the owner's written terms, the
-  `docs/launch/PROMOTION-PROPOSALS.md` review and a `configVersion` bump.
+  `docs/launch/PROMOTION-PROPOSALS.md` review; the automatic effective-pricing version changes when the approved terms change.
 - Client-side JS is minimal, bundled by Astro from `src/scripts/` (no framework). The estimator
   computes in the browser so the instant estimate works on a fully static page. A browser price is
   a PROPOSAL: every priced reservation request is recalculated server-side
@@ -367,7 +367,7 @@ collections are intentionally empty — not errors.
   captions were removed by owner direction in 6.2; image licensing records remain in
   `docs/design/IMAGE-SOURCE-REGISTER.md`. Proposed prices round
   **DOWN** to the nearest $5 (owner-approved), and travel assumes a 35-mile round trip
-  (17.5 one-way included). Quote `configVersion` is `2026-10-25.engine-calibration-supportive-tax.v1`.
+  (17.5 one-way included). Quote `configVersion` is an automatic deterministic fingerprint of the effective pricing values + calculation-schema marker; it is never manually bumped for an owner price edit.
 - **Four estimate engines (Initiative 6.0; dedicated routes 6.2):** `/estimate/` is a clean selection hub with four cards. The **residential estimator lives at `/estimate/residential/`**; STR at `/estimate/str/`; Commercial at `/estimate/commercial/`; Church at `/estimate/church/`.
   Residential keeps the live instant estimate (including the optional Community Support pathway
   and presets `?service=recurring|deep|move-out|supportive`); legacy `/estimate/?service=` and
@@ -422,6 +422,16 @@ collections are intentionally empty — not errors.
   `docs/verification/6.4/`. The 6.3 white-tile icon system, estimator control center, pricing
   mathematics and repository organization remain intact; the single global factor described in the
   6.2 paragraph above was superseded by the four factors.
+- **Initiative 6.5 (owner-editable estimator configuration, 2026-10-26):** added
+  `src/config/estimators/validation.ts` with hard errors and business warnings,
+  a `config:validate` pre-build gate that blocks Cloudflare on invalid values,
+  and `src/config/estimators/pricing-version.ts` with a deterministic
+  effective-pricing fingerprint replacing manual quote-version bumps. Tests now
+  validate structure, ranges, dependencies, identity, client/server agreement
+  and metamorphic behavior without freezing current owner numbers; fixed-reference
+  arithmetic tests use controlled values. `npm run pricing:impact` reports all
+  four engines and supports `--compare <ref>`. Owner workflow is documented in
+  `START-HERE-OWNER-CONTROL-CENTER.md`.
 - **Smart Estimate System 2.0 (2026-10-24, owner directive):**
   - **Address reliability:** an exact-address resolve that no provider could pinpoint no longer
     dead-ends — when the typed query carries a KNOWN 5-digit ZIP, the resolve action returns the
@@ -502,7 +512,7 @@ collections are intentionally empty — not errors.
   the instant estimator. The quote display presents **Estimated Price** (one-time) or
   **First Visit — Deep Cleaning** + **Ongoing Visits** (recurring) with a grouped request
   summary (Cleaning details / Schedule / Location, full-width address rows). Quote
-  `configVersion` is `2026-10-25.engine-calibration-supportive-tax.v1`. The service-area map uses
+  `configVersion` is the automatic effective-pricing fingerprint. The service-area map uses
   real Census county geometry across 18 counties (two core Florida, two by-arrangement Alabama
   and neutral context), collision-aware desktop labels, a water-positioned Gulf Of America label,
   and a phone layout that suppresses county labels rather than letting them overlap; the About page carries no hero CTA, no detail-first slogan

@@ -9,7 +9,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { onRequestPost as leadPost } from '../functions/api/lead.ts';
-import { pricing } from '../src/config/pricing.ts';
+import { pricing, pricingValue } from '../src/config/pricing.ts';
+import { resolveAddonCharge } from '../src/lib/estimate/addons.ts';
+import { formatUsd } from '../src/lib/format.ts';
 
 const jsonRequest = (body: unknown) =>
   new Request('https://example.test/api', {
@@ -184,11 +186,22 @@ test('lead: selected extras are itemized with their actual server-calculated cha
     } as never),
   );
   const sent = forwarded[0] as Record<string, string>;
-  assert.equal(sent['Pricing — Extras subtotal'], '$33', 'the oven charge comes from labor × rate');
-  assert.match(sent['Extras — Priced detail'] ?? '', /Inside oven \$33\.00/);
+  const oven = pricing.addons.items.find((addon) => addon.id === 'inside_oven');
+  assert.ok(oven);
+  const rate = pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour);
+  const ovenCharge = resolveAddonCharge(oven, rate);
+  assert.ok(ovenCharge !== null);
+  assert.equal(sent['Pricing — Extras subtotal'], formatUsd(ovenCharge), 'the oven charge comes from labor × rate');
+  assert.match(
+    sent['Extras — Priced detail'] ?? '',
+    new RegExp(`Inside oven ${formatUsd(ovenCharge, { forceCents: true }).replace('$', '\\$')}`),
+  );
   assert.equal(sent['Extras — Selected'], 'Inside oven');
   assert.equal(sent['Internal — Pricing category'], 'other_services');
-  assert.equal(sent['Internal — Rate per labor hour'], '$55');
+  assert.equal(
+    sent['Internal — Rate per labor hour'],
+    `$${pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour)}`,
+  );
 });
 
 test('lead: a Community Support attestation is recomputed and disclosed without sensitive detail', async () => {
@@ -205,11 +218,16 @@ test('lead: a Community Support attestation is recomputed and disclosed without 
   const sent = forwarded[0] as Record<string, string>;
   const entries = Object.entries(sent);
   const discount = entries.find(([label]) => label.includes('Discount applied'))?.[1] ?? '';
-  assert.match(discount, /Community Support discount/i);
-  assert.match(discount, /10%/);
+  if (pricing.supportiveHomeDiscount.enabled.value) {
+    assert.match(discount, /Community Support discount/i);
+    assert.match(discount, new RegExp(`${pricing.supportiveHomeDiscount.percent.value}%`));
+  } else {
+    assert.equal(discount, '', 'a disabled program contributes no discount line');
+  }
   const tax = entries.find(([label]) => label.includes('Sales tax'))?.[1] ?? '';
   assert.match(tax, /residential/i);
-  assert.equal(sent['Supportive home — 10% eligibility claimed'], 'Yes');
+  const eligibility = entries.find(([label]) => /eligibility claimed/i.test(label))?.[1];
+  assert.equal(eligibility, 'Yes');
   assert.doesNotMatch(JSON.stringify(sent), /diagnosis|medical record|disability certification/i);
 });
 

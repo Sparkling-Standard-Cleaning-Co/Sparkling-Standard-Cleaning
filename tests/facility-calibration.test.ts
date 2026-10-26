@@ -45,10 +45,11 @@ test('church coverage includes sanctuaries, classrooms, nurseries, kitchens, off
   assert.ok(CHURCH_SCENARIOS.some((scenario) => scenario.oneWayMiles));
 });
 
-test('every church row reconciles the exact 10% discount and cents', () => {
+test('every church row reconciles the configured discount and cents', () => {
+  const percent = pricing.churchDiscount.percent.value / 100;
   for (const row of church) {
     if (row.discount > 0) {
-      assert.equal(row.discount, Math.round((row.cleaningSubtotal * 0.1 + Number.EPSILON) * 100) / 100, row.id);
+      assert.equal(row.discount, Math.round((row.cleaningSubtotal * percent + Number.EPSILON) * 100) / 100, row.id);
     }
     assert.doesNotMatch(row.reconciliation, /ERROR/, row.id);
     if (row.serviceRevenue !== null) {

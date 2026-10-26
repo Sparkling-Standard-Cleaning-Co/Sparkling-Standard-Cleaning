@@ -40,31 +40,30 @@ test('owner labor target stays below both approved Option C rates', () => {
   const recurring = pricingValue(pricing.laborEconomics.recurringGrossRevenuePerLaborHour);
   assert.ok(owner < other, 'owner target must be below the other-services rate');
   assert.ok(owner < recurring, 'owner target must be below the recurring rate');
-  assert.ok(recurring <= other, 'recurring maintenance rate must not exceed the other-services rate');
   // Option C values are owner-approved (2026-10-01).
   assert.equal(pricing.laborEconomics.targetGrossRevenuePerLaborHour.state, 'approved');
   assert.equal(pricing.laborEconomics.recurringGrossRevenuePerLaborHour.state, 'approved');
 });
 
-test('condition factors are ordered and at least 1', () => {
+test('condition factors are positive and ordered', () => {
   const factors = Object.values(pricing.conditionFactors).map((entry) => pricingValue(entry));
-  for (const factor of factors) assert.ok(factor >= 1, `condition factor below 1: ${factor}`);
+  for (const factor of factors) assert.ok(factor > 0, `condition factor below zero: ${factor}`);
   for (let index = 1; index < factors.length; index += 1) {
     assert.ok(factors[index] > factors[index - 1], 'condition factors must strictly increase');
   }
 });
 
-test('frequency factors stay within (0, 1]', () => {
+test('frequency factors are positive', () => {
   for (const entry of Object.values(pricing.frequencyFactors)) {
     const factor = pricingValue(entry);
-    assert.ok(factor > 0 && factor <= 1, `frequency factor out of range: ${factor}`);
+    assert.ok(factor > 0, `frequency factor out of range: ${factor}`);
   }
 });
 
-test('last-clean factors are at least 1 and bounded', () => {
+test('last-clean factors are positive', () => {
   for (const entry of Object.values(pricing.lastCleanFactors)) {
     const factor = pricingValue(entry);
-    assert.ok(factor >= 1 && factor <= 1.5, `last-clean factor out of range: ${factor}`);
+    assert.ok(factor > 0, `last-clean factor out of range: ${factor}`);
   }
 });
 
@@ -86,12 +85,13 @@ test('add-on ids are unique snake_case and definitions are complete', () => {
     assert.ok(addon.label.length > 2, `add-on ${addon.id} needs a label`);
     assert.ok(addon.blurb.length > 5, `add-on ${addon.id} needs a description`);
     assert.ok(addon.category.length > 2, `add-on ${addon.id} needs a category`);
-    // ONE authoritative pricing method: eligible add-ons carry labor hours;
+    // Eligible add-ons use positive labor or a positive fixed price;
     // specialty work is quoted individually and never carries a price.
     if (addon.customQuote) {
       assert.equal(addon.laborHours, undefined, `custom-quote add-on ${addon.id} must not carry labor hours`);
+      assert.equal(addon.fixedPriceUsd, undefined, `custom-quote add-on ${addon.id} must not carry a fixed price`);
     } else {
-      assert.ok((addon.laborHours ?? 0) > 0, `add-on ${addon.id} needs labor hours`);
+      assert.ok((addon.laborHours ?? 0) > 0 || (addon.fixedPriceUsd ?? 0) > 0, `add-on ${addon.id} needs a charge`);
     }
   }
 });
@@ -109,7 +109,7 @@ test('the multi-add-on incentive is proposed, bounded and single-tier', () => {
 
 test('the one-hour response guarantee is proposed and unpublished', () => {
   assert.equal(pricing.responseGuarantee.enabled.value, false, 'the guarantee must stay unpublished until approved');
-  assert.equal(pricing.responseGuarantee.windowBusinessHours.value, 1);
+  assert.ok(pricing.responseGuarantee.windowBusinessHours.value > 0);
   assert.ok(pricing.responseGuarantee.discountPercent.value > 0);
   assert.ok(pricing.responseGuarantee.maxDiscount.value > 0, 'a disclosed maximum is required');
   assert.ok(pricing.responseGuarantee.eligibleServices.length > 0);

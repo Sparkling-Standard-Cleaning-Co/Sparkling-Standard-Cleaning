@@ -12,6 +12,7 @@
 
 import { travelConfig } from './estimators/travel.ts';
 import { ownerPricing } from './estimators/pricing-values.ts';
+import { PRICING_CONFIG_VERSION } from './estimators/pricing-version.ts';
 
 // ── WHAT IS PUBLIC vs INTERNAL ───────────────────────────────────────────────
 // PUBLIC (may be shown to customers):
@@ -197,7 +198,7 @@ export const pricing = {
   // scope-review experience with no numeric prices.
   commercialPricing: {
     state: 'approved' as ApprovalState,
-    configVersion: approved('2026-10-25.facility-workload.v3', 'Facility estimate provenance marker (Initiative 6.4: independent commercial/church calibration factors).'),
+    configVersion: approved(PRICING_CONFIG_VERSION, 'Automatic deterministic fingerprint of the effective facility pricing configuration.'),
     grossRatePerHour: approved(ownerPricing.commercialPricing.grossRatePerHour, 'Middle of the published Pensacola market range (-75/hr); sustains owner labour, overhead and a modest margin.'),
     productionSqftPerHour: {
       office: approved(ownerPricing.commercialPricing.productionSqftPerHour.office, 'Conservative effective rate for a DETAILED office standard (ISSA routine benchmark is ~4,200 sqft/hr; lowered for quality, obstacle density and nonproductive time).'),
@@ -331,8 +332,8 @@ export const pricing = {
   // The promotion engine applies at most ONE program per quote. Every program
   // here ships disabled with no terms (`value: null`). Enabling any program
   // requires: explicit owner approval of exact terms, the financial review in
-  // docs/launch/PROMOTION-PROPOSALS.md, and a quote configVersion bump so old
-  // quotes cannot be silently reused under new promotion rules.
+  // docs/launch/PROMOTION-PROPOSALS.md. The effective configuration fingerprint
+  // changes automatically so old quotes cannot be silently reused.
   promotions: {
     appreciationDiscounts: ownerPricing.promotions.appreciationDiscounts,
     addonBundles: ownerPricing.promotions.addonBundles,
@@ -448,11 +449,12 @@ export const pricing = {
      */
     binding: approved(false, 'Binding offers stay off: every reservation is server-verified and owner-confirmed, never auto-charged.'),
     /**
-     * Configuration version recorded with every quote and verified against
-     * the server before a reservation is accepted. Bump when pricing logic,
-     * rates or policy values change so old quotes cannot be silently reused.
+     * Automatic effective-pricing fingerprint recorded with every quote and
+     * verified against the server before a reservation is accepted. It changes
+     * for owner pricing edits and manual calculation-schema changes; never edit
+     * this field for a routine price change.
      */
-    configVersion: approved('2026-10-25.engine-calibration-supportive-tax.v1', 'Quote provenance marker. Incremented for the Initiative 6.4 independent residential/STR calibration factors, Community Support eligibility discount, exact discount reconciliation and tax presentation.'),
+    configVersion: approved(PRICING_CONFIG_VERSION, 'Automatic deterministic fingerprint of the effective pricing configuration plus calculation-schema marker. Never edit manually.'),
     /**
      * Which value from the calculation becomes the offered price. 'expected' is
      * the model price and never the lowest range value; 'midpoint' and 'high'

@@ -31,6 +31,29 @@ truth.
 
 ---
 
+## Automatic pricing versioning
+
+Every quote and facility verification carries an automatic version produced by
+`src/config/estimators/pricing-version.ts`. It combines:
+
+1. A deterministic 64-bit fingerprint of the effective pricing values
+   (rates, labor, minimum, discounts, add-ons, commercial/church workload,
+   promotions eligibility and range/rounding).
+2. The shared travel economics.
+3. The developer-controlled calculation-schema marker in
+   `src/config/estimators/calculation-schema.ts`.
+
+The version is stable across identical builds, computed synchronously by both
+the browser bundle and the Cloudflare function, and contains no timestamp,
+random value or secret. Presentation copy, labels, terms-version labels and
+approval notes are excluded, so a wording-only change does not invalidate
+quotes. Any effective owner price change changes the suffix automatically.
+
+The browser quote and server verification therefore agree without a manual
+bump. A quote sent with an older fingerprint is flagged as a configuration
+mismatch/preliminary rather than silently accepted as current. A developer
+changing the calculation algorithm or pricing order must bump the schema
+marker; ordinary owner edits must never edit it.
 ## A. Master variable directory
 
 ### A1. Global residential pricing
@@ -90,7 +113,7 @@ The public name is **Community Support Cleaning**. Internal keys such as support
 | --- | --- | --- | --- |
 | Proposed-price experience | `enabled: true` | `src/config/pricing.ts` | A request, never a booking |
 | Binding offers | `false` | `src/config/pricing.ts` | Do not enable without verification + owner approval |
-| Quote configuration version | `2026-10-25.engine-calibration-supportive-tax.v1` | `src/config/pricing.ts` | Bump when an effective price rule changes |
+| Quote configuration version | Automatic `${schema}.${16-hex fingerprint}` | `src/config/estimators/pricing-version.ts` | Computed from effective owner values + travel + calculation schema; never edit manually |
 | Offered-price selection | `expected` | `src/config/pricing.ts` | Never the low end |
 | Margin floor | 1.0 | `src/config/pricing.ts` | Discards candidates below expected |
 | Verification validity | 336 hours | `src/config/pricing.ts` | Owner notification only; not a customer hold |
@@ -169,7 +192,7 @@ most one promotion; travel is never discounted.
 | SPARKLE100 | **Enabled** | $100 off first clean; new weekly/biweekly recurring; claim required; no expiry | `pricing-values.ts` |
 
 Do not enable or publish a disabled program without written owner terms, the
-financial review, and a configuration-version bump where the effective price
+financial review, and the automatic effective-pricing fingerprint change
 changes.
 
 ### A6. Customer input definitions and limits
@@ -253,9 +276,9 @@ confirmed tax setup.
 1. Open `src/config/estimators/pricing-values.ts`.
 2. Find `hourlyRates` under section 1.
 3. Change `recurring` and/or `otherServices`. Keep `ownerLaborTarget` below both.
-4. Commit. Run `npm test` and `npm run estimate:quotes`.
-5. If the effective price changes, bump `instantQuote.configVersion` in
-   `src/config/pricing.ts` so old quotes are not reused.
+4. Commit. The automatic effective-pricing fingerprint changes; do not edit a
+   quote-version field.
+5. Run `npm test` and `npm run pricing:impact -- --compare HEAD`.
 6. After deployment, verify a representative estimate.
 
 ### Change the minimum, rounding or calibration factors
@@ -269,8 +292,8 @@ changed without affecting the others. `1.00` leaves that engine unchanged,
 The supported range is `0.50–1.50`. A missing, non-finite or out-of-range value
 fails closed to `1.00`; it never invents or inherits another engine's factor.
 The factor applies after the existing minimum/discount order and before travel
-and tax. Always run the full unit and browser suites and bump the relevant
-`configVersion` when an effective price changes.
+and tax. Always run the full unit and browser suites; the effective-pricing
+fingerprint updates automatically when a value changes.
 
 ### Change a discount
 
@@ -337,8 +360,8 @@ tests together.
 ### Example 1 — raise the recurring labour rate from $55 to $58
 
 - Edit `hourlyRates.recurring` in `pricing-values.ts` to `58`.
-- Bump `instantQuote.configVersion` in `pricing.ts`.
-- Run `npm test`, `npm run estimate:quotes`, `npm run check`.
+- Do not edit a quote-version field; the automatic fingerprint changes.
+- Run `npm test`, `npm run pricing:impact -- --compare HEAD`, `npm run check`.
 - Commit and push. Verify a weekly/biweekly estimate and the owner notification.
 
 ### Example 2 — change the included one-way travel from 17.5 to 20 miles
@@ -389,10 +412,11 @@ anything in `functions/api/`. These are security/operational boundaries.
 
 1. `npm run check`
 2. `npm test`
-3. `npm run estimate:quotes`
-4. `npm run test:browser`
-5. `npm run verify`
-6. A real desktop and mobile estimate, plus the owner notification.
+3. `npm run pricing:impact` (or `-- --compare HEAD`)
+4. `npm run config:validate`
+5. `npm run test:browser`
+6. `npm run verify`
+7. A real desktop and mobile estimate, plus the owner notification.
 
 **Do not publish** a provisional/internal rate or a disabled promotion as a
 public promise. Prices are proposals until the owner confirms them.

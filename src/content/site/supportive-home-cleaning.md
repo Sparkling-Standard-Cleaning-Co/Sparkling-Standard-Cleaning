@@ -1,12 +1,12 @@
 ---
-metaTitle: Community Support Cleaning in Pensacola | 10% Eligibility Discount
-metaDescription: Community Support Cleaning is ordinary residential cleaning with a 10% appreciation discount for adults 65+, first responders, military veterans, people with disabilities, and other eligible community members in Pensacola and Cantonment. No diagnosis or documentation required.
+metaTitle: Community Support Cleaning in Pensacola | {{communityDiscount}} Eligibility Discount
+metaDescription: Community Support Cleaning is ordinary residential cleaning with a {{communityDiscount}} appreciation discount for adults 65+, first responders, military veterans, people with disabilities, and other eligible community members in Pensacola and Cantonment. No diagnosis or documentation required.
 hero:
   headline: 'A Cleaner Home.'
   accent: ' A Little More Peace of Mind.'
   lead: >-
     Community Support Cleaning is the same dependable residential cleaning we
-    provide every day, with a 10% appreciation discount for adults aged 65 or
+    provide every day, with a {{communityDiscount}} appreciation discount for adults aged 65 or
     older, first responders, military veterans, people with disabilities, and
     other eligible community members. No diagnosis, medical record, or
     documentation is required — just a simple self-attestation and a
@@ -14,7 +14,7 @@ hero:
   ctaLabel: Start My Estimate
 sections:
   - eyebrow: Who qualifies
-    heading: A 10% discount for eligible households
+    heading: A {{communityDiscount}} discount for eligible households
     lead: >-
       The discount is a genuine thank-you for neighbors who may appreciate a
       little extra support. Ordinary residential cleaning remains available to
@@ -46,7 +46,7 @@ sections:
         text: Tell us which areas matter most right now; the plan follows the household.
       - title: Light, honest boundaries
         text: We do not provide medical, nursing or personal-care services — cleaning only, done well.
-  - eyebrow: The 10% discount
+  - eyebrow: The {{communityDiscount}} discount
     heading: How the discount appears and is confirmed
     lead: >-
       We keep the program simple and transparent. The discount is applied to
@@ -54,7 +54,7 @@ sections:
       personally before booking.
     items:
       - title: Shown clearly on the estimate
-        text: The estimate shows a “Community Support discount (10%)” line with the exact savings.
+        text: The estimate shows a “Community Support discount ({{communityDiscount}})” line with the exact savings.
       - title: Simple self-attestation
         text: Check the eligibility box if you qualify. We never ask for diagnoses, VA records, disability certifications or ID uploads.
       - title: Confirmed before booking
@@ -85,7 +85,7 @@ process:
         check the Community Support eligibility box if it applies to you.
     - title: See the discount
       text: >-
-        The estimate shows the 10% Community Support discount and the exact
+        The estimate shows the {{communityDiscount}} Community Support discount and the exact
         savings on eligible cleaning charges.
     - title: Confirm together
       text: >-

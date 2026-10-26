@@ -52,10 +52,11 @@ Rule of thumb:
 1. Edit `hourlyRates`, `minimumJob`, labour units, condition/frequency factors,
    add-on hours or the four `estimatorCalibration` factors in
    `pricing-values.ts`.
-2. If the effective quote changes, bump `instantQuote.configVersion` in
-   `src/config/pricing.ts`.
-3. Run `npm run estimate:quotes` to see the representative effect.
-4. Run `npm test` and `npm run check`.
+2. Do not edit a quote-version field; the automatic effective-pricing
+   fingerprint changes with the values.
+3. Run `npm run pricing:impact` (or `-- --compare HEAD`) to see the
+   representative effect.
+4. Run `npm test` and `npm run check`; the build also runs the configuration gate.
 5. Commit/push, wait for deployment, then inspect live desktop and mobile
    estimates.
 
@@ -192,7 +193,7 @@ originals, customer files and archives never belong in the public repo.
 | --- | --- | --- |
 | Site shows old content | Cloudflare deployment, hard refresh | Wait for deployment; verify commit SHA |
 | `validate` fails | GitHub Actions log | Fix the reported file; do not bypass |
-| Estimate wrong | `estimate:quotes`, pricing config, config version | Revert the one change; rerun tests |
+| Estimate wrong | `pricing:impact`, pricing config, automatic version | Revert the one change; rerun tests |
 | Form cannot send | `/api/lead` status, Web3Forms/Resend config | Use call/email; do not fake success |
 | Photos missing | `/api/photo-upload`, R2 binding, retention | Check owner link expiry and R2 |
 | Review not showing | `src/content/reviews/` frontmatter | Fix content; never invent a review |

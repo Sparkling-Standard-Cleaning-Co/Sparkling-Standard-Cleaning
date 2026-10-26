@@ -10,7 +10,7 @@ import {
 } from '../src/lib/estimate/engines.ts';
 import { calculateChurchDiscount } from '../src/lib/estimate/church-discount.ts';
 import { calculateChurchEstimate, calculateFacilityPrice, calculateFacilityWorkload } from '../src/lib/estimate/commercial.ts';
-import { commercialTierConfig } from '../src/config/estimators/commercial.ts';
+import { pricing, pricingValue } from '../src/config/pricing.ts';
 
 test('engine parameter is allowlisted and defaults to residential', () => {
   for (const engine of ESTIMATE_ENGINES) assert.equal(parseEngineParam(engine.id), engine.id);
@@ -51,12 +51,14 @@ test('each calculator family has six intentional step titles', () => {
   assert.notEqual(ENGINE_STEPS.residential.titles[1], ENGINE_STEPS.str.titles[1]);
 });
 
-test('church discount is exactly 10% of the cleaning subtotal', () => {
+test('church discount applies the configured percentage to the cleaning subtotal', () => {
+  if (!pricing.churchDiscount.enabled.value) return;
+  const percent = pricing.churchDiscount.percent.value;
   const result = calculateChurchDiscount(300);
   assert.equal(result.applied, true);
-  assert.equal(result.percent, 10);
-  assert.equal(result.amount, 30);
-  assert.equal(result.discountedSubtotal, 270);
+  assert.equal(result.percent, percent);
+  assert.equal(result.amount, Math.round(300 * (percent / 100) * 100) / 100);
+  assert.equal(result.discountedSubtotal, Math.round(300 * (1 - percent / 100) * 100) / 100);
 });
 
 test('church discount never stacks with another promotion', () => {
@@ -67,10 +69,12 @@ test('church discount never stacks with another promotion', () => {
 });
 
 test('church discount can bring a minimum-job subtotal below the floor (benefit not erased)', () => {
-  const result = calculateChurchDiscount(125);
+  if (!pricing.churchDiscount.enabled.value) return;
+  const percent = pricing.churchDiscount.percent.value / 100;
+  const result = calculateChurchDiscount(pricingValue(pricing.minimumJob));
   assert.equal(result.applied, true);
-  assert.equal(result.amount, 12.5);
-  assert.equal(result.discountedSubtotal, 112.5);
+  assert.equal(result.amount, Math.round(pricingValue(pricing.minimumJob) * percent * 100) / 100);
+  assert.equal(result.discountedSubtotal, Math.round(pricingValue(pricing.minimumJob) * (1 - percent) * 100) / 100);
 });
 
 test('facility workloading follows the ISSA area + fixture method, not per-room time', () => {
@@ -103,8 +107,7 @@ test('workload tiers escalate to a range and then a custom scope review', () => 
   assert.equal(large.tier, 'C');
 });
 
-test('commercial pricing is enabled with a defensible rate and minimum', () => {
-  assert.equal(commercialTierConfig.numericEstimatesEnabled, true);
+test('commercial pricing produces a defensible numeric minimum when enabled', () => {
   const input = {
     cleanableSqft: 2000,
     restroomFixtures: 6,
@@ -115,9 +118,9 @@ test('commercial pricing is enabled with a defensible rate and minimum', () => {
     flooring: 'mixed' as const,
   };
   const workload = calculateFacilityWorkload(input);
-  const price = calculateFacilityPrice(workload, 'weekly');
+  const price = calculateFacilityPrice(workload, 'weekly', { numericEstimatesEnabled: true });
   assert.equal(price.priced, true);
-  assert.ok(price.perVisit >= 125);
+  assert.ok(price.perVisit >= pricingValue(pricing.minimumJob));
   assert.ok(price.monthly && price.monthly > price.perVisit);
   assert.equal(price.travelAdjustment, 0);
 });
@@ -161,14 +164,24 @@ test('the kill switch suppresses the church discount amount as well', () => {
   assert.equal(church.price.total, 0);
 });
 
-test('church estimates apply the 10% discount transparently after the minimum', () => {
+test('church estimates apply the configured discount transparently after the minimum', () => {
   const church = calculateChurchEstimate({ cleanableSqft: 4000, restroomFixtures: 6, breakroom: true, frequency: 'weekly' });
-  assert.ok(church.price.cleaningSubtotal >= 125, 'minimum applies before the discount');
+  assert.ok(church.price.cleaningSubtotal >= pricingValue(pricing.minimumJob), 'minimum applies before the discount');
+  const factor = pricingValue(pricing.estimatorCalibration.church);
+  if (!pricing.churchDiscount.enabled.value) {
+    assert.equal(church.price.discount, null);
+    assert.equal(church.price.perVisit, Math.round(church.price.cleaningSubtotal * factor * 100) / 100);
+    return;
+  }
+  const percent = pricing.churchDiscount.percent.value / 100;
   assert.equal(church.price.discount?.applied, true);
-  assert.equal(church.price.discount?.amount, Math.round(church.price.cleaningSubtotal * 0.1 * 100) / 100);
-  assert.ok(church.price.perVisit < church.price.cleaningSubtotal, 'the church discount reduces the customer price');
-  // The discounted amount is NOT rounded upward again; the exact 10% survives.
-  const expected = Math.round((church.price.cleaningSubtotal * 0.9 + Number.EPSILON) * 100) / 100;
+  assert.equal(church.price.discount?.amount, Math.round(church.price.cleaningSubtotal * percent * 100) / 100);
+  assert.ok(
+    church.price.perVisit < Math.round(church.price.cleaningSubtotal * factor * 100) / 100,
+    'the church discount reduces the calibrated price',
+  );
+  // The discounted amount is NOT rounded upward again; the exact percent survives.
+  const expected = Math.round((church.price.cleaningSubtotal * (1 - percent) * factor + Number.EPSILON) * 100) / 100;
   assert.equal(church.price.perVisit, expected);
   assert.ok(church.price.total >= church.price.perVisit);
 });

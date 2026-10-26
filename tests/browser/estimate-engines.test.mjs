@@ -6,6 +6,9 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { pricing, pricingValue } from '../../src/config/pricing.ts';
+import { calculateChurchEstimate } from '../../src/lib/estimate/commercial.ts';
+import { formatUsd } from '../../src/lib/format.ts';
 
 const PORT = 4419;
 const BASE = `http://localhost:${PORT}`;
@@ -151,7 +154,7 @@ test('the church engine presents the owner-directed 10% discount and optional pa
     const commitment = page.locator('.church-commitment');
     assert.equal(await commitment.count(), 1);
     const text = await commitment.innerText();
-    assert.match(text, /10% off eligible cleaning services/);
+    assert.match(text, new RegExp(`${pricing.churchDiscount.percent.value}% off eligible cleaning services`));
     assert.match(text, /not a charitable donation/);
     const partnership = page.locator('input[name^="partnership_"]');
     assert.equal(await partnership.count(), 5, 'five optional partnership choices');
@@ -205,7 +208,7 @@ test('the commercial engine shows a preliminary per-visit price for an ordinary 
     const price = (await page.locator('[data-facility-estimate-price]').textContent()) ?? '';
     assert.match(price, /^\$\d+/);
     const value = Number(price.replace(/[^0-9]/g, ''));
-    assert.ok(value >= 125, `preliminary per-visit price is at least the minimum (${price})`);
+    assert.ok(value >= pricingValue(pricing.minimumJob), `preliminary per-visit price is at least the minimum (${price})`);
     const note = (await page.locator('[data-facility-estimate-note]').textContent()) ?? '';
     assert.match(note, /Nonbinding preliminary estimate/i);
     const tax = (await page.locator('[data-facility-estimate-tax]').textContent()) ?? '';
@@ -218,7 +221,7 @@ test('the commercial engine shows a preliminary per-visit price for an ordinary 
   }
 });
 
-test('the church engine reconciles the 10% discount and routes very large scopes to review', async () => {
+test('the church engine reconciles the configured discount and routes very large scopes to review', async () => {
   const { context, page } = await open('/estimate/church/');
   try {
     await completeFacilityStepOne(page, 'Test Church (please ignore)');
@@ -227,11 +230,21 @@ test('the church engine reconciles the 10% discount and routes very large scopes
     await page.selectOption('#fac-frequency', 'weekly');
     await page.waitForSelector('[data-facility-estimate]:not([hidden])');
     const lines = (await page.locator('[data-facility-estimate-lines]').innerText()) ?? '';
-    assert.match(lines, /Church discount \(10%\)/i);
-    assert.match(lines, /Subtotal after discount/i);
-    assert.match(lines, /\$14\.50/);
-    const priceText = (await page.locator('[data-facility-estimate-price]').textContent()) ?? '';
-    assert.equal(priceText, '$130.50', 'the exact discounted price reconciles');
+    if (pricing.churchDiscount.enabled.value) {
+      const percent = pricing.churchDiscount.percent.value;
+      assert.ok(lines.includes(`Church discount (${percent}%)`));
+      assert.match(lines, /Subtotal after discount/i);
+      const expected = calculateChurchEstimate({
+        cleanableSqft: 4000,
+        restroomFixtures: 6,
+        breakroom: false,
+        frequency: 'weekly',
+      });
+      assert.ok(expected.price.discount);
+      assert.ok(lines.includes(formatUsd(expected.price.discount.amount, { forceCents: true })));
+      const priceText = (await page.locator('[data-facility-estimate-price]').textContent()) ?? '';
+      assert.equal(priceText, formatUsd(expected.price.total, { forceCents: true }), 'the exact discounted price reconciles');
+    }
     const tax = (await page.locator('[data-facility-estimate-tax]').textContent()) ?? '';
     assert.match(tax, /unless exempt/i);
     // A very large facility must not receive an invented number.

@@ -1,17 +1,20 @@
-// Initiative 6.3 estimator-control-center baseline lock.
+// Current estimator configuration integrity.
 //
-// The organizational refactor must not change a price, labour assumption,
-// threshold or input range. This test is deliberately explicit: an intentional
-// owner-approved pricing change must update this file in the same commit, which
-// forces the change to be reviewed rather than silently drifting.
+// These tests validate the CURRENT owner configuration's structure, range and
+// dependencies without freezing its business values. Intentional owner edits
+// (rates, labor hours, minimums, discounts, calibration factors, add-ons and
+// travel assumptions) must not require a test edit. Mathematical regression
+// protection lives in the fixed-reference and metamorphic pricing tests.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pricing } from '../src/config/pricing.ts';
+import { pricing, pricingValue } from '../src/config/pricing.ts';
 import { ownerPricing } from '../src/config/estimators/pricing-values.ts';
 import { travelConfig } from '../src/config/estimators/travel.ts';
 import { commercialTierConfig } from '../src/config/estimators/commercial.ts';
+import { PRICING_CONFIG_VERSION } from '../src/config/estimators/pricing-version.ts';
+import { validateEstimatorConfiguration } from '../src/config/estimators/validation.ts';
 import {
   COMMERCIAL_FACILITY_TYPES,
   FACILITY_INPUT_LIMITS,
@@ -20,71 +23,93 @@ import {
 } from '../src/config/estimators/input-definitions.ts';
 import { ESTIMATE_ENGINES } from '../src/lib/estimate/engines.ts';
 
-test('estimator-control-center refactor preserves the approved pricing baseline', () => {
-  assert.equal(ownerPricing.hourlyRates.recurring, 55);
-  assert.equal(ownerPricing.hourlyRates.otherServices, 55);
-  assert.equal(ownerPricing.hourlyRates.ownerLaborTarget, 35);
-  assert.equal(ownerPricing.minimumJob, 125);
-  assert.deepEqual(ownerPricing.estimatorCalibration, { residential: 1, str: 1, commercial: 1, church: 1 });
-  assert.equal(ownerPricing.supportiveHomeDiscount.percent, 10);
-  assert.equal(ownerPricing.supportiveHomeDiscount.termsVersion, '2026-10-25.supportive10.v2');
-  assert.deepEqual(ownerPricing.supportiveHomeDiscount.eligibleServices, ['standard', 'deep', 'move_in_out']);
-  assert.equal(ownerPricing.churchDiscount.percent, 10);
+test('the current owner configuration is valid, complete and internally consistent', () => {
+  const result = validateEstimatorConfiguration();
+  assert.equal(result.valid, true, result.errors.map((entry) => `${entry.path}: ${entry.message}`).join('\n'));
+  assert.equal(result.errors.length, 0);
 });
 
-test('labour, condition, frequency and rounding assumptions are unchanged', () => {
-  assert.deepEqual(ownerPricing.baseLaborHours, {
-    standard: 2,
-    deep: 3.2,
-    move_in_out: 3.4,
-    str_turnover: 1.2,
-  });
-  assert.deepEqual(ownerPricing.conditionFactors, {
-    maintained: 1,
-    average: 1.1,
-    needs_attention: 1.25,
-    heavy: 1.45,
-    severe: 2,
-  });
-  assert.deepEqual(ownerPricing.frequencyFactors, {
-    weekly: 0.92,
-    biweekly: 0.95,
-    monthly: 0.98,
-    one_time: 1,
-  });
-  assert.deepEqual(ownerPricing.range, { lowFactor: 0.92, highFactor: 1.12 });
-  assert.equal(ownerPricing.rounding.roundToNearest, 5);
-  assert.equal(pricing.instantQuote.configVersion.value, '2026-10-25.engine-calibration-supportive-tax.v1');
+test('the four calibration factors are present, finite, bounded and independent', () => {
+  const keys = ['residential', 'str', 'commercial', 'church'] as const;
+  assert.deepEqual(Object.keys(ownerPricing.estimatorCalibration).sort(), [...keys].sort());
+  for (const engine of keys) {
+    const value = ownerPricing.estimatorCalibration[engine];
+    assert.equal(Number.isFinite(value), true, `${engine} must be finite`);
+    assert.ok(value >= 0.5 && value <= 1.5, `${engine} must stay within 0.50–1.50`);
+    assert.equal(pricing.estimatorCalibration[engine].value, value, `${engine} typed config must consume the owner value`);
+  }
+  // Independence is behavioral, not a requirement that every value is 1.00.
+  const otherKeys = keys.filter((key) => key !== 'commercial');
+  const otherValues = otherKeys.map((key) => ownerPricing.estimatorCalibration[key]);
+  assert.equal(ownerPricing.estimatorCalibration.commercial, pricing.estimatorCalibration.commercial.value);
+  assert.deepEqual(
+    otherKeys.map((key) => ownerPricing.estimatorCalibration[key]),
+    otherValues,
+    'reading commercial does not mutate another engine',
+  );
 });
 
-test('commercial and church workload assumptions are unchanged', () => {
-  assert.equal(ownerPricing.commercialPricing.grossRatePerHour, 60);
-  assert.equal(ownerPricing.commercialPricing.tierAHours, 3);
-  assert.equal(ownerPricing.commercialPricing.tierBHours, 8);
-  assert.equal(ownerPricing.commercialPricing.overheadRatePercent, 22);
-  assert.equal(ownerPricing.commercialPricing.productionSqftPerHour.office, 3000);
-  assert.equal(ownerPricing.commercialPricing.productionSqftPerHour.church, 2800);
-  assert.equal(commercialTierConfig.numericEstimatesEnabled, true);
-  assert.equal(commercialTierConfig.tierC_triggers.restroomsOver, 4);
+test('the automatic version is the only quote/facility provenance marker', () => {
+  assert.equal(pricing.instantQuote.configVersion.value, PRICING_CONFIG_VERSION);
+  assert.equal(pricing.commercialPricing.configVersion.value, PRICING_CONFIG_VERSION);
+  assert.match(PRICING_CONFIG_VERSION, /^[0-9A-Za-z][0-9A-Za-z._-]*\.[0-9a-f]{16}$/);
 });
 
-test('travel assumptions and the private-origin boundary are unchanged', () => {
-  assert.equal(travelConfig.mpg, 24);
-  assert.equal(travelConfig.wearPerMile, 0.12);
-  assert.equal(travelConfig.includedOneWayMiles, 17.5);
-  assert.equal(travelConfig.fallbackGasPrice, 3.1);
-  assert.equal(travelConfig.maxDrivingMinutes, 60);
-  assert.equal(travelConfig.reviewBandMinutes, 15);
-  assert.equal(travelConfig.maxInstantDistanceMiles, 45);
+test('owner pricing values flow into the typed configuration', () => {
+  assert.equal(pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour), ownerPricing.hourlyRates.otherServices);
+  assert.equal(pricingValue(pricing.laborEconomics.recurringGrossRevenuePerLaborHour), ownerPricing.hourlyRates.recurring);
+  assert.equal(pricingValue(pricing.laborEconomics.ownerLaborTargetPerHour), ownerPricing.hourlyRates.ownerLaborTarget);
+  assert.equal(pricingValue(pricing.minimumJob), ownerPricing.minimumJob);
+  assert.equal(pricingValue(pricing.laborModel.baseHours.standard), ownerPricing.baseLaborHours.standard);
+  assert.equal(pricingValue(pricing.laborModel.sqftHoursPerThousand), ownerPricing.laborUnits.sqftHoursPerThousand);
+  assert.equal(pricingValue(pricing.conditionFactors.maintained), ownerPricing.conditionFactors.maintained);
+  assert.equal(pricingValue(pricing.frequencyFactors.weekly), ownerPricing.frequencyFactors.weekly);
+  assert.equal(pricingValue(pricing.rounding.toNearest), ownerPricing.rounding.roundToNearest);
+  assert.equal(pricing.addons.items, ownerPricing.addons);
 });
 
-test('the four estimator engines and public input definitions are intact', () => {
+test('approval and publication protections remain in place', () => {
+  assert.equal(pricing.instantQuote.binding.value, false, 'binding offers stay disabled');
+  assert.equal(pricing.publication.publishHourlyRates, false);
+  assert.equal(pricing.publication.publishAddonPrices, false);
+  assert.equal(pricing.publication.publishMinimumJob, false);
+  for (const program of pricing.promotions.appreciationDiscounts) assert.equal(program.enabled, false);
+  for (const bundle of pricing.promotions.addonBundles) assert.equal(bundle.enabled, false);
+  assert.equal(pricing.promotions.foundingTen.enabled, false);
+});
+
+test('commercial tier policy is structurally valid and ordered', () => {
+  assert.equal(typeof commercialTierConfig.numericEstimatesEnabled, 'boolean');
+  assert.ok(commercialTierConfig.tierA_maxCleanableSqft > 0);
+  assert.ok(commercialTierConfig.tierB_maxCleanableSqft >= commercialTierConfig.tierA_maxCleanableSqft);
+  assert.ok(commercialTierConfig.tierC_triggers.restroomsOver >= 0);
+  assert.ok(commercialTierConfig.tierC_triggers.specialtyServices.length > 0);
+});
+
+test('travel assumptions are structurally valid and shared', () => {
+  assert.ok(travelConfig.mpg > 0);
+  assert.ok(travelConfig.wearPerMile >= 0);
+  assert.ok(travelConfig.includedOneWayMiles >= 0);
+  assert.ok(travelConfig.fallbackGasPrice > 0);
+  assert.ok(travelConfig.maxDrivingMinutes > 0);
+  assert.ok(travelConfig.reviewBandMinutes >= 0);
+  assert.ok(travelConfig.maxInstantDistanceMiles > 0);
+  assert.equal(pricingValue(pricing.travel.clientDefaults.mpg), travelConfig.mpg);
+  assert.equal(pricingValue(pricing.travel.includedOneWayMiles), travelConfig.includedOneWayMiles);
+  assert.equal(pricingValue(pricing.travel.perMileWearCost), travelConfig.wearPerMile);
+  assert.equal(pricingValue(pricing.travel.fallbackGasPrice), travelConfig.fallbackGasPrice);
+  assert.equal(pricingValue(pricing.drivingPolicy.maxDrivingMinutes), travelConfig.maxDrivingMinutes);
+});
+
+test('the four engines and public input definitions are intact', () => {
   assert.deepEqual(
     ESTIMATE_ENGINES.map((engine) => engine.id),
     ['residential', 'commercial', 'str', 'church'],
   );
   assert.equal(RESIDENTIAL_SERVICE_OPTIONS.length, 4);
   assert.equal(COMMERCIAL_FACILITY_TYPES.length, 8);
-  assert.deepEqual(RESIDENTIAL_INPUT_LIMITS.squareFeet, { min: 200, max: 20000, step: 50 });
-  assert.deepEqual(FACILITY_INPUT_LIMITS.restroomFixtures, { min: 0, max: 60, step: 1 });
+  for (const limit of [...Object.values(RESIDENTIAL_INPUT_LIMITS), ...Object.values(FACILITY_INPUT_LIMITS)]) {
+    assert.ok(limit.max > limit.min);
+    if (limit.step !== undefined) assert.ok(limit.step > 0);
+  }
 });

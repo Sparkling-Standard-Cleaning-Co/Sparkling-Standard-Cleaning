@@ -137,7 +137,9 @@ export function runFacilityCalibration(
   const operatingProfit = serviceRevenue === null || overhead === null || contributionAfterLabor === null ? null : round2(contributionAfterLabor - overhead);
   const perMonth = priced ? visitsPerMonth(scenario) : null;
   const discount = price.discount?.applied ? price.discount.amount : 0;
-  const discountExpected = scenario.kind === 'church' ? round2(price.cleaningSubtotal * 0.1) : 0;
+  const discountExpected = scenario.kind === 'church' && pricing.churchDiscount.enabled.value
+    ? round2(price.cleaningSubtotal * (pricing.churchDiscount.percent.value / 100))
+    : 0;
   const reconciliation =
     scenario.kind === 'church'
       ? `subtotal ${price.cleaningSubtotal.toFixed(2)} − discount ${discount.toFixed(2)} = ${round2(price.cleaningSubtotal - discount).toFixed(2)}; total ${price.total.toFixed(2)}`

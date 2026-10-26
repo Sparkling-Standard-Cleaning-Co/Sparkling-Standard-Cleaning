@@ -36,6 +36,9 @@ interface RoutedTravel {
 
 const form = document.querySelector<HTMLFormElement>('[data-facility-form]');
 const engine = (form?.dataset.engine === 'church' ? 'church' : 'commercial') as Engine;
+const churchDiscountLabel = pricing.churchDiscount.enabled.value
+  ? `${pricing.churchDiscount.percent.value}% church discount`
+  : 'church discount';
 
 if (form) {
   initFacilityForm(form, engine);
@@ -548,24 +551,24 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     if (!reviewNote) return;
     if (!numericEstimatesEnabled) {
       reviewNote.textContent = facilityEngine === 'church'
-        ? 'This is a scope-review request, not a confirmed contract. The 10% church discount applies to the confirmed cleaning quote, and Sparkling Standard confirms the scope and price personally before anything is scheduled.'
+        ? `This is a scope-review request, not a confirmed contract. The ${churchDiscountLabel} applies to the confirmed cleaning quote, and Sparkling Standard confirms the scope and price personally before anything is scheduled.`
         : 'This is a scope-review request, not a confirmed contract. Sparkling Standard confirms the scope and price personally before anything is scheduled.';
       return;
     }
     if (latestPrice?.priced) {
       reviewNote.textContent = facilityEngine === 'church'
-        ? 'The amount above is a nonbinding preliminary estimate with the 10% church discount applied. Final scope, travel and price are confirmed personally before anything is scheduled.'
+        ? `The amount above is a nonbinding preliminary estimate with the ${churchDiscountLabel} applied. Final scope, travel and price are confirmed personally before anything is scheduled.`
         : 'The amount above is a nonbinding preliminary estimate. Final scope, travel and price are confirmed personally before anything is scheduled.';
       return;
     }
     if (latestPrice) {
       reviewNote.textContent = facilityEngine === 'church'
-        ? 'This scope needs a personal review before a responsible price can be given. The 10% church discount applies to the confirmed cleaning quote, and Sparkling Standard confirms the scope and price personally.'
+        ? `This scope needs a personal review before a responsible price can be given. The ${churchDiscountLabel} applies to the confirmed cleaning quote, and Sparkling Standard confirms the scope and price personally.`
         : 'This scope needs a personal review before a responsible price can be given. Sparkling Standard confirms the scope and price personally before anything is scheduled.';
       return;
     }
     reviewNote.textContent = facilityEngine === 'church'
-      ? 'Enter the facility details to see a preliminary estimate. The 10% church discount applies to the confirmed cleaning quote, and Sparkling Standard confirms the scope and price personally before anything is scheduled.'
+      ? `Enter the facility details to see a preliminary estimate. The ${churchDiscountLabel} applies to the confirmed cleaning quote, and Sparkling Standard confirms the scope and price personally before anything is scheduled.`
       : 'Enter the facility details to see a preliminary estimate. Final scope, travel and price are confirmed personally before anything is scheduled.';
   }
 
@@ -773,8 +776,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         resultNote.textContent =
           facilityEngine === 'church'
             ? latestPrice?.priced
-              ? 'Not booked yet. Sparkling Standard will review your preliminary estimate and confirm the scope, travel, final price and your 10% church discount personally.'
-              : 'Not booked yet. Sparkling Standard will review the scope and confirm your 10% church discount and price personally.'
+              ? `Not booked yet. Sparkling Standard will review your preliminary estimate and confirm the scope, travel, final price and your ${churchDiscountLabel} personally.`
+              : `Not booked yet. Sparkling Standard will review the scope and confirm your ${churchDiscountLabel} and price personally.`
             : latestPrice?.priced
               ? 'Not booked yet. Sparkling Standard will review your preliminary estimate and confirm the scope, travel and final price personally.'
               : 'Not booked yet. Sparkling Standard will review the scope and confirm the price personally.';

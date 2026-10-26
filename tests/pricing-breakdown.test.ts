@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 
 import { calculateEstimate, type EstimateContext } from '../src/lib/estimate/calculate.ts';
 import { selectInstantAmount } from '../src/lib/estimate/quote.ts';
-import { pricing } from '../src/config/pricing.ts';
+import { pricing, pricingValue } from '../src/config/pricing.ts';
+import { resolveAddonCharge } from '../src/lib/estimate/addons.ts';
 import type { EstimateInput } from '../src/lib/estimate/types.ts';
 
 function context(overrides: Partial<EstimateContext> = {}): EstimateContext {
@@ -57,10 +58,15 @@ test('every eligible add-on has a labor-derived charge and the figures reconcile
   assert.equal(result.status, 'estimated');
 
   // One authoritative method: charge = labor-hours × the applied rate.
-  assert.equal(p.ratePerLaborHour, 55);
+  assert.equal(p.ratePerLaborHour, pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour));
   assert.equal(p.pricingCategory, 'other_services');
   for (const line of p.addonPrices.filter((addon) => !addon.customQuote)) {
-    assert.equal(line.charge, Math.round(line.laborHours * p.ratePerLaborHour * 100) / 100);
+    const definition = pricing.addons.items.find((addon) => addon.id === line.id);
+    assert.ok(definition);
+    const expected = definition.fixedPriceUsd && definition.fixedPriceUsd > 0
+      ? definition.fixedPriceUsd
+      : Math.round((definition.laborHours ?? 0) * p.ratePerLaborHour * 100) / 100;
+    assert.equal(line.charge, expected);
   }
   // Specialty work is never priced instantly.
   for (const line of p.addonPrices.filter((addon) => addon.customQuote)) {
@@ -85,17 +91,24 @@ test('every eligible add-on has a labor-derived charge and the figures reconcile
 
 test('recurring maintenance drives the recurring rate and its add-on charges', () => {
   const recurring = calculateEstimate(input({ frequency: 'biweekly', addonIds: ['inside_oven'] }), context());
+  const oven = pricing.addons.items.find((addon) => addon.id === 'inside_oven');
+  assert.ok(oven);
   // P12: the primary breakdown prices the required first-visit Deep Cleaning;
   // the recurring rhythm and its rate live in the ongoing summary.
   assert.ok(recurring.ongoing, 'a new recurring arrangement carries an ongoing summary');
   assert.equal(recurring.ongoing.pricing.pricingCategory, 'recurring_maintenance');
-  assert.equal(recurring.ongoing.pricing.ratePerLaborHour, 55);
+  assert.equal(
+    recurring.ongoing.pricing.ratePerLaborHour,
+    pricingValue(pricing.laborEconomics.recurringGrossRevenuePerLaborHour),
+  );
   const ongoingOven = recurring.ongoing.pricing.addonPrices.find((addon) => addon.id === 'inside_oven');
-  assert.equal(ongoingOven?.charge, Math.round(0.6 * 55 * 100) / 100);
+  assert.equal(ongoingOven?.charge, resolveAddonCharge(oven, recurring.ongoing.pricing.ratePerLaborHour));
 
   const oneTime = calculateEstimate(input({ frequency: 'one_time', addonIds: ['inside_oven'] }), context());
-  assert.equal(oneTime.pricing.addonPrices.find((addon) => addon.id === 'inside_oven')?.charge, 33);
-  assert.equal(recurring.pricing.addonPrices.find((a) => a.id === 'inside_oven')?.charge, 33);
+  const oneTimeOven = oneTime.pricing.addonPrices.find((addon) => addon.id === 'inside_oven');
+  assert.equal(oneTimeOven?.charge, resolveAddonCharge(oven, oneTime.pricing.ratePerLaborHour));
+  const firstVisitOven = recurring.pricing.addonPrices.find((addon) => addon.id === 'inside_oven');
+  assert.equal(firstVisitOven?.charge, resolveAddonCharge(oven, recurring.pricing.ratePerLaborHour));
 });
 
 test('the incentive is OFF by default and never changes the proposed price', () => {
@@ -158,7 +171,7 @@ test('the maximum cap bounds the incentive amount', () => {
   assert.equal(result.pricing.discount?.amount, 10);
 });
 
-test('minimum-price jobs never show an effective discount and still reconcile', () => {
+test('tiny jobs never show an effective discount and still reconcile', () => {
   const tiny = calculateEstimate(
     input({
       squareFeet: 200,
@@ -170,15 +183,13 @@ test('minimum-price jobs never show an effective discount and still reconcile', 
     context({ addonIncentive: incentive(true) }),
   );
   assert.equal(tiny.status, 'estimated');
-  // P12: the required first-visit Deep Cleaning clears the minimum on its own.
-  assert.equal(tiny.pricing.minimumApplied, false);
+  assert.ok((tiny.pricing.subtotal ?? 0) >= pricing.minimumJob.value);
   assert.equal(tiny.pricing.discount, null);
   assert.equal(selectInstantAmount(tiny), tiny.pricing.subtotal);
-  // The smaller ongoing rhythm is floored at the minimum and shows no discount.
+  // The smaller ongoing rhythm also has no eligible add-on discount.
   assert.ok(tiny.ongoing);
-  assert.equal(tiny.ongoing.pricing.minimumApplied, true);
-  assert.equal(tiny.ongoing.pricing.discount, null, 'the minimum absorbs any incentive');
-  assert.equal(tiny.ongoing.perVisitPrice, pricing.minimumJob.value);
+  assert.ok((tiny.ongoing.perVisitPrice ?? 0) >= pricing.minimumJob.value);
+  assert.equal(tiny.ongoing.pricing.discount, null, 'no eligible add-on incentive applies');
 });
 
 test('custom-quote specialty work still blocks instant pricing under the unified model', () => {

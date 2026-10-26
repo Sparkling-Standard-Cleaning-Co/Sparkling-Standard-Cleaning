@@ -8,6 +8,8 @@ import ServiceCard from '../components/ServiceCard.astro';
 import CtaBand from '../components/CtaBand.astro';
 import PremiumIcon from '../components/PremiumIcon.astro';
 import { serviceNode, breadcrumbNode, faqNode } from '../lib/schema';
+import { pricing } from '../config/pricing';
+import { replacePricingTokens } from '../lib/content/pricing-text';
 
 export async function getStaticPaths() {
   const services = await getCollection('services');
@@ -29,8 +31,9 @@ interface Props {
 }
 
 const { entry } = Astro.props;
-const data = entry.data;
+const data = replacePricingTokens(entry.data);
 const { Content } = await render(entry);
+const churchDiscountPercent = pricing.churchDiscount.percent.value;
 
 const site = Astro.site ?? new URL('https://pending-website-url.invalid');
 const services = await getCollection('services');
@@ -67,8 +70,8 @@ const engineRequest =
           href: '/estimate/church/',
           label: 'Estimate Church Cleaning',
           eyebrow: 'Church estimate',
-          heading: 'A church estimate with our 10% church discount',
-          lead: 'Tell us about your sanctuary, classrooms, fellowship spaces and schedule. Sparkling Standard confirms the scope and your 10% church discount personally before anything is scheduled.',
+          heading: `A church estimate with our ${churchDiscountPercent}% church discount`,
+          lead: `Tell us about your sanctuary, classrooms, fellowship spaces and schedule. Sparkling Standard confirms the scope and your ${churchDiscountPercent}% church discount personally before anything is scheduled.`,
           cta: 'estimate-engine-church',
         }
       : {

@@ -7,10 +7,11 @@ import Icon from '../components/Icon.astro';
 import PremiumIcon from '../components/PremiumIcon.astro';
 import { breadcrumbNode, serviceNode } from '../lib/schema';
 import { business, contactPhone, isPending } from '../config/business';
+import { replacePricingTokens } from '../lib/content/pricing-text';
 
 const entry = await getEntry('site', 'supportive-home-cleaning');
 if (!entry) throw new Error('Missing content entry: src/content/site/supportive-home-cleaning.md');
-const { data } = entry;
+const data = replacePricingTokens(entry.data);
 
 const site = Astro.site ?? new URL('https://pending-website-url.invalid');
 const schema = [
