@@ -84,7 +84,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); eight confirmed
   social profiles rendering (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release:** **Initiative 6.3** is live at `911b5aa` (Cloudflare Pages deployment `1b1a854c-4cec-433b-b02d-0daefa012101`; GitHub validate and browser checks passed). It installs the 17-icon white-tile system, removes the GPS helper paragraphs from every estimator, centralizes every owner-editable estimator value under `src/config/estimators/`, adds the Owner Control Center/Operations Manual, and completes the repository and local-master organization. Pricing values and estimator mathematics were not changed. Production `/api/photo-upload` remains `enabled:true`; real R2/HEIC uploads, Resend owner attachments and owner inbox receipt remain confirmed.
+- **Current release:** **Initiative 6.4** is live at `685031d` (Cloudflare Pages deployment `f9dea1a0-5b55-4cd8-b09e-18efae73c68a`; GitHub validate, browser and Cloudflare checks passed; documentation closeout follows). It expands the Census service-area map to 18 counties with green/yellow/neutral policy colours and “Gulf Of America”, crops the white-tile canvas margin, installs reading-glasses and red/white/blue community artwork, rebuilds the footer contact actions and review invitation, exposes Service Area/FAQ in both navigation layers, updates founder/Bible Belt/Deep Cleaning copy, centers the values, renames the public program to **Community Support Cleaning**, and replaces the single global factor with four independent owner-editable calibration factors. All four factors remain `1.00`; no pricing rate, formula, minimum, discount or travel assumption was repriced. Production `/api/photo-upload` remains `enabled:true`; real R2/HEIC uploads, Resend owner attachments and owner inbox receipt remain confirmed.
 - **Prior release status:** the 2026-10-03 release was **deployed to production** — `origin/main` =
   `62a1a46` (the five-commit release `8b8dde4`/`03d6ba8`/`53a85aa`/`0f3c38c`/`5a4a024`, the
   documentation closeout `7a51efa`, the social integration `cdc4971`, the deployment-closeout
@@ -396,8 +396,8 @@ collections are intentionally empty — not errors.
   claims and UTM context forward correctly; a four-step guided facility wizard with field-specific
   validation; Community Support 10% eligibility discount (65+, first responders, veterans,
   disabilities, and other eligible community members; self-attested, no sensitive records; never
-  stacked); four independent owner-editable `estimatorCalibration` factors, one per engine, each
-  applied to its own pre-tax service subtotal; exact church-discount reconciliation and two-decimal
+  stacked); owner-editable `globalEstimateFactor` applied to the pre-tax service subtotal across
+  every engine; exact church-discount reconciliation and two-decimal
   currency; category-specific Florida sales-tax disclosure (no invented tax amount); service-area
   page restructured to title → description → map; representative-photo captions and the Mark 12:31
   quotation removed; larger review stars; footer review actions split into Read and Leave; and the
@@ -406,6 +406,22 @@ collections are intentionally empty — not errors.
   signed owner links and Resend owner attachments (live). Facility pricing has a completed
   26-commercial/20-church calibration (`docs/operations/FACILITY-CALIBRATION.md`). Research/order/
   tax records: `docs/operations/ESTIMATE-CALCULATION-ORDER.md`, `docs/operations/TAX-TREATMENT.md`.
+- **Initiative 6.4 (owner audit + engine calibration, 2026-10-25):** completed the 7-page owner
+  audit corrections. The service-area map now uses real Census county geometry across 18 counties
+  (green core Escambia/Santa Rosa FL; yellow by-arrangement Baldwin/Escambia AL; neutral context),
+  labels “Gulf Of America” over the water, and suppresses county labels on phones to avoid the
+  collisions found in audit. White-tile icons now crop their raster canvas margin without adding a
+  second frame; icon 08 is reading glasses (large Reviews tile and 24 px footer vector) and icon 17
+  is red/white/blue community artwork. The footer has four stacked contact actions (Call, Text,
+  Email Us, Contact Form) and the exact review sentence; the founder, Southern Hospitality/Bible
+  Belt and shortened Deep Cleaning copy are updated; values are centered; Service Area and FAQ are
+  in both navigation layers; the public program name is **Community Support Cleaning** on the
+  canonical `/supportive-home-cleaning/` route; and `estimatorCalibration` holds four independent
+  residential/STR/commercial/church factors (all `1.00`, range `0.50–1.50`, invalid fails closed).
+  Audit source: `sswebsiteaudit.docx` (7 pages, images 16–29); evidence:
+  `docs/verification/6.4/`. The 6.3 white-tile icon system, estimator control center, pricing
+  mathematics and repository organization remain intact; the single global factor described in the
+  6.2 paragraph above was superseded by the four factors.
 - **Smart Estimate System 2.0 (2026-10-24, owner directive):**
   - **Address reliability:** an exact-address resolve that no provider could pinpoint no longer
     dead-ends — when the typed query carries a KNOWN 5-digit ZIP, the resolve action returns the
@@ -456,11 +472,13 @@ collections are intentionally empty — not errors.
   `src/assets/icons/white-tile/`; the 1254px PNG masters are preserved in the local master
   archive. `PremiumIcon.astro` is the only renderer and `src/lib/premium-icons.ts` the only
   name registry. The tiles keep their white background, rounded border and soft shadow —
-  **never recolour, crop, stretch or wrap them in another chip/plate**. The six services use
-  01–06; Community Support uses 07; the Reviews heading uses 08; the trust banner uses
-  09–12; the five Community Support/community groups use 13–17. Competitive Pricing keeps
+  **never recolour, stretch, regenerate or wrap them in another chip/plate**. The renderer clips
+  only the saved raster's white canvas margin; the approved artwork itself is not altered. The six services use
+  01–06; Community Support uses 07; the Reviews heading uses 08 (reading glasses, replaced
+  2026-10-25); the trust banner uses 09–12; the five Community Support/community groups use
+  13–17 (17 is red/white/blue community artwork, replaced 2026-10-25). Competitive Pricing keeps
   the exact four-dollar-sign design (first filled gold, three outlined). The small footer review
-  button uses the reading-glasses vector at 24 px. Church Cleaning is the
+  button uses the matching reading-glasses vector at 24 px. Church Cleaning is the
   sixth homepage card. Registry: `docs/design/WHITE-TILE-ICON-INVENTORY.md`.
 - **Authentic reviews live (2026-10-24, Initiative 5.0):** the homepage reviews section is a
   premium layered editorial carousel (`src/components/Reviews.astro`) rendering ONE prominent
@@ -474,7 +492,7 @@ collections are intentionally empty — not errors.
   `richard.md`, `laura.md` (quote text verbatim; never fabricate or "improve" it). Never
   fabricate additional reviews or aggregate/Review schema; new genuine entries render
   automatically and the verified Google reviews link stays intact.
-- **Service-driven estimator questionnaire (2026-10-23 finishing pass):** the selected cleaning
+- **Service-driven estimator questionnaire (2026-10-23 finishing pass; current map/quote status through 6.4):** the selected cleaning
   service determines which questions exist — `src/lib/estimate/service-matrix.ts` is the single
   source of truth for service/frequency compatibility: **Residential house cleaning** offers
   one-time + weekly/biweekly/monthly; **Deep Cleaning, Move-in/Move-out and STR turnover are

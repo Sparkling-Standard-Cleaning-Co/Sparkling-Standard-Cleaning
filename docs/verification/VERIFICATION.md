@@ -3,6 +3,54 @@
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
+## Verified — 2026-10-25 Initiative 6.4 production deployment
+
+**Live branch/commit:** `main` at `685031d` (code release; documentation closeout follows).
+**Cloudflare Pages deployment:** `f9dea1a0-5b55-4cd8-b09e-18efae73c68a`. GitHub `validate`,
+`browser` and Cloudflare Pages checks all completed successfully.
+
+This release completes the seven-page owner audit: the service-area map expands to 18 Census
+counties with green/yellow/neutral policy colours and “Gulf Of America”; white-tile canvas margins
+are cropped without double-framing; icon 08 becomes reading glasses and icon 17 red/white/blue
+community artwork; the footer gets four contact actions and the exact review invitation; founder,
+Bible Belt, Southern Hospitality and Deep Cleaning copy are corrected; values are centered;
+Service Area and FAQ appear in both navigation layers; the public program is **Community Support
+Cleaning**; and the single global factor is replaced by four independent calibration factors.
+No pricing rate, formula, minimum, discount or travel assumption was changed; all four factors are
+`1.00`.
+
+### Predeployment verification
+
+| Check | Command | Result |
+| --- | --- | --- |
+| TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints (140 files) |
+| Production build | `npm run build` | 26 pages + sitemap; only the expected empty `proof` notice |
+| Unit suite | `npm test` | **500 tests: 499 passed, 1 skipped, 0 failed** |
+| Browser regression suite | `npm run test:browser` | **136 passed, 0 failed** |
+| Static validation | `npm run verify` | 1,798 internal links across 26 pages; SEO, homepage copy, marketing/QR, GTM and checklist checks passed |
+| Smoke test | `npm run smoke` | 21 required pages passed |
+| PENDING / fake-testimonial / fact audit | `npm run pending`, `npm run testimonials`, `npm run audit:facts` | all passed |
+| Calibration | `npm run commercial:calibration`, `npm run calibration:report` | 26 commercial + 20 church scenarios; church exact cents; factors 1.00 |
+| Visual evidence | `docs/verification/6.4/` | 17 current captures plus the owner-audit map before image |
+
+### Production live verification
+
+| Check | Result |
+| --- | --- |
+| Homepage content | Bible Belt/Southern Hospitality and “The founder of Sparkling Standard” present; no “Supportive Home” copy |
+| Header | Service Area and FAQ visible at 1024/1440; both exposed in the open 390 px mobile menu |
+| Footer | Four contact actions in order; exact review sentence; 24 px reading-glasses vector |
+| Service-area map | 2 core + 2 arrangement counties, 18 desktop labels, “Gulf Of America”; zero visible county labels and zero overflow at 390 px |
+| Community Support | `/supportive-home-cleaning/` returns 200, Community Support title/breadcrumb, old public name absent |
+| Estimator routes | `/estimate/residential/`, `/estimate/str/`, `/estimate/commercial/`, `/estimate/church/` all return 200 |
+| Photo intake | `GET /api/photo-upload` returns 200 with `enabled:true` (6 photos, 8 MiB each, 32 MiB total) |
+| GitHub / Cloudflare | `validate`, `browser` and Cloudflare Pages checks completed successfully |
+
+**Known residuals:** GTM Version 5 church/promotion event receipt still needs DebugView/Realtime
+confirmation; production R2 signed-link retrieval was not independently tested locally; no live
+lead-email submission was made for this release (the owner photo inbox path remains owner-confirmed).
+The documentation closeout commit follows this code release.
+
 ## Verified — 2026-10-25 Initiative 6.3 production deployment
 
 **Live branch/commit:** `main` at `911b5aa` (code release; documentation closeout follows).
