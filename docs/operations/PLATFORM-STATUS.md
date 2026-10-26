@@ -7,8 +7,8 @@ owner-reported setting into a code-verified fact. Historical records stay histor
 Last reviewed: **2026-10-25** (Initiative 6.3 deployed and live-verified; white-tile icons and estimator control center; R2/photo intake still enabled).
 
 **Release status:** production serves GitHub `main`; the **Initiative 6.3
-release is live at `2b64f0e`**, deployed to Cloudflare Pages on 2026-10-25 (deployment
-`18162d08-3d71-4f0e-874a-06ada6fbd2d7`). It installs the 17 white-tile icons, removes the
+release is live at `911b5aa`**, deployed to Cloudflare Pages on 2026-10-25 (deployment
+`1b1a854c-4cec-433b-b02d-0daefa012101`). It installs the 17 white-tile icons, removes the
 location helper paragraphs, centralizes every owner-editable estimator setting under
 `src/config/estimators/`, adds the Owner Control Center and Operations Manual, and completes the
 repository/local-master organization. Pricing values, formulas, R2 and Resend were not changed.
@@ -40,7 +40,7 @@ Status vocabulary:
 | Cloudflare DNS for the domain | **owner-confirmed** | Domain active on Cloudflare nameservers (owner screenshots, Oct 2026) | None | `docs/deployment/DEPLOYMENT.md` |
 | Cloudflare Pages project | **live (verified)** | `sparkling-standard-cleaning` is Git-connected: every `main` push produces a Cloudflare Pages deployment; custom domain serving. Production commit at the start of the 2026-10-02 review was `1287a763` (owner-stated) | None | `docs/deployment/DEPLOYMENT.md` |
 | Production website | **live (verified)** | `https://sparkling-standard.com` — all 18 pages return 200 with correct canonicals; mobile-throttled LCP 1.26–1.65 s, CLS ≤ 0.038; axe 0 violations (2026-10-01) | None | `docs/verification/VERIFICATION.md` |
-| Production release (deployed) | **live - `2b64f0e`** | Initiative 6.3: 17 white-tile icons, location-helper removal across all estimators, centralized owner estimator config, control-center manuals, repository cleanup and local master consolidation. GitHub `validate`, `browser` and Cloudflare Pages checks passed. Pricing values/formulas unchanged. Prior audit correction at `13fa860`, Initiative 6.2 at `e635d7f` and earlier releases are historical. | Maintain; verify lead delivery after any form or pricing change | `docs/verification/VERIFICATION.md`, `docs/ESTIMATOR-CONTROL-CENTER.md` |
+| Production release (deployed) | **live - `911b5aa`** | Initiative 6.3: 17 white-tile icons, location-helper removal across all estimators, centralized owner estimator config, control-center manuals, repository cleanup and local master consolidation. GitHub `validate`, `browser` and Cloudflare Pages checks passed. Pricing values/formulas unchanged. Prior audit correction at `13fa860`, Initiative 6.2 at `e635d7f` and earlier releases are historical. | Maintain; verify lead delivery after any form or pricing change | `docs/verification/VERIFICATION.md`, `docs/ESTIMATOR-CONTROL-CENTER.md` |
 | Indexing status | **live — owner-approved** | Owner explicitly approves public search-engine indexing (2026-10-01). `robots.txt` = `Allow: /` + sitemap; every page meta robots = `index, follow`; `PUBLIC_PREVIEW_MODE` is NOT set | Maintain. Never introduce noindex/disallow, and never enable indexing on intentionally excluded utility pages | `docs/deployment/DEPLOYMENT.md` §11 |
 | Domain registration | **owner-confirmed** | Registered via Squarespace following Google Workspace purchase | None | — |
 | Google Workspace email | **owner-confirmed** | `owner@sparkling-standard.com` operational; MX/SPF/DKIM imported. Do **not** modify or enable Email Routing | None | `docs/deployment/DEPLOYMENT.md` |

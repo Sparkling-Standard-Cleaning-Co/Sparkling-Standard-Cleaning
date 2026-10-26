@@ -5,8 +5,8 @@ work as complete; update this file when verification runs.
 
 ## Verified — 2026-10-25 Initiative 6.3 production deployment
 
-**Live branch/commit:** `main` at `2b64f0e` (code release; documentation closeout follows).
-**Cloudflare Pages deployment:** `18162d08-3d71-4f0e-874a-06ada6fbd2d7`. GitHub `validate`,
+**Live branch/commit:** `main` at `911b5aa` (code release; documentation closeout follows).
+**Cloudflare Pages deployment:** `1b1a854c-4cec-433b-b02d-0daefa012101`. GitHub `validate`,
 `browser` and Cloudflare Pages checks completed successfully.
 
 The release installs the owner's 17 white-tile icons, removes the GPS helper paragraphs from every
@@ -37,7 +37,7 @@ did not reprice the company.
 
 | Check | Result |
 | --- | --- |
-| Cloudflare deployment | `18162d08-3d71-4f0e-874a-06ada6fbd2d7` — successful |
+| Cloudflare deployment | `1b1a854c-4cec-433b-b02d-0daefa012101` — successful |
 | Homepage white-tile icons | 6 service, 4 value, 5 community-list, 1 review and 1 community-support icon rendered; retired SVG count 0 |
 | Competitive Pricing | Exact four-dollar-sign tile present in the trust banner |
 | Location helper | No “physically at the property” or facility helper text on any estimator; location button remains |

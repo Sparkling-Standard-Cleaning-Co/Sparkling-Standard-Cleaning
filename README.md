@@ -22,8 +22,8 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
   Parler, Locals), and **GA4 analytics** (`GTM-KSQ26HMG` / `G-LG222LQRQ2` —
   page views, `estimate_start` and all three inquiry key events verified; Enhanced Measurement
   form interactions disabled).
-- **Release status:** **Initiative 6.3** is **live** at `2b64f0e` (Cloudflare Pages deployment
-  `18162d08-3d71-4f0e-874a-06ada6fbd2d7`). It installs the 17 white-tile icons, removes the GPS
+- **Release status:** **Initiative 6.3** is **live** at `911b5aa` (Cloudflare Pages deployment
+  `1b1a854c-4cec-433b-b02d-0daefa012101`). It installs the 17 white-tile icons, removes the GPS
   helper paragraphs, centralizes estimator settings and adds the owner control-center
   documentation. Pricing and estimator mathematics were not changed. See
   `docs/verification/VERIFICATION.md`.
