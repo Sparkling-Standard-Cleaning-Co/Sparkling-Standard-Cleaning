@@ -61,6 +61,7 @@ test('commercial and church workload assumptions are unchanged', () => {
   assert.equal(ownerPricing.commercialPricing.grossRatePerHour, 60);
   assert.equal(ownerPricing.commercialPricing.tierAHours, 3);
   assert.equal(ownerPricing.commercialPricing.tierBHours, 8);
+  assert.equal(ownerPricing.commercialPricing.overheadRatePercent, 22);
   assert.equal(ownerPricing.commercialPricing.productionSqftPerHour.office, 3000);
   assert.equal(ownerPricing.commercialPricing.productionSqftPerHour.church, 2800);
   assert.equal(commercialTierConfig.numericEstimatesEnabled, true);

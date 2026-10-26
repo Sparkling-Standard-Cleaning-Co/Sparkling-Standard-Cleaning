@@ -199,7 +199,7 @@ export const pricing = {
     rangeSpreadPercent: approved(ownerPricing.commercialPricing.rangeSpreadPercent, 'Tier B uncertainty band.'),
     tierAHours: approved(ownerPricing.commercialPricing.tierAHours, 'Up to ~3 labour hours for a single preliminary price.'),
     tierBHours: approved(ownerPricing.commercialPricing.tierBHours, 'Up to ~8 labour hours for a preliminary range; above is custom scope review.'),
-    overheadRatePercent: approved(22, 'Conservative operating overhead allowance (supplies, admin, insurance, payment processing, rework) used for the financial audit. Travel is additional.'),
+    overheadRatePercent: approved(ownerPricing.commercialPricing.overheadRatePercent, 'Conservative operating overhead allowance (supplies, admin, insurance, payment processing, rework) used for the financial audit. Travel is additional.'),
     note: 'Enables nonbinding preliminary facility estimates. Owner review and final scope confirmation remain required. Commercial prices round UP to the next $5.',
   },
 

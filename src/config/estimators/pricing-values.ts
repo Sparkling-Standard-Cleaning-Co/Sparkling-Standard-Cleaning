@@ -264,6 +264,8 @@ export interface OwnerPricingConfig {
     rangeSpreadPercent: number;
     tierAHours: number;
     tierBHours: number;
+    /** Operating overhead allowance used for calibration/profit reporting. */
+    overheadRatePercent: number;
   };
 
   // ── 3. Base labor-hours per service type (before size and rooms) ──────────
@@ -428,6 +430,7 @@ export const ownerPricing: OwnerPricingConfig = {
     rangeSpreadPercent: 15,
     tierAHours: 3,
     tierBHours: 8,
+    overheadRatePercent: 22,
   },
 
   // ── 3. Base labor-hours per service type ──────────────────────────────────

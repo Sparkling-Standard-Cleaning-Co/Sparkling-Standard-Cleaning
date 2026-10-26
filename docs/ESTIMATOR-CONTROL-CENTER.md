@@ -142,6 +142,7 @@ replaces the charge only; labour still counts toward scheduled time.
 | Tier B threshold | `commercialPricing.tierBHours` | 8 | workload hours | Both | `pricing-values.ts` |
 | Numeric estimates enabled | `commercialTierConfig.numericEstimatesEnabled` | true | boolean | Both | `estimators/commercial.ts` |
 | Restroom Tier C trigger | `tierC_triggers.restroomsOver` | 4 | count | Legacy tier reference | `estimators/commercial.ts` |
+| Overhead allowance | `commercialPricing.overheadRatePercent` | 22% | service revenue | Commercial, church | `estimators/pricing-values.ts` |
 | Specialty Tier C trigger | `tierC_triggers.specialtyServices` | six values | list | Both | `estimators/commercial.ts` |
 
 The three threshold categories are **hour-based**: Tier A ≤3 hours, Tier B >3
