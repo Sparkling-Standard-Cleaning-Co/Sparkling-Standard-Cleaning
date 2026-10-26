@@ -1,6 +1,6 @@
 # Repository inventory — Sparkling Standard
 
-Audited 2026-10-25 for Initiative 6.4. This is the map of what is active, what
+Audited 2026-10-26 for Initiative 6.5. This is the map of what is active, what
 was archived, and what intentionally lives outside Git. It is not a second set
 of operating instructions; start at
 [START HERE — OWNER CONTROL CENTER](../START-HERE-OWNER-CONTROL-CENTER.md).
@@ -80,7 +80,8 @@ value or formula was changed by the move.
 - Scripts orientation map and this inventory.
 - 12 audit-correction screenshots (6.2 audit folder), 11 Initiative 6.3
   visual-evidence files (including the before/after location helper and the
-  labeled 17-icon inventory) and the 18 Initiative 6.4 verification files.
+  labeled 17-icon inventory), the 18 Initiative 6.4 verification files and the
+  Initiative 6.5 configuration audit.
 
 ## Dependencies
 

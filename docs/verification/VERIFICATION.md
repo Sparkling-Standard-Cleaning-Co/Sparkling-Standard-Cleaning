@@ -3,6 +3,52 @@
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
+## Verified — 2026-10-26 Initiative 6.5 production deployment
+
+**Live branch/commit:** `main` at `298c1df` (code release; documentation closeout follows).
+**Cloudflare Pages deployment:** `f9b4f61a-58d1-4ff3-8535-c375af8789fc`. GitHub `validate`,
+`browser` and Cloudflare Pages checks all completed successfully.
+
+This release makes routine estimator pricing edits safe from GitHub: central validation with
+actionable errors, a `config:validate` pre-build gate that blocks invalid Cloudflare deployments,
+automatic deterministic effective-pricing versioning, configuration-derived tests, fixed-reference
+arithmetic tests and a four-engine pricing impact report. All four calibration factors remain
+`1.00`; no rate, formula, minimum, discount, add-on or travel assumption was repriced.
+
+### Predeployment verification
+
+| Check | Command | Result |
+| --- | --- | --- |
+| TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints (144 files) |
+| Production build | `npm run build` | 26 pages + sitemap; configuration prebuild passed |
+| Unit suite | `npm test` | **522 tests: 521 passed, 1 pre-existing skip, 0 failed** |
+| Browser regression suite | `npm run test:browser` | **136 passed, 0 failed** |
+| Static validation | `npm run verify` | 1,798 internal links; SEO, homepage copy, marketing/QR, GTM and checklist checks passed |
+| Smoke test | `npm run smoke` | 21 required pages passed |
+| PENDING / fake-testimonial / fact audit | `npm run pending`, `npm run testimonials`, `npm run audit:facts` | all passed |
+| Calibration | `npm run commercial:calibration`, `npm run calibration:report` | 26 commercial + 20 church scenarios; exact discount reconciliation |
+| Pricing impact | `npm run pricing:impact -- --compare HEAD` | all representative totals unchanged; four calibration factors `1.00` |
+| Owner-edit simulations | `docs/verification/6.5/README.md` | commercial factor and six other valid edits passed tests; invalid factor rejected; all temporary values restored |
+| Final configuration version | `npm run config:validate` | `2026-10-25.engine-calibration-supportive-tax.v1.6df62617cd8e1616` |
+
+### Production live verification
+
+| Check | Result |
+| --- | --- |
+| Live routes | `/`, all four estimate routes, `/supportive-home-cleaning/` and `/church-cleaning/` return 200 |
+| Content tokens | No unresolved `{{...}}` pricing tokens on live pages; Community Support and church percentages render |
+| Photo intake | `GET /api/photo-upload` returns 200 with `enabled:true` |
+| Live reachability | `node scripts/live-check.mjs https://sparkling-standard.com` passed with 0 warnings |
+| GitHub / Cloudflare | `validate`, `browser` and Cloudflare Pages checks completed successfully |
+| Pricing | No production rate, formula, minimum, discount or travel change; all calibration factors `1.00` |
+
+**Known residuals:** Cloudflare's build gate validates owner pricing configuration before Astro
+builds; it does not run the browser suite, and GitHub browser checks run in parallel. A valid
+configuration with a browser-only regression could therefore deploy before the browser check
+completes. GitHub `browser` is the regression gate for that class of issue. GTM Version 5
+church/promotion event receipt still needs DebugView/Realtime confirmation; no live lead-email
+submission was made for this release; production R2 signed-link retrieval was not independently
+tested locally. The documentation closeout commit follows this code release.
 ## Verified — 2026-10-25 Initiative 6.4 production deployment
 
 **Live branch/commit:** `main` at `685031d` (code release; documentation closeout follows).

@@ -95,3 +95,30 @@ All four factors are restored to `1.00`; rates, labor, minimum, add-ons,
 discount and travel values are the pre-initiative production values. The final
 effective version is
 `2026-10-25.engine-calibration-supportive-tax.v1.6df62617cd8e1616`.
+
+## Final local verification
+
+- `npm run check`: 0 errors, 0 warnings, 0 hints (144 files).
+- `npm test`: **522 tests, 521 pass, 1 pre-existing skip, 0 fail**.
+- `npm run test:browser`: **136 tests, 136 pass, 0 fail**.
+- `npm run verify`: 26 pages, 1,798 internal links, SEO/homepage/marketing/QR/GTM/checklist checks passed.
+- `npm run smoke`: 21 pages passed.
+- `npm run pending`: no PENDING placeholder facts across 30 built files.
+- `npm run testimonials` / `npm run audit:facts`: passed.
+- `npm run commercial:calibration`: 26 commercial + 20 church scenarios, exact church reconciliation.
+- `npm run pricing:impact -- --compare HEAD`: zero price changes at the restored baseline.
+- `npm run config:validate`: valid; automatic version
+  `2026-10-25.engine-calibration-supportive-tax.v1.6df62617cd8e1616`.
+
+## Production release
+
+- Final code commit: `298c1df` — `feat: implement Initiative 6.5 owner estimator configuration`.
+- Cloudflare Pages deployment: `f9b4f61a-58d1-4ff3-8535-c375af8789fc`.
+- GitHub `validate`, `browser` and Cloudflare Pages checks: all successful.
+- Live routes verified: `/`, `/estimate/residential/`, `/estimate/str/`,
+  `/estimate/commercial/`, `/estimate/church/`, `/supportive-home-cleaning/`,
+  `/church-cleaning/` all HTTP 200; no unresolved content tokens.
+- Live `/api/photo-upload`: HTTP 200, `enabled:true`.
+- Live `scripts/live-check.mjs`: all reachability checks passed, 0 warnings.
+- The four calibration factors are restored to `1.00`; no production rate,
+  labor, minimum, add-on, discount or travel assumption was changed.

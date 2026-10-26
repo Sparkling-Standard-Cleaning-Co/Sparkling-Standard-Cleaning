@@ -22,11 +22,12 @@ TRAFFIC → ESTIMATE → LEAD → BOOKING REQUEST → CONFIRMED JOB → RECURRIN
   Parler, Locals), and **GA4 analytics** (`GTM-KSQ26HMG` / `G-LG222LQRQ2` —
   page views, `estimate_start` and all three inquiry key events verified; Enhanced Measurement
   form interactions disabled).
-- **Release status:** **Initiative 6.4** is **live** at `685031d` (Cloudflare Pages deployment
-  `f9dea1a0-5b55-4cd8-b09e-18efae73c68a`). It expands the Census service-area map, corrects
-  icons/footer/navigation/copy, renames the public program to Community Support Cleaning and adds
-  four independent `1.00` calibration factors. No rate, formula, minimum, discount or travel
-  assumption was repriced. See `docs/verification/VERIFICATION.md` and `docs/verification/6.4/`.
+- **Release status:** **Initiative 6.5** is **live** at `298c1df` (Cloudflare Pages deployment
+  `f9b4f61a-58d1-4ff3-8535-c375af8789fc`). It adds central owner-pricing validation, a pre-build
+  configuration gate, automatic deterministic quote versioning, configuration-derived tests and a
+  four-engine pricing impact report. All four calibration factors remain `1.00`; no rate, formula,
+  minimum, discount or travel assumption was repriced. See `docs/verification/VERIFICATION.md` and
+  `docs/verification/6.5/`.
 - **Remaining owner items:** formal launch checklist (legal entity spelling, insurance/bonding/
   licensing claims, genuine reviews, final cancellation percentages), Instagram verification,
   the deferred YouTube channel (Google Workspace eligibility — no paid workarounds), genuine

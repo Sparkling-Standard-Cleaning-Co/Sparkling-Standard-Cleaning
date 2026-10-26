@@ -4,15 +4,16 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-25** (Initiative 6.4 code release deployed and live-verified; map, footer, Community Support naming and four calibration factors; R2/photo intake still enabled).
+Last reviewed: **2026-10-26** (Initiative 6.5 code release deployed and live-verified; automatic estimator versioning, validation gate and impact report; R2/photo intake still enabled).
 
-**Release status:** production serves GitHub `main`; the **Initiative 6.4
-code release is live at `685031d`**, deployed to Cloudflare Pages on 2026-10-25 (deployment
-`f9dea1a0-5b55-4cd8-b09e-18efae73c68a`; documentation closeout follows). It expands the
-Census service-area map, corrects icons/footer/navigation/copy, renames the public program to
-Community Support Cleaning and adds four independent `1.00` calibration factors. No pricing rate,
-formula, minimum, discount or travel assumption was repriced. The Initiative 6.3 release at
-`911b5aa`, audit correction at `13fa860` and Initiative 6.2 at `e635d7f` are historical.
+**Release status:** production serves GitHub `main`; the **Initiative 6.5
+code release is live at `298c1df`**, deployed to Cloudflare Pages on 2026-10-26 (deployment
+`f9b4f61a-58d1-4ff3-8535-c375af8789fc`; documentation closeout follows). It replaces manual
+owner-price test edits and quote-version bumps with configuration-derived tests, central
+validation, automatic fingerprinting and a four-engine impact report. All four calibration
+factors remain `1.00`; no pricing rate, formula, minimum, discount or travel assumption was
+repriced. Initiative 6.4 at `685031d`, 6.3 at `911b5aa`, audit correction at `13fa860` and
+Initiative 6.2 at `e635d7f` are historical.
 
 **Customer photos are live:** production `/api/photo-upload` reports `enabled:true`; the private R2
 bucket, `PHOTOS_BUCKET` binding and `PHOTO_OWNER_TOKEN` are active. Real JPEG and converted iPhone
@@ -40,7 +41,7 @@ Status vocabulary:
 | Cloudflare DNS for the domain | **owner-confirmed** | Domain active on Cloudflare nameservers (owner screenshots, Oct 2026) | None | `docs/deployment/DEPLOYMENT.md` |
 | Cloudflare Pages project | **live (verified)** | `sparkling-standard-cleaning` is Git-connected: every `main` push produces a Cloudflare Pages deployment; custom domain serving. Production commit at the start of the 2026-10-02 review was `1287a763` (owner-stated) | None | `docs/deployment/DEPLOYMENT.md` |
 | Production website | **live (verified)** | `https://sparkling-standard.com` — all 18 pages return 200 with correct canonicals; mobile-throttled LCP 1.26–1.65 s, CLS ≤ 0.038; axe 0 violations (2026-10-01) | None | `docs/verification/VERIFICATION.md` |
-| Production release (deployed) | **live - `685031d`** | Initiative 6.4: 18-county Census map, icon-frame/reading-glasses/community-art corrections, footer contact/review rebuild, Service Area and FAQ navigation, founder/Bible Belt/Deep Cleaning copy, centered values, Community Support Cleaning naming and four independent `1.00` calibration factors. GitHub `validate`, `browser` and Cloudflare Pages checks passed. No pricing rate/formula/minimum/discount/travel change. Initiative 6.3 at `911b5aa`, audit correction at `13fa860`, Initiative 6.2 at `e635d7f` and earlier releases are historical. | Maintain; verify lead delivery after any form or pricing change | `docs/verification/VERIFICATION.md`, `docs/ESTIMATOR-CONTROL-CENTER.md` |
+| Production release (deployed) | **live - `298c1df`** | Initiative 6.5: central pricing validation, Cloudflare pre-build gate, automatic effective-pricing fingerprint, configuration-derived tests, fixed-reference arithmetic guard and four-engine impact report. All calibration factors `1.00`; no pricing rate/formula/minimum/discount/travel change. GitHub `validate`, `browser` and Cloudflare Pages checks passed. Initiative 6.4 at `685031d` and earlier releases are historical. | Maintain; verify lead delivery after any form or pricing change | `docs/verification/VERIFICATION.md`, `docs/ESTIMATOR-CONTROL-CENTER.md` |
 | Indexing status | **live — owner-approved** | Owner explicitly approves public search-engine indexing (2026-10-01). `robots.txt` = `Allow: /` + sitemap; every page meta robots = `index, follow`; `PUBLIC_PREVIEW_MODE` is NOT set | Maintain. Never introduce noindex/disallow, and never enable indexing on intentionally excluded utility pages | `docs/deployment/DEPLOYMENT.md` §11 |
 | Domain registration | **owner-confirmed** | Registered via Squarespace following Google Workspace purchase | None | — |
 | Google Workspace email | **owner-confirmed** | `owner@sparkling-standard.com` operational; MX/SPF/DKIM imported. Do **not** modify or enable Email Routing | None | `docs/deployment/DEPLOYMENT.md` |
