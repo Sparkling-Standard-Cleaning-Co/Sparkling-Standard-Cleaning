@@ -4,8 +4,7 @@ metaTitle: Deep Cleaning in Pensacola & Cantonment
 metaDescription: Deep cleaning for Pensacola-area homes that need extra care and attention — hand-wiped baseboards and blinds, detailed walls and doors, and the buildup a standard clean misses. Required before new recurring service.
 summary: An in-depth reset for a home that needs extra care and attention. Our deep cleaning service focuses on areas that can get buildup over time, from hand wiping baseboards and blinds to detailing walls and doors. We go beyond the basics to leave your home feeling renewed, and thoroughly clean.
 homepageParagraphs:
-  - An in-depth reset for a home that needs extra care and attention. Our deep cleaning service focuses on areas that can get buildup over time, from hand wiping baseboards and blinds to detailing walls and doors (See our Deep Cleaning procedure and available add-ons for a full list of services). We go beyond the basics to leave your home feeling renewed, and thoroughly clean.
-  - This service is ideal for one-time cleanings and is required before beginning recurring residential maintenance cleaning. It’s also recommended for returning clients when dirt, grime, or buildup begins to accumulate beyond what routine maintenance cleaning is designed to address.
+  - An in-depth reset for a home that needs extra care — baseboards, frames, buildup and the details routine cleaning can miss. Required before a new recurring residential arrangement; the complete procedure lives on the Deep Cleaning page.
 icon: deep-cleaning
 order: 3
 path: /deep-cleaning/

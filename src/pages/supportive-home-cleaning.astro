@@ -16,14 +16,14 @@ const site = Astro.site ?? new URL('https://pending-website-url.invalid');
 const schema = [
   serviceNode({
     site,
-    name: 'Supportive Home Cleaning',
+    name: 'Community Support Cleaning',
     description: data.metaDescription,
     path: '/supportive-home-cleaning/',
-    serviceType: 'Supportive home cleaning for seniors and households needing extra help',
+    serviceType: 'Community support cleaning for seniors and households needing extra help',
   }),
   breadcrumbNode(site, [
     { name: 'Home', path: '/' },
-    { name: 'Supportive Home Cleaning', path: '/supportive-home-cleaning/' },
+    { name: 'Community Support Cleaning', path: '/supportive-home-cleaning/' },
   ]),
 ];
 
@@ -45,11 +45,11 @@ const showText = phone !== null && business.flags.smsEnabled && !isPending(phone
       <Breadcrumbs
         trail={[
           { name: 'Home', path: '/' },
-          { name: 'Supportive Home Cleaning', path: '/supportive-home-cleaning/' },
+          { name: 'Community Support Cleaning', path: '/supportive-home-cleaning/' },
         ]}
       />
       <div class="section-head mt-4 readable">
-        <p class="eyebrow">Supportive Home Cleaning</p>
+        <p class="eyebrow">Community Support Cleaning</p>
         <h1>
           {data.hero.headline}
           {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}

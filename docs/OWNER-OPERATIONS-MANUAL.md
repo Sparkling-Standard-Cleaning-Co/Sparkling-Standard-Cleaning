@@ -50,7 +50,8 @@ Rule of thumb:
 ## 4. Update service pricing
 
 1. Edit `hourlyRates`, `minimumJob`, labour units, condition/frequency factors,
-   or add-on hours in `pricing-values.ts`.
+   add-on hours or the four `estimatorCalibration` factors in
+   `pricing-values.ts`.
 2. If the effective quote changes, bump `instantQuote.configVersion` in
    `src/config/pricing.ts`.
 3. Run `npm run estimate:quotes` to see the representative effect.

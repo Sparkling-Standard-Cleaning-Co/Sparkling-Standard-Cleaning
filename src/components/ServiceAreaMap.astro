@@ -10,7 +10,7 @@
  * and surrounding copy keep the "confirm your address" qualification and the
  * authoritative eligibility logic stays in the estimator.
  */
-import { MAP_COUNTIES, MAP_CONTEXT_PATHS, MAP_CITIES, MAP_COUNTY_LABELS, MAP_STATE_LINE, MAP_WIDTH, MAP_HEIGHT } from '../lib/geo/service-area-map';
+import { MAP_COUNTIES, MAP_CONTEXT_PATHS, MAP_CITIES, MAP_COUNTY_LABELS, MAP_STATE_LINE, MAP_WATER_LABEL, MAP_WIDTH, MAP_HEIGHT } from '../lib/geo/service-area-map';
 
 const counties = MAP_COUNTIES;
 const core = counties.filter((county) => county.category === 'core');
@@ -23,7 +23,7 @@ const arrangement = counties.filter((county) => county.category === 'arrangement
       viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
       class="area-map__svg"
       role="img"
-      aria-label="Map of the Sparkling Standard service area: Escambia and Santa Rosa Counties in Florida as the core service area, including Pensacola, Cantonment, Gulf Breeze, Milton and Pace; Baldwin and Escambia Counties in Alabama served by arrangement; neighboring counties shown for context with no coverage implied."
+      aria-label="Map of the Sparkling Standard service area: Escambia and Santa Rosa Counties in Florida are the green core service area, including Pensacola, Cantonment, Gulf Breeze, Milton and Pace; Baldwin and Escambia Counties in Alabama are yellow service-by-arrangement counties; surrounding Florida and Alabama counties are neutral geographic context only. The Gulf Of America is shown south of the coastline."
     >
       <rect x="0" y="0" width={MAP_WIDTH} height={MAP_HEIGHT} fill="var(--color-cream-100)" />
       <!-- Neighboring geography: neutral, explicitly not covered -->
@@ -67,19 +67,23 @@ const arrangement = counties.filter((county) => county.category === 'arrangement
           </g>
         ))}
       </g>
-      <text x={MAP_WIDTH - 14} y={MAP_HEIGHT - 14} text-anchor="end" class="area-map__water-label">
-        Gulf of Mexico
+      <text x={MAP_WATER_LABEL.x} y={MAP_WATER_LABEL.y} text-anchor="middle" class="area-map__water-label">
+        Gulf Of America
       </text>
     </svg>
   </div>
   <figcaption class="area-map__legend">
     <span class="area-map__legend-item">
       <span class="area-map__swatch area-map__swatch--core" aria-hidden="true"></span>
-      <strong>Core Service Area</strong>
+      <span><strong>Core Service Area</strong> <span class="area-map__legend-note">green</span></span>
     </span>
     <span class="area-map__legend-item">
       <span class="area-map__swatch area-map__swatch--arrangement" aria-hidden="true"></span>
-      <strong>Service by Arrangement</strong>
+      <span><strong>Service by Arrangement / Approval</strong> <span class="area-map__legend-note">yellow, dashed</span></span>
+    </span>
+    <span class="area-map__legend-item">
+      <span class="area-map__swatch area-map__swatch--context" aria-hidden="true"></span>
+      <span><strong>Surrounding Geographic Context</strong> <span class="area-map__legend-note">not automatically served</span></span>
     </span>
     <span class="area-map__legend-item">
       <span class="area-map__swatch area-map__swatch--confirm" aria-hidden="true"></span>
@@ -87,9 +91,11 @@ const arrangement = counties.filter((county) => county.category === 'arrangement
     </span>
   </figcaption>
   <p class="small text-muted area-map__note">
-    Shaded counties describe where we work — not an automatic whole-county
-    guarantee. The instant estimate checks your exact address and confirms
-    coverage and travel before anything is booked. Neighboring counties are
-    shown for orientation only.
+    Escambia and Santa Rosa counties in Florida (green) are our core service
+    area; Baldwin and Escambia counties in Alabama (yellow) are served by
+    arrangement or approval. Neutral counties are geographic context only and
+    do not imply coverage. A county tint is never an automatic whole-county
+    guarantee: the instant estimate checks your exact address and confirms
+    coverage and travel before anything is booked.
   </p>
 </figure>

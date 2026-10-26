@@ -8,7 +8,7 @@
 //  - the minimum job value is applied silently to every estimate;
 //  - prices are never negative or nonsensical.
 
-import { pricing, resolveGlobalEstimateFactor } from '../../config/pricing.ts';
+import { pricing, resolveEstimatorCalibration } from '../../config/pricing.ts';
 import { zoneForZip } from '../../config/geography.ts';
 import type { AddonBundleDefinition, CampaignPromotionConfig, FoundingTenConfig, PromotionCustomerKind, PromotionTerms } from '../../config/estimators/pricing-values.ts';
 import { calculateTravelAdjustment } from '../travel/calculateTravelAdjustment.ts';
@@ -35,8 +35,8 @@ import type {
 } from './types.ts';
 
 export interface EstimateContext {
-  /** Test/owner override for the global estimate factor; defaults to config. */
-  globalEstimateFactor?: number;
+  /** Test-only override for this engine calibration factor; production reads config. */
+  globalFactorOverride?: number;
   travel: {
     /** Present only when the serverless routing function answered. */
     routed?: RoutedTravelInfo;
@@ -396,8 +396,10 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
   const discount = evaluation.discount;
   // 2. One discount (never stacked) applies to the rounded base.
   const discountedBase = discount ? round2(baseRounded - discount.amount) : baseRounded;
-  // 3. The owner global factor applies to the discounted service subtotal.
-  const globalFactor = resolveGlobalEstimateFactor(context.globalEstimateFactor);
+  // 3. The selected engine calibration factor applies to the discounted service subtotal.
+  const calibrationEngine = input.serviceType === 'str_turnover' ? 'str' : 'residential';
+  const globalFactor = resolveEstimatorCalibration(calibrationEngine, context.globalFactorOverride);
+  const calibrationLabel = calibrationEngine === 'str' ? 'STR' : 'Residential';
   const adjustedBase = round2(discountedBase * globalFactor);
   const globalAdjustment = round2(adjustedBase - discountedBase);
   // 4. Travel is a separately stated pass-through; tax is never included here.
@@ -446,13 +448,13 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
       ? [
           {
             step: 'price:global_factor',
-            detail: `Owner global estimate factor × ${globalFactor.toFixed(2)} applied to the pre-tax service subtotal`,
+            detail: `${calibrationLabel} calibration factor × ${globalFactor.toFixed(2)} applied to the pre-tax service subtotal`,
             value: globalAdjustment,
           },
         ]
       : []),
     { step: 'price:base_rounding', detail: `Base service rounded down to the nearest $${step}`, value: round2(baseRounded - gross) },
-    { step: 'price:rounding', detail: 'Discounts and the owner factor are preserved to the cent; no upward rounding or reapplied minimum', value: roundingAdjustment },
+    { step: 'price:rounding', detail: 'Discounts and the engine calibration factor are preserved to the cent; no upward rounding or reapplied minimum', value: roundingAdjustment },
     { step: 'price:expected', detail: 'Offered price before travel/tax presentation', value: expectedPrice },
   );
 
@@ -461,7 +463,7 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
       code: 'GLOBAL_FACTOR_BELOW_FLOOR',
       severity: 'review',
       message:
-        'The owner global estimate factor takes this service subtotal below the standard minimum; review before confirming.',
+        'The engine calibration factor takes this service subtotal below the standard minimum; review before confirming.',
     });
   }
 

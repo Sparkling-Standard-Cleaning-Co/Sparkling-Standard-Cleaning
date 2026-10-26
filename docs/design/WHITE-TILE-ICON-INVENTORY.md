@@ -6,13 +6,19 @@ masters remain in the local master asset archive; the repository carries the
 optimized 384 px WebP renditions in
 `src/assets/icons/white-tile/`.
 
-![Contact sheet of all 17 white-tile icons](white-tile-icon-contact-sheet.jpg)
+![Original owner contact sheet of all 17 white-tile icons; icon 08 and 17 were replaced in the 2026-10-25 audit](white-tile-icon-contact-sheet.jpg)
+
+> The supplied contact sheet predates the 2026-10-25 audit substitutions for
+> **08** (reading glasses) and **17** (red/white/blue community figures). The
+> per-icon thumbnails and rows below are the current repository truth.
 
 **Provenance:** the owner supplied the pack as the approved visual direction.
 Competitive Pricing keeps **four dollar signs — first filled gold, three
 outlined**; do not substitute a tag, coins or a calculator. The white tile,
-rounded border and soft shadow are part of the artwork; never recolour, crop or
-stretch a tile.
+rounded border and soft shadow are part of the artwork; never recolour or
+stretch a tile. The saved raster carries a narrow white canvas margin, so the
+renderer clips that margin at display time (`.premium-icon__image` scale
+`1.12`); the approved artwork itself is not regenerated or physically cropped.
 
 ## Placement map
 
@@ -30,15 +36,18 @@ stretch a tile.
 | 10 | Christian Values | Trust banner | 64 px | `TrustChips` |
 | 11 | Flexible Scheduling | Trust banner | 64 px | `TrustChips` |
 | 12 | Competitive Pricing | Trust banner — exact four-dollar design | 67 px | `TrustChips` |
-| 13 | Seniors / 65+ | Community spotlight list; Supportive Home eligibility | 56 / 72 px | homepage + `supportive-home-cleaning.astro` |
-| 14 | First Responders | Community spotlight list; Supportive Home eligibility | 56 / 72 px | same |
-| 15 | Military Veterans | Community spotlight list; Supportive Home eligibility | 56 / 72 px | same |
-| 16 | People with Disabilities | Community spotlight list; Supportive Home eligibility | 56 / 72 px | same |
-| 17 | Other Eligible Community | Community spotlight list; Supportive Home eligibility | 56 / 72 px | same |
+| 13 | Seniors / 65+ | Community spotlight list; Community Support eligibility | 56 / 72 px | homepage + `supportive-home-cleaning.astro` |
+| 14 | First Responders | Community spotlight list; Community Support eligibility | 56 / 72 px | same |
+| 15 | Military Veterans | Community spotlight list; Community Support eligibility | 56 / 72 px | same |
+| 16 | People with Disabilities | Community spotlight list; Community Support eligibility | 56 / 72 px | same |
+| 17 | Other Eligible Community | Community spotlight list; Community Support eligibility | 56 / 72 px | same |
 
-The small “Read Our Reviews” footer button intentionally keeps the simple vector
-magnifying glass, as specified in the owner pack’s implementation guide: a
-384 px raster tile is not appropriate inside a small text button.
+The 2026-10-25 owner audit replaced two tiles without changing the 17-icon
+registry: **08** now carries clean reading glasses rather than a magnifier, and
+**17** carries a red/white/blue three-figure community mark. The replaced
+originals remain in the local master archive under `99-Archive-For-Review/`.
+The small footer “Read Our Reviews” action uses the matching **vector reading
+glasses** at 24 px; the old search/magnifier vector is removed.
 
 ## Thumbnails
 

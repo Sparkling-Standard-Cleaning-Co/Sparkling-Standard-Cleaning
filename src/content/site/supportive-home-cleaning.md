@@ -1,11 +1,11 @@
 ---
-metaTitle: Supportive Home Cleaning in Pensacola | 10% Eligibility Discount
-metaDescription: Supportive Home Cleaning is ordinary residential cleaning with a 10% appreciation discount for adults 65+, first responders, military veterans, people with disabilities, and other eligible community members in Pensacola and Cantonment. No diagnosis or documentation required.
+metaTitle: Community Support Cleaning in Pensacola | 10% Eligibility Discount
+metaDescription: Community Support Cleaning is ordinary residential cleaning with a 10% appreciation discount for adults 65+, first responders, military veterans, people with disabilities, and other eligible community members in Pensacola and Cantonment. No diagnosis or documentation required.
 hero:
   headline: 'A Cleaner Home.'
   accent: ' A Little More Peace of Mind.'
   lead: >-
-    Supportive Home Cleaning is the same dependable residential cleaning we
+    Community Support Cleaning is the same dependable residential cleaning we
     provide every day, with a 10% appreciation discount for adults aged 65 or
     older, first responders, military veterans, people with disabilities, and
     other eligible community members. No diagnosis, medical record, or
@@ -54,7 +54,7 @@ sections:
       personally before booking.
     items:
       - title: Shown clearly on the estimate
-        text: The estimate shows a “Supportive Home discount (10%)” line with the exact savings.
+        text: The estimate shows a “Community Support discount (10%)” line with the exact savings.
       - title: Simple self-attestation
         text: Check the eligibility box if you qualify. We never ask for diagnoses, VA records, disability certifications or ID uploads.
       - title: Confirmed before booking
@@ -65,7 +65,7 @@ sections:
     heading: Service values you can hold us to
     lead: >-
       Our approach is simple: treat people the way we would want our own
-      family treated. These are the standards behind every supportive visit.
+      family treated. These are the standards behind every community visit.
     items:
       - title: Treated with dignity
         text: You are a customer with standards, not a case to manage.
@@ -82,10 +82,10 @@ process:
     - title: Choose your cleaning
       text: >-
         Start an instant residential estimate, choose the cleaning you need and
-        check the Supportive Home eligibility box if it applies to you.
+        check the Community Support eligibility box if it applies to you.
     - title: See the discount
       text: >-
-        The estimate shows the 10% Supportive Home discount and the exact
+        The estimate shows the 10% Community Support discount and the exact
         savings on eligible cleaning charges.
     - title: Confirm together
       text: >-

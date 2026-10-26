@@ -17,7 +17,7 @@ estimateBand:
 communityBand:
   eyebrow: Community Support
   heading: Giving Back to Those Who Give So Much.
-  text: Everyone deserves a home that feels cared for. Through Supportive Home Cleaning, we offer eligible seniors, first responders, veterans, people with disabilities, and other community members a discounted cleaning — with eligibility confirmed personally and no intrusive paperwork.
+  text: Everyone deserves a home that feels cared for. Through Community Support Cleaning, we offer eligible seniors, first responders, veterans, people with disabilities, and other community members a discounted cleaning — with eligibility confirmed personally and no intrusive paperwork.
   note: The same Sparkling Standard clean, with a little extra appreciation for the people who hold our community together.
   ctaLabel: Explore Community Support Cleaning
   ctaHref: /supportive-home-cleaning/
@@ -35,10 +35,10 @@ communityBand:
 founderBand:
   heading: The Woman Behind the Sparkle
   paragraphs:
-    - Our founder grew up around cleaning — from a grandmother who owned her own cleaning business to working alongside family, then building experience with established local cleaning companies. She coordinated directly with customers and inspected the quality of work firsthand, gaining an inside perspective on the industry.
+    - The founder of Sparkling Standard grew up around cleaning — from a grandmother who owned her own cleaning business to working alongside family, then building experience with established local cleaning companies. She coordinated directly with customers and inspected the quality of work firsthand, gaining an inside perspective on the industry.
     - Over time, she repeatedly saw speed and profit being prioritized over care and quality. Homeowners deserve better than that.
     - "Sparkling Standard exists for this reason: to create spaces so clean they amaze, where the small things are actually noticed. The fingerprints on the switch plate, the buildup behind the faucet, the spattered toothbrush holder nobody notices."
-    - Our founder’s standards are shaped from her hands-on experience, a firsthand understanding of where cleaning services can fall short, and her genuine passion for transforming untidy spaces into clean, polished sanctuaries.
+    - The founder of Sparkling Standard shapes her standards from hands-on experience, a firsthand understanding of where cleaning services can fall short, and her genuine passion for transforming untidy spaces into clean, polished sanctuaries.
     - "Her ambition comes from knowing exactly what she wants to build: a company devoted to delivering the highest quality of work, where care is never sacrificed, and the details always matter."
   linkLabel: Meet Our Founder
 areaBand:

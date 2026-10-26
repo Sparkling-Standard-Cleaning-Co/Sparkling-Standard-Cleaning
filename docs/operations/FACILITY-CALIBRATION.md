@@ -1,11 +1,12 @@
-# Facility pricing calibration (Initiative 6.2 completion)
+# Facility pricing calibration (Initiative 6.4 completion)
 
 **Date:** 2026-10-25
 **Status:** completed initial calibration; hypothetical scenarios, not completed jobs.
 **Model:** $60.00/labor-hour gross;
 $35.00/hour owner-labour cost;
 $125.00 minimum; 22% overhead allowance;
-global factor 1.00.
+commercial calibration 1.00;
+church calibration 1.00.
 
 ## Method
 
@@ -14,8 +15,8 @@ global factor 1.00.
 - All rows use the **same shared functions** used by the website and
   `facility-verify.ts`; they are not a separate spreadsheet.
 - The church discount is applied after the $125 minimum and the $5 facility
-  presentation step, then retained to the cent. The global owner factor applies
-  after the discount and never to travel.
+  presentation step, then retained to the cent. The matching engine calibration
+  factor applies after the discount and never to travel.
 - Tier A = one preliminary number; Tier B = ±15% range; Tier C = custom review
   with no invented number. Specialty work is always custom.
 - Travel is a separately stated pass-through; it is excluded from the
@@ -102,8 +103,9 @@ offered; their labour estimate remains visible for planning.
    rather than misleading numbers.
 3. Ordinary church scenarios use the exact 10% discount. Example:
    $145.00 − $14.50 = $130.50. No upward re-rounding occurs.
-4. The owner global factor scales service revenue without changing the church
-   discount or travel charge; the shared tests cover 0.90/1.00/1.10.
+4. The matching engine calibration factor scales service revenue without
+   changing the church discount or travel charge; the shared tests cover
+   0.90/1.00/1.10 for each engine.
 5. Travel is visible separately (c25 and h20); it is not discounted.
 6. The model is deliberately conservative on production rates and uses a
    $60/hour gross rate within the researched local $50–75/hour band. No rate

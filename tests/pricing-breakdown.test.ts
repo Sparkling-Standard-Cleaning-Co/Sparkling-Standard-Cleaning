@@ -68,7 +68,7 @@ test('every eligible add-on has a labor-derived charge and the figures reconcile
   }
 
   // base + extras − discount + rounding = proposed total, exactly.
-  // base + extras + base rounding - discount + global factor + travel = total.
+  // base + extras + base rounding - discount + engine calibration factor + travel = total.
   const expectedTotal =
     Math.round(
       (p.basePrice +

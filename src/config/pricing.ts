@@ -118,17 +118,32 @@ export const pricing = {
   ),
 
   /**
-   * ONE owner-controlled adjustment to the pre-tax cleaning/service subtotal.
-   * Applies after the minimum and any single eligible discount, before travel
-   * and tax. 1.00 = unchanged, 0.90 = 10% lower, 1.10 = 10% higher.
+   * Four INDEPENDENT owner-controlled calibration factors. Each applies to
+   * its own engine's eligible service subtotal only. 1.00 = unchanged;
+   * 0.90 = 10% lower; 1.10 = 10% higher. Travel and tax are separate and are
+   * never multiplied by a factor. Supported range: 0.50–1.50.
    */
-  globalEstimateFactor: approved(
-    ownerPricing.globalEstimateFactor,
-    'Owner-directed global estimate adjustment (2026-10-25). Applies to the pre-tax service subtotal across all engines; travel and tax are separate. Supported range 0.50–1.50.',
-  ),
+  estimatorCalibration: {
+    residential: approved(
+      ownerPricing.estimatorCalibration.residential,
+      'Owner calibration factor for the Residential engine. Applies to the eligible service subtotal after the existing discount/minimum order; travel and tax are separate.',
+    ),
+    str: approved(
+      ownerPricing.estimatorCalibration.str,
+      'Owner calibration factor for the Short-Term Rental / Turnover engine. Independent from Residential; travel and tax are separate.',
+    ),
+    commercial: approved(
+      ownerPricing.estimatorCalibration.commercial,
+      'Owner calibration factor for the Commercial engine. Independent from Church; travel and tax are separate.',
+    ),
+    church: approved(
+      ownerPricing.estimatorCalibration.church,
+      'Owner calibration factor for the Church engine. Independent from Commercial; travel and tax are separate.',
+    ),
+  },
 
-  // ── Supportive Home discount (owner-directed 2026-10-25) ────────────────────
-  // A 10% appreciation discount for eligible Supportive Home customers. It is
+  // ── Community Support discount (owner-directed 2026-10-25) ────────────────────
+  // A 10% appreciation discount for eligible Community Support customers. It is
   // self-attested at the estimate and confirmed by the owner before booking.
   // It is one discount in the single-discount policy (never stacked with a
   // campaign or other promotion). It applies to eligible residential cleaning
@@ -137,19 +152,19 @@ export const pricing = {
     state: 'approved' as ApprovalState,
     termsVersion: approved(
       ownerPricing.supportiveHomeDiscount.termsVersion,
-      'Version marker for the Supportive Home eligibility-discount terms.',
+      'Version marker for the Community Support eligibility-discount terms.',
     ),
     enabled: approved(
       ownerPricing.supportiveHomeDiscount.enabled,
-      'Owner-directed Supportive Home 10% discount (2026-10-25).',
+      'Owner-directed Community Support 10% discount (2026-10-25).',
     ),
     percent: approved(
       ownerPricing.supportiveHomeDiscount.percent,
-      'Owner-directed 10% appreciation discount for eligible Supportive Home customers.',
+      'Owner-directed 10% appreciation discount for eligible Community Support customers.',
     ),
     eligibleServices: approved(
       ownerPricing.supportiveHomeDiscount.eligibleServices,
-      'Residential services eligible for the Supportive Home discount (never commercial, church or STR).',
+      'Residential services eligible for the Community Support discount (never commercial, church or STR).',
     ),
     appliesTo: 'cleaning_subtotal' as const,
     stacking: false as const,
@@ -182,7 +197,7 @@ export const pricing = {
   // scope-review experience with no numeric prices.
   commercialPricing: {
     state: 'approved' as ApprovalState,
-    configVersion: approved('2026-10-25.facility-workload.v2', 'Facility estimate provenance marker (Initiative 6.2: global factor, exact discount reconciliation and tax presentation).'),
+    configVersion: approved('2026-10-25.facility-workload.v3', 'Facility estimate provenance marker (Initiative 6.4: independent commercial/church calibration factors).'),
     grossRatePerHour: approved(ownerPricing.commercialPricing.grossRatePerHour, 'Middle of the published Pensacola market range (-75/hr); sustains owner labour, overhead and a modest margin.'),
     productionSqftPerHour: {
       office: approved(ownerPricing.commercialPricing.productionSqftPerHour.office, 'Conservative effective rate for a DETAILED office standard (ISSA routine benchmark is ~4,200 sqft/hr; lowered for quality, obstacle density and nonproductive time).'),
@@ -437,7 +452,7 @@ export const pricing = {
      * the server before a reservation is accepted. Bump when pricing logic,
      * rates or policy values change so old quotes cannot be silently reused.
      */
-    configVersion: approved('2026-10-25.global-factor-supportive-tax.v1', 'Quote provenance marker. Incremented for the Initiative 6.2 global estimate factor, Supportive Home eligibility discount, exact discount reconciliation and tax presentation.'),
+    configVersion: approved('2026-10-25.engine-calibration-supportive-tax.v1', 'Quote provenance marker. Incremented for the Initiative 6.4 independent residential/STR calibration factors, Community Support eligibility discount, exact discount reconciliation and tax presentation.'),
     /**
      * Which value from the calculation becomes the offered price. 'expected' is
      * the model price and never the lowest range value; 'midpoint' and 'high'
@@ -499,20 +514,26 @@ export function pricingValue<T>(configValue: ConfigValue<T>): T {
   return configValue.value;
 }
 
-/** Supported bounds for the owner-controlled global estimate factor. */
-export const GLOBAL_ESTIMATE_FACTOR_MIN = 0.5;
-export const GLOBAL_ESTIMATE_FACTOR_MAX = 1.5;
+/** Supported bounds for every estimator calibration factor. */
+export const ESTIMATOR_CALIBRATION_MIN = 0.5;
+export const ESTIMATOR_CALIBRATION_MAX = 1.5;
+
+export type EstimatorCalibrationEngine = 'residential' | 'str' | 'commercial' | 'church';
 
 /**
- * Returns the validated global estimate factor. An invalid/nonfinite/out-of-
- * range value fails CLOSED to 1.00 (no silent surprise adjustment) and the
- * configuration test reports the bad value. Callers never accept a client
- * factor; this reads the owner configuration only.
+ * Returns the validated owner calibration factor for one engine.
+ *
+ * An explicit numeric override is for tests/calibration tooling only; the
+ * customer and server paths always read the owner configuration. Invalid,
+ * nonfinite or out-of-range values fail CLOSED to 1.00.
  */
-export function resolveGlobalEstimateFactor(
-  value: number = pricing.globalEstimateFactor.value,
+export function resolveEstimatorCalibration(
+  engine: EstimatorCalibrationEngine,
+  override?: number | undefined,
 ): number {
+  const configured = pricing.estimatorCalibration[engine].value;
+  const value = override ?? configured;
   if (!Number.isFinite(value)) return 1;
-  if (value < GLOBAL_ESTIMATE_FACTOR_MIN || value > GLOBAL_ESTIMATE_FACTOR_MAX) return 1;
+  if (value < ESTIMATOR_CALIBRATION_MIN || value > ESTIMATOR_CALIBRATION_MAX) return 1;
   return value;
 }

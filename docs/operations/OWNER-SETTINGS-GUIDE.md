@@ -159,28 +159,36 @@ Public pages never print hourly rates or labor hours — only the proposed custo
 
 ---
 
-## 5a. The global estimate factor (one number across the business)
+## 5a. The four engine calibration factors
 
 In `src/config/estimators/pricing-values.ts` find:
 
 ```ts
-globalEstimateFactor: 1.0,
+estimatorCalibration: {
+  residential: 1.0,
+  str: 1.0,
+  commercial: 1.0,
+  church: 1.0,
+},
 ```
 
-- `1.00` = no change.
-- `0.90` = reduce the pre-tax **cleaning/service** subtotal by 10%.
-- `1.10` = increase it by 10%.
-- Supported range: `0.50` to `1.50`. An invalid value fails closed to `1.00` and the configuration
-  test reports it.
+Each engine has its **own independent** factor. Changing residential never changes STR,
+commercial or church.
 
-The factor applies after the minimum and any single discount, and before travel and tax. It never
-scales travel or tax. Tier C facility jobs stay scope reviews. After editing, run `npm test` and
-`npm run check`, commit, rebuild and deploy. The server reads the same value; a client cannot send
-its own factor.
+- `1.00` = no change.
+- `0.90` = reduce that engine's pre-tax **cleaning/service** subtotal by 10%.
+- `1.10` = increase that engine's pre-tax cleaning/service subtotal by 10%.
+- Supported range: `0.50` to `1.50`. An invalid, non-finite or out-of-range value fails closed
+  to `1.00` and the configuration test reports it.
+
+Each factor applies after the minimum and any single discount, and before travel and tax. A factor
+never scales travel or tax and never applies to another engine. Tier C facility jobs stay scope
+reviews. After editing, run `npm test` and `npm run check`, commit, rebuild and deploy. The server
+reads the same values; a client cannot send its own factor.
 
 The full order is documented in `docs/operations/ESTIMATE-CALCULATION-ORDER.md`.
 
-The Supportive Home 10% discount is configured in the same file under
+The Community Support 10% discount is configured in the same file under
 `supportiveHomeDiscount`. The eligibility categories and self-attestation are described on
 `/supportive-home-cleaning/`; it never stacks with another promotion.
 

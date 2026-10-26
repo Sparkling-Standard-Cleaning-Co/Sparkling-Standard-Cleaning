@@ -403,7 +403,7 @@ function pricingLines(fields: Record<string, string>): Array<[string, string]> {
   if (globalFactor && globalFactor !== '1' && globalFactor !== '1.00') {
     const direction = Number(globalAdjustment) < 0 ? '−' : '+';
     lines.push([
-      'Pricing — Owner estimate adjustment',
+      'Pricing — Estimate calibration adjustment',
       `${globalFactor}×${globalAdjustment ? ` (${direction}${money(String(Math.abs(Number(globalAdjustment))))})` : ''}`,
     ]);
   }
@@ -550,9 +550,9 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
     actions.push('Church request — 10% discount applied after the minimum; confirm scope and any tax exemption');
   }
   if (text(fields, 'supportive_eligible') === 'yes') {
-    actions.push('Supportive Home eligibility discount claimed — confirm eligibility before booking; 10% applies to eligible cleaning');
+    actions.push('Community Support eligibility discount claimed — confirm eligibility before booking; 10% applies to eligible cleaning');
   } else if (text(fields, 'supportive_home')) {
-    actions.push('Supportive Home Cleaning requested — review practical accommodations');
+    actions.push('Community Support Cleaning requested — review practical accommodations');
   }
   if (text(fields, 'engine_type') === 'commercial' || text(fields, 'engine_type') === 'church') {
     actions.push('Confirm the facility scope and final price personally before scheduling');

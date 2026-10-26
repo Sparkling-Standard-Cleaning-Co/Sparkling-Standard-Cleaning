@@ -479,7 +479,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     if (p.globalFactor !== 1) {
       lines.push({
-        label: `Owner estimate adjustment (\u00d7${p.globalFactor.toFixed(2)})`,
+        label: `Estimate calibration adjustment (\u00d7${p.globalFactor.toFixed(2)})`,
         value: `${p.globalAdjustment < 0 ? '\u2212' : '+'}${formatUsd(Math.abs(p.globalAdjustment), { forceCents: true })}`,
       });
     }
@@ -1097,7 +1097,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       if (!deepRequired) acknowledged.checked = false;
     }
 
-    // Supportive Home Cleaning is a RESIDENTIAL pathway, never offered inside
+    // Community Support Cleaning is a RESIDENTIAL pathway, never offered inside
     // the turnover engine and never priced differently by category.
     const supportiveSection = form.querySelector<HTMLElement>('[data-supportive-section]');
     if (supportiveSection) supportiveSection.hidden = engine === 'str' || isStr;
@@ -1665,7 +1665,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
           select.dispatchEvent(new Event('change', { bubbles: true }));
         }
       }
-      // The Supportive Home eligibility checkbox is NEVER preselected. A
+      // The Community Support eligibility checkbox is NEVER preselected. A
       // `?service=supportive&supportive=yes` deep link only selects ordinary
       // residential cleaning; the customer makes the self-attestation.
     }

@@ -41,7 +41,7 @@ export interface EstimateInput {
   destinationConfirmed?: boolean;
   pets?: PetSituation;
   /**
-   * Customer self-attestation that they qualify for the Supportive Home 10%
+   * Customer self-attestation that they qualify for the Community Support 10%
    * discount (65+, first responder, veteran, disability, or another eligible
    * community category). Optional; never inferred from a
    * sensitive category and never required to receive ordinary cleaning.
@@ -142,9 +142,9 @@ export interface PricingBreakdown {
   roundingAdjustment: number;
   /** The offered price before the $5 round-up (expectedPrice equivalent). */
   subtotal: number;
-  /** Owner-controlled global estimate factor applied to the service subtotal. */
+  /** Engine-specific calibration factor applied to the service subtotal. */
   globalFactor: number;
-  /** Dollar effect of the global factor (negative = reduction). */
+  /** Dollar effect of the calibration factor (negative = reduction). */
   globalAdjustment: number;
   /** True when the minimum job value raised the price. */
   minimumApplied: boolean;

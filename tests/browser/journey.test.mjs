@@ -690,7 +690,7 @@ test('eligible add-ons show their calculated price before selection and update w
   }
 });
 
-test('the Supportive Home 10% discount and tax disclosure are explicit in the quote', async () => {
+test('the Community Support 10% discount and tax disclosure are explicit in the quote', async () => {
   const { context, page } = await openEstimate(1440, 900);
   try {
     await step1(page);
@@ -703,7 +703,7 @@ test('the Supportive Home 10% discount and tax disclosure are explicit in the qu
     await extrasStep(page);
     await timingStep(page);
     const breakdown = (await page.locator('[data-price-breakdown]').textContent()) ?? '';
-    assert.match(breakdown, /Supportive Home discount \(10%\)/);
+    assert.match(breakdown, /Community Support discount \(10%\)/);
     assert.match(breakdown, /no sales tax applicable/i);
     assert.match(breakdown, /Proposed total/);
   } finally {

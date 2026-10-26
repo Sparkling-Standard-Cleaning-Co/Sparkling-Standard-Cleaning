@@ -62,7 +62,7 @@ export function selectInstantAmount(
   };
 
   // The base service price is already presented at the owner-approved $5 step
-  // before discounts and the global factor. The default 'expected' selection
+  // before discounts and the engine calibration factor. The default 'expected' selection
   // is therefore the final offered price; never floor or reapply the minimum
   // after an explicit discount/factor.
   if (selection === 'expected') {

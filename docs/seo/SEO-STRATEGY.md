@@ -10,7 +10,7 @@ observations, GBP recommendations, citation ledger and the 90-day roadmap) lives
 
 - Homepage title now targets the category (“Cleaning Company in Pensacola, FL | Sparkling
   Standard”); the description names the real service mix instead of “five services”.
-- About, Contact and Supportive Home Cleaning titles carry local/service intent.
+- About, Contact and Community Support Cleaning titles carry local/service intent.
 - `scripts/verify-seo.mjs` now parses robots directives properly (it previously accepted
   `noindex` because it searched for the substring “index”), detects duplicate/wrong-domain
   canonicals, stale sitemap URLs and sitemap/noindex contradictions; regression tests live in

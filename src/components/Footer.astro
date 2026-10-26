@@ -70,7 +70,7 @@ const phone = isPending(business.phone) ? null : business.phone;
               data-review-link="site"
               data-cta="footer-reviews-read"
             >
-              <Icon name="search" size={18} /> Read Our Reviews
+              <Icon name="glasses" size={24} strokeWidth={2.2} /> Read Our Reviews
             </a>
             {
               reviewLeaveUrl ? (
@@ -91,53 +91,48 @@ const phone = isPending(business.phone) ? null : business.phone;
             }
           </div>
           <p class="small site-footer__reviews-note">
-            Your review could help neighbors find Sparkling Standard, a cleaning service they can depend on.
+            Your review could help neighbors find Sparkling Standard!
           </p>
         </div>
       </div>
 
       <div>
         <h3>Contact</h3>
-        {
-          phone ? (
-            <div class="site-footer__contact-actions">
+        <div class="site-footer__contact-actions">
+          {
+            phone ? (
               <a class="btn btn--ghost" href={phone.href} data-cta="footer-call">
                 <Icon name="phone" size={18} /> Call {phone.display}
               </a>
-              {
-                business.flags.smsEnabled && (
-                  <a class="btn btn--ghost" href={phone.sms} data-cta="footer-text">
-                    <Icon name="message" size={18} /> Text {phone.display}
-                  </a>
-                )
-              }
-            </div>
-          ) : preview ? (
-            <p class="small"><span class="small">Phone: </span><span class="pending-badge">Pending owner input</span></p>
-          ) : (
-            <p class="small">Phone being set up — use the contact form meanwhile.</p>
-          )
-        }
-        <ul class="site-footer__contact-list">
-          <li><a href="/contact/" data-cta="footer-contact">Contact</a></li>
-          {
-            isPending(business.email) ? (
-              <li>
-                {preview ? (
-                  <>
-                    <span class="small">Email: </span>
-                    <span class="pending-badge">Pending owner input</span>
-                  </>
-                ) : (
-                  <span class="small">Email being set up — use the contact form meanwhile.</span>
-                )}
-              </li>
+            ) : preview ? (
+              <p class="small"><span class="small">Phone: </span><span class="pending-badge">Pending owner input</span></p>
             ) : (
-              <li><a href={`mailto:${business.email}`}>{business.email}</a></li>
+              <p class="small">Phone being set up — use the contact form meanwhile.</p>
             )
           }
-          <li>{business.hours.display}</li>
-        </ul>
+          {
+            phone && business.flags.smsEnabled && (
+              <a class="btn btn--ghost" href={phone.sms} data-cta="footer-text">
+                <Icon name="message" size={18} /> Text {phone.display}
+              </a>
+            )
+          }
+          {
+            !isPending(business.email) ? (
+              <a class="btn btn--ghost" href={`mailto:${business.email}`} data-cta="footer-email">
+                <Icon name="mail" size={18} /> Email Us
+              </a>
+            ) : preview ? (
+              <p class="small"><span class="small">Email: </span><span class="pending-badge">Pending owner input</span></p>
+            ) : (
+              <p class="small">Email being set up — use the contact form meanwhile.</p>
+            )
+          }
+          <a class="btn btn--ghost" href="/contact/" data-cta="footer-contact">
+            <Icon name="clipboard" size={18} /> Contact Form
+          </a>
+        </div>
+        <p class="small site-footer__hours">{business.hours.display}</p>
       </div>
     </div>
 

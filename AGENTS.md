@@ -202,7 +202,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | System | Source of truth | Detailed docs |
 | --- | --- | --- |
 | Business facts, contact, socials, launch/publication flags | `src/config/business.ts`, `.env` | `docs/launch/OWNER-INPUT-REQUIRED.md` |
-| Pricing, labor model, add-ons, promotions, discounts, global estimate factor, Supportive Home discount | `src/config/estimators/pricing-values.ts` (owner-editable values) + `src/config/pricing.ts` (typed config/flags) | `START-HERE-OWNER-CONTROL-CENTER.md`, `docs/ESTIMATOR-CONTROL-CENTER.md`, `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
+| Pricing, labor model, add-ons, promotions, discounts, four engine calibration factors, Community Support discount | `src/config/estimators/pricing-values.ts` (owner-editable values) + `src/config/pricing.ts` (typed config/flags) | `START-HERE-OWNER-CONTROL-CENTER.md`, `docs/ESTIMATOR-CONTROL-CENTER.md`, `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
 | Customer input options, labels and limits | `src/config/estimators/input-definitions.ts` + the two estimator form components | `docs/ESTIMATOR-CONTROL-CENTER.md` |
 | Travel economics, included miles, zone adjustments | `src/config/estimators/travel.ts`, `src/config/geography.ts` | `docs/ESTIMATOR-CONTROL-CENTER.md`, `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Location selection, geocoding, GPS/manual modes | `src/scripts/address-finder.ts`, `src/lib/location/`, `functions/api/geocode.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
@@ -367,9 +367,9 @@ collections are intentionally empty — not errors.
   captions were removed by owner direction in 6.2; image licensing records remain in
   `docs/design/IMAGE-SOURCE-REGISTER.md`. Proposed prices round
   **DOWN** to the nearest $5 (owner-approved), and travel assumes a 35-mile round trip
-  (17.5 one-way included). Quote `configVersion` is `2026-10-25.global-factor-supportive-tax.v1`.
+  (17.5 one-way included). Quote `configVersion` is `2026-10-25.engine-calibration-supportive-tax.v1`.
 - **Four estimate engines (Initiative 6.0; dedicated routes 6.2):** `/estimate/` is a clean selection hub with four cards. The **residential estimator lives at `/estimate/residential/`**; STR at `/estimate/str/`; Commercial at `/estimate/commercial/`; Church at `/estimate/church/`.
-  Residential keeps the live instant estimate (including the optional Supportive Home pathway
+  Residential keeps the live instant estimate (including the optional Community Support pathway
   and presets `?service=recurring|deep|move-out|supportive`); legacy `/estimate/?service=` and
   `?promo=` links forward to the dedicated route with their query intact. STR
   (`/estimate/str/`) runs the live per-turnover model; Commercial (`/estimate/commercial/`) and
@@ -394,10 +394,10 @@ collections are intentionally empty — not errors.
 - **Initiative 6.2 (complete-experience release candidate):** dedicated `/estimate/residential/`
   route and a selection-only `/estimate/` hub; legacy residential/STR query links, SPARKLE100
   claims and UTM context forward correctly; a four-step guided facility wizard with field-specific
-  validation; Supportive Home 10% eligibility discount (65+, first responders, veterans,
+  validation; Community Support 10% eligibility discount (65+, first responders, veterans,
   disabilities, and other eligible community members; self-attested, no sensitive records; never
-  stacked); owner-editable `globalEstimateFactor` applied to the pre-tax
-  service subtotal across every engine; exact church-discount reconciliation and two-decimal
+  stacked); four independent owner-editable `estimatorCalibration` factors, one per engine, each
+  applied to its own pre-tax service subtotal; exact church-discount reconciliation and two-decimal
   currency; category-specific Florida sales-tax disclosure (no invented tax amount); service-area
   page restructured to title → description → map; representative-photo captions and the Mark 12:31
   quotation removed; larger review stars; footer review actions split into Read and Leave; and the
@@ -458,9 +458,9 @@ collections are intentionally empty — not errors.
   name registry. The tiles keep their white background, rounded border and soft shadow —
   **never recolour, crop, stretch or wrap them in another chip/plate**. The six services use
   01–06; Community Support uses 07; the Reviews heading uses 08; the trust banner uses
-  09–12; the five Supportive Home/community groups use 13–17. Competitive Pricing keeps
+  09–12; the five Community Support/community groups use 13–17. Competitive Pricing keeps
   the exact four-dollar-sign design (first filled gold, three outlined). The small footer review
-  button keeps the simple vector magnifying glass per the owner pack. Church Cleaning is the
+  button uses the reading-glasses vector at 24 px. Church Cleaning is the
   sixth homepage card. Registry: `docs/design/WHITE-TILE-ICON-INVENTORY.md`.
 - **Authentic reviews live (2026-10-24, Initiative 5.0):** the homepage reviews section is a
   premium layered editorial carousel (`src/components/Reviews.astro`) rendering ONE prominent
@@ -484,9 +484,10 @@ collections are intentionally empty — not errors.
   the instant estimator. The quote display presents **Estimated Price** (one-time) or
   **First Visit — Deep Cleaning** + **Ongoing Visits** (recurring) with a grouped request
   summary (Cleaning details / Schedule / Location, full-width address rows). Quote
-  `configVersion` remains `2026-10-23.floor5-travel35.v1`. The service-area map uses
-  collision-aware label placement (county labels pinned away from the city cluster; Cantonment
-  centered above its marker); the About page carries no hero CTA, no detail-first slogan
+  `configVersion` is `2026-10-25.engine-calibration-supportive-tax.v1`. The service-area map uses
+  real Census county geometry across 18 counties (two core Florida, two by-arrangement Alabama
+  and neutral context), collision-aware desktop labels, a water-positioned Gulf Of America label,
+  and a phone layout that suppresses county labels rather than letting them overlap; the About page carries no hero CTA, no detail-first slogan
   section and no four-card banner (owner removals); the homepage hero carousel and the service
   cards use DISTINCT photographs.
 - **Two-price recurring quotes (2026-10-23):** a NEW recurring residential arrangement is quoted

@@ -84,7 +84,7 @@ console.log('HYPOTHETICAL facility calibration — research-based, not completed
 console.log(
   `Rate ${money(pricing.commercialPricing.grossRatePerHour.value)}/labor-hour; owner labour ${money(pricing.laborEconomics.ownerLaborTargetPerHour.value)}/hr; ` +
     `minimum ${money(pricing.minimumJob.value)}; overhead ${pricing.commercialPricing.overheadRatePercent.value}% of service revenue; ` +
-    `global factor ${pricing.globalEstimateFactor.value.toFixed(2)}; prices round up to $${pricing.rounding.toNearest.value}.`,
+    `commercial calibration ${pricing.estimatorCalibration.commercial.value.toFixed(2)}; prices round up to $${pricing.rounding.toNearest.value}.`,
 );
 console.log(
   'Per-visit and monthly square-foot figures are different units; do not compare them directly. ' +

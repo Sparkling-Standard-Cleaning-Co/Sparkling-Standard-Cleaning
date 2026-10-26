@@ -207,15 +207,20 @@ export interface OwnerPricingConfig {
   minimumJob: number;
 
   /**
-   * ONE owner-controlled adjustment applied to the pre-tax cleaning/service
-   * subtotal across every engine. 1.00 = unchanged, 0.90 = 10% lower,
-   * 1.10 = 10% higher. Travel and tax are always separate and are never
-   * multiplied by this factor. Supported range: 0.50–1.50.
+   * One independent calibration factor per estimator. 1.00 = unchanged;
+   * 0.90 = 10% lower; 1.10 = 10% higher. Applies to the eligible service
+   * subtotal only, after the existing minimum/discount order and before travel
+   * and tax. Never use a client-supplied factor. Supported range: 0.50–1.50.
    */
-  globalEstimateFactor: number;
+  estimatorCalibration: {
+    residential: number;
+    str: number;
+    commercial: number;
+    church: number;
+  };
 
   /**
-   * 10% appreciation discount for eligible Supportive Home customers:
+   * 10% appreciation discount for eligible Community Support customers:
    * adults aged 65+, first responders, military veterans, people with
    * disabilities, and other eligible community members.
    * Self-attested at the estimate; the owner confirms eligibility before
@@ -395,10 +400,15 @@ export const ownerPricing: OwnerPricingConfig = {
   // ── 2. Minimum job ────────────────────────────────────────────────────────
   minimumJob: 125,
 
-  // Owner-controlled global adjustment. Edit this ONE number.
-  globalEstimateFactor: 1.0,
+  // Owner-controlled global calibration — one independent factor per engine.
+  estimatorCalibration: {
+    residential: 1.0,
+    str: 1.0,
+    commercial: 1.0,
+    church: 1.0,
+  },
 
-  // Supportive Home 10% eligibility discount (owner-directed 2026-10-25).
+  // Community Support 10% eligibility discount (owner-directed 2026-10-25).
   supportiveHomeDiscount: {
     enabled: true,
     percent: 10,

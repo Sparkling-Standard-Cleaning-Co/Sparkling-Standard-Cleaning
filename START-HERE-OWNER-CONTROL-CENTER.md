@@ -15,7 +15,7 @@ Estimator details: [Estimator Control Center](docs/ESTIMATOR-CONTROL-CENTER.md).
 
 | I want to change… | Edit this file | Notes |
 | --- | --- | --- |
-| Prices, labour hours, minimum charge, discounts, add-ons, rounding, travel economics, commercial/church workload values, promotions | [`src/config/estimators/pricing-values.ts`](src/config/estimators/pricing-values.ts) | The single owner-editable pricing file. Keep approval flags in `src/config/pricing.ts` honest. |
+| Prices, labour hours, minimum charge, discounts, engine calibration factors, add-ons, rounding, travel economics, commercial/church workload values, promotions | [`src/config/estimators/pricing-values.ts`](src/config/estimators/pricing-values.ts) | The single owner-editable pricing file. `estimatorCalibration` holds four independent factors (residential, STR, commercial, church), all 1.00 by default. Keep approval flags in `src/config/pricing.ts` honest. |
 | Service names, dropdown choices, descriptions, form limits (square footage, bedrooms, fixtures) | [`src/config/estimators/input-definitions.ts`](src/config/estimators/input-definitions.ts) | Changing a value the calculator does not understand needs engineering review. |
 | Mileage, fuel/wear assumptions and driving-time policy | [`src/config/estimators/travel.ts`](src/config/estimators/travel.ts) | Shared by the browser and the Cloudflare travel function. |
 | Commercial/church numeric-price switch and tier triggers | [`src/config/estimators/commercial.ts`](src/config/estimators/commercial.ts) | The kill switch is enforced in the browser and on the server. |

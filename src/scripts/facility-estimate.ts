@@ -515,7 +515,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         }
         if (latestPrice.globalFactor !== 1) {
           priceLines.push(
-            `<li><span>Owner estimate adjustment (×${latestPrice.globalFactor.toFixed(2)})</span><strong>${latestPrice.globalAdjustment < 0 ? '−' : '+'}${formatUsd(Math.abs(latestPrice.globalAdjustment), { forceCents: true })}</strong></li>`,
+            `<li><span>${facilityEngine === 'church' ? 'Church' : 'Commercial'} calibration adjustment (×${latestPrice.globalFactor.toFixed(2)})</span><strong>${latestPrice.globalAdjustment < 0 ? '−' : '+'}${formatUsd(Math.abs(latestPrice.globalAdjustment), { forceCents: true })}</strong></li>`,
           );
         }
         if (latestPrice.travelAdjustment > 0) {

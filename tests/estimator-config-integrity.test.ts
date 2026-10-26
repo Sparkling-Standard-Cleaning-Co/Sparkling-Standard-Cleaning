@@ -25,7 +25,7 @@ test('estimator-control-center refactor preserves the approved pricing baseline'
   assert.equal(ownerPricing.hourlyRates.otherServices, 55);
   assert.equal(ownerPricing.hourlyRates.ownerLaborTarget, 35);
   assert.equal(ownerPricing.minimumJob, 125);
-  assert.equal(ownerPricing.globalEstimateFactor, 1);
+  assert.deepEqual(ownerPricing.estimatorCalibration, { residential: 1, str: 1, commercial: 1, church: 1 });
   assert.equal(ownerPricing.supportiveHomeDiscount.percent, 10);
   assert.equal(ownerPricing.supportiveHomeDiscount.termsVersion, '2026-10-25.supportive10.v2');
   assert.deepEqual(ownerPricing.supportiveHomeDiscount.eligibleServices, ['standard', 'deep', 'move_in_out']);
@@ -54,7 +54,7 @@ test('labour, condition, frequency and rounding assumptions are unchanged', () =
   });
   assert.deepEqual(ownerPricing.range, { lowFactor: 0.92, highFactor: 1.12 });
   assert.equal(ownerPricing.rounding.roundToNearest, 5);
-  assert.equal(pricing.instantQuote.configVersion.value, '2026-10-25.global-factor-supportive-tax.v1');
+  assert.equal(pricing.instantQuote.configVersion.value, '2026-10-25.engine-calibration-supportive-tax.v1');
 });
 
 test('commercial and church workload assumptions are unchanged', () => {

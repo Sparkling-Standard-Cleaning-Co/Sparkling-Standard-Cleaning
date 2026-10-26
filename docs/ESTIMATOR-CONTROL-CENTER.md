@@ -41,10 +41,15 @@ truth.
 | Other-services labour rate | `hourlyRates.otherServices` | 55 | USD per labour-hour | Residential, STR | Yes | `pricing-values.ts` | Must stay above owner floor; normally equal to recurring |
 | Founder labour target | `hourlyRates.ownerLaborTarget` | 35 | USD per labour-hour | All | Indirect | `pricing-values.ts` | Must stay below both rates; guard test |
 | Minimum job | `minimumJob` | 125 | USD | All priced engines | Yes | `pricing-values.ts` | Do not set below cost; affects discount headroom |
-| Global estimate factor | `globalEstimateFactor` | 1.00 | multiplier | All | Yes | `pricing-values.ts` | Supported 0.50–1.50; applies to service subtotal only, never travel/tax |
-| Supportive Home enabled | `supportiveHomeDiscount.enabled` | true | boolean | Residential | Yes | `pricing-values.ts` | Owner-approved program; never auto-applied |
-| Supportive Home percent | `supportiveHomeDiscount.percent` | 10 | percent | Residential | Yes | `pricing-values.ts` | Never stack; minimum-floor reconciliation |
-| Supportive Home terms version | `supportiveHomeDiscount.termsVersion` | `2026-10-25.supportive10.v2` | text | Residential | No, provenance | `pricing-values.ts` | Bump if eligibility terms change |
+| Residential calibration | `estimatorCalibration.residential` | 1.00 | multiplier | Residential | Yes | `pricing-values.ts` | Independent factor; default 1.00; supported 0.50–1.50; service subtotal only, after discount/minimum, before travel/tax |
+| STR calibration | `estimatorCalibration.str` | 1.00 | multiplier | STR | Yes | `pricing-values.ts` | Independent factor; same order and safe range |
+| Commercial calibration | `estimatorCalibration.commercial` | 1.00 | multiplier | Commercial | Yes | `pricing-values.ts` | Independent factor; same order and safe range |
+| Church calibration | `estimatorCalibration.church` | 1.00 | multiplier | Church | Yes | `pricing-values.ts` | Independent factor; same order and safe range |
+| Community Support enabled | `supportiveHomeDiscount.enabled` | true | boolean | Residential | Yes | `pricing-values.ts` | Owner-approved program; never auto-applied |
+| Community Support percent | `supportiveHomeDiscount.percent` | 10 | percent | Residential | Yes | `pricing-values.ts` | Never stack; minimum-floor reconciliation |
+| Community Support terms version | `supportiveHomeDiscount.termsVersion` | `2026-10-25.supportive10.v2` | text | Residential | No, provenance | `pricing-values.ts` | Bump if eligibility terms change |
+
+The public name is **Community Support Cleaning**. Internal keys such as supportiveHomeDiscount, the supportive service preset and the /supportive-home-cleaning/ URL remain stable for compatibility; do not expose the old display name on the website.
 | Supportive eligible services | `supportiveHomeDiscount.eligibleServices` | standard, deep, move_in_out | service list | Residential | Yes | `pricing-values.ts` | Never commercial/church/STR |
 | Church discount enabled | `churchDiscount.enabled` | true | boolean | Church | Yes | `pricing-values.ts` | Owner-directed; never a donation/tithe |
 | Church discount percent | `churchDiscount.percent` | 10 | percent | Church | Yes | `pricing-values.ts` | Never stacks; applied after minimum |
@@ -85,7 +90,7 @@ truth.
 | --- | --- | --- | --- |
 | Proposed-price experience | `enabled: true` | `src/config/pricing.ts` | A request, never a booking |
 | Binding offers | `false` | `src/config/pricing.ts` | Do not enable without verification + owner approval |
-| Quote configuration version | `2026-10-25.global-factor-supportive-tax.v1` | `src/config/pricing.ts` | Bump when an effective price rule changes |
+| Quote configuration version | `2026-10-25.engine-calibration-supportive-tax.v1` | `src/config/pricing.ts` | Bump when an effective price rule changes |
 | Offered-price selection | `expected` | `src/config/pricing.ts` | Never the low end |
 | Margin floor | 1.0 | `src/config/pricing.ts` | Discards candidates below expected |
 | Verification validity | 336 hours | `src/config/pricing.ts` | Owner notification only; not a customer hold |
@@ -253,11 +258,19 @@ confirmed tax setup.
    `src/config/pricing.ts` so old quotes are not reused.
 6. After deployment, verify a representative estimate.
 
-### Change the minimum, rounding or global factor
+### Change the minimum, rounding or calibration factors
 
-Edit `minimumJob`, `rounding.roundToNearest`, or
-`globalEstimateFactor`. These affect every engine (the global factor applies to
-service subtotal only). Always run the full unit and browser suites.
+Edit `minimumJob` or `rounding.roundToNearest`. The four engine calibration
+factors live together under `estimatorCalibration` in `pricing-values.ts`:
+`residential`, `str`, `commercial` and `church`. Each is independent and may be
+changed without affecting the others. `1.00` leaves that engine unchanged,
+`0.90` lowers its eligible service subtotal by 10%, and `1.10` raises it by 10%.
+
+The supported range is `0.50–1.50`. A missing, non-finite or out-of-range value
+fails closed to `1.00`; it never invents or inherits another engine's factor.
+The factor applies after the existing minimum/discount order and before travel
+and tax. Always run the full unit and browser suites and bump the relevant
+`configVersion` when an effective price changes.
 
 ### Change a discount
 
@@ -363,7 +376,7 @@ tests together.
 **Safe to change independently (then run tests):** labels, help text, option
 descriptions, add-on labels, non-price copy, approved public area wording.
 
-**Requires reconciliation:** hourly rates, minimum, global factor, labour
+**Requires reconciliation:** hourly rates, minimum, engine calibration factors, labour
 hours, production rates, condition/frequency/last-clean factors, range,
 rounding, discounts, add-on hours, travel assumptions, tier thresholds,
 scheduling window, service/frequency matrix, tax treatment.

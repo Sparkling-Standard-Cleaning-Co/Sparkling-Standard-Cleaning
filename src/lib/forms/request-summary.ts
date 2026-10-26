@@ -268,7 +268,7 @@ export function buildRequestSummary(fields: Record<string, string>): RequestSumm
   const globalAdjustment = text(fields, 'global_adjustment');
   if (globalFactor && globalFactor !== '1.00' && globalFactor !== '1') {
     add(
-      'Owner estimate adjustment',
+      'Estimate calibration adjustment',
       `${globalFactor}×${globalAdjustment ? ` (${Number(globalAdjustment) < 0 ? '−' : '+'}${money(String(Math.abs(Number(globalAdjustment))))})` : ''}`,
     );
   }

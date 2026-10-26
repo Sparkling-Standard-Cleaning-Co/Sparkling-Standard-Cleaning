@@ -11,12 +11,12 @@
 > is applied to the numeric cleaning subtotal after the minimum. Method,
 > sources and benchmarks: `COMMERCIAL-PRICING-RESEARCH.md`.
 >
-> **2026-10-25 (Initiative 6.2) update:** the residential estimator now lives at
+> **2026-10-25 (Initiatives 6.2–6.4) update:** the residential estimator now lives at
 > `/estimate/residential/`; `/estimate/` is a clean four-engine selection hub.
 > Legacy residential/STR query links and campaign claims forward with their
 > query intact. Commercial and church forms are four-step guided experiences
-> with field-specific validation. The owner-editable `globalEstimateFactor`,
-> Supportive Home 10% eligibility discount, exact church-discount
+> with field-specific validation. The owner-editable `estimatorCalibration` factors,
+> Community Support 10% eligibility discount, exact church-discount
 > reconciliation, two-decimal currency and tax disclosure are documented in
 > `ESTIMATE-CALCULATION-ORDER.md` and `TAX-TREATMENT.md`.
 
@@ -59,11 +59,11 @@ query intact. There is ONE submission pipeline
 - New recurring arrangements still require the **first-visit Deep Cleaning**
   (acknowledgement enforced in the browser and the server).
 - Two-price recurring presentation: first visit + ongoing per-visit amount.
-- **Supportive Home Cleaning** is an optional RESIDENTIAL pathway: the customer
+- **Community Support Cleaning** is an optional RESIDENTIAL pathway: the customer
   self-attests eligibility (65+, first responder, veteran, living with a
   disability, or another eligible community category; the checked category is
   recorded only as an eligibility reason). The owner-directed
-  **10% Supportive Home discount** applies once, never stacks with another
+  **10% Community Support discount** applies once, never stacks with another
   promotion, and is applied to the pre-tax residential service subtotal. It is
   never automatic: the customer must check the eligibility box. The pathway
   never asks for medical records, proof documents or sensitive details, and
@@ -94,7 +94,7 @@ verdict.
 + `facility-estimate.ts`): Your facility → Cleaning needs → Schedule & access →
 Contact. Each step validates its own fields, keeps a visible progress state,
 supports Back/Continue, moves focus to the first invalid field and exposes an
-accessible error summary. The address, travel, tax and global-factor rules are
+accessible error summary. The address, travel, tax and engine calibration rules are
 identical to residential; facility requests are never automatically booked.
 
 ## 5. Short-term rental engine
@@ -120,7 +120,7 @@ fee and no invented availability.
   - the discount applies to that rounded cleaning subtotal and is retained to
     the cent — it is **not** rounded upward again;
   - example: `$145.00 − $14.50 = $130.50`;
-  - the owner global factor, when configured, is applied after the discount to
+  - the engine calibration factor, when configured, is applied after the discount to
     the cleaning subtotal only;
   - travel and third-party costs are excluded;
   - it never stacks with another promotion;
@@ -147,7 +147,7 @@ fee and no invented availability.
 | Recurring page | `/estimate/residential/?service=recurring` | Get My Cleaning Estimate |
 | Deep page | `/estimate/residential/?service=deep` | Get My Cleaning Estimate |
 | Move-in/out page | `/estimate/residential/?service=move-out` | Get My Moving Clean Estimate |
-| Supportive page | `/estimate/residential/?service=supportive&supportive=yes` | Get My Cleaning Estimate |
+| Community Support page | `/estimate/residential/?service=supportive&supportive=yes` | Get My Cleaning Estimate |
 | STR page | `/estimate/str/` | Get a Turnover Estimate |
 | Commercial page | `/estimate/commercial/` | Estimate My Facility Cleaning |
 | Church page | `/estimate/church/` | Estimate Church Cleaning |
@@ -170,8 +170,8 @@ fee and no invented availability.
   Turnstile/honeypot/contact checks; they are explicitly labelled scope reviews.
 - `travel_verified=true` only for a real provider route. Never trust client
   travel values.
-- The server independently re-derives the Supportive Home eligibility discount
-  and the owner global factor; a client-supplied discount, factor, tax amount
+- The server independently re-derives the Community Support eligibility discount
+  and the engine calibration factor; a client-supplied discount, factor, tax amount
   or final total is never trusted.
 - The verified final total and pre-discount cleaning subtotal must reconcile to
   the cent; the owner notification and customer receipt carry the same
@@ -181,10 +181,10 @@ fee and no invented availability.
 
 ## 9. Owner controls
 
-- **Prices, labour model, travel, church discount, Supportive Home discount,
-  global estimate factor, facility baseline**: `src/config/estimators/pricing-values.ts`
+- **Prices, labour model, travel, church discount, Community Support discount,
+  engine calibration factor, facility baseline**: `src/config/estimators/pricing-values.ts`
   (typed state in `src/config/pricing.ts`). Values outside the supported
-  `0.50–1.50` global-factor range fail closed to `1.00`.
+  `0.50–1.50` calibration range fail closed to `1.00`.
 - **Facility numeric pricing kill switch**:
   `src/config/estimators/commercial.ts` (`numericEstimatesEnabled`). FALSE returns
   every commercial/church request to a scope review with no numeric prices in
@@ -200,8 +200,8 @@ fee and no invented availability.
 - **Quote preview**: `npm run estimate:quotes`.
 - **Calculation and tax rules**: `ESTIMATE-CALCULATION-ORDER.md` and
   `TAX-TREATMENT.md`.
-- **Financial scenarios**: `npm run estimate:scenarios` (global factor,
-  Supportive Home nonstacking, church exact cents, taxable vs exempt).
+- **Financial scenarios**: `npm run estimate:scenarios` (engine calibration factor,
+  Community Support nonstacking, church exact cents, taxable vs exempt).
 
 ## 10. Known pending owner decisions
 

@@ -122,7 +122,7 @@ test('footer has distinct read and leave review actions and the approved review 
     const leave = footer.getByRole('link', { name: /Leave Us a Review/i });
     assert.equal(await leave.count(), 1);
     assert.equal(await leave.getAttribute('data-review-link'), 'google');
-    assert.match((await footer.innerText()) ?? '', /Your review could help neighbors find Sparkling Standard, a cleaning service they can depend on\./);
+    assert.match((await footer.innerText()) ?? '', /Your review could help neighbors find Sparkling Standard!/);
     const companyLinks = await footer.locator('.site-footer__grid > div').nth(1).locator('a').allTextContents();
     assert.equal(companyLinks.some((label) => /^Reviews$/i.test(label.trim())), false, 'Company nav has no redundant Reviews item');
   } finally {

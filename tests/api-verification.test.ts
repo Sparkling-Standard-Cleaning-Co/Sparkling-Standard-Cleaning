@@ -191,7 +191,7 @@ test('lead: selected extras are itemized with their actual server-calculated cha
   assert.equal(sent['Internal — Rate per labor hour'], '$55');
 });
 
-test('lead: a Supportive Home attestation is recomputed and disclosed without sensitive detail', async () => {
+test('lead: a Community Support attestation is recomputed and disclosed without sensitive detail', async () => {
   const { stub, forwarded } = verificationStub();
   await withFetch(stub, () =>
     leadPost({
@@ -205,7 +205,7 @@ test('lead: a Supportive Home attestation is recomputed and disclosed without se
   const sent = forwarded[0] as Record<string, string>;
   const entries = Object.entries(sent);
   const discount = entries.find(([label]) => label.includes('Discount applied'))?.[1] ?? '';
-  assert.match(discount, /Supportive Home discount/i);
+  assert.match(discount, /Community Support discount/i);
   assert.match(discount, /10%/);
   const tax = entries.find(([label]) => label.includes('Sales tax'))?.[1] ?? '';
   assert.match(tax, /residential/i);

@@ -29,7 +29,7 @@
 // the confirmed service address and current DR-15DSS rates. Estimates show
 // "+ applicable tax" where tax may apply; the final quote/invoice confirms
 // the exact amount. Tax is never folded into the cleaning price, a discount,
-// the global estimate factor or travel.
+// the engine calibration factor or travel.
 
 export type TaxTreatment = 'not_taxable' | 'taxable_pending' | 'exemption_pending' | 'unknown';
 

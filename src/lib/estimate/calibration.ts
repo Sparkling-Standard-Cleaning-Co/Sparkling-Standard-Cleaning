@@ -115,7 +115,7 @@ export function runFacilityCalibration(
   const quoteOptions: FacilityQuoteOptions = {
     church: scenario.kind === 'church',
     numericEstimatesEnabled: true,
-    globalFactor: options.globalFactor ?? 1,
+    globalFactorOverride: options.globalFactor ?? 1,
     ...(scenario.oneWayMiles ? { oneWayMiles: scenario.oneWayMiles } : {}),
   };
   const price =
@@ -124,7 +124,7 @@ export function runFacilityCalibration(
           ...input,
           frequency: scenario.frequency,
           ...(scenario.oneWayMiles ? { oneWayMiles: scenario.oneWayMiles } : {}),
-          globalFactor: options.globalFactor ?? 1,
+          globalFactorOverride: options.globalFactor ?? 1,
           numericEstimatesEnabled: true,
         }).price
       : calculateFacilityPrice(workload, scenario.frequency, quoteOptions);

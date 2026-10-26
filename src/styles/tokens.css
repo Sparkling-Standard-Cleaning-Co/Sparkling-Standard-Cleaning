@@ -47,6 +47,10 @@
   /* ── Color: functional ────────────────────────────────────────────────── */
   --color-white: #ffffff;
   --color-google-gold: #fbbc04; /* authentic Google review stars */
+  --color-map-core: #e4efe0; /* core service-area counties */
+  --color-map-core-line: #5f7a5c;
+  --color-map-arrangement: #f5e7b8; /* service by arrangement/approval */
+  --color-map-arrangement-line: #9a7b2e;
   --color-success-100: #e8f3ea;
   --color-success-700: #2f6b3d;
   --color-warning-100: #fbf0dd;

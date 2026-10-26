@@ -1,9 +1,8 @@
 // Regression guard for Hayli's six-page homepage audit.
 //
 // Reads the RENDERED homepage output (dist/index.html) and verifies that the
-// six complete approved service descriptions are actually present — including
-// the mandatory Deep Cleaning prerequisite, which the prior implementation
-// silently omitted from the homepage card.
+// six complete approved service descriptions are actually present. The Deep
+// Cleaning card is intentionally concise and points to its full service page.
 //
 // Run after the build (called by npm run validate).
 
@@ -37,14 +36,9 @@ const required = [
       'A consistent, scheduled cleaning that keeps your home maintained, tidy, and sparkling. Choose a weekly, biweekly, or monthly schedule to keep your home looking its best.',
   },
   {
-    label: 'Deep Cleaning — service scope',
+    label: 'Deep Cleaning — concise homepage scope',
     copy:
-      'An in-depth reset for a home that needs extra care and attention. Our deep cleaning service focuses on areas that can get buildup over time, from hand wiping baseboards and blinds to detailing walls and doors (See our Deep Cleaning procedure and available add-ons for a full list of services). We go beyond the basics to leave your home feeling renewed, and thoroughly clean.',
-  },
-  {
-    label: 'Deep Cleaning — mandatory recurring prerequisite and returning-client recommendation',
-    copy:
-      'This service is ideal for one-time cleanings and is required before beginning recurring residential maintenance cleaning. It’s also recommended for returning clients when dirt, grime, or buildup begins to accumulate beyond what routine maintenance cleaning is designed to address.',
+      'An in-depth reset for a home that needs extra care — baseboards, frames, buildup and the details routine cleaning can miss. Required before a new recurring residential arrangement; the complete procedure lives on the Deep Cleaning page.',
   },
   {
     label: 'Move-in and Move-out Cleaning',

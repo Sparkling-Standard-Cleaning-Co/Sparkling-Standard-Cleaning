@@ -29,9 +29,9 @@ export interface FacilityVerification {
   discountAmount: number | null;
   /** Human label when a church discount applies. */
   discountLabel: string | null;
-  /** Owner global factor applied to the service subtotal (null when disabled/unpriced). */
+  /** Engine calibration factor applied to the service subtotal (null when disabled/unpriced). */
   globalFactor: number | null;
-  /** Dollar effect of the owner factor. */
+  /** Dollar effect of the calibration factor. */
   globalAdjustment: number | null;
   configMatch: 'match' | 'mismatch' | 'unknown';
   travelStatus: 'verified' | 'preliminary' | 'manual_review';

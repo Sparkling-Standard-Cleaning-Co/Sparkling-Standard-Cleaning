@@ -69,7 +69,7 @@ With recurring service from Sparkling Standard, you can spend less time worrying
 
 ## What investing in recurring cleaning with Sparkling Standard looks like
 
-You see the same cleaner each visit. She learns what matters most to you, how you like things arranged, and the perfect process in cleaning your home. In her work you'll see consistency, reliability, and care. Sometimes our founder will bring a trusted helper, but you'll never be serviced by a rotating crew; only familiar faces.
+You see the same cleaner each visit. She learns what matters most to you, how you like things arranged, and the perfect process in cleaning your home. In her work you'll see consistency, reliability, and care. Sometimes the founder of Sparkling Standard will bring a trusted helper, but you'll never be serviced by a rotating crew; only familiar faces.
 
 ## Included Services
 

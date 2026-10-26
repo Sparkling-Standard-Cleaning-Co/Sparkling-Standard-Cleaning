@@ -41,10 +41,23 @@ const CATEGORIES = [
   { fips: '12113', category: 'core' }, // Santa Rosa County, FL (Gulf Breeze/Milton/Pace)
   { fips: '01003', category: 'arrangement' }, // Baldwin County, AL
   { fips: '01053', category: 'arrangement' }, // Escambia County, AL
-  { fips: '12133', category: 'context' }, // Okaloosa County, FL (neighbor)
-  { fips: '01097', category: 'context' }, // Mobile County, AL (neighbor)
-  { fips: '01035', category: 'context' }, // Conecuh County, AL (neighbor)
-  { fips: '01099', category: 'context' }, // Monroe County, AL (neighbor)
+
+  // Neutral geographic context, expanded two to three counties in each
+  // direction so the map is continuous and no county appears detached.
+  { fips: '12091', category: 'context' }, // Okaloosa County, FL
+  { fips: '12131', category: 'context' }, // Walton County, FL
+  { fips: '12059', category: 'context' }, // Holmes County, FL
+  { fips: '12133', category: 'context' }, // Washington County, FL
+  { fips: '12005', category: 'context' }, // Bay County, FL
+  { fips: '12063', category: 'context' }, // Jackson County, FL
+  { fips: '12013', category: 'context' }, // Calhoun County, FL
+  { fips: '01097', category: 'context' }, // Mobile County, AL
+  { fips: '01129', category: 'context' }, // Washington County, AL
+  { fips: '01025', category: 'context' }, // Clarke County, AL
+  { fips: '01035', category: 'context' }, // Conecuh County, AL
+  { fips: '01099', category: 'context' }, // Monroe County, AL
+  { fips: '01039', category: 'context' }, // Covington County, AL
+  { fips: '01061', category: 'context' }, // Geneva County, AL
 ];
 
 /**
@@ -76,11 +89,24 @@ const CITIES = [
  *     Baldwin AL's row.
  */
 const LABEL_OVERRIDES = {
-  '12033': { x: 245, y: 268 }, // Escambia FL
-  '12113': { x: 355, y: 300 }, // Santa Rosa FL
-  '01003': { x: 166, y: 297 }, // Baldwin AL
-  '01053': { x: 359, y: 202 }, // Escambia AL
-  '01097': { x: 85, y: 345 }, // Mobile AL (context)
+  '12033': { x: 185, y: 255 }, // Escambia FL
+  '12113': { x: 345, y: 360 }, // Santa Rosa FL
+  '01003': { x: 170, y: 280 }, // Baldwin AL
+  '01053': { x: 307, y: 205 }, // Escambia AL
+  '12091': { x: 390, y: 300 }, // Okaloosa FL
+  '12131': { x: 460, y: 360 }, // Walton FL
+  '12059': { x: 550, y: 270 }, // Holmes FL
+  '12133': { x: 550, y: 330 }, // Washington FL
+  '12005': { x: 550, y: 420 }, // Bay FL
+  '12063': { x: 650, y: 285 }, // Jackson FL
+  '12013': { x: 650, y: 350 }, // Calhoun FL
+  '01097': { x: 80, y: 330 }, // Mobile AL
+  '01129': { x: 95, y: 165 }, // Washington AL
+  '01025': { x: 125, y: 120 }, // Clarke AL
+  '01035': { x: 370, y: 150 }, // Conecuh AL
+  '01099': { x: 270, y: 115 }, // Monroe AL
+  '01039': { x: 550, y: 185 }, // Covington AL
+  '01061': { x: 660, y: 235 }, // Geneva AL
 };
 
 const MAP_WIDTH = 720;
@@ -225,6 +251,7 @@ const LAT_MID = (box[1] + box[3]) / 2;
 const lonSpan = (box[2] - box[0]) * Math.cos((LAT_MID * Math.PI) / 180);
 const SCALE = MAP_WIDTH / lonSpan;
 const MAP_HEIGHT = Math.round((box[3] - box[1]) * SCALE);
+const WATER_LABEL = { x: Math.round(MAP_WIDTH * 0.52), y: MAP_HEIGHT - 16 };
 
 const project = ([lon, lat]) => [
   Math.round(((lon - box[0]) * Math.cos((LAT_MID * Math.PI) / 180) * SCALE) * 10) / 10,
@@ -386,6 +413,8 @@ export const MAP_CONTEXT_PATHS: string[] = ${JSON.stringify(contextPaths, null, 
 export const MAP_CITIES: MapCity[] = ${JSON.stringify(cityPoints, null, 2)};
 
 export const MAP_COUNTY_LABELS: MapCountyLabel[] = ${JSON.stringify(countyLabels, null, 2)};
+
+export const MAP_WATER_LABEL = ${JSON.stringify(WATER_LABEL)};
 
 export const MAP_STATE_LINE = ${JSON.stringify(stateLinePath)};
 `;

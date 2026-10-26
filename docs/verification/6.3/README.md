@@ -1,5 +1,7 @@
 # Initiative 6.3 visual verification
 
+> Historical record. The footer magnifier and two icon tiles were superseded by Initiative 6.4; see `../6.4/`.
+
 Captured from the local production build (`npm run build` → `astro preview`) with
 Playwright Chromium at the sizes noted below. The header, mobile action bar and
 consent banner were hidden only for section captures; no section layout was

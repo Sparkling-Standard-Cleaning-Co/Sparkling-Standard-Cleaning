@@ -17,7 +17,7 @@ export const cleaningTypesNav: NavItem[] = [
   { label: 'Recurring Residential Cleaning', href: '/recurring-cleaning/' },
   { label: 'Deep Cleaning', href: '/deep-cleaning/' },
   { label: 'Move-in and Move-out Cleaning', href: '/move-in-move-out-cleaning/' },
-  { label: 'Supportive Home Cleaning', href: '/supportive-home-cleaning/' },
+  { label: 'Community Support Cleaning', href: '/supportive-home-cleaning/' },
   { label: 'Short-term Rental Turnover Cleaning', href: '/short-term-rental-cleaning/' },
   { label: 'Commercial Cleaning', href: '/commercial-cleaning/' },
   { label: 'Church Cleaning', href: '/church-cleaning/' },
@@ -36,13 +36,15 @@ export const homepageServicePaths: string[] = [
   '/church-cleaning/',
 ];
 
-/** Desktop primary navigation: the Types of Cleanings dropdown plus About. */
+/** Desktop primary navigation: cleaning types plus Service Area, FAQ and About. */
 export const primaryNav: NavItem[] = [
   {
     label: 'Types of Cleanings',
     href: '/recurring-cleaning/',
     children: cleaningTypesNav,
   },
+  { label: 'Service Area', href: '/service-area/' },
+  { label: 'FAQ', href: '/faq/' },
   { label: 'About', href: '/about/' },
 ];
 
@@ -57,7 +59,7 @@ export const mobileCleaningNav: NavItem[] = [
   { label: 'Recurring Cleaning', href: '/recurring-cleaning/' },
   { label: 'Deep Cleaning', href: '/deep-cleaning/' },
   { label: 'Move-In / Move-Out', href: '/move-in-move-out-cleaning/' },
-  { label: 'Supportive Home Cleaning', href: '/supportive-home-cleaning/' },
+  { label: 'Community Support Cleaning', href: '/supportive-home-cleaning/' },
   { label: 'Vacation Rental Turnovers', href: '/short-term-rental-cleaning/' },
   { label: 'Commercial Cleaning', href: '/commercial-cleaning/' },
   { label: 'Church Cleaning', href: '/church-cleaning/' },
@@ -65,12 +67,13 @@ export const mobileCleaningNav: NavItem[] = [
 
 export const mobileTopNav: NavItem[] = [
   { label: 'Service Area', href: '/service-area/' },
+  { label: 'FAQ', href: '/faq/' },
   { label: 'Reviews', href: '/#reviews' },
   { label: 'About', href: '/about/' },
   { label: 'Contact', href: '/contact/' },
 ];
 
-/** Footer services column — every service category, including Supportive Home. */
+/** Footer services column — every service category, including Community Support. */
 export const footerServicesNav: NavItem[] = [...cleaningTypesNav];
 
 export const footerCompanyNav: NavItem[] = [

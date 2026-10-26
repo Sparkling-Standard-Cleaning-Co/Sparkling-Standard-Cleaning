@@ -1351,20 +1351,28 @@ li + li {
 }
 
 .trust-item {
-  display: flex;
-  gap: var(--space-3);
-  align-items: flex-start;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.trust-item > div {
+  display: grid;
+  justify-items: center;
 }
 
 .trust-item__title {
   font-weight: var(--weight-bold);
   color: var(--color-rose-800);
-  margin: 0.35rem 0 var(--space-1);
+  margin: var(--space-2) 0 var(--space-1);
   font-size: var(--text-base);
   line-height: 1.2;
 }
 
 .trust-item__text {
+  max-width: 28ch;
   font-size: var(--text-sm);
   color: var(--color-ink-700);
   margin: 0;
@@ -1375,6 +1383,7 @@ li + li {
    Each passage gets its own grouping with a visually secondary but legible
    reference; generous line spacing, readable on mobile. */
 .trust-item__verses {
+  max-width: 34ch;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1592,6 +1601,7 @@ div[id] {
   flex: none;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   background: none;
   border: none;
   box-shadow: none;
@@ -1602,6 +1612,10 @@ div[id] {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  /* The approved raster tiles include a narrow white canvas margin. Crop it
+     inside the same square so the tile is the only visible frame. The tile
+     artwork itself is never resized or regenerated. */
+  transform: scale(1.12);
 }
 
 /* ── Homepage photo service cards ───────────────────────────────────────────
@@ -3525,11 +3539,13 @@ fieldset.input--invalid {
 }
 
 .site-footer__reviews-note {
+  justify-self: stretch;
   color: var(--color-ink-muted);
   margin: 0;
   max-width: none;
   font-size: var(--text-sm);
   line-height: 1.6;
+  text-align: center;
 }
 
 /* Call / text buttons with their icons and the visible number. */
@@ -3555,8 +3571,12 @@ fieldset.input--invalid {
   color: var(--color-champagne-200);
 }
 
-.site-footer__contact-list {
-  margin-top: var(--space-2);
+.site-footer__hours {
+  margin: var(--space-3) 0 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  white-space: nowrap;
 }
 
 /* ── Reviews invitation (empty-collection state) ─────────────────────────── */
@@ -4563,7 +4583,7 @@ fieldset.input--invalid {
   margin-block: var(--space-6);
 }
 
-/* ── Readable mode (supportive home cleaning) ─────────────────────────────── */
+/* ── Readable mode (community support cleaning) ─────────────────────────────── */
 /* Larger, comfortable type and generous spacing for older visitors and low-
    vision users, without altering the rest of the site. */
 .readable {
@@ -4632,14 +4652,14 @@ fieldset.input--invalid {
 }
 
 .area-map__core .area-map__county {
-  fill: var(--color-rose-100);
-  stroke: var(--color-rose-600);
+  fill: var(--color-map-core);
+  stroke: var(--color-map-core-line);
   stroke-width: 1.75;
 }
 
 .area-map__arrangement .area-map__county {
-  fill: var(--color-sage-100);
-  stroke: var(--color-sage-700);
+  fill: var(--color-map-arrangement);
+  stroke: var(--color-map-arrangement-line);
   stroke-width: 1.5;
   stroke-dasharray: 7 5;
 }
@@ -4669,8 +4689,12 @@ fieldset.input--invalid {
   stroke-linejoin: round;
 }
 
+.area-map__county-label--core {
+  fill: var(--color-map-core-line);
+}
+
 .area-map__county-label--arrangement {
-  fill: var(--color-sage-700);
+  fill: var(--color-map-arrangement-line);
 }
 
 .area-map__county-label--context {
@@ -4704,23 +4728,20 @@ fieldset.input--invalid {
   fill: var(--color-rose-800);
 }
 
-/* Small screens scale the whole viewBox down, so the labels inside the SVG
-   need larger point sizes to stay readable (owner-directed map polish). */
-@media (max-width: 48rem) {
+/* At phone width the county names cannot be placed without colliding. The
+   colour legend and the note below the map name the four policy counties;
+   only the city labels stay on the artwork. */
+@media (max-width: 40rem) {
   .area-map__county-label {
-    font-size: 13px;
-  }
-
-  .area-map__county-label--context {
-    font-size: 12px;
+    display: none;
   }
 
   .area-map__city-label {
-    font-size: 15px;
+    font-size: 18px;
   }
 
   .area-map__city-label--primary {
-    font-size: 16px;
+    font-size: 19px;
   }
 }
 
@@ -4729,9 +4750,14 @@ fieldset.input--invalid {
   font-size: 15px;
   font-style: italic;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
   fill: var(--color-taupe-500);
   opacity: 0.85;
+}
+
+@media (max-width: 40rem) {
+  .area-map__water-label {
+    font-size: 20px;
+  }
 }
 
 .area-map__legend {
@@ -4762,13 +4788,23 @@ fieldset.input--invalid {
 }
 
 .area-map__swatch--core {
-  background: var(--color-rose-100);
-  border: 1.75px solid var(--color-rose-600);
+  background: var(--color-map-core);
+  border: 1.75px solid var(--color-map-core-line);
 }
 
 .area-map__swatch--arrangement {
-  background: var(--color-sage-100);
-  border: 1.5px dashed var(--color-sage-700);
+  background: var(--color-map-arrangement);
+  border: 1.5px dashed var(--color-map-arrangement-line);
+}
+
+.area-map__swatch--context {
+  background: var(--color-cream-200);
+  border: 1.5px solid var(--color-sand-300);
+}
+
+.area-map__legend-note {
+  color: var(--color-taupe-600);
+  font-size: var(--text-xs);
 }
 
 .area-map__swatch--confirm {

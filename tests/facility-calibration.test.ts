@@ -1,5 +1,5 @@
 // Facility calibration matrix: coverage, exact church arithmetic, Tier C
-// behavior, global factor interaction and browser/server-compatible outputs.
+// behavior, engine calibration factor interaction and browser/server-compatible outputs.
 // These are hypothetical scenarios, never presented as completed jobs.
 
 import assert from 'node:assert/strict';
@@ -79,7 +79,7 @@ test('ordinary Tier A/B rows are numeric, profitable and carry effective units',
   }
 });
 
-test('the global owner factor scales the service subtotal without changing the discount', () => {
+test('the engine calibration factor scales the service subtotal without changing the discount', () => {
   const base = runFacilityCalibration(
     CHURCH_SCENARIOS.find((scenario) => scenario.id === 'h04')!,
   );

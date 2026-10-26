@@ -51,10 +51,14 @@ for (const width of [1024, 1280, 1440, 1680]) {
   test(`desktop header fits and aligns at ${width}px`, async () => {
     const { context, page } = await open('/', width);
     try {
-      // Types of Cleanings and About are the two primary desktop items.
+      // Cleaning types, Service Area, FAQ and About are the primary desktop items.
       const about = page.locator('.site-nav__links a[href="/about/"]');
       assert.equal(await about.isVisible(), true, 'About link visible in desktop nav');
       assert.equal((await about.textContent())?.trim(), 'About');
+      const serviceArea = page.locator('.site-nav__links a[href="/service-area/"]');
+      assert.equal(await serviceArea.isVisible(), true, 'Service Area link visible in desktop nav');
+      const faq = page.locator('.site-nav__links a[href="/faq/"]');
+      assert.equal(await faq.isVisible(), true, 'FAQ link visible in desktop nav');
       const types = page.locator('.site-nav__links .nav-dropdown__trigger');
       assert.equal(await types.isVisible(), true, 'Types of Cleanings dropdown visible');
       assert.match((await types.textContent())?.trim() ?? '', /^Types of Cleanings/);
@@ -66,7 +70,7 @@ for (const width of [1024, 1280, 1440, 1680]) {
           return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
         }),
       );
-      assert.equal(boxes.length, 2, 'two primary navigation items');
+      assert.equal(boxes.length, 4, 'four primary navigation items');
       const centers = boxes.map(centerY);
       const firstCenter = centers[0];
       for (const center of centers) {
@@ -139,7 +143,7 @@ test('Types of Cleanings exposes the seven approved cleaning categories', async 
         'Recurring Residential Cleaning',
         'Deep Cleaning',
         'Move-in and Move-out Cleaning',
-        'Supportive Home Cleaning',
+        'Community Support Cleaning',
         'Short-term Rental Turnover Cleaning',
         'Commercial Cleaning',
         'Church Cleaning',
@@ -165,6 +169,26 @@ test('the compact mobile brand stays readable without descriptor or tagline', as
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     assert.ok(overflow <= 1, `no horizontal overflow on mobile (${overflow})`);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the mobile menu exposes Service Area and FAQ alongside the cleaning services', async () => {
+  const { context, page } = await open('/', 390, 844);
+  try {
+    const toggle = page.locator('[data-nav-toggle]');
+    assert.equal(await toggle.isVisible(), true, 'menu button visible');
+    await toggle.click();
+    assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
+    assert.equal(await page.locator('[data-nav-panel]').getAttribute('data-open'), 'true');
+    const serviceArea = page.locator('#mobile-nav > .mobile-nav__links a[href="/service-area/"]');
+    const faq = page.locator('#mobile-nav > .mobile-nav__links a[href="/faq/"]');
+    assert.equal(await serviceArea.isVisible(), true, 'Service Area visible in the open mobile menu');
+    assert.equal(await faq.isVisible(), true, 'FAQ visible in the open mobile menu');
+    assert.equal((await serviceArea.textContent())?.trim(), 'Service Area');
+    assert.equal((await faq.textContent())?.trim(), 'FAQ');
+    assert.equal(await page.locator('#mobile-nav a[href="/recurring-cleaning/"]').count(), 1, 'cleaning services remain first');
   } finally {
     await context.close();
   }

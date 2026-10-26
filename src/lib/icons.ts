@@ -18,6 +18,7 @@ export type IconName =
   | 'home'
   | 'refresh'
   | 'star'
+  | 'glasses'
   | 'key'
   | 'spray'
   | 'open-box'
@@ -38,7 +39,6 @@ export type IconName =
   | 'card'
   | 'info'
   | 'alert-circle'
-  | 'search'
   | 'building'
   | 'send'
   | 'external';

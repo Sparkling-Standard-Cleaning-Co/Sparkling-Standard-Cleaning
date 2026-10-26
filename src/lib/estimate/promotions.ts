@@ -95,7 +95,7 @@ export interface PromotionInput {
    */
   campaignArrangement?: { serviceType: PricingServiceType; frequency: Frequency } | null;
   /**
-   * Supportive Home eligibility discount (owner-directed 2026-10-25). It is
+   * Community Support eligibility discount (owner-directed 2026-10-25). It is
    * one of the single-discount candidates; it never stacks. The customer's
    * self-attestation is the eligibility signal, confirmed by the owner before
    * booking. It applies only to the configured residential services.
@@ -371,7 +371,7 @@ function campaignCandidate(input: PromotionInput): PromotionCandidate | null {
 }
 
 /**
- * Supportive Home eligibility discount. Unlike the prepared promotion
+ * Community Support eligibility discount. Unlike the prepared promotion
  * programs this is an owner-directed customer benefit, so it is allowed to
  * reduce a minimum-price job below the minimum; the advertised 10% is never
  * silently erased by the floor. It still participates in the SAME single-
@@ -388,7 +388,7 @@ function supportiveCandidate(input: PromotionInput): PromotionCandidate | null {
   return {
     id: 'supportive-home',
     source: 'supportive',
-    label: `Supportive Home discount (${config.percent}%)`,
+    label: `Community Support discount (${config.percent}%)`,
     percent: fraction,
     amount,
   };
@@ -400,7 +400,7 @@ function supportiveCandidate(input: PromotionInput): PromotionCandidate | null {
  * With every program disabled (and no campaign claim) this returns nulls.
  *
  * Tie-break policy (documented in docs/operations/ESTIMATE-CALCULATION-ORDER.md):
- * the largest customer benefit wins; on an exact tie the Supportive Home
+ * the largest customer benefit wins; on an exact tie the Community Support
  * eligibility discount wins, then the claimed campaign, then other programs.
  */
 export function evaluatePromotions(input: PromotionInput): PromotionEvaluation {

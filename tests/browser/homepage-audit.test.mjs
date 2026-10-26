@@ -50,7 +50,7 @@ const approved = [
   {
     title: 'Deep Cleaning',
     copy:
-      'An in-depth reset for a home that needs extra care and attention. Our deep cleaning service focuses on areas that can get buildup over time, from hand wiping baseboards and blinds to detailing walls and doors (See our Deep Cleaning procedure and available add-ons for a full list of services). We go beyond the basics to leave your home feeling renewed, and thoroughly clean.',
+      'An in-depth reset for a home that needs extra care — baseboards, frames, buildup and the details routine cleaning can miss. Required before a new recurring residential arrangement; the complete procedure lives on the Deep Cleaning page.',
   },
   {
     title: 'Move-in and Move-out Cleaning',
@@ -73,9 +73,6 @@ const approved = [
       'A complete church cleaning service for sanctuaries, fellowship halls, nurseries, restrooms, and offices — scheduled around services and church life.',
   },
 ];
-
-const deepPrerequisite =
-  'This service is ideal for one-time cleanings and is required before beginning recurring residential maintenance cleaning. It’s also recommended for returning clients when dirt, grime, or buildup begins to accumulate beyond what routine maintenance cleaning is designed to address.';
 
 const normalize = (value) => value.replace(/\s+/g, ' ').trim();
 
@@ -106,8 +103,8 @@ for (const [label, width, height] of [
 
       const deepCard = page.locator('.service-card', { hasText: 'Deep Cleaning' }).first();
       const deepText = normalize((await deepCard.textContent()) ?? '');
-      assert.ok(deepText.includes(deepPrerequisite), 'Deep Cleaning card states the mandatory recurring prerequisite');
-      assert.ok(deepText.includes('returning clients'), 'Deep Cleaning card includes the returning-client recommendation');
+      assert.ok(deepText.includes('Required before a new recurring residential arrangement'), 'Deep Cleaning card states the recurring prerequisite');
+      assert.ok(deepText.includes('complete procedure lives on the Deep Cleaning page'), 'Deep Cleaning card points to the full service page');
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -191,7 +188,7 @@ test('the community support panel stays inside a phone viewport', async () => {
   }
 });
 
-test('the footer review action uses a magnifying glass instead of a star', async () => {
+test('the footer review action uses reading glasses and the contact actions keep their order', async () => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
   try {
@@ -199,8 +196,22 @@ test('the footer review action uses a magnifying glass instead of a star', async
     const button = page.locator('[data-cta="footer-reviews-read"]');
     assert.equal(await button.locator('svg').count(), 1);
     const path = await button.locator('svg path').getAttribute('d');
-    assert.match(path ?? '', /^M21 21l-4\.35-4\.35/);
+    assert.equal(await button.locator('svg').getAttribute('width'), '24', 'glasses render large enough to read');
+    assert.equal(await button.locator('svg').getAttribute('stroke-width'), '2.2');
+    assert.match(path ?? '', /^M0\.5 8\.5 2\.5 10/);
+    assert.match(path ?? '', /M4\.5 8h4a2/);
+    assert.doesNotMatch(path ?? '', /^M21 21l-4\.35-4\.35/, 'the old search icon is gone');
     assert.doesNotMatch(normalize((await button.innerText()) ?? ''), /^$/, 'action label remains visible');
+
+    const actions = page.locator('.site-footer__contact-actions .btn');
+    assert.equal(await actions.count(), 4, 'Call, Text, Email and Contact Form render');
+    const labels = await actions.evaluateAll((items) =>
+      items.map((item) => item.textContent?.replace(/\s+/g, ' ').trim() ?? ''),
+    );
+    assert.match(labels[0] ?? '', /^Call \(850\) 426-8479$/);
+    assert.match(labels[1] ?? '', /^Text \(850\) 426-8479$/);
+    assert.equal(labels[2], 'Email Us');
+    assert.equal(labels[3], 'Contact Form');
   } finally {
     await context.close();
   }

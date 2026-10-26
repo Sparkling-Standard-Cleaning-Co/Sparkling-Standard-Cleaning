@@ -23,7 +23,7 @@
 // price is produced for the customer, the request or the owner notification.
 
 import type { Condition } from '../../config/pricing.ts';
-import { pricing, resolveGlobalEstimateFactor } from '../../config/pricing.ts';
+import { pricing, resolveEstimatorCalibration } from '../../config/pricing.ts';
 import { commercialTierConfig } from '../../config/estimators/commercial.ts';
 import { calculateChurchDiscount, type ChurchDiscountResult } from './church-discount.ts';
 
@@ -123,8 +123,8 @@ export interface FacilityQuoteOptions {
   otherDiscountApplied?: boolean | undefined;
   /** Owner kill switch override for tests; defaults to the shared config. */
   numericEstimatesEnabled?: boolean | undefined;
-  /** Test/owner override for the global estimate factor; defaults to config. */
-  globalFactor?: number | undefined;
+  /** Test-only override for this engine calibration factor; production reads config. */
+  globalFactorOverride?: number | undefined;
 }
 
 export interface FacilityPrice {
@@ -142,9 +142,9 @@ export interface FacilityPrice {
   monthly: number | null;
   visitsPerMonth: number | null;
   discount: ChurchDiscountResult | null;
-  /** Owner global estimate factor applied to the cleaning subtotal. */
+  /** Commercial or church calibration factor applied to the cleaning subtotal. */
   globalFactor: number;
-  /** Dollar effect of the owner factor (negative = reduction). */
+  /** Dollar effect of the calibration factor (negative = reduction). */
   globalAdjustment: number;
   tier: 'A' | 'B' | 'C';
   /** True when a numeric estimate can be shown (Tiers A/B and the owner switch on). */
@@ -214,7 +214,7 @@ export function calculateFacilityPrice(
   // The church discount is applied to the already-rounded cleaning subtotal and
   // is NOT rounded upward again; the full 10% benefit survives to the cent.
   const discountedSubtotal = discount?.applied ? discount.discountedSubtotal : cleaningSubtotal;
-  const globalFactor = resolveGlobalEstimateFactor(options.globalFactor);
+  const globalFactor = resolveEstimatorCalibration(church ? 'church' : 'commercial', options.globalFactorOverride);
   const adjustedService = round2(discountedSubtotal * globalFactor);
   const globalAdjustment = round2(adjustedService - discountedSubtotal);
   const perVisitCore = adjustedService;
@@ -253,7 +253,7 @@ export interface ChurchEstimateInput extends FacilityWorkloadInput {
   oneWayMiles?: number | null;
   otherDiscountApplied?: boolean;
   numericEstimatesEnabled?: boolean | undefined;
-  globalFactor?: number | undefined;
+  globalFactorOverride?: number | undefined;
 }
 
 export interface ChurchEstimateSummary {
@@ -271,7 +271,7 @@ export function calculateChurchEstimate(input: ChurchEstimateInput): ChurchEstim
       oneWayMiles: input.oneWayMiles,
       otherDiscountApplied: input.otherDiscountApplied,
       numericEstimatesEnabled: input.numericEstimatesEnabled,
-      globalFactor: input.globalFactor,
+      globalFactorOverride: input.globalFactorOverride,
     }),
   };
 }

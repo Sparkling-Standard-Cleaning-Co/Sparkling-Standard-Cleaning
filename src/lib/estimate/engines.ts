@@ -31,8 +31,8 @@ export const ESTIMATE_ENGINES: readonly EngineDefinition[] = [
     label: 'Residential Cleaning',
     shortLabel: 'Residential',
     description:
-      'Homes, apartments and condos — recurring cleaning, deep cleaning, move-in/move-out and supportive home cleaning.',
-    includes: 'Recurring · Deep · Move-in/out · Supportive',
+      'Homes, apartments and condos — recurring cleaning, deep cleaning, move-in/move-out and community support cleaning.',
+    includes: 'Recurring · Deep · Move-in/out · Community Support',
     ctaLabel: 'Get My Cleaning Estimate',
     requestLabel: 'Residential cleaning request',
     wizard: 'residential',

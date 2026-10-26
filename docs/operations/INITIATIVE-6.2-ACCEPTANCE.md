@@ -5,6 +5,11 @@
 **Evidence:** predeployment local suites, production upload/lead tests, live engine/price checks,
 and the screenshots in `docs/verification/6.2/`. Owner inbox attachment receipt remains pending.
 
+> Historic record: the single global factor in item 19 was superseded by four
+> independent engine calibration factors in Initiative 6.4. Current behavior is
+> documented in `docs/ESTIMATOR-CONTROL-CENTER.md` and
+> `docs/operations/ESTIMATE-CALCULATION-ORDER.md`.
+
 Status vocabulary:
 
 - **Verified** — implemented and covered by automated tests and/or direct visual capture.
