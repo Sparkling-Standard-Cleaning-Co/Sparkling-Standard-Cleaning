@@ -180,3 +180,13 @@ test('the plain-text fallback mirrors the HTML content without markup', () => {
   assert.match(confirmation.introText, /we received your request/i);
   assert.doesNotMatch(confirmation.introText, /</);
 });
+
+test('a Pay Now request explains the separate Stripe step without telling the customer not to pay', () => {
+  const confirmation = buildCustomerConfirmation({ ...reservation, payment_choice: 'pay_now' }, business);
+  for (const body of [confirmation.text, confirmation.html]) {
+    assert.match(body, /secure payment step opens separately through Stripe/i);
+    assert.match(body, /not a payment receipt/i);
+    assert.doesNotMatch(body, /Please don't send payment until/i);
+    assert.doesNotMatch(body, /payment received|amount charged|paid in full/i);
+  }
+});

@@ -103,9 +103,10 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   primary business objective is dependable weekly/biweekly residential customers. The owner's
   pending marketing actions live in `docs/launch/OWNER-INPUT-REQUIRED.md` (M2–M7; M1 — the
   software release — was deployed 2026-10-03).
-- **Formal launch checklist still outstanding (owner sign-off):** legal entity spelling, insurance/
+- **Formal launch checklist still outstanding (owner sign-off):** insurance/
   bonding/licensing claims, genuine reviews, final cancellation percentages, and any profile
-  URLs not yet supplied. `business.launch.productionApproved` remains `false` as the formal
+  URLs not yet supplied. The legal entity spelling is owner-confirmed and supported by the
+  Florida Articles certificate in the private master archive. `business.launch.productionApproved` remains `false` as the formal
   checklist gate; it does NOT reflect deployment state (the site is live).
 - Owner-confirmed facts: name, domain, phone `(850) 426-8479` (corrected 2026-10-02 — the
   earlier `(850) 246-8479` was a typo and must never be reintroduced), email
@@ -145,7 +146,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
   import extensions for Node-test compatibility). No client framework, no CSS framework, no CMS,
   no database.
 - `trailingSlash: 'always'`; canonical domain from `PUBLIC_SITE_URL`; sitemap excludes 404,
-  thank-you and leave-review.
+  payment-success, thank-you and leave-review.
 - **Single sources of truth** (never hard-code these facts elsewhere):
   - `src/config/business.ts` — every business fact, contact channel, socials, launch flags,
     publication flags.
@@ -182,7 +183,8 @@ Never publish unapproved promotional promises or activate binding pricing withou
   fields are never trusted. A GPS destination without a resolvable ZIP is priced from its confirmed
   pin and stays **preliminary** — never represented as a server-verified street address.
 - Serverless functions live in `functions/api/` (Cloudflare Pages Functions) for geocoding, travel
-  lookup and the lead relay. **Secrets only ever live in the function environment** (Cloudflare).
+  lookup, the lead relay and server-verified Stripe estimate payments. **Secrets only ever live
+  in the function environment** (Cloudflare).
 - Styles: `src/styles/tokens.css` (design tokens), `global.css` (component styles), `fonts.css`
   (generated). Use tokens only — never raw colors, spacing or font sizes.
 - Analytics: nothing loads before an explicit analytics consent choice; Umami/GTM/GA4 are gated by
@@ -203,14 +205,15 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | System | Source of truth | Detailed docs |
 | --- | --- | --- |
 | Business facts, contact, socials, launch/publication flags | `src/config/business.ts`, `.env` | `docs/launch/OWNER-INPUT-REQUIRED.md` |
-| Pricing, labor model, add-ons, promotions, discounts, four engine calibration factors, Community Support discount | `src/config/estimators/pricing-values.ts` (owner-editable values) + `src/config/pricing.ts` (typed config/flags) | `START-HERE-OWNER-CONTROL-CENTER.md`, `docs/ESTIMATOR-CONTROL-CENTER.md`, `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
+| Pricing, labor model, add-ons, owner-approved bundles, promotions, discounts, four engine calibration factors, Community Support discount | `src/config/estimators/pricing-values.ts` (owner-editable values) + `src/config/pricing.ts` (typed config/flags) | `START-HERE-OWNER-CONTROL-CENTER.md`, `docs/ESTIMATOR-CONTROL-CENTER.md`, `docs/launch/PRICING-PROPOSAL.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
 | Customer input options, labels and limits | `src/config/estimators/input-definitions.ts` + the two estimator form components | `docs/ESTIMATOR-CONTROL-CENTER.md` |
 | Travel economics, included miles, zone adjustments | `src/config/estimators/travel.ts`, `src/config/geography.ts` | `docs/ESTIMATOR-CONTROL-CENTER.md`, `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Location selection, geocoding, GPS/manual modes | `src/scripts/address-finder.ts`, `src/lib/location/`, `functions/api/geocode.ts` | `docs/operations/ESTIMATOR-LOCATION-ENGINE.md` |
 | Quote calculation and server verification | `src/lib/estimate/` (`calculate.ts`, `quote.ts`, `verify.ts`, `validation.ts`, `facility-verify.ts`, `tax.ts`) | `docs/verification/VERIFICATION.md`, `docs/operations/TAX-TREATMENT.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
+| Secure Pay Now / reservation choice | `src/config/payments.ts`, `functions/api/estimate-checkout.ts`, `functions/api/stripe-webhook.ts`, `src/pages/estimate/payment-success.astro`, `src/scripts/payment-success.ts` | `docs/operations/ESTIMATE-PAYMENTS.md` |
 | Four estimate engines (residential `/estimate/residential/`, STR `/estimate/str/`, commercial `/estimate/commercial/`, church `/estimate/church/`) + 10% church discount | `src/lib/estimate/engines.ts`, `commercial.ts`, `church-discount.ts`, `src/components/EstimateHub.astro`, `FacilityEstimateForm.astro`, `src/pages/estimate/` | `docs/operations/ESTIMATOR-ENGINES.md` |
 | Commercial/church facility pricing (provisional Tier A/B) + owner kill switch + completed initial calibration | `src/config/estimators/commercial.ts` (`numericEstimatesEnabled`), `src/config/estimators/pricing-values.ts` (`commercialPricing`), `src/lib/estimate/calibration.ts`, `npm run commercial:calibration`, `npm run calibration:report` | `docs/operations/ESTIMATOR-ENGINES.md`, `docs/operations/COMMERCIAL-PRICING-RESEARCH.md`, `docs/operations/FACILITY-CALIBRATION.md` |
-| Promotions, bundles, Founding-10 (all disabled) | `src/lib/estimate/promotions.ts` + `src/config/estimators/pricing-values.ts` | `docs/launch/PROMOTION-PROPOSALS.md` |
+| Promotions and Founding-10 (disabled) + three owner-approved add-on bundles | `src/lib/estimate/promotions.ts` + `src/config/estimators/pricing-values.ts` | `docs/launch/PROMOTION-PROPOSALS.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
 | Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` §4a |
 | Reservation window, statuses, ledger | `src/config/scheduling.ts` + `src/scripts/estimate-wizard.ts` | `docs/operations/RESERVATION-TRACKING.md` |
@@ -280,6 +283,7 @@ required**, **whether a rebuild/regenerate step is needed**, and **what could br
 - Website copy, images, founder info → `src/content/`, `docs/CONTENT-GUIDE.md`.
 - Social profile URLs and icons → `business.ts` socials + the shared social component.
 - Marketing campaigns / UTM links → `marketing-links.ts`, then `npm run marketing:links`.
+- Secure estimate payments → `src/config/payments.ts`; live Stripe keys and webhook secret live only in Cloudflare (`docs/operations/ESTIMATE-PAYMENTS.md`).
 - Marketing strategy, platform priorities, content production and account setup →
   `docs/marketing/` (start with `MULTIPLATFORM-OPERATING-PLAN.md`).
 - Analytics configuration → `docs/analytics/ANALYTICS-SETUP.md`.
@@ -476,8 +480,8 @@ collections are intentionally empty — not errors.
     `docs/archive/launch/COMMERCIAL-ESTIMATE-MODEL-2026-10-24.md` is historical).
   - **Future booking roadmap (documentation only):** docs/operations/BOOKING-ARCHITECTURE.md
     defines the state machine (Estimate → Request Submitted → Owner Approved → Reserved →
-    Confirmed → Paid) and the recommended additions. NOTHING is auto-booked and no payment is
-    collected.
+    Confirmed → Paid) and the recommended additions. NOTHING is auto-booked. Pay Now is an
+    optional exact-quote Stripe step and never holds a calendar slot.
 - **White-tile icon collection (2026-10-25, owner-supplied artwork):** the 17 approved
   white-tile icons replace the earlier vector set. Optimized 384px WebP renditions live in
   `src/assets/icons/white-tile/`; the 1254px PNG masters are preserved in the local master
@@ -607,12 +611,13 @@ collections are intentionally empty — not errors.
   homepage, labeled representative — never presented as our work. Source/licence register:
   `docs/design/IMAGE-SOURCE-REGISTER.md`. Replace remaining stock with genuine, permissioned
   photography when it exists.
-- **Provisional (internal only, publication flags off):** add-on pricing surface, multi-add-on
-  incentive, response guarantee, appreciation discounts, add-on bundles, Founding-10 program and
-  market comparisons. The promotion engine applies at most one discount, never below the minimum
-  job, and always fails closed without owner-approved terms. Financial review:
-  `docs/launch/PROMOTION-PROPOSALS.md`; regenerate with `npm run promotions:impact`.
-- **Pending owner input:** legal entity spelling/suffix, insurance/bonding/licensing claims,
+- **Add-on bundles (owner-approved 2026-10-26):** Kitchen Refresh, Deep Detail and Recurring Care
+  are enabled as transparent extra-service bundles in `pricing-values.ts`. Every required extra
+  must be selected; the discount is calculated on the eligible add-on subtotal; specialty work is
+  excluded; the normal single-discount policy still applies. The rest of the prepared promotion
+  programs, appreciation discounts and Founding-10 remain disabled until owner terms are approved.
+  Financial review: `docs/launch/PROMOTION-PROPOSALS.md`; regenerate with `npm run promotions:impact`.
+- **Pending owner input:** insurance/bonding/licensing claims,
   Instagram verification, the deferred
   YouTube channel (Google Workspace eligibility), Umami website ID, final cancellation
   percentages, marketing-launch approvals (M2–M7; M1 deployed 2026-10-03), the Resend

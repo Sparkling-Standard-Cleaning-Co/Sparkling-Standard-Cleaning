@@ -533,7 +533,8 @@ export const ownerPricing: OwnerPricingConfig = {
   ],
 
   // ── 10. Promotions and discounts ──────────────────────────────────────────
-  // ALL DISABLED. These require explicit owner approval before any of them is
+  // The owner authorized these three transparent add-on bundles on 2026-10-26.
+  // Every other prepared promotion remains disabled until approved.
   // wired into customer-facing behavior or published.
   promotions: {
     addonIncentive: {
@@ -580,27 +581,40 @@ export const ownerPricing: OwnerPricingConfig = {
     addonBundles: [
       {
         id: 'bundle-kitchen-refresh',
-        label: 'Kitchen refresh bundle',
-        enabled: false,
-        requiredAddonIds: ['inside_fridge', 'inside_oven'],
+        label: 'Kitchen Refresh Bundle',
+        enabled: true,
+        requiredAddonIds: ['inside_fridge', 'inside_oven', 'inside_cabinets'],
         eligibleFrequencies: [],
         requiresRecurring: false,
         kind: 'percent',
-        value: null,
-        maxDiscountUsd: null,
+        value: 0.1,
+        maxDiscountUsd: 30,
+        expiresOn: null,
+        stackable: false,
+      },
+      {
+        id: 'bundle-deep-detail',
+        label: 'Deep Detail Bundle',
+        enabled: true,
+        requiredAddonIds: ['detailed_baseboards', 'detailed_walls', 'interior_windows'],
+        eligibleFrequencies: [],
+        requiresRecurring: false,
+        kind: 'percent',
+        value: 0.1,
+        maxDiscountUsd: 30,
         expiresOn: null,
         stackable: false,
       },
       {
         id: 'bundle-recurring-care',
-        label: 'Recurring care bundle',
-        enabled: false,
-        requiredAddonIds: ['bed_linen_change', 'dishes'],
+        label: 'Recurring Care Bundle',
+        enabled: true,
+        requiredAddonIds: ['bed_linen_change', 'dishes', 'laundry'],
         eligibleFrequencies: ['weekly', 'biweekly'],
         requiresRecurring: true,
         kind: 'percent',
-        value: null,
-        maxDiscountUsd: null,
+        value: 0.1,
+        maxDiscountUsd: 20,
         expiresOn: null,
         stackable: false,
       },

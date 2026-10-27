@@ -28,6 +28,8 @@ interface StripeEvent {
     object?: {
       id?: string;
       payment_status?: string;
+      amount_total?: number;
+      currency?: string;
       customer_details?: { email?: string; name?: string };
       metadata?: Record<string, string>;
     };
@@ -77,6 +79,58 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
 
   const metadata = session.metadata ?? {};
+
+  // Direct estimate payment (2026-10-26). The cleaning request itself was
+  // delivered by /api/lead before checkout; this is the authoritative paid
+  // notice. The amount comes from Stripe, never from metadata or the browser.
+  if (metadata.checkout_kind === 'estimate_payment') {
+    const amount =
+      typeof session.amount_total === 'number' && session.amount_total > 0
+        ? (session.amount_total / 100).toFixed(2)
+        : 'unknown';
+    const reference = (metadata.quote_reference ?? '').trim() || 'reference unavailable';
+    const customerName = (session.customer_details?.name ?? '').trim();
+    const customerEmail = (session.customer_details?.email ?? '').trim();
+    if (!env.WEB3FORMS_ACCESS_KEY) {
+      return json({ ok: false, error: 'not_configured' }, 500);
+    }
+    try {
+      const response = await fetch(env.WEB3FORMS_ENDPOINT ?? 'https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          access_key: env.WEB3FORMS_ACCESS_KEY,
+          subject: `PAID estimate — $${amount} — ${reference}`,
+          from_name: 'Sparkling Standard Website',
+          botcheck: '',
+          'Payment status': 'PAID — verify in Stripe before scheduling',
+          'Amount paid': `$${amount} USD`,
+          'Quote reference': reference,
+          'Service': metadata.service_type ?? 'cleaning',
+          'Customer': customerName || 'name not supplied by Stripe',
+          'Email': customerEmail || 'email not supplied by Stripe',
+          'Stripe event': eventId,
+          'Stripe session': session.id ?? '',
+          'Note':
+            'The cleaning request was delivered separately by the website lead relay. Confirm the requested date, scope and final details personally before scheduling.',
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      const data = (await response.json().catch(() => ({}))) as { success?: boolean };
+      if (!response.ok || data.success !== true) {
+        return json({ ok: false, error: 'provider_failed' }, 500);
+      }
+    } catch {
+      return json({ ok: false, error: 'provider_failed' }, 500);
+    }
+    processedEvents.add(eventId);
+    if (processedEvents.size > MAX_TRACKED_EVENTS) {
+      const oldest = processedEvents.values().next().value;
+      if (oldest) processedEvents.delete(oldest);
+    }
+    return json({ ok: true, received: true });
+  }
+
   const valueUsd = numberFrom(metadata.gift_value_usd);
   const recipientName = (metadata.recipient_name ?? '').trim();
   const purchaserName = (metadata.purchaser_name ?? '').trim();

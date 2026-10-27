@@ -111,7 +111,8 @@ Do these in order, stopping when the branch list appears.
     stay in the function environment; the private travel origin is never read or returned here.
 - Outbound calls: `api.web3forms.com`, `api.resend.com` (customer confirmation, optional),
   `api.mapmap.ai` (addresses + routing), `geocoding.geo.census.gov`
-  (free fallback), `api.eia.gov` (optional), `challenges.cloudflare.com` (Turnstile, optional).
+  (free fallback), `api.eia.gov` (optional), `api.stripe.com` (only when Pay Now is configured),
+  `challenges.cloudflare.com` (Turnstile, optional).
 
 ## 4. Environment variables — build-time vs runtime
 
@@ -144,6 +145,8 @@ a commit) before the built pages and Functions see it.
 | `TURNSTILE_SECRET_KEY` | Optional | `functions/api/lead.ts` | Turnstile check skipped; honeypot + timing still apply |
 | `ROUTES_API_KEY` | Optional | `functions/api/travel.ts` | Straight-line × 1.18 distance estimate labeled as such |
 | `EIA_API_KEY` | Optional | `functions/api/travel.ts` | Uses `REFERENCE_GAS_PRICE` |
+| `STRIPE_SECRET_KEY` | Optional; required for Pay Now | `functions/api/estimate-checkout.ts`, `functions/api/stripe-webhook.ts` | Pay Now stays hidden; reservation-without-payment remains available |
+| `STRIPE_WEBHOOK_SECRET` | Optional; required to confirm paid estimate/gift sessions | `functions/api/stripe-webhook.ts` | Paid webhook returns `503`; no paid notice or gift fulfillment is issued |
 
 ### Optional runtime text variables (dashboard, "Text" type)
 
@@ -195,6 +198,23 @@ Failure behavior (by design): if Resend rejects or fails, the function logs
 `customer-confirmation: failed (provider N)` server-side — no PII, no secrets — and still returns
 success to the customer, because the lead was already delivered. The on-page thank-you summary is
 always shown immediately.
+
+### 4b. Secure estimate payments (Stripe) — owner setup
+
+The code for **Pay Now Securely** is present but environment-gated. Without `STRIPE_SECRET_KEY`,
+`GET /api/estimate-checkout` reports `enabled:false` and customers see only the reservation path.
+
+1. Use the existing Sparkling Standard Stripe account; do not create a second processor.
+2. Add `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` as Cloudflare **Secrets**, then redeploy.
+3. Point the existing webhook endpoint `https://sparkling-standard.com/api/stripe-webhook` at
+   `checkout.session.completed` and paste its signing secret into `STRIPE_WEBHOOK_SECRET`.
+4. Test with Stripe **test mode** first. No live charge should be made until the owner approves the
+   payment terms and the amount flow. The code verifies the quote server-side, but it cannot verify
+   a real payment without Stripe test keys.
+5. Confirm `GET /api/estimate-checkout` returns `enabled:true` and that a test-mode payment creates
+   both the normal lead request and the separate `PAID estimate` owner notice.
+
+Operational details and the exact safety model: `docs/operations/ESTIMATE-PAYMENTS.md`.
 
 ### Documented but NOT consumed by code
 

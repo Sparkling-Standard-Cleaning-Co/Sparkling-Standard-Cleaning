@@ -10,7 +10,7 @@ servicesIntro:
   heading: Our Services
   lead: Sparkling Standard offers six distinct cleaning services, each with its own scope and level of care, so you can find the right fit for your space.
 estimateBand:
-  heading: Ready for your home to sparkle?
+  heading: Is your space ready to sparkle?
   text: Get an estimate in less than two minutes!
   body: After you are guided through a few quick questions, our estimating software will present you with a practical pricing range, built mathematically. When you move forward, a service request is sent to Sparkling Standard, where your quote is personally reviewed and approved before confirmation.
   ctaLabel: Instant Estimate
@@ -22,13 +22,13 @@ communityBand:
   ctaLabel: Explore Community Support Cleaning
   ctaHref: /supportive-home-cleaning/
   groups:
-    - title: Seniors and elderly residents
-      text: A little extra support for the households that mean so much to us.
+    - title: Seniors and Elderly
+      text: A little extra care for the generations whose hard work, wisdom, and love paved the way for us today.
     - title: First responders
-      text: A thank-you for the neighbors who show up when others need them most.
+      text: Our thanks to those who show up when others need them most.
     - title: Military veterans
       text: For veterans and their households, with our thanks for your service.
-    - title: People with disabilities
+    - title: Those with Disabilities
       text: Thoughtful help for households where cleaning can be harder to manage.
     - title: Other eligible community members
       text: Not sure whether you qualify? Reach out and we will confirm it personally.

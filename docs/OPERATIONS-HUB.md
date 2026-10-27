@@ -28,7 +28,7 @@ This repository is the company's marketing and lead system:
 - Astro 5 static site: home, seven service pages, service area, estimate wizard, about, FAQ,
   contact, privacy, terms, thank-you, leave-review, 404.
 - A six-step instant estimate engine with travel/fuel architecture and fail-safe behavior.
-- Pages Functions for lead relay (`/api/lead`) and travel lookup (`/api/travel`).
+- Pages Functions for lead relay (`/api/lead`), travel lookup (`/api/travel`), geocoding and optional server-verified Stripe estimate checkout (`/api/estimate-checkout`).
 - Consent-gated analytics, owner-confirmed operational: GTM container `GTM-KSQ26HMG` loads only
   after consent and GA4 `G-LG222LQRQ2` receives page views, `estimate_start` and the three inquiry
   key events (`docs/analytics/ANALYTICS-SETUP.md`). Umami is implemented but has no website ID.
@@ -96,10 +96,14 @@ Every arrow maps to an authoritative document — see §10.
    confirmation instead of a guessed number.
 3. The visitor submits a request. The client posts to `/api/lead`; the function validates,
    applies spam checks (Turnstile when configured), and relays to Web3Forms using the server key.
+   The request is saved before any optional payment step.
 4. If the function is not configured (`503`), the client falls back to a direct Web3Forms
    submission using the public key. If neither path is configured, the visitor sees an honest
    message plus call/email alternatives — **never a fake success**.
-5. The owner receives the inquiry at `owner@sparkling-standard.com` and replies personally.
+5. The customer may reserve without paying upfront, or choose Pay Now for an exact, server-verified
+   quote. Pay Now uses Stripe-hosted Checkout only; custom/range/custom-review quotes stay
+   reservation-only. See `docs/operations/ESTIMATE-PAYMENTS.md`.
+6. The owner receives the inquiry at `owner@sparkling-standard.com` and replies personally.
    There is no CRM; follow-up is manual.
 
 Funnel verification status: **live and owner-confirmed (2026-10-01)** — all four funnels deliver to

@@ -45,7 +45,7 @@ const schema = [
           {data.hero.headline}
           {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
         </h1>
-        <p class="lead">{data.hero.lead}</p>
+        {data.hero.lead && <p class="lead">{data.hero.lead}</p>}
       </div>
       <p class="mt-4">
         <a href="/estimate/">Not a home? See all estimate options →</a>

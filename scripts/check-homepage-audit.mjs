@@ -38,7 +38,7 @@ const required = [
   {
     label: 'Deep Cleaning — concise homepage scope',
     copy:
-      'An in-depth reset for a home that needs extra care — baseboards, frames, buildup and the details routine cleaning can miss. Required before a new recurring residential arrangement; the complete procedure lives on the Deep Cleaning page.',
+      'An in-depth reset for a home that needs extra care — available as a one-time cleaning and required before a new recurring residential arrangement. The complete procedure lives on the Deep Cleaning page.',
   },
   {
     label: 'Move-in and Move-out Cleaning',

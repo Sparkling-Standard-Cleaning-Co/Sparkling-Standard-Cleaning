@@ -105,7 +105,8 @@ or when Resend is not yet configured.
 
 - Never implies a confirmed appointment, a booking or a scheduled visit.
 - Never presents a provisional estimate as a final price.
-- Never acts as an invoice or a payment receipt; no payment is taken by a form.
+- Never acts as an invoice or a payment receipt. A Pay Now choice is processed separately through
+  Stripe; the email explains that distinction and never tells a Pay Now customer not to pay.
 - Never contains another customer's information, internal verification codes,
   labor math, credentials or the private operating origin.
 

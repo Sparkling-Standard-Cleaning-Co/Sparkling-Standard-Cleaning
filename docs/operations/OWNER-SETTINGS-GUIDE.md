@@ -128,8 +128,8 @@ for one add-on instead, add a line to that add-on:
 ### 10. Promotions and discounts
 The `promotions` section holds every prepared program: the multi-add-on incentive, the response
 guarantee, the appreciation discounts, the add-on bundles and the Founding-10 program.
-**Every program ships disabled with `value: null` until the owner approves exact terms in
-writing.** Additional rules:
+**The three add-on bundles are owner-approved and enabled (2026-10-26); every other
+program remains disabled with `value: null` until the owner approves exact terms in writing.** Additional rules:
 
 - Only **one** promotion can ever apply to a quote; the engine picks the single largest effective
   discount. Programs never stack with each other or with the multi-add-on incentive.

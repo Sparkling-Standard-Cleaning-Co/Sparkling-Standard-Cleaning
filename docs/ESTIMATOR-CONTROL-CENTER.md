@@ -187,7 +187,7 @@ most one promotion; travel is never discounted.
 | Add-on incentive | Disabled | 5% at 2 add-ons, 8% at 3+, cap $75 | `pricing-values.ts` |
 | Response guarantee | Disabled | 1 business hour, 25%, cap $50 | `pricing-values.ts` |
 | Appreciation discounts | Disabled | No approved terms | `pricing-values.ts` |
-| Add-on bundles | Disabled | No approved values | `pricing-values.ts` |
+| Add-on bundles | **Enabled (3, 2026-10-26)** | Kitchen Refresh, Deep Detail and Recurring Care; 10% off eligible extras, caps $30/$30/$20; weekly/biweekly for recurring care | `pricing-values.ts` |
 | Founding-10 | Disabled | No mechanism selected | `pricing-values.ts` |
 | SPARKLE100 | **Enabled** | $100 off first clean; new weekly/biweekly recurring; claim required; no expiry | `pricing-values.ts` |
 

@@ -6,7 +6,7 @@ import { pricing } from '../config/pricing';
 import { breadcrumbNode } from '../lib/schema';
 
 // These terms describe the currently implemented model: requests (not instant
-// bookings), estimate ranges confirmed personally, payment after service, and
+// bookings), estimate ranges confirmed personally, optional exact-quote Pay Now or payment after service, and
 // the make-it-right policy. Cancellation percentages stay OUT of this page
 // until the owner approves final values (pricing.cancellation.ownerApproved).
 // Owner legal review is a launch blocker — see docs/launch/OWNER-INPUT-REQUIRED.md.
@@ -93,12 +93,14 @@ const phone = contactPhone();
           <h2>Payment</h2>
           <ul>
             <li>
-              Residential cleaning is paid upon completion. Commercial cleaning is invoiced monthly
-              with Net 15 terms.
+              You may pay an exact estimate securely through Stripe when Pay Now is offered, or
+              submit a reservation request without paying upfront. Pay Now does not by itself confirm
+              the date or final scope. Commercial cleaning is invoiced monthly with Net 15 terms.
             </li>
             <li>
-              No standard deposit or late fee applies initially. Large projects may be considered
-              separately with written terms agreed before work begins.
+              No standard deposit or late fee applies initially. If the personally confirmed scope
+              differs from the estimate, any adjustment is discussed and agreed before work begins.
+              Large projects may be considered separately with written terms agreed before work begins.
             </li>
             <li>
               Accepted methods include {business.payments.accepted.join(', ')}, plus{' '}

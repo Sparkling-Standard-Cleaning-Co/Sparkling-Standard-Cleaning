@@ -240,6 +240,49 @@ function validatePromotionArray(
   }
 }
 
+function validateAddonBundles(
+  value: unknown,
+  path: string,
+  errors: ConfigIssue[],
+  warnings: ConfigIssue[],
+  addonIds: Set<string>,
+): void {
+  const list = arrayValue(value, path, errors);
+  const ids = new Set<string>();
+  for (const [index, entry] of list.entries()) {
+    const bundle = asRecord(entry, `${path}[${index}]`, errors);
+    const id = stringValue(bundle.id, `${path}[${index}].id`, errors);
+    if (id && ids.has(id)) errors.push(issue('error', `${path}[${index}].id`, `Duplicate bundle id ${id}.`));
+    if (id) ids.add(id);
+    stringValue(bundle.label, `${path}[${index}].label`, errors);
+    const enabled = booleanValue(bundle.enabled, `${path}[${index}].enabled`, errors);
+    booleanValue(bundle.requiresRecurring, `${path}[${index}].requiresRecurring`, errors);
+    frequencyList(bundle.eligibleFrequencies, `${path}[${index}].eligibleFrequencies`, errors);
+    const required = arrayValue(bundle.requiredAddonIds, `${path}[${index}].requiredAddonIds`, errors);
+    if (required.length === 0) {
+      errors.push(issue('error', `${path}[${index}].requiredAddonIds`, 'A bundle must require at least one add-on.'));
+    }
+    for (const [addonIndex, addonId] of required.entries()) {
+      if (typeof addonId !== 'string' || !addonIds.has(addonId)) {
+        errors.push(issue('error', `${path}[${index}].requiredAddonIds[${addonIndex}]`, `Unknown add-on id ${received(addonId)}.`));
+      }
+    }
+    if (enabled === true) {
+      if (bundle.value === null || bundle.value === undefined) {
+        errors.push(issue('error', `${path}[${index}].value`, 'An enabled bundle must have a value.'));
+      } else {
+        discountValue(bundle.value, bundle.kind, `${path}[${index}].value`, errors, warnings);
+      }
+      if (!(typeof bundle.maxDiscountUsd === 'number' && Number.isFinite(bundle.maxDiscountUsd) && bundle.maxDiscountUsd > 0)) {
+        errors.push(issue('error', `${path}[${index}].maxDiscountUsd`, 'An enabled bundle needs a positive safety cap.'));
+      }
+    }
+    dateValue(bundle.expiresOn, `${path}[${index}].expiresOn`, errors);
+    if (bundle.stackable === true) {
+      errors.push(issue('error', `${path}[${index}].stackable`, 'Bundles must remain non-stackable.'));
+    }
+  }
+}
 export function validateEstimatorConfiguration(
   input: EstimatorConfigurationInput = {},
 ): EstimatorConfigurationResult {
@@ -482,7 +525,7 @@ export function validateEstimatorConfiguration(
   stringValue(guarantee.businessTimezone, 'promotions.responseGuarantee.businessTimezone', errors);
 
   validatePromotionArray(promotions.appreciationDiscounts, 'promotions.appreciationDiscounts', errors, warnings);
-  validatePromotionArray(promotions.addonBundles, 'promotions.addonBundles', errors, warnings);
+  validateAddonBundles(promotions.addonBundles, 'promotions.addonBundles', errors, warnings, addonIds);
 
   const founding = asRecord(promotions.foundingTen, 'promotions.foundingTen', errors);
   booleanValue(founding.enabled, 'promotions.foundingTen.enabled', errors);

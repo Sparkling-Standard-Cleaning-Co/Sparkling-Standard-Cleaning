@@ -29,18 +29,18 @@ const schema = [
           { name: 'Commercial Cleaning', path: '/estimate/commercial/' },
         ]}
       />
-      <div class="section-head mt-4">
+      <div class="section-head section-head--center mt-4">
         <h1>
           {data.hero.headline}
           {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
         </h1>
         <p class="lead">{data.hero.lead}</p>
+        <p class="mt-3"><a href="/estimate/">Estimating something else? See all estimate options →</a></p>
       </div>
     </div>
   </section>
 
   <div class="container container--narrow" style="margin-bottom: var(--space-9)">
-    <p><a href="/estimate/">Estimating something else? See all estimate options →</a></p>
     <FacilityEstimateForm engine="commercial" />
   </div>
 </BaseLayout>

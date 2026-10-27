@@ -1,10 +1,10 @@
 # Promotion proposals — owner decision package
 
-**Status: ALL PROGRAMS DISABLED.** Nothing in this document is published or active. The
-promotion engine (`src/lib/estimate/promotions.ts`) ships with every program `enabled: false`
-and `value: null`; a program with no approved value can never apply. Enabling any program
-requires explicit written owner approval of exact terms **and** the automatic effective-pricing version
-bump so old quotes cannot be silently reused under new rules.
+**Status: ADD-ON BUNDLES APPROVED; OTHER PROGRAMS DISABLED.** On 2026-10-26 the owner
+approved three transparent add-on bundles. Every other program in this document remains
+`enabled: false` with `value: null`. Enabling another program requires explicit written
+owner approval of exact terms; the automatic effective-pricing version changes so old quotes
+cannot be silently reused under new rules.
 
 Regenerate the numbers any time with:
 
@@ -101,24 +101,25 @@ closed until the first-customer question exists.
 
 ## Add-on bundles
 
-Prepared bundles (all disabled, no values):
+**Owner-approved bundles (enabled 2026-10-26):**
 
-| Bundle | Requires | Proposed form |
-| --- | --- | --- |
-| `bundle-kitchen-refresh` | Inside refrigerator + inside oven | % off the eligible add-on subtotal, cap, expiry |
-| `bundle-recurring-care` | Bed linen change + dishes | % off eligible add-ons, weekly/biweekly only |
+| Bundle | Requires | Discount | Cap | Rhythm |
+| --- | --- | --- | --- | --- |
+| `bundle-kitchen-refresh` | Inside refrigerator + inside oven + inside cabinets | 10% off the selected eligible add-on subtotal | $30 | Any |
+| `bundle-deep-detail` | Detailed baseboards + detailed wall spot-cleaning + interior windows | 10% off the selected eligible add-on subtotal | $30 | Any |
+| `bundle-recurring-care` | Bed linen change + dishes + laundry | 10% off the selected eligible add-on subtotal | $20 | Weekly/biweekly |
 
-Modeled kitchen bundle at 8% (cap $20): price $305.00 → $300.00 (eligible add-on subtotal $55,
-discount $5, then the $5 round-up absorbs part of it). Bundles reward profitable add-on purchases
-and, for the recurring-care bundle, reinforce retention. Because only **one** promotion applies,
-a bundle never stacks with the existing multi-add-on incentive — the engine picks whichever gives
-the customer the larger effective reduction.
+The exact bundle price and savings are calculated from the current add-on prices in
+`pricing-values.ts`; no fixed bundle dollar price is hard-coded. All required extras must be
+selected. Because only **one** promotion applies, a bundle never stacks with the campaign,
+Community Support discount or another program; the engine picks the largest effective reduction.
+Specialty/custom-quote extras and the base cleaning price are excluded.
 
 ## Remaining business decisions
 
 1. Which Founding 10 mechanism (if any), with exact value, cap, frequency list and expiry.
 2. Appreciation discount terms: who qualifies, how much, cap, expiry.
-3. Bundle terms: which combos, percentage/fixed value, caps, expiry.
+3. Whether to adjust the approved bundle percentages/caps later; any change flows through the automatic pricing fingerprint.
 4. Whether any promotion should ever coexist with the proposed multi-add-on incentive (current
    engine: no — single promotion only).
 5. How the owner will track Founding enrollments (owner-manual list) and what the customer-facing

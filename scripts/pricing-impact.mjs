@@ -129,6 +129,8 @@ function buildReport() {
   scenarios.push(residentialRow('res-typical-3-2', 'Typical 3-bed / 2-bath residential clean', residentialInput()));
   scenarios.push(residentialRow('res-typical-3-2-oven', 'Typical 3-bed / 2-bath + inside oven', residentialInput({ addonIds: ['inside_oven'] })));
   scenarios.push(residentialRow('res-deep-3-2', 'Typical 3-bed / 2-bath deep clean', residentialInput({ serviceType: 'deep' })));
+  scenarios.push(residentialRow('res-kitchen-bundle', 'Typical 3-bed / 2-bath + Kitchen Refresh Bundle', residentialInput({ addonIds: ['inside_fridge', 'inside_oven', 'inside_cabinets'] })));
+  scenarios.push(residentialRow('res-deep-detail-bundle', 'Typical deep clean + Deep Detail Bundle', residentialInput({ serviceType: 'deep', addonIds: ['detailed_baseboards', 'detailed_walls', 'interior_windows'] })));
   const recurring = calculateEstimate(residentialInput({ frequency: 'biweekly' }), context);
   scenarios.push(residentialRow('res-recurring-first-visit', 'New biweekly recurring arrangement — first visit', residentialInput({ frequency: 'biweekly' })));
   const ongoing = ongoingRow('res-recurring-ongoing', 'New biweekly recurring arrangement — ongoing visit', recurring);

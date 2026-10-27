@@ -184,7 +184,7 @@ test('the facility form validates the current step with field-specific messages'
     const summary = (await page.locator('[data-error-summary]').innerText()) ?? '';
     assert.match(summary, /Enter the business or organization name/i);
     assert.match(summary, /Enter the contact name for this request/i);
-    assert.match(summary, /Enter the facility ZIP code/i);
+    assert.doesNotMatch(summary, /ZIP code/i, 'the optional facility ZIP must not block step one');
     assert.equal(await page.evaluate(() => document.activeElement?.id), 'fac-org');
     assert.equal(await page.locator('[data-facility-step-panel="2"]').evaluate((el) => el.hidden), true);
     await completeFacilityStepOne(page);
@@ -251,10 +251,10 @@ test('the church engine reconciles the configured discount and routes very large
     await page.fill('#fac-sqft', '30000');
     await page.fill('#fac-restrooms', '24');
     await page.waitForFunction(
-      () => document.querySelector('[data-facility-estimate-price]')?.textContent?.includes('together'),
+      () => document.querySelector('[data-facility-estimate-price]')?.textContent?.includes('confirm this with you'),
     );
     const reviewText = (await page.locator('[data-facility-estimate-price]').textContent()) ?? '';
-    assert.match(reviewText, /together/i);
+    assert.match(reviewText, /confirm this with you/i);
     const reviewNote = (await page.locator('[data-facility-review-note]').textContent()) ?? '';
     assert.match(reviewNote, /personal review/i, 'Tier C is described as a personal review');
     assert.doesNotMatch(reviewNote, /nonbinding preliminary estimate/i);

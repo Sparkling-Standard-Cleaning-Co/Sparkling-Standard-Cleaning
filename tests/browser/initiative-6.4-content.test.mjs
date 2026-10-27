@@ -168,8 +168,9 @@ test('Community Support Cleaning is the public name everywhere and the route sta
     const homeText = normalize((await page.locator('body').innerText()) ?? '');
     assert.doesNotMatch(homeText, /Supportive Home/i);
     assert.match(homeText, /Community Support Cleaning/);
-    assert.match(homeText, /Here in the Florida Panhandle, in the heart of the Bible Belt/);
-    assert.match(homeText, /how neighbors care for one another/);
+    assert.match(homeText, /Our Values/);
+    assert.match(homeText, /porch light left on/);
+    assert.doesNotMatch(homeText, /Southern Hospitality|Bible Belt/);
   } finally {
     await context.close();
   }

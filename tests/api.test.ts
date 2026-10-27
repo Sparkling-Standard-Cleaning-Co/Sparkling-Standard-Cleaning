@@ -15,6 +15,10 @@ import assert from 'node:assert/strict';
 
 import { onRequestPost as leadPost, onRequestGet as leadGet } from '../functions/api/lead.ts';
 import { onRequestPost as travelPost, onRequestGet as travelGet } from '../functions/api/travel.ts';
+import {
+  onRequestPost as estimateCheckoutPost,
+  onRequestGet as estimateCheckoutGet,
+} from '../functions/api/estimate-checkout.ts';
 
 let requestIp = 0;
 const jsonRequest = (body: unknown, ip = `10.77.0.${++requestIp}`) =>
@@ -580,3 +584,70 @@ test('travel: a burst from one IP is throttled so the free allowance cannot be d
   assert.equal(lastStatus, 429, 'requests beyond the per-IP window must be refused');
 });
 
+
+// ── /api/estimate-checkout ─────────────────────────────────────────────────
+
+test('estimate checkout: configuration probe stays disabled without Stripe', async () => {
+  const response = await estimateCheckoutGet({
+    request: new Request('https://example.test/api/estimate-checkout'),
+    env: {},
+  } as never);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, enabled: false });
+});
+
+test('estimate checkout: missing Stripe fails closed without charging', async () => {
+  const response = await estimateCheckoutPost({
+    request: jsonRequest({ fields: { service_type: 'standard', quoted_price: '250' }, returnPath: '/estimate/residential/' }),
+    env: {},
+  } as never);
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { ok: false, error: 'not_configured' });
+});
+
+test('estimate checkout: empty fields are rejected before any provider call', async () => {
+  let called = false;
+  const response = await withFetch(
+    async () => {
+      called = true;
+      return jsonResponse({});
+    },
+    () =>
+      estimateCheckoutPost({
+        request: jsonRequest({ fields: {} }),
+        env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+      } as never),
+  );
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { ok: false, error: 'invalid_request' });
+  assert.equal(called, false);
+});
+
+test('estimate checkout: a facility quote without a server-verified total is not payable', async () => {
+  let called = false;
+  const response = await withFetch(
+    async () => {
+      called = true;
+      return jsonResponse({});
+    },
+    () =>
+      estimateCheckoutPost({
+        request: jsonRequest({
+          fields: {
+            request_type: 'facility_estimate',
+            engine_type: 'commercial',
+            service_type: 'commercial_cleaning',
+            cleanable_sqft: '2000',
+            restroom_fixtures: '4',
+            frequency: 'weekly',
+            quoted_price: '1',
+          },
+          returnPath: '/estimate/commercial/',
+        }),
+        env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+      } as never),
+  );
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { ok: false, error: 'quote_not_payable' });
+  assert.equal(called, false);
+});

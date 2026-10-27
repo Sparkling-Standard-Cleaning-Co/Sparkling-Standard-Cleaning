@@ -97,6 +97,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const backButton = form.querySelector<HTMLButtonElement>('[data-back]');
   const nextButton = form.querySelector<HTMLButtonElement>('[data-next]');
   const submitButton = form.querySelector<HTMLButtonElement>('[data-submit]');
+  const payNowButton = form.querySelector<HTMLButtonElement>('[data-pay-now]');
   const progressFill = form.querySelector<HTMLElement>('[data-progress-fill]');
   const progressBar = form.querySelector<HTMLElement>('[data-progress-bar]');
   const progressPercent = form.querySelector<HTMLElement>('[data-progress-percent]');
@@ -129,11 +130,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const pricePreviewNote = form.querySelector<HTMLElement>('[data-price-preview-note]');
   const addonIncentiveEl = form.querySelector<HTMLElement>('[data-addon-incentive]');
   const addonIncentiveText = form.querySelector<HTMLElement>('[data-addon-incentive-text]');
+  const bundleOffers = [...form.querySelectorAll<HTMLElement>('[data-bundle-id]')];
   const reserveCall = document.querySelector<HTMLAnchorElement>('[data-reserve-call]');
   const reserveText = document.querySelector<HTMLAnchorElement>('[data-reserve-text]');
   const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
   const engineNote = form.querySelector<HTMLElement>('[data-engine-note]');
   let engine: 'residential' | 'str' = 'residential';
+  let paymentEnabled = false;
   const photoController = initPhotoUploads(form, {
     engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
   });
@@ -273,6 +276,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     renderResult(result);
     renderAddonPrices(result);
     renderIncentive(result);
+    renderBundles(result);
     renderPricePreview(result);
     renderReservationSummary(result);
     // One aggregated event when the claimed campaign discount lands in the
@@ -289,6 +293,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   function travelCopy(result: EstimateResult): string {
+    if (result.status !== 'estimated') return '';
     const travel = result.travel;
     const submission = submissionAddress();
     // Routing is only presented as distance-based certainty when the customer
@@ -384,7 +389,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
         });
       }
     } else {
-      livePrice.textContent = 'Custom confirmation required';
+      if (liveLabel) liveLabel.textContent = 'Estimate status';
+      livePrice.textContent = 'Confirmation Required';
       if (liveRange) {
         liveRange.hidden = true;
         liveRange.textContent = '';
@@ -403,6 +409,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (liveTravel) liveTravel.textContent = travelCopy(result);
 
     for (const flag of result.flags) {
+      if (result.status !== 'estimated' && flag.code === 'CUSTOM_CONFIRMATION_REQUIRED') continue;
       const item = document.createElement('li');
       item.textContent = flag.message;
       liveFlags.appendChild(item);
@@ -448,6 +455,79 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     addonIncentiveEl.hidden = false;
     addonIncentiveText.textContent = `You're saving $${discount.amount.toFixed(2)} — ${discount.label.toLowerCase()}.`;
+  }
+
+  function renderBundles(result: EstimateResult): void {
+    if (bundleOffers.length === 0) return;
+    const selected = new Set(
+      [...form.querySelectorAll<HTMLInputElement>('input[name="addons"]:checked')].map(
+        (input) => input.value,
+      ),
+    );
+    const frequency = textValue('frequency') ?? 'one_time';
+    for (const offer of bundleOffers) {
+      const required = (offer.dataset.bundleRequired ?? '').split(',').filter(Boolean);
+      const priceNode = offer.querySelector<HTMLElement>('[data-bundle-price]');
+      const addButton = offer.querySelector<HTMLButtonElement>('[data-bundle-add]');
+      const recurring = offer.dataset.bundleRecurring === 'true';
+      const allowedFrequencies = (offer.dataset.bundleFrequencies ?? '')
+        .split(',')
+        .filter(Boolean);
+      const frequencyAllowed =
+        (!recurring || frequency !== 'one_time') &&
+        (allowedFrequencies.length === 0 || allowedFrequencies.includes(frequency));
+      const allSelected = required.every((id) => selected.has(id));
+      const charges = required
+        .map((id) => result.pricing.addonPrices.find((line) => line.id === id)?.charge ?? null)
+        .filter((charge): charge is number => charge !== null && charge > 0);
+      const normal = charges.reduce((sum, charge) => sum + charge, 0);
+      const kind = offer.dataset.bundleKind === 'fixed' ? 'fixed' : 'percent';
+      const value = Number(offer.dataset.bundleValue);
+      const cap = Number(offer.dataset.bundleCap);
+      const nominalSavings =
+        normal > 0 && Number.isFinite(value)
+          ? Math.min(
+              normal,
+              kind === 'percent' ? normal * value : value,
+              Number.isFinite(cap) && cap > 0 ? cap : Number.POSITIVE_INFINITY,
+            )
+          : 0;
+
+      if (addButton) {
+        addButton.disabled = allSelected || !frequencyAllowed;
+        addButton.textContent = allSelected
+          ? 'Selected'
+          : frequencyAllowed
+            ? 'Add these extras'
+            : 'Available with recurring service';
+      }
+      if (!priceNode) continue;
+      if (!frequencyAllowed) {
+        priceNode.textContent = 'Available with weekly or biweekly service.';
+        continue;
+      }
+      const applied = result.pricing.discount;
+      if (allSelected && applied && applied.id === offer.dataset.bundleId) {
+        const selectedNormal = result.pricing.addonPrices
+          .filter((line) => selected.has(line.id) && line.charge !== null)
+          .reduce((sum, line) => sum + (line.charge ?? 0), 0);
+        const bundlePrice = Math.max(0, selectedNormal - applied.amount);
+        priceNode.textContent = `Bundle price ${formatUsd(bundlePrice, { forceCents: true })} for your selected extras (${formatUsd(selectedNormal, { forceCents: true })} individually — save ${formatUsd(applied.amount, { forceCents: true })}).`;
+      } else if (allSelected && result.pricing.discount) {
+        priceNode.textContent = 'A larger discount is applied instead.';
+      } else if (allSelected) {
+        priceNode.textContent =
+          result.pricing.minimumApplied
+            ? 'Included in the minimum visit price.'
+            : `Selected — bundle price ${formatUsd(Math.max(0, normal - nominalSavings), { forceCents: true })} (save ${formatUsd(nominalSavings, { forceCents: true })}).`;
+      } else if (normal > 0 && nominalSavings > 0) {
+        priceNode.textContent = `${formatUsd(normal, { forceCents: true })} individually — ${formatUsd(Math.max(0, normal - nominalSavings), { forceCents: true })} as a bundle. Save ${formatUsd(nominalSavings, { forceCents: true })}.`;
+      } else if (kind === 'percent' && Number.isFinite(value) && value > 0) {
+        priceNode.textContent = `Save ${Math.round(value * 100)}% when selected together.`;
+      } else {
+        priceNode.textContent = 'Select every extra below to see your bundle price.';
+      }
+    }
   }
 
   /** Builds the reconciled price lines used by both the preview and summary. */
@@ -567,9 +647,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return list;
   }
 
+  function syncPaymentAvailability(hasQuote: boolean): void {
+    if (!payNowButton) return;
+    payNowButton.hidden = !paymentEnabled || !hasQuote;
+  }
   function renderReservationSummary(result: EstimateResult): void {
     if (!reservationSummary) return;
     const hasQuote = result.status === 'estimated' && latestQuote !== null;
+    syncPaymentAvailability(hasQuote);
     reservationSummary.hidden = !hasQuote;
     if (submitButton) {
       submitButton.textContent = hasQuote ? 'Reserve This Cleaning' : 'Send My Request';
@@ -1354,8 +1439,26 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return { ...fields, ...attributionFields() };
   }
 
-  async function handleSubmit(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
+  async function startSecurePayment(fields: Record<string, string>): Promise<boolean> {
+    try {
+      const response = await fetch('/api/estimate-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          fields,
+          returnPath: engine === 'str' ? '/estimate/str/' : '/estimate/residential/',
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; url?: string };
+      if (!response.ok || !data.ok || !data.url) return false;
+      window.location.assign(data.url);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async function handleSubmit(event?: Event, paymentChoice: 'reserve' | 'pay_now' = 'reserve'): Promise<void> {
+    event?.preventDefault();
     if (!validateStep(currentStep)) return;
     if (photoController.isUploading()) {
       if (status) {
@@ -1384,6 +1487,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
 
     if (submitButton) submitButton.disabled = true;
+    if (payNowButton) payNowButton.disabled = true;
     if (status) {
       status.dataset.state = 'info';
       status.textContent =
@@ -1393,6 +1497,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
 
     const fields = buildSubmissionFields(result);
+    fields.payment_choice = paymentChoice === 'pay_now' ? 'pay_now' : 'reserve';
     const isReservation = fields.request_type === 'reservation_request';
     const priceLabel = fields.quoted_price ? ` — $${fields.quoted_price}` : '';
     const destinationLabel =
@@ -1404,6 +1509,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     if (!outcome.ok) {
       if (submitButton) submitButton.disabled = false;
+      if (payNowButton) payNowButton.disabled = false;
       if (status) {
         status.dataset.state = 'error';
         status.textContent = `${failureCopy(outcome.reason as FailureReason, contact)} Your answers are still on this page.`;
@@ -1434,6 +1540,34 @@ function initEstimateWizard(form: HTMLFormElement): void {
     // customer exactly what they submitted.
     saveSubmissionSummary(fields);
 
+    if (paymentChoice === 'pay_now') {
+      const payableStatus = outcome.verification?.status;
+      if (payableStatus !== 'verified' && payableStatus !== 'preliminary') {
+        if (payNowButton) payNowButton.disabled = false;
+        if (submitButton) submitButton.disabled = false;
+        if (status) {
+          status.dataset.state = 'error';
+          status.textContent =
+            'Your request was received, but this quote cannot be paid online yet. Sparkling Standard will confirm the price and payment options with you.';
+        }
+        return;
+      }
+      if (status) {
+        status.dataset.state = 'info';
+        status.textContent = 'Request received. Opening secure Stripe payment...';
+      }
+      const started = await startSecurePayment(fields);
+      if (!started) {
+        if (payNowButton) payNowButton.disabled = false;
+        if (submitButton) submitButton.disabled = false;
+        if (status) {
+          status.dataset.state = 'error';
+          status.textContent =
+            'Your request was received, but secure online payment could not start. Your reservation request is saved; Sparkling Standard will confirm payment options with you.';
+        }
+      }
+      return;
+    }
     // The receipt reflects the server's actual verdict. A mismatch or
     // preliminary travel result is never presented as an accepted price.
     const receipt = isReservation
@@ -1480,6 +1614,25 @@ function initEstimateWizard(form: HTMLFormElement): void {
       showStep(target);
     });
   }
+
+  for (const offer of bundleOffers) {
+    offer.querySelector<HTMLButtonElement>('[data-bundle-add]')?.addEventListener('click', () => {
+      const required = (offer.dataset.bundleRequired ?? '').split(',').filter(Boolean);
+      for (const id of required) {
+        const input = form.querySelector<HTMLInputElement>(`input[name="addons"][value="${id}"]`);
+        if (input && !input.checked) {
+          input.checked = true;
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+      recalc();
+    });
+  }
+
+  payNowButton?.addEventListener('click', () => {
+    void handleSubmit(undefined, 'pay_now');
+  });
 
   form.addEventListener('input', (event) => {
     if (!estimateStarted) {
@@ -1691,6 +1844,16 @@ function initEstimateWizard(form: HTMLFormElement): void {
   applyDeepLinkSelections();
   recalc();
   void lookupTravel();
+  void (async () => {
+    try {
+      const response = await fetch('/api/estimate-checkout', { headers: { Accept: 'application/json' } });
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; enabled?: boolean };
+      paymentEnabled = response.ok && data.ok === true && data.enabled === true;
+    } catch {
+      paymentEnabled = false;
+    }
+    syncPaymentAvailability(latestQuote !== null);
+  })();
 
   // Debug handle — preview builds only. Never rendered publicly.
   if (preview) {

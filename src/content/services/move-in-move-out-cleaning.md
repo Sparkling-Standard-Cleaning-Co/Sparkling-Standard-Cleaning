@@ -25,6 +25,7 @@ goodFor:
   - Homeowners preparing a house for listing or closing
   - Buyers who want the home genuinely clean before belongings arrive
   - Military households on a tight relocation timeline
+hideNotIncluded: true
 notIncluded:
   - Repair, painting or maintenance of any kind
   - Carpet shampooing (quoted case by case)

@@ -12,7 +12,10 @@ recalculation, the owner notification and the customer receipt.
    (`pricing.rounding.toNearest`). This is the displayed base before any discount.
 4. **One discount only** — the promotion engine and the Community Support eligibility discount are
    evaluated together. The **largest effective discount wins**; ties favor Community Support, then
-   the claimed campaign, then other programs. No stacking.
+   the claimed campaign, then other programs. No stacking. The owner-approved add-on bundles
+   (`bundle-kitchen-refresh`, `bundle-deep-detail`, `bundle-recurring-care`) compete in the same
+   single-discount policy. Every required extra must be selected; the discount is calculated on
+   the eligible add-on subtotal; specialty/custom-quote work is excluded.
 5. **Engine calibration** — the matching `pricing.estimatorCalibration` value
    (residential or STR) multiplies the discounted **service** subtotal. `1.00`
    is unchanged; it never multiplies travel or tax. The four engines have

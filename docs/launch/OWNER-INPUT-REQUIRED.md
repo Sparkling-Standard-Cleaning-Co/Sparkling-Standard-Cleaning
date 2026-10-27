@@ -12,7 +12,7 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 
 | Item | Value |
 | --- | --- |
-| Registered legal name | **Sparkling Standard LLC**; public brand **Sparkling Standard** — owner-confirmed 2026-10-21; Sunbiz record pending |
+| Registered legal name | **Sparkling Standard LLC**; public brand **Sparkling Standard** — owner-confirmed 2026-10-21; Florida Articles certificate dated 2026-10-21 filed in the private master legal archive |
 | Official slogan | **Standards That Make Your Space Sparkle.** |
 | Final domain | **https://sparkling-standard.com** — in `src/config/business.ts` + `astro.config.mjs` default |
 | Public phone | **(850) 426-8479** — in `src/config/business.ts` (owner-corrected 2026-10-02; the earlier `(850) 246-8479` was a typo) |
@@ -44,7 +44,7 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 
 | # | Item | Where | Notes |
 | --- | --- | --- | --- |
-| 6 | ~~Legal entity spelling / suffix~~ **Resolved 2026-10-21** | `business.legalName` | **Sparkling Standard LLC** configured and published in schema/formal disclosures. Supply the Sunbiz record/certificate and confirm abbreviated-brand use with counsel. |
+| 6 | ~~Legal entity spelling / suffix~~ **Resolved 2026-10-21** | `business.legalName` | **Sparkling Standard LLC** configured and published in schema/formal disclosures. Florida Articles certificate received and archived privately; confirm abbreviated-brand use with counsel. |
 | 7 | Exact service-zone review | `src/config/geography.ts` | Zones are provisional ZIP centroids around the one-hour driving boundary. Confirm the final list after the origin coordinates are entered. |
 | 8 | ~~Pricing matrix approval~~ **Resolved 2026-10-21** | `src/config/estimators/pricing-values.ts` | Owner approved **$55 per productive cleaning labor-hour** as the internal billing target. Customers receive job-specific quotes; no public hourly rate. |
 | 9 | ~~Review link + profile URL (Google)~~ **Done 2026-10-08** | `business.reviews.submissionUrl`, `business.reviews.profileUrl`, `business.socials.googleProfile` | **Resolved:** the exact owner-supplied URLs are configured (see the Resolved table); the `/leave-review/` page is live and review requests are unblocked. Never modify, shorten or hand-build the URLs. |
@@ -101,6 +101,15 @@ requests only. Full workflow: `docs/operations/GIFT-CERTIFICATES.md`.
 | G4 | Stripe activation | Cloudflare production secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`; webhook endpoint `/api/stripe-webhook` for `checkout.session.completed`; Stripe email receipts on | Confirm enabled payment methods before advertising them. |
 | G5 | One live end-to-end test purchase (smallest denomination) | Stripe + owner inbox | Verify webhook alert, certificate generation, delivery, redemption, ledger. |
 
+## PAY NOW — owner setup before live payment
+
+| # | Item | Where | Notes |
+| --- | --- | --- | --- |
+| P1 | Stripe Pay Now secrets | Cloudflare runtime secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | The code is ready; the button stays hidden until the secret exists. |
+| P2 | Webhook endpoint | Stripe → `https://sparkling-standard.com/api/stripe-webhook` → `checkout.session.completed` | The same endpoint handles estimate payments and approved gift certificates. |
+| P3 | Test-mode checkout | Stripe test mode + a controlled request | Confirm the normal lead and the separate **PAID estimate** owner notice before enabling live payment. No live charge is authorized by engineering. |
+| P4 | Payment/refund terms | Owner-approved policy | The site does not invent a refund or cancellation promise. Existing terms govern. |
+
 ## CAN WAIT
 
 | # | Item | Notes |
@@ -116,7 +125,7 @@ requests only. Full workflow: `docs/operations/GIFT-CERTIFICATES.md`.
 
 ## What was deliberately NOT decided by engineering
 
-Legal entity suffix, insurance, bonding, licensing, price approval, final cancellation fees, the
+Insurance, bonding, licensing, price approval, final cancellation fees, the
 remaining social profile links (Instagram/YouTube and the lower-priority platforms), the Umami
 analytics ID, genuine photography and public business claim wording. None of these appear as
 invented facts anywhere in the codebase. The private operating coordinates exist only as a

@@ -414,6 +414,16 @@ function pricingLines(fields: Record<string, string>): Array<[string, string]> {
   return lines;
 }
 
+function formatDriveMinutes(value: string): string {
+  const total = Number(value);
+  if (!Number.isFinite(total) || total <= 0) return value;
+  const minutes = Math.round(total);
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (hours === 0) return `${remainder} min`;
+  return remainder === 0 ? `${hours} hr` : `${hours} hr ${remainder} min`;
+}
+
 function travelLines(fields: Record<string, string>): Array<[string, string]> {
   const lines: Array<[string, string]> = [];
   const qualification = text(fields, 'travel_qualification');
@@ -425,7 +435,7 @@ function travelLines(fields: Record<string, string>): Array<[string, string]> {
   if (miles || minutes) {
     lines.push([
       'Travel — One-way',
-      [miles ? `${miles} mi` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' · '),
+      [miles ? `${miles} mi` : '', minutes ? `${formatDriveMinutes(minutes)}` : ''].filter(Boolean).join(' · '),
     ]);
   }
   const method = text(fields, 'travel_method');
@@ -542,6 +552,9 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   if (text(fields, 'recipient_name')) {
     actions.push('Gift request — confirm details and send the payment link (no payment taken)');
   }
+  if (text(fields, 'payment_choice') === 'pay_now') {
+    actions.push('Pay Now selected - verify the separate Stripe paid notice before scheduling');
+  }
   if (!text(fields, 'recipient_name') && (text(fields, 'facility_type') || text(fields, 'organization'))) {
     actions.push('Schedule the walkthrough');
   }
@@ -580,6 +593,16 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   const preferredDate = text(fields, 'preferred_date', 'walkthrough_date');
   add('Inquiry — Preferred date', preferredDate, 'preferred_date', 'walkthrough_date');
   add('Inquiry — Estimate status', text(fields, 'estimate_status'), 'estimate_status');
+  const paymentChoice = text(fields, 'payment_choice');
+  if (paymentChoice) {
+    add(
+      'Inquiry — Payment preference',
+      paymentChoice === 'pay_now'
+        ? 'Pay Now selected - await the separate Stripe paid notice before treating this as paid'
+        : 'Reserve without upfront payment',
+      'payment_choice',
+    );
+  }
   if (text(fields, 'initial_deep_clean_required') === 'yes') {
     add(
       'Inquiry — Initial Deep Cleaning',

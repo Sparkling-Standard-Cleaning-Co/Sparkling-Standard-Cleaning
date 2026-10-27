@@ -68,6 +68,8 @@ current approved value, not a permanent value that tests require.
 | Time per bath/bed/square foot | `laborUnits` | Yes; keep sensible positive values |
 | Condition/frequency/last-clean multipliers | `conditionFactors`, `frequencyFactors`, `lastCleanFactors` | Yes; preserve the ordering rules shown in validation |
 | Add-on price | an add-on's `laborHours` or `fixedPriceUsd` | Yes; specialty add-ons stay `customQuote` |
+| Add-on bundles | `promotions.addonBundles` | Yes; keep every bundle transparent, all required extras selected, one discount only, and specialty items excluded |
+| Online payment availability | `src/config/payments.ts` + Cloudflare `STRIPE_SECRET_KEY` | Owner-approved feature switch; live checkout requires the secret and webhook |
 | Discount percentages | `supportiveHomeDiscount`, `churchDiscount` | Yes; current approval and non-stacking terms still apply |
 | Commercial/church workload | `commercialPricing` | Yes; Tier B must exceed Tier A |
 | Range and rounding | `range`, `rounding` | Yes; preserve range ordering and a positive step |
@@ -118,6 +120,7 @@ client/server agreement; it does not authorize new business policy.
 | Icons and imagery | [`src/assets/icons/white-tile/`](src/assets/icons/white-tile/), [`src/assets/images/`](src/assets/images/) | Keep the approved white-tile backgrounds intact. |
 | Reviews | [`src/content/reviews/`](src/content/reviews/) | Genuine reviews only; first names only. |
 | Estimates after a change | `npm run pricing:impact` | Shows representative four-engine impact; add `-- --compare HEAD` for before/after. |
+| Pay Now, reservation, Stripe configuration | [`docs/operations/ESTIMATE-PAYMENTS.md`](docs/operations/ESTIMATE-PAYMENTS.md) | Server-verified amount; custom/range quotes stay reservation-only. |
 
 ---
 

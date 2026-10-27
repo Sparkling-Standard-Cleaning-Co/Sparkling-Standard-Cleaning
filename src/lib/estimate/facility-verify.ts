@@ -24,6 +24,8 @@ import {
 export interface FacilityVerification {
   status: 'verified' | 'preliminary' | 'mismatch' | 'unverifiable' | 'pricing_disabled';
   expectedCleaning: number | null;
+  /** Per-visit total including the server-known travel adjustment. */
+  expectedTotal: number | null;
   expectedRange: { low: number; high: number } | null;
   laborHours: number | null;
   discountAmount: number | null;
@@ -42,6 +44,8 @@ export interface FacilityVerification {
 export interface FacilityVerifyOptions {
   /** Owner kill switch override for tests; defaults to the shared config. */
   numericEstimatesEnabled?: boolean | undefined;
+  /** Server-routed one-way miles override for payment verification. */
+  routedOneWayMiles?: number | null | undefined;
 }
 
 /** Client-supplied facility fields that must never survive a disabled switch. */
@@ -91,6 +95,7 @@ export function verifyFacilityQuote(
     return {
       status: 'pricing_disabled',
       expectedCleaning: null,
+      expectedTotal: null,
       expectedRange: null,
       laborHours: null,
       discountAmount: null,
@@ -118,6 +123,7 @@ export function verifyFacilityQuote(
     return {
       status: 'unverifiable',
       expectedCleaning: null,
+      expectedTotal: null,
       expectedRange: null,
       laborHours: null,
       discountAmount: null,
@@ -144,7 +150,10 @@ export function verifyFacilityQuote(
   };
   const workload = calculateFacilityWorkload(input);
   const price = calculateFacilityPrice(workload, fields.frequency ?? 'weekly', {
-    oneWayMiles: num(fields.travel_one_way_miles),
+    oneWayMiles:
+      options.routedOneWayMiles !== undefined
+        ? options.routedOneWayMiles
+        : num(fields.travel_one_way_miles),
     church: input.facilityType === 'church' || fields.service_type === 'church_cleaning',
   });
 
@@ -152,6 +161,7 @@ export function verifyFacilityQuote(
     return {
       status: 'preliminary',
       expectedCleaning: null,
+      expectedTotal: null,
       expectedRange: null,
       laborHours: workload.laborHours,
       discountAmount: price.discount?.applied ? price.discount.amount : null,
@@ -171,6 +181,7 @@ export function verifyFacilityQuote(
     return {
       status: 'unverifiable',
       expectedCleaning: price.perVisit,
+      expectedTotal: price.total,
       expectedRange: price.range,
       laborHours: workload.laborHours,
       discountAmount: price.discount?.applied ? price.discount.amount : null,
@@ -191,6 +202,7 @@ export function verifyFacilityQuote(
   return {
     status: configMatch === 'mismatch' || !cleaningMatches || !finalMatches ? 'mismatch' : travelStatus === 'verified' ? 'verified' : 'preliminary',
     expectedCleaning: price.perVisit,
+    expectedTotal: price.total,
     expectedRange: price.range,
     laborHours: workload.laborHours,
     discountAmount: price.discount?.applied ? price.discount.amount : null,

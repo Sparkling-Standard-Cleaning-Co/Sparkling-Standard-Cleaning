@@ -150,21 +150,26 @@ const communityIcons = [
 
   <TrustChips />
 
-  <section class="section difference-intro" aria-labelledby="hospitality-heading">
+  <section class="section difference-intro difference-intro--center" aria-labelledby="hospitality-heading">
     <div class="container difference-intro__grid">
-      <h2 id="hospitality-heading" class="difference-intro__heading">Southern Hospitality</h2>
+      <h2 id="hospitality-heading" class="difference-intro__heading">Our Values</h2>
       <div class="difference-intro__copy">
         <p>
-          Here in the Florida Panhandle, in the heart of the Bible Belt, Southern hospitality is
-          more than a saying — it&rsquo;s how neighbors care for one another. It&rsquo;s welcoming
-          people warmly, lending a hand when it&rsquo;s needed, and taking pride in doing a job
-          well. That same spirit guides the care we bring into every home.
+          At Sparkling Standard, treating people right isn&rsquo;t just what we do, it&rsquo;s who we
+          are. We believe in looking out for our neighbors and showing care in the little things: a
+          space put together just right, a porch light left on, or a helping hand when it matters
+          most.
         </p>
         <p>
-          Sparkling Standard was built on that same spirit. We clean with genuine care for the
-          people who live and work in the spaces we touch, and we take the time to do it properly:
-          an eye for detail, a commitment to quality, and the willingness to go the extra mile for
-          a neighbor.
+          We bring that same spirit of care to every space we clean. With an eye for detail, a
+          commitment to quality, and pride in doing things right, we go the extra mile for the
+          people we serve. Because to us, cleaning is about more than a spotless space; it&rsquo;s
+          about making life a little easier, helping people feel at home, and treating every
+          customer like a neighbor.
+        </p>
+        <p class="scripture">
+          &ldquo;By love serve one another.&rdquo;
+          <span>Galatians 5:13 (KJV)</span>
         </p>
       </div>
     </div>
@@ -247,6 +252,10 @@ const communityIcons = [
               <h2 id="estimate-heading">{data.estimateBand.heading}</h2>
               <p class="lead">{data.estimateBand.text}</p>
               {data.estimateBand.body && <p class="estimate-card__body">{data.estimateBand.body}</p>}
+              <p class="scripture scripture--center">
+                &ldquo;And whatsoever ye do, do it heartily, as to the Lord.&rdquo;
+                <span>Colossians 3:23 (KJV)</span>
+              </p>
               <div class="estimate-card__actions">
                 <a class="btn btn--primary btn--large" href="/estimate/" data-cta="home-estimate">
                   {data.estimateBand.ctaLabel}

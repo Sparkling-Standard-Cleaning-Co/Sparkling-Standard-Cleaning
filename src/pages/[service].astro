@@ -159,7 +159,7 @@ const schema = [
   </section>
 
   {
-    data.notIncluded.length > 0 && (
+    data.notIncluded.length > 0 && !data.hideNotIncluded && (
       <section class="section">
         <div class="container">
           <div class="section-head">
@@ -254,7 +254,7 @@ const schema = [
   <div class="container section section--tight">
     <CtaBand
       title={`Ready for ${data.title.toLowerCase()}?`}
-      text="Start with the estimate — it tells you honestly what your home needs and what it should cost."
+      text={data.hideClosingCtaText ? undefined : 'Start with the estimate — it tells you honestly what your home needs and what it should cost.'}
       primaryLabel={data.ctaLabel}
       primaryHref={data.ctaHref}
       secondaryLabel="Get in Touch"

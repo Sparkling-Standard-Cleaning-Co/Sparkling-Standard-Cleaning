@@ -9,7 +9,8 @@ optimized 384 px WebP renditions in
 ![Original owner contact sheet of all 17 white-tile icons; icon 08 and 17 were replaced in the 2026-10-25 audit](white-tile-icon-contact-sheet.jpg)
 
 > The supplied contact sheet predates the 2026-10-25 audit substitutions for
-> **08** (reading glasses) and **17** (red/white/blue community figures). The
+> **08** (reading glasses) and **17** (red/white/blue community figures), and the
+> 2026-10-26 replacement of **03** with a moving box and in/out arrows. The
 > per-icon thumbnails and rows below are the current repository truth.
 
 **Provenance:** the owner supplied the pack as the approved visual direction.
@@ -44,7 +45,9 @@ renderer clips that margin at display time (`.premium-icon__image` scale
 
 The 2026-10-25 owner audit replaced two tiles without changing the 17-icon
 registry: **08** now carries clean reading glasses rather than a magnifier, and
-**17** carries a red/white/blue three-figure community mark. The replaced
+**17** carries a red/white/blue three-figure community mark. The 2026-10-26
+audit replaced **03** with a moving box and directional in/out arrows; the
+Competitive Pricing asset (**12**) was deliberately not changed. The replaced
 originals remain in the local master archive under `99-Archive-For-Review/`.
 The small footer “Read Our Reviews” action uses the matching **vector reading
 glasses** at 24 px; the old search/magnifier vector is removed.

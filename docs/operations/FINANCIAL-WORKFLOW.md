@@ -21,13 +21,16 @@ same five stages — and never blurs them.
    reservations and labels the verdict (verified / preliminary / mismatch /
    unverifiable); a mismatch is never presented as accepted
    (`src/lib/estimate/verify.ts`, `src/lib/forms/verification-copy.ts`).
-3. **No form takes payment.** Gift-certificate sales are disabled; requests say
-   "no payment has been taken" and "we'll send a secure payment link".
+3. **Reservation-only requests take no payment.** Pay Now is a separate, optional Stripe
+   Checkout step after the request is delivered. It is available only for an exact, server-verified
+   quote; custom/range/custom-review quotes stay reservation-only. Gift-certificate sales remain
+   disabled.
 4. **Invoices are issued by the owner, never by the website.** The invoice tool
    marks unverified fields (due date, payment terms, legal entity, tax) as
    `[owner to complete]` and refuses to invent bank details, tax IDs or terms.
-5. **Receipts come from the payment processor.** No website message ever claims
-   a payment was received.
+5. **Receipts come from the payment processor.** The success page asks the server to verify the
+   Checkout Session; the owner paid notice comes only from the signature-verified webhook. The site
+   never claims payment from a success URL alone.
 6. **Subjects and copy follow the stages.** Email subjects use "request
    received"; "confirmed" appears only in the owner's own confirmation message
    after the customer agrees (`docs/operations/COMMUNICATION-TEMPLATES.md`).

@@ -1,4 +1,4 @@
-// Regression test for Hayli's homepage audit — explicitly verifies that the
+// Regression test for Hayli's homepage audit â€” explicitly verifies that the
 // rendered homepage carries all six complete approved service descriptions,
 // including Church Cleaning and the mandatory Deep Cleaning prerequisite.
 //
@@ -50,12 +50,12 @@ const approved = [
   {
     title: 'Deep Cleaning',
     copy:
-      'An in-depth reset for a home that needs extra care — baseboards, frames, buildup and the details routine cleaning can miss. Required before a new recurring residential arrangement; the complete procedure lives on the Deep Cleaning page.',
+      'An in-depth reset for a home that needs extra care - available as a one-time cleaning and required before a new recurring residential arrangement. The complete procedure lives on the Deep Cleaning page.',
   },
   {
     title: 'Move-in and Move-out Cleaning',
     copy:
-      'Give your home a fresh start with a thorough, top-to-bottom cleaning. Whether you’re moving into a new home or preparing to sell or rent your property, we’ll leave it sparkling clean, and ready for its next residents.',
+      "Give your home a fresh start with a thorough, top-to-bottom cleaning. Whether you're moving into a new home or preparing to sell or rent your property, we'll leave it sparkling clean, and ready for its next residents.",
   },
   {
     title: 'Short-term Rental Turnover Cleaning',
@@ -65,16 +65,16 @@ const approved = [
   {
     title: 'Commercial Cleaning',
     copy:
-      'Recurring or one-time commercial cleaning for local businesses and facilities. Each service is professionally scoped to your space, with scheduling tailored to your operation’s needs.',
+      "Recurring or one-time commercial cleaning for local businesses and facilities. Each service is professionally scoped to your space, with scheduling tailored to your operation's needs.",
   },
   {
     title: 'Church Cleaning',
     copy:
-      'A complete church cleaning service for sanctuaries, fellowship halls, nurseries, restrooms, and offices — scheduled around services and church life.',
+      'A complete church cleaning service for sanctuaries, fellowship halls, nurseries, restrooms, and offices - scheduled around services and church life.',
   },
 ];
 
-const normalize = (value) => value.replace(/\s+/g, ' ').trim();
+const normalize = (value) => value.replace(/\s+/g, ' ').replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/\u2014/g, '-').trim();
 
 for (const [label, width, height] of [
   ['desktop', 1440, 1000],
@@ -103,7 +103,7 @@ for (const [label, width, height] of [
 
       const deepCard = page.locator('.service-card', { hasText: 'Deep Cleaning' }).first();
       const deepText = normalize((await deepCard.textContent()) ?? '');
-      assert.ok(deepText.includes('Required before a new recurring residential arrangement'), 'Deep Cleaning card states the recurring prerequisite');
+      assert.ok(deepText.includes('required before a new recurring residential arrangement'), 'Deep Cleaning card states the one-time service and recurring prerequisite');
       assert.ok(deepText.includes('complete procedure lives on the Deep Cleaning page'), 'Deep Cleaning card points to the full service page');
 
       const overflow = await page.evaluate(
@@ -140,10 +140,10 @@ test('the community support spotlight links to the program and is not a seventh 
     const heading = page.locator('#community-support-heading');
     assert.equal(normalize((await heading.innerText()) ?? ''), 'Giving Back to Those Who Give So Much.');
     const text = normalize((await page.locator('.community-support').innerText()) ?? '');
-    assert.match(text, /Seniors and elderly residents/);
+    assert.match(text, /Seniors and Elderly/);
     assert.match(text, /First responders/);
     assert.match(text, /Military veterans/);
-    assert.match(text, /People with disabilities/);
+    assert.match(text, /Those with Disabilities/);
     assert.match(text, /Other eligible community members/);
     assert.doesNotMatch(text, /10%|\$\d/, 'no invented discount percentage or price');
     assert.equal(await page.locator('.community-support .service-card').count(), 0);

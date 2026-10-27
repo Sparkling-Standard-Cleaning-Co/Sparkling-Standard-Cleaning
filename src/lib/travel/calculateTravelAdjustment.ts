@@ -9,6 +9,17 @@ import { zonePolicy } from '../../config/geography.ts';
 import { travelConfig } from '../../config/estimators/travel.ts';
 import type { ServiceZone, TravelEstimate, RoutedTravelInfo } from '../estimate/types.ts';
 
+/** Customer-facing duration: 390 -> "6 hours and 30 minutes". */
+export function formatDriveDuration(totalMinutes: number): string {
+  const minutes = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (hours === 0) return `${remainder} minute${remainder === 1 ? '' : 's'}`;
+  const hourLabel = `${hours} hour${hours === 1 ? '' : 's'}`;
+  if (remainder === 0) return hourLabel;
+  return `${hourLabel} and ${remainder} minute${remainder === 1 ? '' : 's'}`;
+}
+
 export interface TravelCalculationInput {
   zone: ServiceZone;
   /** Present only when the serverless routing function answered. */
@@ -84,11 +95,11 @@ export function calculateTravelAdjustment(input: TravelCalculationInput): Travel
       } else if (durationMinutes <= maxMinutes + reviewBand) {
         drivingTimeStatus = 'review_band';
         requiresManualConfirmation = true;
-        reason = `About ${Math.round(durationMinutes)} minutes of driving is just beyond our usual instant-estimate boundary, so we confirm it personally before booking.`;
+        reason = `About ${formatDriveDuration(durationMinutes)} of driving is just beyond our usual instant-estimate boundary, so we confirm it personally before booking.`;
       } else {
         drivingTimeStatus = 'beyond';
         requiresManualConfirmation = true;
-        reason = `About ${Math.round(durationMinutes)} minutes of driving is beyond our usual service boundary — send a request anyway and we will tell you honestly whether we can help.`;
+        reason = `About ${formatDriveDuration(durationMinutes)} of driving is beyond our usual service boundary — send a request anyway and we will tell you honestly whether we can help.`;
       }
     } else {
       // Distance-only provider answer: keep the hard safety cap.

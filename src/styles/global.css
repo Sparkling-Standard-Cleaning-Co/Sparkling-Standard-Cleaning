@@ -1170,6 +1170,44 @@ li + li {
   margin-top: 0;
 }
 
+.scripture {
+  margin: var(--space-5) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-rose-200);
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--color-ink-800);
+}
+
+.scripture span {
+  display: block;
+  margin-top: var(--space-1);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-style: normal;
+  letter-spacing: 0.04em;
+  color: var(--color-rose-700);
+}
+
+.scripture--center {
+  margin-inline: auto;
+  max-width: 48ch;
+  text-align: center;
+}
+
+.difference-intro--center .difference-intro__grid {
+  justify-items: center;
+  text-align: center;
+}
+
+.difference-intro--center .difference-intro__heading {
+  text-align: center;
+}
+
+.difference-intro--center .difference-intro__copy {
+  margin-inline: auto;
+}
+
 .difference-intro__copy p:last-child {
   margin-bottom: 0;
 }
@@ -1178,6 +1216,13 @@ li + li {
   .difference-intro__grid {
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.5fr);
     gap: var(--space-7);
+  }
+}
+@media (min-width: 56rem) {
+  .difference-intro--center .difference-intro__grid {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 68rem;
+    margin-inline: auto;
   }
 }
 
@@ -1347,6 +1392,15 @@ li + li {
 @media (min-width: 40rem) {
   .trust-strip__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 56rem) {
+  .trust-strip__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-width: 76rem;
+    margin-inline: auto;
+    gap: var(--space-4);
   }
 }
 
@@ -2755,6 +2809,33 @@ fieldset.input--invalid {
 }
 
 /* ── GPS-first address selection ───────────────────────────────────────────── */
+[data-address-gps][aria-busy="true"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+[data-address-gps][aria-busy="true"]::before {
+  content: "";
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: address-spin 0.8s linear infinite;
+}
+
+@keyframes address-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-address-gps][aria-busy="true"]::before {
+    animation-duration: 2.4s;
+  }
+}
+
 .address-gps {
   display: grid;
   gap: var(--space-3);
@@ -3287,6 +3368,68 @@ fieldset.input--invalid {
   color: var(--color-text-muted);
   font-weight: var(--weight-semibold);
   font-style: italic;
+}
+
+/* Add-on bundles (owner-directed 2026-10-26). Transparent price + savings,
+   automatic application; only one discount can ever apply. */
+.bundle-offers {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-rose-200);
+  border-radius: var(--radius-lg);
+  background: var(--color-cream-50);
+}
+
+.bundle-offers__title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--color-rose-800);
+}
+
+.bundle-offers__grid {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+@media (min-width: 48rem) {
+  .bundle-offers__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.bundle-offer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-rose-200);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+}
+
+.bundle-offer__title {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--color-ink-900);
+}
+
+.bundle-offer__contents {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.bundle-offer__price {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-rose-800);
+}
+
+.bundle-offer .btn {
+  margin-top: auto;
+  align-self: start;
 }
 
 .addon-incentive {

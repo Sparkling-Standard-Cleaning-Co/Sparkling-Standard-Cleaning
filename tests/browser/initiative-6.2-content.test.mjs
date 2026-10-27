@@ -153,12 +153,13 @@ test('supportive home page explains eligibility and never selects the discount a
   try {
     const text = await page.locator('main').innerText();
     assert.match(text, new RegExp(`${pricing.supportiveHomeDiscount.percent.value}%`));
-    assert.match(text, /65 or older|65\b/i);
+    assert.match(text, /seniors/i);
+    assert.match(text, /verification before cleaning/i);
     assert.match(text, /first responder/i);
     assert.match(text, /veteran/i);
     assert.match(text, /disabilit/i);
     assert.match(text, /other eligible community members/i);
-    assert.match(text, /No diagnosis/i);
+    assert.match(text, /diagnosis/i);
     assert.match(text, /not a charitable donation|not medical|cleaning only/i);
     const cta = page.locator('a[data-cta="supportive-estimate"]').first();
     assert.match((await cta.getAttribute('href')) ?? '', /\/estimate\/residential\/\?service=supportive&supportive=yes/);

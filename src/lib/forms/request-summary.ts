@@ -171,15 +171,15 @@ function estimateFor(fields: Record<string, string>, kind: RequestKind): Estimat
         label: 'Preliminary per-visit estimate',
         value: `${money(facilityQuote)} per visit`,
         note: facilityRange
-          ? `Nonbinding preliminary estimate (typical range ${facilityRange}) — final scope, travel and price are confirmed personally before anything is scheduled.`
-          : 'Nonbinding preliminary estimate — final scope, travel and price are confirmed personally before anything is scheduled.',
+          ? `Nonbinding preliminary estimate (typical range ${facilityRange}) — final scope and price are confirmed personally before anything is scheduled.`
+          : 'Nonbinding preliminary estimate — final scope and price are confirmed personally before anything is scheduled.',
       };
     }
     if (facilityRange) {
       return {
         label: 'Preliminary per-visit range',
         value: facilityRange,
-        note: 'Nonbinding preliminary estimate — final scope, travel and price are confirmed personally before anything is scheduled.',
+        note: 'Nonbinding preliminary estimate — final scope and price are confirmed personally before anything is scheduled.',
       };
     }
     return null;

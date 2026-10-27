@@ -69,15 +69,20 @@ function overrides(partial: Partial<PromotionInput>): PromotionInput {
 
 // ── Shipped state ─────────────────────────────────────────────────────────────
 
-test('every shipped promotion program is disabled with no terms', () => {
+test('only the owner-approved add-on bundles are enabled', () => {
   for (const program of pricing.promotions.appreciationDiscounts) {
     assert.equal(program.enabled, false, `${program.id} must stay disabled`);
     assert.equal(program.value, null, `${program.id} must have no unapproved value`);
     assert.equal(program.maxDiscountUsd, null, `${program.id} must have no unapproved cap`);
   }
+  assert.ok(pricing.promotions.addonBundles.length >= 2, 'the owner approved bundle offerings');
   for (const bundle of pricing.promotions.addonBundles) {
-    assert.equal(bundle.enabled, false, `${bundle.id} must stay disabled`);
-    assert.equal(bundle.value, null, `${bundle.id} must have no unapproved value`);
+    assert.equal(bundle.enabled, true, `${bundle.id} was owner-approved on 2026-10-26`);
+    assert.equal(typeof bundle.value, 'number');
+    assert.ok((bundle.value ?? 0) > 0, `${bundle.id} needs a real discount`);
+    assert.ok((bundle.maxDiscountUsd ?? 0) > 0, `${bundle.id} needs a safety cap`);
+    assert.ok(bundle.requiredAddonIds.length >= 2, `${bundle.id} needs multiple extras`);
+    assert.equal(bundle.stackable, false);
   }
   assert.equal(pricing.promotions.foundingTen.enabled, false);
   assert.equal(pricing.promotions.foundingTen.mechanism, null, 'the owner has not chosen a mechanism');
@@ -86,7 +91,34 @@ test('every shipped promotion program is disabled with no terms', () => {
   assert.equal(pricing.promotions.foundingTen.reservationRequired, true);
 });
 
-test('no discount ever applies in the shipped configuration', () => {
+test('the shipped bundles apply only when every required extra is selected', () => {
+  for (const bundle of pricing.promotions.addonBundles) {
+    const frequency = bundle.requiresRecurring ? 'weekly' : 'one_time';
+    const evaluation = evaluatePromotions(
+      overrides({
+        frequency,
+        eligibleAddonIds: [...bundle.requiredAddonIds],
+        addonSubtotal: 100,
+        gross: 500,
+        addonBundles: pricing.promotions.addonBundles,
+      }),
+    );
+    assert.equal(evaluation.discount?.id, bundle.id);
+    assert.equal(evaluation.discount?.amount, 10);
+
+    const partial = evaluatePromotions(
+      overrides({
+        frequency,
+        eligibleAddonIds: bundle.requiredAddonIds.slice(0, -1),
+        addonSubtotal: 100,
+        gross: 500,
+        addonBundles: pricing.promotions.addonBundles,
+      }),
+    );
+    assert.equal(partial.discount, null, `${bundle.id} must not apply without every required extra`);
+  }
+});
+test('no unrelated discount applies without a qualifying bundle, campaign or eligibility claim', () => {
   const evaluation = evaluatePromotions(baseInput);
   assert.equal(evaluation.discount, null);
 

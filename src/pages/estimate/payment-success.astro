@@ -1,0 +1,69 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+import { business, contactPhone } from '../../config/business';
+
+const phone = contactPhone();
+---
+
+<BaseLayout
+  title="Payment Step Complete"
+  description="Your secure payment step is complete. Sparkling Standard confirms the requested date, scope and final details personally before scheduling."
+  noindex
+>
+  <section class="section">
+    <div class="container container--narrow text-center">
+      <span class="card__icon" style="margin-inline: auto"><Icon name="shield" /></span>
+      <h1 class="mt-4">Thank you.</h1>
+      <p class="lead" style="margin-inline: auto" data-payment-state>
+        We are checking the secure payment status now.
+      </p>
+
+      <div class="card mt-6" style="text-align:left">
+        <h2 class="card__title">What happens next</h2>
+        <div class="stack" style="gap: var(--space-4); margin-top: var(--space-4)">
+          <div>
+            <p class="step__title">Personal review</p>
+            <p class="step__text">
+              Your cleaning request and payment are reviewed together. Sparkling Standard confirms
+              the requested date, scope and final details with you.
+            </p>
+          </div>
+          <div>
+            <p class="step__title">Confirmation</p>
+            <p class="step__text">
+              Your visit is scheduled only after that personal confirmation. Payment by itself does
+              not hold a date.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <p class="mt-6">
+        Need to add something or change a detail? Call, text or email us and include your estimate
+        reference if you have it.
+      </p>
+      <div class="btn-row" style="justify-content: center">
+        {
+          phone && (
+            <>
+              <a class="btn btn--secondary" href={phone.href} data-cta="payment-success-call">
+                <Icon name="phone" size={18} /> Call
+              </a>
+              {business.flags.smsEnabled && (
+                <a class="btn btn--secondary" href={phone.sms} data-cta="payment-success-text">
+                  <Icon name="message" size={18} /> Text
+                </a>
+              )}
+            </>
+          )
+        }
+        <a class="btn btn--ghost" href="/">Back to Home</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  import '../../scripts/payment-success';
+</script>

@@ -4,7 +4,7 @@ metaDescription: Get a residential cleaning estimate from Sparkling Standard. En
 hero:
   headline: Six Short Steps to a
   accent: Sparkling Standard!
-  lead: Enter your address, answer six short steps and see a proposed cleaning price built on real labor math. Sparkling Standard confirms the final scope, price and appointment with you before any cleaning is scheduled.
+  lead: ""
   ctaLabel: Start Below
 estimateNote: The proposed price reflects the scope you enter. Final scope, condition, access and unique circumstances are confirmed personally by Sparkling Standard before anything is booked.
 estimateFaqIds:

@@ -3,6 +3,39 @@
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
+## Verified — 2026-10-27 Initiative 6.6 owner audit (local pre-deployment)
+
+**Baseline:** `main` at `5d8cd44`, clean tree. **Audit:** the 13-page `sswebsiteaudit.docx`.
+The full change table and evidence are in `docs/verification/6.6/README.md`.
+
+Implemented: homepage value/banner/verse/CTA corrections; the approved Our Values and Community
+Support copy; Deep Cleaning and Move-in/Move-out scope changes; the move-in/out icon; FL/AL-only
+state selection with Georgia coming soon; GPS loading/busy state; exact address-failure copy;
+optional facility ZIP after a confirmed location; centered commercial/church intros; simplified
+confirmation/travel/scheduling copy and human-readable drive duration; Service Area wording; three
+owner-approved add-on bundles; and a server-verified Stripe **Pay Now** path alongside reservation
+without upfront payment. Custom/range/custom-review quotes remain reservation-only. Private legal
+records were organized in the master archive, not this repository.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| TypeScript diagnostics | `npm run check` | 148 files; 0 errors, 0 warnings, 0 hints |
+| Functions TypeScript | `npx tsc --noEmit` | 0 errors |
+| Production build | `npm run build` | 27 pages; config prebuild passed |
+| Unit suite | `npm test` | **531 tests: 530 passed, 1 pre-existing skip, 0 failed** |
+| Browser regression | `npm run test:browser` | **146 passed, 0 failed** |
+| Static validation | `npm run validate` | 1,855 internal links; all checks passed |
+| Smoke | `npm run smoke` | 21 pages passed |
+| PENDING / fake testimonials / facts | `npm run pending`, `npm run testimonials`, `npm run audit:facts` | all passed |
+| Configuration | `npm run config:validate` | `2026-10-25.engine-calibration-supportive-tax.v1.d2374591a95ad4cc` |
+| Pricing impact | `npm run pricing:impact` | four factors `1.00`; bundle savings shown; no base price change |
+| Visual evidence | `docs/verification/6.6/` | desktop/mobile review completed |
+
+**Known residuals:** live Stripe card payment and webhook receipt are not verified (no local or
+production secret was used); the owner must configure `STRIPE_SECRET_KEY` and
+`STRIPE_WEBHOOK_SECRET` and run a test-mode checkout. No live lead or payment was submitted for
+this release. Deployment details follow the authorized push.
+
 ## Verified — 2026-10-26 Initiative 6.5 production deployment
 
 **Live branch/commit:** `main` at `298c1df` (code release; documentation closeout follows).

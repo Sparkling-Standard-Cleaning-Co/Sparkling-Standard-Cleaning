@@ -86,7 +86,8 @@ Preconditions: production Pages project variables match the expected configurati
 7. Confirm the built bundle contains no `TRAVEL_ORIGIN`, `ROUTES_API_KEY`/`MAPMAP_API_KEY` names
    or values, and no payment credentials (`npm run test:browser` security scan covers this).
 8. Only after steps 1–7 pass: request production approval. Binding instant prices remain disabled
-   (`instantQuote.binding=false`); no payment or booking endpoint may be enabled in this release.
+   (`instantQuote.binding=false`). Pay Now may be enabled only for an exact server-verified quote;
+   custom/range quotes stay reservation-only and no booking endpoint is enabled.
 
 ## 2. Demonstrated with actual live providers (2026-10-01, `$0` tier)
 
@@ -133,7 +134,8 @@ coordinates. No quota, credit or coverage blocker was found.
 
 - **Binding instant quotes** (`pricing.instantQuote.binding` stays `false`): every reservation is
   a request that the owner confirms; nothing is auto-accepted or charged.
-- **Auto-booking / payment capture**: no booking or payment endpoint exists.
+- **Auto-booking**: no booking endpoint exists. **Pay Now** is an optional exact-quote Stripe
+  Checkout step; it does not book or hold a slot.
 - **`instantQuote.enabled`** may stay `true` for the proposed-price display because every quote
   is either server-verified or explicitly labeled preliminary; it must stay coupled to
   `binding=false`.

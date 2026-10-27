@@ -211,13 +211,13 @@ const facilityStepDescriptions = church
               <label for="est-address-state">State</label>
               <select class="select" id="est-address-state" name="addressState" autocomplete="address-level1">
                 {US_STATES.map((state) => (
-                  <option value={state.code} selected={state.code === 'FL'}>{state.name}</option>
+                  <option value={state.code} selected={state.code === 'FL'} disabled={state.disabled}>{state.name}</option>
                 ))}
               </select>
             </div>
             <div class="field field--zip">
-              <label for="est-zip">ZIP code</label>
-              <input class="input" id="est-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" placeholder="e.g. 32503" required pattern="[0-9]{5}(-[0-9]{4})?" />
+              <label for="est-zip">ZIP code <span class="text-muted">(if known)</span></label>
+              <input class="input" id="est-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" placeholder="e.g. 32503" pattern="[0-9]{5}(-[0-9]{4})?" />
             </div>
           </div>
           <ul class="address-suggestions" id="est-address-suggestions" role="listbox" aria-label="Address suggestions" data-address-suggestions hidden></ul>
@@ -502,7 +502,7 @@ const facilityStepDescriptions = church
       </ul>
       <p class="facility-review__note" data-facility-review-note>
         {numericEstimatesEnabled
-          ? 'A preliminary estimate is not a confirmed contract. Sparkling Standard confirms the scope, travel and final price personally before anything is scheduled.'
+          ? 'A preliminary estimate is not a confirmed contract. Sparkling Standard confirms the scope and final price personally before anything is scheduled.'
           : 'This is a scope-review request, not a confirmed contract. Sparkling Standard confirms the scope and price personally before anything is scheduled.'}
       </p>
     </div>
@@ -538,6 +538,12 @@ const facilityStepDescriptions = church
     <button class="btn btn--primary btn--large btn--block" type="submit" data-facility-submit data-cta={church ? 'church-submit' : 'commercial-submit'} hidden>
       <Icon name="send" size={18} /> {church ? 'Request Our Church Estimate' : 'Request My Facility Estimate'}
     </button>
+    <button class="btn btn--secondary btn--large btn--block" type="button" data-facility-pay-now hidden>
+      Pay Now Securely
+    </button>
+    <p class="small text-muted" data-facility-pay-note hidden>
+      Pay this single-price estimate securely now, or request the visit without paying upfront.
+    </p>
   </div>
   <p class="form-status" data-form-status role="status" aria-live="polite"></p>
 </form>

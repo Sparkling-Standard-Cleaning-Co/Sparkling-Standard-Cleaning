@@ -7,7 +7,7 @@ the variable directory or worked examples.
 
 | File | Owns | Edit when |
 | --- | --- | --- |
-| `pricing-values.ts` | Raw pricing numbers: labour rates, production rates, add-ons, discounts, minimums, rounding, travel economics, commercial/church workload values, promotion terms and the four independent `estimatorCalibration` factors. | The owner changes a business assumption. |
+| `pricing-values.ts` | Raw pricing numbers: labour rates, production rates, add-ons, owner-approved bundles, discounts, minimums, rounding, travel economics, commercial/church workload values, promotion terms and the four independent `estimatorCalibration` factors. | The owner changes a business assumption. |
 | `pricing-version.ts` | Automatic deterministic fingerprint of the effective pricing values + shared travel economics + calculation-schema marker. | Never for a normal price edit; it is computed. |
 | `calculation-schema.ts` | Developer marker for calculation-algorithm changes. | A developer changes the estimator formula/order, never an owner value. |
 | `validation.ts` | Hard validation and business warnings for owner values, dependencies, input limits and tier policy. | No edit for normal owner values. |
@@ -31,7 +31,9 @@ version bump. `npm run config:validate` (run automatically by `prebuild`)
 checks the current values; tests derive expectations from the current
 configuration; and `pricing-version.ts` updates the quote fingerprint
 deterministically. Use `npm run pricing:impact` to preview representative
-offers.
+offers, including the owner-approved Kitchen Refresh and Deep Detail bundles.
+`docs/operations/ESTIMATE-PAYMENTS.md` explains the separate server-verified Stripe
+Pay Now path; it is not a pricing value and never trusts the browser amount.
 
 **Safety:** this repository is public. Never place API keys, passwords,
 customer data or private operating coordinates in these files. Production

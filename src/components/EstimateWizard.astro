@@ -24,6 +24,8 @@ import { isFormEnabled } from '../config/business';
 
 const configured = isFormEnabled();
 const addons = pricing.addons.items;
+const addonLabels = new Map(addons.map((addon) => [addon.id, addon.label]));
+const activeBundles = pricing.promotions.addonBundles.filter((bundle) => bundle.enabled);
 const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const phone = contactPhone();
 const email = isPending(business.email) ? null : business.email;
@@ -197,7 +199,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
                   <label for="est-address-state">State</label>
                   <select class="select" id="est-address-state" name="addressState" autocomplete="address-level1" required>
                     {US_STATES.map((state) => (
-                      <option value={state.code} selected={state.code === 'FL'}>{state.name}</option>
+                      <option value={state.code} selected={state.code === 'FL'} disabled={state.disabled}>{state.name}</option>
                     ))}
                   </select>
                 </div>
@@ -367,9 +369,6 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <p class="hint">
             For adults aged 65 or older, first responders, military veterans, people with
             disabilities, and other eligible community members.
-            Ordinary residential cleaning is available to every customer; this optional discount
-            requires eligibility. No diagnosis, medical record or documentation is ever requested.
-            <a href="/supportive-home-cleaning/">See eligibility and program details</a>.
           </p>
           <label class="policy-notice__confirm">
             <input type="checkbox" name="supportiveEligible" value="yes" data-supportive-eligible />
@@ -378,9 +377,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             </span>
           </label>
           <p class="hint">
-            *Eligibility is confirmed personally before booking. The discount applies to eligible
-            cleaning charges and never stacks with another promotion — the larger single discount
-            applies.
+            *Eligibility is subject to verification before cleaning. The discount applies to
+            eligible cleaning charges and never stacks with another promotion — the larger single
+            discount applies.
           </p>
           <div class="field">
             <label for="est-supportive-notes">Anything practical we should know? (optional)</label>
@@ -440,6 +439,46 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             included in your proposed total when selected. Items marked “Custom quote” are priced
             individually.
           </p>
+
+          {
+            activeBundles.length > 0 && (
+              <div class="bundle-offers" data-bundle-offers>
+                <h3 class="bundle-offers__title">Bundle & save</h3>
+                <p class="hint">
+                  Select every extra in a bundle and the discount applies automatically to your
+                  extra services. Only one discount applies per quote.
+                </p>
+                <div class="bundle-offers__grid">
+                  {activeBundles.map((bundle) => (
+                    <article
+                      class="bundle-offer"
+                      data-bundle-id={bundle.id}
+                      data-bundle-value={bundle.value ?? 0}
+                      data-bundle-kind={bundle.kind}
+                      data-bundle-cap={bundle.maxDiscountUsd ?? ''}
+                      data-bundle-required={bundle.requiredAddonIds.join(',')}
+                      data-bundle-recurring={bundle.requiresRecurring ? 'true' : 'false'}
+                      data-bundle-frequencies={bundle.eligibleFrequencies.join(',')}
+                    >
+                      <h4 class="bundle-offer__title">{bundle.label}</h4>
+                      <p class="bundle-offer__contents">
+                        {bundle.requiredAddonIds.map((id) => addonLabels.get(id) ?? id).join(' + ')}
+                      </p>
+                      <p class="bundle-offer__price" data-bundle-price>
+                        {bundle.kind === 'percent'
+                          ? `Save ${Math.round((bundle.value ?? 0) * 100)}% when selected together`
+                          : 'Bundle discount when selected together'}
+                      </p>
+                      <button class="btn btn--secondary btn--small" type="button" data-bundle-add>
+                        Add these extras
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            )
+          }
+
           {
             incentiveEnabled && (
               <p class="addon-incentive" data-addon-incentive>
@@ -496,10 +535,6 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             </select>
           </div>
         </div>
-        <p class="small text-muted">
-          Later appointments get an arrival window, not a promised exact time — we won't rush your
-          home to protect a clock.
-        </p>
       </section>
 
       <!-- Step 6 — estimate + reservation + details -->
@@ -517,10 +552,14 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
           <div class="reservation-actions">
             <p class="reservation-actions__note">
-              <strong>Reserve This Cleaning</strong> sends a reservation request with all of your
-              calculator details — it is not a confirmed appointment until Sparkling Standard
-              confirms it.
+              <strong>Pay Now Securely</strong> pays this proposed total through Stripe.
+              <strong>Reserve This Cleaning</strong> sends the same request without paying
+              upfront. Either way, Sparkling Standard confirms the final details and date before
+              the cleaning is booked.
             </p>
+            <button class="btn btn--primary btn--large" type="button" data-pay-now hidden>
+              Pay Now Securely
+            </button>
             <div class="reservation-actions__links">
               {phone && (
                 <a class="btn btn--ghost btn--small" data-reserve-call href={phone.href}>
@@ -598,13 +637,18 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
   <aside class="stack">
     <div class="card card--muted">
-      <h2 class="card__title">How the estimate works</h2>
+      <h2 class="card__title">No two homes are the same</h2>
       <p class="card__text">
-        Your confirmed address sets the destination for travel. The price is built on real
-        labor-time math for homes like yours — not a template price. It's a proposed price on a
-        request, not a confirmed booking: Sparkling Standard confirms the final scope, price and
-        timing with you first.
+        No two homes are the same, so why should their prices be? Your estimate is built from the
+        details you provide — square footage, condition, extras and travel — so you can see a real
+        proposed total before choosing what to do next.
       </p>
+      <p class="card__text">
+        Pay securely through Stripe now, or send your reservation request without paying anything
+        upfront. Sparkling Standard personally reviews and confirms the final details before your
+        cleaning is scheduled.
+      </p>
+      <p class="card__text"><strong>Your home. Your estimate. Your schedule. Your choice.</strong></p>
     </div>
 
     <div class="card">

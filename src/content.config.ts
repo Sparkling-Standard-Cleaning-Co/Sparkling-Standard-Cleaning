@@ -54,6 +54,10 @@ const services = defineCollection({
     goodFor: z.array(z.string()).default([]),
     /** What this service deliberately does not cover. */
     notIncluded: z.array(z.string()).default([]),
+    /** Hide the "What this service doesn't cover" section for this page. */
+    hideNotIncluded: z.boolean().default(false),
+    /** Hide the closing CTA supporting sentence while keeping the buttons. */
+    hideClosingCtaText: z.boolean().default(false),
     /** FAQ ids from the faqs collection shown on this page. */
     faqIds: z.array(z.string()).default([]),
     /** Related service paths. */

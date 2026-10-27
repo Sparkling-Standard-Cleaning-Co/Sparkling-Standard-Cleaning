@@ -178,6 +178,9 @@ fee and no invented availability.
   breakdown. A mismatch is a review action, not a silently accepted price.
 - Tax is disclosed from the category policy in `TAX-TREATMENT.md`; no server
   or client path invents a numeric tax rate or amount.
+- Pay Now uses the same server-recalculated quote and is available only when the exact amount is
+  known. Residential/STR quotes are re-verified and re-routed; facility payments are Tier A only.
+  See `ESTIMATE-PAYMENTS.md`. Custom/range quotes remain reservation-only.
 
 ## 9. Owner controls
 
@@ -194,6 +197,11 @@ fee and no invented availability.
   `src/config/estimators/pricing-values.ts` (`commercialPricing`) with typed state in
   `src/config/pricing.ts`.
 - **Engine definitions/CTAs**: `src/lib/estimate/engines.ts`.
+- **Add-on bundles**: `pricing-values.ts` (`promotions.addonBundles`). The owner-approved
+  Kitchen Refresh, Deep Detail and Recurring Care bundles apply only when every required extra is
+  selected, use the same single-discount policy and never discount specialty work.
+- **Pay Now switch**: `src/config/payments.ts`; live checkout also requires Cloudflare
+  `STRIPE_SECRET_KEY` and a configured `STRIPE_WEBHOOK_SECRET`.
 - **Calibration**: `npm run commercial:calibration` (hypothetical scenarios;
 - **Calibration report**: `npm run calibration:report` regenerates `FACILITY-CALIBRATION.md` and the full-field CSV; 26 commercial + 20 church scenarios completed (`FACILITY-CALIBRATION.md`).
   intended for internal financial review, never published to customers).

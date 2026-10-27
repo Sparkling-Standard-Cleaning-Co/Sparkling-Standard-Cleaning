@@ -2,8 +2,9 @@
 
 Owner directive: Smart Estimate System 2.0, Part 6. This documents how the
 current Astro/Cloudflare architecture can grow into direct booking WITHOUT
-rebuilding the estimator. **Nothing here is activated. No appointments are
-auto-confirmed and no payments are collected today.**
+rebuilding the estimator. **No appointments are auto-confirmed.** The current release offers an
+optional Pay Now for exact estimate quotes, but it is not a booking or deposit system and does not
+hold a calendar slot.
 
 ## The state machine (never interchangeable)
 
@@ -33,10 +34,11 @@ APPROVED — everything below is future work.
 - **Lead record + notification** — the flat field map is effectively a
   proto-booking record; the reservation ledger docs
   (`docs/operations/RESERVATION-TRACKING.md`) already track statuses.
-- **Payment primitives (dormant)** — Stripe Checkout + a
-  signature-verified webhook exist for gift certificates
-  (`functions/api/gift-checkout.ts`, `functions/api/stripe-webhook.ts`); the
-  same pattern extends to deposits. No new vendor needed.
+- **Payment primitives** — Stripe Checkout + a
+  signature-verified webhook serve exact estimate Pay Now
+  (`functions/api/estimate-checkout.ts`, `functions/api/stripe-webhook.ts`); gift
+  certificates remain dormant. A future deposit/hold flow must not reuse the instant full-payment
+  path as if it held a slot.
 - **Scheduling config** — `src/config/scheduling.ts` (60-day window,
   statuses) is the seed of an availability model.
 - **Private storage** — the R2 photo pipeline (Part 2) demonstrates the

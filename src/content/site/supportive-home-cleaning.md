@@ -6,30 +6,29 @@ hero:
   accent: ' A Little More Peace of Mind.'
   lead: >-
     Community Support Cleaning is the same dependable residential cleaning we
-    provide every day, with a {{communityDiscount}} appreciation discount for adults aged 65 or
-    older, first responders, military veterans, people with disabilities, and
-    other eligible community members. No diagnosis, medical record, or
-    documentation is required — just a simple self-attestation and a
-    conversation about what would help.
+    provide every day, with a {{communityDiscount}} appreciation discount for
+    seniors, first responders, military veterans, people with disabilities, and
+    other eligible community members. Eligibility is subject to verification
+    before cleaning.
   ctaLabel: Start My Estimate
 sections:
   - eyebrow: Who qualifies
     heading: A {{communityDiscount}} discount for eligible households
     lead: >-
-      The discount is a genuine thank-you for neighbors who may appreciate a
-      little extra support. Ordinary residential cleaning remains available to
-      every customer; only this special discount requires eligibility.
+      The discount is a genuine thank-you for eligible neighbors. Ordinary
+      residential cleaning remains available to every customer. Eligibility is
+      subject to verification before cleaning.
     items:
-      - title: Adults aged 65 or older
-        text: A straightforward appreciation discount for senior households.
+      - title: Seniors and Elderly
+        text: A little extra care for the generations whose hard work, wisdom, and love paved the way for us today.
       - title: First responders
-        text: For firefighters, law enforcement, EMS and other responders who serve our community.
+        text: Our thanks to those who show up when others need them most.
       - title: Military veterans
         text: For veterans and their households, with our thanks for your service.
-      - title: People with disabilities
+      - title: Those with Disabilities
         text: For households where a disability or mobility limitation makes cleaning harder to manage.
       - title: Other eligible community members
-        text: If circumstances in your household make cleaning harder to manage, tell us — eligibility and any discount are confirmed personally.
+        text: If circumstances in your household make cleaning harder to manage, tell us — eligibility is subject to verification before cleaning.
   - eyebrow: What is included
     heading: Ordinary residential cleaning, within an agreed scope
     lead: >-
@@ -50,8 +49,8 @@ sections:
     heading: How the discount appears and is confirmed
     lead: >-
       We keep the program simple and transparent. The discount is applied to
-      eligible cleaning charges on your estimate, and eligibility is confirmed
-      personally before booking.
+      eligible cleaning charges on your estimate. Eligibility is subject to
+      verification before cleaning.
     items:
       - title: Shown clearly on the estimate
         text: The estimate shows a “Community Support discount ({{communityDiscount}})” line with the exact savings.

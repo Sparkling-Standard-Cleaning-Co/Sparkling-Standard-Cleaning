@@ -31,6 +31,7 @@ import {
   type RoutingEnv,
 } from '../travel/server-routing.ts';
 import { resolveAddress, type GeocodeEnv } from '../location/server-geocode.ts';
+import { formatDriveDuration } from '../travel/calculateTravelAdjustment.ts';
 
 export interface QuoteVerificationEnv extends RoutingEnv, GeocodeEnv {}
 
@@ -398,7 +399,7 @@ export async function verifyReservationQuote(
       'mismatch',
       null,
       null,
-      `Our server recalculation does not produce an instant price (${estimate.message ?? 'custom confirmation required'}). Review before confirming.`,
+      `Our server recalculation does not produce an instant price (${estimate.message ?? 'confirmation required'}). Review before confirming.`,
     );
   }
 
@@ -508,7 +509,7 @@ export async function verifyReservationQuote(
   }
 
   if (uncertainties.length === 0) {
-    const travelCopy = `live route ${travel.oneWayMiles ?? '—'} mi / ${travel.durationMinutes ?? '—'} min via ${travel.provider}`;
+    const travelCopy = `live route ${travel.oneWayMiles ?? '—'} mi / ${travel.durationMinutes === null ? '—' : formatDriveDuration(travel.durationMinutes)} via ${travel.provider}`;
     return result(
       'verified',
       amount,
@@ -518,7 +519,7 @@ export async function verifyReservationQuote(
   }
 
   const travelSummary = travel.verified
-    ? `live route ${travel.oneWayMiles ?? '—'} mi / ${travel.durationMinutes ?? '—'} min via ${travel.provider}`
+    ? `live route ${travel.oneWayMiles ?? '—'} mi / ${travel.durationMinutes === null ? '—' : formatDriveDuration(travel.durationMinutes)} via ${travel.provider}`
     : travel.method === 'straight_line_estimate'
       ? `approximate ${travel.oneWayMiles ?? '—'} mi road-distance estimate`
       : 'zone-based travel';

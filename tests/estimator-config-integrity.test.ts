@@ -74,7 +74,13 @@ test('approval and publication protections remain in place', () => {
   assert.equal(pricing.publication.publishAddonPrices, false);
   assert.equal(pricing.publication.publishMinimumJob, false);
   for (const program of pricing.promotions.appreciationDiscounts) assert.equal(program.enabled, false);
-  for (const bundle of pricing.promotions.addonBundles) assert.equal(bundle.enabled, false);
+  for (const bundle of pricing.promotions.addonBundles) {
+    if (!bundle.enabled) continue;
+    assert.ok(typeof bundle.value === 'number' && bundle.value > 0);
+    assert.ok(typeof bundle.maxDiscountUsd === 'number' && bundle.maxDiscountUsd > 0);
+    assert.ok(bundle.requiredAddonIds.length >= 2);
+    assert.equal(bundle.stackable, false);
+  }
   assert.equal(pricing.promotions.foundingTen.enabled, false);
 });
 

@@ -7,7 +7,7 @@ hero:
   ctaLabel: Get an Estimate
 communities:
   heading: Where we clean
-  lead: The confirmed service area today, stated exactly as it is — no fake maps, no invented radius claims.
+  lead: Serving Pensacola, Cantonment, and nearby communities with care and consideration.
   list:
     - Pensacola
     - Cantonment
@@ -15,8 +15,7 @@ communities:
     - Select nearby Alabama communities, by arrangement
 beyond:
   heading: On the edge of the map?
-  text: If you're just outside our usual area, it's still worth asking. Extended-area jobs are reviewed personally so travel time and scheduling are handled honestly — sometimes it works, and when it doesn't, we'll tell you straight.
-coverageNote: The instant estimate checks your ZIP as you enter it. Areas that need a personal confirmation get one — never a guessed price.
+  text: If you're just outside our usual area, it's still worth asking. Extended-area jobs are reviewed personally with care and consideration.
 sections:
   - eyebrow: How coverage works
     heading: Why we confirm some locations personally

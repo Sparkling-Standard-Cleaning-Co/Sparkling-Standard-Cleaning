@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 
 import { calculateEstimate, type EstimateContext } from '../src/lib/estimate/calculate.ts';
 import type { EstimateInput } from '../src/lib/estimate/types.ts';
+import { formatDriveDuration } from '../src/lib/travel/calculateTravelAdjustment.ts';
 
 function context(routed?: EstimateContext['travel']['routed'], overrides: Partial<EstimateContext['travel']> = {}) {
   return {
@@ -149,4 +150,11 @@ test('offline zone mode is never presented as verified travel', () => {
   const result = calculateEstimate(input(), context());
   assert.equal(result.travel.method, 'zone');
   assert.equal(result.travel.verified, false);
+});
+
+test('driving durations are presented as hours and minutes, never raw minutes', () => {
+  assert.equal(formatDriveDuration(390), '6 hours and 30 minutes');
+  assert.equal(formatDriveDuration(60), '1 hour');
+  assert.equal(formatDriveDuration(45), '45 minutes');
+  assert.equal(formatDriveDuration(61), '1 hour and 1 minute');
 });

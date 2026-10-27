@@ -126,6 +126,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   const statusEl = root.querySelector<HTMLElement>('[data-address-status]');
   const gpsButton = root.querySelector<HTMLButtonElement>('[data-address-gps]');
   const gpsRetryButton = root.querySelector<HTMLButtonElement>('[data-address-gps-retry]');
+  const gpsButtonInitialHtml = gpsButton?.innerHTML ?? '';
   const manualOpenButton = root.querySelector<HTMLButtonElement>('[data-address-manual-open]');
   const manualDetails = root.querySelector<HTMLDetailsElement>('[data-address-manual-details]');
   const permissionPanel = root.querySelector<HTMLElement>('[data-address-permission]');
@@ -158,6 +159,17 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   let searchSeq = 0;
   /** True while resolved values are written programmatically into fields. */
   let applyingResolved = false;
+  let gpsBusy = false;
+
+  function setGpsBusy(busy: boolean): void {
+    gpsBusy = busy;
+    if (!gpsButton) return;
+    gpsButton.disabled = busy;
+    gpsButton.setAttribute('aria-busy', busy ? 'true' : 'false');
+    if (gpsRetryButton) gpsRetryButton.disabled = busy;
+    if (busy) gpsButton.textContent = 'Finding Your Location…';
+    else gpsButton.innerHTML = gpsButtonInitialHtml;
+  }
 
   // MapLibre is imported lazily and only once per page.
   type MapLibreModule = typeof import('maplibre-gl');
@@ -376,7 +388,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     if (mapCard) mapCard.hidden = true;
     setState('unresolved');
     setStatus(
-      "We couldn't pinpoint that address on the map. Everything you typed is saved — try again with any small change (a street abbreviation like Ln/St/Rd, or a nearby cross street), or continue and we'll confirm the location with you personally.",
+      "We couldn't find that address on the map. Please enter your ZIP code to continue, and we'll confirm the exact price and location during booking.",
       'info',
     );
     emit();
@@ -554,12 +566,18 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   function beginLocationRequest(): void {
+    if (gpsBusy) return;
+    setGpsBusy(true);
     hidePermissionPanel();
     setState('locating');
-    setStatus('Getting your location…', 'info');
+    setStatus('Getting your location...', 'info');
     navigator.geolocation.getCurrentPosition(
-      (position) => void handleGpsPosition(position),
+      (position) => {
+        setGpsBusy(false);
+        void handleGpsPosition(position);
+      },
       (error) => {
+        setGpsBusy(false);
         if (error.code === error.PERMISSION_DENIED) showPermissionHelp('denied');
         else if (error.code === error.POSITION_UNAVAILABLE) showPermissionHelp('unavailable');
         else showPermissionHelp('timeout');
@@ -576,6 +594,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   function useCurrentLocation(): void {
+    if (gpsBusy) return;
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       showPermissionHelp('unsupported');
       setStatus('Your browser does not support location sharing — enter your address manually.', 'info');

@@ -49,6 +49,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   const numericEstimatesEnabled = commercialTierConfig.numericEstimatesEnabled;
   const status = host.querySelector<HTMLElement>('[data-form-status]');
   const submitButton = host.querySelector<HTMLButtonElement>('button[type="submit"]');
+  const payNowButton = host.querySelector<HTMLButtonElement>('[data-facility-pay-now]');
+  const payNowNote = host.querySelector<HTMLElement>('[data-facility-pay-note]');
   const reviewLines = host.querySelector<HTMLElement>('[data-facility-review-lines]');
   const reviewNote = host.querySelector<HTMLElement>('[data-facility-review-note]');
   const result = host.querySelector<HTMLElement>('[data-facility-result]');
@@ -79,6 +81,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   const photoController = initPhotoUploads(host, { engine: facilityEngine });
   let latestWorkload: FacilityWorkload | null = null;
   let latestPrice: FacilityPrice | null = null;
+  let paymentEnabled = false;
   let startTracked = false;
   let travel: RoutedTravel | null = null;
   let travelKey = '';
@@ -94,6 +97,18 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     if (!status) return;
     status.dataset.state = kind;
     status.textContent = message;
+  }
+
+  function syncFacilityPayment(): void {
+    if (!payNowButton) return;
+    const payable =
+      numericEstimatesEnabled &&
+      paymentEnabled &&
+      currentStep === stepPanels.length &&
+      latestPrice?.priced === true &&
+      latestPrice.tier === 'A';
+    payNowButton.hidden = !payable;
+    if (payNowNote) payNowNote.hidden = !payable;
   }
 
   function field(name: string): string {
@@ -198,6 +213,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   function rulesForStep(step: number): FieldRule[] {
     const zipRule: FieldRule = {
       name: 'zip',
+      optional: true,
       message: 'Enter the facility ZIP code so we can confirm travel and coverage.',
       validate: (value) =>
         /^\d{5}(-\d{4})?$/.test(value)
@@ -295,8 +311,12 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       if (!element) continue;
       clearFieldError(rule.name);
       const value = element.value.trim();
-      let message = value === '' ? (rule.optional ? null : rule.message) : null;
-      if (!message && rule.validate) message = rule.validate(value);
+      let message: string | null = null;
+      if (value === '') {
+        message = rule.optional ? null : rule.message;
+      } else if (rule.validate) {
+        message = rule.validate(value);
+      }
       if (message) {
         setFieldError(rule.name, message);
         errors.push({ name: rule.name, message });
@@ -338,6 +358,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       const panel = stepPanels[currentStep - 1];
       stepDescription.textContent = panel?.querySelector<HTMLElement>('.facility-step-description')?.textContent?.trim() ?? '';
     }
+    syncFacilityPayment();
     if (focus) stepPanels[currentStep - 1]?.querySelector<HTMLElement>('[data-facility-step-title]')?.focus();
   }
 
@@ -384,7 +405,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     form: host,
     onChange: (location) => {
       travel = null;
-      travelKey = location ? `${location.lat},${location.lng}` : '';
+      travelKey = location ? `pin:${location.lat},${location.lng}` : '';
       if (confirmedTravel) confirmedTravel.textContent = '';
       renderSummary();
       if (location) void lookupTravel(location.lat, location.lng);
@@ -392,7 +413,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   });
 
   async function lookupTravel(lat: number, lng: number): Promise<void> {
-    const key = `${lat},${lng}`;
+    const key = `pin:${lat},${lng}`;
     try {
       const response = await fetch('/api/travel', {
         method: 'POST',
@@ -405,7 +426,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       if (typeof data.oneWayMiles === 'number' && data.oneWayMiles > 0) {
         travel = data;
         if (confirmedTravel) {
-          confirmedTravel.textContent = `${data.oneWayMiles.toFixed(1)} miles one way from our operating area — travel is included in the review of your request.`;
+          confirmedTravel.textContent = `${data.oneWayMiles.toFixed(1)} miles one way from our operating area.`;
         }
         renderSummary();
       }
@@ -465,8 +486,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     const tax = taxPresentationForService(facilityEngine === 'church' ? 'church_cleaning' : 'commercial_cleaning');
     if (estimateTax) estimateTax.textContent = `${tax.label}. ${tax.note}`;
     if (!price.priced) {
-      estimateLabel.textContent = 'Custom scope review';
-      estimatePrice.textContent = 'Let’s confirm this together';
+      estimateLabel.textContent = 'Confirmation Required';
+      estimatePrice.textContent = "We'll confirm this with you";
       if (estimateRange) estimateRange.hidden = true;
       estimateNote.textContent = numericEstimatesEnabled
         ? 'This facility has enough scope or special detail that a responsible price needs a personal review. Send the details and Sparkling Standard will confirm an exact quote.'
@@ -484,7 +505,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       }
     }
     estimateNote.textContent =
-      'Nonbinding preliminary estimate based on the scope you entered. Final scope, condition, access and travel are confirmed personally before anything is booked.';
+      'Nonbinding preliminary estimate based on the scope you entered. Final details are confirmed personally before anything is booked.';
   }
 
   function renderSummary(): void {
@@ -545,6 +566,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     lines.push('<li><span>Final price</span><strong>Confirmed personally before booking</strong></li>');
     if (reviewLines) reviewLines.innerHTML = lines.join('');
     renderReviewNote();
+    syncFacilityPayment();
   }
 
   function renderReviewNote(): void {
@@ -557,8 +579,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     }
     if (latestPrice?.priced) {
       reviewNote.textContent = facilityEngine === 'church'
-        ? `The amount above is a nonbinding preliminary estimate with the ${churchDiscountLabel} applied. Final scope, travel and price are confirmed personally before anything is scheduled.`
-        : 'The amount above is a nonbinding preliminary estimate. Final scope, travel and price are confirmed personally before anything is scheduled.';
+        ? `The amount above is a nonbinding preliminary estimate with the ${churchDiscountLabel} applied. Final scope and price are confirmed personally before anything is scheduled.`
+        : 'The amount above is a nonbinding preliminary estimate. Final scope and price are confirmed personally before anything is scheduled.';
       return;
     }
     if (latestPrice) {
@@ -569,7 +591,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     }
     reviewNote.textContent = facilityEngine === 'church'
       ? `Enter the facility details to see a preliminary estimate. The ${churchDiscountLabel} applies to the confirmed cleaning quote, and Sparkling Standard confirms the scope and price personally before anything is scheduled.`
-      : 'Enter the facility details to see a preliminary estimate. Final scope, travel and price are confirmed personally before anything is scheduled.';
+      : 'Enter the facility details to see a preliminary estimate. Final scope and price are confirmed personally before anything is scheduled.';
   }
 
   function escapeHtml(value: string): string {
@@ -581,8 +603,14 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   }
 
   function updateSummary(): void {
-    const zip = field('zip');
-    const currentKey = zip ? `zip:${zip}` : '';
+    const submission = finder?.getSubmission();
+    const location = submission?.location ?? null;
+    const zip = submission?.zip ?? field('zip');
+    const currentKey = location
+      ? `pin:${location.lat},${location.lng}`
+      : zip
+        ? `zip:${zip}`
+        : '';
     if (travelKey !== currentKey) {
       travel = null;
       travelKey = currentKey;
@@ -614,6 +642,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     }
   }
 
+  payNowButton?.addEventListener('click', () => {
+    void handleSubmit('pay_now');
+  });
   host.addEventListener('submit', (event) => {
     event.preventDefault();
     if (currentStep < stepPanels.length) {
@@ -623,7 +654,26 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     void handleSubmit();
   });
 
-  async function handleSubmit(): Promise<void> {
+  async function startSecurePayment(fields: Record<string, string>): Promise<boolean> {
+    try {
+      const response = await fetch('/api/estimate-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          fields,
+          returnPath:
+            facilityEngine === 'church' ? '/estimate/church/' : '/estimate/commercial/',
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; url?: string };
+      if (!response.ok || !data.ok || !data.url) return false;
+      window.location.assign(data.url);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async function handleSubmit(paymentChoice: 'reserve' | 'pay_now' = 'reserve'): Promise<void> {
     const invalid = validateAllSteps();
     if (invalid) {
       maxVisitedStep = Math.max(maxVisitedStep, invalid.step);
@@ -649,9 +699,13 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
 
     const submission = finder?.getSubmission();
     const zip = submission?.zip ?? field('zip');
-    if (!zip) {
-      setStatus('error', 'Please confirm the facility address or ZIP code.');
-      host.querySelector<HTMLInputElement>('#est-zip')?.focus();
+    if (!zip && !submission?.location) {
+      setStatus('error', 'Please confirm the facility location or enter a ZIP code.');
+      if (submission?.method === 'gps' || submission?.location) {
+        host.querySelector<HTMLButtonElement>('[data-address-gps]')?.focus();
+      } else {
+        host.querySelector<HTMLInputElement>('#est-zip')?.focus();
+      }
       return;
     }
 
@@ -662,6 +716,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     const organization = field('organization');
     const fields: Record<string, string> = {
       engine_type: facilityEngine,
+      payment_choice: paymentChoice === 'pay_now' ? 'pay_now' : 'reserve',
       request_type: 'facility_estimate',
       estimate_status: 'custom_confirmation_required',
       service_type: facilityEngine === 'church' ? 'church_cleaning' : 'commercial_cleaning',
@@ -752,6 +807,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     }
 
     if (submitButton) submitButton.disabled = true;
+    if (payNowButton) payNowButton.disabled = true;
     setStatus('info', 'Sending your request…');
 
     const subject =
@@ -768,6 +824,19 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         delete fields.photo_request_ref;
       }
       saveSubmissionSummary(fields);
+      if (paymentChoice === 'pay_now') {
+        setStatus('info', 'Request received. Opening secure Stripe payment...');
+        const started = await startSecurePayment(fields);
+        if (!started) {
+          if (payNowButton) payNowButton.disabled = false;
+          if (submitButton) submitButton.disabled = false;
+          setStatus(
+            'error',
+            'Your request was received, but secure online payment could not start. Your request is saved; Sparkling Standard will confirm payment options with you.',
+          );
+        }
+        return;
+      }
       const event = facilityEngine === 'church' ? 'church_request_submit' : 'commercial_quote_submit';
       recordConversion(event, { ...(fields.facility_type ? { facility_type: fields.facility_type } : {}) });
       if (result && resultTitle && resultNote) {
@@ -776,10 +845,10 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         resultNote.textContent =
           facilityEngine === 'church'
             ? latestPrice?.priced
-              ? `Not booked yet. Sparkling Standard will review your preliminary estimate and confirm the scope, travel, final price and your ${churchDiscountLabel} personally.`
+              ? `Not booked yet. Sparkling Standard will review your preliminary estimate and confirm the final scope, price and your ${churchDiscountLabel} personally.`
               : `Not booked yet. Sparkling Standard will review the scope and confirm your ${churchDiscountLabel} and price personally.`
             : latestPrice?.priced
-              ? 'Not booked yet. Sparkling Standard will review your preliminary estimate and confirm the scope, travel and final price personally.'
+              ? 'Not booked yet. Sparkling Standard will review your preliminary estimate and confirm the final scope and price personally.'
               : 'Not booked yet. Sparkling Standard will review the scope and confirm the price personally.';
       }
       setStatus(
@@ -795,10 +864,21 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     }
 
     if (submitButton) submitButton.disabled = false;
+    if (payNowButton) payNowButton.disabled = false;
     const reason = (outcome.reason ?? 'unknown') as FailureReason;
     setStatus('error', failureCopy(reason, contact));
   }
 
   renderSummary();
   updateSummary();
+  void (async () => {
+    try {
+      const response = await fetch('/api/estimate-checkout', { headers: { Accept: 'application/json' } });
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; enabled?: boolean };
+      paymentEnabled = response.ok && data.ok === true && data.enabled === true;
+    } catch {
+      paymentEnabled = false;
+    }
+    syncFacilityPayment();
+  })();
 }

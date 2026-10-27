@@ -9,7 +9,8 @@
 // Integrity rules (enforced by tests):
 //  - "We received your request" — never "confirmed booking";
 //  - "provisional estimate" — never a final price or a paid receipt;
-//  - no payment has been taken by a website form, and the copy says so;
+//  - no payment is taken by a website form; Pay Now is a separate Stripe step;
+//  - the email is never presented as a payment receipt;
 //  - nothing internal (labor hours, rates, verification codes) is exposed.
 //
 // The HTML is table-based with inline styles (the only reliable approach in
@@ -143,6 +144,7 @@ function buildHtml(
   intro: string,
   steps: string[],
   business: ConfirmationBusiness,
+  payNow: boolean,
 ): string {
   const rows = summary.rows
     .map(
@@ -219,7 +221,7 @@ function buildHtml(
             <tr>
               <td style="padding:14px 16px;">
                 <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:${PALETTE.rose};">This is not a confirmed appointment.</p>
-                <p style="margin:0;font-size:13px;line-height:1.5;color:${PALETTE.inkSoft};">Final scope, pricing and availability may require confirmation before anything is scheduled. Please don&rsquo;t send payment until we&rsquo;ve confirmed an amount and a payment method with you.</p>
+                <p style="margin:0;font-size:13px;line-height:1.5;color:${PALETTE.inkSoft};">${payNow ? "Your secure payment step opens separately through Stripe. Payment is processed there; this email is not a payment receipt. Sparkling Standard confirms the final scope, price and date before the cleaning is scheduled." : "Final scope, pricing and availability may require confirmation before anything is scheduled. Please don&rsquo;t send payment until we&rsquo;ve confirmed an amount and a payment method with you."}</p>
               </td>
             </tr>
           </table>
@@ -255,6 +257,7 @@ function buildText(
   intro: string,
   steps: string[],
   business: ConfirmationBusiness,
+  payNow: boolean,
 ): string {
   const lines: string[] = [];
   lines.push(business.name);
@@ -280,7 +283,9 @@ function buildText(
   }
   lines.push('THIS IS NOT A CONFIRMED APPOINTMENT.');
   lines.push(
-    "Final scope, pricing and availability may require confirmation before anything is scheduled. Please don't send payment until we've confirmed an amount and a payment method with you.",
+    payNow
+      ? 'Your secure payment step opens separately through Stripe. Payment is processed there; this email is not a payment receipt. Sparkling Standard confirms the final scope, price and date before the cleaning is scheduled.'
+      : "Final scope, pricing and availability may require confirmation before anything is scheduled. Please don't send payment until we've confirmed an amount and a payment method with you.",
   );
   lines.push('');
   lines.push('WHAT HAPPENS NEXT');
@@ -310,12 +315,13 @@ export function buildCustomerConfirmation(
   const summary = buildRequestSummary(fields);
   const intro = introFor(summary.kind, summary.estimate !== null);
   const steps = nextStepsFor(summary.kind, summary.estimate !== null);
+  const payNow = fields.payment_choice === 'pay_now';
   return {
     // Fixed subject for every request type — never "booking confirmed",
     // "your receipt" or "your invoice" (see docs/operations/FINANCIAL-WORKFLOW.md).
     subject: 'We received your Sparkling Standard request',
     introText: intro,
-    html: buildHtml(summary, intro, steps, business),
-    text: buildText(summary, intro, steps, business),
+    html: buildHtml(summary, intro, steps, business, payNow),
+    text: buildText(summary, intro, steps, business, payNow),
   };
 }

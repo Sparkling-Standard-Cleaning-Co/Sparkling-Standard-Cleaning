@@ -97,9 +97,14 @@ test('house-number helpers distinguish exact addresses from street-level results
   assert.equal(labelHasHouseNumber('Maplewood Lane, Molino, Florida, 32577', null), true);
 });
 
-test('the state selector includes Florida and Alabama first', () => {
+test('the state selector supports Florida and Alabama and disables Georgia', () => {
   assert.equal(US_STATES[0].code, 'FL');
   assert.equal(US_STATES[1].code, 'AL');
+  const georgia = US_STATES.find((state) => state.code === 'GA');
+  assert.ok(georgia);
+  assert.equal(georgia.disabled, true);
+  assert.match(georgia.name, /Coming Soon/);
+  assert.deepEqual(US_STATES.map((state) => state.code), ['FL', 'AL', 'GA']);
   assert.ok(US_STATES.some((state) => state.name === 'Florida'));
   assert.ok(US_STATES.some((state) => state.name === 'Alabama'));
   assert.equal(new Set(US_STATES.map((state) => state.code)).size, US_STATES.length, 'no duplicate states');
