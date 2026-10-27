@@ -32,12 +32,14 @@ import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInf
 import { locationKey, formatLocationLine, type ConfirmedLocation } from '../lib/location/location';
 import { initAddressFinder, type AddressFinderHandle } from './address-finder';
 import { initPhotoUploads } from './photo-uploads';
+import { cancelEstimateReveal, playEstimateReveal } from './estimate-reveal';
 import { submitLead, recordConversion } from '../lib/forms/submit';
 import { reservationReceipt } from '../lib/forms/verification-copy';
 import { saveSubmissionSummary } from '../lib/forms/submission-receipt';
 import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { track } from '../lib/analytics/events';
 import { attributionFields } from '../lib/attribution';
+import { legalTerms } from '../config/legal';
 const TRAVEL_CACHE_PREFIX = 'pcc-travel-';
 
 // ── SPARKLE100 claim state (first-party, no PII) ─────────────────────────────
@@ -118,6 +120,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const status = form.querySelector<HTMLElement>('[data-form-status]');
   const resetButton = document.querySelector<HTMLButtonElement>('[data-estimate-reset]');
   const reservationSummary = form.querySelector<HTMLElement>('[data-reservation-summary]');
+  const estimateReveal = form.querySelector<HTMLElement>('[data-estimate-reveal]');
   const reservationEyebrow = form.querySelector<HTMLElement>('[data-reservation-eyebrow]');
   const reservationPrice = form.querySelector<HTMLElement>('[data-reservation-price]');
   const reservationReference = form.querySelector<HTMLElement>('[data-reservation-reference]');
@@ -153,6 +156,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   let routedKey: string | null = null;
   let latestResult: EstimateResult | null = null;
   let latestQuote: InstantQuote | null = null;
+  let revealKey = '';
   let lastTravelKey = '';
   let estimateStarted = false;
   let estimateCompleted = false;
@@ -285,6 +289,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     renderBundles(result);
     renderPricePreview(result);
     renderReservationSummary(result);
+    maybeRevealEstimate();
     // One aggregated event when the claimed campaign discount lands in the
     // estimate — the code only, never any customer data.
     if (!campaignAppliedTracked && result.pricing.discount?.source === 'campaign') {
@@ -335,11 +340,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
       return;
     }
 
-    // On the final step the reservation summary takes over for estimable jobs;
-    // for custom-confirmation jobs the live panel stays to explain why.
+    // Before the final step the calculator runs silently: no changing dollar
+    // totals, no sidebar price and no accessible price announcement. On the
+    // final step the reservation summary takes over for estimable jobs; for
+    // custom-confirmation jobs the status panel explains why no number exists.
     const summaryTakesOver =
       currentStep === steps.length && result.status === 'estimated' && latestQuote !== null;
-    livePanel.hidden = summaryTakesOver;
+    livePanel.hidden = currentStep !== steps.length || summaryTakesOver;
 
     if (result.status === 'estimated') {
       const amount = latestQuote ? formatUsd(latestQuote.amount) : '—';
@@ -685,6 +692,23 @@ function initEstimateWizard(form: HTMLFormElement): void {
       payNowButton.textContent = payNowLabel();
     }
   }
+  function maybeRevealEstimate(): void {
+    if (!reservationSummary) return;
+    const key =
+      currentStep === steps.length && latestQuote
+        ? `${latestQuote.reference}:${latestQuote.amount}`
+        : '';
+    if (!key) {
+      revealKey = '';
+      cancelEstimateReveal(estimateReveal, reservationSummary);
+      return;
+    }
+    if (revealKey === key) return;
+    revealKey = key;
+    reservationSummary.hidden = false;
+    void playEstimateReveal({ reveal: estimateReveal, target: reservationSummary });
+  }
+
   function renderReservationSummary(result: EstimateResult): void {
     if (!reservationSummary) return;
     const hasQuote = result.status === 'estimated' && latestQuote !== null;
@@ -1336,6 +1360,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
     travelLookupSeq += 1;
     latestResult = null;
     latestQuote = null;
+    revealKey = '';
+    cancelEstimateReveal(estimateReveal, reservationSummary);
     pendingPaymentFields = null;
     acceptedPaymentAmount = null;
     paymentRetryAvailable = false;
@@ -1450,6 +1476,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
       name: textValue('name') ?? '',
       phone: textValue('phone') ?? '',
       email: textValue('email') ?? '',
+      terms_accepted: form.querySelector<HTMLInputElement>('input[name="termsAccepted"]')?.checked
+        ? 'yes'
+        : 'no',
+      terms_version: legalTerms.termsVersion,
     };
     if (requiresInitialDeepClean()) {
       const acknowledged = form.querySelector<HTMLInputElement>('input[name="initialDeepCleanAcknowledged"]');

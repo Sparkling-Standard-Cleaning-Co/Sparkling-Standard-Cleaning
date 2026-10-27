@@ -55,7 +55,7 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | 14 | Turnstile keys (recommended) | `PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Otherwise forms rely on honeypot + timing. |
 | 15 | EIA API key (optional) | `EIA_API_KEY` | Live Gulf Coast gas reference; fallback price works without it. |
 | 16 | Browser/device QA + Lighthouse + accessibility scan | local preview / production preview | **Owner accepts completed launch testing (2026-10-21).** Additional Lighthouse/device testing is optional unless a new change causes a problem; regression testing continues. |
-| 17 | Owner legal review of `/terms/` and `/privacy/` | site pages | Drafted as honest operating terms, not legal advice. |
+| 17 | Owner legal review of `/terms/` and `/privacy/` | site pages | **Expanded 2026-10-27** with Florida cancellation/gift research and owner-approval gates. Still not legal advice; a Florida-licensed attorney must review before new fees or gift sales activate. See `docs/legal/TERMS-RESEARCH.md`. |
 
 ## MARKETING LAUNCH — owner approvals and actions (grouped in execution order)
 
@@ -96,7 +96,7 @@ requests only. Full workflow: `docs/operations/GIFT-CERTIFICATES.md`.
 | # | Item | Where | Notes |
 | --- | --- | --- | --- |
 | G1 | Approved denominations (or custom-only) | `giftCertificateConfig.denominations`, `allowCustomAmount`, bounds | No amount may be advertised until approved. |
-| G2 | Public terms: coverage wording, redemption steps, expiry (or none), refunds | `giftCertificateConfig` + the certificate template | Do **not** invent restrictive expiry periods or fees. |
+| G2 | Public terms: coverage wording, redemption steps, refunds | `giftCertificateConfig` + the certificate template | **2026-10-27:** purchased certificates are now published as non-expiring with no post-sale fees (Fla. Stat. § 501.95). Review the remaining redemption/refund wording with counsel. |
 | G3 | Florida (and Alabama where relevant) gift-certificate requirement review | owner/advisor | Required before public sales. The 60-day reservation window is NOT a certificate validity period. |
 | G4 | Stripe activation | Cloudflare production secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`; webhook endpoint `/api/stripe-webhook` for `checkout.session.completed`; Stripe email receipts on | Confirm enabled payment methods before advertising them. |
 | G5 | One live end-to-end test purchase (smallest denomination) | Stripe + owner inbox | Verify webhook alert, certificate generation, delivery, redemption, ledger. |
@@ -109,6 +109,22 @@ requests only. Full workflow: `docs/operations/GIFT-CERTIFICATES.md`.
 | P2 | Webhook endpoint | Stripe → `https://sparkling-standard.com/api/stripe-webhook` → `checkout.session.completed` | The same endpoint handles estimate payments and approved gift certificates. |
 | P3 | Test-mode checkout | Stripe test mode + a controlled request | Confirm the normal lead and the separate **PAID estimate** owner notice before enabling live payment. No live charge is authorized by engineering. |
 | P4 | Payment/refund terms | Owner-approved policy | The site does not invent a refund or cancellation promise. Existing terms govern. |
+
+## BOOKING / LIVE AVAILABILITY — blocked on owner configuration
+
+The website still collects a **preferred date and arrival window** as a request. It does not display
+live slots because no calendar, job schedule, crew roster or travel-time source is connected.
+Initiative 6.8 deliberately did not fabricate availability. Full architecture:
+`docs/operations/BOOKING-ARCHITECTURE.md`.
+
+| # | Item | Where | Notes |
+| --- | --- | --- | --- |
+| B1 | Choose the calendar/scheduling provider | Owner decision | Recommended starting point: Google Calendar free/busy for existing jobs plus a private Cloudflare booking ledger for holds. A free-tier scheduler may be used only if it supports the travel, duration and concurrency rules. |
+| B2 | Provide calendar authorization | Owner-controlled OAuth / service account + calendar ID | Never commit credentials. The owner must choose which calendar contains confirmed jobs. |
+| B3 | Import existing jobs | Owner calendar or import file | A job is not available just because it is absent from the website. Start time, duration, location, crew and buffers are required. |
+| B4 | Approve scheduling rules | `schedulingConfig` + new booking config | Service hours, days off, minimum notice, advance window, travel/prep buffers, crew capacity, hold expiry and manual-review rules. |
+| B5 | Approve booking confirmation policy | Owner decision | Auto-confirm only if scope, price, capacity and travel all pass; otherwise keep owner approval. Pay Now must not imply a confirmed slot. |
+| B6 | Test concurrency, timezone and cancellation | Test environment | Verify two customers cannot hold the same capacity, DST in `America/Chicago`, calendar failure recovery and rescheduling. |
 
 ## CAN WAIT
 

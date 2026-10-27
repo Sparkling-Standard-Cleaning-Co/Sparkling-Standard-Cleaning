@@ -38,7 +38,7 @@ const hasEmail = !isPending(business.email);
         Clear rules, plainly written. This policy describes what this website actually does — not
         what it might do someday.
       </p>
-      <p class="small text-muted">Last updated: October 21, 2026.</p>
+      <p class="small text-muted">Last updated: October 27, 2026.</p>
 
       <div class="prose stack mt-6">
         <section>
@@ -211,6 +211,17 @@ const hasEmail = !isPending(business.email);
             is sent to you through our transactional email provider (Resend) — it contains the
             summary of your request and how to reach us, and is never marketing.
           </p>
+          <h3>Terms acceptance record</h3>
+          <p>
+            When you accept the Terms and Conditions and applicable Policies, the server records the
+            terms version, policy version, acceptance time, a unique acceptance identifier, the
+            request type, the quote reference (if any), the email address you supplied and the
+            service type. This record is stored in private Cloudflare R2 storage and is used only to
+            evidence which version you accepted, resolve a dispute or meet a legal/accounting
+            obligation. It is not used for analytics or marketing. We keep it only as long as needed
+            for those purposes; a deletion request is honored except where a record must be retained
+            by law or for an active dispute.
+          </p>
         </section>
 
         <section>
@@ -232,6 +243,12 @@ const hasEmail = !isPending(business.email);
             does not collect or store card numbers. You may also submit a cleaning request without
             paying upfront; payment is then arranged through the method Sparkling Standard confirms
             with you. A Pay Now payment does not by itself confirm an appointment.
+          </p>
+          <p>
+            To prevent duplicate charges and reconcile webhook delivery, Stripe payment references,
+            the amount, the quote reference and limited purchaser contact details are recorded in
+            private Cloudflare R2 storage. This website never stores card numbers, CVCs or full payment
+            credentials.
           </p>
         </section>
 

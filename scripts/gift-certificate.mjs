@@ -99,7 +99,7 @@ const html = certificateHtml({
     'Any remaining balance is handled directly with the recipient after the cleaning.',
   ],
   terms:
-    'This certificate represents a prepaid value toward Sparkling Standard cleaning services and is not redeemable for cash. Final redemption terms are provided with purchase. Gift certificates issued in Florida; the holder’s statutory rights are not limited by this certificate.',
+    'This purchased certificate represents a prepaid value toward Sparkling Standard cleaning services. It does not expire and carries no post-sale service, dormancy, maintenance or cash-out fee. It is not redeemable for cash except where required by law. Redeem by contacting Sparkling Standard with the code before booking. Applicable unclaimed-property rules may apply. The holder\'s statutory rights are not limited by this certificate.',
 });
 
 const htmlPath = path.join(OUT_DIR, `certificate-${code}.html`);

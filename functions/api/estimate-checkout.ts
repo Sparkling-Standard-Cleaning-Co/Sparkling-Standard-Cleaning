@@ -37,6 +37,7 @@ import {
   type PaymentStorageEnv,
 } from '../../src/lib/payments/ledger.ts';
 import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.ts';
+import { legalTerms } from '../../src/config/legal.ts';
 
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   STRIPE_SECRET_KEY?: string;
@@ -457,6 +458,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
   const fields = sanitizeFields(payload.fields);
   if (Object.keys(fields).length === 0) return json({ ok: false, error: 'invalid_request' }, 400);
+  if (fields.terms_accepted !== 'yes' || fields.terms_version !== legalTerms.termsVersion) {
+    return json({ ok: false, error: 'terms_required' }, 400);
+  }
   const returnPath =
     typeof payload.returnPath === 'string' && RETURN_PATHS.has(payload.returnPath)
       ? payload.returnPath

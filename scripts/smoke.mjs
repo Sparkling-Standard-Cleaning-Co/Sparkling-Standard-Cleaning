@@ -87,7 +87,8 @@ for (const [label, needle] of [
   ['location permission guidance', 'data-address-permission'],
   ['use-my-current-location control', 'data-address-gps'],
   ['reservation summary', 'data-reservation-summary'],
-  ['price preview', 'data-price-preview'],
+  ['final estimate reveal', 'data-estimate-reveal'],
+  ['terms acceptance', 'terms-acceptance'],
   ['post-send timeline', 'timeline__stage'],
 ]) {
   if (!estimate.includes(needle)) problems.push(`estimate page: missing ${label}`);

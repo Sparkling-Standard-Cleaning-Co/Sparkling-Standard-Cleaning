@@ -1,0 +1,28 @@
+---
+interface Props {
+  id?: string;
+}
+const { id } = Astro.props;
+---
+<div
+  class="estimate-reveal"
+  data-estimate-reveal
+  id={id}
+  hidden
+  role="status"
+  aria-live="polite"
+  aria-atomic="true"
+>
+  <div class="estimate-reveal__art" aria-hidden="true">
+    <span class="estimate-reveal__orbit">
+      <span class="estimate-reveal__spark estimate-reveal__spark--one"></span>
+      <span class="estimate-reveal__spark estimate-reveal__spark--two"></span>
+      <span class="estimate-reveal__spark estimate-reveal__spark--three"></span>
+    </span>
+    <svg class="estimate-reveal__mark" viewBox="0 0 24 24">
+      <path d="M12 1.5 14 9.9l8.5 2.1-8.5 2.1L12 22.5l-2-8.4L1.5 12 10 9.9Z" />
+    </svg>
+  </div>
+  <p class="estimate-reveal__message">Calculating what it&rsquo;ll take to make your space sparkle&hellip;</p>
+  <p class="estimate-reveal__note">Using the details you confirmed.</p>
+</div>

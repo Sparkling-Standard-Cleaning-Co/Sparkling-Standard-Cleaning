@@ -11,10 +11,12 @@ import { taxPresentationForService } from '../lib/estimate/tax';
 import { formatUsd } from '../lib/format';
 import { initAddressFinder } from './address-finder';
 import { initPhotoUploads } from './photo-uploads';
+import { cancelEstimateReveal, playEstimateReveal } from './estimate-reveal';
 import { submitLead, recordConversion } from '../lib/forms/submit';
 import { saveSubmissionSummary } from '../lib/forms/submission-receipt';
 import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { attributionFields } from '../lib/attribution';
+import { legalTerms } from '../config/legal';
 import { track } from '../lib/analytics/events';
 import {
   calculateFacilityPrice,
@@ -64,6 +66,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   const estimateLines = host.querySelector<HTMLElement>('[data-facility-estimate-lines]');
   const estimateNote = host.querySelector<HTMLElement>('[data-facility-estimate-note]');
   const estimateTax = host.querySelector<HTMLElement>('[data-facility-estimate-tax]');
+  const estimateReveal = host.querySelector<HTMLElement>('[data-estimate-reveal]');
+  const finalPanel = host.querySelector<HTMLElement>('[data-facility-step-panel="4"]');
   const stepPanels = [...host.querySelectorAll<HTMLElement>('[data-facility-step-panel]')];
   const stepButtons = [...host.querySelectorAll<HTMLButtonElement>('[data-facility-step-jump]')];
   const nextButton = host.querySelector<HTMLButtonElement>('[data-facility-next]');
@@ -90,6 +94,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   let startTracked = false;
   let travel: RoutedTravel | null = null;
   let travelKey = '';
+  let revealKey = '';
   let finder: ReturnType<typeof initAddressFinder> = null;
 
   const phone = contactPhone();
@@ -311,6 +316,10 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       default:
         return [
           {
+            name: 'termsAccepted',
+            message: 'Please agree to the Terms and Conditions and applicable Policies to continue.',
+          },
+          {
             name: 'phone',
             message: 'Enter a phone number so we can confirm the scope.',
             validate: (value) => {
@@ -391,6 +400,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       stepDescription.textContent = panel?.querySelector<HTMLElement>('.facility-step-description')?.textContent?.trim() ?? '';
     }
     syncFacilityPayment();
+    maybeRevealFacilityEstimate();
     if (focus) stepPanels[currentStep - 1]?.querySelector<HTMLElement>('[data-facility-step-title]')?.focus();
   }
 
@@ -505,6 +515,22 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     };
   }
 
+  function maybeRevealFacilityEstimate(): void {
+    if (!finalPanel) return;
+    const key =
+      currentStep === stepPanels.length && latestPrice?.priced
+        ? `${latestPrice.total}:${latestPrice.tier}:${travel?.oneWayMiles ?? 'none'}`
+        : '';
+    if (!key) {
+      revealKey = '';
+      cancelEstimateReveal(estimateReveal, finalPanel);
+      return;
+    }
+    if (revealKey === key) return;
+    revealKey = key;
+    void playEstimateReveal({ reveal: estimateReveal, target: finalPanel });
+  }
+
   function renderEstimate(priceLines: string[]): void {
     if (!estimatePanel || !estimatePrice || !estimateLabel || !estimateNote || !estimateLines) return;
     const price = latestPrice;
@@ -514,6 +540,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       return;
     }
     estimatePanel.hidden = false;
+    maybeRevealFacilityEstimate();
     estimateLines.innerHTML = priceLines.join('');
     const tax = taxPresentationForService(facilityEngine === 'church' ? 'church_cleaning' : 'commercial_cleaning');
     if (estimateTax) estimateTax.textContent = `${tax.label}. ${tax.note}`;
@@ -858,6 +885,10 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       contact_role: field('contact_role'),
       phone: field('phone'),
       email: field('email'),
+      terms_accepted: host.querySelector<HTMLInputElement>('input[name="termsAccepted"]')?.checked
+        ? 'yes'
+        : 'no',
+      terms_version: legalTerms.termsVersion,
       facility_type: field('facility_type') || (facilityEngine === 'church' ? 'church' : ''),
       cleanable_sqft: field('cleanable_sqft'),
       restroom_fixtures: field('restroom_fixtures'),

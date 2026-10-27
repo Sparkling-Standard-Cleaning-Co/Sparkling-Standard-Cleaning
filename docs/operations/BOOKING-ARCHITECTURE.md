@@ -1,10 +1,17 @@
-# Future booking & checkout architecture — roadmap (NOT ACTIVE)
+# Booking & checkout architecture - roadmap (LIVE BOOKING NOT ACTIVE)
 
 Owner directive: Smart Estimate System 2.0, Part 6. This documents how the
 current Astro/Cloudflare architecture can grow into direct booking WITHOUT
 rebuilding the estimator. **No appointments are auto-confirmed.** The current release offers an
 optional Pay Now for exact estimate quotes, but it is not a booking or deposit system and does not
 hold a calendar slot.
+
+**Initiative 6.8 status (2026-10-27):** live availability is still **not connected**. The website
+continues to collect a preferred date and arrival window as a request, not a confirmed slot. No
+calendar credentials, owner job schedule or crew roster were provided, so no honest availability
+could be calculated. The owner must choose a provider and supply the connection before the
+availability endpoint, holds and booking confirmation can be activated. Do not display fabricated
+slots in the meantime.
 
 ## The state machine (never interchangeable)
 

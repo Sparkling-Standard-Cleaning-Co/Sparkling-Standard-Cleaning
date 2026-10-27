@@ -4,6 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import ContactForm from '../components/ContactForm.astro';
 import Icon from '../components/Icon.astro';
+import Scripture from '../components/Scripture.astro';
 import { business, contactPhone, isPending } from '../config/business';
 import { breadcrumbNode } from '../lib/schema';
 
@@ -112,5 +113,6 @@ const schema = [
         <ContactForm />
       </div>
     </div>
+    <Scripture verse="service" variant="panel" />
   </section>
 </BaseLayout>

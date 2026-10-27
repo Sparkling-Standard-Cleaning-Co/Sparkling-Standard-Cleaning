@@ -3,6 +3,8 @@
 // server-side and returns a Stripe-hosted Checkout URL. No card data ever
 // touches this page; no certificate is issued from the browser.
 
+import { legalTerms } from '../config/legal';
+
 export {};
 
 const form = document.querySelector<HTMLFormElement>('[data-gift-purchase]');
@@ -32,6 +34,8 @@ if (form) {
       deliveryDate: String(data.get('delivery_date') ?? ''),
       denominationUsd: data.get('denominationUsd') ? Number(data.get('denominationUsd')) : undefined,
       amountUsd: data.get('gift_value') ? Number(data.get('gift_value')) : undefined,
+      termsAccepted: data.get('termsAccepted') === 'yes',
+      termsVersion: legalTerms.termsVersion,
     };
 
     try {

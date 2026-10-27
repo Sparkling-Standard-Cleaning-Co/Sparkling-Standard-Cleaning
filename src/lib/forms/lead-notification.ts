@@ -775,6 +775,20 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Notes — Website message', text(fields, 'message'), 'message');
   add('Notes — Current situation', text(fields, 'current_situation'), 'current_situation');
 
+  // Transactional agreement: server-verified and timestamped before delivery.
+  if (text(fields, 'terms_accepted_at') !== '') {
+    add(
+      'Terms - Accepted',
+      text(fields, 'terms_accepted') === 'yes' ? 'Yes - server verified' : '',
+      'terms_accepted',
+    );
+    add('Terms - Terms version', text(fields, 'terms_version'), 'terms_version');
+    add('Terms - Policy version', text(fields, 'policy_version'), 'policy_version');
+    add('Terms - Accepted at (Central)', formatCentral(text(fields, 'terms_accepted_at')), 'terms_accepted_at');
+    add('Terms - Acceptance record', text(fields, 'terms_acceptance_id'), 'terms_acceptance_id');
+    add('Terms - Record status', text(fields, 'terms_record_status'), 'terms_record_status');
+  }
+
   // ── H. Internal verification and follow-up ──────────────────────────────
   // Raw machine codes are kept here so the owner can search/filter reliably;
   // the readable verdict lives in the Pricing section.

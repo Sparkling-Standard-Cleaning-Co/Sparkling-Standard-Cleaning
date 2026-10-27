@@ -88,6 +88,21 @@ arrives.
 - A live paid card test was **not** performed. Use Stripe test mode with the owner's test keys before
   claiming production payment readiness.
 
+## Terms acceptance (Initiative 6.8, 2026-10-27)
+
+A reservation, estimate or Pay Now request now requires an unchecked-by-default acceptance of the
+current `Terms and Conditions` and applicable policies. The server independently checks
+`terms_accepted=yes` and the exact `legalTerms.termsVersion`; a missing/outdated acceptance returns
+`terms_required`/`terms_outdated` and no lead or checkout is created. The server stamps the
+acceptance time and a unique id, records it privately under
+`legal/acceptances/YYYY-MM-DD/<id>.json` when the R2 binding is available, and includes the version,
+policy version, time and record id in the owner notification. The customer confirmation includes the
+accepted version. Contact-form messages are exempt.
+
+If the private R2 write fails for a transactional request, the lead fails closed with
+`acceptance_storage_failed` so the customer can retry; it is never silently reported as recorded.
+The acceptance record is not used for analytics or marketing.
+
 ## Initiative 6.7 reliability (2026-10-27)
 
 Pay Now is now fail-closed on operational readiness, not merely key presence. The configuration

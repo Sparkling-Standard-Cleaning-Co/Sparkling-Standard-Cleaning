@@ -10,6 +10,10 @@ taken, no amount is advertised, and no certificate is issued until payment verif
 the owner approves the terms. This document records how the system works and what remains to be
 decided.
 
+**2026-10-27 policy update:** the public terms now state that a purchased certificate does not
+expire and carries no post-sale service, dormancy, maintenance or cash-out fee (Fla. Stat. § 501.95).
+Sales remain off until the owner approves the exact denominations and the activation checklist below.
+
 ## 1. What is built
 
 | Piece | Where | Status |
@@ -60,9 +64,10 @@ confirmation only.
 
 1. **Approve denominations** (exact amounts) or keep custom amounts only — set
    `giftCertificateConfig.denominations` and `allowCustomAmount` bounds.
-2. **Approve the public terms**: coverage wording, redemption steps, whether they expire
-   (do not invent restrictions; Florida — and Alabama where relevant — gift-certificate
-   requirements must be reviewed first), refund/cancellation handling.
+2. **Approve the public terms**: coverage wording, redemption steps, refund/cancellation handling.
+   The 2026-10-27 public terms already prohibit expiration and post-sale fees; keep those rules
+   unless a lawyer confirms a stricter requirement. Florida and Alabama unclaimed-property treatment
+   still requires review.
 3. **Stripe**: confirm enabled payment methods and set `STRIPE_SECRET_KEY` (Secret) and
    `STRIPE_WEBHOOK_SECRET` (Secret) in the Cloudflare **production** environment, register the
    webhook endpoint `https://sparkling-standard.com/api/stripe-webhook` for

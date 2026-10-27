@@ -81,7 +81,7 @@ test('gift checkout rejects invalid amounts before any provider call', async () 
   try {
     const response = await giftCheckout({
       request: jsonRequest(
-        { purchaserName: 'A', purchaserEmail: 'a@example.com', recipientName: 'B', amountUsd: 5 },
+        { purchaserName: 'A', purchaserEmail: 'a@example.com', recipientName: 'B', amountUsd: 5, termsAccepted: true, termsVersion: '2026-10-27.terms.v1' },
         '10.10.0.4',
       ),
       env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },

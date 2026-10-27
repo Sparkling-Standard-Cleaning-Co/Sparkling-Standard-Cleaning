@@ -177,6 +177,14 @@ async function completeFacilityStepOne(page, organization = 'Test facility (plea
   await page.waitForFunction(() => document.querySelector('[data-facility-step-panel="2"]')?.hidden === false);
 }
 
+async function reachFacilityReview(page) {
+  await page.click('[data-facility-next]');
+  await page.selectOption('#fac-window', { index: 1 });
+  await page.click('[data-facility-next]');
+  await page.waitForFunction(() => document.querySelector('[data-facility-step-panel="4"]')?.hidden === false);
+  await page.waitForFunction(() => document.querySelector('[data-estimate-reveal]')?.hidden === true);
+}
+
 test('the facility form validates the current step with field-specific messages', async () => {
   const { context, page } = await open('/estimate/commercial/');
   try {
@@ -204,6 +212,7 @@ test('the commercial engine shows a preliminary per-visit price for an ordinary 
     await page.fill('#fac-restrooms', '6');
     await page.selectOption('#fac-frequency', 'weekly');
     await page.selectOption('#fac-condition', 'average');
+    await reachFacilityReview(page);
     await page.waitForSelector('[data-facility-estimate]:not([hidden])');
     const price = (await page.locator('[data-facility-estimate-price]').textContent()) ?? '';
     assert.match(price, /^\$\d+/);
@@ -228,6 +237,7 @@ test('the church engine reconciles the configured discount and routes very large
     await page.fill('#fac-sqft', '4000');
     await page.fill('#fac-restrooms', '6');
     await page.selectOption('#fac-frequency', 'weekly');
+    await reachFacilityReview(page);
     await page.waitForSelector('[data-facility-estimate]:not([hidden])');
     const lines = (await page.locator('[data-facility-estimate-lines]').innerText()) ?? '';
     if (pricing.churchDiscount.enabled.value) {
@@ -247,9 +257,12 @@ test('the church engine reconciles the configured discount and routes very large
     }
     const tax = (await page.locator('[data-facility-estimate-tax]').textContent()) ?? '';
     assert.match(tax, /unless exempt/i);
-    // A very large facility must not receive an invented number.
+    // A very large facility must not receive an invented number. Return to the
+    // scope step, change the size, and advance back to the final review.
+    await page.click('[data-facility-step-jump="2"]');
     await page.fill('#fac-sqft', '30000');
     await page.fill('#fac-restrooms', '24');
+    await reachFacilityReview(page);
     await page.waitForFunction(
       () => document.querySelector('[data-facility-estimate-price]')?.textContent?.includes('confirm this with you'),
     );

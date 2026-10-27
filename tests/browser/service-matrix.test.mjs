@@ -162,6 +162,7 @@ async function finishAndSubmit(page, captured, { deepAck = false } = {}) {
   await page.fill('#est-name', 'Service matrix test (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
+  if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms');
   await page.click('[data-submit]');
   await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'success', undefined, { timeout: 15000 });
   await delay(150);

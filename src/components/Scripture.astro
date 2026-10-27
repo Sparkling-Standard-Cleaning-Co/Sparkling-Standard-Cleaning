@@ -1,0 +1,18 @@
+---
+import { scriptures, type ScriptureId, type ScriptureVerse } from '../config/scriptures';
+
+interface Props {
+  verse: ScriptureId | ScriptureVerse;
+  variant?: 'quiet' | 'panel' | 'footer';
+  class?: string;
+}
+
+const { verse, variant = 'quiet', class: className = '' } = Astro.props;
+const selected = typeof verse === 'string' ? scriptures[verse] : verse;
+---
+<figure class:list={['scripture-block', `scripture-block--${variant}`, className]}>
+  <blockquote class="scripture-block__text">
+    <p>{selected.text}</p>
+  </blockquote>
+  <figcaption class="scripture-block__reference">{selected.reference} (KJV)</figcaption>
+</figure>

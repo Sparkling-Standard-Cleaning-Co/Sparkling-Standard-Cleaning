@@ -268,6 +268,7 @@ async function contactFields(page) {
   await page.fill('#est-name', 'Browser journey (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
+  if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms');
 }
 
 // ── Address autocomplete + confirmation ──────────────────────────────────────
@@ -389,53 +390,53 @@ test('confirmed coordinates — not a ZIP centroid — reach the routing lookup'
 
 // ── Price experience ─────────────────────────────────────────────────────────
 
-test('the proposed price calculates correctly and extras change it', async () => {
+test('prices stay hidden until the final step, then the reveal shows the exact proposed total', async () => {
   const { context, page } = await openEstimate(1440, 900);
   try {
     await step1(page);
     await addressStep(page);
     await homeStep(page);
     await conditionStep(page);
-    const basePrice = expectedResidentialPrice();
-    await page.waitForSelector('[data-estimate-price]:not(:empty)');
-    await page.waitForFunction(
-      (expected) => document.querySelector('[data-estimate-price]')?.textContent === expected,
-      formatUsd(basePrice),
-      { timeout: 10000 },
-    );
+    await extrasStep(page, ['inside_oven']);
+
+    // Calculation continues internally, but no dollar total is visible or
+    // announced while the customer answers questions.
+    assert.equal(await page.locator('[data-estimate-live]').isVisible(), false, 'no live price panel');
+    assert.equal(await page.locator('[data-addon-price]').count(), 0, 'no per-add-on dollar totals');
+    assert.equal(await page.locator('[data-price-preview]').count(), 0, 'no price-so-far preview');
+
+    await timingStep(page);
+    await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
+    const withOven = expectedResidentialPrice({ addonIds: ['inside_oven'] });
+    assert.equal(await page.locator('[data-reservation-price]').textContent(), formatUsd(withOven));
     assert.match(
-      (await page.locator('[data-estimate-travel]').textContent()) ?? '',
-      /proposed price includes travel based on the driving distance/i,
-      'confirmed travel is labeled',
+      (await page.locator('[data-reservation-qualification]').textContent()) ?? '',
+      /Travel-inclusive proposed price/i,
+      'confirmed travel is labeled only on the final estimate',
     );
+    await page.waitForFunction(() => document.querySelector('[data-estimate-reveal]')?.hidden === true);
     await page.evaluate(() => window.scrollTo(0, 0));
     await shot(page, '02-price-desktop');
-
-    const withOven = expectedResidentialPrice({ addonIds: ['inside_oven'] });
-    await extrasStep(page, ['inside_oven']);
-    await page.waitForFunction(
-      (expected) => document.querySelector('[data-estimate-price]')?.textContent === expected,
-      formatUsd(withOven),
-      { timeout: 10000 },
-    );
   } finally {
     await context.close();
   }
 });
 
-test('a routing failure degrades to an honest preliminary estimate', async () => {
+test('a routing failure degrades to an honest preliminary estimate at the final step', async () => {
   const { context, page } = await openEstimate(1440, 900, { travelFails: true });
   try {
     await step1(page);
     await zipOnlyAddressStep(page);
     await homeStep(page);
     await conditionStep(page);
-    await page.waitForSelector('[data-estimate-price]:not(:empty)');
-    const price = (await page.locator('[data-estimate-price]').textContent()) ?? '';
+    await extrasStep(page);
+    await timingStep(page);
+    await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
+    const price = (await page.locator('[data-reservation-price]').textContent()) ?? '';
     assert.match(price, /^\$\d+/, 'the price still appears from zone travel math');
-    const travel = (await page.locator('[data-estimate-travel]').textContent()) ?? '';
-    assert.match(travel, /proposed price includes estimated travel/i, 'travel is labeled as an estimate');
-  assert.doesNotMatch(travel, /based on the driving distance to your selected location/i, 'never claims confirmed travel');
+    const qualification = (await page.locator('[data-reservation-qualification]').textContent()) ?? '';
+    assert.match(qualification, /Preliminary proposed price/i, 'travel is labeled as an estimate');
+    assert.doesNotMatch(qualification, /Travel-inclusive proposed price/i, 'never claims confirmed travel');
   } finally {
     await context.close();
   }
@@ -717,45 +718,25 @@ test('a manually moved destination pin is submitted as adjusted and never receiv
 
 // ── Add-on pricing transparency + timeline ───────────────────────────────────
 
-test('eligible add-ons show their calculated price before selection and update with the service rhythm', async () => {
+test('add-on amounts are not displayed before the final estimate; the final breakdown reconciles', async () => {
   const { context, page } = await openEstimate(1440, 900);
   try {
     await step1(page);
     await addressStep(page);
     await homeStep(page);
-    await conditionStep(page); // one-time standard → $50/labor-hour
-    await page.waitForSelector('[data-addon-price="inside_oven"]:not(:empty)');
-    const otherRate = pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour);
-    const ovenCharge = addonCharge('inside_oven', otherRate);
-    const laundryCharge = addonCharge('laundry', otherRate);
-    assert.equal(
-      await page.locator('[data-addon-price="inside_oven"]').textContent(),
-      `+${formatUsd(ovenCharge, { forceCents: true })}`,
-    );
-    assert.equal(
-      await page.locator('[data-addon-price="laundry"]').textContent(),
-      `+${formatUsd(laundryCharge, { forceCents: true })}`,
-    );
-    // Specialty work is labelled, never a misleading $0.
+    await conditionStep(page); // one-time standard
+    assert.equal(await page.locator('[data-addon-price]').count(), 0, 'no add-on dollar labels');
+    // Specialty work remains labelled honestly.
     const custom = page.locator('label.option:has(input[value="carpet_cleaning"]) .option__price--custom');
     assert.equal(((await custom.textContent()) ?? '').trim(), 'Custom quote');
-    assert.equal(await page.locator('[data-addon-price="carpet_cleaning"]').count(), 0);
-    await page.waitForFunction(
-      (expected) => document.querySelector('[data-estimate-price]')?.textContent === expected,
-      formatUsd(expectedResidentialPrice()),
-    );
 
-    // Revisit the condition step and switch to recurring.
-    await page.click('[data-step-jump="3"]');
-    await page.selectOption('#est-frequency', 'biweekly');
-    const deepAck = page.locator('input[name="initialDeepCleanAcknowledged"]');
-    if (await deepAck.isVisible()) await deepAck.check();
-    await page.click('[data-next]');
-    await page.waitForSelector('[data-addon-price="inside_oven"]:not(:empty)');
-    assert.equal(
-      await page.locator('[data-addon-price="inside_oven"]').textContent(),
-      `+${formatUsd(ovenCharge, { forceCents: true })}`,
-    );
+    await extrasStep(page, ['inside_oven']);
+    await timingStep(page);
+    await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
+    const otherRate = pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour);
+    const ovenCharge = addonCharge('inside_oven', otherRate);
+    const breakdown = (await page.locator('[data-price-breakdown]').textContent()) ?? '';
+    assert.ok(breakdown.includes(`Inside oven+${formatUsd(ovenCharge, { forceCents: true })}`));
   } finally {
     await context.close();
   }
@@ -785,7 +766,7 @@ test('the Community Support 10% discount and tax disclosure are explicit in the 
   }
 });
 
-test('the price preview reconciles base, extras, rounding and the proposed total', async () => {
+test('the final breakdown reconciles base, extras, rounding and the proposed total', async () => {
   const { context, page } = await openEstimate(1440, 900);
   try {
     await step1(page);
@@ -794,28 +775,26 @@ test('the price preview reconciles base, extras, rounding and the proposed total
     await conditionStep(page);
     await page.click('label.option:has(input[name="addons"][value="inside_oven"])');
     await page.click('label.option:has(input[name="addons"][value="laundry"])');
-    await page.waitForSelector('[data-price-preview]', { state: 'visible' });
-    const preview = (await page.locator('[data-price-preview-lines]').textContent()) ?? '';
+    await page.click('[data-next]');
+    await page.fill('#est-date', BOOKING_DATE);
+    await page.selectOption('#est-arrival', 'morning');
+    await page.click('[data-next]');
+
+    const breakdown = (await page.locator('[data-price-breakdown]').textContent()) ?? '';
     const otherRate = pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour);
     const ovenCharge = addonCharge('inside_oven', otherRate);
     const laundryCharge = addonCharge('laundry', otherRate);
     const expectedTotal = expectedResidentialPrice({ addonIds: ['inside_oven', 'laundry'] });
     const step = pricingValue(pricing.rounding.toNearest);
-    assert.match(preview, /Base cleaning\$\d/);
-    assert.ok(preview.includes(`Inside oven+${formatUsd(ovenCharge, { forceCents: true })}`));
-    assert.ok(preview.includes(`Laundry+${formatUsd(laundryCharge, { forceCents: true })}`));
-    assert.match(preview, new RegExp(`Rounded to the nearest \\$${step}[−-]\\$`));
-    assert.ok(preview.includes(`Proposed total${formatUsd(expectedTotal)}`));
-    // The displayed figures agree with the offered price.
-    await page.click('[data-next]');
-    await page.fill('#est-date', BOOKING_DATE);
-    await page.selectOption('#est-arrival', 'morning');
-    await page.click('[data-next]');
+    assert.match(breakdown, /Base cleaning\$\d/);
+    assert.ok(breakdown.includes(`Inside oven+${formatUsd(ovenCharge, { forceCents: true })}`));
+    assert.ok(breakdown.includes(`Laundry+${formatUsd(laundryCharge, { forceCents: true })}`));
+    assert.match(breakdown, new RegExp(`Rounded to the nearest \\$${step}`));
+    assert.ok(breakdown.includes(`Proposed total${formatUsd(expectedTotal)}`));
     assert.equal(await page.locator('[data-reservation-price]').textContent(), formatUsd(expectedTotal));
-    // Neither proposed promotion is published while disabled.
     assert.equal(await page.locator('[data-addon-incentive]').count(), 0);
     assert.equal(await page.locator('[data-response-guarantee]').count(), 0);
-    assert.doesNotMatch(preview, /save/i);
+    assert.doesNotMatch(breakdown, /save/i);
   } finally {
     await context.close();
   }

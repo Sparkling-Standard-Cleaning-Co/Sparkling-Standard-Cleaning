@@ -1,0 +1,36 @@
+---
+import { legalTerms } from '../config/legal';
+
+interface Props {
+  id: string;
+}
+
+const { id } = Astro.props;
+---
+<div class="terms-acceptance">
+  <label class="terms-acceptance__label" for={id}>
+    <input
+      class="terms-acceptance__input"
+      id={id}
+      name="termsAccepted"
+      type="checkbox"
+      value="yes"
+      required
+      data-error-required="Please agree to the Terms and Conditions and applicable Policies to continue."
+    />
+    <span>
+      {legalTerms.acceptanceLabel}
+      <a href={legalTerms.termsPath} target="_blank" rel="noopener noreferrer">Terms and Conditions</a>,
+      <a href={legalTerms.cancellationPath} target="_blank" rel="noopener noreferrer"
+        >Cancellation and Rescheduling Policy</a
+      >, and
+      <a href={legalTerms.privacyPath} target="_blank" rel="noopener noreferrer">Privacy Policy</a
+      >.
+    </span>
+  </label>
+  <p class="terms-acceptance__note">
+    The version you accept is recorded with your request. For a continuing service agreement,
+    Florida law gives you three business days to cancel without penalty. Please review the policies
+    before paying or reserving.
+  </p>
+</div>

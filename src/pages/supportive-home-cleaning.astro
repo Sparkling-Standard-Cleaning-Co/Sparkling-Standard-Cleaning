@@ -5,6 +5,7 @@ import Breadcrumbs from '../components/Breadcrumbs.astro';
 import CtaBand from '../components/CtaBand.astro';
 import Icon from '../components/Icon.astro';
 import PremiumIcon from '../components/PremiumIcon.astro';
+import Scripture from '../components/Scripture.astro';
 import { breadcrumbNode, serviceNode } from '../lib/schema';
 import { business, contactPhone, isPending } from '../config/business';
 import { replacePricingTokens } from '../lib/content/pricing-text';
@@ -203,6 +204,12 @@ const showText = phone !== null && business.flags.smsEnabled && !isPending(phone
         them <a href="/contact/">contact us directly</a> — with your permission,
         we coordinate scheduling and access with the people you trust.
       </p>
+    </div>
+  </section>
+
+  <section class="section section--tight" aria-label="A reflection on serving neighbors">
+    <div class="container">
+      <Scripture verse="kindness" variant="panel" />
     </div>
   </section>
 

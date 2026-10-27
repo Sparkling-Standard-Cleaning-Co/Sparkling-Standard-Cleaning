@@ -20,6 +20,8 @@ import Icon from './Icon.astro';
 import TurnstileWidget from './TurnstileWidget.astro';
 import PhotoUploadSection from './PhotoUploadSection.astro';
 import ResponseGuarantee from './ResponseGuarantee.astro';
+import EstimateReveal from './EstimateReveal.astro';
+import TermsAcceptance from './TermsAcceptance.astro';
 import { isFormEnabled } from '../config/business';
 
 const configured = isFormEnabled();
@@ -497,7 +499,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
                     {addon.customQuote ? (
                       <span class="option__price option__price--custom">Custom quote</span>
                     ) : (
-                      <span class="option__price" data-addon-price={addon.id}>—</span>
+                      <span class="option__price">Optional extra</span>
                     )}
                   </span>
                   <span class="option__desc">{addon.blurb}</span>
@@ -506,12 +508,6 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             ))}
           </div>
         </fieldset>
-
-        <div class="price-preview" data-price-preview hidden>
-          <h3 class="price-preview__title">Your price so far</h3>
-          <ul class="summary-list" data-price-preview-lines></ul>
-          <p class="price-preview__note" data-price-preview-note></p>
-        </div>
       </section>
 
       <!-- Step 5 — scheduling -->
@@ -523,6 +519,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
               <input class="input" id="est-date" name="preferredDate" type="date" required />
               <span class="hint">
                 Requests can be made up to {business.scheduling.advanceReservationDays} days in advance.
+                Appointment times are {schedulingConfig.timeZoneLabel}.
               </span>
             </div>
           <div class="field">
@@ -540,7 +537,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       <!-- Step 6 — estimate + reservation + details -->
       <section class="wizard__step" data-step="6" aria-label={stepTitle(5)}>
         <h2 class="wizard__step-heading" data-step-title={5}>{stepTitle(5)}</h2>
-        <div class="reservation-summary" data-reservation-summary hidden>
+        <div class="estimate-reveal-stage">
+          <EstimateReveal />
+          <div class="reservation-summary" data-reservation-summary hidden>
           <p class="reservation-summary__eyebrow" data-reservation-eyebrow>Your proposed cleaning price</p>
           <p class="reservation-summary__price" data-reservation-price>—</p>
           <p class="reservation-summary__meta" data-reservation-reference hidden></p>
@@ -574,6 +573,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             </div>
           </div>
         </div>
+        </div>
 
         <div class="field-row field-row--2">
           <div class="field">
@@ -600,6 +600,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           ></textarea>
         </div>
         <PhotoUploadSection engine="residential" />
+        <TermsAcceptance id="est-terms" />
         <TurnstileWidget />
         <div class="honeypot" aria-hidden="true">
           <input

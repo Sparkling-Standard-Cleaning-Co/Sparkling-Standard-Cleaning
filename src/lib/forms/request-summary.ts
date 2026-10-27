@@ -279,6 +279,15 @@ export function buildRequestSummary(fields: Record<string, string>): RequestSumm
   const taxNote = text(fields, 'tax_note');
   if (taxNote) add('Sales tax', taxNote);
 
+  const termsVersion = text(fields, 'terms_version');
+  if (termsVersion) {
+    const acceptedAt = text(fields, 'terms_accepted_at').slice(0, 10);
+    add(
+      'Terms accepted',
+      `${termsVersion}${acceptedAt ? ` on ${acceptedAt}` : ''}`,
+    );
+  }
+
   const estimate = estimateFor(fields, kind);
   const title =
     kind === 'facility_estimate' && !estimate

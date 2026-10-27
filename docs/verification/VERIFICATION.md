@@ -1,5 +1,62 @@
 # Verification status
 
+## Verified — 2026-10-27 Initiative 6.8 local release (deployment pending)
+
+**Audit:** `Aaron ss website audit.docx` (three pages, annotated screenshots).
+**Start baseline:** `820ad19`; the verified 6.7 payment work was integrated first as `f111014`.
+The 6.8 tree was verified locally before its release commit.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| TypeScript diagnostics | `npm run check` | 158 files; 0 errors, 0 warnings, 0 hints |
+| Unit suite | `npm test` | **548 tests: 547 passed, 1 pre-existing skip, 0 failed** |
+| Browser regression | `npm run test:browser` | **148 passed, 0 failed** |
+| Production build | `npm run build` | 28 pages; expected empty `proof` notice only |
+| Static validation | `npm run validate` | 1,990 internal links across 28 pages; SEO, homepage, marketing/QR, GTM and checklist checks passed |
+| Visual evidence | `docs/verification/6.8/` | Homepage/services desktop+mobile, corrected pricing badge, scripture, reveal/final estimate desktop+mobile, facility reveal/final, terms acceptance, terms page, gift page, footer verse |
+| Pricing | unchanged | no rate, formula, minimum, discount, calibration factor or travel assumption changed |
+| Transactional terms | server-enforced | missing/outdated acceptance rejected; current acceptance server-stamped and recorded in private R2 |
+| Payment reliability | preserved | 6.7 verified-only checkout, durable idempotency, webhook claims and cancellation/status pages retained |
+| Live payment / booking / gift sales | **not claimed** | no card charge, no calendar connection, no gift sale activation |
+
+Implemented:
+
+- Prices remain hidden while all preliminary estimate questions are answered (residential, STR and
+  both facility engines); the shared branded reveal plays only at the final stage, then resolves to
+  the full summary. Changing answers invalidates/recalculates the final result.
+- The owner-supplied **two-of-four** Competitive Pricing badge is installed in the white-tile
+  registry without changing the tile frame.
+- Homepage service cards use one equal-height CSS grid (1/2/3 columns); no masonry/column height
+  mismatch.
+- Reusable KJV scripture component with verified verses on the homepage, About, service pages,
+  Community Support, recurring, contact and footer. Register: `docs/design/SCRIPTURE-REGISTER.md`.
+- Unchecked-by-default transactional terms acceptance on all four estimators and the gift form.
+  Server validation, timestamp, version/policy id, acceptance id and private R2 record. Customer and
+  owner records include the accepted version.
+- Comprehensive public terms: booking/request distinction, Florida three-business-day continuing-
+  service cancellation right, cancellation/access/condition reassessment (no unapproved fee),
+  payments/refunds/chargebacks, damage/liability, safety, recurring, commercial/church, gift
+  certificates (no expiration/post-sale fees), privacy, disputes and versioning.
+- Research memorandum: `docs/legal/TERMS-RESEARCH.md` (primary sources, implications, uncertainties,
+  attorney-review gates).
+- Business timezone documented as `America/Chicago` in scheduling config and both scheduling forms.
+- Gift terms prohibit expiration and post-sale fees; sales remain disabled pending owner-approved
+  denominations, redemption ledger/fulfillment and legal review.
+
+Known residuals at this checkpoint:
+
+- **Live calendar booking is not implemented or connected.** No calendar authorization, existing job
+  schedule or crew roster exists, so no honest availability could be displayed. The site continues
+  to collect a preferred date as a request; it does not claim a confirmed slot. Setup/blockers:
+  `docs/launch/OWNER-INPUT-REQUIRED.md` B1–B6 and `docs/operations/BOOKING-ARCHITECTURE.md`.
+- **Gift sales remain disabled.** No owner-approved denominations were supplied, and the durable
+  issuance/redemption activation is not complete.
+- No new cancellation/reassessment fee was activated; the owner and a Florida-licensed attorney must
+  approve a written fee schedule before one can be published or charged.
+- No live Stripe card charge or test-mode transaction was performed in this initiative.
+- Deployment and production checks are recorded in the release closeout after the push.
+
+
 ## Verified — 2026-10-27 Initiative 6.7 payment reliability (local, pending deployment)
 
 **Baseline:** `820ad19`. The working tree contains the 6.7 payment-reliability changes; they are

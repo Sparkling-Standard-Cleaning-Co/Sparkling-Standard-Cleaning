@@ -111,17 +111,22 @@ for (const [label, width, height] of [
       );
       assert.ok(overflow <= 1, `no horizontal overflow (${overflow}px)`);
 
-      if (width >= 1024) {
-        const columns = await page
-          .locator('.service-list--photo')
-          .evaluate((el) => getComputedStyle(el).columnCount);
-        assert.equal(columns, '3', 'desktop services flow through three balanced columns');
-      } else {
-        const columns = await page
-          .locator('.service-list--photo')
-          .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
-        assert.equal(columns, 1, 'phones keep one service column');
-      }
+      const columns = await page
+        .locator('.service-list--photo')
+        .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+      assert.equal(columns, width >= 1024 ? 3 : 1, 'service cards use the intended balanced grid');
+      const rowsAligned = await page.locator('.service-list--photo').evaluate((el) => {
+        const rows = new Map();
+        for (const card of el.querySelectorAll('.service-card')) {
+          const rect = card.getBoundingClientRect();
+          const key = Math.round(rect.top);
+          const heights = rows.get(key) ?? [];
+          heights.push(Math.round(rect.height));
+          rows.set(key, heights);
+        }
+        return [...rows.values()].every((heights) => new Set(heights).size === 1);
+      });
+      assert.equal(rowsAligned, true, 'cards sharing a grid row have equal heights');
 
       const body = normalize((await page.textContent('body')) ?? '');
       assert.doesNotMatch(body, /Details We Notice|Detail proof|How it works/i);

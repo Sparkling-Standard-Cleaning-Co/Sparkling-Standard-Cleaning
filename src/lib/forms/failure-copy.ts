@@ -18,7 +18,10 @@ export type FailureReason =
   | 'spam_rejected'
   | 'verification_failed'
   | 'invalid_request'
-  | 'deep_clean_required';
+  | 'deep_clean_required'
+  | 'terms_required'
+  | 'terms_outdated'
+  | 'acceptance_storage_failed';
 
 export interface ContactFacts {
   /** Human-formatted phone, e.g. "(850) 426-8479". */
@@ -54,6 +57,12 @@ export function failureCopy(reason: FailureReason, contact: ContactFacts): strin
       return `Some of your details didn't come through. Please check the form and try again, or ${alternatives}.`;
     case 'deep_clean_required':
       return `A new recurring residential arrangement must begin with a Deep Cleaning. Please go back to the condition and frequency step and confirm the Deep Cleaning requirement, then send your request again.`;
+    case 'terms_required':
+      return `Please agree to the current Terms and Conditions and applicable Policies before sending your request.`;
+    case 'terms_outdated':
+      return `The terms changed while you were working. Please review the current Terms and Conditions and applicable Policies, then confirm your agreement again.`;
+    case 'acceptance_storage_failed':
+      return `We could not securely record your agreement just now, so your request was not sent. Please try again in a moment �?" your answers are still here �?" or ${alternatives}.`;
     case 'network_error':
       return `We could not reach the message service. Check your connection and try again, or ${alternatives}.`;
     case 'server_error':

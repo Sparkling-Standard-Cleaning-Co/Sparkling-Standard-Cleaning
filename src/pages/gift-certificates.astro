@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import Icon from '../components/Icon.astro';
+import TermsAcceptance from '../components/TermsAcceptance.astro';
 import { giftCertificateConfig } from '../config/gift-certificates';
 import { business, contactPhone, isPending } from '../config/business';
 import { brandWords } from '../config/brand';
@@ -204,6 +205,12 @@ const sampleCode = 'SSGC-SAMP-LE42';
             placeholder="A short note to include on the certificate."
           ></textarea>
         </div>
+        <TermsAcceptance id="gift-terms" />
+        <p class="small text-muted">
+          Gift certificate terms are part of our
+          <a href="/terms/#gift-certificates">Terms and Conditions</a>. Purchased certificates do not
+          expire and carry no post-sale service fee.
+        </p>
         <div class="honeypot" aria-hidden="true">
           <input
             id="gift-extra-ref"
@@ -242,9 +249,12 @@ const sampleCode = 'SSGC-SAMP-LE42';
         <div class="card card--muted">
           <p class="eyebrow mb-0">Terms status</p>
           <p class="card__text mt-2">
-            Final redemption terms, validity and refund wording are being reviewed by the owner
-            (including Florida and Alabama gift-certificate requirements) before public sales open.
-            Nothing on this page limits a recipient’s statutory rights.
+            Purchased certificates do not expire and carry no post-sale service, dormancy,
+            maintenance or cash-out fee. The owner is still approving the final denomination list,
+            automated delivery and redemption records before public sales open. The full
+            <a href="/terms/#gift-certificates">gift certificate terms</a> explain redemption,
+            balances and applicable unclaimed-property rules. Nothing on this page limits a
+            recipient&rsquo;s statutory rights.
           </p>
         </div>
         <div class="card">

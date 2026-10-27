@@ -31,6 +31,8 @@ import { US_STATES } from '../lib/location/location';
 import Icon from './Icon.astro';
 import TurnstileWidget from './TurnstileWidget.astro';
 import PhotoUploadSection from './PhotoUploadSection.astro';
+import EstimateReveal from './EstimateReveal.astro';
+import TermsAcceptance from './TermsAcceptance.astro';
 
 type FacilityEngine = 'commercial' | 'church';
 
@@ -129,12 +131,6 @@ const facilityStepDescriptions = church
   <div class="error-summary" data-error-summary hidden role="alert" tabindex="-1">
     <p class="error-summary__title" data-error-summary-title>Please review these details before sending:</p>
     <ul data-error-summary-list></ul>
-  </div>
-
-  <div class="estimate-result facility-form__result" data-facility-result hidden aria-live="polite">
-    <p class="estimate-result__label">Your request</p>
-    <p class="estimate-result__price" data-facility-result-title>Scope review</p>
-    <p class="estimate-result__note" data-facility-result-note></p>
   </div>
 
   <!-- 1. Facility & address -->
@@ -397,15 +393,6 @@ const facilityStepDescriptions = church
     </div>
   </section>
 
-  <div class="facility-estimate" data-facility-estimate hidden aria-live="polite">
-    <p class="facility-estimate__eyebrow" data-facility-estimate-label>Preliminary estimate</p>
-    <p class="facility-estimate__price" data-facility-estimate-price>—</p>
-    <p class="facility-estimate__range" data-facility-estimate-range hidden></p>
-    <ul class="summary-list facility-estimate__lines" data-facility-estimate-lines></ul>
-    <p class="facility-estimate__note" data-facility-estimate-note></p>
-    <p class="facility-estimate__tax small text-muted" data-facility-estimate-tax></p>
-  </div>
-
   <!-- 3. Schedule & access -->
   <section class="facility-form__section" data-facility-section="3" data-facility-step-panel="3" hidden>
     <h2 class="wizard__step-heading" tabindex="-1" data-facility-step-title>Schedule & access</h2>
@@ -414,7 +401,10 @@ const facilityStepDescriptions = church
       <div class="field">
         <label for="fac-start">Preferred start date</label>
         <input class="input" id="fac-start" name="preferred_date" type="date" />
-        <span class="hint">Requests can be made up to {schedulingConfig.advanceReservationDays} days in advance.</span>
+        <span class="hint">
+          Requests can be made up to {schedulingConfig.advanceReservationDays} days in advance.
+          Appointment times are {schedulingConfig.timeZoneLabel}.
+        </span>
       </div>
       <div class="field">
         <label for="fac-window">Service window</label>
@@ -446,6 +436,21 @@ const facilityStepDescriptions = church
   <section class="facility-form__section" data-facility-section="4" data-facility-step-panel="4" hidden>
     <h2 class="wizard__step-heading" tabindex="-1" data-facility-step-title>Contact & review</h2>
     <p class="small text-muted facility-step-description">{facilityStepDescriptions[3]}</p>
+
+    <EstimateReveal />
+    <div class="facility-estimate" data-facility-estimate hidden aria-live="polite">
+      <p class="facility-estimate__eyebrow" data-facility-estimate-label>Preliminary estimate</p>
+      <p class="facility-estimate__price" data-facility-estimate-price>—</p>
+      <p class="facility-estimate__range" data-facility-estimate-range hidden></p>
+      <ul class="summary-list facility-estimate__lines" data-facility-estimate-lines></ul>
+      <p class="facility-estimate__note" data-facility-estimate-note></p>
+      <p class="facility-estimate__tax small text-muted" data-facility-estimate-tax></p>
+    </div>
+    <div class="estimate-result facility-form__result" data-facility-result hidden aria-live="polite">
+      <p class="estimate-result__label">Your request</p>
+      <p class="estimate-result__price" data-facility-result-title>Scope review</p>
+      <p class="estimate-result__note" data-facility-result-note></p>
+    </div>
 
     {
       church && (
@@ -508,6 +513,7 @@ const facilityStepDescriptions = church
     </div>
 
     <PhotoUploadSection engine={engine} />
+    <TermsAcceptance id={`${engine}-terms`} />
     <TurnstileWidget />
     <div class="honeypot" aria-hidden="true">
       <input

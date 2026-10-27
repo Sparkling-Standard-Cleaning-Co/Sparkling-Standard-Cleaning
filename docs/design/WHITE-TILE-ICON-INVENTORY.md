@@ -36,7 +36,7 @@ renderer clips that margin at display time (`.premium-icon__image` scale
 | 09 | Locally Owned | Trust banner | 64 px | `src/components/TrustChips.astro` |
 | 10 | Christian Values | Trust banner | 64 px | `TrustChips` |
 | 11 | Flexible Scheduling | Trust banner | 64 px | `TrustChips` |
-| 12 | Competitive Pricing | Trust banner — exact four-dollar design | 67 px | `TrustChips` |
+| 12 | Competitive Pricing | Trust banner - two of four dollar signs selected | 67 px | `TrustChips` |
 | 13 | Seniors / 65+ | Community spotlight list; Community Support eligibility | 56 / 72 px | homepage + `supportive-home-cleaning.astro` |
 | 14 | First Responders | Community spotlight list; Community Support eligibility | 56 / 72 px | same |
 | 15 | Military Veterans | Community spotlight list; Community Support eligibility | 56 / 72 px | same |
@@ -47,8 +47,8 @@ The 2026-10-25 owner audit replaced two tiles without changing the 17-icon
 registry: **08** now carries clean reading glasses rather than a magnifier, and
 **17** carries a red/white/blue three-figure community mark. The 2026-10-26
 audit replaced **03** with a moving box and directional in/out arrows; the
-Competitive Pricing asset (**12**) was deliberately not changed. The replaced
-originals remain in the local master archive under `99-Archive-For-Review/`.
+Competitive Pricing asset (**12**) was replaced on 2026-10-27 with the
+owner-supplied two-of-four badge. The replaced originals remain in the local master archive under 99-Archive-For-Review/.
 The small footer “Read Our Reviews” action uses the matching **vector reading
 glasses** at 24 px; the old search/magnifier vector is removed.
 

@@ -7,6 +7,8 @@ import FaqItem from '../components/FaqItem.astro';
 import ServiceCard from '../components/ServiceCard.astro';
 import CtaBand from '../components/CtaBand.astro';
 import PremiumIcon from '../components/PremiumIcon.astro';
+import Scripture from '../components/Scripture.astro';
+import type { ScriptureId } from '../config/scriptures';
 import { serviceNode, breadcrumbNode, faqNode } from '../lib/schema';
 import { pricing } from '../config/pricing';
 import { replacePricingTokens } from '../lib/content/pricing-text';
@@ -34,6 +36,19 @@ const { entry } = Astro.props;
 const data = replacePricingTokens(entry.data);
 const { Content } = await render(entry);
 const churchDiscountPercent = pricing.churchDiscount.percent.value;
+
+const serviceScripture: ScriptureId =
+  entry.id === 'church-cleaning'
+    ? 'glory'
+    : entry.id === 'commercial-cleaning'
+      ? 'integrity'
+      : entry.id === 'short-term-rental-cleaning'
+        ? 'hospitality'
+        : entry.id === 'move-in-move-out-cleaning'
+          ? 'workmanship'
+          : entry.id === 'deep-cleaning'
+            ? 'excellence'
+            : 'service';
 
 const site = Astro.site ?? new URL('https://pending-website-url.invalid');
 const services = await getCollection('services');
@@ -250,6 +265,12 @@ const schema = [
       </section>
     )
   }
+
+  <section class="section section--tight" aria-label="A reflection on this work">
+    <div class="container">
+      <Scripture verse={serviceScripture} variant="panel" />
+    </div>
+  </section>
 
   <div class="container section section--tight">
     <CtaBand

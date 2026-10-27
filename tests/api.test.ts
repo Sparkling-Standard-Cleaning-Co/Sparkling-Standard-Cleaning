@@ -603,7 +603,15 @@ test('estimate checkout: configuration probe stays disabled without Stripe', asy
 
 test('estimate checkout: missing Stripe fails closed without charging', async () => {
   const response = await estimateCheckoutPost({
-    request: jsonRequest({ fields: { service_type: 'standard', quoted_price: '250' }, returnPath: '/estimate/residential/' }),
+    request: jsonRequest({
+      fields: {
+        service_type: 'standard',
+        quoted_price: '250',
+        terms_accepted: 'yes',
+        terms_version: '2026-10-27.terms.v1',
+      },
+      returnPath: '/estimate/residential/',
+    }),
     env: {},
   } as never);
   assert.equal(response.status, 503);

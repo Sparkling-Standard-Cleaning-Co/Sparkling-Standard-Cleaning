@@ -92,6 +92,9 @@ export async function waitForTurnstileToken(timeoutMs = 10_000): Promise<string 
 function relayFailureReason(status: number, error: string): FailureReason {
   if (error === 'verification_failed') return 'verification_failed';
   if (error === 'deep_clean_required') return 'deep_clean_required';
+  if (error === 'terms_required') return 'terms_required';
+  if (error === 'terms_outdated') return 'terms_outdated';
+  if (error === 'acceptance_storage_failed') return 'acceptance_storage_failed';
   if (error === 'spam_rejected' || status === 403) return 'spam_rejected';
   if (error === 'invalid_request' || status === 400 || status === 422) return 'invalid_request';
   return 'server_error';

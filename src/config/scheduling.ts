@@ -4,6 +4,14 @@
 
 export const schedulingConfig = {
   /**
+   * The business scheduling timezone. Every appointment time communicated to
+   * a customer is Central Time, including daylight-saving transitions. The
+   * future availability engine must calculate in this zone, not the visitor's.
+   */
+  timeZone: 'America/Chicago',
+  timeZoneLabel: 'Central Time',
+
+  /**
    * Customers may request a preferred cleaning date up to this many days
    * ahead. Owner-configurable; the estimator enforces it in the date picker
    * and the server discards out-of-window dates with a note (never silently

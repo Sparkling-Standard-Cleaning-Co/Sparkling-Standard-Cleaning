@@ -72,6 +72,7 @@ test('the gift page explains the offering and takes a request without charging',
     await page.fill('#gift-recipient-email', 'recipient@example.com');
     await page.fill('#gift-value', '100');
     await page.fill('#gift-message', 'Enjoy a beautifully kept home!');
+    await page.check('#gift-terms');
     await page.click('button[type="submit"]');
     await page.waitForSelector('[data-form-status][data-state="success"]', { timeout: 15000 });
 
@@ -107,6 +108,7 @@ test('a filled trap field blocks the gift request without sending', async () => 
     await page.fill('#gift-purchaser-email', 'purchaser@example.com');
     await page.fill('#gift-recipient-name', 'Synthetic Recipient');
     await page.fill('#gift-value', '100');
+    await page.check('#gift-terms');
     await page.evaluate(() => {
       const trap = document.querySelector('input[name="extra_ref"]');
       if (trap) trap.value = 'bot';

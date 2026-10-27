@@ -32,6 +32,7 @@ import type { Frequency } from '../../src/lib/estimate/types.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
 import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
 import { schedulingConfig } from '../../src/config/scheduling.ts';
+import { legalTerms } from '../../src/config/legal.ts';
 import {
   normalizePhotoEntries,
   photoKeysField,
@@ -58,6 +59,7 @@ interface R2ObjectLike {
 interface R2BucketLike {
   head?(key: string): Promise<unknown | null>;
   get?(key: string): Promise<R2ObjectLike | null>;
+  put?(key: string, value: string): Promise<unknown>;
 }
 interface Env extends QuoteVerificationEnv {
   WEB3FORMS_ACCESS_KEY?: string;
@@ -77,7 +79,7 @@ interface Env extends QuoteVerificationEnv {
 
 // The estimator sends structured scope + quote + attribution fields; the cap
 // stays bounded (a hard server-side limit) while fitting the full request.
-const MAX_FIELDS = 60;
+const MAX_FIELDS = 70;
 const MAX_VALUE_LENGTH = 2000;
 const MAX_SUBJECT_LENGTH = 200;
 const SAFE_KEY = /^[a-z0-9_]{1,40}$/i;
@@ -134,6 +136,10 @@ const SERVER_OWNED_KEYS = new Set([
   'ongoing_frequency',
   'photo_count',
   'photo_note',
+  'terms_accepted_at',
+  'policy_version',
+  'terms_acceptance_id',
+  'terms_record_status',
 ]);
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -166,6 +172,38 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   });
+}
+
+/**
+ * Persist the server-verified acceptance in the private customer bucket. The
+ * owner email still carries the same identifiers, but a durable record lets us
+ * prove which terms version was accepted even after delivery is gone.
+ */
+async function recordTermsAcceptance(
+  env: Env,
+  fields: Record<string, string>,
+  acceptedAt: string,
+  acceptanceId: string,
+): Promise<'durable' | 'email_record_only' | 'storage_failed'> {
+  if (!env.PHOTOS_BUCKET?.put) return 'email_record_only';
+  const day = acceptedAt.slice(0, 10);
+  const key = `legal/acceptances/${day}/${acceptanceId}.json`;
+  const record = {
+    acceptanceId,
+    acceptedAt,
+    termsVersion: fields.terms_version,
+    policyVersion: fields.policy_version,
+    requestType: fields.request_type ?? '',
+    quoteReference: fields.quote_reference ?? '',
+    email: fields.email ?? '',
+    serviceType: fields.service_type ?? '',
+  };
+  try {
+    await env.PHOTOS_BUCKET.put(key, JSON.stringify(record));
+    return 'durable';
+  } catch {
+    return 'storage_failed';
+  }
 }
 
 async function verifyTurnstile(secret: string, token: string, remoteIp: string | null): Promise<boolean> {
@@ -229,6 +267,37 @@ export async function onRequestPost(context: {
   // Require at least one contact channel.
   if (!clean.phone && !clean.email) {
     return json({ ok: false, error: 'invalid_request' }, 400);
+  }
+
+  // Owner requirement: a cleaning request or reservation must carry a
+  // server-verified acceptance of the current terms and applicable policies.
+  // Contact-form messages are not transactional and are exempt.
+  const transactionalRequest = new Set([
+    'reservation_request',
+    'residential_estimate',
+    'facility_estimate',
+  ]).has(clean.request_type ?? '');
+  if (transactionalRequest) {
+    if (clean.terms_accepted !== 'yes') {
+      return json({ ok: false, error: 'terms_required' }, 400);
+    }
+    if (clean.terms_version !== legalTerms.termsVersion) {
+      return json({ ok: false, error: 'terms_outdated' }, 400);
+    }
+    clean.terms_version = legalTerms.termsVersion;
+    clean.policy_version = legalTerms.policyVersion;
+    clean.terms_accepted_at = new Date().toISOString();
+    clean.terms_acceptance_id = crypto.randomUUID();
+    const recordStatus = await recordTermsAcceptance(
+      env,
+      clean,
+      clean.terms_accepted_at,
+      clean.terms_acceptance_id,
+    );
+    if (recordStatus === 'storage_failed') {
+      return json({ ok: false, error: 'acceptance_storage_failed' }, 503);
+    }
+    clean.terms_record_status = recordStatus;
   }
 
   // Sales-tax presentation: server-derived from the service type, never from

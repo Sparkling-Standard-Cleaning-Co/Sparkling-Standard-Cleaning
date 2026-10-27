@@ -159,6 +159,8 @@ function validFacilityInput(engine: 'commercial' | 'church' = 'commercial') {
       name: 'Synthetic Customer',
       organization: engine === 'church' ? 'Synthetic Church' : 'Synthetic Facility',
       phone: '8500000000',
+      terms_accepted: 'yes',
+      terms_version: '2026-10-27.terms.v1',
     },
   };
 }
@@ -421,6 +423,8 @@ function validResidentialInput(serviceType: 'standard' | 'str_turnover') {
       email: 'customer@example.test',
       name: 'Synthetic Customer',
       phone: '8500000000',
+      terms_accepted: 'yes',
+      terms_version: '2026-10-27.terms.v1',
     } as Record<string, string>,
   };
 }

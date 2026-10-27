@@ -168,6 +168,7 @@ async function fillAddressAndDetails(page) {
   await page.fill('#est-name', 'UX test (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
+  if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms');
 }
 
 test('no Google script loads and no event fires before an analytics choice', async () => {

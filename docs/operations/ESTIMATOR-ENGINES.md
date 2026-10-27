@@ -19,6 +19,14 @@
 > Community Support 10% eligibility discount, exact church-discount
 > reconciliation, two-decimal currency and tax disclosure are documented in
 > `ESTIMATE-CALCULATION-ORDER.md` and `TAX-TREATMENT.md`.
+>
+> **2026-10-27 (Initiative 6.8) update:** prices are no longer displayed while the customer answers
+> preliminary questions. The browser still calculates internally, but the live price, add-on dollar
+> amounts and "price so far" preview are hidden. On the final step the shared branded reveal plays
+> once and resolves into the full estimate/request summary. Changing an answer invalidates the prior
+> result and the next final visit recalculates/re-reveals. Facility numeric prices are likewise
+> confined to step 4. The underlying pricing mathematics, bundles, discounts, minimums, travel and
+> configuration versioning are unchanged.
 
 Initiative 6.0 restructured the customer estimate experience into **four
 specialized engines unified by one system**. This is the authoritative guide to

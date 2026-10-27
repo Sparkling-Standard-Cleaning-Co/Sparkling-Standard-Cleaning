@@ -2,14 +2,16 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import { business, contactPhone, isPending } from '../config/business';
+import { legalTerms } from '../config/legal';
 import { pricing } from '../config/pricing';
 import { breadcrumbNode } from '../lib/schema';
 
 // These terms describe the currently implemented model: requests (not instant
-// bookings), estimate ranges confirmed personally, optional exact-quote Pay Now or payment after service, and
-// the make-it-right policy. Cancellation percentages stay OUT of this page
-// until the owner approves final values (pricing.cancellation.ownerApproved).
-// Owner legal review is a launch blocker — see docs/launch/OWNER-INPUT-REQUIRED.md.
+// bookings), estimate ranges confirmed personally, optional exact-quote Pay Now
+// or payment after service, and the make-it-right policy. Cancellation and
+// reassessment fees remain OFF until the owner approves a written fee schedule;
+// no unapproved charge is enforced by the payment system.
+// Owner legal counsel review remains an explicit launch gate.
 
 const site = Astro.site ?? new URL('https://pending-website-url.invalid');
 const schema = [
@@ -25,7 +27,7 @@ const phone = contactPhone();
 
 <BaseLayout
   title="Terms of Service"
-  description="The terms for estimates, booking requests, scheduling, payment, cancellations and the make-it-right policy."
+  description="The terms for estimates, booking requests, scheduling, payment, cancellations, property condition, damage and the make-it-right policy."
   schema={schema}
 >
   <section class="section section--tight">
@@ -33,38 +35,65 @@ const phone = contactPhone();
       <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Terms', path: '/terms/' }]} />
       <h1 class="mt-4">Terms of service</h1>
       <p class="lead">
-        The rules of working together, written to be read — not to be survived.
+        Clear rules for working together, written to protect your home and our team.
       </p>
-      <p class="small text-muted">Last updated: October 21, 2026.</p>
+      <p class="small text-muted">
+        Version {legalTerms.termsVersion}. Last updated: October 27, 2026.
+      </p>
 
       <div class="prose stack mt-6">
+        <section>
+          <h2>Who these terms cover</h2>
+          <p>
+            These terms apply to estimates, cleaning requests, reservations, appointments and
+            payments involving <strong>{business.legalName}</strong>, doing business publicly as
+            <strong>{business.displayName}</strong>. By submitting a request, reserving a cleaning or
+            paying through this website, you agree to these terms and the policies linked in the
+            checkout or reservation acknowledgment.
+          </p>
+          <p>
+            If a signed service agreement or commercial proposal applies to your job, that document
+            controls where it conflicts with these website terms. No employee or representative may
+            orally waive a term unless the waiver is confirmed in writing by an authorized owner.
+          </p>
+        </section>
+
         <section>
           <h2>Estimates and requests</h2>
           <ul>
             <li>
-              The online estimate is an <strong>estimated range</strong>, not a guaranteed price.
-              Final scope, condition, access and unique circumstances can affect the final
+              The online estimate is a <strong>proposed estimate</strong>, not a guaranteed final
+              price. Final scope, condition, access and unique circumstances can affect the
               confirmed price.
             </li>
             <li>
               Submitting an estimate or request is a <strong>request, not a confirmed booking</strong>.
-              A booking exists only after Sparkling Standard confirms the scope, date and final price with
-              you.
+              A booking exists only after {business.displayName} confirms the scope, date and final
+              price with you.
             </li>
             <li>
-              If the property's condition differs materially from what was described, we may discuss
-              a revised price, adjust the scope to the agreed amount, or reschedule with a custom
-              quote — always discussed with you before work continues.
+              If the property's condition differs materially from what you described, we may discuss
+              a revised price, adjust the scope to the agreed amount, or stop and reschedule with a
+              revised quote. We will discuss the change with you before additional work continues.
+            </li>
+            <li>
+              We do not knowingly accept a request based on a property description we believe is
+              materially inaccurate. Honest mistakes are handled as a conversation, not an accusation.
             </li>
           </ul>
         </section>
 
         <section>
-          <h2>Scheduling and arrival windows</h2>
+          <h2>Booking and scheduling</h2>
           <ul>
             <li>
+              A request or temporary hold is not a confirmed appointment. We confirm the scope,
+              date, arrival window and price with you before the cleaning is placed on the schedule.
+            </li>
+            <li>
               The first appointment of the day can be scheduled for an exact arrival time. Later
-              appointments use an arrival window.
+              appointments use an arrival window so we can account for traffic, travel between jobs
+              and the honest duration of earlier work.
             </li>
             <li>
               We clean {business.hours.days.toLowerCase()}, between {business.hours.residentialWindow}.
@@ -72,7 +101,99 @@ const phone = contactPhone();
               during the walkthrough.
             </li>
             <li>A home takes as long as it honestly takes; we do not rush jobs to protect a clock.</li>
+            <li>
+              Appointment availability depends on existing confirmed jobs, travel time between
+              locations, crew capacity and the time required for your scope. A time displayed as a
+              request preference is not a guarantee until we confirm it.
+            </li>
           </ul>
+        </section>
+
+        <section id="cancellation-rescheduling">
+          <h2>Cancellations, rescheduling and access</h2>
+          <p>
+            We ask for at least {pricing.cancellation.noticeHours.value} hours' notice so the time
+            can be offered to someone else. To cancel or reschedule, contact us using the phone,
+            text, email or contact form listed on this website and keep the confirmation we send.
+          </p>
+          <p>
+            <strong>Your statutory cancellation right.</strong> For a contract for future consumer
+            services to be provided on a continuing basis, Florida law gives you the right to cancel
+            without penalty or obligation within <strong>three business days</strong> after you enter
+            the contract, and to a full refund of payments made. You may also cancel if a doctor
+            orders that you cannot physically receive the services, or if the services cease to be
+            offered as stated. If you cancel for either of those reasons, we may keep only the pro
+            rata portion of the price for services already used or completed, plus the cost of
+            related goods you consumed or retained. Refunds for a valid cancellation will be issued
+            within 20 days after we receive notice. This right is in addition to any other right you
+            have.
+          </p>
+          <ul>
+            <li>
+              <strong>No standard cancellation fee currently applies.</strong> If the owner later
+              approves a cancellation or late-rescheduling fee, it will be disclosed in writing, in a
+              clearly identified fee schedule, before you accept it, and will be limited to a
+              reasonable estimate of documented business loss. It will not be enforced during the
+              statutory three-business-day cancellation period.
+            </li>
+            <li>
+              Repeated cancellations, repeated access failures or abusive scheduling behavior may
+              lead to declining future bookings.
+            </li>
+            <li>
+              If access is unavailable, we will contact you to work out the next available option. We
+              do not retain customer physical keys; access uses an authorized temporary method or a
+              customer-controlled lockbox.
+            </li>
+            <li>
+              If you cancel after we have already traveled to the property or begun setting up, we
+              may discuss reimbursement of documented, reasonable travel and preparation costs. No
+              such charge is automatically collected by this website.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Property condition, scope and on-site reassessment</h2>
+          <p>
+            Our estimate depends on the accuracy of the information you provide — including square
+            footage, room counts, condition, buildup, pets, access, photos and the presence of
+            specialty conditions. If the actual conditions are materially different, we may need to
+            reassess before work begins.
+          </p>
+          <p>
+            An on-site reassessment is not a punishment and is not automatically a fee. It is a
+            documented review of the actual scope. After reassessment, we may:
+          </p>
+          <ul>
+            <li>confirm the original scope and price;</li>
+            <li>offer a revised written quote for your approval;</li>
+            <li>adjust the scope to fit the agreed amount;</li>
+            <li>reschedule the work; or</li>
+            <li>decline unsafe, hazardous or specialist work.</li>
+          </ul>
+          <p>
+            We will not charge more than the amount you approved. If you decline a necessary revised
+            scope before work begins, either party may decline to proceed. Any cancellation or
+            reassessment fee would apply only if it was disclosed and accepted in advance, and only
+            to the extent it is a reasonable estimate of documented business loss. No such fee is
+            currently enabled on this website.
+          </p>
+        </section>
+
+        <section>
+          <h2>Failed access and wasted appointments</h2>
+          <p>
+            Please provide working entry instructions, gate codes, parking information and any
+            building requirements before the appointment. If we cannot access the property, if the
+            authorized contact is unavailable when presence is required, or if access is withdrawn
+            after we arrive, we will attempt to contact you and document the visit.
+          </p>
+          <p>
+            Where a disclosed and accepted fee schedule applies, a failed-access charge may be based
+            on documented travel and allocated labor costs. No automatic failed-access fee is
+            currently collected through this website.
+          </p>
         </section>
 
         <section>
@@ -86,16 +207,28 @@ const phone = contactPhone();
               The initial Deep Cleaning is scoped and priced separately; recurring visits begin after
               it is complete.
             </li>
+            <li>
+              Recurring frequency, scope and pricing may be adjusted when the condition of the home,
+              the scope or the number of visits changes. We will discuss a change with you before it
+              takes effect.
+            </li>
+            <li>
+              Skipped or paused visits do not automatically create a credit, and recurring service is
+              not an automatic-renewal card charge. Payment authorization is handled separately and
+              only as disclosed. A recurring arrangement may be ended with the notice stated in your
+              confirmed plan or, where no period is stated, with reasonable written notice.
+            </li>
           </ul>
         </section>
 
         <section>
-          <h2>Payment</h2>
+          <h2>Payment, Pay Now and refunds</h2>
           <ul>
             <li>
               You may pay an exact estimate securely through Stripe when Pay Now is offered, or
               submit a reservation request without paying upfront. Pay Now does not by itself confirm
-              the date or final scope. Commercial cleaning is invoiced monthly with Net 15 terms.
+              the date or final scope. Commercial cleaning is invoiced monthly with Net 15 terms
+              unless a written proposal says otherwise.
             </li>
             <li>
               No standard deposit or late fee applies initially. If the personally confirmed scope
@@ -106,24 +239,19 @@ const phone = contactPhone();
               Accepted methods include {business.payments.accepted.join(', ')}, plus{' '}
               {business.payments.alternate.join(', ')}.
             </li>
-          </ul>
-        </section>
-
-        <section>
-          <h2>Cancellations, rescheduling and access</h2>
-          <ul>
             <li>
-              We ask for at least {pricing.cancellation.noticeHours.value} hours' notice so the time
-              can be offered to someone else.
+              If a prepaid service is canceled, any refund is calculated under the applicable
+              cancellation right and the work actually performed. A refund is not a penalty or an
+              admission of fault. We will not keep money for work we did not perform.
             </li>
             <li>
-              No standard cancellation fee applies initially. Repeated cancellations or access
-              problems may lead to declining future bookings.
+              If you believe a charge is wrong, contact us first so we can investigate. We will not
+              retaliate against a customer for exercising a legitimate cardholder dispute right.
             </li>
             <li>
-              If access is unavailable, we will contact you to work out the next available option.
-              We do not retain customer physical keys; access uses an authorized temporary method or
-              a customer-controlled lockbox.
+              Overpayments and duplicate payments are refunded or credited after verification. Do not
+              send payment to an account or link that did not come from an authorized Sparkling
+              Standard communication.
             </li>
           </ul>
         </section>
@@ -134,55 +262,132 @@ const phone = contactPhone();
           <p>
             This applies to items within the agreed cleaning scope. It does not extend to unrelated
             work, restoration, repair, or conditions outside the scope, and it is not an
-            unconditional refund promise.
+            unconditional refund promise. Report a concern within <strong>seven days</strong> of the
+            cleaning so we can inspect the affected area and make it right.
           </p>
         </section>
 
         <section>
-          <h2>What we do not take on</h2>
+          <h2>Property, damage and liability</h2>
           <p>
-            Post-construction cleaning is not offered. Specialist and hazardous situations —
-            including biohazards, sharps, crime scenes, severe hoarding, mold remediation, serious
-            infestations, fire restoration, hazardous chemical remediation and unsafe height work —
-            require certified specialist providers and are outside our scope. If a job requires a
-            specialist, we will say so directly.
+            We work carefully and treat every home with respect. You are responsible for telling us
+            about fragile, antique, improperly secured, damaged or unusually delicate items and
+            surfaces before work begins, and for securing cash, jewelry, firearms, medications and
+            other valuables. Please remove or secure items you do not want our team to handle.
+          </p>
+          <p>
+            We are responsible for damage caused by our own negligent work within the agreed scope.
+            We are not responsible for pre-existing damage, ordinary wear, improperly installed
+            fixtures, damage caused by defective products you supplied, or conditions we could not
+            reasonably see or access. This is not a waiver of liability for our own negligence.
+          </p>
+          <p>
+            If you believe we damaged something, tell us promptly — preferably within seven days —
+            and preserve the item and any photos. We will investigate, document the claim and work
+            toward a fair resolution. Insurance and written service agreements may affect how a
+            claim is handled. Nothing in these terms limits a right that cannot legally be limited.
           </p>
         </section>
 
         <section>
-          <h2>Pets</h2>
+          <h2>Health, safety and unsafe work</h2>
           <p>
-            Pets are welcome. If an animal creates a safety risk or prevents the work from being
-            done properly, we will ask that it be secured during the visit.
+            We do not perform biohazard remediation, sharps cleanup, crime-scene cleanup, severe
+            hoarding, mold remediation, fire restoration, hazardous chemical remediation or unsafe
+            height work. We may stop work immediately if conditions are unsafe, threatening,
+            infested, structurally unsound, or outside the agreed scope. If a specialist is needed,
+            we will say so directly.
+          </p>
+          <p>
+            Please secure aggressive or uncontrolled animals before the visit. Pets are welcome when
+            they are safe and do not prevent the work from being done properly. Harassment,
+            threats or unsafe conduct toward our team ends the appointment.
           </p>
         </section>
 
         <section>
-          <h2>Photos and marketing</h2>
+          <h2>Commercial and church services</h2>
           <p>
-            Completion photos may be taken for quality and documentation. We obtain written consent
-            before publishing identifiable photos or video of your property. Approved marketing
-            material is stored securely and retained only as long as needed for the permitted use.
-            Photos are never used in a way that exposes identifying or private information.
+            Commercial and church scopes are confirmed through a walkthrough or a written proposal.
+            The proposal identifies included areas, excluded areas, service frequency, access,
+            supplies, equipment, facility contacts and invoicing terms. Additional work requires
+            authorization. Either party may terminate a recurring commercial arrangement as stated
+            in the written proposal. The church discount applies only to eligible cleaning and does
+            not create a charitable donation or tithe.
+          </p>
+        </section>
+
+        <section id="gift-certificates">
+          <h2>Gift certificates</h2>
+          <p>
+            A purchased Sparkling Standard gift certificate is a prepaid service credit, not cash and
+            not a bank card. Gift certificate sales are disabled on this website until the owner
+            approves the denominations, fulfillment and written gift terms. When enabled, the
+            following rules will apply:
+          </p>
+          <ul>
+            <li>
+              A purchased gift certificate will not expire, and no post-sale service, dormancy,
+              maintenance or cash-out fee will be charged, consistent with Florida law.
+            </li>
+            <li>
+              The certificate's value is applied to the agreed price of the recipient's cleaning. It
+              does not promise that a stated amount covers an entire cleaning.
+            </li>
+            <li>
+              The recipient should contact us before booking so we can verify the code and remaining
+              balance. A certificate cannot be redeemed twice, and it is not redeemable for cash except
+              where required by law.
+            </li>
+            <li>
+              Promotional or complimentary certificates are separate from purchased certificates and
+              will state their own terms clearly.
+            </li>
+            <li>
+              Lost or stolen certificate codes should be reported promptly so we can investigate and,
+              where appropriate, reissue a replacement after verification.
+            </li>
+            <li>
+              Unredeemed purchased certificates may be subject to applicable unclaimed-property rules.
+              We do not impose an expiration date or service fee to avoid that obligation.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Privacy and communications</h2>
+          <p>
+            Our <a href="/privacy/">Privacy Policy</a> explains what we collect, why, how long we keep
+            it and how to ask us to delete it. By submitting a request or accepting these terms, you
+            agree that we may contact you about that request using the phone number or email you
+            provided. We do not sell your personal information or send your form contents to
+            analytics.
           </p>
         </section>
 
         <section>
-          <h2>Liability</h2>
+          <h2>Questions, complaints and disputes</h2>
           <p>
-            We work carefully and treat every home with respect. If something within the agreed
-            scope is missed or damaged through our work, contact us promptly and we will work
-            quickly to address the affected work within that scope. This is a plain-language
-            service commitment, not a separate guarantee, insurance policy, or waiver. Where a
-            signed service agreement applies, that agreement controls.
+            Please contact us first so we have a chance to resolve the issue. We will review the
+            facts, respond in writing where appropriate and try to reach a fair resolution. These
+            terms are governed by Florida law. Any dispute that cannot be resolved may be brought in
+            a court of competent jurisdiction serving Escambia County, Florida, except where a
+            consumer protection law gives you a non-waivable right to another forum. Each provision
+            stands on its own; if one is unenforceable, the rest remains in effect.
+          </p>
+          <p>
+            These terms do not create an arbitration agreement, a class-action waiver, or a waiver of
+            any right that cannot lawfully be waived. No provision should be read as a penalty or as
+            an attempt to collect an undisclosed charge.
           </p>
         </section>
 
         <section>
-          <h2>Changes</h2>
+          <h2>Changes and versions</h2>
           <p>
-            We may update these terms. The version in effect for your booking is the one confirmed
-            with you before your cleaning.
+            We may update these terms. The version in effect for your request is the version you
+            accepted, and that version identifier is recorded with your request. A later version does
+            not retroactively change what you accepted unless you agree to it.
           </p>
         </section>
 

@@ -329,6 +329,7 @@ test('Pay Now appears only for an exact Tier A facility quote when Stripe is con
     assert.match(normalize((await page.locator('[data-facility-pay-note]').innerText()) ?? ''), /without paying upfront/);
     await page.fill('#fac-phone', '8500000000');
     await page.fill('#fac-email', 'customer@example.test');
+    await page.check('#commercial-terms');
     await page.locator('[data-facility-pay-now]').click();
     await page.waitForFunction(() => document.querySelector('[data-facility-pay-now]')?.getAttribute('aria-busy') === 'true');
     assert.equal(await page.locator('[data-facility-pay-now]').isDisabled(), true);

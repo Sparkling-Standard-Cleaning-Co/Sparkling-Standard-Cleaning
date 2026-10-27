@@ -12,6 +12,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import Checklist from '../components/Checklist.astro';
 import CtaBand from '../components/CtaBand.astro';
+import Scripture from '../components/Scripture.astro';
 import { serviceNode, breadcrumbNode } from '../lib/schema';
 
 const entry = await getEntry('services', 'recurring-cleaning');
@@ -92,6 +93,12 @@ const schema = [
       </section>
     )
   }
+
+  <section class="section section--tight" aria-label="A reflection on faithful work">
+    <div class="container">
+      <Scripture verse="work" variant="panel" />
+    </div>
+  </section>
 
   <div class="container section section--tight">
     <CtaBand

@@ -15,6 +15,13 @@ export const giftCertificateConfig = {
   /** Public sales gate. Keep false until the owner has approved everything. */
   enabled: false,
 
+  /** Purchased certificates never expire and carry no post-sale fee. */
+  noExpiration: true,
+  noPostSaleFees: true,
+
+  /** Sales activation still requires an approved denomination list and terms. */
+  termsVersion: '2026-10-27.terms.v1',
+
   /**
    * Owner-approved monetary denominations (USD). EMPTY = not approved yet.
    * The purchase UI only offers values listed here; a client-supplied amount

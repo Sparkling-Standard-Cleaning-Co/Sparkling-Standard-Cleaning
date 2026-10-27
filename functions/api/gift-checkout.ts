@@ -13,6 +13,7 @@
 // Responses: 200 { ok, url } | 400 | 403 not_enabled | 405 | 429 | 502 | 503
 
 import { giftCertificateConfig } from '../../src/config/gift-certificates.ts';
+import { legalTerms } from '../../src/config/legal.ts';
 
 interface Env {
   STRIPE_SECRET_KEY?: string;
@@ -86,6 +87,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     payload = (await request.json()) as Record<string, unknown>;
   } catch {
     return json({ ok: false, error: 'invalid_request' }, 400);
+  }
+
+  if (payload.termsAccepted !== true || payload.termsVersion !== legalTerms.termsVersion) {
+    return json({ ok: false, error: 'terms_required' }, 400);
   }
 
   const purchaserName = cleanText(payload.purchaserName, MAX_NAME);

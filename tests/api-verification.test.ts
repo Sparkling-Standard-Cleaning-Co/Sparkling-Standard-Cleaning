@@ -61,6 +61,8 @@ const reservationFields = (overrides: Record<string, string> = {}) => ({
   // A hostile client claiming its own verification result:
   quote_verified: 'match',
   verified_price: '1',
+  terms_accepted: 'yes',
+  terms_version: '2026-10-27.terms.v1',
   ...overrides,
 });
 

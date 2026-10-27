@@ -10,6 +10,7 @@ import Checklist from '../components/Checklist.astro';
 import Reviews from '../components/Reviews.astro';
 import Icon from '../components/Icon.astro';
 import PremiumIcon from '../components/PremiumIcon.astro';
+import Scripture from '../components/Scripture.astro';
 import { breadcrumbNode } from '../lib/schema';
 import { homepageServicePaths } from '../lib/site';
 import type { ImageMetadata } from 'astro';
@@ -202,6 +203,12 @@ const communityIcons = [
     </div>
   </section>
 
+  <section class="section section--tight" aria-label="A reflection on stewardship">
+    <div class="container">
+      <Scripture verse="stewardship" variant="panel" />
+    </div>
+  </section>
+
   {
     data.communityBand && (
       <section class="section community-support" aria-labelledby="community-support-heading">
@@ -316,6 +323,12 @@ const communityIcons = [
           See Our Service Area <Icon name="arrow-right" size={16} />
         </a>
       </div>
+    </div>
+  </section>
+
+  <section class="section section--tight" aria-label="A reflection on faithful work">
+    <div class="container">
+      <Scripture verse="work" />
     </div>
   </section>
 
