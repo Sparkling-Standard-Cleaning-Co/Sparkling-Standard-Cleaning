@@ -81,10 +81,11 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   with the private `TRAVEL_ORIGIN` configured in Cloudflare; Web3Forms lead delivery (owner-
   confirmed); Cloudflare Turnstile optional; **GA4 analytics owner-confirmed operational**
   (`GTM-KSQ26HMG` / `G-LG222LQRQ2`; owner reports GTM Version 5, earlier Version 3 receipt of all
-  three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); eight confirmed
+  three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now code deployed but disabled until the owner configures runtime secrets; eight confirmed
   social profiles rendering (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release:** **Initiative 6.5** is live at `298c1df` (Cloudflare Pages deployment `f9b4f61a-58d1-4ff3-8535-c375af8789fc`; GitHub `validate`, `browser` and Cloudflare checks passed; documentation closeout follows). It makes routine estimator configuration owner-editable without test or quote-version edits: central hard/warning validation, a `config:validate` pre-build gate that blocks invalid Cloudflare deployments, automatic deterministic effective-pricing fingerprinting, configuration-derived tests, fixed-reference arithmetic tests and a four-engine pricing impact report. All four calibration factors remain `1.00`; no pricing rate, formula, minimum, discount or travel assumption was repriced. Production `/api/photo-upload` remains `enabled:true`; R2/HEIC uploads, Resend owner attachments and owner inbox receipt remain confirmed.
+- **Current release:** **Initiative 6.6** is live at `0b907d4` (Cloudflare Pages deployment `26e3b9f8-7665-426f-8687-7f171588c865`; GitHub `validate`, `browser` and Cloudflare checks passed). It completes the 13-page owner audit: approved homepage/Community Support/Deep Cleaning/Service Area copy, four-column value strip and relocated KJV verses, move-in/out icon, FL/AL state restriction with Georgia coming soon, GPS loading and exact address-failure copy, optional facility ZIP after a confirmed location, centered facility intros, human-readable drive times, and three owner-approved add-on bundles. A server-verified Stripe Pay Now path is implemented for exact residential/STR and Tier A facility quotes; it is hidden in production until the owner configures `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`. Custom/range quotes remain reservation-only. Private legal records were organized in the master archive.
+- **Prior Initiative 6.5:** live at `298c1df` (deployment `f9b4f61a-58d1-4ff3-8535-c375af8789fc`); automatic estimator configuration, validation gate, pricing fingerprint and four-engine impact report remain intact; all calibration factors remain `1.00`.
 - **Prior Initiative 6.4:** live at `685031d` (deployment `f9dea1a0-5b55-4cd8-b09e-18efae73c68a`); the 18-county map, reading-glasses/red-white-blue icons, footer/navigation/copy corrections and four `1.00` calibration factors remain intact.
 - **Prior release status:** the 2026-10-03 release was **deployed to production** — `origin/main` =
   `62a1a46` (the five-commit release `8b8dde4`/`03d6ba8`/`53a85aa`/`0f3c38c`/`5a4a024`, the
@@ -621,8 +622,9 @@ collections are intentionally empty — not errors.
   Instagram verification, the deferred
   YouTube channel (Google Workspace eligibility), Umami website ID, final cancellation
   percentages, marketing-launch approvals (M2–M7; M1 deployed 2026-10-03), the Resend
-  customer-email setup (`RESEND_API_KEY` + sender-domain verification — `DEPLOYMENT.md` §4a) and
-  any marketing claim not yet supplied. (Google Business Profile is **verified with its profile +
+  customer-email setup (`RESEND_API_KEY` + sender-domain verification, DEPLOYMENT.md section 4a),
+  Stripe Pay Now runtime secrets and a test-mode checkout (`STRIPE_SECRET_KEY`,
+  `STRIPE_WEBHOOK_SECRET`) and any marketing claim not yet supplied. (Google Business Profile is **verified with its profile +
   review links captured**, owner-supplied 2026-10-08.)
 - Current platform details: `docs/operations/PLATFORM-STATUS.md`. Owner checklist:
   `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals are grouped there as M2–M7).

@@ -3,8 +3,9 @@
 **Baseline:** `main` at `5d8cd44` (Initiative 6.5 documentation closeout), clean working tree.
 **Audit source:** `sswebsiteaudit.docx` (13 pages, 2026-10-26), extracted into
 `%TEMP%\opencode\ss66\docx\`.
-**Status:** implemented and verified locally; deployment recorded in
-`docs/verification/VERIFICATION.md` after the authorized push.
+**Status:** implemented, verified and deployed at `0b907d4` (Cloudflare Pages
+`26e3b9f8-7665-426f-8687-7f171588c865`). Pay Now is hidden in production until the owner
+configures the Stripe runtime secrets.
 
 ## Owner-directed changes
 
@@ -63,8 +64,25 @@
 
 ## Known residuals
 
-- Live Stripe checkout/webhook receipt is unverified until the owner supplies test/live secrets and
-  a test-mode payment is completed.
+- Pay Now is disabled in production until the owner supplies Stripe runtime secrets and completes a
+  test-mode checkout; live card processing/webhook receipt is therefore unverified.
 - The master-folder legal archive is private and intentionally outside Git; this repository records
   only that it exists.
 - Visual evidence is from the local production build, not a physical mobile device.
+
+## Production verification
+
+- Homepage: Our Values, new CTA, Galatians 5:13, Colossians 3:23 and the updated Community Support
+  cards are live; Southern Hospitality/Bible Belt are absent.
+- Deep Cleaning: **What a Deep Clean Is** is live; the removed scope-exclusion and “Prefer to ask
+  first?” sections are absent.
+- Service Area: **care and consideration** is live; the audited coverage/map claims are absent.
+- Residential estimate: the new sidebar is live; “Custom confirmation required” is absent.
+- Payment success: 200 with `noindex, nofollow`; absent from the 21-URL sitemap.
+- Photo intake: `/api/photo-upload` still returns `enabled:true`.
+- Pay Now: `/api/estimate-checkout` returns `{ ok:true, enabled:false }` because no Stripe runtime
+  secret is configured. The reservation-without-payment path is live.
+
+**Remaining owner action:** add `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` in Cloudflare,
+configure the `checkout.session.completed` webhook, and run a Stripe test-mode checkout before
+claiming live online payments.

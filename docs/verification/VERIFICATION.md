@@ -3,10 +3,12 @@
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
-## Verified — 2026-10-27 Initiative 6.6 owner audit (local pre-deployment)
+## Verified — 2026-10-27 Initiative 6.6 production deployment
 
-**Baseline:** `main` at `5d8cd44`, clean tree. **Audit:** the 13-page `sswebsiteaudit.docx`.
-The full change table and evidence are in `docs/verification/6.6/README.md`.
+**Live branch/commit:** `main` at `0b907d4`. **Cloudflare Pages deployment:**
+`26e3b9f8-7665-426f-8687-7f171588c865`. GitHub `validate`, `browser` and Cloudflare
+Pages checks all completed successfully. **Baseline:** `5d8cd44`. **Audit:** the 13-page
+`sswebsiteaudit.docx`. Full change table and screenshots: `docs/verification/6.6/README.md`.
 
 Implemented: homepage value/banner/verse/CTA corrections; the approved Our Values and Community
 Support copy; Deep Cleaning and Move-in/Move-out scope changes; the move-in/out icon; FL/AL-only
@@ -31,10 +33,26 @@ records were organized in the master archive, not this repository.
 | Pricing impact | `npm run pricing:impact` | four factors `1.00`; bundle savings shown; no base price change |
 | Visual evidence | `docs/verification/6.6/` | desktop/mobile review completed |
 
-**Known residuals:** live Stripe card payment and webhook receipt are not verified (no local or
-production secret was used); the owner must configure `STRIPE_SECRET_KEY` and
-`STRIPE_WEBHOOK_SECRET` and run a test-mode checkout. No live lead or payment was submitted for
-this release. Deployment details follow the authorized push.
+### Production live verification
+
+| Check | Result |
+| --- | --- |
+| Live routes | Homepage, `/deep-cleaning/`, `/service-area/` and `/estimate/payment-success/` return 200 |
+| Homepage copy | **Our Values**, **Is your space ready to sparkle?**, Galatians 5:13, Colossians 3:23 and “Those with Disabilities” present; Southern Hospitality/Bible Belt absent |
+| Deep Cleaning | **What a Deep Clean Is** present; the removed scope/'Prefer to ask first?'/'Anyone who wants to see' blocks are absent |
+| Service Area | **care and consideration** present; the audited map/coverage claims absent |
+| Residential estimate | “No two homes are the same” present; old “Custom confirmation required” absent |
+| Payment success page | 200 with `noindex, nofollow`; excluded from the 21-URL sitemap |
+| Photo intake | `/api/photo-upload` returns `enabled:true` |
+| Pay Now configuration | `/api/estimate-checkout` returns `{ok:true,enabled:false}` because the Stripe runtime secret is not configured; the reservation path remains live |
+| GitHub / Cloudflare | `validate`, `browser` and Cloudflare Pages checks passed |
+
+**Known residuals:** Pay Now is implemented and verified locally but **not live**: production has no
+`STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`, so the button is honestly hidden and the configuration
+probe reports disabled. The owner must add both Cloudflare secrets and complete a Stripe test-mode
+checkout before claiming live online payment. No live card charge or live lead submission was made.
+GTM Version 5 church/promotion event receipt still needs DebugView/Realtime confirmation. The
+private legal archive is outside Git.
 
 ## Verified — 2026-10-26 Initiative 6.5 production deployment
 
