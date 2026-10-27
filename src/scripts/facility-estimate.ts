@@ -82,9 +82,15 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   let latestWorkload: FacilityWorkload | null = null;
   let latestPrice: FacilityPrice | null = null;
   let paymentEnabled = false;
+  let paymentBusy = false;
+  let paymentBlocked = false;
+  let pendingPaymentFields: Record<string, string> | null = null;
+  let acceptedPaymentAmount: number | null = null;
+  let paymentRetryAvailable = false;
   let startTracked = false;
   let travel: RoutedTravel | null = null;
   let travelKey = '';
+  let finder: ReturnType<typeof initAddressFinder> = null;
 
   const phone = contactPhone();
   const contact = {
@@ -99,15 +105,41 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     status.textContent = message;
   }
 
+  function payNowLabel(): string {
+    if (acceptedPaymentAmount !== null) return `Pay ${formatUsd(acceptedPaymentAmount)} Securely`;
+    return paymentRetryAvailable ? 'Try Secure Payment Again' : 'Pay Now Securely';
+  }
+
+  function setPayNowBusy(busy: boolean): void {
+    paymentBusy = busy;
+    if (!payNowButton) return;
+    payNowButton.disabled = busy;
+    payNowButton.setAttribute('aria-busy', busy ? 'true' : 'false');
+    payNowButton.textContent = busy ? 'Preparing Secure Checkout...' : payNowLabel();
+  }
+
   function syncFacilityPayment(): void {
     if (!payNowButton) return;
+    const submitted = finder?.getSubmission();
     const payable =
       numericEstimatesEnabled &&
       paymentEnabled &&
+      !paymentBlocked &&
       currentStep === stepPanels.length &&
       latestPrice?.priced === true &&
-      latestPrice.tier === 'A';
+      latestPrice.tier === 'A' &&
+      travel?.verified === true &&
+      Boolean(submitted?.location) &&
+      (submitted?.street.trim().length ?? 0) >= 5 &&
+      submitted?.location?.precision !== 'street' &&
+      submitted?.location?.precision !== 'approximate';
     payNowButton.hidden = !payable;
+    if (!payable) {
+      payNowButton.setAttribute('aria-busy', 'false');
+      payNowButton.textContent = payNowLabel();
+    } else if (!paymentBusy) {
+      payNowButton.textContent = payNowLabel();
+    }
     if (payNowNote) payNowNote.hidden = !payable;
   }
 
@@ -401,7 +433,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     if (name) clearFieldError(name);
   });
   showStep(1, false);
-  const finder = initAddressFinder({
+  finder = initAddressFinder({
     form: host,
     onChange: (location) => {
       travel = null;
@@ -654,7 +686,19 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     void handleSubmit();
   });
 
-  async function startSecurePayment(fields: Record<string, string>): Promise<boolean> {
+  interface StartPaymentResult {
+    ok: boolean;
+    error?: string;
+    reason?: string;
+    amount?: number;
+    quotedAmount?: number;
+    reference?: string;
+  }
+
+  async function startSecurePayment(
+    fields: Record<string, string>,
+    acceptedAmount: number | null = null,
+  ): Promise<StartPaymentResult> {
     try {
       const response = await fetch('/api/estimate-checkout', {
         method: 'POST',
@@ -663,17 +707,106 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
           fields,
           returnPath:
             facilityEngine === 'church' ? '/estimate/church/' : '/estimate/commercial/',
+          ...(acceptedAmount !== null ? { acceptRecalculated: true, acceptedAmount } : {}),
         }),
       });
-      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; url?: string };
-      if (!response.ok || !data.ok || !data.url) return false;
-      window.location.assign(data.url);
-      return true;
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        url?: string;
+        error?: string;
+        reason?: string;
+        amount?: number;
+        quotedAmount?: number;
+        reference?: string;
+      };
+      if (response.ok && data.ok && data.url) {
+        window.location.assign(data.url);
+        return { ok: true };
+      }
+      if (data.error) console.warn('[secure-checkout]', data.error, data.reason ?? '');
+      return {
+        ok: false,
+        ...(data.error ? { error: data.error } : {}),
+        ...(data.reason ? { reason: data.reason } : {}),
+        ...(typeof data.amount === 'number' ? { amount: data.amount } : {}),
+        ...(typeof data.quotedAmount === 'number' ? { quotedAmount: data.quotedAmount } : {}),
+        ...(data.reference ? { reference: data.reference } : {}),
+      };
     } catch {
-      return false;
+      console.warn('[secure-checkout] network_unavailable');
+      return { ok: false, error: 'network_unavailable' };
     }
   }
+
+  function markRequestReceived(): void {
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = 'Request Received';
+    }
+  }
+
+  function handlePaymentFailure(failure: StartPaymentResult): void {
+    if (
+      failure.error === 'quote_changed' &&
+      typeof failure.amount === 'number' &&
+      Number.isFinite(failure.amount) &&
+      failure.amount > 0
+    ) {
+      acceptedPaymentAmount = failure.amount;
+      paymentRetryAvailable = false;
+      markRequestReceived();
+      setPayNowBusy(false);
+      syncFacilityPayment();
+      setStatus(
+        'info',
+        'The secure total is now ' +
+          formatUsd(failure.amount) +
+          '. Click Pay ' +
+          formatUsd(failure.amount) +
+          ' Securely to approve the recalculated total. No charge has been made.',
+      );
+      return;
+    }
+    if (
+      failure.error === 'quote_not_payable' ||
+      failure.error === 'payment_not_ready' ||
+      failure.error === 'email_required'
+    ) {
+      paymentBlocked = true;
+      acceptedPaymentAmount = null;
+      paymentRetryAvailable = false;
+      markRequestReceived();
+      setPayNowBusy(false);
+      syncFacilityPayment();
+      setStatus(
+        'error',
+        'Your request was received, but secure payment is not available for this estimate. Sparkling Standard will confirm the price and payment options with you. No payment has been taken by this website.',
+      );
+      return;
+    }
+    paymentRetryAvailable = true;
+    markRequestReceived();
+    setPayNowBusy(false);
+    syncFacilityPayment();
+    setStatus(
+      'error',
+      'Your request was received, but secure checkout could not start right now. You can try payment again, or arrange payment when we confirm your appointment. No payment has been taken by this website.',
+    );
+  }
+
+  async function retryPendingPayment(): Promise<void> {
+    if (!pendingPaymentFields || paymentBusy) return;
+    setPayNowBusy(true);
+    setStatus('info', 'Opening secure checkout...');
+    const started = await startSecurePayment(pendingPaymentFields, acceptedPaymentAmount);
+    if (!started.ok) handlePaymentFailure(started);
+  }
+
   async function handleSubmit(paymentChoice: 'reserve' | 'pay_now' = 'reserve'): Promise<void> {
+    if (paymentChoice === 'pay_now' && pendingPaymentFields) {
+      await retryPendingPayment();
+      return;
+    }
     const invalid = validateAllSteps();
     if (invalid) {
       maxVisitedStep = Math.max(maxVisitedStep, invalid.step);
@@ -807,8 +940,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     }
 
     if (submitButton) submitButton.disabled = true;
-    if (payNowButton) payNowButton.disabled = true;
-    setStatus('info', 'Sending your request…');
+    if (paymentChoice === 'pay_now') setPayNowBusy(true);
+    setStatus('info', paymentChoice === 'pay_now' ? 'Saving your request and preparing secure checkout…' : 'Sending your request…');
 
     const subject =
       facilityEngine === 'church'
@@ -818,6 +951,10 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     const outcome = await submitLead(fields, subject);
 
     if (outcome.ok) {
+      if (paymentChoice === 'pay_now') {
+        pendingPaymentFields = { ...fields };
+        markRequestReceived();
+      }
       fields.photo_count = String(outcome.photoCount ?? 0);
       if ((outcome.photoCount ?? 0) === 0) {
         delete fields.photo_keys;
@@ -825,16 +962,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       }
       saveSubmissionSummary(fields);
       if (paymentChoice === 'pay_now') {
-        setStatus('info', 'Request received. Opening secure Stripe payment...');
-        const started = await startSecurePayment(fields);
-        if (!started) {
-          if (payNowButton) payNowButton.disabled = false;
-          if (submitButton) submitButton.disabled = false;
-          setStatus(
-            'error',
-            'Your request was received, but secure online payment could not start. Your request is saved; Sparkling Standard will confirm payment options with you.',
-          );
-        }
+        setStatus('info', 'Request received. Opening secure checkout...');
+        const started = await startSecurePayment(pendingPaymentFields!, acceptedPaymentAmount);
+        if (!started.ok) handlePaymentFailure(started);
         return;
       }
       const event = facilityEngine === 'church' ? 'church_request_submit' : 'commercial_quote_submit';
@@ -864,7 +994,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     }
 
     if (submitButton) submitButton.disabled = false;
-    if (payNowButton) payNowButton.disabled = false;
+    if (paymentChoice === 'pay_now') setPayNowBusy(false);
+    else if (payNowButton) payNowButton.disabled = false;
     const reason = (outcome.reason ?? 'unknown') as FailureReason;
     setStatus('error', failureCopy(reason, contact));
   }

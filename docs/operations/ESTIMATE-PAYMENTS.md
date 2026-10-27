@@ -87,3 +87,38 @@ arrives.
   facility ZIP after a confirmed location, bundle offers and the public copy corrections.
 - A live paid card test was **not** performed. Use Stripe test mode with the owner's test keys before
   claiming production payment readiness.
+
+## Initiative 6.7 reliability (2026-10-27)
+
+Pay Now is now fail-closed on operational readiness, not merely key presence. The configuration
+probe reports `ok`, `enabled`, `mode` and named checks (Stripe key, webhook secret, webhook endpoint,
+notifier, durable ledger). Pay Now stays hidden unless the required checks pass. Test-mode keys are
+accepted only on non-production origins.
+
+Checkout is verified-only: the server requires a confirmed non-street address, a live route, a
+current pricing configuration and an acknowledged initial Deep Cleaning for new recurring service.
+Custom, preliminary, unverified, range and Tier B/C quotes remain reservation-only. A genuine price
+change returns `409 quote_changed` with the server amount; checkout continues only after explicit
+customer acceptance of that exact amount. No client-supplied price or route is trusted.
+
+Checkout attempts are recorded privately in R2 (`PAYMENT_LEDGER`, falling back to `PHOTOS_BUCKET`)
+under `payments/checkouts/`; the key is a SHA-256 attempt fingerprint. An open Checkout Session is
+reused, a completed one redirects to the verified status page, and an expired one may be recreated.
+Stripe receives a deterministic idempotency key. Concurrent duplicate calls fail closed rather than
+opening two payable sessions.
+
+Stripe webhook events are durably claimed under `payments/events/` before notification or gift
+fulfillment. A duplicate delivery is acknowledged without repeating side effects; a notification
+failure returns a retryable error so Stripe redelivers. The existing in-memory Set is only a
+fallback when R2 is unavailable, not the primary deduplication mechanism.
+
+Cancellation now returns to `/estimate/payment-canceled/`, which explains that no appointment was
+confirmed, preserves a safe quote reference, and offers a path back to the estimator. The success
+page distinguishes paid, open/pending, expired, unknown and unavailable verification states; it
+never displays a false paid confirmation.
+
+A failed Pay Now attempt preserves the submitted reservation and allows a direct payment retry
+without resubmitting the lead. The reservation-without-payment path is unchanged.
+
+The R2 records contain payment references and limited purchaser metadata. Keep the bucket private;
+never expose those object keys, Stripe secrets, card data or customer records in logs or reports.

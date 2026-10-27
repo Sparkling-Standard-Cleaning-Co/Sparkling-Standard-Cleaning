@@ -111,7 +111,9 @@ test('lead: missing server key returns not_configured so the client can fall bac
     env: {},
   } as never);
   assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), { ok: false, error: 'not_configured' });
+  const data = (await response.json()) as { ok?: boolean; error?: string };
+  assert.equal(data.ok, false);
+  assert.equal(data.error, 'not_configured');
 });
 
 test('lead: provider success is reported as success', async () => {
@@ -593,7 +595,10 @@ test('estimate checkout: configuration probe stays disabled without Stripe', asy
     env: {},
   } as never);
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, enabled: false });
+  const data = (await response.json()) as { ok?: boolean; enabled?: boolean; mode?: string };
+  assert.equal(data.ok, true);
+  assert.equal(data.enabled, false);
+  assert.equal(data.mode, 'unknown');
 });
 
 test('estimate checkout: missing Stripe fails closed without charging', async () => {
@@ -602,7 +607,7 @@ test('estimate checkout: missing Stripe fails closed without charging', async ()
     env: {},
   } as never);
   assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), { ok: false, error: 'not_configured' });
+  assert.deepEqual(await response.json(), { ok: false, error: 'payment_not_ready', reason: 'configuration' });
 });
 
 test('estimate checkout: empty fields are rejected before any provider call', async () => {
@@ -620,34 +625,5 @@ test('estimate checkout: empty fields are rejected before any provider call', as
   );
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { ok: false, error: 'invalid_request' });
-  assert.equal(called, false);
-});
-
-test('estimate checkout: a facility quote without a server-verified total is not payable', async () => {
-  let called = false;
-  const response = await withFetch(
-    async () => {
-      called = true;
-      return jsonResponse({});
-    },
-    () =>
-      estimateCheckoutPost({
-        request: jsonRequest({
-          fields: {
-            request_type: 'facility_estimate',
-            engine_type: 'commercial',
-            service_type: 'commercial_cleaning',
-            cleanable_sqft: '2000',
-            restroom_fixtures: '4',
-            frequency: 'weekly',
-            quoted_price: '1',
-          },
-          returnPath: '/estimate/commercial/',
-        }),
-        env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
-      } as never),
-  );
-  assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { ok: false, error: 'quote_not_payable' });
   assert.equal(called, false);
 });

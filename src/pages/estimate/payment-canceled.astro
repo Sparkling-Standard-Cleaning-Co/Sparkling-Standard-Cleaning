@@ -1,0 +1,71 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+import { business, contactPhone } from '../../config/business';
+
+const phone = contactPhone();
+---
+
+<BaseLayout
+  title="Checkout Canceled"
+  description="Secure checkout was canceled. No completed payment was confirmed, and your cleaning request remains available for personal follow-up."
+  noindex
+>
+  <section class="section">
+    <div class="container container--narrow text-center">
+      <span class="card__icon" style="margin-inline: auto"><Icon name="card" /></span>
+      <h1 class="mt-4">Checkout canceled.</h1>
+      <p class="lead" style="margin-inline: auto">
+        No completed payment was confirmed. Your cleaning request was submitted before secure
+        checkout, so it is not lost.
+      </p>
+      <p class="small text-muted" data-checkout-reference hidden></p>
+
+      <div class="card mt-6" style="text-align:left">
+        <h2 class="card__title">What happens next</h2>
+        <div class="stack" style="gap: var(--space-4); margin-top: var(--space-4)">
+          <div>
+            <p class="step__title">Your request is still saved</p>
+            <p class="step__text">
+              Sparkling Standard can still confirm the requested date, scope and final price with
+              you.
+            </p>
+          </div>
+          <div>
+            <p class="step__title">Payment was not completed</p>
+            <p class="step__text">
+              Nothing was charged by this canceled checkout. If you want to pay now, contact us and
+              we will help you restart securely.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <p class="mt-6">
+        Need to pay, change a detail, or ask a question? Call, text or email us and include your
+        estimate reference if you have it.
+      </p>
+      <div class="btn-row" style="justify-content: center">
+        {
+          phone && (
+            <>
+              <a class="btn btn--primary" href={phone.href} data-cta="payment-canceled-call">
+                <Icon name="phone" size={18} /> Call
+              </a>
+              {business.flags.smsEnabled && (
+                <a class="btn btn--secondary" href={phone.sms} data-cta="payment-canceled-text">
+                  <Icon name="message" size={18} /> Text
+                </a>
+              )}
+            </>
+          )
+        }
+        <a class="btn btn--ghost" href="/estimate/" data-return-estimate>Return to Estimates</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  import '../../scripts/payment-canceled';
+</script>

@@ -228,6 +228,61 @@ test('a confirmed facility location can continue without a ZIP code', async () =
 test('Pay Now appears only for an exact Tier A facility quote when Stripe is configured', async () => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
+  await page.route('**/api/geocode', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        result: {
+          label: '100 S BAYLEN ST, PENSACOLA, FL, 32502',
+          lat: 30.4111,
+          lng: -87.2164,
+          zip: '32502',
+          city: 'Pensacola',
+          state: 'FL',
+          source: 'mapmap',
+          precise: true,
+        },
+      }),
+    });
+  });
+  await page.route('**/api/travel', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        oneWayMiles: 15,
+        durationMinutes: 30,
+        gasPrice: 3.1,
+        gasPriceSource: 'configured_reference',
+        provider: 'mapmap',
+        method: 'route',
+        verified: true,
+        zone: 'core',
+      }),
+    });
+  });
+  await page.route('**tiles.openfreemap.org/**', (route) => route.abort());
+  let leadRequests = 0;
+  let checkoutRequests = 0;
+  await page.route('**/api/lead', async (route) => {
+    leadRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        via: 'relay',
+        verification: {
+          status: 'verified',
+          travel_verified: true,
+          travel_method: 'route',
+          config_match: 'match',
+        },
+      }),
+    });
+  });
   await page.route('**/api/estimate-checkout', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({
@@ -237,14 +292,27 @@ test('Pay Now appears only for an exact Tier A facility quote when Stripe is con
       });
       return;
     }
-    await route.abort();
+    checkoutRequests += 1;
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    await route.fulfill({
+      status: 502,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: false, error: 'stripe_unavailable' }),
+    });
   });
   try {
     await page.goto(BASE + '/estimate/commercial/', { waitUntil: 'load' });
     await page.locator('#fac-org').fill('Test Facility');
     await page.locator('#fac-name').fill('Test Owner');
     await page.locator('summary.address-manual__summary').click();
+    await page.locator('#est-address').fill('100 S Baylen St');
+    await page.locator('#est-address-city').fill('Pensacola');
+    await page.locator('#est-address-state').selectOption('FL');
     await page.locator('#est-zip').fill('32502');
+    await page.locator('[data-address-resolve]').click();
+    await page.locator('[data-address-confirm]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
+    await page.locator('[data-address-confirmed]').waitFor({ state: 'visible' });
     await page.locator('[data-facility-next]').click();
     await page.locator('[data-facility-step-panel="2"]').waitFor({ state: 'visible' });
     await page.selectOption('#fac-type', 'office');
@@ -259,6 +327,21 @@ test('Pay Now appears only for an exact Tier A facility quote when Stripe is con
     await page.locator('[data-facility-pay-now]').waitFor({ state: 'visible' });
     assert.equal(await page.locator('[data-facility-pay-now]').innerText(), 'Pay Now Securely');
     assert.match(normalize((await page.locator('[data-facility-pay-note]').innerText()) ?? ''), /without paying upfront/);
+    await page.fill('#fac-phone', '8500000000');
+    await page.fill('#fac-email', 'customer@example.test');
+    await page.locator('[data-facility-pay-now]').click();
+    await page.waitForFunction(() => document.querySelector('[data-facility-pay-now]')?.getAttribute('aria-busy') === 'true');
+    assert.equal(await page.locator('[data-facility-pay-now]').isDisabled(), true);
+    assert.match(normalize((await page.locator('[data-facility-pay-now]').innerText()) ?? ''), /Preparing Secure Checkout/);
+    await page.waitForFunction(() => (document.querySelector('[data-form-status]')?.textContent ?? '').includes('secure checkout could not start'));
+    assert.equal(leadRequests, 1);
+    assert.equal(checkoutRequests, 1);
+    assert.equal(await page.locator('[data-facility-submit]').isDisabled(), true);
+    assert.equal(normalize((await page.locator('[data-facility-submit]').innerText()) ?? ''), 'Request Received');
+    await page.locator('[data-facility-pay-now]').click();
+    await page.waitForTimeout(1100);
+    assert.equal(checkoutRequests, 2);
+    assert.equal(leadRequests, 1, 'payment retry must not submit a duplicate lead');
   } finally {
     await context.close();
   }
@@ -285,5 +368,47 @@ test('the GPS action shows a disabled, busy loading state while locating', async
     assert.match(normalize((await button.innerText()) ?? ''), /Finding Your Location/);
   } finally {
     await context.close();
+  }
+});
+test('the canceled-checkout page preserves a safe reference and return path', async () => {
+  const { context, page } = await open('/estimate/payment-canceled/?reference=SS-20261027-ABC123&return=%2Festimate%2Fresidential%2F', 390, 844);
+  try {
+    assert.match(normalize((await page.locator('[data-checkout-reference]').innerText()) ?? ''), /SS-20261027-ABC123/);
+    assert.equal(await page.locator('[data-return-estimate]').getAttribute('href'), '/estimate/residential/');
+    assert.match(normalize((await page.locator('main').innerText()) ?? ''), /No completed payment was confirmed/);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the payment status page distinguishes paid, pending and unavailable verification', async () => {
+  for (const scenario of [
+    { paid: true, status: 'complete', text: /Your payment was received/ },
+    { paid: false, status: 'open', text: /No completed payment is showing yet/ },
+    { paid: false, status: 'expired', text: /checkout expired without a completed payment/ },
+  ]) {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await page.route('**/api/estimate-checkout?session_id=*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          paid: scenario.paid,
+          status: scenario.status,
+          amount: 125,
+          reference: 'SS-20261027-ABC123',
+        }),
+      }),
+    );
+    try {
+      await page.goto(BASE + '/estimate/payment-success/?session_id=cs_test_123', { waitUntil: 'load' });
+      await page.waitForFunction((pattern) => new RegExp(pattern, 'i').test(document.querySelector('[data-payment-state]')?.textContent ?? ''), scenario.text.source);
+      assert.match(normalize((await page.locator('[data-payment-state]').innerText()) ?? ''), scenario.text);
+      assert.match(normalize((await page.locator('[data-payment-reference]').innerText()) ?? ''), /SS-20261027-ABC123/);
+    } finally {
+      await context.close();
+    }
   }
 });

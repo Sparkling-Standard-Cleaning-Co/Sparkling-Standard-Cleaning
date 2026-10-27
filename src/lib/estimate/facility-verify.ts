@@ -46,6 +46,8 @@ export interface FacilityVerifyOptions {
   numericEstimatesEnabled?: boolean | undefined;
   /** Server-routed one-way miles override for payment verification. */
   routedOneWayMiles?: number | null | undefined;
+  /** True only when the payment endpoint independently obtained a live route. */
+  routedTravelVerified?: boolean | undefined;
 }
 
 /** Client-supplied facility fields that must never survive a disabled switch. */
@@ -175,7 +177,15 @@ export function verifyFacilityQuote(
   }
 
   const travelStatus =
-    fields.travel_verified === 'true' ? 'verified' : fields.travel_verified === 'false' && fields.travel_qualification === 'manual_review' ? 'manual_review' : 'preliminary';
+    options.routedTravelVerified !== undefined
+      ? options.routedTravelVerified
+        ? 'verified'
+        : 'preliminary'
+      : fields.travel_verified === 'true'
+        ? 'verified'
+        : fields.travel_verified === 'false' && fields.travel_qualification === 'manual_review'
+          ? 'manual_review'
+          : 'preliminary';
 
   if (clientCleaning === null || clientFinal === null) {
     return {

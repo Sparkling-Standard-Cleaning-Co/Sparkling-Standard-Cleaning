@@ -23,6 +23,7 @@ export default defineConfig({
         !page.includes('/404') &&
         !page.includes('/thank-you') &&
         !page.includes('/estimate/payment-success') &&
+        !page.includes('/estimate/payment-canceled') &&
         !page.includes('/leave-review') &&
         !page.includes('/gift-certificates/success') &&
         !page.includes('/gift-certificates/redeem'),

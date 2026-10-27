@@ -3372,6 +3372,25 @@ fieldset.input--invalid {
 
 /* Add-on bundles (owner-directed 2026-10-26). Transparent price + savings,
    automatic application; only one discount can ever apply. */
+[data-pay-now][aria-busy="true"],
+[data-facility-pay-now][aria-busy="true"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+[data-pay-now][aria-busy="true"]::before,
+[data-facility-pay-now][aria-busy="true"]::before {
+  content: "";
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: address-spin 0.8s linear infinite;
+}
+
 .bundle-offers {
   margin: 0 0 var(--space-5);
   padding: var(--space-4);

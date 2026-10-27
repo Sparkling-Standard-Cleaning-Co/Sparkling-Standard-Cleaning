@@ -1,5 +1,28 @@
 # Verification status
 
+## Verified — 2026-10-27 Initiative 6.7 payment reliability (local, pending deployment)
+
+**Baseline:** `820ad19`. The working tree contains the 6.7 payment-reliability changes; they are
+not reset or overwritten by Initiative 6.8. Local verification after the final retry/cancellation
+fixes:
+
+| Check | Command | Result |
+| --- | --- | --- |
+| TypeScript diagnostics | `npm run check` | 152 files; 0 errors, 0 warnings, 0 hints |
+| Unit suite | `npm test` | **543 tests: 542 passed, 1 pre-existing skip, 0 failed** |
+| Browser regression | `npm run test:browser` | **148 passed, 0 failed** |
+| Pay Now targeted | `node --test tests/estimate-checkout.test.ts` | 12/12 passed |
+| Webhook targeted | `node --test tests/payment-webhook.test.ts` | passed |
+| Production build/validation/live payment | pending | final 6.8 validation and deployment |
+
+Implemented: readiness checks for key, webhook secret/endpoint, notifier, ledger and mode;
+verified-only checkout; explicit `quote_changed` acceptance; SHA-256 checkout idempotency with R2
+session reuse; durable webhook event claims; retryable paid notifications; preserved gift
+fulfillment; safe cancellation page; verified payment-status states; and no duplicate lead on a
+payment retry. Production live payment is **not claimed verified**; no live card charge or
+Stripe test-mode transaction was performed.
+
+
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 

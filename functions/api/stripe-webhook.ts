@@ -1,19 +1,37 @@
-// POST /api/stripe-webhook — authoritative payment confirmation for gift
-// certificates. Issuance is authorized ONLY by a signature-verified,
-// paid Checkout Session event (never by a visitor reaching a success URL).
+// POST /api/stripe-webhook — authoritative payment confirmation for estimate
+// payments and gift certificates.
 //
-// Idempotency: the certificate code is derived from the Stripe event id, and
-// processed event ids are remembered in-isolate. A retried event therefore
-// never mints a second code; the owner ledger records the Stripe event id as
-// the durable dedupe key. If the notification cannot be forwarded, a 500 is
-// returned so Stripe retries rather than losing a paid purchase.
+// Reliability:
+//  - Stripe signature is verified before any state change.
+//  - A paid event is claimed in the durable R2 ledger before fulfillment.
+//    Cloudflare isolates can run in parallel; process memory is never the only
+//    record of a payment.
+//  - Duplicate event deliveries return success without sending/fulfilling
+//    twice. If a notification provider fails, the paid record remains in the
+//    ledger and Stripe's retry can safely resume the notification.
+//  - Cleaning payments never issue gift certificates and gift payments never
+//    create cleaning reservations.
 //
-// Responses: 200 { received } | 400 invalid_signature | 405 | 500 | 503
+// Responses: 200 | 400 | 405 | 500 | 503
 
 import { verifyStripeSignature } from '../../src/lib/gift/stripe-signature.ts';
 import { buildGiftFulfillment } from '../../src/lib/gift/fulfillment.ts';
+import {
+  completePaymentEvent,
+  failPaymentEvent,
+  incompletePaymentEvent,
+  claimPaymentEvent,
+  type PaymentEventRecord,
+} from '../../src/lib/payments/event-ledger.ts';
+import {
+  ledgerKey,
+  paymentLedger,
+  readLedgerJson,
+  writeLedgerJson,
+  type PaymentStorageEnv,
+} from '../../src/lib/payments/ledger.ts';
 
-interface Env {
+interface Env extends PaymentStorageEnv {
   STRIPE_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
@@ -36,6 +54,19 @@ interface StripeEvent {
   };
 }
 
+interface CheckoutLedgerRecord {
+  version?: number;
+  status?: string;
+  generation?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  reference?: string;
+  amountCents?: number;
+  serviceType?: string;
+  sessionId?: string;
+  sessionUrl?: string;
+}
+
 const processedEvents = new Set<string>();
 const MAX_TRACKED_EVENTS = 500;
 
@@ -46,9 +77,78 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-function numberFrom(value: string | undefined): number | null {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+function amountCentsFrom(value: number | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : null;
+}
+
+function markInMemory(eventId: string): void {
+  processedEvents.add(eventId);
+  if (processedEvents.size > MAX_TRACKED_EVENTS) {
+    const oldest = processedEvents.values().next().value;
+    if (oldest) processedEvents.delete(oldest);
+  }
+}
+
+async function updateCheckoutRecord(
+  env: Env,
+  attempt: string,
+  session: NonNullable<StripeEvent['data']>['object'],
+): Promise<void> {
+  if (!/^[a-f0-9]{64}$/i.test(attempt)) return;
+  const bucket = paymentLedger(env);
+  if (!bucket) return;
+  const key = ledgerKey('checkouts', attempt.toLowerCase());
+  try {
+    const existing = await readLedgerJson<CheckoutLedgerRecord>(bucket, key);
+    const now = new Date().toISOString();
+    const record: CheckoutLedgerRecord = {
+      ...(existing?.value ?? {}),
+      version: 1,
+      status: 'completed',
+      generation: existing?.value.generation ?? 0,
+      createdAt: existing?.value.createdAt ?? now,
+      updatedAt: now,
+      reference: existing?.value.reference ?? session?.metadata?.quote_reference ?? '',
+      amountCents:
+        amountCentsFrom(session?.amount_total) ?? existing?.value.amountCents ?? 0,
+      serviceType:
+        existing?.value.serviceType ?? session?.metadata?.service_type ?? 'cleaning',
+      ...(session?.id ? { sessionId: session.id } : {}),
+    };
+    await writeLedgerJson(bucket, key, record);
+  } catch (error) {
+    console.error('[stripe-webhook] checkout_record_update_failed', {
+      name: error instanceof Error ? error.name : 'unknown',
+    });
+  }
+}
+
+async function notifyOwner(
+  env: Env,
+  subject: string,
+  fields: Record<string, string>,
+): Promise<boolean> {
+  if (!env.WEB3FORMS_ACCESS_KEY) return false;
+  try {
+    const response = await fetch(env.WEB3FORMS_ENDPOINT ?? 'https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        access_key: env.WEB3FORMS_ACCESS_KEY,
+        subject,
+        from_name: 'Sparkling Standard Website',
+        botcheck: '',
+        ...fields,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const data = (await response.json().catch(() => ({}))) as { success?: boolean };
+    return response.ok && data.success === true;
+  } catch {
+    return false;
+  }
 }
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
@@ -67,7 +167,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
 
-  // Only a completed, actually-paid Checkout Session authorizes issuance.
+  // Only a completed, actually-paid Checkout Session authorizes anything.
   if (event.type !== 'checkout.session.completed' || event.data?.object?.payment_status !== 'paid') {
     return json({ ok: true, received: true, ignored: true });
   }
@@ -79,112 +179,148 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
 
   const metadata = session.metadata ?? {};
+  const amountCents = amountCentsFrom(session.amount_total);
+  const giftValueUsd = (() => {
+    const value = Number(metadata.gift_value_usd);
+    return Number.isFinite(value) && value > 0 ? Math.round(value * 100) / 100 : 0;
+  })();
+  const kind = metadata.checkout_kind === 'estimate_payment' ? 'estimate' : 'gift';
+  const reference = (metadata.quote_reference ?? '').trim();
+  const customerName = (session.customer_details?.name ?? '').trim();
+  const customerEmail = (session.customer_details?.email ?? '').trim();
+  const paidAt = event.created
+    ? new Date(event.created * 1000).toISOString()
+    : new Date().toISOString();
 
-  // Direct estimate payment (2026-10-26). The cleaning request itself was
-  // delivered by /api/lead before checkout; this is the authoritative paid
-  // notice. The amount comes from Stripe, never from metadata or the browser.
-  if (metadata.checkout_kind === 'estimate_payment') {
-    const amount =
-      typeof session.amount_total === 'number' && session.amount_total > 0
-        ? (session.amount_total / 100).toFixed(2)
-        : 'unknown';
-    const reference = (metadata.quote_reference ?? '').trim() || 'reference unavailable';
-    const customerName = (session.customer_details?.name ?? '').trim();
-    const customerEmail = (session.customer_details?.email ?? '').trim();
-    if (!env.WEB3FORMS_ACCESS_KEY) {
-      return json({ ok: false, error: 'not_configured' }, 500);
-    }
+  const seed: Omit<
+    PaymentEventRecord,
+    'version' | 'status' | 'attempts' | 'firstSeenAt' | 'updatedAt'
+  > = {
+    eventId,
+    kind,
+    sessionId: session.id ?? '',
+    amountCents,
+    reference,
+    serviceType: metadata.service_type ?? (kind === 'gift' ? 'gift_certificate' : 'cleaning'),
+    ...(customerName ? { customerName } : {}),
+    ...(customerEmail ? { customerEmail } : {}),
+    ...(kind === 'gift'
+      ? {
+          gift: {
+            valueUsd: giftValueUsd,
+            recipientName: (metadata.recipient_name ?? '').trim(),
+            purchaserName: (metadata.purchaser_name ?? '').trim(),
+            purchaserEmail: customerEmail,
+            ...(metadata.recipient_email ? { recipientEmail: metadata.recipient_email } : {}),
+            ...(metadata.gift_message ? { message: metadata.gift_message } : {}),
+            ...(metadata.delivery_date ? { deliveryDate: metadata.delivery_date } : {}),
+          },
+        }
+      : {}),
+  };
+
+  const bucket = paymentLedger(env);
+  let record: PaymentEventRecord | null = null;
+  if (bucket) {
     try {
-      const response = await fetch(env.WEB3FORMS_ENDPOINT ?? 'https://api.web3forms.com/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          access_key: env.WEB3FORMS_ACCESS_KEY,
-          subject: `PAID estimate — $${amount} — ${reference}`,
-          from_name: 'Sparkling Standard Website',
-          botcheck: '',
-          'Payment status': 'PAID — verify in Stripe before scheduling',
-          'Amount paid': `$${amount} USD`,
-          'Quote reference': reference,
-          'Service': metadata.service_type ?? 'cleaning',
-          'Customer': customerName || 'name not supplied by Stripe',
-          'Email': customerEmail || 'email not supplied by Stripe',
-          'Stripe event': eventId,
-          'Stripe session': session.id ?? '',
-          'Note':
-            'The cleaning request was delivered separately by the website lead relay. Confirm the requested date, scope and final details personally before scheduling.',
-        }),
-        signal: AbortSignal.timeout(10_000),
-      });
-      const data = (await response.json().catch(() => ({}))) as { success?: boolean };
-      if (!response.ok || data.success !== true) {
-        return json({ ok: false, error: 'provider_failed' }, 500);
+      const claim = await claimPaymentEvent(bucket, eventId, seed);
+      if (claim.action === 'duplicate') {
+        markInMemory(eventId);
+        return json({ ok: true, received: true, duplicate: true });
       }
-    } catch {
-      return json({ ok: false, error: 'provider_failed' }, 500);
+      if (claim.action === 'busy') {
+        return json({ ok: false, error: 'event_in_progress' }, 503);
+      }
+      record = claim.record;
+    } catch (error) {
+      console.error('[stripe-webhook] ledger_claim_failed', {
+        name: error instanceof Error ? error.name : 'unknown',
+      });
+      // Do not lose a paid event because durable storage is temporarily
+      // unavailable. The readiness gate prevents new payments in this state;
+      // existing payments still reach the owner.
     }
-    processedEvents.add(eventId);
-    if (processedEvents.size > MAX_TRACKED_EVENTS) {
-      const oldest = processedEvents.values().next().value;
-      if (oldest) processedEvents.delete(oldest);
+  } else {
+    console.error('[stripe-webhook] durable_ledger_not_configured');
+  }
+
+  if (kind === 'estimate') {
+    if (session.id && metadata.checkout_attempt) {
+      await updateCheckoutRecord(env, metadata.checkout_attempt, session);
+    }
+
+    const amount = amountCents === null ? 'unknown' : (amountCents / 100).toFixed(2);
+    const fields: Record<string, string> = {
+      'Payment status': 'PAID - verify in Stripe before scheduling',
+      'Amount paid': `$${amount} USD`,
+      'Quote reference': reference || 'reference unavailable',
+      Service: metadata.service_type ?? 'cleaning',
+      Customer: customerName || 'name not supplied by Stripe',
+      Email: customerEmail || 'email not supplied by Stripe',
+      'Stripe event': eventId,
+      'Stripe session': session.id ?? '',
+      'Checkout attempt': metadata.checkout_attempt ?? '',
+      'Paid at': paidAt,
+      Note:
+        'The cleaning request was delivered separately by the website lead relay. Confirm the requested date, scope and final details personally before scheduling.',
+    };
+    const sent = await notifyOwner(
+      env,
+      `PAID estimate - $${amount} - ${reference || 'reference unavailable'}`,
+      fields,
+    );
+    if (!sent) {
+      if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'notification_failed');
+      return json({ ok: false, error: 'notification_failed' }, 500);
+    }
+    markInMemory(eventId);
+    if (bucket && record) {
+      await completePaymentEvent(bucket, eventId, record).catch((error) => {
+        console.error('[stripe-webhook] event_complete_failed', {
+          name: error instanceof Error ? error.name : 'unknown',
+        });
+      });
     }
     return json({ ok: true, received: true });
   }
 
-  const valueUsd = numberFrom(metadata.gift_value_usd);
-  const recipientName = (metadata.recipient_name ?? '').trim();
-  const purchaserName = (metadata.purchaser_name ?? '').trim();
-  const purchaserEmail = (session.customer_details?.email ?? '').trim();
-  if (!valueUsd || !recipientName || !purchaserName || !purchaserEmail) {
-    // Missing data must not authorize a certificate; 200 stops Stripe retries
-    // and the owner receives nothing — the ledger will show a paid session
-    // without a fulfillment, which is visibly wrong and auditable.
+  // Gift certificate path (sales remain disabled until owner approval).
+  if (!seed.gift || !seed.gift.valueUsd || !seed.gift.recipientName || !seed.gift.purchaserName || !seed.gift.purchaserEmail) {
+    if (bucket && record) {
+      await incompletePaymentEvent(bucket, eventId, record, 'missing_gift_metadata').catch(() => undefined);
+    }
     return json({ ok: true, received: true, incomplete: true });
   }
 
   const fulfillment = buildGiftFulfillment({
     eventId,
     sessionId: session.id ?? '',
-    valueUsd,
-    recipientName,
-    purchaserName,
-    purchaserEmail,
-    ...(metadata.recipient_email ? { recipientEmail: metadata.recipient_email } : {}),
-    ...(metadata.gift_message ? { message: metadata.gift_message } : {}),
-    ...(metadata.delivery_date ? { deliveryDate: metadata.delivery_date } : {}),
-    paidAtIso: event.created ? new Date(event.created * 1000).toISOString() : new Date().toISOString(),
+    valueUsd: seed.gift.valueUsd,
+    recipientName: seed.gift.recipientName,
+    purchaserName: seed.gift.purchaserName,
+    purchaserEmail: seed.gift.purchaserEmail,
+    ...(seed.gift.recipientEmail ? { recipientEmail: seed.gift.recipientEmail } : {}),
+    ...(seed.gift.message ? { message: seed.gift.message } : {}),
+    ...(seed.gift.deliveryDate ? { deliveryDate: seed.gift.deliveryDate } : {}),
+    paidAtIso: paidAt,
     ...(env.PUBLIC_SITE_URL ? { siteUrl: env.PUBLIC_SITE_URL } : {}),
   });
-
-  if (!env.WEB3FORMS_ACCESS_KEY) {
-    // Paid purchase with no way to alert the owner: let Stripe retry.
-    return json({ ok: false, error: 'not_configured' }, 500);
+  const sent = await notifyOwner(
+    env,
+    `PAID gift certificate - ${fulfillment['Gift value']} - ${seed.gift.recipientName}`,
+    fulfillment,
+  );
+  if (!sent) {
+    if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'notification_failed');
+    return json({ ok: false, error: 'notification_failed' }, 500);
   }
-  try {
-    const response = await fetch(env.WEB3FORMS_ENDPOINT ?? 'https://api.web3forms.com/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        access_key: env.WEB3FORMS_ACCESS_KEY,
-        subject: `PAID gift certificate — ${fulfillment['Gift value']} — ${recipientName}`,
-        from_name: 'Sparkling Standard Website',
-        botcheck: '',
-        ...fulfillment,
-      }),
-      signal: AbortSignal.timeout(10_000),
+  markInMemory(eventId);
+  if (bucket && record) {
+    await completePaymentEvent(bucket, eventId, record).catch((error) => {
+      console.error('[stripe-webhook] event_complete_failed', {
+        name: error instanceof Error ? error.name : 'unknown',
+      });
     });
-    const data = (await response.json().catch(() => ({}))) as { success?: boolean };
-    if (!response.ok || data.success !== true) {
-      return json({ ok: false, error: 'provider_failed' }, 500);
-    }
-  } catch {
-    return json({ ok: false, error: 'provider_failed' }, 500);
-  }
-
-  processedEvents.add(eventId);
-  if (processedEvents.size > MAX_TRACKED_EVENTS) {
-    const oldest = processedEvents.values().next().value;
-    if (oldest) processedEvents.delete(oldest);
   }
   return json({ ok: true, received: true });
 }

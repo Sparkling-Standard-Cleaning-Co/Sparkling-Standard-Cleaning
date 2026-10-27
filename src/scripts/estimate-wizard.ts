@@ -137,6 +137,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const engineNote = form.querySelector<HTMLElement>('[data-engine-note]');
   let engine: 'residential' | 'str' = 'residential';
   let paymentEnabled = false;
+  let paymentBusy = false;
+  let paymentBlocked = false;
+  let pendingPaymentFields: Record<string, string> | null = null;
+  let acceptedPaymentAmount: number | null = null;
+  let paymentRetryAvailable = false;
+  let requestAlreadySent = false;
   const photoController = initPhotoUploads(form, {
     engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
   });
@@ -647,9 +653,37 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return list;
   }
 
+  function clientPaymentEligible(): boolean {
+    if (!latestQuote?.travelVerified) return false;
+    const submission = submissionAddress();
+    if (submission.street.trim().length < 5) return false;
+    const precision = submission.location?.precision;
+    return precision !== 'street' && precision !== 'approximate';
+  }
+
+  function payNowLabel(): string {
+    if (acceptedPaymentAmount !== null) return `Pay ${formatUsd(acceptedPaymentAmount)} Securely`;
+    return paymentRetryAvailable ? 'Try Secure Payment Again' : 'Pay Now Securely';
+  }
+
+  function setPayNowBusy(busy: boolean): void {
+    paymentBusy = busy;
+    if (!payNowButton) return;
+    payNowButton.disabled = busy;
+    payNowButton.setAttribute('aria-busy', busy ? 'true' : 'false');
+    payNowButton.textContent = busy ? 'Preparing Secure Checkout...' : payNowLabel();
+  }
+
   function syncPaymentAvailability(hasQuote: boolean): void {
     if (!payNowButton) return;
-    payNowButton.hidden = !paymentEnabled || !hasQuote;
+    const eligible = paymentEnabled && !paymentBlocked && hasQuote && clientPaymentEligible();
+    payNowButton.hidden = !eligible;
+    if (!eligible) {
+      payNowButton.setAttribute('aria-busy', 'false');
+      payNowButton.textContent = payNowLabel();
+    } else if (!paymentBusy) {
+      payNowButton.textContent = payNowLabel();
+    }
   }
   function renderReservationSummary(result: EstimateResult): void {
     if (!reservationSummary) return;
@@ -657,7 +691,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
     syncPaymentAvailability(hasQuote);
     reservationSummary.hidden = !hasQuote;
     if (submitButton) {
-      submitButton.textContent = hasQuote ? 'Reserve This Cleaning' : 'Send My Request';
+      submitButton.textContent = requestAlreadySent
+        ? 'Request Received'
+        : hasQuote
+          ? 'Reserve This Cleaning'
+          : 'Send My Request';
+      if (requestAlreadySent) submitButton.disabled = true;
     }
     if (!hasQuote || !latestQuote) {
       if (reserveCall) reserveCall.hidden = !phone;
@@ -1297,6 +1336,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
     travelLookupSeq += 1;
     latestResult = null;
     latestQuote = null;
+    pendingPaymentFields = null;
+    acceptedPaymentAmount = null;
+    paymentRetryAvailable = false;
+    paymentBlocked = false;
+    requestAlreadySent = false;
+    setPayNowBusy(false);
+    if (submitButton) submitButton.disabled = false;
     estimateStarted = false;
     estimateCompleted = false;
     clearTravelCache();
@@ -1439,7 +1485,20 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return { ...fields, ...attributionFields() };
   }
 
-  async function startSecurePayment(fields: Record<string, string>): Promise<boolean> {
+  interface StartPaymentResult {
+    ok: boolean;
+    url?: string;
+    error?: string;
+    reason?: string;
+    amount?: number;
+    quotedAmount?: number;
+    reference?: string;
+  }
+
+  async function startSecurePayment(
+    fields: Record<string, string>,
+    acceptedAmount: number | null = null,
+  ): Promise<StartPaymentResult> {
     try {
       const response = await fetch('/api/estimate-checkout', {
         method: 'POST',
@@ -1447,18 +1506,123 @@ function initEstimateWizard(form: HTMLFormElement): void {
         body: JSON.stringify({
           fields,
           returnPath: engine === 'str' ? '/estimate/str/' : '/estimate/residential/',
+          ...(acceptedAmount !== null
+            ? { acceptRecalculated: true, acceptedAmount }
+            : {}),
         }),
       });
-      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; url?: string };
-      if (!response.ok || !data.ok || !data.url) return false;
-      window.location.assign(data.url);
-      return true;
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        url?: string;
+        error?: string;
+        reason?: string;
+        amount?: number;
+        quotedAmount?: number;
+        reference?: string;
+      };
+      if (response.ok && data.ok && data.url) {
+        window.location.assign(data.url);
+        return { ok: true, url: data.url };
+      }
+      if (data.error) {
+        console.warn('[secure-checkout]', data.error, data.reason ?? '');
+      }
+      return {
+        ok: false,
+        ...(data.error ? { error: data.error } : {}),
+        ...(data.reason ? { reason: data.reason } : {}),
+        ...(typeof data.amount === 'number' ? { amount: data.amount } : {}),
+        ...(typeof data.quotedAmount === 'number' ? { quotedAmount: data.quotedAmount } : {}),
+        ...(data.reference ? { reference: data.reference } : {}),
+      };
     } catch {
-      return false;
+      console.warn('[secure-checkout] network_unavailable');
+      return { ok: false, error: 'network_unavailable' };
     }
   }
+
+  function markRequestReceived(): void {
+    requestAlreadySent = true;
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = 'Request Received';
+    }
+  }
+
+  function handlePaymentFailure(failure: StartPaymentResult): void {
+    if (
+      failure.error === 'quote_changed' &&
+      typeof failure.amount === 'number' &&
+      Number.isFinite(failure.amount) &&
+      failure.amount > 0
+    ) {
+      acceptedPaymentAmount = failure.amount;
+      paymentRetryAvailable = false;
+      markRequestReceived();
+      setPayNowBusy(false);
+      syncPaymentAvailability(true);
+      if (status) {
+        status.dataset.state = 'info';
+        const prior =
+          typeof failure.quotedAmount === 'number'
+            ? `The estimate showed ${formatUsd(failure.quotedAmount)}. `
+            : '';
+        status.textContent =
+          `${prior}The secure total is now ${formatUsd(failure.amount)}. ` +
+          `Click “Pay ${formatUsd(failure.amount)} Securely” to approve the recalculated total. No charge has been made.`;
+      }
+      return;
+    }
+
+    if (
+      failure.error === 'quote_not_payable' ||
+      failure.error === 'payment_not_ready' ||
+      failure.error === 'email_required'
+    ) {
+      paymentBlocked = true;
+      acceptedPaymentAmount = null;
+      paymentRetryAvailable = false;
+      markRequestReceived();
+      setPayNowBusy(false);
+      syncPaymentAvailability(true);
+      if (status) {
+        status.dataset.state = 'error';
+        status.textContent =
+          'Your request was received, but secure payment is not available for this estimate. ' +
+          'Sparkling Standard will confirm the price and payment options with you. No payment has been taken by this website.';
+      }
+      return;
+    }
+
+    paymentRetryAvailable = true;
+    markRequestReceived();
+    setPayNowBusy(false);
+    syncPaymentAvailability(true);
+    if (status) {
+      status.dataset.state = 'error';
+      status.textContent =
+        'Your request was received, but secure checkout could not start right now. ' +
+        'You can try payment again, or arrange payment when we confirm your appointment. No payment has been taken by this website.';
+    }
+  }
+
+  async function retryPendingPayment(): Promise<void> {
+    if (!pendingPaymentFields || paymentBusy) return;
+    setPayNowBusy(true);
+    if (status) {
+      status.dataset.state = 'info';
+      status.textContent = 'Opening secure checkout…';
+    }
+    const started = await startSecurePayment(pendingPaymentFields, acceptedPaymentAmount);
+    if (!started.ok) handlePaymentFailure(started);
+  }
+
   async function handleSubmit(event?: Event, paymentChoice: 'reserve' | 'pay_now' = 'reserve'): Promise<void> {
     event?.preventDefault();
+    if (paymentChoice === 'pay_now' && pendingPaymentFields) {
+      await retryPendingPayment();
+      return;
+    }
     if (!validateStep(currentStep)) return;
     if (photoController.isUploading()) {
       if (status) {
@@ -1487,13 +1651,15 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
 
     if (submitButton) submitButton.disabled = true;
-    if (payNowButton) payNowButton.disabled = true;
+    if (paymentChoice === 'pay_now') setPayNowBusy(true);
     if (status) {
       status.dataset.state = 'info';
       status.textContent =
-        result.status === 'estimated' && latestQuote
-          ? 'Sending your reservation request…'
-          : 'Sending your request…';
+        paymentChoice === 'pay_now'
+          ? 'Saving your request and preparing secure checkout…'
+          : result.status === 'estimated' && latestQuote
+            ? 'Sending your reservation request…'
+            : 'Sending your request…';
     }
 
     const fields = buildSubmissionFields(result);
@@ -1509,7 +1675,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     if (!outcome.ok) {
       if (submitButton) submitButton.disabled = false;
-      if (payNowButton) payNowButton.disabled = false;
+      if (paymentChoice === 'pay_now') setPayNowBusy(false);
+      else if (payNowButton) payNowButton.disabled = false;
       if (status) {
         status.dataset.state = 'error';
         status.textContent = `${failureCopy(outcome.reason as FailureReason, contact)} Your answers are still on this page.`;
@@ -1541,31 +1708,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
     saveSubmissionSummary(fields);
 
     if (paymentChoice === 'pay_now') {
-      const payableStatus = outcome.verification?.status;
-      if (payableStatus !== 'verified' && payableStatus !== 'preliminary') {
-        if (payNowButton) payNowButton.disabled = false;
-        if (submitButton) submitButton.disabled = false;
-        if (status) {
-          status.dataset.state = 'error';
-          status.textContent =
-            'Your request was received, but this quote cannot be paid online yet. Sparkling Standard will confirm the price and payment options with you.';
-        }
-        return;
-      }
+      pendingPaymentFields = { ...fields };
+      markRequestReceived();
       if (status) {
         status.dataset.state = 'info';
-        status.textContent = 'Request received. Opening secure Stripe payment...';
+        status.textContent = 'Request received. Opening secure checkout…';
       }
-      const started = await startSecurePayment(fields);
-      if (!started) {
-        if (payNowButton) payNowButton.disabled = false;
-        if (submitButton) submitButton.disabled = false;
-        if (status) {
-          status.dataset.state = 'error';
-          status.textContent =
-            'Your request was received, but secure online payment could not start. Your reservation request is saved; Sparkling Standard will confirm payment options with you.';
-        }
-      }
+      const started = await startSecurePayment(pendingPaymentFields, acceptedPaymentAmount);
+      if (!started.ok) handlePaymentFailure(started);
       return;
     }
     // The receipt reflects the server's actual verdict. A mismatch or
