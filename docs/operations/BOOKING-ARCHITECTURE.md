@@ -22,6 +22,11 @@ offered. Owner confirmation accepts a request or hold ID, detects an existing ca
 Sparkling reference before creating another, and cancellation deletes the event and releases both
 records.
 
+**Admin safety:** `/api/booking-admin` rejects unknown actions instead of defaulting to confirmation.
+Releasing or declining a confirmed booking with a Google event returns `confirmed_booking_requires_cancel`;
+only `cancel` deletes the event. Confirmation is idempotent by request status and checks for an existing
+Sparkling reference event before creating another.
+
 **Implemented and active:**
 
 

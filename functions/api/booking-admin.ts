@@ -22,7 +22,7 @@ import {
   type PendingBookingRequest,
 } from '../../src/lib/booking/requests.ts';
 import { availabilityForDate, type BookingEnv } from '../../src/lib/booking/service.ts';
-import { createCalendarEvent, deleteCalendarEvent, findCalendarEventByReference } from '../../src/lib/booking/google-calendar.ts';
+import { createCalendarEvent, deleteCalendarEvent, findCalendarEventByReference, getCalendarEvent } from '../../src/lib/booking/google-calendar.ts';
 import { writeLedgerJson } from '../../src/lib/payments/ledger.ts';
 
 interface Env extends BookingEnv, BookingStorageEnv {
@@ -123,6 +123,8 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
   const resolved = await resolveBooking(bucket, id);
   const slot = resolved.request ? slotFromRequest(resolved.request) : resolved.hold ? slotFromHold(resolved.hold) : null;
   if (!slot) return json({ ok: false, error: 'not_found' }, 404);
+  const eventId = resolved.request?.calendarEventId ?? resolved.hold?.calendarEventId;
+  const calendarEvent = eventId ? await getCalendarEvent(env, eventId) : null;
   return json({
     ok: true,
     request: resolved.request,
@@ -130,6 +132,8 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     active: resolved.hold ? holdIsActive(resolved.hold) : false,
     slot,
     pendingRequest: resolved.request?.status === 'pending',
+    calendarEventId: eventId ?? null,
+    calendarEvent,
   });
 }
 
@@ -145,14 +149,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
   const id = typeof payload.id === 'string' ? payload.id : '';
-  const action =
-    payload.action === 'release'
-      ? 'release'
-      : payload.action === 'cancel'
-        ? 'cancel'
-        : payload.action === 'decline'
-          ? 'decline'
-          : 'confirm';
+  const requestedAction = typeof payload.action === 'string' ? payload.action : '';
+  if (!['confirm', 'cancel', 'decline', 'release'].includes(requestedAction)) {
+    return json({ ok: false, error: 'invalid_action' }, 400);
+  }
+  const action = requestedAction as 'confirm' | 'cancel' | 'decline' | 'release';
   const resolved = await resolveBooking(bucket, id);
   const { request: pending, hold } = resolved;
   if (!pending && !hold) return json({ ok: false, error: 'not_found' }, 404);
@@ -160,6 +161,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
   if (action === 'release' || action === 'cancel' || action === 'decline') {
     const eventId = pending?.calendarEventId ?? hold?.calendarEventId;
+    if (eventId && action !== 'cancel') {
+      return json({ ok: false, error: 'confirmed_booking_requires_cancel' }, 409);
+    }
     if (action === 'cancel' && eventId) {
       const deleted = await deleteCalendarEvent(env, eventId);
       if (!deleted.ok) return json({ ok: false, error: deleted.reason ?? 'calendar_delete_failed' }, 502);

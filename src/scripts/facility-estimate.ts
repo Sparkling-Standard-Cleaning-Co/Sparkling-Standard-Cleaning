@@ -538,20 +538,34 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     });
   }
   verifyAddressButton?.addEventListener('click', () => {
+    if (addressVerificationPending) return;
     addressVerificationPending = true;
+    verifyAddressButton.disabled = true;
+    verifyAddressButton.setAttribute('aria-busy', 'true');
+    verifyAddressButton.textContent = 'Opening Address Verification…';
     showStep(1);
     setStatus(
       'info',
       'Verify the full facility address and confirm the map pin. We will return you to the final estimate automatically.',
     );
     if (!finder) {
+      addressVerificationPending = false;
+      verifyAddressButton.disabled = false;
+      verifyAddressButton.setAttribute('aria-busy', 'false');
+      verifyAddressButton.textContent = 'Verify Address & Finalize Price';
       setStatus(
         'error',
         'Address verification could not start. Please enter the full facility address on step 1, then return to the final step.',
       );
       return;
     }
-    void finder.verifyAddress();
+    void finder.verifyAddress().finally(() => {
+      verifyAddressButton.disabled = false;
+      verifyAddressButton.setAttribute('aria-busy', 'false');
+      verifyAddressButton.textContent =
+        addressVerificationPending ? 'Verify Address & Finalize Price' : 'Address Verified';
+      if (!addressVerificationPending) verifyAddressButton.hidden = true;
+    });
   });
 
   async function lookupTravel(lat: number, lng: number): Promise<void> {

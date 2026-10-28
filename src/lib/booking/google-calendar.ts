@@ -257,3 +257,45 @@ export async function findCalendarEventByReference(
     return null;
   }
 }
+export interface CalendarEventDetails {
+  id: string;
+  summary?: string;
+  location?: string;
+  start?: string;
+  end?: string;
+  status?: string;
+}
+
+export async function getCalendarEvent(
+  env: GoogleCalendarEnv,
+  eventId: string,
+): Promise<CalendarEventDetails | null> {
+  const token = await accessToken(env);
+  if (!token) return null;
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${calendarPath(env)}/events/${encodeURIComponent(eventId)}`,
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
+    );
+    if (!response.ok) return null;
+    const data = (await response.json().catch(() => ({}))) as {
+      id?: string;
+      summary?: string;
+      location?: string;
+      status?: string;
+      start?: { dateTime?: string; date?: string };
+      end?: { dateTime?: string; date?: string };
+    };
+    if (!data.id) return null;
+    return {
+      id: data.id,
+      ...(data.summary ? { summary: data.summary } : {}),
+      ...(data.location ? { location: data.location } : {}),
+      ...(data.status ? { status: data.status } : {}),
+      ...(data.start?.dateTime ? { start: data.start.dateTime } : {}),
+      ...(data.end?.dateTime ? { end: data.end.dateTime } : {}),
+    };
+  } catch {
+    return null;
+  }
+}

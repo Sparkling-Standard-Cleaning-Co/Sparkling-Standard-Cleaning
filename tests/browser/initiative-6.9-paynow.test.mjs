@@ -106,6 +106,8 @@ async function open(width, height) {
 async function reachFinalWithUnconfirmedAddress(page) {
   await page.click('label.option:has(input[name="serviceType"][value="standard"])');
   await page.fill('#est-address', '100 S Baylen St');
+  await page.fill('#est-address-city', 'Pensacola');
+  await page.selectOption('#est-address-state', 'FL');
   await page.fill('#est-zip', '32502');
   await page.click('[data-next]');
   await page.selectOption('#est-property', 'house');

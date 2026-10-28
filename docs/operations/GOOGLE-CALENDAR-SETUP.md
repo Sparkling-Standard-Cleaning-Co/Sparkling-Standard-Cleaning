@@ -96,7 +96,22 @@ It must show `enabled:true` and slots that:
 If it returns `calendar_not_configured`, `auth_failed`, `calendar_unavailable` or
 `travel_unavailable`, fix that before enabling booking.
 
-## 7. Activation gate
+## 7. Owner-run live verification utility
+
+`scripts/booking-live-test.mjs` verifies the full live lifecycle without exposing the token:
+
+```powershell
+cd C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository
+node scripts/booking-live-test.mjs
+```
+
+The script prompts for `BOOKING_OWNER_TOKEN` with a masked TTY input (or reads the environment
+variable), never prints it, and requires the owner to type **YES** before any write. It finds a real
+slot, creates a synthetic TEST hold, confirms it through `/api/booking-admin`, verifies the Google
+event and blocked availability, cancels it, verifies availability restoration and attempts emergency
+cleanup on failure. Do not run it without owner authorization.
+
+## 8. Activation gate
 
 `src/config/booking.ts` has `enabled:false` and `autoConfirmAllowed:false`. Keep both false until:
 

@@ -272,6 +272,17 @@ test('owner cancellation deletes the calendar event and releases the hold', asyn
       throw new Error('unexpected fetch: ' + url);
     },
     async () => {
+      const releaseRequest = new Request('https://example.test/api/booking-admin', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: created.hold.id, action: 'release' }),
+      });
+      const releaseResponse = await bookingAdminPost({
+        request: releaseRequest,
+        env: { ...env, PAYMENT_LEDGER: bucket, BOOKING_OWNER_TOKEN: 'owner' } as never,
+      } as never);
+      assert.equal(releaseResponse.status, 409, 'confirmed booking cannot be silently released');
+      assert.equal((await getBookingHold(bucket, created.hold.id))?.status, 'confirmed');
       const request = new Request('https://example.test/api/booking-admin', {
         method: 'POST',
         headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
@@ -344,4 +355,18 @@ test('an expired hold with a durable pending request can still be owner-confirme
   } finally {
     config.enabled = original;
   }
+});
+
+test('booking admin rejects unknown actions instead of defaulting to confirmation', async () => {
+  const request = new Request('https://example.test/api/booking-admin', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: 'anything', action: 'destroy' }),
+  });
+  const response = await bookingAdminPost({
+    request,
+    env: { PAYMENT_LEDGER: new FakeLedger(), BOOKING_OWNER_TOKEN: 'owner' } as never,
+  } as never);
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { ok: false, error: 'invalid_action' });
 });

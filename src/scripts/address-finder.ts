@@ -1181,7 +1181,13 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     verifyAddress: async () => {
       ensureManualMode();
       if (manualDetails) manualDetails.open = true;
+      manualDetails?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       streetField.focus();
+      if (!cityInput?.value.trim() || !zipInput?.value.trim()) {
+        setStatus('Add your city, state and ZIP code so we can verify the exact property.', 'error');
+        (cityInput?.value.trim() ? zipInput : cityInput)?.focus();
+        return;
+      }
       setStatus('Verify your full service address, then confirm the map pin.', 'info');
       await manualResolve();
     },

@@ -1444,7 +1444,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
     });
   }
   verifyAddressButton?.addEventListener('click', () => {
+    if (addressVerificationPending) return;
     addressVerificationPending = true;
+    verifyAddressButton.disabled = true;
+    verifyAddressButton.setAttribute('aria-busy', 'true');
+    verifyAddressButton.textContent = 'Opening Address Verification…';
     showStep(1);
     if (status) {
       status.dataset.state = 'info';
@@ -1452,6 +1456,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
         'Verify your full service address and confirm the map pin. We will return you to your final estimate automatically.';
     }
     if (!addressFinder) {
+      addressVerificationPending = false;
+      verifyAddressButton.disabled = false;
+      verifyAddressButton.setAttribute('aria-busy', 'false');
+      verifyAddressButton.textContent = 'Verify Address & Finalize Price';
       if (status) {
         status.dataset.state = 'error';
         status.textContent =
@@ -1459,7 +1467,15 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
       return;
     }
-    void addressFinder.verifyAddress();
+    void addressFinder.verifyAddress().finally(() => {
+      verifyAddressButton.disabled = false;
+      verifyAddressButton.setAttribute('aria-busy', 'false');
+      verifyAddressButton.textContent =
+        addressVerificationPending ? 'Verify Address & Finalize Price' : 'Address Verified';
+      if (!addressVerificationPending) {
+        verifyAddressButton.hidden = true;
+      }
+    });
   });
 
   function resetWizard(): void {
