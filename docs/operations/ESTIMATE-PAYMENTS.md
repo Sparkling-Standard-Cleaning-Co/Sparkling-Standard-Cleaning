@@ -200,7 +200,7 @@ attempt and that the reservation/manual-review path remains available.
 **Not yet proven:** a controlled Stripe test-mode card payment. The production runtime currently has
 a live-mode key; no test-mode credentials were provided, and no live charge was authorized.
 
-### Batch A server hardening (2026-10-28, local; not deployed)
+### Batch A server hardening (2026-10-28, released in `8edce3a`)
 
 The owner-authorized commercial implementation directive identified several server-side trust gaps.
 The current local source now enforces:

@@ -5,17 +5,20 @@ recalculation, the owner notification and the customer receipt.
 
 ## Residential and STR
 
-1. **Scope and labor** — service, property size, rooms, condition, last clean, pets, extras and
-   travel are validated and converted to labor hours by the shared estimator.
-2. **Base service** — `max(minimumJob, labor value + extras)` is calculated.
+1. **Scope and labor** - service, property size, rooms, condition, last clean, pets, extras and
+   travel are validated and converted to labor hours by the shared estimator. Residential
+   optional-extra charges receive the owner-approved 15% reduction exactly once; STR, commercial
+   and church extras do not.
+2. **Base service** - max(minimumJob, labor value + reduced extras) is calculated.
 3. **Base presentation rounding** — the service base is rounded DOWN to the owner-approved $5 step
    (`pricing.rounding.toNearest`). This is the displayed base before any discount.
 4. **One discount only** — the promotion engine and the Community Support eligibility discount are
    evaluated together. The **largest effective discount wins**; ties favor Community Support, then
    the claimed campaign, then other programs. No stacking. The owner-approved add-on bundles
    (`bundle-kitchen-refresh`, `bundle-deep-detail`, `bundle-recurring-care`) compete in the same
-   single-discount policy. Every required extra must be selected; the discount is calculated on
-   the eligible add-on subtotal; specialty/custom-quote work is excluded.
+   single-discount policy. The owner-approved custom three-extra bundle gives exactly three
+   eligible residential extras 20% off their combined reduced subtotal. Every required extra must
+   be selected; specialty/custom-quote work is excluded; the largest single discount wins.
 5. **Engine calibration** — the matching `pricing.estimatorCalibration` value
    (residential or STR) multiplies the discounted **service** subtotal. `1.00`
    is unchanged; it never multiplies travel or tax. The four engines have
@@ -25,8 +28,10 @@ recalculation, the owner notification and the customer receipt.
    an explicit discount or engine calibration factor; the benefit is preserved exactly.
 8. **Tax** — presented separately as a disclosure (see `TAX-TREATMENT.md`). No tax amount is
    invented.
-9. **Recurring** — a new recurring arrangement prices its required first Deep Cleaning under this
-   order; the ongoing per-visit rhythm is computed by the same engine and shown separately.
+9. **Recurring** - a new recurring arrangement prices its required first Deep Cleaning under this
+   order; the ongoing per-visit rhythm is computed by the same engine and shown separately. The
+   ongoing rhythm uses maintained/within-month condition assumptions so the initial buildup
+   penalty is not charged forever; size, rooms, add-ons and frequency still apply.
 
 ## Commercial and church
 

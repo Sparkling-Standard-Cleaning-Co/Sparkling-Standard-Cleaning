@@ -311,24 +311,26 @@ test('cleanup requires owner authentication, supports dry runs and removes expir
     },
   };
   const unauthorized = await photoCleanupPost({
-    request: new Request('https://example.test/api/photo-cleanup?days=90', { method: 'POST' }),
+    request: new Request('https://example.test/api/photo-cleanup', { method: 'POST' }),
     env: { PHOTOS_BUCKET: bucket, PHOTO_OWNER_TOKEN: OWNER },
   });
   assert.equal(unauthorized.status, 401);
 
   const dry = await photoCleanupPost({
-    request: new Request('https://example.test/api/photo-cleanup?days=90&dry=1', {
+    request: new Request('https://example.test/api/photo-cleanup?dry=1', {
       method: 'POST',
       headers: { Authorization: `Bearer ${OWNER}` },
     }),
     env: { PHOTOS_BUCKET: bucket, PHOTO_OWNER_TOKEN: OWNER },
   });
   assert.equal(dry.status, 200);
-  assert.equal(((await dry.json()) as { eligible: number }).eligible, 2);
+  const dryBody = (await dry.json()) as { eligible: number; retentionDays: number };
+  assert.equal(dryBody.retentionDays, 30, 'default retention is the owner-approved 30 days');
+  assert.equal(dryBody.eligible, 2);
   assert.equal(deleted.length, 0);
 
   const real = await photoCleanupPost({
-    request: new Request('https://example.test/api/photo-cleanup?days=90', {
+    request: new Request('https://example.test/api/photo-cleanup', {
       method: 'POST',
       headers: { Authorization: `Bearer ${OWNER}` },
     }),

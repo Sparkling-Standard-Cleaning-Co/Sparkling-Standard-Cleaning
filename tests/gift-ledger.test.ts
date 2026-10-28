@@ -295,3 +295,34 @@ test('owner refund fails closed without Stripe or a server refund provider', asy
   const stored = await lookupGiftCertificate(bucket, 'SSGC-ABCD-2345');
   assert.equal(stored?.status, 'active');
 });
+
+test('the owner inventory is paginated and searchable without exposing all records at once', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record({ code: 'SSGC-AAAA-1111' }));
+  await issueGiftCertificate(bucket, record({ code: 'SSGC-BBBB-2222', recipientName: 'Second Recipient' }));
+  await issueGiftCertificate(bucket, record({ code: 'SSGC-CCCC-3333', recipientName: 'Third Recipient' }));
+  const access = await adminAccess(bucket);
+  const response = await adminGet({
+    request: authedRequest('https://example.test/api/gift-admin?list=1&page=1&pageSize=5', access),
+    env: access.env,
+  } as never);
+  assert.equal(response.status, 200);
+  const payload = (await response.json()) as {
+    total?: number;
+    page?: number;
+    totalPages?: number;
+    items?: Array<{ code?: string }>;
+  };
+  assert.equal(payload.total, 3);
+  assert.equal(payload.page, 1);
+  assert.equal(payload.totalPages, 1);
+  assert.equal(payload.items?.length, 3);
+
+  const filtered = await adminGet({
+    request: authedRequest('https://example.test/api/gift-admin?list=1&q=Third', access),
+    env: access.env,
+  } as never);
+  const filteredPayload = (await filtered.json()) as { total?: number; items?: Array<{ code?: string }> };
+  assert.equal(filteredPayload.total, 1);
+  assert.equal(filteredPayload.items?.[0]?.code, 'SSGC-CCCC-3333');
+});
