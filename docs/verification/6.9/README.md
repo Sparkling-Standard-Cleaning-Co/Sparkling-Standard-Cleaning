@@ -1,7 +1,8 @@
 # Initiative 6.9 verification evidence
 
-**Status:** code complete for the deployable portions; booking and gift sales remain behind owner
-activation gates.
+**Status:** deployed at `4e28788`; booking and gift sales remain behind owner activation gates.
+**Cloudflare Pages:** `7f8a172c-18a9-43d0-9a4e-382094ba211d`; GitHub `validate`, `browser` and
+Cloudflare checks passed.
 **Production baseline at start:** Initiative 6.10, `07360b7`.
 **Initiative 6.10 was preserved:** 12 Follow Us profiles, URLs, structured data and marketing docs.
 

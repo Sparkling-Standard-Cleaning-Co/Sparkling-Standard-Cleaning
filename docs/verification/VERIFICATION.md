@@ -1,5 +1,44 @@
 # Verification status
 
+## Verified — 2026-10-28 Initiative 6.9 deployment
+
+**Release:** `4e28788`; Cloudflare Pages deployment `7f8a172c-18a9-43d0-9a4e-382094ba211d`.
+GitHub `validate`, `browser` and Cloudflare Pages checks passed. Initiative 6.10 social
+activation (`eb8b2bc`/`07360b7`) is preserved.
+
+Implemented and deployed behind activation gates:
+- Pay Now final-summary state fix: preliminary quotes show **Verify Address & Finalize Price**,
+  verified quotes show Pay Now plus **Reserve This Cleaning (Pay Later)**. Regression test covers
+  desktop and mobile.
+- Google Calendar OAuth client, Central-Time/DST helpers, travel-aware availability, existing-job
+  and buffer logic, `GET /api/availability`, durable R2 holds with per-day locks, owner
+  confirmation/release, calendar event creation and a customer booking picker.
+- Gift ledger (idempotent issuance, balance, partial redemption), automatic branded
+  purchaser/recipient delivery, public balance lookup and owner-only admin API.
+
+Activation status:
+- Booking is **disabled** (`bookingConfig.enabled:false`); production returns
+  `enabled:false, reason:"booking_not_enabled"` and renders no slots.
+- Gift sales are **disabled**; the page remains request-only and no denomination is advertised.
+- No live card charge, Stripe test-mode payment, real calendar connection or real gift purchase was
+  performed.
+
+| Check | Result |
+| --- | --- |
+| TypeScript diagnostics | `npm run check`: 0 errors (173 files) |
+| Unit suite | **572 tests: 571 passed, 1 pre-existing skip, 0 failed** |
+| Browser regression | **151 passed, 0 failed** (GitHub) |
+| Production build / validation / smoke | passed |
+| Pay Now readiness | 200; enabled true; mode live; all checks true |
+| Booking gate | 200; enabled false; reason booking_not_enabled |
+| Gift admin | 401 without owner token; gift balance returns 404 for unknown code |
+| Live Pay Now evidence | `docs/verification/6.9/` |
+
+**Known residuals:** Google Calendar credentials/dedicated calendar and approved gift denominations
+were not supplied; Stripe test-mode credentials were not available; no live payment, calendar event
+or gift fulfillment was exercised. The deployed code does not advertise unavailable functionality.
+
+
 ## Verified — 2026-10-28 Initiative 6.10 social platform activation
 
 **Release:** `eb8b2bc`; Cloudflare Pages deployment `95b29d45-33fa-4fdf-a695-c058b53bdae2`.

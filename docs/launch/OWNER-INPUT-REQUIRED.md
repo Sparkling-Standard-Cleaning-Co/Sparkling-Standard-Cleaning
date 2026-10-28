@@ -120,7 +120,7 @@ Initiative 6.8 deliberately did not fabricate availability. Full architecture:
 | # | Item | Where | Notes |
 | --- | --- | --- | --- |
 | B1 | Choose the calendar/scheduling provider | Owner decision | Recommended starting point: Google Calendar free/busy for existing jobs plus a private Cloudflare booking ledger for holds. A free-tier scheduler may be used only if it supports the travel, duration and concurrency rules. |
-| B2 | Provide calendar authorization | Owner-controlled OAuth / service account + calendar ID | Never commit credentials. The owner must choose which calendar contains confirmed jobs. |
+| B2 | Provide calendar authorization | Owner-controlled OAuth / service account + calendar ID | Exact steps: docs/operations/GOOGLE-CALENDAR-SETUP.md. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, GOOGLE_CALENDAR_ID and BOOKING_OWNER_TOKEN as Cloudflare Secrets. Never commit credentials. |
 | B3 | Import existing jobs | Owner calendar or import file | A job is not available just because it is absent from the website. Start time, duration, location, crew and buffers are required. |
 | B4 | Approve scheduling rules | `schedulingConfig` + new booking config | Service hours, days off, minimum notice, advance window, travel/prep buffers, crew capacity, hold expiry and manual-review rules. |
 | B5 | Approve booking confirmation policy | Owner decision | Auto-confirm only if scope, price, capacity and travel all pass; otherwise keep owner approval. Pay Now must not imply a confirmed slot. |

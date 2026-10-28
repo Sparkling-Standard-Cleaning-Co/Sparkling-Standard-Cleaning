@@ -4,7 +4,7 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-28** (Initiative 6.10 social activation: twelve Follow Us profiles live; Instagram, YouTube and X UTM placements remain prepared pending owner confirmation).
+Last reviewed: **2026-10-28** (Initiative 6.9 payment/booking/gift code deployed; Pay Now live-mode ready; booking and gift sales intentionally disabled pending credentials/approval).
 
 **Release status:** production serves GitHub `main`; **Initiative 6.8 is live at
 `6e36c95` plus the HEIC test-stability fix `9fe8764`** (Cloudflare Pages deployments
@@ -45,7 +45,7 @@ Status vocabulary:
 | Cloudflare DNS for the domain | **owner-confirmed** | Domain active on Cloudflare nameservers (owner screenshots, Oct 2026) | None | `docs/deployment/DEPLOYMENT.md` |
 | Cloudflare Pages project | **live (verified)** | `sparkling-standard-cleaning` is Git-connected: every `main` push produces a Cloudflare Pages deployment; custom domain serving. Production commit at the start of the 2026-10-02 review was `1287a763` (owner-stated) | None | `docs/deployment/DEPLOYMENT.md` |
 | Production website | **live (verified)** | `https://sparkling-standard.com` — 27 built pages served; current release routes and payment-success utility page return 200; mobile-throttled LCP 1.26–1.65 s, CLS ≤ 0.038; axe 0 violations (2026-10-01 baseline) | None | `docs/verification/VERIFICATION.md` |
-| Production release (deployed) | **live - `0b907d4`** | Initiative 6.6 owner audit, three add-on bundles and server-verified Pay Now code; Cloudflare deployment `26e3b9f8-7665-426f-8687-7f171588c865`; GitHub `validate`, `browser` and Cloudflare checks passed. Pay Now remains hidden until Stripe secrets are configured. | Maintain; verify lead delivery after any form/pricing change | `docs/verification/VERIFICATION.md`, `docs/operations/ESTIMATE-PAYMENTS.md` |
+| Production release (deployed) | **live - `4e28788`** | Initiative 6.9 booking/gift infrastructure and truthful Pay Now flow; Cloudflare deployment `7f8a172c-18a9-43d0-9a4e-382094ba211d`; GitHub `validate`, `browser` and Cloudflare checks passed. Booking and gift sales remain disabled behind owner gates; no fake slots or unapproved prices render. | Maintain; complete owner Google Calendar and gift authorization | `docs/verification/VERIFICATION.md`, `docs/operations/ESTIMATE-PAYMENTS.md` |
 | Indexing status | **live — owner-approved** | Owner explicitly approves public search-engine indexing (2026-10-01). `robots.txt` = `Allow: /` + sitemap; every page meta robots = `index, follow`; `PUBLIC_PREVIEW_MODE` is NOT set | Maintain. Never introduce noindex/disallow, and never enable indexing on intentionally excluded utility pages | `docs/deployment/DEPLOYMENT.md` §11 |
 | Domain registration | **owner-confirmed** | Registered via Squarespace following Google Workspace purchase | None | — |
 | Google Workspace email | **owner-confirmed** | `owner@sparkling-standard.com` operational; MX/SPF/DKIM imported. Do **not** modify or enable Email Routing | None | `docs/deployment/DEPLOYMENT.md` |
