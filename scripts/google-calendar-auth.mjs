@@ -66,10 +66,7 @@ const server = http.createServer(async (request, response) => {
         redirect_uri: redirectUri,
       }),
     });
-    const token = (await tokenResponse.json().catch(() => ({}))) as {
-      refresh_token?: string;
-      error_description?: string;
-    };
+    const token = await tokenResponse.json().catch(() => ({}));
     if (!tokenResponse.ok || !token.refresh_token) {
       response.writeHead(500).end('Token exchange failed. Check the terminal.');
       console.error('Token exchange failed:', token.error_description ?? tokenResponse.status);
