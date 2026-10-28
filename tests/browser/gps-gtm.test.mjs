@@ -144,11 +144,11 @@ async function completeRemainingSteps(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
-  await page.click('[data-next]');
-  await page.click('[data-next]'); // extras
-  await page.fill('#est-date', BOOKING_DATE);
+    await page.click('[data-next]');
+    await page.fill('#est-date', BOOKING_DATE);
   await page.selectOption('#est-arrival', 'morning');
   await page.click('[data-next]');
+await page.click('[data-next]');
   await page.fill('#est-name', 'UX test (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');

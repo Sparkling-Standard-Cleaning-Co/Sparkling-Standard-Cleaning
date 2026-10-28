@@ -35,6 +35,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 import { constantTimeEqual, ownerTokenFromAuthorization } from './photo-auth.ts';
+import { isPhotoKey, isPhotoSidecarKey } from '../../src/lib/photos.ts';
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
@@ -46,8 +47,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (!bucket) return json({ ok: false, error: 'photo_storage_not_configured' }, 503);
 
   const url = new URL(request.url);
-  const parsedDays = Number(url.searchParams.get('days') ?? '90');
-  const days = Number.isFinite(parsedDays) ? Math.min(365, Math.max(7, Math.floor(parsedDays))) : 90;
+  const parsedDays = Number(url.searchParams.get('days') ?? '30');
+  const days = Number.isFinite(parsedDays) ? Math.min(365, Math.max(1, Math.floor(parsedDays))) : 30;
   const dryRun = url.searchParams.get('dry') === '1';
   const cutoff = Date.now() - days * 86_400_000;
 
@@ -61,7 +62,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const page = await bucket.list({ prefix: 'leads/', limit: 500, ...(cursor ? { cursor } : {}) });
     for (const object of page.objects) {
       scanned += 1;
+      // Defense in depth: this job only deletes server-generated customer-photo
+      // keys (and their metadata sidecars) under leads/. Payment, gift,
+      // booking, legal and agreement records can never match this shape.
       if (!object.key.startsWith('leads/')) continue;
+      const isPhoto = isPhotoKey(object.key);
+      const isSidecar = isPhotoSidecarKey(object.key);
+      if (!isPhoto && !isSidecar) continue;
       const uploaded = object.uploaded instanceof Date ? object.uploaded.getTime() : Number.NaN;
       if (!Number.isFinite(uploaded) || uploaded >= cutoff) continue;
       toDelete.push(object.key);

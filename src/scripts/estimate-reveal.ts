@@ -15,10 +15,15 @@ export function playEstimateReveal({ reveal, target }: EstimateRevealElements): 
   if (!reveal || !target) return Promise.resolve();
   const sequence = ++revealSequence;
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const duration = reduceMotion ? 120 : 850;
+  const duration = reduceMotion ? 120 : 5000;
 
   reveal.hidden = false;
   target.dataset.revealing = 'true';
+  if (!reduceMotion) {
+    window.requestAnimationFrame(() => {
+      reveal.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
 
   return new Promise((resolve) => {
     window.setTimeout(() => {

@@ -15,8 +15,19 @@ const options = PHOTO_CATEGORY_OPTIONS[engine];
 ---
 
 <section class="photo-upload" data-photo-section aria-labelledby="photo-upload-title" hidden>
-  <h3 class="photo-upload__title" id="photo-upload-title" data-photo-title>{copy.title}</h3>
+  <h3 class="photo-upload__title" id="photo-upload-title" data-photo-title>
+    {copy.title}{engine === 'residential' ? ' (optional)' : ''}
+  </h3>
   <p class="photo-upload__hint" data-photo-hint>{copy.hint}</p>
+  {
+    engine === 'residential' && (
+      <p class="photo-upload__hint">
+        Photos are recommended but optional. Your estimate assumes the home matches the condition
+        and details you provided. If conditions differ materially, we will discuss any necessary
+        adjustments before additional work. See our <a href="/terms/">Terms and Conditions</a>.
+      </p>
+    )
+  }
   <p class="photo-upload__privacy hint" data-photo-privacy>{copy.privacy}</p>
 
   <div class="photo-upload__grid" data-photo-grid></div>

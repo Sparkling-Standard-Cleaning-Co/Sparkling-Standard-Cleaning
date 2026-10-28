@@ -25,7 +25,7 @@ import type {
 } from '../../config/estimators/pricing-values.ts';
 import type { Frequency, PricingServiceType } from '../../config/pricing.ts';
 
-export type PromotionSource = 'addon_incentive' | 'addon_bundle' | 'appreciation' | 'founding' | 'campaign' | 'supportive';
+export type PromotionSource = 'addon_incentive' | 'custom_three' | 'addon_bundle' | 'appreciation' | 'founding' | 'campaign' | 'supportive';
 
 export interface PromotionCandidate {
   id: string;
@@ -75,6 +75,12 @@ export interface PromotionInput {
   addonIncentive: PromotionConfig;
   appreciationDiscounts: PromotionTerms[];
   addonBundles: AddonBundleDefinition[];
+  /** Owner-approved exact-three residential extras bundle. */
+  customThreeExtraBundle?: {
+    enabled: boolean;
+    percent: number;
+    maxDiscountUsd: number | null;
+  } | null;
   foundingTen: FoundingTenConfig;
   /**
    * The (approved) SPARKLE100 campaign configuration. Null disables it.
@@ -180,6 +186,28 @@ function addonIncentiveCandidate(input: PromotionInput): PromotionCandidate | nu
         ? `${percentLabel} off extras (${input.eligibleAddonIds.length} add-ons)`
         : `${percentLabel} off extras`,
     percent: tier.percent,
+    amount,
+  };
+}
+
+function customThreeCandidate(input: PromotionInput): PromotionCandidate | null {
+  const bundle = input.customThreeExtraBundle;
+  if (!bundle?.enabled || input.eligibleAddonIds.length !== 3 || input.addonSubtotal <= 0) return null;
+  if (input.serviceType === 'str_turnover') return null;
+  const amount = effectiveAmount({
+    kind: 'percent',
+    value: bundle.percent,
+    base: input.addonSubtotal,
+    cap: bundle.maxDiscountUsd,
+    gross: input.gross,
+    minimumJob: input.minimumJob,
+  });
+  if (amount <= 0) return null;
+  return {
+    id: 'custom-three-extra-bundle',
+    source: 'custom_three',
+    label: '20% off three extras',
+    percent: bundle.percent,
     amount,
   };
 }
@@ -407,6 +435,8 @@ export function evaluatePromotions(input: PromotionInput): PromotionEvaluation {
   const candidates: PromotionCandidate[] = [];
   const incentive = addonIncentiveCandidate(input);
   if (incentive) candidates.push(incentive);
+  const customThree = customThreeCandidate(input);
+  if (customThree) candidates.push(customThree);
   for (const bundle of input.addonBundles) {
     const candidate = bundleCandidate(bundle, input);
     if (candidate) candidates.push(candidate);
@@ -427,9 +457,10 @@ export function evaluatePromotions(input: PromotionInput): PromotionEvaluation {
     supportive: 0,
     campaign: 1,
     addon_incentive: 2,
-    addon_bundle: 3,
-    appreciation: 4,
-    founding: 5,
+    custom_three: 3,
+    addon_bundle: 4,
+    appreciation: 5,
+    founding: 6,
   };
   candidates.sort((a, b) => b.amount - a.amount || priority[a.source] - priority[b.source]);
   return { discount: candidates[0] ?? null, grant: founding.grant };

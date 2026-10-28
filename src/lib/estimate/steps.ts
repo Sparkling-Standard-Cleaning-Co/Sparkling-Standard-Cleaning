@@ -33,14 +33,14 @@ export const ESTIMATE_STEPS: readonly EstimateStepDefinition[] = [
     blurb: 'How the home has been kept, and how often you would like it cleaned.',
   },
   {
-    id: 'extras',
-    title: 'Optional Extras',
-    blurb: 'Focused extras with the price shown beside each one before you choose.',
-  },
-  {
     id: 'scheduling',
     title: 'Scheduling',
     blurb: 'Your preferred date and the arrival window that works for you.',
+  },
+  {
+    id: 'extras',
+    title: 'Optional Extras',
+    blurb: 'Focused extras with the price shown beside each one before you choose.',
   },
   {
     id: 'estimate',

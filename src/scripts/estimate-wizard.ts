@@ -97,6 +97,9 @@ if (formHost) {
 }
 
 function initEstimateWizard(form: HTMLFormElement): void {
+  const extrasSection = form.querySelector<HTMLElement>('.wizard__step[data-step="4"]');
+  const schedulingSection = form.querySelector<HTMLElement>('.wizard__step[data-step="5"]');
+  if (extrasSection && schedulingSection) extrasSection.before(schedulingSection);
   const steps = [...form.querySelectorAll<HTMLElement>('.wizard__step')];
   const backButton = form.querySelector<HTMLButtonElement>('[data-back]');
   const nextButton = form.querySelector<HTMLButtonElement>('[data-next]');
@@ -138,6 +141,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const pricePreviewNote = form.querySelector<HTMLElement>('[data-price-preview-note]');
   const addonIncentiveEl = form.querySelector<HTMLElement>('[data-addon-incentive]');
   const addonIncentiveText = form.querySelector<HTMLElement>('[data-addon-incentive-text]');
+  const customBundleEl = form.querySelector<HTMLElement>('[data-custom-bundle]');
+  const customBundleText = form.querySelector<HTMLElement>('[data-custom-bundle-text]');
   const bundleOffers = [...form.querySelectorAll<HTMLElement>('[data-bundle-id]')];
   const reserveCall = document.querySelector<HTMLAnchorElement>('[data-reserve-call]');
   const reserveText = document.querySelector<HTMLAnchorElement>('[data-reserve-text]');
@@ -294,6 +299,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     renderResult(result);
     renderAddonPrices(result);
     renderIncentive(result);
+    renderCustomBundle(result);
     renderBundles(result);
     renderPricePreview(result);
     renderReservationSummary(result);
@@ -478,6 +484,30 @@ function initEstimateWizard(form: HTMLFormElement): void {
     addonIncentiveText.textContent = `You're saving $${discount.amount.toFixed(2)} — ${discount.label.toLowerCase()}.`;
   }
 
+  function renderCustomBundle(result: EstimateResult): void {
+    if (!customBundleEl || !customBundleText) return;
+    const selectedExtras = result.status === 'estimated' ? result.pricing.selectedExtras : [];
+    if (selectedExtras.length !== 3) {
+      customBundleEl.hidden = true;
+      customBundleText.textContent = '';
+      return;
+    }
+    const subtotal = result.pricing.extrasSubtotal;
+    const nominal = Math.round(subtotal * 0.2 * 100) / 100;
+    const applied = result.pricing.discount?.source === 'custom_three'
+      ? result.pricing.discount.amount
+      : 0;
+    customBundleEl.hidden = false;
+    customBundleText.textContent =
+      `Selected extras: ${formatUsd(subtotal, { forceCents: true })}. ` +
+      `Three-extra bundle: ${formatUsd(nominal, { forceCents: true })} off, ` +
+      `leaving ${formatUsd(Math.max(0, subtotal - nominal), { forceCents: true })} for those extras.` +
+      (applied > 0
+        ? ' The 20% bundle is included in your total below.'
+        : result.pricing.discount
+          ? ' A larger single discount is applied instead under the no-stacking policy.'
+          : '');
+  }
   function renderBundles(result: EstimateResult): void {
     if (bundleOffers.length === 0) return;
     const selected = new Set(
@@ -763,7 +793,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
             )}`
           : '';
       bookingPicker.contextChanged(bookingKey);
-      if (currentStep === steps.length && bookingKey) void bookingPicker.activate();
+      if (currentStep === steps.length - 2 && bookingKey) void bookingPicker.activate();
     }
     reservationSummary.hidden = !hasQuote;
     if (submitButton) {
@@ -861,6 +891,20 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const scheduleRows = summaryGroup('Schedule', reservationScope);
         addSummaryRow(scheduleRows, 'Preferred date', textValue('preferredDate') ?? '');
         addSummaryRow(scheduleRows, 'Arrival', textValue('arrivalPreference')?.replaceAll('-', ' ') ?? '');
+        const held = bookingPicker?.holdFields();
+        addSummaryRow(
+          scheduleRows,
+          'Status',
+          held
+            ? `Temporary hold until ${held.booking_hold_expires_at.slice(11, 16)} Central — not confirmed`
+            : 'Pending owner confirmation',
+        );
+        const editButton = document.createElement('button');
+        editButton.type = 'button';
+        editButton.className = 'btn btn--ghost btn--small';
+        editButton.textContent = 'Edit date or time';
+        editButton.addEventListener('click', () => showStep(steps.length - 2));
+        scheduleRows.appendChild(editButton);
 
         const locationRows = summaryGroup('Location', reservationScope);
         addSummaryRow(
@@ -937,6 +981,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     updateChrome();
     recalc();
+    if (currentStep === steps.length - 2 && latestQuote) void bookingPicker?.activate();
     if (!changed) return;
 
     // Accessible focus management without scrolling the document.

@@ -34,6 +34,8 @@ const phone = contactPhone();
 const email = isPending(business.email) ? null : business.email;
 const smsEnabled = business.flags.smsEnabled;
 const incentiveEnabled = pricing.addonIncentive.enabled.value;
+const customThreeExtraEnabled = pricing.customThreeExtraBundle.enabled.value;
+const customThreeExtraPercent = pricing.customThreeExtraBundle.percent.value;
 const communitySupportEnabled = pricing.supportiveHomeDiscount.enabled.value;
 const communitySupportPercent = pricing.supportiveHomeDiscount.percent.value;
 const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
@@ -109,7 +111,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         <h2 class="wizard__step-heading" data-step-title={0}>{stepTitle(0)}</h2>
         <fieldset class="field" data-service-fieldset data-group-error="serviceType" data-group-message="Please select a cleaning service.">
           <legend>What kind of cleaning are you looking for?</legend>
-          <div class="option-grid option-grid--2">
+          <div class="option-grid">
             {
               RESIDENTIAL_SERVICE_OPTIONS.map((option) => (
                 <label class="option">
@@ -186,6 +188,15 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
                 </div>
               </div>
 
+              <ul
+                class="address-suggestions"
+                id="est-address-suggestions"
+                role="listbox"
+                aria-label="Address suggestions"
+                data-address-suggestions
+                hidden
+              ></ul>
+
               <div class="field-row field-row--3">
                 <div class="field field--grow">
                   <label for="est-address-city">City</label>
@@ -212,18 +223,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
                 </div>
               </div>
 
-              <ul
-                class="address-suggestions"
-                id="est-address-suggestions"
-                role="listbox"
-                aria-label="Address suggestions"
-                data-address-suggestions
-                hidden
-              ></ul>
-
-              <p class="hint address-finder__status" data-address-status data-kind="" aria-live="polite">
-                Start typing your street address — suggestions appear as you type.
-              </p>
+              <p class="hint address-finder__status" data-address-status data-kind="" aria-live="polite"></p>
 
               <div class="address-finder__actions">
                 <button type="button" class="btn btn--secondary btn--small" data-address-resolve>
@@ -433,7 +433,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       </section>
 
       <!-- Step 4 — add-ons -->
-      <section class="wizard__step" data-step="4" aria-label={stepTitle(3)}>
+      <section class="wizard__step" data-step="4" aria-label={stepTitle(4)}>
         <h2 class="wizard__step-heading" data-step-title={3}>{stepTitle(3)}</h2>
         <fieldset class="field">
           <legend>Any extras? (optional)</legend>
@@ -489,6 +489,20 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
               </p>
             )
           }
+          {
+            customThreeExtraEnabled && (
+              <div class="custom-bundle" data-custom-bundle hidden>
+                <p class="custom-bundle__title">
+                  Want to bundle and save on any of these extras?
+                </p>
+                <p class="custom-bundle__copy">
+                  Choose exactly three eligible extras and save{' '}
+                  {Math.round(customThreeExtraPercent * 100)}% on the extras subtotal.
+                </p>
+                <p class="custom-bundle__math" data-custom-bundle-text></p>
+              </div>
+            )
+          }
           <div class="option-grid option-grid--2">
             {addons.map((addon) => (
               <label class="option option--addon">
@@ -512,8 +526,8 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       </section>
 
       <!-- Step 5 — scheduling -->
-      <section class="wizard__step" data-step="5" aria-label={stepTitle(4)}>
-        <h2 class="wizard__step-heading" data-step-title={4}>{stepTitle(4)}</h2>
+      <section class="wizard__step" data-step="5" aria-label={stepTitle(3)}>
+        <h2 class="wizard__step-heading" data-step-title={3}>{stepTitle(3)}</h2>
         <div class="field-row field-row--2">
             <div class="field">
               <label for="est-date">Preferred date</label>
@@ -533,6 +547,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             </select>
           </div>
         </div>
+        <BookingPicker id="residential-booking" showDate={false} />
       </section>
 
       <!-- Step 6 — estimate + reservation + details -->
@@ -580,8 +595,6 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </div>
         </div>
         </div>
-
-        <BookingPicker id="residential-booking" />
 
         <div class="field-row field-row--2">
           <div class="field">

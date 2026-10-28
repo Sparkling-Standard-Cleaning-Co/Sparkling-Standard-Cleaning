@@ -42,6 +42,8 @@ export interface PaymentEventRecord {
     recipientEmail?: string;
     message?: string;
     deliveryDate?: string;
+    deliveryMethod?: 'print' | 'recipient_email';
+    deliveryTiming?: 'immediate' | 'scheduled';
   };
 }
 

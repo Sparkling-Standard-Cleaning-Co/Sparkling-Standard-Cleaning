@@ -115,8 +115,23 @@ export const pricing = {
   // ── Minimum job value (directive §22) ──────────────────────────────────────
   minimumJob: provisional(
     ownerPricing.minimumJob,
-    'Directive §22 initial provisional minimum. One setting only. Applied silently to the estimate range; the number is not advertised unless the owner approves.',
+    'Directive 22 initial provisional minimum. One setting only. Applied silently to the estimate range; the number is not advertised unless the owner approves.',
   ),
+
+  /**
+   * Owner-approved 15% reduction of residential optional-extra prices
+   * (2026-10-28). This is a price change, applied once to each eligible
+   * residential add-on charge; it never touches STR, commercial or church
+   * extras, base cleaning, travel or tax.
+   */
+  residentialExtras: {
+    state: 'approved' as ApprovalState,
+    priceFactor: approved(
+      ownerPricing.residentialExtras.priceFactor,
+      'Owner-approved 15% reduction of residential optional-extra prices (2026-10-28).',
+    ),
+    note: 'Applies exactly once to each residential add-on charge. Existing bundles and the three-extra bundle calculate from the reduced extras subtotal.',
+  },
 
   /**
    * Four INDEPENDENT owner-controlled calibration factors. Each applies to
@@ -313,6 +328,26 @@ export const pricing = {
     ],
     maxDiscount: provisional(ownerPricing.promotions.addonIncentive.maxDiscount, 'Internal safety cap on the incentive amount; keep below the smallest realistic add-on subtotal without owner review.'),
     note: 'Single tier only (never stacked). Applies only to non-specialty add-ons. Requires owner approval before it can be enabled.',
+  },
+
+  /**
+   * Owner-approved custom three-extra bundle (2026-10-28): exactly three
+   * distinct eligible residential extras receive 20% off their combined
+   * extras subtotal. Never base cleaning, travel or tax; never stacks with a
+   * standard bundle (the single largest eligible discount wins).
+   */
+  customThreeExtraBundle: {
+    state: 'approved' as ApprovalState,
+    enabled: approved(
+      ownerPricing.promotions.customThreeExtraBundle.enabled,
+      'Owner-approved three-extra bundle (2026-10-28).',
+    ),
+    percent: approved(
+      ownerPricing.promotions.customThreeExtraBundle.percent,
+      'Owner-approved 20% off exactly three eligible residential extras.',
+    ),
+    maxDiscountUsd: ownerPricing.promotions.customThreeExtraBundle.maxDiscountUsd,
+    note: 'Exact-three qualifying rule. Specialty/custom-quote items are ineligible. The standard bundles and this bundle compete under the single-discount policy.',
   },
 
   // ── One-hour response guarantee (PROPOSED — not published) ────────────────

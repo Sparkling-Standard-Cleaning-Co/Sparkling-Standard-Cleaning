@@ -85,8 +85,9 @@ async function openWizard(width, height) {
 
 const activeStep = (page) =>
   page.evaluate(() => {
-    const active = document.querySelector('.wizard__step[data-active="true"]');
-    return active ? Number(active.getAttribute('data-step')) : null;
+    const steps = [...document.querySelectorAll('.wizard__step')];
+    const active = steps.find((step) => step.getAttribute('data-active') === 'true');
+    return active ? steps.indexOf(active) + 1 : null;
   });
 
 const isVisible = (page, selector) => page.locator(selector).isVisible();
@@ -149,10 +150,11 @@ test('a new recurring residential request requires the Deep Cleaning acknowledgm
 });
 
 async function fillExtrasAndScheduling(page) {
-  await page.click('[data-next]'); // step 4: no add-ons
+  await page.click('[data-next]'); // scheduling
   await page.fill('#est-date', BOOKING_DATE);
   await page.selectOption('#est-arrival', 'morning');
-  await page.click('[data-next]');
+  await page.click('[data-next]'); // extras
+  await page.click('[data-next]'); // final summary
 }
 
 // ── Navigation contract at every viewport ────────────────────────────────────

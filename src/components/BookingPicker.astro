@@ -1,8 +1,10 @@
 ---
 interface Props {
   id: string;
+  showDate?: boolean;
 }
-const { id } = Astro.props;
+
+const { id, showDate = true } = Astro.props;
 ---
 <section class="booking-picker" data-booking-picker hidden aria-labelledby={`${id}-heading`}>
   <div class="booking-picker__head">
@@ -14,10 +16,14 @@ const { id } = Astro.props;
     </p>
   </div>
   <div class="booking-picker__date">
-    <div class="field">
-      <label for={`${id}-date`}>Preferred date</label>
-      <input class="input" id={`${id}-date`} type="date" data-booking-date />
-    </div>
+    {
+      showDate && (
+        <div class="field">
+          <label for={`${id}-date`}>Preferred date</label>
+          <input class="input" id={`${id}-date`} type="date" data-booking-date />
+        </div>
+      )
+    }
     <button class="btn btn--secondary" type="button" data-booking-check>Check Available Times</button>
   </div>
   <div class="booking-picker__slots" data-booking-slots role="list" aria-live="polite"></div>

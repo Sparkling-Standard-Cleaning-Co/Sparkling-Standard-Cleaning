@@ -152,12 +152,12 @@ async function finishAndSubmit(page, captured, { deepAck = false } = {}) {
     await page.waitForSelector('input[name="initialDeepCleanAcknowledged"]', { state: 'visible' });
     await page.check('input[name="initialDeepCleanAcknowledged"]');
   }
-  await page.click('[data-next]');
-  await page.click('[data-next]'); // extras
+  await page.click('[data-next]'); // scheduling
   const bookingDate = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
   await page.fill('#est-date', bookingDate);
   await page.selectOption('#est-arrival', 'morning');
-  await page.click('[data-next]');
+  await page.click('[data-next]'); // extras
+  await page.click('[data-next]'); // final summary
   await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
   await page.fill('#est-name', 'Service matrix test (please ignore)');
   await page.fill('#est-phone', '8500000000');

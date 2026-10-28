@@ -192,7 +192,7 @@ test('lead: selected extras are itemized with their actual server-calculated cha
   const oven = pricing.addons.items.find((addon) => addon.id === 'inside_oven');
   assert.ok(oven);
   const rate = pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour);
-  const ovenCharge = resolveAddonCharge(oven, rate);
+  const ovenCharge = resolveAddonCharge(oven, rate, pricing.residentialExtras.priceFactor.value);
   assert.ok(ovenCharge !== null);
   assert.equal(sent['Pricing — Extras subtotal'], formatUsd(ovenCharge), 'the oven charge comes from labor × rate');
   assert.match(

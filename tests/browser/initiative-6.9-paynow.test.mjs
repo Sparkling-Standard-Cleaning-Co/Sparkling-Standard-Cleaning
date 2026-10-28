@@ -133,11 +133,11 @@ async function reachFinalWithUnconfirmedAddress(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
-  await page.click('[data-next]');
-  await page.click('[data-next]');
-  await page.fill('#est-date', BOOKING_DATE);
+    await page.click('[data-next]');
+    await page.fill('#est-date', BOOKING_DATE);
   await page.selectOption('#est-arrival', 'morning');
   await page.click('[data-next]');
+await page.click('[data-next]');
   await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
 }
 

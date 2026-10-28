@@ -10,6 +10,10 @@ import { pricing, pricingValue } from '../src/config/pricing.ts';
 import { resolveAddonCharge } from '../src/lib/estimate/addons.ts';
 import type { EstimateInput } from '../src/lib/estimate/types.ts';
 
+function round2(value: number): number {
+  return Math.round((value + 1e-9) * 100) / 100;
+}
+
 function context(overrides: Partial<EstimateContext> = {}): EstimateContext {
   return {
     travel: {
@@ -63,9 +67,10 @@ test('every eligible add-on has a labor-derived charge and the figures reconcile
   for (const line of p.addonPrices.filter((addon) => !addon.customQuote)) {
     const definition = pricing.addons.items.find((addon) => addon.id === line.id);
     assert.ok(definition);
-    const expected = definition.fixedPriceUsd && definition.fixedPriceUsd > 0
+    const baseExpected = definition.fixedPriceUsd && definition.fixedPriceUsd > 0
       ? definition.fixedPriceUsd
-      : Math.round((definition.laborHours ?? 0) * p.ratePerLaborHour * 100) / 100;
+      : (definition.laborHours ?? 0) * p.ratePerLaborHour;
+    const expected = Math.round(baseExpected * pricing.residentialExtras.priceFactor.value * 100) / 100;
     assert.equal(line.charge, expected);
   }
   // Specialty work is never priced instantly.
@@ -102,13 +107,14 @@ test('recurring maintenance drives the recurring rate and its add-on charges', (
     pricingValue(pricing.laborEconomics.recurringGrossRevenuePerLaborHour),
   );
   const ongoingOven = recurring.ongoing.pricing.addonPrices.find((addon) => addon.id === 'inside_oven');
-  assert.equal(ongoingOven?.charge, resolveAddonCharge(oven, recurring.ongoing.pricing.ratePerLaborHour));
+  const addonFactor = pricing.residentialExtras.priceFactor.value;
+  assert.equal(ongoingOven?.charge, resolveAddonCharge(oven, recurring.ongoing.pricing.ratePerLaborHour, addonFactor));
 
   const oneTime = calculateEstimate(input({ frequency: 'one_time', addonIds: ['inside_oven'] }), context());
   const oneTimeOven = oneTime.pricing.addonPrices.find((addon) => addon.id === 'inside_oven');
-  assert.equal(oneTimeOven?.charge, resolveAddonCharge(oven, oneTime.pricing.ratePerLaborHour));
+  assert.equal(oneTimeOven?.charge, resolveAddonCharge(oven, oneTime.pricing.ratePerLaborHour, addonFactor));
   const firstVisitOven = recurring.pricing.addonPrices.find((addon) => addon.id === 'inside_oven');
-  assert.equal(firstVisitOven?.charge, resolveAddonCharge(oven, recurring.pricing.ratePerLaborHour));
+  assert.equal(firstVisitOven?.charge, resolveAddonCharge(oven, recurring.pricing.ratePerLaborHour, addonFactor));
 });
 
 test('the incentive is OFF by default and never changes the proposed price', () => {
@@ -122,7 +128,7 @@ test('the incentive is OFF by default and never changes the proposed price', () 
   assert.equal(without.pricing.subtotal, withOverride.pricing.subtotal);
 });
 
-test('two add-ons apply only the 5% tier; three apply only the 8% tier (never stacked)', () => {
+test('two add-ons use the 5% tier; three use the approved 20% extra bundle (never stacked)', () => {
   const two = calculateEstimate(
     input({ addonIds: ['inside_oven', 'laundry'] }),
     context({ addonIncentive: incentive(true) }),
@@ -139,11 +145,12 @@ test('two add-ons apply only the 5% tier; three apply only the 8% tier (never st
     context({ addonIncentive: incentive(true) }),
   );
   assert.ok(three.pricing.discount);
-  assert.equal(three.pricing.discount?.percent, 0.08);
-  // Only one tier: the 8% amount, not 5% + 8%.
-  assert.notEqual(
+  // The owner-approved exactly-three bundle (20%) outranks the old disabled
+  // incentive tier; it never stacks with the 5% tier.
+  assert.equal(three.pricing.discount?.percent, 0.2);
+  assert.equal(
     three.pricing.discount?.amount,
-    Math.round(three.pricing.extrasSubtotal * 0.13 * 100) / 100,
+    Math.round(three.pricing.extrasSubtotal * 0.2 * 100) / 100,
   );
 });
 
@@ -196,4 +203,59 @@ test('custom-quote specialty work still blocks instant pricing under the unified
   const result = calculateEstimate(input({ addonIds: ['carpet_cleaning'] }), context());
   assert.equal(result.status, 'custom_confirmation_required');
   assert.equal(selectInstantAmount(result), null);
+});
+
+test('residential extras receive the approved 15% reduction exactly once', () => {
+  const result = calculateEstimate(input({ addonIds: ['inside_oven', 'laundry'] }), context());
+  const factor = pricing.residentialExtras.priceFactor.value;
+  const expected = round2(
+    result.pricing.selectedExtras.reduce((sum, extra) => {
+      const definition = pricing.addons.items.find((addon) => addon.id === extra.id);
+      assert.ok(definition);
+      return sum + (resolveAddonCharge(definition, result.pricing.ratePerLaborHour, factor) ?? 0);
+    }, 0),
+  );
+  assert.equal(factor, 0.85);
+  assert.equal(result.pricing.extrasSubtotal, expected);
+  assert.equal(result.pricing.discount, null, 'the reduction is a price, not a promotion');
+});
+
+test('the exactly-three extras bundle gives 20% off only the extras subtotal', () => {
+  const result = calculateEstimate(
+    input({ addonIds: ['inside_oven', 'laundry', 'dishes'] }),
+    context(),
+  );
+  assert.equal(result.status, 'estimated');
+  assert.equal(result.pricing.discount?.source, 'custom_three');
+  assert.equal(result.pricing.discount?.percent, 0.2);
+  assert.equal(
+    result.pricing.discount?.amount,
+    round2(result.pricing.extrasSubtotal * 0.2),
+  );
+  const four = calculateEstimate(
+    input({ addonIds: ['inside_oven', 'laundry', 'dishes', 'inside_fridge'] }),
+    context(),
+  );
+  assert.notEqual(four.pricing.discount?.source, 'custom_three', 'four extras do not get the exact-three rule');
+});
+
+test('ongoing maintenance does not inherit the initial condition and history penalties', () => {
+  const result = calculateEstimate(
+    input({
+      frequency: 'biweekly',
+      condition: 'heavy',
+      lastClean: 'never_professional',
+      addonIds: [],
+    }),
+    context(),
+  );
+  assert.equal(result.status, 'estimated');
+  assert.ok(result.ongoing);
+  const maintained = calculateEstimate(
+    input({ frequency: 'biweekly', condition: 'maintained', lastClean: 'within_month' }),
+    context(),
+  );
+  assert.ok(maintained.ongoing);
+  assert.equal(result.ongoing.pricing.baseLaborHours, maintained.ongoing.pricing.baseLaborHours);
+  assert.ok(result.laborHours! > maintained.laborHours!, 'the first visit still carries the real condition');
 });

@@ -201,14 +201,26 @@ export function calculateEstimate(
 
   // The welcome campaign is a first-clean offer: it never discounts the
   // ongoing rhythm, whatever the customer claimed.
-  const ongoing = computeCore(input, {
-    ...context,
-    promotions: {
-      ...context.promotions,
-      claimedCampaignCode: null,
-      campaignArrangement: null,
+  // The first visit is priced for the home's current buildup. The ongoing
+  // maintenance rhythm assumes the home has been brought to Sparkling
+  // Standard's standard, so the one-time condition/history penalties are not
+  // applied forever. Actual workload factors (size, rooms, pets/add-ons and
+  // frequency) still apply.
+  const ongoing = computeCore(
+    {
+      ...input,
+      condition: 'maintained',
+      lastClean: 'within_month',
     },
-  });
+    {
+      ...context,
+      promotions: {
+        ...context.promotions,
+        claimedCampaignCode: null,
+        campaignArrangement: null,
+      },
+    },
+  );
 
   const ongoingSummary: OngoingVisitSummary | undefined =
     ongoing.status === 'estimated' && ongoing.expectedPrice !== null
@@ -336,20 +348,25 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
   const baseRaw = labor.baseHours * rate;
 
   // Every non-specialty add-on charge resolves through ONE helper: the
-  // owner-set fixed price when present, otherwise labor-hours × rate. The
-  // add-on subtotal is the sum of those resolved charges, so a fixed-price
-  // item feeds the total exactly as displayed. Labor-hours (including a
-  // fixed-price item's hours) still come from the labor model for scheduling.
+  // owner-set fixed price when present, otherwise labor-hours x rate. The
+  // owner-approved 15% residential extra reduction is applied exactly once
+  // here; STR turnover extras are not reduced.
+  const addonPriceFactor =
+    input.serviceType === 'str_turnover' ? 1 : pricing.residentialExtras.priceFactor.value;
   const addonPrices: AddonPriceLine[] = pricing.addons.items.map((item) => ({
     id: item.id,
     label: item.label,
     laborHours: item.laborHours ?? 0,
     customQuote: item.customQuote,
-    charge: resolveAddonCharge(item, rate),
+    charge: resolveAddonCharge(item, rate, addonPriceFactor),
   }));
   const selectedExtras = addonSelection.selected
     .filter((addon) => !addon.customQuote)
-    .map((addon) => ({ id: addon.id, label: addon.label, charge: resolveAddonCharge(addon, rate) ?? 0 }));
+    .map((addon) => ({
+      id: addon.id,
+      label: addon.label,
+      charge: resolveAddonCharge(addon, rate, addonPriceFactor) ?? 0,
+    }));
   const extrasSubtotal = round2(selectedExtras.reduce((sum, addon) => sum + addon.charge, 0));
   const addonRaw = extrasSubtotal;
 
@@ -382,6 +399,13 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
     addonIncentive: incentive,
     appreciationDiscounts: context.promotions?.appreciationDiscounts ?? pricing.promotions.appreciationDiscounts,
     addonBundles: context.promotions?.addonBundles ?? pricing.promotions.addonBundles,
+    customThreeExtraBundle: pricing.customThreeExtraBundle.enabled.value
+      ? {
+          enabled: true,
+          percent: pricing.customThreeExtraBundle.percent.value,
+          maxDiscountUsd: pricing.customThreeExtraBundle.maxDiscountUsd,
+        }
+      : null,
     foundingTen: context.promotions?.foundingTen ?? pricing.promotions.foundingTen,
     campaign: context.promotions?.campaign !== undefined ? context.promotions.campaign : pricing.promotions.campaign.value,
     claimedCampaignCode: context.promotions?.claimedCampaignCode ?? null,

@@ -156,10 +156,11 @@ test('calculateEstimate honors a fixed-price add-on while keeping its labor hour
     oven.fixedPriceUsd = 35;
     const result = calculateEstimate(input({ addonIds: ['inside_oven'] }), context());
     assert.equal(result.status, 'estimated');
+    const reduced = 35 * pricing.residentialExtras.priceFactor.value;
     const line = result.pricing.addonPrices.find((addon) => addon.id === 'inside_oven');
-    assert.equal(line?.charge, 35, 'the display line uses the fixed price');
-    assert.equal(result.pricing.selectedExtras[0]?.charge, 35, 'the selected extra uses the fixed price');
-    assert.equal(result.pricing.extrasSubtotal, 35, 'the extras subtotal uses the fixed price');
+    assert.equal(line?.charge, reduced, 'the display line uses the fixed price after the owner reduction');
+    assert.equal(result.pricing.selectedExtras[0]?.charge, reduced, 'the selected extra uses the fixed price after the owner reduction');
+    assert.equal(result.pricing.extrasSubtotal, reduced, 'the extras subtotal uses the fixed price after the owner reduction');
     assert.equal(result.pricing.addonLaborHours, oven.laborHours, 'labor hours still count for scheduling');
   } finally {
     if (originalFixedPrice === undefined) {
@@ -208,9 +209,16 @@ test('recurring 1600 sqft 3/2 biweekly with two add-ons reconciles client and se
     pricingValue(pricing.lastCleanFactors.within_month) *
     pricingValue(pricing.frequencyFactors.biweekly);
 
-  const ovenHours = pricing.addons.items.find((addon) => addon.id === 'inside_oven')?.laborHours ?? 0;
-  const laundryHours = pricing.addons.items.find((addon) => addon.id === 'laundry')?.laborHours ?? 0;
-  const expectedExtras = (ovenHours + laundryHours) * p.ratePerLaborHour;
+  const oven = pricing.addons.items.find((addon) => addon.id === 'inside_oven');
+  const laundry = pricing.addons.items.find((addon) => addon.id === 'laundry');
+  assert.ok(oven && laundry);
+  const ovenHours = oven.laborHours ?? 0;
+  const laundryHours = laundry.laborHours ?? 0;
+  const addonFactor = pricing.residentialExtras.priceFactor.value;
+  const expectedExtras = round2(
+    (resolveAddonCharge(oven, p.ratePerLaborHour, addonFactor) ?? 0) +
+      (resolveAddonCharge(laundry, p.ratePerLaborHour, addonFactor) ?? 0),
+  );
   const step = pricingValue(pricing.rounding.toNearest);
   const firstSubtotal = round2(firstLabor * p.ratePerLaborHour + round2(expectedExtras));
   const firstRounded = Math.floor(firstSubtotal / step) * step;

@@ -34,11 +34,13 @@ function round2(value: number): number {
 export function resolveAddonCharge(
   definition: AddonChargeDefinition,
   ratePerLaborHour: number,
+  priceFactor = 1,
 ): number | null {
   if (definition.customQuote) return null;
+  const factor = Number.isFinite(priceFactor) && priceFactor > 0 ? priceFactor : 1;
   const fixed = definition.fixedPriceUsd;
-  if (typeof fixed === 'number' && Number.isFinite(fixed) && fixed > 0) return round2(fixed);
-  return round2((definition.laborHours ?? 0) * ratePerLaborHour);
+  if (typeof fixed === 'number' && Number.isFinite(fixed) && fixed > 0) return round2(fixed * factor);
+  return round2((definition.laborHours ?? 0) * ratePerLaborHour * factor);
 }
 
 export function selectAddons(addonIds: string[]): AddonSelection {

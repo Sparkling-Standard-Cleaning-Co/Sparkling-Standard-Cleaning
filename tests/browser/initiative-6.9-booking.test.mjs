@@ -150,16 +150,16 @@ test('a real available slot becomes an expiring hold and travels with the reques
     await page.click('label.option:has(input[name="condition"][value="maintained"])');
     await page.selectOption('#est-last-clean', 'within_month');
     await page.selectOption('#est-pets', 'none');
-    await page.click('[data-next]');
-    await page.click('[data-next]');
-    await page.fill('#est-date', BOOKING_DATE);
+        await page.click('[data-next]');
+        await page.fill('#est-date', BOOKING_DATE);
     await page.selectOption('#est-arrival', 'morning');
-    await page.click('[data-next]');
     await page.waitForSelector('[data-booking-picker]', { state: 'visible' });
     await page.waitForSelector('.booking-picker__slot', { state: 'visible' });
     await page.click('.booking-picker__slot');
     await page.waitForFunction(() => !document.querySelector('[data-booking-hold]')?.hidden);
     assert.match((await page.locator('[data-booking-hold]').innerText()).replace(/\s+/g, ' '), /Temporary hold until .* Central/i);
+    await page.click('[data-next]');
+    await page.click('[data-next]');
 
     await page.fill('#est-name', 'Booking Test');
     await page.fill('#est-phone', '8500000000');

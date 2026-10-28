@@ -113,6 +113,10 @@ export function isPhotoKey(value: string): boolean {
   return PHOTO_KEY_PATTERN.test(value);
 }
 
+export function isPhotoSidecarKey(value: string): boolean {
+  return /^leads\/\d{4}\/\d{2}\/[a-z0-9-]{8,40}\/[a-z_]+-[0-9a-f]{32}\.(jpg|png|webp|heic)\.meta\.json$/.test(value);
+}
+
 /** True only when the key is inside this request's server-generated prefix. */
 export function photoKeyBelongsToRequest(key: string, requestRef: string): boolean {
   const ref = sanitizePhotoRequestRef(requestRef);

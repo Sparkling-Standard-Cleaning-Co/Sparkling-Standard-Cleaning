@@ -41,7 +41,7 @@ sets:
 ## Security and privacy controls
 
 - **Private R2 only.** Objects have no public URL. Retrieval is through
-  `/api/photo-view` with a time-limited HMAC link (default 90 days).
+  `/api/photo-view` with a time-limited HMAC link (default 30 days).
 - **Server-generated keys:**
   `leads/<yyyy/mm>/<request-ref>/<category>-<32-hex>.<ext>`.
 - **Content validation:** magic bytes for JPEG/PNG/WebP; PNG signature and
@@ -69,7 +69,7 @@ sets:
   The only analytics events are the existing non-PII form events.
 - **Retention:** operator-run cleanup removes objects (and `.meta.json`
   sidecars) older than the retention window, measured from the R2 upload time.
-  Default 90 days; orphaned uploads from abandoned forms are removed by the same
+  Default 30 days; orphaned uploads from abandoned forms are removed by the same
   cutoff. Customer deletion requests can be honoured earlier.
 
 ## Owner email attachments
@@ -138,7 +138,7 @@ These are the only external actions that remain:
      `PHOTO_OWNER_TOKEN` = a long random value (at least 32 random bytes).
    - This secret signs photo links and authenticates cleanup. It is never
      exposed to the browser.
-   - Optional: `PHOTO_LINK_TTL_DAYS` = `90` (1–365).
+   - Optional: `PHOTO_LINK_TTL_DAYS` = `30` (1–365).
    - Optional: `PHOTOS_MAX_BYTES` = `8388608` (hard-capped at 12 MiB).
 
 4. **Confirm Resend is active** — `RESEND_API_KEY` and the verified sending domain already used for customer confirmations. No new account/DNS/cost is required. Optionally set `OWNER_NOTIFICATION_EMAIL`; default `owner@sparkling-standard.com`.
@@ -173,13 +173,13 @@ CLI-driven deployment. Do not commit a real `wrangler.toml` containing secrets.
 - [ ] The private signed links still open every photo.
 - [ ] A simulated provider failure produces the Web3Forms fallback with an explicit failure note and links.
 - [ ] No public bucket URL, credential, photo bytes, or customer PII appears in logs or analytics.
-- [ ] `/api/photo-cleanup?days=90&dry=1` reports the expected retention window.
+- [ ] `/api/photo-cleanup?days=30&dry=1` reports the expected retention window.
 
 The first four are infrastructure prerequisites; the remaining items are the owner-run production acceptance test.
 ## Owner photo access
 
 - Open the signed private link in the owner notification. The link is valid for
-  the configured TTL (default 90 days) and displays only that photo.
+  the configured TTL (default 30 days) and displays only that photo.
 - Do not forward the links. Download the photo if it must be retained for a
   job record; the R2 object remains private.
 - For a permanent/manual workflow, use the Cloudflare dashboard (`R2` → bucket
@@ -190,14 +190,14 @@ The first four are infrastructure prerequisites; the remaining items are the own
 Run from a trusted machine (never in client code):
 
 ```powershell
-curl.exe -X POST "https://sparkling-standard.com/api/photo-cleanup?days=90" `
+curl.exe -X POST "https://sparkling-standard.com/api/photo-cleanup?days=30" `
   -H "Authorization: Bearer $env:PHOTO_OWNER_TOKEN"
 ```
 
 Preview without deleting:
 
 ```powershell
-curl.exe -X POST "https://sparkling-standard.com/api/photo-cleanup?days=90&dry=1" `
+curl.exe -X POST "https://sparkling-standard.com/api/photo-cleanup?days=30&dry=1" `
   -H "Authorization: Bearer $env:PHOTO_OWNER_TOKEN"
 ```
 
@@ -205,7 +205,12 @@ The endpoint processes up to 500 objects per page, deletes old photo objects and
 their sidecars, and reports `scanned`, `eligible`, `deleted`, `retentionDays`
 and `truncated`. Repeat while `truncated` is true for a large backlog. The
 retention clock is based on R2 `uploaded` time; unattached uploads are cleaned
-by the same rule.
+by the same rule. The cleanup is hard-limited to the `leads/` prefix **and** the
+server-generated photo key shape; it must never be pointed at `payments/`,
+`gifts/`, `booking/`, `legal/` or agreement records. See
+`docs/operations/R2-STORAGE-AND-BACKUP.md`. Automatic daily execution is not
+active; a production dry run and explicit owner approval are required before
+scheduling any deletion job.
 
 ## Testing notes
 
@@ -229,7 +234,7 @@ by the same rule.
 ## Current limitations / owner decisions
 
 1. R2 is provisioned and live; the owner must confirm inbox receipt/download for the final acceptance.
-2. Retention is 90 days by default; confirm or change it and keep the privacy
+2. Retention is 30 days by default; confirm or change it and keep the privacy
    page consistent.
 3. HEIC conversion happens in the browser. If a particular device/browser
    cannot decode HEIC, the customer receives an explicit instruction; the

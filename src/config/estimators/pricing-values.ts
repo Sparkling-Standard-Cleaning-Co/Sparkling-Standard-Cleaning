@@ -212,6 +212,15 @@ export interface OwnerPricingConfig {
   minimumJob: number;
 
   /**
+   * Owner-approved 15% reduction of residential optional-extra prices
+   * (2026-10-28). Applied once to each add-on charge; never to STR,
+   * commercial or church extras.
+   */
+  residentialExtras: {
+    priceFactor: number;
+  };
+
+  /**
    * One independent calibration factor per estimator. 1.00 = unchanged;
    * 0.90 = 10% lower; 1.10 = 10% higher. Applies to the eligible service
    * subtotal only, after the existing minimum/discount order and before travel
@@ -350,6 +359,17 @@ export interface OwnerPricingConfig {
       maxDiscount: number;
     };
     /**
+     * Owner-approved custom three-extra bundle (2026-10-28): exactly three
+     * distinct eligible residential extras receive 20% off the extras
+     * subtotal. It never discounts base cleaning, travel or tax and competes
+     * under the single-discount rule with standard bundles.
+     */
+    customThreeExtraBundle: {
+      enabled: boolean;
+      percent: number;
+      maxDiscountUsd: number | null;
+    };
+    /**
      * One-business-hour response guarantee. A service-recovery credit, never
      * an automatic booking promise. DISABLED until owner approval AND
      * documented response timestamps exist.
@@ -404,6 +424,11 @@ export const ownerPricing: OwnerPricingConfig = {
 
   // ── 2. Minimum job ────────────────────────────────────────────────────────
   minimumJob: 125,
+
+  // Owner-approved 2026-10-28: residential extras reduced by 15% exactly once.
+  residentialExtras: {
+    priceFactor: 0.85,
+  },
 
   // Owner-controlled global calibration — one independent factor per engine.
   estimatorCalibration: {
@@ -542,6 +567,11 @@ export const ownerPricing: OwnerPricingConfig = {
       twoAddons: { minAddons: 2, percent: 0.05 },
       threeOrMoreAddons: { minAddons: 3, percent: 0.08 },
       maxDiscount: 75,
+    },
+    customThreeExtraBundle: {
+      enabled: true,
+      percent: 0.2,
+      maxDiscountUsd: null,
     },
     responseGuarantee: {
       enabled: false,

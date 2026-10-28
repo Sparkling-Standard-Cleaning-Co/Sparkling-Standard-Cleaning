@@ -116,11 +116,11 @@ async function completeAfterAddress(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
-  await page.click('[data-next]');
-  await page.click('[data-next]'); // extras
-  await page.fill('#est-date', BOOKING_DATE);
+    await page.click('[data-next]');
+    await page.fill('#est-date', BOOKING_DATE);
   await page.selectOption('#est-arrival', 'morning');
   await page.click('[data-next]');
+await page.click('[data-next]');
   await page.fill('#est-name', 'Hotfix test (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
@@ -319,7 +319,11 @@ test('the map worker is configured and its failure path is honest (no page crash
     // The maplibre worker asset is part of the build; the page must initialize
     // the map without an uncaught script error (tiles are blocked here).
     await delay(1500);
-    assert.deepEqual(pageErrors, [], `no uncaught page errors: ${pageErrors.join(' | ')}`);
+    assert.deepEqual(
+      pageErrors,
+      [],
+      `uncaught page errors: ${pageErrors.join(' | ')}`,
+    );
     assert.equal(await page.locator('.maplibregl-marker').count(), 1, 'map marker initialized');
   } finally {
     await context.close();

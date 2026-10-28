@@ -84,7 +84,7 @@ function expectedResidentialPrice(overrides = {}) {
 function addonCharge(id, rate) {
   const addon = pricing.addons.items.find((item) => item.id === id);
   assert.ok(addon, `${id} must exist`);
-  return resolveAddonCharge(addon, rate);
+  return resolveAddonCharge(addon, rate, pricing.residentialExtras.priceFactor.value);
 }
 
 let server;
@@ -251,16 +251,16 @@ async function conditionStep(page) {
 }
 
 async function extrasStep(page, addons = []) {
+  await page.fill('#est-date', BOOKING_DATE);
+  await page.selectOption('#est-arrival', 'morning');
+  await page.click('[data-next]');
   for (const id of addons) {
     // Click the styled label (the visible option), not the hidden input.
     await page.click(`label.option:has(input[name="addons"][value="${id}"])`);
   }
-  await page.click('[data-next]');
 }
 
 async function timingStep(page) {
-  await page.fill('#est-date', BOOKING_DATE);
-  await page.selectOption('#est-arrival', 'morning');
   await page.click('[data-next]');
 }
 
@@ -500,7 +500,7 @@ test('reservation summary carries every answer and the call/text actions work', 
     const fields = captured.payload.fields;
     assert.equal(captured.payload.subject.includes('Reservation request'), true, 'subject marks a reservation');
     assert.equal(fields.request_type, 'reservation_request');
-    assert.equal(fields.quoted_price, '300');
+    assert.equal(fields.quoted_price, String(expectedResidentialPrice({ addonIds: ['inside_oven'] })));
     assert.match(fields.quote_reference, /^SS-\d{8}-[0-9A-Z]{6}$/);
     assert.equal(fields.quote_config_version, pricing.instantQuote.configVersion.value);
     assert.equal(fields.service_address, '100 S Baylen');
@@ -773,12 +773,8 @@ test('the final breakdown reconciles base, extras, rounding and the proposed tot
     await addressStep(page);
     await homeStep(page);
     await conditionStep(page);
-    await page.click('label.option:has(input[name="addons"][value="inside_oven"])');
-    await page.click('label.option:has(input[name="addons"][value="laundry"])');
-    await page.click('[data-next]');
-    await page.fill('#est-date', BOOKING_DATE);
-    await page.selectOption('#est-arrival', 'morning');
-    await page.click('[data-next]');
+    await extrasStep(page, ['inside_oven', 'laundry']);
+    await timingStep(page);
 
     const breakdown = (await page.locator('[data-price-breakdown]').textContent()) ?? '';
     const otherRate = pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour);

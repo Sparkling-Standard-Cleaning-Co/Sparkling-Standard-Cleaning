@@ -336,6 +336,8 @@ export function validateEstimatorConfiguration(
   }
 
   const minimum = numberValue(owner.minimumJob, 'minimumJob', errors, { positive: true });
+  const residentialExtras = asRecord(owner.residentialExtras, 'residentialExtras', errors);
+  numberValue(residentialExtras.priceFactor, 'residentialExtras.priceFactor', errors, { min: 0.5, max: 1 });
   const calibration = asRecord(owner.estimatorCalibration, 'estimatorCalibration', errors);
   for (const engine of ['residential', 'str', 'commercial', 'church'] as const) {
     const label = `${engine[0]?.toUpperCase()}${engine.slice(1)}`;
@@ -515,6 +517,13 @@ export function validateEstimatorConfiguration(
     numberValue(tier.percent, `promotions.addonIncentive.${key}.percent`, errors, { min: 0.000001, max: 0.25 });
   }
   numberValue(incentive.maxDiscount, 'promotions.addonIncentive.maxDiscount', errors, { positive: true });
+
+  const customBundle = asRecord(promotions.customThreeExtraBundle, 'promotions.customThreeExtraBundle', errors);
+  booleanValue(customBundle.enabled, 'promotions.customThreeExtraBundle.enabled', errors);
+  numberValue(customBundle.percent, 'promotions.customThreeExtraBundle.percent', errors, { min: 0.000001, max: 0.5 });
+  if (customBundle.maxDiscountUsd !== null && customBundle.maxDiscountUsd !== undefined) {
+    numberValue(customBundle.maxDiscountUsd, 'promotions.customThreeExtraBundle.maxDiscountUsd', errors, { positive: true });
+  }
 
   const guarantee = asRecord(promotions.responseGuarantee, 'promotions.responseGuarantee', errors);
   booleanValue(guarantee.enabled, 'promotions.responseGuarantee.enabled', errors);
