@@ -10,7 +10,8 @@ import {
 import { onRequestGet as availabilityGet } from '../functions/api/availability.ts';
 import { FakeLedger } from './helpers/payment-fakes.ts';
 import { onRequestPost as bookingAdminPost } from '../functions/api/booking-admin.ts';
-import { createBookingHold, getBookingHold } from '../src/lib/booking/holds.ts';
+import { createBookingHold, getBookingHold, holdKey } from '../src/lib/booking/holds.ts';
+import { writeLedgerJson } from '../src/lib/payments/ledger.ts';
 
 const env = {
   GOOGLE_CLIENT_ID: 'client',
@@ -240,4 +241,48 @@ test('booking admin is owner-token protected', async () => {
   const request = new Request('https://example.test/api/booking-admin?id=not-a-hold');
   const response = await bookingAdminPost({ request, env: {} } as never);
   assert.equal(response.status, 401);
+});
+test('owner cancellation deletes the calendar event and releases the hold', async () => {
+  const bucket = new FakeLedger();
+  const created = await createBookingHold(bucket, {
+    date: '2026-11-10',
+    start: '2026-11-10T15:00:00.000Z',
+    end: '2026-11-10T17:00:00.000Z',
+    durationMinutes: 120,
+    destination: { lat: 30.4111, lng: -87.2164 },
+    locationText: '100 S Baylen St, Pensacola, FL 32502',
+    reference: 'TEST-CANCEL',
+  });
+  assert.equal(created.ok, true);
+  if (!created.ok) return;
+  await writeLedgerJson(bucket, holdKey(created.hold.id), {
+    ...created.hold,
+    status: 'confirmed',
+    calendarEventId: 'evt-to-delete',
+  });
+  let deleted = 0;
+  await withFetch(
+    async (url, init) => {
+      if (url.includes('oauth2.googleapis.com/token')) return jsonResponse({ access_token: 'access', expires_in: 3600 });
+      if (url.includes('/events/evt-to-delete') && init?.method === 'DELETE') {
+        deleted += 1;
+        return new Response(null, { status: 204 });
+      }
+      throw new Error('unexpected fetch: ' + url);
+    },
+    async () => {
+      const request = new Request('https://example.test/api/booking-admin', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: created.hold.id, action: 'cancel' }),
+      });
+      const response = await bookingAdminPost({
+        request,
+        env: { ...env, PAYMENT_LEDGER: bucket, BOOKING_OWNER_TOKEN: 'owner' } as never,
+      } as never);
+      assert.equal(response.status, 200);
+    },
+  );
+  assert.equal(deleted, 1);
+  assert.equal((await getBookingHold(bucket, created.hold.id))?.status, 'released');
 });

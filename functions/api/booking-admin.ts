@@ -14,7 +14,7 @@ import {
   type BookingStorageEnv,
 } from '../../src/lib/booking/holds.ts';
 import { availabilityForDate, type BookingEnv } from '../../src/lib/booking/service.ts';
-import { createCalendarEvent } from '../../src/lib/booking/google-calendar.ts';
+import { createCalendarEvent, deleteCalendarEvent } from '../../src/lib/booking/google-calendar.ts';
 import { writeLedgerJson } from '../../src/lib/payments/ledger.ts';
 
 interface Env extends BookingEnv, BookingStorageEnv {
@@ -71,11 +71,15 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
   const id = typeof payload.id === 'string' ? payload.id : '';
-  const action = payload.action === 'release' ? 'release' : 'confirm';
+  const action = payload.action === 'release' ? 'release' : payload.action === 'cancel' ? 'cancel' : 'confirm';
   const hold = await getBookingHold(bucket, id);
   if (!hold) return json({ ok: false, error: 'not_found' }, 404);
 
-  if (action === 'release') {
+  if (action === 'release' || action === 'cancel') {
+    if (action === 'cancel' && hold.calendarEventId) {
+      const deleted = await deleteCalendarEvent(env, hold.calendarEventId);
+      if (!deleted.ok) return json({ ok: false, error: deleted.reason ?? 'calendar_delete_failed' }, 502);
+    }
     const released = { ...hold, status: 'released' as const };
     await writeLedgerJson(bucket, holdKey(id), released);
     return json({ ok: true, hold: released });

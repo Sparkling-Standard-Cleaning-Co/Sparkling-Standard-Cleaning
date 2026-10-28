@@ -215,3 +215,22 @@ export async function createCalendarEvent(
     return { ok: false, reason: 'calendar_unavailable' };
   }
 }
+
+export async function deleteCalendarEvent(
+  env: GoogleCalendarEnv,
+  eventId: string,
+): Promise<{ ok: boolean; reason?: 'auth_failed' | 'calendar_unavailable' }> {
+  const token = await accessToken(env);
+  if (!token) return { ok: false, reason: 'auth_failed' };
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${calendarPath(env)}/events/${encodeURIComponent(eventId)}`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
+    );
+    return response.ok || response.status === 404
+      ? { ok: true }
+      : { ok: false, reason: 'calendar_unavailable' };
+  } catch {
+    return { ok: false, reason: 'calendar_unavailable' };
+  }
+}
