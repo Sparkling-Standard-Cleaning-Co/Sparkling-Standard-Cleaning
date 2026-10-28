@@ -279,6 +279,13 @@ export function buildRequestSummary(fields: Record<string, string>): RequestSumm
   const taxNote = text(fields, 'tax_note');
   if (taxNote) add('Sales tax', taxNote);
 
+  const bookingStatus = text(fields, 'booking_request_status');
+  if (bookingStatus === 'pending_owner_review') {
+    add(
+      'Appointment',
+      'Time requested — pending owner approval. The temporary hold may expire; Sparkling Standard will confirm the appointment or offer an alternative.',
+    );
+  }
   const termsVersion = text(fields, 'terms_version');
   if (termsVersion) {
     const acceptedAt = text(fields, 'terms_accepted_at').slice(0, 10);
