@@ -100,6 +100,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const nextButton = form.querySelector<HTMLButtonElement>('[data-next]');
   const submitButton = form.querySelector<HTMLButtonElement>('[data-submit]');
   const payNowButton = form.querySelector<HTMLButtonElement>('[data-pay-now]');
+  const verifyAddressButton = form.querySelector<HTMLButtonElement>('[data-verify-address]');
+  const paymentNote = form.querySelector<HTMLElement>('[data-payment-note]');
+  const paymentUnavailable = form.querySelector<HTMLElement>('[data-payment-unavailable]');
   const progressFill = form.querySelector<HTMLElement>('[data-progress-fill]');
   const progressBar = form.querySelector<HTMLElement>('[data-progress-bar]');
   const progressPercent = form.querySelector<HTMLElement>('[data-progress-percent]');
@@ -146,6 +149,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   let acceptedPaymentAmount: number | null = null;
   let paymentRetryAvailable = false;
   let requestAlreadySent = false;
+  let addressVerificationPending = false;
   const photoController = initPhotoUploads(form, {
     engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
   });
@@ -682,15 +686,38 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   function syncPaymentAvailability(hasQuote: boolean): void {
-    if (!payNowButton) return;
     const eligible = paymentEnabled && !paymentBlocked && hasQuote && clientPaymentEligible();
-    payNowButton.hidden = !eligible;
-    if (!eligible) {
-      payNowButton.setAttribute('aria-busy', 'false');
-      payNowButton.textContent = payNowLabel();
-    } else if (!paymentBusy) {
-      payNowButton.textContent = payNowLabel();
+    const canOfferVerification = hasQuote && paymentEnabled && !paymentBlocked && !eligible;
+    if (payNowButton) {
+      payNowButton.hidden = !eligible;
+      if (!eligible) {
+        payNowButton.setAttribute('aria-busy', 'false');
+        payNowButton.textContent = payNowLabel();
+      } else if (!paymentBusy) {
+        payNowButton.textContent = payNowLabel();
+      }
     }
+    if (verifyAddressButton) verifyAddressButton.hidden = !canOfferVerification;
+    if (paymentUnavailable) {
+      paymentUnavailable.hidden = !hasQuote || eligible || canOfferVerification || (paymentEnabled && !paymentBlocked);
+    }
+    if (!paymentNote) return;
+    if (!hasQuote) {
+      paymentNote.textContent = '';
+      return;
+    }
+    if (eligible) {
+      paymentNote.innerHTML =
+        '<strong>Your estimate is ready.</strong> Pay securely now or reserve without paying upfront. Payment does not by itself confirm an appointment date.';
+      return;
+    }
+    if (canOfferVerification) {
+      paymentNote.innerHTML =
+        '<strong>Verify your service address to finalize your price and unlock secure online payment.</strong> You can still reserve without paying, and Sparkling Standard will confirm the final details.';
+      return;
+    }
+    paymentNote.innerHTML =
+      '<strong>Your cleaning request is ready.</strong> Sparkling Standard will confirm the final scope and price before arranging payment. Reserve without paying upfront, or call or text us.';
   }
   function maybeRevealEstimate(): void {
     if (!reservationSummary) return;
@@ -713,12 +740,29 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (!reservationSummary) return;
     const hasQuote = result.status === 'estimated' && latestQuote !== null;
     syncPaymentAvailability(hasQuote);
+    if (
+      addressVerificationPending &&
+      currentStep !== steps.length &&
+      hasQuote &&
+      latestQuote !== null &&
+      clientPaymentEligible()
+    ) {
+      addressVerificationPending = false;
+      if (status) {
+        status.dataset.state = 'info';
+        status.textContent =
+          'Address verified. Your price is finalized for secure online payment. Returning to your estimate…';
+      }
+      window.setTimeout(() => showStep(steps.length), 250);
+    }
     reservationSummary.hidden = !hasQuote;
     if (submitButton) {
       submitButton.textContent = requestAlreadySent
         ? 'Request Received'
         : hasQuote
-          ? 'Reserve This Cleaning'
+          ? paymentEnabled && !paymentBlocked && clientPaymentEligible() && !requestAlreadySent
+            ? 'Reserve This Cleaning (Pay Later)'
+            : 'Reserve This Cleaning'
           : 'Send My Request';
       if (requestAlreadySent) submitButton.disabled = true;
     }
@@ -1348,6 +1392,25 @@ function initEstimateWizard(form: HTMLFormElement): void {
   });
 
   // ── Fresh start (no drafts are ever stored) ───────────────────────────────
+  verifyAddressButton?.addEventListener('click', () => {
+    addressVerificationPending = true;
+    showStep(1);
+    if (status) {
+      status.dataset.state = 'info';
+      status.textContent =
+        'Verify your full service address and confirm the map pin. We will return you to your final estimate automatically.';
+    }
+    if (!addressFinder) {
+      if (status) {
+        status.dataset.state = 'error';
+        status.textContent =
+          'Address verification could not start. Please enter your full address on step 1, then return to the final step.';
+      }
+      return;
+    }
+    void addressFinder.verifyAddress();
+  });
+
   function resetWizard(): void {
     form.reset();
     addressFinder?.reset();
@@ -1367,6 +1430,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     paymentRetryAvailable = false;
     paymentBlocked = false;
     requestAlreadySent = false;
+    addressVerificationPending = false;
     setPayNowBusy(false);
     if (submitButton) submitButton.disabled = false;
     estimateStarted = false;

@@ -550,15 +550,20 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <p class="reservation-summary__qualification" data-reservation-qualification></p>
 
           <div class="reservation-actions">
-            <p class="reservation-actions__note">
-              <strong>Pay Now Securely</strong> pays this proposed total through Stripe.
-              <strong>Reserve This Cleaning</strong> sends the same request without paying
-              upfront. Either way, Sparkling Standard confirms the final details and date before
+            <p class="reservation-actions__note" data-payment-note>
+              Your estimate is ready. Sparkling Standard confirms the final details and date before
               the cleaning is booked.
             </p>
+            <button class="btn btn--secondary btn--large" type="button" data-verify-address hidden>
+              Verify Address &amp; Finalize Price
+            </button>
             <button class="btn btn--primary btn--large" type="button" data-pay-now hidden>
               Pay Now Securely
             </button>
+            <p class="small text-muted" data-payment-unavailable hidden>
+              Secure online payment is not available for this estimate yet. You can still reserve
+              without paying, or call or text us to arrange payment.
+            </p>
             <div class="reservation-actions__links">
               {phone && (
                 <a class="btn btn--ghost btn--small" data-reserve-call href={phone.href}>

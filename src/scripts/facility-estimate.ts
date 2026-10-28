@@ -52,6 +52,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   const status = host.querySelector<HTMLElement>('[data-form-status]');
   const submitButton = host.querySelector<HTMLButtonElement>('button[type="submit"]');
   const payNowButton = host.querySelector<HTMLButtonElement>('[data-facility-pay-now]');
+  const verifyAddressButton = host.querySelector<HTMLButtonElement>('[data-facility-verify-address]');
+  const paymentGuidance = host.querySelector<HTMLElement>('[data-facility-payment-guidance]');
   const payNowNote = host.querySelector<HTMLElement>('[data-facility-pay-note]');
   const reviewLines = host.querySelector<HTMLElement>('[data-facility-review-lines]');
   const reviewNote = host.querySelector<HTMLElement>('[data-facility-review-note]');
@@ -95,6 +97,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   let travel: RoutedTravel | null = null;
   let travelKey = '';
   let revealKey = '';
+  let addressVerificationPending = false;
   let finder: ReturnType<typeof initAddressFinder> = null;
 
   const phone = contactPhone();
@@ -123,29 +126,57 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     payNowButton.textContent = busy ? 'Preparing Secure Checkout...' : payNowLabel();
   }
 
-  function syncFacilityPayment(): void {
-    if (!payNowButton) return;
+  function facilityAddressReady(): boolean {
     const submitted = finder?.getSubmission();
-    const payable =
-      numericEstimatesEnabled &&
-      paymentEnabled &&
-      !paymentBlocked &&
-      currentStep === stepPanels.length &&
-      latestPrice?.priced === true &&
-      latestPrice.tier === 'A' &&
+    return (
       travel?.verified === true &&
       Boolean(submitted?.location) &&
       (submitted?.street.trim().length ?? 0) >= 5 &&
       submitted?.location?.precision !== 'street' &&
-      submitted?.location?.precision !== 'approximate';
-    payNowButton.hidden = !payable;
-    if (!payable) {
-      payNowButton.setAttribute('aria-busy', 'false');
-      payNowButton.textContent = payNowLabel();
-    } else if (!paymentBusy) {
-      payNowButton.textContent = payNowLabel();
+      submitted?.location?.precision !== 'approximate'
+    );
+  }
+
+  function syncFacilityPayment(): void {
+    const addressReady = facilityAddressReady();
+    const priceReady =
+      numericEstimatesEnabled &&
+      latestPrice?.priced === true &&
+      latestPrice.tier === 'A';
+    const eligibleBase = priceReady && currentStep === stepPanels.length;
+    const payable = eligibleBase && paymentEnabled && !paymentBlocked && addressReady;
+    const canVerify =
+      eligibleBase &&
+      paymentEnabled &&
+      !paymentBlocked &&
+      !addressReady;
+    if (payNowButton) {
+      payNowButton.hidden = !payable;
+      if (!payable) {
+        payNowButton.setAttribute('aria-busy', 'false');
+        payNowButton.textContent = payNowLabel();
+      } else if (!paymentBusy) {
+        payNowButton.textContent = payNowLabel();
+      }
+    }
+    if (verifyAddressButton) verifyAddressButton.hidden = !canVerify;
+    if (paymentGuidance) {
+      paymentGuidance.hidden = !eligibleBase || payable;
+      paymentGuidance.textContent = canVerify
+        ? 'Verify your service address to finalize travel and unlock secure online payment. You can still request the visit without paying.'
+        : 'Your cleaning request is ready. We will confirm the final scope and price before arranging payment.';
     }
     if (payNowNote) payNowNote.hidden = !payable;
+    if (
+      addressVerificationPending &&
+      currentStep !== stepPanels.length &&
+      priceReady &&
+      addressReady
+    ) {
+      addressVerificationPending = false;
+      setStatus('info', 'Address verified. Returning to your final facility estimate…');
+      window.setTimeout(() => showStep(stepPanels.length), 250);
+    }
   }
 
   function field(name: string): string {
@@ -452,6 +483,23 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       renderSummary();
       if (location) void lookupTravel(location.lat, location.lng);
     },
+  });
+
+  verifyAddressButton?.addEventListener('click', () => {
+    addressVerificationPending = true;
+    showStep(1);
+    setStatus(
+      'info',
+      'Verify the full facility address and confirm the map pin. We will return you to the final estimate automatically.',
+    );
+    if (!finder) {
+      setStatus(
+        'error',
+        'Address verification could not start. Please enter the full facility address on step 1, then return to the final step.',
+      );
+      return;
+    }
+    void finder.verifyAddress();
   });
 
   async function lookupTravel(lat: number, lng: number): Promise<void> {

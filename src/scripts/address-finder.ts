@@ -59,6 +59,8 @@ export interface AddressFinderHandle {
   focus(): void;
   /** Open and focus the manual-entry section. */
   focusManual(): void;
+  /** Resolve the typed address and show the pin confirmation for checkout eligibility. */
+  verifyAddress(): Promise<void>;
 }
 
 interface ResolvedCandidate {
@@ -1176,5 +1178,12 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     },
     focus: () => streetField.focus(),
     focusManual: () => openManualSection(),
+    verifyAddress: async () => {
+      ensureManualMode();
+      if (manualDetails) manualDetails.open = true;
+      streetField.focus();
+      setStatus('Verify your full service address, then confirm the map pin.', 'info');
+      await manualResolve();
+    },
   };
 }

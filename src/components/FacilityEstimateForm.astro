@@ -544,11 +544,18 @@ const facilityStepDescriptions = church
     <button class="btn btn--primary btn--large btn--block" type="submit" data-facility-submit data-cta={church ? 'church-submit' : 'commercial-submit'} hidden>
       <Icon name="send" size={18} /> {church ? 'Request Our Church Estimate' : 'Request My Facility Estimate'}
     </button>
+    <button class="btn btn--secondary btn--large btn--block" type="button" data-facility-verify-address hidden>
+      Verify Address &amp; Finalize Price
+    </button>
     <button class="btn btn--secondary btn--large btn--block" type="button" data-facility-pay-now hidden>
       Pay Now Securely
     </button>
+    <p class="small text-muted" data-facility-payment-guidance hidden>
+      Verify your service address to finalize travel and unlock secure online payment.
+    </p>
     <p class="small text-muted" data-facility-pay-note hidden>
-      Pay this single-price estimate securely now, or request the visit without paying upfront.
+      Your estimate is ready. Pay securely now or request the visit without paying upfront. Payment
+      does not by itself confirm an appointment.
     </p>
   </div>
   <p class="form-status" data-form-status role="status" aria-live="polite"></p>
