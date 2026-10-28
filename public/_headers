@@ -1,0 +1,20 @@
+# Financial and redemption pages must never be cached by a browser or proxy.
+/gift-admin/*
+  Cache-Control: no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+
+/gift-certificates/redeem/*
+  Cache-Control: no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+
+/estimate/payment-success/*
+  Cache-Control: no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow
+
+/estimate/payment-canceled/*
+  Cache-Control: no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow

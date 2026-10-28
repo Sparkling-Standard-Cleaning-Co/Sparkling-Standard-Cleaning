@@ -56,7 +56,8 @@ SMS provider is approved, configured and tested; the page does not claim otherwi
 setting caused the production enrollment HTTP 500. New hashes therefore use 100,000 iterations,
 which is **below current OWASP PBKDF2 guidance**; this is a runtime compatibility ceiling, not the
 preferred permanent architecture. Unique 16-byte random salts, a minimum 12-character/three-class
-password policy, rate limiting, generic login failures, session hardening, CSRF and password
+password policy, distributed rate limiting (per-IP and account-wide counters persisted in the
+ledger, not per-isolate memory), generic login failures, session hardening, CSRF and password
 step-up remain in force. The stored format is `pbkdf2-sha256$<iterations>$<salt>$<hash>`, so the
 algorithm and cost stay explicit; older higher-cost hashes remain recognizable and are rehashed
 after a successful login on a runtime that can compute them. A server-side pepper was evaluated

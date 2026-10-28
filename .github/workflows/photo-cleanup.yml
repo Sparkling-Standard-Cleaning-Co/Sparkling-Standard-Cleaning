@@ -1,0 +1,30 @@
+name: photo-cleanup
+
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete eligible customer photos older than 30 days
+        env:
+          SITE_URL: ${{ secrets.PUBLIC_SITE_URL }}
+          PHOTO_OWNER_TOKEN: ${{ secrets.PHOTO_OWNER_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PHOTO_OWNER_TOKEN:-}" ]; then
+            echo "PHOTO_OWNER_TOKEN is not configured; skipping photo retention cleanup."
+            exit 0
+          fi
+          base="${SITE_URL:-https://sparkling-standard.com}"
+          base="${base%/}"
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-delay 10 --max-time 60 \
+            -X POST "$base/api/photo-cleanup?days=30" \
+            -H "Authorization: Bearer $PHOTO_OWNER_TOKEN"

@@ -40,14 +40,18 @@ import {
   sendAdminEmail,
   type AdminEmailEnv,
 } from '../../src/lib/admin/email.ts';
+import {
+  AUTH_RATE_LIMITS,
+  clearRateLimit,
+  rateLimitStatus,
+  recordRateLimitFailure,
+} from '../../src/lib/admin/rate-limit.ts';
 
 interface Env extends AdminStorageEnv, AdminEmailEnv {
   GIFT_ADMIN_SETUP_CODE?: string;
 }
 
-const WINDOW_MS = 15 * 60_000;
-const MAX_FAILURES = 5;
-const failures = new Map<string, { count: number; resetAt: number }>();
+const ADMIN_ACCOUNT_RATE_KEY = 'hayli';
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -58,29 +62,6 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
       ...headers,
     },
   });
-}
-
-function throttled(ip: string): boolean {
-  const now = Date.now();
-  const entry = failures.get(ip);
-  if (!entry || entry.resetAt <= now) {
-    failures.delete(ip);
-    return false;
-  }
-  return entry.count >= MAX_FAILURES;
-}
-
-function recordFailure(ip: string): void {
-  const now = Date.now();
-  const entry = failures.get(ip);
-  failures.set(ip, {
-    count: (entry && entry.resetAt > now ? entry.count : 0) + 1,
-    resetAt: now + WINDOW_MS,
-  });
-}
-
-function clearFailures(ip: string): void {
-  failures.delete(ip);
 }
 
 function sameOrigin(request: Request): boolean {
@@ -192,10 +173,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (await readAdmin(bucket)) return json({ ok: false, error: 'already_configured' }, 409);
     const expected = env.GIFT_ADMIN_SETUP_CODE?.trim() ?? '';
     if (!expected) return json({ ok: false, error: 'setup_unavailable' }, 503);
-    if (throttled(`setup:${ip}`)) return json({ ok: false, error: 'rate_limited' }, 429);
+    if ((await rateLimitStatus(bucket, 'setup:ip', ip, AUTH_RATE_LIMITS.setupIp)).limited) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
     const supplied = text(payload.setupCode, 200);
     if (!supplied || !constantTimeEqual(supplied, expected)) {
-      recordFailure(`setup:${ip}`);
+      await recordRateLimitFailure(bucket, 'setup:ip', ip, AUTH_RATE_LIMITS.setupIp);
       await audit(bucket, 'admin.setup', { success: false, ip });
       return json({ ok: false, error: 'setup_rejected' }, 401);
     }
@@ -219,7 +202,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     };
     const created = await createAdmin(bucket, admin);
     if (!created) return json({ ok: false, error: 'already_configured' }, 409);
-    clearFailures(`setup:${ip}`);
+    await clearRateLimit(bucket, 'setup:ip', ip);
     const { token, session } = await createSession(bucket, { ip, userAgent });
     let verificationSent = false;
     if (recoveryEmail && env.RESEND_API_KEY) {
@@ -242,15 +225,27 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (action === 'login') {
     const admin = await readAdmin(bucket);
     if (!admin) return json({ ok: false, error: 'not_configured' }, 503);
-    if (throttled(ip)) return json({ ok: false, error: 'rate_limited' }, 429);
+    const [ipLimited, accountLimited] = await Promise.all([
+      rateLimitStatus(bucket, 'login:ip', ip, AUTH_RATE_LIMITS.loginIp),
+      rateLimitStatus(bucket, 'login:account', ADMIN_ACCOUNT_RATE_KEY, AUTH_RATE_LIMITS.loginAccount),
+    ]);
+    if (ipLimited.limited || accountLimited.limited) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
     const password = typeof payload.password === 'string' ? payload.password : '';
     const valid = password.length > 0 && password.length <= 200 && (await verifyPassword(password, admin.passwordHash));
     if (!valid) {
-      recordFailure(ip);
+      await Promise.all([
+        recordRateLimitFailure(bucket, 'login:ip', ip, AUTH_RATE_LIMITS.loginIp),
+        recordRateLimitFailure(bucket, 'login:account', ADMIN_ACCOUNT_RATE_KEY, AUTH_RATE_LIMITS.loginAccount),
+      ]);
       await audit(bucket, 'admin.login', { success: false, ip });
       return json({ ok: false, error: 'invalid_credentials' }, 401);
     }
-    clearFailures(ip);
+    await Promise.all([
+      clearRateLimit(bucket, 'login:ip', ip),
+      clearRateLimit(bucket, 'login:account', ADMIN_ACCOUNT_RATE_KEY),
+    ]);
     if (hashNeedsUpgrade(admin.passwordHash)) {
       const upgraded = await safeHashPassword(password);
       if (upgraded) {
@@ -280,8 +275,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (action === 'recover') {
     // Always return the same response: recovery must not reveal whether the
     // account or a verified recovery channel exists.
-    if (throttled(`recover:${ip}`)) return json({ ok: true, accepted: true });
-    recordFailure(`recover:${ip}`);
+    if ((await rateLimitStatus(bucket, 'recover:ip', ip, AUTH_RATE_LIMITS.recoveryIp)).limited) {
+      return json({ ok: true, accepted: true });
+    }
+    await recordRateLimitFailure(bucket, 'recover:ip', ip, AUTH_RATE_LIMITS.recoveryIp);
     const admin = await readAdmin(bucket);
     const channel = text(payload.channel, 20);
     if (admin && channel === 'email' && admin.recoveryEmail && admin.recoveryEmailVerified) {
@@ -300,7 +297,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
 
   if (action === 'reset') {
-    if (throttled(`reset:${ip}`)) return json({ ok: false, error: 'rate_limited' }, 429);
+    if ((await rateLimitStatus(bucket, 'reset:ip', ip, AUTH_RATE_LIMITS.resetIp)).limited) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
     const token = text(payload.token, 300);
     const password = typeof payload.password === 'string' ? payload.password : '';
     const passwordIssue = passwordProblem(password);
@@ -309,7 +308,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!passwordHash) return json({ ok: false, error: 'auth_crypto_unavailable' }, 503);
     const challenge = await consumeChallenge(bucket, token, 'reset_password');
     if (!challenge) {
-      recordFailure(`reset:${ip}`);
+      await recordRateLimitFailure(bucket, 'reset:ip', ip, AUTH_RATE_LIMITS.resetIp);
       await audit(bucket, 'admin.password.reset', { success: false, ip });
       return json({ ok: false, error: 'invalid_or_expired' }, 400);
     }
@@ -322,6 +321,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       passwordHash,
       updatedAt: new Date().toISOString(),
     });
+    await clearRateLimit(bucket, 'reset:ip', ip);
     await invalidateAllSessions(bucket);
     await sendAdminEmail(env, challenge.email, buildPasswordChangedEmail(env), `admin-changed-${challenge.tokenHash.slice(0, 24)}`);
     await audit(bucket, 'admin.password.reset', { success: true, ip, actor: 'hayli' });

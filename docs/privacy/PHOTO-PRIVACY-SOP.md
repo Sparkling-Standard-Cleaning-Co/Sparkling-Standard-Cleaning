@@ -59,8 +59,8 @@ marketing content:
 - stored only in the private R2 bucket; never public and never indexed;
 - server-strips EXIF/GPS/text metadata before storage;
 - viewed by the owner through time-limited signed links, not a public gallery;
-- retained up to 90 days after upload, then removed by the `/api/photo-cleanup`
-  retention process; deletion can be requested sooner;
+- retained for 30 days after upload, then removed by the `/api/photo-cleanup`
+  retention process (daily workflow or R2 lifecycle rule); deletion can be requested sooner;
 - never reused in marketing, social media or public proof without separate
   written permission;
 - not sent to analytics, and no photo URL/key reaches GA4.

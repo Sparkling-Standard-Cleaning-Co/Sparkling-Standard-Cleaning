@@ -67,10 +67,13 @@ sets:
   `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`.
 - **Analytics:** no photo content, key, URL, filename or count is sent to GA4.
   The only analytics events are the existing non-PII form events.
-- **Retention:** operator-run cleanup removes objects (and `.meta.json`
-  sidecars) older than the retention window, measured from the R2 upload time.
-  Default 30 days; orphaned uploads from abandoned forms are removed by the same
-  cutoff. Customer deletion requests can be honoured earlier.
+- **Retention:** a daily GitHub Actions workflow (`.github/workflows/photo-cleanup.yml`)
+  calls `POST /api/photo-cleanup?days=30`; it skips until the owner adds the
+  `PHOTO_OWNER_TOKEN` repository secret. Objects and `.meta.json` sidecars older
+  than the window are removed by R2 upload time. Orphaned uploads from abandoned
+  forms are removed by the same cutoff. Customer deletion requests can be
+  honoured earlier. A 30-day R2 lifecycle rule on `leads/` is the recommended
+  zero-secret safety net.
 
 ## Owner email attachments
 
@@ -208,9 +211,10 @@ retention clock is based on R2 `uploaded` time; unattached uploads are cleaned
 by the same rule. The cleanup is hard-limited to the `leads/` prefix **and** the
 server-generated photo key shape; it must never be pointed at `payments/`,
 `gifts/`, `booking/`, `legal/` or agreement records. See
-`docs/operations/R2-STORAGE-AND-BACKUP.md`. Automatic daily execution is not
-active; a production dry run and explicit owner approval are required before
-scheduling any deletion job.
+`docs/operations/R2-STORAGE-AND-BACKUP.md`. Daily execution is prepared but
+remains unverified until the `PHOTO_OWNER_TOKEN` repository secret is added and
+the first scheduled run is observed. A production dry run should be checked
+once before relying on the schedule.
 
 ## Testing notes
 

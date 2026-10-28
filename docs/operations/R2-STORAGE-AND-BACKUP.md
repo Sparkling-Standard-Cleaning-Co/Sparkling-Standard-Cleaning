@@ -30,19 +30,23 @@ proof of the production bucket.
 | `PAYMENT_LEDGER` or fallback | `booking/locks/<date>.json` | Per-day conditional lock | `src/lib/booking/holds.ts` | Short-lived; no blanket deletion |
 | `PAYMENT_LEDGER` or fallback | `booking/requests/BR-<hold>.json` | Durable owner-review booking requests | `/api/lead`, `/api/booking-admin` | Business record; no automatic deletion |
 | Gift ledger or fallback | `gifts/certificates/<code>.json` | Gift certificate value, redemption history | Stripe webhook; gift admin | Financial liability; no automatic deletion |
-| Gift ledger or fallback | `gifts/deliveries/<code>.json` | Durable scheduled gift deliveries | Stripe webhook; gift delivery processor | Pending until sent; retained for audit |
+
 | Planned private R2 | `agreements/templates/` | Approved agreement templates | Future owner upload | Versioned; no automatic deletion |
 | Planned private R2 | `agreements/signed/` | Signed customer artifacts | Future e-sign workflow | Legal record; no automatic deletion |
 | Planned private R2 | `agreements/audit/` | Signature/audit events | Future e-sign workflow | Legal record; no automatic deletion |
 
 ## Current retention status
 
-- Customer photos: **30-day public privacy commitment**. The automated scheduler is not configured
-  in this repository; cleanup is currently owner-run through `POST /api/photo-cleanup?days=30`.
+- Customer photos: **30-day public privacy commitment**. `.github/workflows/photo-cleanup.yml`
+  runs daily and calls `POST /api/photo-cleanup?days=30`. It skips safely until the owner adds the
+  `PHOTO_OWNER_TOKEN` repository secret; it never prints the token.
+- A Cloudflare R2 lifecycle rule on prefix `leads/` (30-day expiration) is the recommended
+  zero-secret safety net. That rule is dashboard configuration and is not yet verified from here.
 - Payment, booking, gift, terms and agreement records: **not subject to photo cleanup**.
-- `photo-cleanup` now requires both the `leads/` prefix and the server-generated photo key shape via
-  `isPhotoKey()`. A future object under `leads/` that is not a photo is not eligible.
-- No production deletion schedule is active. No destructive operation was run in this work.
+- `photo-cleanup` requires both the `leads/` prefix and the server-generated photo key shape via
+  `isPhotoKey()`, so `legal/`, `payments/`, `booking/`, `gifts/` and `agreements/` can never match.
+- No destructive operation was run in this work. Production execution remains unverified until the
+  repository secret or lifecycle rule is configured and the first run is observed.
 
 ## Backup status
 
@@ -76,13 +80,16 @@ evidence or a read-only API credential before the inventory can show actual usag
 - supports `dry=1`;
 - deletes only photo keys, never payment, gift, booking, legal or agreement records.
 
-Automated daily execution is **not active**. Before activation:
+Activation requires the owner to add the `PHOTO_OWNER_TOKEN` repository secret (same value as the
+Cloudflare photo token) or configure an equivalent R2 lifecycle rule. Before relying on either:
 
-1. Run a production dry run and inspect the eligible key list.
+1. Run a production dry run (`?days=30&dry=1`) and inspect the eligible key list.
 2. Verify the retention threshold and object count.
 3. Confirm no non-photo record is eligible.
-4. Obtain explicit owner approval for the destructive schedule.
-5. Configure a scheduler only after that approval.
+4. Observe the first scheduled run (or lifecycle execution) and record the result.
+
+The 30-day automated deletion policy is owner-approved in the current launch directive. This
+document does not claim execution until the actual run is observed.
 
 ## Recovery limitations
 

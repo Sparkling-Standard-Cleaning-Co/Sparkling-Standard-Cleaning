@@ -104,6 +104,21 @@ test('partial redemption reduces the balance and records history', async () => {
   assert.equal(stored.history[0]?.reference, 'JOB-1');
 });
 
+test('simultaneous redemptions cannot spend the same balance twice', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const [first, second] = await Promise.all([
+    redeemGiftCertificate(bucket, 'SSGC-ABCD-2345', 6000, 'Concurrent A', 'JOB-A'),
+    redeemGiftCertificate(bucket, 'SSGC-ABCD-2345', 6000, 'Concurrent B', 'JOB-B'),
+  ]);
+  assert.equal([first.ok, second.ok].filter(Boolean).length, 1);
+  const stored = await lookupGiftCertificate(bucket, 'SSGC-ABCD-2345');
+  assert.ok(stored);
+  assert.equal(stored.redeemedCents, 6000);
+  assert.equal(remainingCents(stored), 4000);
+  assert.equal(stored.history.length, 1);
+});
+
 test('over-redemption and duplicate full redemption are rejected', async () => {
   const bucket = new FakeLedger();
   await issueGiftCertificate(bucket, record({ valueCents: 5000 }));
