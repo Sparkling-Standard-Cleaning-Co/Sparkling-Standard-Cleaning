@@ -199,3 +199,36 @@ attempt and that the reservation/manual-review path remains available.
 
 **Not yet proven:** a controlled Stripe test-mode card payment. The production runtime currently has
 a live-mode key; no test-mode credentials were provided, and no live charge was authorized.
+
+### Batch A server hardening (2026-10-28, local; not deployed)
+
+The owner-authorized commercial implementation directive identified several server-side trust gaps.
+The current local source now enforces:
+
+- **Facility Tier A only at the API boundary.** The UI already hid Pay Now for Tier B/C, but the
+  checkout endpoint accepted any server-verified facility total. `verifyFacilityPayment()` now
+  rejects a priced Tier B range (`expectedRange !== null`) and any unpriced/custom facility quote.
+  `functions/api/estimate-checkout.ts:314-355`.
+- **Facility travel is not client-trusted in the lead relay.** `/api/lead` now re-resolves the
+  destination and re-routes from the private origin, then passes the server route into
+  `verifyFacilityQuote()`. Client `travel_one_way_miles`, `travel_verified` and
+  `travel_qualification` are server-owned and discarded from the incoming payload.
+  `functions/api/lead.ts:339-392`, `496-532`; `src/lib/estimate/facility-verify.ts:44-51`.
+- **Facility checkout requires an exact server-geocoded destination and a positive driving
+  duration.** ZIP-centroid facility destinations and distance-only routes are reservation-only.
+  `functions/api/estimate-checkout.ts:321-327`.
+- **Residential/STR checkout requires a positive driving duration.** A distance-only route can no
+  longer pass the structural verification guard. `functions/api/estimate-checkout.ts:374-382`.
+- **Booking holds use the configured hold duration.** The writer now reads
+  `bookingConfig.holdMinutes` instead of a duplicated hardcoded `20`. `src/lib/booking/holds.ts:141`.
+- **Holds and pending requests use the same binding as booking/payment readiness.**
+  `PAYMENT_LEDGER` wins over `PHOTOS_BUCKET`, so a hold cannot be written to one store and read from
+  another. `functions/api/lead.ts:566-635`, `src/lib/payments/ledger.ts:26-45`.
+
+Regression coverage added: `tests/estimate-checkout.test.ts` (Tier B direct-API rejection,
+route-without-duration rejection), `tests/facility-verify.test.ts` (server route evidence overrides
+client travel), and `tests/facility-lead-travel.test.ts` (forged client travel does not reach the
+owner notification as verified).
+
+These changes are local only. They have not been deployed, and no live charge or financial
+activation was performed.

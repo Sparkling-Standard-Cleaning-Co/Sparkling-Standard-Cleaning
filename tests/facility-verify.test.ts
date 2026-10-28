@@ -54,6 +54,23 @@ test('a tampered cleaning price is flagged as a mismatch', () => {
   assert.equal(result.status, 'mismatch');
 });
 
+test('server route evidence overrides client travel claims', () => {
+  const verified = verifyFacilityQuote(fieldsFor(), {
+    routedOneWayMiles: 10,
+    routedTravelVerified: true,
+  });
+  assert.equal(verified.status, 'verified');
+  assert.equal(verified.travelStatus, 'verified');
+
+  const noRoute = verifyFacilityQuote(
+    fieldsFor({ travel_one_way_miles: '999', travel_verified: 'true' }),
+    { routedOneWayMiles: null, routedTravelVerified: false },
+  );
+  assert.notEqual(noRoute.status, 'verified');
+  assert.equal(noRoute.travelStatus, 'preliminary');
+  assert.equal(noRoute.expectedTotal, verifyFacilityQuote(fieldsFor()).expectedTotal);
+});
+
 test('a stale configuration version is flagged', () => {
   const result = verifyFacilityQuote(fieldsFor({ quote_config_version: 'old' }));
   assert.equal(result.configMatch, 'mismatch');

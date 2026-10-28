@@ -110,7 +110,12 @@ test('a contact message is not blocked by transactional terms', async () => {
     leadPost({
       request: jsonRequest({
         subject: 'Question',
-        fields: { request_type: 'contact', phone: '8500000000', message: 'Hello' },
+        fields: {
+          request_type: 'contact',
+          phone: '8500000000',
+          email: 'contact@example.test',
+          message: 'Hello',
+        },
       }),
       env: { WEB3FORMS_ACCESS_KEY: 'dummy' },
     } as never),

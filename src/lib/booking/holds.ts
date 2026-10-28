@@ -3,6 +3,7 @@
  * not a confirmed appointment. All writes for one day are serialized with an
  * R2 conditional lock so two customers cannot hold overlapping time.
  */
+import { bookingConfig } from '../../config/booking.ts';
 import {
   createLedgerJson,
   deleteLedgerKey,
@@ -138,7 +139,7 @@ export async function createBookingHold(
   ) {
     return { ok: false, error: 'invalid' };
   }
-  const expiresAt = new Date(Date.now() + 20 * 60_000).toISOString();
+  const expiresAt = new Date(Date.now() + bookingConfig.holdMinutes * 60_000).toISOString();
   const id = `${input.date}__${crypto.randomUUID()}`;
   const hold: BookingHold = {
     version: 1,

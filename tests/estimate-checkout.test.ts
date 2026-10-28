@@ -56,7 +56,8 @@ function makeEnv(ledger: FakeLedger) {
   };
 }
 
-function providerStub() {
+function providerStub(options: { includeDuration?: boolean } = {}) {
+  const includeDuration = options.includeDuration !== false;
   let checkoutPosts = 0;
   const stub = async (url: string | URL, init?: RequestInit) => {
     const href = String(url);
@@ -89,7 +90,10 @@ function providerStub() {
       });
     }
     if (href.includes('/route/v1/')) {
-      return jsonResponse({ code: 'Ok', routes: [{ distance: 16093.44, duration: 1200 }] });
+      return jsonResponse({
+        code: 'Ok',
+        routes: [{ distance: 16093.44, ...(includeDuration ? { duration: 1200 } : {}) }],
+      });
     }
     if (href.includes('/v1/checkout/sessions/')) {
       return jsonResponse({
@@ -162,6 +166,56 @@ function validFacilityInput(engine: 'commercial' | 'church' = 'commercial') {
       terms_accepted: 'yes',
       terms_version: '2026-10-27.terms.v1',
     },
+  };
+}
+
+function tierBFacilityInput() {
+  const workload = calculateFacilityWorkload({
+    cleanableSqft: 8000,
+    restroomFixtures: 6,
+    breakroom: false,
+    facilityType: 'office',
+    condition: 'average',
+    traffic: 'average',
+    flooring: 'mixed',
+    firstClean: false,
+    specialty: false,
+  });
+  const price = calculateFacilityPrice(workload, 'weekly', { oneWayMiles: 10 });
+  assert.ok(price.priced && price.tier === 'B');
+  return {
+    price,
+    fields: {
+      request_type: 'facility_estimate',
+      engine_type: 'commercial',
+      service_type: 'commercial_cleaning',
+      facility_type: 'office',
+      cleanable_sqft: '8000',
+      restroom_fixtures: '6',
+      breakroom: 'none',
+      condition: 'average',
+      traffic: 'average',
+      flooring: 'mixed',
+      frequency: 'weekly',
+      service_address: '100 S Baylen St',
+      address_city: 'Pensacola',
+      address_state: 'FL',
+      zip: '32502',
+      address_method: 'manual',
+      address_confirmed: 'yes',
+      pin_latitude: '30.411100',
+      pin_longitude: '-87.216400',
+      pin_adjusted: 'no',
+      cleaning_subtotal: String(price.cleaningSubtotal),
+      quoted_price: String(price.total),
+      quote_config_version: pricing.commercialPricing.configVersion.value,
+      email: 'customer@example.test',
+      name: 'Synthetic Customer',
+      organization: 'Synthetic Tier B Facility',
+      phone: '8500000000',
+      terms_accepted: 'yes',
+      terms_version: '2026-10-27.terms.v1',
+    } as Record<string, string>,
   };
 }
 
@@ -244,6 +298,24 @@ test('a valid facility quote creates one session at the server-calculated amount
   assert.equal(amountCents, String(Math.round(price.total * 100)));
   assert.equal(provider.postCount(), 1);
   assert.equal(ledger.values.size, 1);
+});
+
+test('a Tier B facility quote cannot create a checkout session through the API', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub();
+  const { fields } = tierBFacilityInput();
+  const response = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ fields, returnPath: '/estimate/commercial/' }),
+      env,
+    } as never),
+  );
+  assert.equal(response.status, 400);
+  const data = (await response.json()) as { error?: string; reason?: string };
+  assert.equal(data.error, 'quote_not_payable');
+  assert.equal(data.reason, 'facility_range');
+  assert.equal(provider.postCount(), 0, 'no Stripe session for a Tier B range');
 });
 
 test('repeated requests return the existing session instead of charging twice', async () => {
@@ -446,6 +518,24 @@ for (const serviceType of ['standard', 'str_turnover'] as const) {
     assert.equal(amount > 0, true);
   });
 }
+
+test('a residential route without a driving duration cannot create checkout', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub({ includeDuration: false });
+  const { fields } = validResidentialInput('standard');
+  const response = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ fields, returnPath: '/estimate/residential/' }),
+      env,
+    } as never),
+  );
+  assert.equal(response.status, 400);
+  const data = (await response.json()) as { error?: string; reason?: string };
+  assert.equal(data.error, 'quote_not_payable');
+  assert.equal(data.reason, 'quote_not_verified');
+  assert.equal(provider.postCount(), 0);
+});
 
 test('church Tier A uses the discounted server total and creates checkout', async () => {
   const ledger = new FakeLedger();

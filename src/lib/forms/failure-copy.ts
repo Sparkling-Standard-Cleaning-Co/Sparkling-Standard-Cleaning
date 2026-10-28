@@ -18,6 +18,8 @@ export type FailureReason =
   | 'spam_rejected'
   | 'verification_failed'
   | 'invalid_request'
+  | 'email_required'
+  | 'email_invalid'
   | 'deep_clean_required'
   | 'terms_required'
   | 'terms_outdated'
@@ -55,6 +57,10 @@ export function failureCopy(reason: FailureReason, contact: ContactFacts): strin
       return `We couldn't complete the security check before sending. Please try again — your answers are still here — or ${alternatives}.`;
     case 'invalid_request':
       return `Some of your details didn't come through. Please check the form and try again, or ${alternatives}.`;
+    case 'email_required':
+      return `Please enter a valid email address so we can send your receipt, booking update and service documents. You can also ${alternatives}.`;
+    case 'email_invalid':
+      return `That email address does not look complete. Please enter a valid address, such as name@example.com, or ${alternatives}.`;
     case 'deep_clean_required':
       return `A new recurring residential arrangement must begin with a Deep Cleaning. Please go back to the condition and frequency step and confirm the Deep Cleaning requirement, then send your request again.`;
     case 'terms_required':

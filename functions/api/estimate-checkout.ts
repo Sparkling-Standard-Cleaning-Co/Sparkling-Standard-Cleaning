@@ -38,6 +38,7 @@ import {
 } from '../../src/lib/payments/ledger.ts';
 import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.ts';
 import { legalTerms } from '../../src/config/legal.ts';
+import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
 
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   STRIPE_SECRET_KEY?: string;
@@ -137,11 +138,6 @@ function sanitizeFields(value: unknown): Record<string, string> {
     count += 1;
   }
   return clean;
-}
-
-function emailFrom(fields: Record<string, string>): string {
-  const email = (fields.email ?? '').trim();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) ? email.toLowerCase() : '';
 }
 
 function siteOrigin(env: Env): string {
@@ -321,8 +317,16 @@ async function verifyFacilityPayment(
   const destination = await resolveServerDestination(fields, env).catch(() => null);
   const origin = parseLatLng(env.TRAVEL_ORIGIN);
   if (!origin || !destination) return { ok: false, reason: 'route_unavailable' };
+  if (destination.source !== 'address_geocode') return { ok: false, reason: 'quote_not_verified' };
   const route = await resolveRoute(env, origin, destination).catch(() => null);
-  if (!route || !route.verified || !Number.isFinite(route.oneWayMiles) || route.oneWayMiles <= 0) {
+  if (
+    !route ||
+    !route.verified ||
+    !Number.isFinite(route.oneWayMiles) ||
+    route.oneWayMiles <= 0 ||
+    route.durationMinutes === null ||
+    route.durationMinutes <= 0
+  ) {
     return { ok: false, reason: 'route_unavailable' };
   }
 
@@ -332,12 +336,16 @@ async function verifyFacilityPayment(
   });
   if (verification.configMatch === 'mismatch') return { ok: false, reason: 'quote_stale' };
   if (verification.status === 'mismatch') return { ok: false, reason: 'price_mismatch' };
-  if (verification.status !== 'verified' || verification.expectedTotal === null) {
+  // Tier B is a range (expectedRange != null) and Tier C is not priced at all.
+  // The customer UI hides Pay Now for both; the server must enforce the same
+  // rule so a direct API call cannot buy a range/custom quote.
+  if (verification.expectedRange !== null || verification.expectedTotal === null) {
     return {
       ok: false,
       reason: verification.expectedRange !== null ? 'facility_range' : 'facility_not_verified',
     };
   }
+  if (verification.status !== 'verified') return { ok: false, reason: 'facility_not_verified' };
 
   const amountCents = cents(verification.expectedTotal);
   const quotedCents = cents(quoted);
@@ -377,6 +385,8 @@ async function verifyResidentialPayment(
   const structurallyVerified =
     verification.travel.verified &&
     verification.travel.destinationSource === 'address_geocode' &&
+    verification.travel.durationMinutes !== null &&
+    verification.travel.durationMinutes > 0 &&
     verification.pinCheck === 'ok' &&
     verification.configMatch === 'match';
   if (!structurallyVerified) return { ok: false, reason: 'quote_not_verified' };
@@ -507,8 +517,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     );
   }
 
-  const email = emailFrom(fields);
-  if (!email) return json({ ok: false, error: 'email_required' }, 400);
+  const emailProblem = customerEmailProblem(fields.email);
+  if (emailProblem) return json({ ok: false, error: emailProblem }, 400);
+  const email = normalizeCustomerEmail(fields.email);
   const attemptFingerprint = await paymentHash(
     [
       candidate.reference,

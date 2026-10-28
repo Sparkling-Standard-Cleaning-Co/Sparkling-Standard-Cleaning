@@ -55,6 +55,7 @@ const reservationFields = (overrides: Record<string, string> = {}) => ({
   service_address: '100 S Baylen St',
   name: 'Reservation Test',
   phone: '8500000000',
+  email: 'reservation@example.test',
   quoted_price: '0',
   quote_reference: 'SS-20261001-ABC123',
   quote_config_version: pricing.instantQuote.configVersion.value,
@@ -272,7 +273,10 @@ test('lead: a non-priced request is delivered without verification fields', asyn
   const { stub, forwarded } = verificationStub();
   const response = await withFetch(stub, () =>
     leadPost({
-      request: jsonRequest({ subject: 'Estimate', fields: { phone: '5551234567', service_type: 'standard' } }),
+      request: jsonRequest({
+        subject: 'Estimate',
+        fields: { phone: '5551234567', email: 'customer@example.test', service_type: 'standard' },
+      }),
       env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key' },
     } as never),
   );

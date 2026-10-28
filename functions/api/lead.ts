@@ -22,6 +22,7 @@
 
 import {
   isPricedReservation,
+  resolveServerDestination,
   verifyReservationQuote,
   type QuoteVerificationEnv,
 } from '../../src/lib/estimate/verify.ts';
@@ -30,6 +31,7 @@ import { verifyFacilityQuote, stripFacilityPricingFields } from '../../src/lib/e
 import { taxPresentationForService } from '../../src/lib/estimate/tax.ts';
 import type { Frequency } from '../../src/lib/estimate/types.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
+import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
 import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
 import { schedulingConfig } from '../../src/config/scheduling.ts';
 import { legalTerms } from '../../src/config/legal.ts';
@@ -51,7 +53,8 @@ import {
 import { buildPhotoViewUrl } from './photo-auth.ts';
 import { createPendingBookingRequest } from '../../src/lib/booking/requests.ts';
 import type { BookingHold } from '../../src/lib/booking/holds.ts';
-import type { LedgerBucket } from '../../src/lib/payments/ledger.ts';
+import { paymentLedger, type LedgerBucket } from '../../src/lib/payments/ledger.ts';
+import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.ts';
 
 interface R2ObjectLike {
   arrayBuffer?(): Promise<ArrayBuffer>;
@@ -76,6 +79,7 @@ interface Env extends QuoteVerificationEnv {
   // Customer photo storage (Smart Estimate directive, Part 2). The R2 bucket
   // binding and the owner viewing token exist only in the function env.
   PHOTOS_BUCKET?: R2BucketLike;
+  PAYMENT_LEDGER?: LedgerBucket;
   PHOTO_OWNER_TOKEN?: string;
   PHOTO_LINK_TTL_DAYS?: string;
   OWNER_NOTIFICATION_EMAIL?: string;
@@ -132,7 +136,9 @@ const SERVER_OWNED_KEYS = new Set([
   'travel_provider',
   'travel_distance_miles',
   'travel_duration_minutes',
+  'travel_one_way_miles',
   'travel_verified',
+  'travel_qualification',
   'travel_destination_source',
   'initial_deep_clean_required',
   'first_visit_total',
@@ -271,10 +277,12 @@ export async function onRequestPost(context: {
   // customer their submission.
   if (clean.extra_ref) return json({ ok: false, error: 'spam_rejected' }, 403);
 
-  // Require at least one contact channel.
-  if (!clean.phone && !clean.email) {
-    return json({ ok: false, error: 'invalid_request' }, 400);
-  }
+  // Owner decision: a valid customer email is mandatory on every submission,
+  // including contact messages and reservations. Phone-only is no longer a
+  // submission path; a syntactically valid email is not proof of ownership.
+  const emailProblem = customerEmailProblem(clean.email);
+  if (emailProblem) return json({ ok: false, error: emailProblem }, 400);
+  clean.email = normalizeCustomerEmail(clean.email);
 
   // Owner requirement: a cleaning request or reservation must carry a
   // server-verified acceptance of the current terms and applicable policies.
@@ -337,11 +345,43 @@ export async function onRequestPost(context: {
   // When the owner switch is off, every client-supplied price field is removed
   // and the request is recorded as a scope review only.
   if (clean.request_type === 'facility_estimate') {
-    const facility = verifyFacilityQuote(clean);
+    // Do not trust the client's travel fields. Re-resolve and re-route the
+    // facility destination server-side; the verified flag is only true for an
+    // exact geocoded address with a live route and a real driving duration.
+    const facilityDestination = await resolveServerDestination(clean, env).catch(() => null);
+    const facilityOrigin = parseLatLng(env.TRAVEL_ORIGIN);
+    const facilityRoute =
+      facilityOrigin && facilityDestination
+        ? await resolveRoute(env, facilityOrigin, facilityDestination).catch(() => null)
+        : null;
+    const facilityTravelVerified =
+      Boolean(facilityDestination && facilityDestination.source === 'address_geocode') &&
+      facilityRoute?.verified === true &&
+      typeof facilityRoute.durationMinutes === 'number' &&
+      facilityRoute.durationMinutes > 0;
+    const facility = verifyFacilityQuote(clean, {
+      routedOneWayMiles: facilityRoute?.oneWayMiles ?? null,
+      routedTravelVerified: facilityTravelVerified,
+    });
     if (!facility.pricingEnabled) stripFacilityPricingFields(clean);
-    clean.facility_quote_verified = facility.status;
+    clean.facility_quote_verified = !facilityTravelVerified
+      ? 'unverifiable'
+      : facility.status === 'verified' && facility.expectedRange === null
+        ? 'verified'
+        : 'preliminary';
     clean.facility_config_match = facility.configMatch;
-    clean.facility_travel_status = facility.travelStatus;
+    clean.facility_travel_status = facilityTravelVerified ? facility.travelStatus : 'manual_review';
+    clean.travel_method = facilityRoute?.method ?? 'none';
+    clean.travel_provider = facilityRoute?.provider ?? 'none';
+    clean.travel_verified = String(facilityTravelVerified);
+    clean.travel_qualification = facilityTravelVerified ? 'verified_route' : 'manual_review';
+    clean.travel_one_way_miles = facilityRoute ? String(Math.round(facilityRoute.oneWayMiles * 10) / 10) : '';
+    if (facilityRoute) {
+      clean.travel_distance_miles = String(Math.round(facilityRoute.oneWayMiles * 10) / 10);
+      if (facilityRoute.durationMinutes !== null) {
+        clean.travel_duration_minutes = String(Math.round(facilityRoute.durationMinutes));
+      }
+    }
     clean.estimate_status =
       facility.pricingEnabled && facility.expectedCleaning !== null
         ? 'estimated'
@@ -533,6 +573,15 @@ export async function onRequestPost(context: {
   // Optional appointment hold: the browser only supplies the opaque hold id.
   // The server reads the durable record and carries its own slot/expiry into
   // the owner notification. A forged/expired hold never becomes authoritative.
+  // Use the SAME binding selection as bookingStore/paymentReadiness: a dedicated
+  // PAYMENT_LEDGER wins over the photo bucket, so holds cannot be written to one
+  // store and read from another.
+  const holdBucket = paymentLedger({
+    ...(env.PAYMENT_LEDGER ? { PAYMENT_LEDGER: env.PAYMENT_LEDGER } : {}),
+    ...(env.PHOTOS_BUCKET
+      ? { PHOTOS_BUCKET: env.PHOTOS_BUCKET as unknown as LedgerBucket }
+      : {}),
+  });
   if (!clean.booking_hold_id) {
     delete clean.booking_slot_start;
     delete clean.booking_slot_end;
@@ -544,10 +593,10 @@ export async function onRequestPost(context: {
     delete clean.booking_hold_expires_at;
     if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
       clean.booking_hold_status = 'invalid';
-    } else if (!env.PHOTOS_BUCKET?.get) {
+    } else if (!holdBucket || !holdBucket.get) {
       clean.booking_hold_status = 'unavailable';
     } else {
-      const object = await env.PHOTOS_BUCKET.get(`booking/holds/${holdId}.json`).catch(() => null);
+      const object = await holdBucket.get(`booking/holds/${holdId}.json`).catch(() => null);
       if (!object) {
         clean.booking_hold_status = 'not_found';
       } else {
@@ -572,10 +621,10 @@ export async function onRequestPost(context: {
           if (hold.end) clean.booking_slot_end = hold.end;
           if (hold.expiresAt) clean.booking_hold_expires_at = hold.expiresAt;
           if (hold.reference) clean.booking_hold_reference = hold.reference;
-          if (hold.status === 'held' && env.PHOTOS_BUCKET?.put) {
+          if (hold.status === 'held') {
             try {
               const request = await createPendingBookingRequest(
-                env.PHOTOS_BUCKET as unknown as LedgerBucket,
+                holdBucket,
                 hold as unknown as BookingHold,
               );
               clean.booking_request_id = request.id;

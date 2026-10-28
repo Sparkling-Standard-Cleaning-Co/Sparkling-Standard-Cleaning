@@ -79,7 +79,7 @@ test('lead: a legacy autofilled company_website value no longer rejects a custom
       leadPost({
         request: jsonRequest({
           subject: 'x',
-          fields: { phone: '5551234567', company_website: 'autofilled by the browser' },
+          fields: { phone: '5551234567', email: 'customer@example.test', company_website: 'autofilled by the browser' },
         }),
         env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key' },
       } as never),
@@ -88,17 +88,36 @@ test('lead: a legacy autofilled company_website value no longer rejects a custom
   assert.deepEqual(await response.json(), { ok: true });
 });
 
-test('lead: a submission without phone or email is rejected', async () => {
+test('lead: a submission without email is rejected', async () => {
   const response = await leadPost({
     request: jsonRequest({ subject: 'x', fields: { message: 'hello' } }),
     env: {},
   } as never);
   assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { ok: false, error: 'email_required' });
+});
+
+test('lead: an invalid email is rejected before delivery', async () => {
+  const response = await leadPost({
+    request: jsonRequest({ subject: 'x', fields: { phone: '5551234567', email: 'not-an-email' } }),
+    env: {},
+  } as never);
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { ok: false, error: 'email_invalid' });
+});
+
+test('lead: a phone-only request is rejected because email is mandatory', async () => {
+  const response = await leadPost({
+    request: jsonRequest({ subject: 'x', fields: { phone: '5551234567' } }),
+    env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key' },
+  } as never);
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { ok: false, error: 'email_required' });
 });
 
 test('lead: Turnstile configured without a token fails verification', async () => {
   const response = await leadPost({
-    request: jsonRequest({ subject: 'x', fields: { phone: '5551234567' } }),
+    request: jsonRequest({ subject: 'x', fields: { phone: '5551234567', email: 'customer@example.test' } }),
     env: { TURNSTILE_SECRET_KEY: 'dummy-turnstile-secret' },
   } as never);
   assert.equal(response.status, 400);
@@ -107,7 +126,7 @@ test('lead: Turnstile configured without a token fails verification', async () =
 
 test('lead: missing server key returns not_configured so the client can fall back', async () => {
   const response = await leadPost({
-    request: jsonRequest({ subject: 'x', fields: { phone: '5551234567' } }),
+    request: jsonRequest({ subject: 'x', fields: { phone: '5551234567', email: 'customer@example.test' } }),
     env: {},
   } as never);
   assert.equal(response.status, 503);
@@ -121,7 +140,7 @@ test('lead: provider success is reported as success', async () => {
     async () => jsonResponse({ success: true }),
     () =>
       leadPost({
-        request: jsonRequest({ subject: 'x', fields: { phone: '5551234567', name: 'Test' } }),
+        request: jsonRequest({ subject: 'x', fields: { phone: '5551234567', email: 'customer@example.test', name: 'Test' } }),
         env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key' },
       } as never),
   );
@@ -134,7 +153,7 @@ test('lead: provider failure is never reported as success', async () => {
     async () => jsonResponse({ success: false }, 500),
     () =>
       leadPost({
-        request: jsonRequest({ subject: 'x', fields: { phone: '5551234567' } }),
+        request: jsonRequest({ subject: 'x', fields: { phone: '5551234567', email: 'customer@example.test' } }),
         env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key' },
       } as never),
   );
@@ -263,27 +282,21 @@ test('lead: owner-delivery failure never triggers a customer confirmation', asyn
   });
 });
 
-test('lead: a phone-only request skips the customer confirmation safely', async () => {
+test('lead: a valid email is enforced and normalized before delivery', async () => {
   await withRoutedFetch({}, async (calls) => {
     const response = await leadPost({
-      request: jsonRequest({ subject: 'x', fields: { name: 'Synthetic', phone: '8500000000' } }),
+      request: jsonRequest({
+        subject: 'x',
+        fields: { ...customerFields, email: '  CUSTOMER@EXAMPLE.TEST  ' },
+      }),
       env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
     } as never);
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true });
-    assert.equal(calls.filter((call) => call.url.includes('api.resend.com')).length, 0);
-  });
-});
-
-test('lead: an invalid customer email is never sent a confirmation', async () => {
-  await withRoutedFetch({}, async (calls) => {
-    const response = await leadPost({
-      request: jsonRequest({ subject: 'x', fields: { ...customerFields, email: 'not-an-email' } }),
-      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
-    } as never);
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { ok: true });
-    assert.equal(calls.filter((call) => call.url.includes('api.resend.com')).length, 0);
+    const resend = calls.find((call) => call.url.includes('api.resend.com'));
+    assert.ok(resend);
+    const body = JSON.parse(String(resend.init?.body)) as { to?: string[] };
+    assert.deepEqual(body.to, ['customer@example.test']);
   });
 });
 

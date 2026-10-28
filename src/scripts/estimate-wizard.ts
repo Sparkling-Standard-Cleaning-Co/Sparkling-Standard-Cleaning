@@ -1750,7 +1750,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (
       failure.error === 'quote_not_payable' ||
       failure.error === 'payment_not_ready' ||
-      failure.error === 'email_required'
+      failure.error === 'email_required' ||
+      failure.error === 'email_invalid'
     ) {
       paymentBlocked = true;
       acceptedPaymentAmount = null;

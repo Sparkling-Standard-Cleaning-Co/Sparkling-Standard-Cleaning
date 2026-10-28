@@ -55,6 +55,11 @@ test('invalid form data gets a fix-the-form message, never a spam accusation', (
   assert.doesNotMatch(text, /could not be verified/i);
 });
 
+test('email failures are explicit and actionable', () => {
+  assert.match(failureCopy('email_required', confirmed), /valid email address/i);
+  assert.match(failureCopy('email_invalid', confirmed), /name@example\.com/i);
+});
+
 test('every failure reason produces an honest message with alternatives', () => {
   const reasons = [
     'not_configured',
@@ -64,6 +69,8 @@ test('every failure reason produces an honest message with alternatives', () => 
     'spam_rejected',
     'verification_failed',
     'invalid_request',
+    'email_required',
+    'email_invalid',
   ] as const;
   for (const reason of reasons) {
     const text = failureCopy(reason, confirmed);

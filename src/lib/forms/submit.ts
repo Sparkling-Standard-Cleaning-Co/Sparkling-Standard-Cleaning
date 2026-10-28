@@ -13,6 +13,7 @@ import { business } from '../../config/business';
 import type { AnalyticsEventName } from '../analytics/events';
 import { track } from '../analytics/events';
 import type { FailureReason } from './failure-copy';
+import { customerEmailProblem, normalizeCustomerEmail } from './contact-email.ts';
 import { directFallbackFields } from './fallback-fields.ts';
 
 export type SubmitOutcome =
@@ -91,6 +92,8 @@ export async function waitForTurnstileToken(timeoutMs = 10_000): Promise<string 
 /** Maps a relay error body/status to a distinct, actionable failure reason. */
 function relayFailureReason(status: number, error: string): FailureReason {
   if (error === 'verification_failed') return 'verification_failed';
+  if (error === 'email_required') return 'email_required';
+  if (error === 'email_invalid') return 'email_invalid';
   if (error === 'deep_clean_required') return 'deep_clean_required';
   if (error === 'terms_required') return 'terms_required';
   if (error === 'terms_outdated') return 'terms_outdated';
@@ -137,6 +140,13 @@ export async function submitLead(
   fields: Record<string, string>,
   subject: string,
 ): Promise<SubmitOutcome> {
+  // The owner requires a customer email for every submission. Enforce it here
+  // as well as in the relay/backend so the static provider fallback cannot
+  // become a phone-only bypass.
+  const emailProblem = customerEmailProblem(fields.email);
+  if (emailProblem) return { ok: false, reason: emailProblem };
+  fields.email = normalizeCustomerEmail(fields.email);
+
   // A configured Turnstile widget must produce a token first; submitting
   // without one would just be rejected by the server and confuse the customer.
   const token = await waitForTurnstileToken();
