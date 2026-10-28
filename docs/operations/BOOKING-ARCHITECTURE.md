@@ -1,4 +1,4 @@
-# Booking & checkout architecture - roadmap (LIVE BOOKING NOT ACTIVE)
+# Booking & checkout architecture - live owner-approval availability
 
 Owner directive: Smart Estimate System 2.0, Part 6. This documents how the
 current Astro/Cloudflare architecture can grow into direct booking WITHOUT
@@ -6,14 +6,14 @@ rebuilding the estimator. **No appointments are auto-confirmed.** The current re
 optional Pay Now for exact estimate quotes, but it is not a booking or deposit system and does not
 hold a calendar slot.
 
-**Initiative 6.8 status (2026-10-27):** live availability is still **not connected**. The website
-continues to collect a preferred date and arrival window as a request, not a confirmed slot. No
-calendar credentials, owner job schedule or crew roster were provided, so no honest availability
-could be calculated. The owner must choose a provider and supply the connection before the
-availability endpoint, holds and booking confirmation can be activated. Do not display fabricated
-slots in the meantime.
+**Initiative 6.9 status (2026-10-28):** live booking is **connected and active** against the
+dedicated **Sparkling Standard - Bookings** Google Calendar in `America/Chicago`. Production
+availability and holds are real. Confirmation is owner-approval only (`autoConfirmAllowed:false`);
+a hold is never advertised as confirmed. The calendar currently has no jobs, so real availability
+reflects only the configured working window and travel from the origin until the owner adds jobs.
 
-**Implemented in Initiative 6.9 (behind `bookingConfig.enabled:false`):**
+**Implemented and active:**
+
 
 - Google Calendar OAuth client (`src/lib/booking/google-calendar.ts`) with dedicated-calendar
   status, event retrieval and event creation.

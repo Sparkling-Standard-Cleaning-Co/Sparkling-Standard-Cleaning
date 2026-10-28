@@ -119,12 +119,12 @@ Initiative 6.8 deliberately did not fabricate availability. Full architecture:
 
 | # | Item | Where | Notes |
 | --- | --- | --- | --- |
-| B1 | Choose the calendar/scheduling provider | Owner decision | Recommended starting point: Google Calendar free/busy for existing jobs plus a private Cloudflare booking ledger for holds. A free-tier scheduler may be used only if it supports the travel, duration and concurrency rules. |
-| B2 | Provide calendar authorization | Owner-controlled OAuth / service account + calendar ID | Exact steps: docs/operations/GOOGLE-CALENDAR-SETUP.md. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, GOOGLE_CALENDAR_ID and BOOKING_OWNER_TOKEN as Cloudflare Secrets. Never commit credentials. |
-| B3 | Import existing jobs | Owner calendar or import file | A job is not available just because it is absent from the website. Start time, duration, location, crew and buffers are required. |
-| B4 | Approve scheduling rules | `schedulingConfig` + new booking config | Service hours, days off, minimum notice, advance window, travel/prep buffers, crew capacity, hold expiry and manual-review rules. |
-| B5 | Approve booking confirmation policy | Owner decision | Auto-confirm only if scope, price, capacity and travel all pass; otherwise keep owner approval. Pay Now must not imply a confirmed slot. |
-| B6 | Test concurrency, timezone and cancellation | Test environment | Verify two customers cannot hold the same capacity, DST in `America/Chicago`, calendar failure recovery and rescheduling. |
+| B1 | Choose the calendar/scheduling provider | Owner decision | **Done:** Google Calendar selected and connected to **Sparkling Standard - Bookings** in `America/Chicago`. |
+| B2 | Provide calendar authorization | Owner-controlled OAuth / calendar ID | **Done 2026-10-28:** all five Cloudflare secrets present; OAuth refresh exchange and event read verified. Exact guide remains `docs/operations/GOOGLE-CALENDAR-SETUP.md`. |
+| B3 | Import existing jobs | Owner calendar | **Owner action:** the calendar currently has zero jobs. Add each confirmed job with start/end and full address in the location field. Jobs without locations block availability. |
+| B4 | Approve scheduling rules | `src/config/booking.ts` | **Active:** one crew, 8:00 a.m.–6:00 p.m. Central, seven days, 24-hour notice, 60-day window, 15-minute travel/job buffers, 20-minute holds. Change only with owner approval. |
+| B5 | Approve booking confirmation policy | Owner decision | **Active:** `owner_approval`; `autoConfirmAllowed:false`. A held slot is never advertised as confirmed. |
+| B6 | Test concurrency, timezone and cancellation | Live/controlled test | **Partial:** real availability, live holds, overlap 409 and DST logic verified. Owner confirmation/event creation and cancellation are mock-tested; run one live test with the private token, then delete the test event. |
 
 ## CAN WAIT
 

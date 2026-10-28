@@ -1,7 +1,7 @@
 # Initiative 6.9 verification evidence
 
-**Status:** deployed at `4e28788`; booking and gift sales remain behind owner activation gates.
-**Cloudflare Pages:** `7f8a172c-18a9-43d0-9a4e-382094ba211d`; GitHub `validate`, `browser` and
+**Status:** deployed. Google Calendar booking is **active** with owner approval; gift sales remain disabled.
+**Cloudflare Pages:** c84e974f-5e11-4ed3-9e4c-a723e29f58fd; GitHub alidate, rowser and Cloudflare checks passed. Live status: all five Google/owner secrets present, OAuth connected to **Sparkling Standard - Bookings**, timezone America/Chicago, event read okay.
 Cloudflare checks passed.
 **Production baseline at start:** Initiative 6.10, `07360b7`.
 **Initiative 6.10 was preserved:** 12 Follow Us profiles, URLs, structured data and marketing docs.
@@ -19,7 +19,7 @@ Cloudflare checks passed.
 
 ## Google Calendar booking
 
-Implemented behind `bookingConfig.enabled:false`:
+Live with `bookingConfig.enabled:true`, `confirmationMode:"owner_approval"` and `autoConfirmAllowed:false`:
 
 - Dedicated-calendar OAuth client and exact setup: `docs/operations/GOOGLE-CALENDAR-SETUP.md`.
 - Central-time/DST helpers, travel-aware availability, existing-job and buffer handling,
@@ -31,8 +31,12 @@ Implemented behind `bookingConfig.enabled:false`:
 - Tests: `tests/booking-availability.test.ts`, `tests/booking-calendar.test.ts`,
   `tests/booking-holds.test.ts`, `tests/browser/initiative-6.9-booking.test.mjs`.
 
-Not live: no Google Calendar credentials or dedicated calendar were provided. No real availability
-is shown; the existing preferred-date request path remains.
+Live verification: production availability returned real slots (9:00 AM–4:00 PM start times for a
+120-minute job), a real hold was created, a second overlapping hold was rejected with 409, and the
+desktop/mobile picker rendered live slots without overflow. The owner confirmation/deletion path is
+covered by mocked integration tests. A live owner-confirmation and Google event creation test was
+not possible because the owner secret token cannot be read by engineering; no test event was left in
+the calendar.
 
 ## Gift certificates
 
@@ -50,13 +54,14 @@ Sales remain disabled. No real Stripe test-mode purchase, delivery or redemption
 ## Verification
 
 - `npm run check`: 173 files, 0 errors.
-- `npm test`: 572 tests, 571 passed, 1 pre-existing skip, 0 failed.
+- `npm test`: 573 tests, 572 passed, 1 pre-existing skip, 0 failed.
 - `npm run test:browser`: 151 passed, 0 failed.
 - Focused Pay Now/booking/gift browser tests pass with mocked providers.
 
 ## Remaining external gates
 
-1. Google Cloud OAuth + dedicated **Sparkling Standard — Bookings** calendar and Cloudflare secrets.
-2. Owner approval of gift denominations and activation.
-3. Stripe test-mode credentials or an authorized test-mode environment for a complete card test.
-4. Owner/attorney approval of any fees (none active).
+1. Owner must add real confirmed jobs (with full addresses) to the connected bookings calendar; it currently has zero events.
+2. Owner must exercise one owner-confirmation/event-creation test with the private token, then delete the test event; the API is implemented but not live-tested.
+3. Owner approval of gift denominations and activation.
+4. Stripe test-mode credentials or an authorized test-mode environment for a complete card test.
+5. Owner/attorney approval of any fees (none active).

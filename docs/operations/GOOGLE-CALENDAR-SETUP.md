@@ -1,8 +1,10 @@
 # Google Calendar booking setup
 
-**Status:** Code is implemented; live booking is **not connected** until the owner completes these
-steps. Never use the Sunshine Climate Solutions calendar, credentials or OAuth client for Sparkling
-Standard.
+**Status:** **Connected and active (2026-10-28).** OAuth refresh exchange succeeds against the dedicated
+**Sparkling Standard - Bookings** calendar in `America/Chicago`; real event reads and live
+availability/holds have been verified. Booking remains `owner_approval`; auto-confirm is disabled.
+No Sunshine Climate Solutions calendar or credentials are used. The owner still needs to add real
+jobs with full addresses and run one owner-confirmation/event-creation test.
 
 ## 1. Create the dedicated calendar
 

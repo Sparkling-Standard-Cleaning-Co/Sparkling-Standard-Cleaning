@@ -1,5 +1,40 @@
 # Verification status
 
+## Verified — 2026-10-28 Google Calendar booking activation
+
+**Code:** `1228140`; Cloudflare Pages deployment `c84e974f-5e11-4ed3-9e4c-a723e29f58fd`.
+GitHub `validate`, `browser` and Cloudflare checks passed.
+
+- All five production secrets are present (presence-only probe; no values exposed).
+- OAuth refresh exchange succeeds; the connected calendar is **Sparkling Standard - Bookings**,
+  timezone **America/Chicago**, event-read true.
+- Production availability returned real slots for a 120-minute job in Central Time, including
+  origin travel, 15-minute travel/job buffers and 24-hour notice.
+- A real 20-minute hold was created; a second overlapping hold was rejected with HTTP 409.
+- The customer booking picker rendered the real slots on desktop and mobile with no horizontal
+  overflow, and the final summary offered Pay Now plus Reserve This Cleaning (Pay Later).
+- Live screenshots: `docs/verification/6.9/live-booking-available-desktop.png`,
+  `live-booking-hold-desktop.png`, `live-booking-available-mobile.png`.
+
+Current settings are active: one crew, 8:00 a.m.–6:00 p.m. Central, seven days, 24-hour notice,
+15-minute buffers, 20-minute holds, `owner_approval`, `autoConfirmAllowed:false`.
+
+**Not yet live-tested:** owner confirmation and Google Calendar event creation/cancellation. The
+endpoint requires the private `BOOKING_OWNER_TOKEN`, which engineering cannot read; the flow is
+covered by mocked integration tests. The calendar currently has zero jobs, so the owner must add
+real jobs with full addresses before availability reflects live work.
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **573 tests: 572 passed, 1 pre-existing skip, 0 failed** |
+| Browser regression | **151 passed, 0 failed** |
+| Type check / build / validation / smoke | passed |
+| Production booking status | enabled true; all five secrets present; connected; eventReadOk true |
+| Production availability | real slots returned |
+| Production hold/conflict | real hold 200; duplicate overlap 409 |
+| Owner confirmation | implemented, mock-tested; live test pending private token |
+
+
 ## Verified — 2026-10-28 Initiative 6.9 deployment
 
 **Release:** `4e28788`; Cloudflare Pages deployment `7f8a172c-18a9-43d0-9a4e-382094ba211d`.
