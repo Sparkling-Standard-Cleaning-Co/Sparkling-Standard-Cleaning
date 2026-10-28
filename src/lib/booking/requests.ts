@@ -27,6 +27,9 @@ export interface PendingBookingRequest {
   createdAt: string;
   updatedAt: string;
   calendarEventId?: string;
+  /** Assigned cleaning resources (absent on legacy requests: blocks all). */
+  resourceIds?: string[];
+  crewSize?: number;
 }
 
 export function requestIdForHold(holdId: string): string {
@@ -68,6 +71,8 @@ export async function createPendingBookingRequest(
     status: 'pending',
     createdAt: now,
     updatedAt: now,
+    ...(hold.resourceIds && hold.resourceIds.length > 0 ? { resourceIds: hold.resourceIds } : {}),
+    ...(hold.crewSize ? { crewSize: hold.crewSize } : {}),
   };
   const created = await createLedgerJson(bucket, requestKey(id), request);
   if (created) return request;
@@ -79,7 +84,19 @@ export async function createPendingBookingRequest(
 export async function updatePendingBookingRequest(
   bucket: LedgerBucket,
   request: PendingBookingRequest,
-  patch: Partial<Pick<PendingBookingRequest, 'status' | 'calendarEventId'>>,
+  patch: Partial<
+    Pick<
+      PendingBookingRequest,
+      | 'status'
+      | 'calendarEventId'
+      | 'date'
+      | 'start'
+      | 'end'
+      | 'durationMinutes'
+      | 'resourceIds'
+      | 'crewSize'
+    >
+  >,
 ): Promise<PendingBookingRequest> {
   const updated: PendingBookingRequest = {
     ...request,

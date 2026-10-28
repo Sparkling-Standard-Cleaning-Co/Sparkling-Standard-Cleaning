@@ -29,6 +29,7 @@ import {
 import { requiresInitialDeepClean } from '../../src/lib/estimate/frequency.ts';
 import { verifyFacilityQuote, stripFacilityPricingFields } from '../../src/lib/estimate/facility-verify.ts';
 import { taxPresentationForService } from '../../src/lib/estimate/tax.ts';
+import { calculateServiceTax } from '../../src/lib/tax/engine.ts';
 import type { Frequency } from '../../src/lib/estimate/types.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
@@ -119,6 +120,17 @@ const SERVER_OWNED_KEYS = new Set([
   'global_adjustment',
   'tax_status',
   'tax_note',
+  'tax_category',
+  'tax_jurisdiction',
+  'tax_jurisdiction_label',
+  'tax_rate',
+  'tax_amount',
+  'tax_source',
+  'tax_review_reason',
+  'taxable_subtotal',
+  'total_due',
+  'tax_effective_from',
+  'tax_effective_through',
   'promotion_source',
   'rounding_adjustment',
   'facility_quote_verified',
@@ -217,6 +229,40 @@ async function recordTermsAcceptance(
   } catch {
     return 'storage_failed';
   }
+}
+
+/**
+ * Server-owned service-location tax. The browser never supplies a rate or a
+ * tax amount that survives: this recomputes from the confirmed service
+ * address and the verified cleaning total.
+ */
+function applyServiceTax(clean: Record<string, string>, taxableBase: number | null): void {
+  if (taxableBase === null || !Number.isFinite(taxableBase)) {
+    clean.tax_status = 'review_required';
+    clean.tax_review_reason = 'quote_unpriced';
+    clean.tax_note =
+      'Tax is confirmed with the final quote for the confirmed service address.';
+    return;
+  }
+  const tax = calculateServiceTax({
+    serviceType: clean.service_type ?? '',
+    state: clean.address_state ?? null,
+    zip: clean.zip ?? null,
+    taxableBase,
+  });
+  clean.tax_status = tax.treatment;
+  clean.tax_category = tax.category;
+  clean.tax_note = tax.note;
+  if (tax.jurisdictionKey) clean.tax_jurisdiction = tax.jurisdictionKey;
+  if (tax.jurisdictionLabel) clean.tax_jurisdiction_label = tax.jurisdictionLabel;
+  if (tax.ratePercent !== null) clean.tax_rate = String(tax.ratePercent);
+  if (tax.taxAmount !== null) clean.tax_amount = tax.taxAmount.toFixed(2);
+  if (tax.total !== null) clean.total_due = tax.total.toFixed(2);
+  if (tax.source) clean.tax_source = tax.source;
+  if (tax.reviewReason) clean.tax_review_reason = tax.reviewReason;
+  if (tax.effectiveFrom) clean.tax_effective_from = tax.effectiveFrom;
+  if (tax.effectiveThrough) clean.tax_effective_through = tax.effectiveThrough;
+  if (tax.taxableBase >= 0) clean.taxable_subtotal = tax.taxableBase.toFixed(2);
 }
 
 async function verifyTurnstile(secret: string, token: string, remoteIp: string | null): Promise<boolean> {
@@ -397,6 +443,7 @@ export async function onRequestPost(context: {
       clean.global_factor = String(facility.globalFactor);
       clean.global_adjustment = String(facility.globalAdjustment ?? 0);
     }
+    applyServiceTax(clean, facility.expectedTotal);
   }
 
   // Turnstile verification when the secret is configured.
@@ -515,6 +562,8 @@ export async function onRequestPost(context: {
         clean.ongoing_price_per_visit = String(verification.ongoing.perVisitPrice);
         clean.ongoing_frequency = verification.ongoing.frequency;
       }
+
+      applyServiceTax(clean, verification.verifiedPrice);
 
       // The customer-facing receipt carries the verdict (no prices) so the
       // browser can never imply an unverified price was accepted.

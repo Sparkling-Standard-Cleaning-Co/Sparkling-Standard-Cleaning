@@ -3,7 +3,7 @@
  * not a confirmed appointment. All writes for one day are serialized with an
  * R2 conditional lock so two customers cannot hold overlapping time.
  */
-import { bookingConfig } from '../../config/booking.ts';
+import { activeBookingResources, bookingConfig, validResourceIds } from '../../config/booking.ts';
 import {
   createLedgerJson,
   deleteLedgerKey,
@@ -28,6 +28,9 @@ export interface BookingHold {
   expiresAt: string;
   status: 'held' | 'released' | 'confirmed';
   calendarEventId?: string;
+  /** Assigned cleaning resources. Absent on legacy holds, which block all. */
+  resourceIds?: string[];
+  crewSize?: number;
 }
 
 export type BookingStorageEnv = PaymentStorageEnv;
@@ -117,6 +120,18 @@ export function holdIsActive(hold: BookingHold | null): boolean {
   );
 }
 
+/** Resources a hold blocks. A legacy hold without ids conservatively blocks all. */
+export function holdResourceIds(hold: BookingHold): string[] {
+  if (hold.resourceIds && hold.resourceIds.length > 0) return hold.resourceIds;
+  return activeBookingResources().map((resource) => resource.id);
+}
+
+function resourceSetsOverlap(a: BookingHold, b: BookingHold): boolean {
+  const aIds = holdResourceIds(a);
+  const bIds = holdResourceIds(b);
+  return aIds.some((id) => bIds.includes(id));
+}
+
 export async function createBookingHold(
   bucket: LedgerBucket,
   input: {
@@ -127,6 +142,8 @@ export async function createBookingHold(
     destination: { lat: number; lng: number };
     locationText: string;
     reference: string;
+    resourceIds: ReadonlyArray<string>;
+    crewSize?: number;
   },
 ): Promise<{ ok: true; hold: BookingHold } | { ok: false; error: 'busy' | 'overlap' | 'invalid' }> {
   const start = new Date(input.start);
@@ -135,10 +152,17 @@ export async function createBookingHold(
     !Number.isFinite(start.getTime()) ||
     !Number.isFinite(end.getTime()) ||
     end <= start ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(input.date)
+    !/^\d{4}-\d{2}-\d{2}$/.test(input.date) ||
+    !validResourceIds(input.resourceIds)
   ) {
     return { ok: false, error: 'invalid' };
   }
+  const resourceIds = [...new Set(input.resourceIds)];
+  const crewSize = Math.min(
+    bookingConfig.maxCrewSize,
+    Math.max(1, Math.round(input.crewSize ?? resourceIds.length)),
+  );
+  if (crewSize !== resourceIds.length) return { ok: false, error: 'invalid' };
   const expiresAt = new Date(Date.now() + bookingConfig.holdMinutes * 60_000).toISOString();
   const id = `${input.date}__${crypto.randomUUID()}`;
   const hold: BookingHold = {
@@ -154,11 +178,16 @@ export async function createBookingHold(
     createdAt: new Date().toISOString(),
     expiresAt,
     status: 'held',
+    resourceIds,
+    crewSize,
   };
   return withDayLock(bucket, input.date, async () => {
     const existing = await listActiveHolds(bucket, input.date);
     const overlap = existing.some(
-      (candidate) => start < new Date(candidate.end) && new Date(candidate.start) < end,
+      (candidate) =>
+        start < new Date(candidate.end) &&
+        new Date(candidate.start) < end &&
+        resourceSetsOverlap(hold, candidate),
     );
     if (overlap) return { ok: false as const, error: 'overlap' as const };
     await writeLedgerJson(bucket, holdKey(id), hold);

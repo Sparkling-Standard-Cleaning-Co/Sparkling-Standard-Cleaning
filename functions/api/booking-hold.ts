@@ -61,46 +61,56 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
 
-  const availability = await availabilityForDate(env, {
-    date,
-    durationMinutes,
-    destination: { lat, lng },
-  });
-  if (!availability.ok) {
-    return json({ ok: false, error: availability.reason }, 409);
-  }
   const requestedStart = new Date(start).toISOString();
   const requestedEnd = new Date(end).toISOString();
-  const exact = availability.availability.slots.some(
-    (slot) => slot.start === requestedStart && slot.end === requestedEnd,
-  );
-  if (!exact) return json({ ok: false, error: 'slot_unavailable' }, 409);
 
-  const created = await createBookingHold(bucket, {
-    date,
-    start: requestedStart,
-    end: requestedEnd,
-    durationMinutes: availability.durationMinutes,
-    destination: { lat, lng },
-    locationText,
-    reference,
-  });
-  if (!created.ok) {
-    return json(
-      { ok: false, error: created.error === 'overlap' ? 'slot_unavailable' : created.error },
-      created.error === 'busy' ? 503 : 409,
+  // Two customers can select the same time in the same instant. The first hold
+  // takes one cleaner; a conflicting second request re-reads availability so
+  // the other cleaner can still be offered instead of failing the customer.
+  let lastError = 'slot_unavailable';
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const availability = await availabilityForDate(env, {
+      date,
+      durationMinutes,
+      destination: { lat, lng },
+    });
+    if (!availability.ok) {
+      return json({ ok: false, error: availability.reason }, 409);
+    }
+    const exact = availability.availability.slots.find(
+      (slot) => slot.start === requestedStart && slot.end === requestedEnd,
     );
+    if (!exact || exact.resourceIds.length === 0) {
+      return json({ ok: false, error: 'slot_unavailable' }, 409);
+    }
+    const created = await createBookingHold(bucket, {
+      date,
+      start: requestedStart,
+      end: requestedEnd,
+      durationMinutes: availability.durationMinutes,
+      destination: { lat, lng },
+      locationText,
+      reference,
+      resourceIds: exact.resourceIds,
+      crewSize: availability.crewSize,
+    });
+    if (created.ok) {
+      return json({
+        ok: true,
+        holdId: created.hold.id,
+        expiresAt: created.hold.expiresAt,
+        start: created.hold.start,
+        end: created.hold.end,
+        timeZone: bookingConfig.timeZone,
+        status: 'held',
+        notice:
+          'Temporary hold - not a confirmed appointment. Sparkling Standard confirms the booking personally.',
+      });
+    }
+    lastError = created.error === 'overlap' ? 'slot_unavailable' : created.error;
+    if (created.error === 'busy') break;
   }
-  return json({
-    ok: true,
-    holdId: created.hold.id,
-    expiresAt: created.hold.expiresAt,
-    start: created.hold.start,
-    end: created.hold.end,
-    timeZone: bookingConfig.timeZone,
-    status: 'held',
-    notice: 'Temporary hold - not a confirmed appointment. Sparkling Standard confirms the booking personally.',
-  });
+  return json({ ok: false, error: lastError }, lastError === 'busy' ? 503 : 409);
 }
 
 export async function onRequestGet(): Promise<Response> {

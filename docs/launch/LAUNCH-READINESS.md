@@ -28,7 +28,7 @@ deployment, activation and actual provider verification.
 | Address autocomplete / GPS / manual / pin | Implemented, tested, deployed, activated | MapMap/Census live routing previously production-verified; browser regression covers fallbacks. |
 | Four-county eligibility | Implemented, tested, deployed | Escambia/Santa Rosa FL and Baldwin/Escambia AL policy layers; boundary cases route to review. |
 | ZIP/microzone geographic pricing | **Approval pending** | Proposal/evidence required before any new dollar amounts activate. Current travel behavior remains. |
-| Sales tax calculation | **Not implemented** | Only category-specific disclosure exists; no rate is invented. Tax engine and official-rate verification remain open. |
+| Sales tax calculation | Implemented, tested, deployed in the next release | Service-location engine: FL residential/STR not taxable; FL commercial/church 6% + verified county surtax (Escambia 7.5%, Santa Rosa 7.0% for 2026); AL cleaning outside the sales-tax base. Unknown jurisdiction fails closed and withholds Pay Now. Rates require re-verification for 2027. |
 | Customer photos | Deployed, activated | Private R2, metadata stripping, signed links, optional upload, owner attachments. |
 | Photo retention execution | Deployed; **activation/verification pending** | Daily workflow exists but needs the `PHOTO_OWNER_TOKEN` repository secret; first run not observed. R2 lifecycle rule not yet confirmed. |
 
@@ -41,7 +41,7 @@ deployment, activation and actual provider verification.
 | Reserve Without Payment | Implemented, tested, deployed, activated | Request remains non-guaranteed until owner confirmation. |
 | Itemized customer receipts | **Not implemented** | Invoice generator exists for commercial use; customer receipt delivery is not complete. |
 | Refund synchronization / reconciliation | Partial | Gift unused-certificate refund/void path exists; no live Stripe refund; general reconciliation not complete. |
-| Tax accounting | **Not implemented** | See tax engine gap above. |
+| Tax accounting | Implemented, tested, deployed in the next release | Tax is stored with the checkout record and carried into the owner notification/customer summary. No live tax-inclusive charge has yet been run. |
 
 ## Gift certificates
 
@@ -67,7 +67,7 @@ deployment, activation and actual provider verification.
 | Temporary holds and owner approval | Implemented, tested, deployed, activated | 20-minute holds, durable pending requests, owner-token confirmation. |
 | Booking-hold correctness | Fixed in `74fbf05` | Minute-boundary quote recalculation no longer clears a held time; regression test added. |
 | Google Calendar integration | Deployed, owner-approval mode | Connected calendar / availability previously checked; calendar currently has no jobs. Real event creation still needs an owner-authorized test. |
-| Two independent cleaners | **Not implemented** | Current model does not yet provide per-resource availability, joint jobs or conflict controls. |
+| Two independent cleaners | Implemented, tested, deployed in the next release | Resource-aware availability, per-resource holds, concurrent independent jobs, joint jobs on owner confirmation, reassignment and rescheduling. Owner approval and the calendar remain the source of truth. |
 | Customer history | **Not implemented** | No unified customer/job record across estimates, payments, gifts and agreements. |
 | Agreement / e-sign workflow | **Not implemented / legal approval pending** | Draft materials are preserved untracked; no signing workflow is published or activated. |
 
@@ -88,17 +88,16 @@ deployment, activation and actual provider verification.
 1. **Gift sales:** final gift-terms legal review, a live/test-mode Stripe purchase, valid-from
    redemption, refund and reconciliation exercise, and explicit activation authorization.
 2. **Checkout redemption:** gift-code application at cleaning checkout is not built.
-3. **Tax:** no service-location tax engine or verified rates; do not collect an invented amount.
-4. **Receipts:** itemized customer receipts and ledger reconciliation are incomplete.
-5. **Two-cleaner scheduling:** not implemented; the current engine must not be described as a
-   two-resource scheduler.
-6. **Backups:** no independent backup or successful restore.
-7. **Photo retention:** scheduled execution not yet activated or observed.
-8. **Email recovery:** implemented, but the live verified-email recovery path still needs an owner
+3. **Receipts:** itemized customer receipts and ledger reconciliation are incomplete.
+4. **Backups:** no independent backup or successful restore.
+5. **Photo retention:** scheduled execution not yet activated or observed.
+6. **Email recovery:** implemented, but the live verified-email recovery path still needs an owner
    test.
-9. **Agreements:** legal review and signing workflow not activated.
-10. **Geographic pricing:** proposed ZIP/microzone amounts await owner approval; current behavior
-    stays in force.
+7. **Agreements:** legal review and signing workflow not activated.
+8. **Geographic pricing:** proposed ZIP/microzone amounts await owner approval; current behavior
+   stays in force.
+9. **Tax rate rollover:** the 2026 Florida table must be re-verified before 2027 charges; until then
+   the engine fails closed for taxable services.
 
 ## Owner actions required now
 
@@ -113,8 +112,7 @@ deployment, activation and actual provider verification.
 ## Next safe engineering actions
 
 1. Build gift redemption at checkout with durable reservation/commit semantics.
-2. Build the service-location tax engine with official rates and an explicit fail-safe.
-3. Add itemized receipt generation and Stripe ledger reconciliation.
-4. Implement per-resource scheduling with joint-job and conflict tests.
-5. Implement independent backups and run a restore test.
-6. Complete customer/job history and the agreement signing workflow after legal review.
+2. Add itemized receipt generation and Stripe ledger reconciliation.
+3. Implement independent backups and run a restore test.
+4. Complete customer/job history and the agreement signing workflow after legal review.
+5. Re-verify the Florida county surtaxes for 2027 before the rate table expires.

@@ -39,6 +39,7 @@ import {
 import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.ts';
 import { legalTerms } from '../../src/config/legal.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
+import { calculateServiceTax, type ServiceTaxResult } from '../../src/lib/tax/engine.ts';
 
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   STRIPE_SECRET_KEY?: string;
@@ -72,6 +73,10 @@ interface CheckoutRecord {
   serviceType: string;
   sessionId?: string;
   sessionUrl?: string;
+  /** Tax and itemized amounts captured when the verified session was created. */
+  tax?: ServiceTaxResult;
+  cleaningAmountCents?: number;
+  quotedTotalCents?: number;
 }
 
 interface StripeSession {
@@ -85,10 +90,17 @@ interface StripeSession {
 }
 
 interface VerifiedCandidate {
+  /** Total the customer will be charged, including verified tax. */
   amountCents: number;
+  /** Server cleaning/travel amount before tax. */
+  cleaningAmountCents: number;
+  /** The amount the browser displayed for the cleaning portion. */
   quotedCents: number;
+  /** The browser's displayed all-in total, when supplied. */
+  quotedTotalCents: number | null;
   reference: string;
   serviceType: string;
+  tax: ServiceTaxResult;
   priceChanged: boolean;
 }
 
@@ -347,18 +359,37 @@ async function verifyFacilityPayment(
   }
   if (verification.status !== 'verified') return { ok: false, reason: 'facility_not_verified' };
 
-  const amountCents = cents(verification.expectedTotal);
+  const serviceType =
+    fields.service_type ?? (fields.engine_type === 'church' ? 'church_cleaning' : 'commercial_cleaning');
+  const cleaningAmountCents = cents(verification.expectedTotal);
   const quotedCents = cents(quoted);
-  if (!withinAcceptance(quotedCents, amountCents)) return { ok: false, reason: 'price_mismatch' };
+  if (!withinAcceptance(quotedCents, cleaningAmountCents)) {
+    return { ok: false, reason: 'price_mismatch' };
+  }
+  const tax = calculateServiceTax({
+    serviceType,
+    state: fields.address_state ?? null,
+    zip: fields.zip ?? null,
+    taxableBase: verification.expectedTotal,
+  });
+  if (!tax.canCharge) return { ok: false, reason: `tax_${tax.reviewReason ?? 'review_required'}` };
+  const amountCents = cents((verification.expectedTotal ?? 0) + (tax.taxAmount ?? 0));
   const reference = await facilityReference(fields, amountCents);
+  const quotedTotalRaw = Number(fields.quoted_total);
+  const quotedTotalCents =
+    Number.isFinite(quotedTotalRaw) && quotedTotalRaw > 0 ? cents(quotedTotalRaw) : null;
   return {
     ok: true,
     amountCents,
+    cleaningAmountCents,
     quotedCents,
+    quotedTotalCents,
     reference,
-    serviceType:
-      fields.service_type ?? (fields.engine_type === 'church' ? 'church_cleaning' : 'commercial_cleaning'),
-    priceChanged: needsExplicitAcceptance(quotedCents, amountCents),
+    serviceType,
+    tax,
+    priceChanged:
+      needsExplicitAcceptance(quotedCents, cleaningAmountCents) ||
+      (quotedTotalCents !== null && needsExplicitAcceptance(quotedTotalCents, amountCents)),
   };
 }
 
@@ -391,16 +422,35 @@ async function verifyResidentialPayment(
     verification.configMatch === 'match';
   if (!structurallyVerified) return { ok: false, reason: 'quote_not_verified' };
 
-  const amountCents = cents(verification.verifiedPrice);
+  const serviceType = fields.service_type ?? 'standard';
+  const cleaningAmountCents = cents(verification.verifiedPrice);
   const quotedCents = cents(quoted);
-  if (!withinAcceptance(quotedCents, amountCents)) return { ok: false, reason: 'price_mismatch' };
+  if (!withinAcceptance(quotedCents, cleaningAmountCents)) {
+    return { ok: false, reason: 'price_mismatch' };
+  }
+  const tax = calculateServiceTax({
+    serviceType,
+    state: fields.address_state ?? null,
+    zip: fields.zip ?? null,
+    taxableBase: verification.verifiedPrice,
+  });
+  if (!tax.canCharge) return { ok: false, reason: `tax_${tax.reviewReason ?? 'review_required'}` };
+  const amountCents = cents(verification.verifiedPrice + (tax.taxAmount ?? 0));
+  const quotedTotalRaw = Number(fields.quoted_total);
+  const quotedTotalCents =
+    Number.isFinite(quotedTotalRaw) && quotedTotalRaw > 0 ? cents(quotedTotalRaw) : null;
   return {
     ok: true,
     amountCents,
+    cleaningAmountCents,
     quotedCents,
+    quotedTotalCents,
     reference: await residentialReference(verification, fields, amountCents),
-    serviceType: fields.service_type ?? 'standard',
-    priceChanged: needsExplicitAcceptance(quotedCents, amountCents),
+    serviceType,
+    tax,
+    priceChanged:
+      needsExplicitAcceptance(quotedCents, cleaningAmountCents) ||
+      (quotedTotalCents !== null && needsExplicitAcceptance(quotedTotalCents, amountCents)),
   };
 }
 
@@ -510,6 +560,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         error: 'quote_changed',
         amount: candidate.amountCents / 100,
         quotedAmount: candidate.quotedCents / 100,
+        cleaningAmount: candidate.cleaningAmountCents / 100,
+        tax: candidate.tax,
         reference: candidate.reference,
         serviceType: candidate.serviceType,
       },
@@ -551,6 +603,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     reference: candidate.reference,
     amountCents: candidate.amountCents,
     serviceType: candidate.serviceType,
+    cleaningAmountCents: candidate.cleaningAmountCents,
+    ...(candidate.quotedTotalCents !== null ? { quotedTotalCents: candidate.quotedTotalCents } : {}),
+    tax: candidate.tax,
   };
   const claimed = await createLedgerJson(bucket, key, claim).catch((error) => {
     console.error('[estimate-checkout] ledger_claim_failed', {
@@ -588,6 +643,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('metadata[quote_reference]', candidate.reference);
   body.set('metadata[service_type]', candidate.serviceType);
   body.set('metadata[checkout_attempt]', attemptFingerprint);
+  body.set('metadata[cleaning_amount_cents]', String(candidate.cleaningAmountCents));
+  body.set('metadata[tax_amount_cents]', String(cents(candidate.tax.taxAmount ?? 0)));
+  body.set('metadata[tax_treatment]', candidate.tax.treatment);
+  body.set('metadata[tax_rate_percent]', String(candidate.tax.ratePercent ?? ''));
+  body.set('metadata[tax_jurisdiction]', candidate.tax.jurisdictionKey ?? '');
   body.set('customer_email', email);
 
   try {
@@ -665,6 +725,19 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     status: session.status ?? 'unknown',
     paymentStatus: session.payment_status ?? 'unknown',
     amount: typeof session.amount_total === 'number' ? session.amount_total / 100 : null,
+    cleaningAmount:
+      typeof session.metadata?.cleaning_amount_cents === 'string'
+        ? Number(session.metadata.cleaning_amount_cents) / 100
+        : null,
+    taxAmount:
+      typeof session.metadata?.tax_amount_cents === 'string'
+        ? Number(session.metadata.tax_amount_cents) / 100
+        : null,
+    taxRatePercent:
+      typeof session.metadata?.tax_rate_percent === 'string' && session.metadata.tax_rate_percent !== ''
+        ? Number(session.metadata.tax_rate_percent)
+        : null,
+    taxJurisdiction: session.metadata?.tax_jurisdiction || null,
     reference: session.metadata?.quote_reference ?? '',
     serviceType: session.metadata?.service_type ?? '',
     livemode: session.livemode ?? null,

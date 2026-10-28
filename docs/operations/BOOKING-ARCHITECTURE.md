@@ -12,6 +12,21 @@ availability and holds are real. Confirmation is owner-approval only (`autoConfi
 a hold is never advertised as confirmed. The calendar currently has no jobs, so real availability
 reflects only the configured working window and travel from the origin until the owner adds jobs.
 
+**Resource-aware scheduler (2026-10-28):** the model now schedules the two real cleaning resources
+(`src/config/booking.ts` → `bookingResources`: Hayli and the family cleaner), not a single crew with
+a raised concurrency setting. Each resource has its own timeline, travel origin and working window.
+A normal job consumes one resource; the owner may confirm a joint job with both and a shorter
+on-site duration. Holds store the assigned resource ids, overlapping holds are allowed only on
+different resources, and legacy calendar events without resource metadata conservatively block
+both. Owner actions include `confirm`, `cancel`, `decline`, `release`, `reassign` (resource ids) and
+`reschedule` (date/start/end/duration/crew). Calendar events carry `sparkling_resources` in their
+private extended properties; owner confirmation honors the customer's held assignment instead of
+silently auto-selecting a different cleaner.
+
+**Working window (owner direction):** first appointment starts are offered from 7:00 AM; the slot
+grid is 15 minutes; later starts are calculated from duration and travel; normal completion is by
+6:00 PM in `America/Chicago`. Public contact hours remain 7:00 AM–7:00 PM.
+
 **Hold vs pending request lifecycle (2026-10-28):** a 20-minute hold protects only the checkout
 window. When the customer submits the lead, the server creates a durable pending booking request
 (`booking/requests/BR-<hold>.json`) linked to the hold, quote and slot. Pending requests are

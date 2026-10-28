@@ -63,6 +63,16 @@ export async function onRequestGet(context: { request: Request; env: BookingEnv 
     date,
     durationMinutes: result.durationMinutes,
     confirmationMode: bookingConfig.confirmationMode,
-    ...result.availability,
+    available: result.availability.available,
+    enabled: result.availability.enabled,
+    ...(result.availability.reason ? { reason: result.availability.reason } : {}),
+    // Staffing assignments are server-owned; the public picker receives only
+    // the times a customer may choose.
+    slots: result.availability.slots.map(({ start, end, startLabel, endLabel }) => ({
+      start,
+      end,
+      startLabel,
+      endLabel,
+    })),
   });
 }

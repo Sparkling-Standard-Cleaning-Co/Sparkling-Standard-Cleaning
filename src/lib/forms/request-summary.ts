@@ -276,8 +276,28 @@ export function buildRequestSummary(fields: Record<string, string>): RequestSumm
   if (photoCount && Number(photoCount) > 0) {
     add('Photos attached', `${photoCount} private photo${Number(photoCount) === 1 ? '' : 's'}`);
   }
-  const taxNote = text(fields, 'tax_note');
-  if (taxNote) add('Sales tax', taxNote);
+  const taxStatus = text(fields, 'tax_status');
+  const taxAmount = text(fields, 'tax_amount');
+  const taxRate = text(fields, 'tax_rate');
+  const taxJurisdiction = text(fields, 'tax_jurisdiction_label', 'tax_jurisdiction');
+  if (taxStatus === 'taxable' && taxAmount) {
+    add(
+      'Sales tax',
+      `${money(taxAmount)}${taxRate ? ` at ${taxRate}%` : ''}${taxJurisdiction ? ` (${taxJurisdiction})` : ''}`,
+    );
+  } else if (taxStatus === 'exempt') {
+    add('Sales tax', 'Exempt — exemption certificate on file');
+  } else if (taxStatus === 'not_taxable') {
+    add('Sales tax', 'No sales tax applicable');
+  } else {
+    const taxNote = text(fields, 'tax_note');
+    if (taxNote) add('Sales tax', taxNote);
+  }
+  const totalDue = text(fields, 'total_due');
+  const quotedTotal = text(fields, 'quoted_price', 'proposed_total');
+  if (totalDue && (!quotedTotal || Number(totalDue) !== Number(quotedTotal))) {
+    add('Total after tax', money(totalDue));
+  }
 
   const bookingStatus = text(fields, 'booking_request_status');
   if (bookingStatus === 'pending_owner_review') {

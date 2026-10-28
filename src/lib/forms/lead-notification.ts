@@ -408,7 +408,25 @@ function pricingLines(fields: Record<string, string>): Array<[string, string]> {
     ]);
   }
   const taxNote = text(fields, 'tax_note');
-  if (taxNote) lines.push(['Pricing — Sales tax', taxNote]);
+  if (taxNote) lines.push(['Pricing - Sales tax', taxNote]);
+  const taxAmount = text(fields, 'tax_amount');
+  const taxRate = text(fields, 'tax_rate');
+  const taxJurisdiction = text(fields, 'tax_jurisdiction_label', 'tax_jurisdiction');
+  if (taxAmount) {
+    lines.push([
+      'Pricing - Sales tax amount',
+      `${money(taxAmount)}${taxRate ? ` at ${taxRate}%` : ''}${taxJurisdiction ? ` (${taxJurisdiction})` : ''}`,
+    ]);
+  }
+  const totalDue = text(fields, 'total_due');
+  if (totalDue) lines.push(['Pricing - Total due after tax', money(totalDue)]);
+  const taxReview = text(fields, 'tax_review_reason');
+  if (taxReview) {
+    lines.push([
+      'Pricing - Sales tax review',
+      'Tax could not be verified for this service address. Confirm the jurisdiction and any exemption before charging.',
+    ]);
+  }
   const minimum = text(fields, 'minimum_job_applied');
   if (minimum === 'true') lines.push(['Pricing — Minimum job applied', 'Yes']);
   return lines;
@@ -746,6 +764,19 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
     'unverified_client_ongoing_price',
     'unverified_client_ongoing_frequency',
     'unverified_priced_request',
+    'tax_note',
+    'tax_status',
+    'tax_category',
+    'tax_rate',
+    'tax_amount',
+    'tax_jurisdiction',
+    'tax_jurisdiction_label',
+    'tax_source',
+    'tax_review_reason',
+    'taxable_subtotal',
+    'total_due',
+    'tax_effective_from',
+    'tax_effective_through',
   ]);
   addLines(travelLines(fields), [
     'travel_qualification',

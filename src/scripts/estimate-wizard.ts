@@ -790,7 +790,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         latestResult
           ? Math.max(
               bookingConfig.minimumJobMinutes,
-              Math.ceil((latestResult.pricing.totalLaborHours * 60) / bookingConfig.crewCount),
+              Math.ceil((latestResult.pricing.totalLaborHours * 60) / bookingConfig.defaultCrewSize),
             )
           : 0;
       const bookingKey =
@@ -1485,7 +1485,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
       const durationMinutes = Math.max(
         bookingConfig.minimumJobMinutes,
-        Math.ceil((latestResult.pricing.totalLaborHours * 60) / bookingConfig.crewCount),
+        Math.ceil((latestResult.pricing.totalLaborHours * 60) / bookingConfig.defaultCrewSize),
       );
       return {
         durationMinutes,

@@ -8,6 +8,7 @@ import { commercialTierConfig } from '../config/estimators/commercial';
 import { pricing } from '../config/pricing';
 import { schedulingConfig } from '../config/scheduling';
 import { taxPresentationForService } from '../lib/estimate/tax';
+import { calculateServiceTax, type ServiceTaxResult } from '../lib/tax/engine';
 import { formatUsd } from '../lib/format';
 import { initAddressFinder } from './address-finder';
 import { initPhotoUploads } from './photo-uploads';
@@ -89,6 +90,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   const photoController = initPhotoUploads(host, { engine: facilityEngine });
   let latestWorkload: FacilityWorkload | null = null;
   let latestPrice: FacilityPrice | null = null;
+  let latestTax: ServiceTaxResult | null = null;
   let paymentEnabled = false;
   let paymentBusy = false;
   let paymentBlocked = false;
@@ -150,8 +152,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       numericEstimatesEnabled &&
       latestPrice?.priced === true &&
       latestPrice.tier === 'A';
+    const taxReady = latestTax === null || latestTax.canCharge;
     const eligibleBase = priceReady && currentStep === stepPanels.length;
-    const payable = eligibleBase && paymentEnabled && !paymentBlocked && addressReady;
+    const payable = eligibleBase && paymentEnabled && !paymentBlocked && addressReady && taxReady;
     const canVerify =
       eligibleBase &&
       paymentEnabled &&
@@ -170,11 +173,13 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     if (verifyAddressButton) verifyAddressButton.hidden = !canVerify;
     if (paymentGuidance) {
       paymentGuidance.hidden = !eligibleBase || payable;
-      paymentGuidance.textContent = canVerify
-        ? 'Verify your service address to finalize travel and unlock secure online payment. You can still request the visit without paying.'
-        : addressReviewRequired
-          ? "We couldn't verify the exact facility address online. Request the visit without paying — we'll confirm the address and arrange payment personally."
-          : 'Your cleaning request is ready. We will confirm the final scope and price before arranging payment.';
+      paymentGuidance.textContent = !taxReady
+        ? 'Sales tax for this service address needs personal confirmation before online payment. Send your request and Sparkling Standard will confirm the tax and payment options with you.'
+        : canVerify
+          ? 'Verify your service address to finalize travel and unlock secure online payment. You can still request the visit without paying.'
+          : addressReviewRequired
+            ? "We couldn't verify the exact facility address online. Request the visit without paying — we'll confirm the address and arrange payment personally."
+            : 'Your cleaning request is ready. We will confirm the final scope and price before arranging payment.';
     }
     if (payNowNote) payNowNote.hidden = !payable;
     if (bookingPicker) {
@@ -525,7 +530,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       }
       const durationMinutes = Math.max(
         bookingConfig.minimumJobMinutes,
-        Math.ceil((latestWorkload.laborHours * 60) / bookingConfig.crewCount),
+        Math.ceil((latestWorkload.laborHours * 60) / bookingConfig.defaultCrewSize),
       );
       const preferredDate = field('preferred_date');
       return {
@@ -668,8 +673,16 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     estimatePanel.hidden = false;
     maybeRevealFacilityEstimate();
     estimateLines.innerHTML = priceLines.join('');
-    const tax = taxPresentationForService(facilityEngine === 'church' ? 'church_cleaning' : 'commercial_cleaning');
-    if (estimateTax) estimateTax.textContent = `${tax.label}. ${tax.note}`;
+    if (estimateTax) {
+      const tax = latestTax;
+      estimateTax.textContent = tax
+        ? tax.treatment === 'taxable'
+          ? `${tax.note} Tax at checkout: ${formatUsd(tax.taxAmount ?? 0, { forceCents: true })}; total ${formatUsd(tax.total ?? price.total, { forceCents: true })}.`
+          : tax.note
+        : taxPresentationForService(
+            facilityEngine === 'church' ? 'church_cleaning' : 'commercial_cleaning',
+          ).note;
+    }
     if (!price.priced) {
       estimateLabel.textContent = 'Confirmation Required';
       estimatePrice.textContent = "We'll confirm this with you";
@@ -713,6 +726,15 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         oneWayMiles: travel?.oneWayMiles ?? null,
         church: facilityEngine === 'church',
       });
+      const submittedAddress = finder?.getSubmission();
+      latestTax = latestPrice.priced
+        ? calculateServiceTax({
+            serviceType: facilityEngine === 'church' ? 'church_cleaning' : 'commercial_cleaning',
+            state: submittedAddress?.state ?? field('addressState'),
+            zip: submittedAddress?.zip ?? field('zip'),
+            taxableBase: latestPrice.total,
+          })
+        : null;
       const priceLines: string[] = [];
       if (latestPrice.priced) {
         priceLines.push(`<li><span>Cleaning (${latestWorkload.laborHours} labor hrs)</span><strong>${formatUsd(latestPrice.cleaningSubtotal, { forceCents: true })}</strong></li>`);
@@ -733,7 +755,21 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         if (latestPrice.monthly) {
           priceLines.push(`<li><span>Estimated monthly</span><strong>${formatUsd(latestPrice.monthly, { forceCents: true })}</strong></li>`);
         }
-        lines.push(`<li><span>Preliminary estimate</span><strong>${formatUsd(latestPrice.total, { forceCents: true })} per visit</strong></li>`);
+        if (latestTax?.treatment === 'taxable') {
+          priceLines.push(
+            `<li><span>Sales tax (${latestTax.ratePercent}%${latestTax.jurisdictionLabel ? ` — ${escapeHtml(latestTax.jurisdictionLabel)}` : ''})</span><strong>${formatUsd(latestTax.taxAmount ?? 0, { forceCents: true })}</strong></li>`,
+          );
+          priceLines.push(
+            `<li><span>Total with tax</span><strong>${formatUsd(latestTax.total ?? latestPrice.total, { forceCents: true })} per visit</strong></li>`,
+          );
+        } else if (latestTax?.treatment === 'exempt') {
+          priceLines.push('<li><span>Sales tax</span><strong>Exempt — certificate on file</strong></li>');
+        } else if (latestTax?.treatment === 'not_taxable') {
+          priceLines.push('<li><span>Sales tax</span><strong>No sales tax applicable</strong></li>');
+        } else {
+          priceLines.push('<li><span>Sales tax</span><strong>To be confirmed for this address</strong></li>');
+        }
+        lines.push(`<li><span>Preliminary estimate</span><strong>${formatUsd(latestPrice.total, { forceCents: true })} per visit${latestTax?.treatment === 'taxable' ? ' before tax' : ''}</strong></li>`);
       } else {
         lines.push('<li><span>Estimate type</span><strong>Custom scope review</strong></li>');
       }
@@ -845,7 +881,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     error?: string;
     reason?: string;
     amount?: number;
+    cleaningAmount?: number;
     quotedAmount?: number;
+    tax?: ServiceTaxResult;
     reference?: string;
   }
 
@@ -870,7 +908,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         error?: string;
         reason?: string;
         amount?: number;
+        cleaningAmount?: number;
         quotedAmount?: number;
+        tax?: ServiceTaxResult;
         reference?: string;
       };
       if (response.ok && data.ok && data.url) {
@@ -883,7 +923,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         ...(data.error ? { error: data.error } : {}),
         ...(data.reason ? { reason: data.reason } : {}),
         ...(typeof data.amount === 'number' ? { amount: data.amount } : {}),
+        ...(typeof data.cleaningAmount === 'number' ? { cleaningAmount: data.cleaningAmount } : {}),
         ...(typeof data.quotedAmount === 'number' ? { quotedAmount: data.quotedAmount } : {}),
+        ...(data.tax ? { tax: data.tax } : {}),
         ...(data.reference ? { reference: data.reference } : {}),
       };
     } catch {
@@ -911,13 +953,32 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       markRequestReceived();
       setPayNowBusy(false);
       syncFacilityPayment();
+      const taxDetail =
+        failure.tax?.treatment === 'taxable'
+          ? ` This total includes ${formatUsd(failure.tax.taxAmount ?? 0, { forceCents: true })} in verified sales tax.`
+          : '';
       setStatus(
         'info',
         'The secure total is now ' +
           formatUsd(failure.amount) +
-          '. Click Pay ' +
+          '.' +
+          taxDetail +
+          ' Click Pay ' +
           formatUsd(failure.amount) +
           ' Securely to approve the recalculated total. No charge has been made.',
+      );
+      return;
+    }
+    if (failure.reason?.startsWith('tax_')) {
+      paymentBlocked = true;
+      acceptedPaymentAmount = null;
+      paymentRetryAvailable = false;
+      markRequestReceived();
+      setPayNowBusy(false);
+      syncFacilityPayment();
+      setStatus(
+        'error',
+        'Your request was received. Sales tax for this service address must be confirmed personally before online payment, so no payment has been taken. Sparkling Standard will confirm the tax and payment options with you.',
       );
       return;
     }
@@ -1087,6 +1148,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       fields.quote_config_version = pricing.commercialPricing.configVersion.value;
       if (latestPrice.priced) {
         fields.quoted_price = String(latestPrice.total);
+        if (latestTax?.canCharge && latestTax.total !== null) {
+          fields.quoted_total = String(latestTax.total);
+        }
         fields.quoted_range = latestPrice.range
           ? `$${latestPrice.range.low}-$${latestPrice.range.high}`
           : '';

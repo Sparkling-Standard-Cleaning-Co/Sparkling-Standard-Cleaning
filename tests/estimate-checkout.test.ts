@@ -14,6 +14,7 @@ import { calculateEstimate } from '../src/lib/estimate/calculate.ts';
 import { selectInstantAmount } from '../src/lib/estimate/quote.ts';
 import { travelConfig } from '../src/config/estimators/travel.ts';
 import { pricing } from '../src/config/pricing.ts';
+import { calculateServiceTax } from '../src/lib/tax/engine.ts';
 import { FakeLedger } from './helpers/payment-fakes.ts';
 
 let ip = 0;
@@ -134,9 +135,18 @@ function validFacilityInput(engine: 'commercial' | 'church' = 'commercial') {
     church: engine === 'church',
   });
   assert.ok(price.priced && price.tier === 'A');
+  const tax = calculateServiceTax({
+    serviceType: engine === 'church' ? 'church_cleaning' : 'commercial_cleaning',
+    state: 'FL',
+    zip: '32502',
+    taxableBase: price.total,
+    at: new Date('2026-10-28T12:00:00Z'),
+  });
+  assert.ok(tax.canCharge && tax.total !== null);
   return {
     workload,
     price,
+    tax,
     fields: {
       request_type: 'facility_estimate',
       engine_type: engine,
@@ -158,6 +168,7 @@ function validFacilityInput(engine: 'commercial' | 'church' = 'commercial') {
       pin_adjusted: 'no',
       cleaning_subtotal: String(price.cleaningSubtotal),
       quoted_price: String(price.total),
+      quoted_total: String(tax.total),
       quote_config_version: pricing.commercialPricing.configVersion.value,
       email: 'customer@example.test',
       name: 'Synthetic Customer',
@@ -272,7 +283,7 @@ test('a valid facility quote creates one session at the server-calculated amount
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
-  const { price, fields } = validFacilityInput();
+  const { price, tax, fields } = validFacilityInput();
   let amountCents = '';
 
   const response = await withFetch(
@@ -295,7 +306,8 @@ test('a valid facility quote creates one session at the server-calculated amount
 
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { ok: true, url: 'https://checkout.stripe.test/session' });
-  assert.equal(amountCents, String(Math.round(price.total * 100)));
+  assert.equal(amountCents, String(Math.round((tax.total ?? price.total) * 100)));
+  assert.ok((tax.taxAmount ?? 0) > 0, 'Florida commercial service tax is included');
   assert.equal(provider.postCount(), 1);
   assert.equal(ledger.values.size, 1);
 });
@@ -359,7 +371,7 @@ test('a small server price difference requires explicit acceptance before checko
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
-  const { price, fields } = validFacilityInput();
+  const { price, tax, fields } = validFacilityInput();
   const changed = { ...fields, quoted_price: String(Number(price.total) - 1) };
   const first = await withFetch(provider.stub, () =>
     onRequestPost({
@@ -374,7 +386,7 @@ test('a small server price difference requires explicit acceptance before checko
     quotedAmount?: number;
   };
   assert.equal(changedBody.error, 'quote_changed');
-  assert.equal(changedBody.amount, price.total);
+  assert.equal(changedBody.amount, tax.total);
   assert.equal(changedBody.quotedAmount, Number(price.total) - 1);
   assert.equal(provider.postCount(), 0, 'no session before explicit acceptance');
 
@@ -384,7 +396,7 @@ test('a small server price difference requires explicit acceptance before checko
         fields: changed,
         returnPath: '/estimate/commercial/',
         acceptRecalculated: true,
-        acceptedAmount: price.total,
+        acceptedAmount: tax.total,
       }),
       env,
     } as never),

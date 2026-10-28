@@ -48,9 +48,9 @@ const RESIDENTIAL_NOTE =
 const STR_NOTE =
   'Cleaning billed to the property owner or host for a residential rental is not taxable. A mandatory cleaning fee a host charges guests is part of the host’s taxable transient rental charge.';
 const COMMERCIAL_NOTE =
-  'Nonresidential cleaning is subject to Florida’s 6% state sales tax plus any applicable county discretionary sales surtax. The final quote shows the tax for the confirmed service address.';
+  'Nonresidential cleaning is subject to Florida’s 6% state sales tax plus the county discretionary sales surtax for the confirmed service address. The exact tax is calculated from that address; if the jurisdiction cannot be verified, online payment is withheld until it is confirmed.';
 const CHURCH_NOTE =
-  'Nonresidential cleaning is taxable unless the church provides a current Florida Consumer’s Certificate of Exemption (Form DR-14) and pays directly. We confirm any exemption before booking.';
+  'Nonresidential cleaning is taxable unless the church provides a current Florida Consumer’s Certificate of Exemption (Form DR-14) and pays directly. The exact tax is calculated from the confirmed service address; any exemption is verified before it is applied.';
 const UNKNOWN_NOTE =
   'Sales-tax treatment will be confirmed with your final quote for the service address.';
 

@@ -22,6 +22,7 @@ export interface GoogleCalendarEvent {
   end: { dateTime?: string; date?: string };
   transparency?: string;
   status?: string;
+  extendedProperties?: { private?: Record<string, string> };
 }
 
 export interface CalendarJob {
@@ -31,6 +32,23 @@ export interface CalendarJob {
   end: Date;
   locationText: string;
   blocksDay: boolean;
+  /**
+   * Cleaning resources assigned to the job. Absent for legacy/owner events,
+   * which conservatively block every resource.
+   */
+  resourceIds?: string[];
+}
+
+/** Parses the private comma-separated resource assignment on an event. */
+export function eventResourceIds(
+  event: Pick<GoogleCalendarEvent, 'extendedProperties'>,
+): string[] {
+  const raw = event.extendedProperties?.private?.sparkling_resources ?? '';
+  const ids = raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return ids.length > 0 ? [...new Set(ids)] : [];
 }
 
 export interface GoogleCalendarStatus {
@@ -114,6 +132,7 @@ export async function calendarStatus(env: GoogleCalendarEnv): Promise<GoogleCale
 
 function eventJob(event: GoogleCalendarEvent, timeZone: string): CalendarJob | null {
   if (event.status === 'cancelled' || event.transparency === 'transparent') return null;
+  const resourceIds = eventResourceIds(event);
   if (event.start.date || event.end.date) {
     const day = event.start.date ?? event.end.date ?? '';
     const start = zonedTimeToUtc(day, '00:00', timeZone);
@@ -124,6 +143,7 @@ function eventJob(event: GoogleCalendarEvent, timeZone: string): CalendarJob | n
       end: new Date(start.getTime() + 24 * 60 * 60 * 1000),
       locationText: '',
       blocksDay: true,
+      ...(resourceIds.length > 0 ? { resourceIds } : {}),
     };
   }
   if (!event.start.dateTime || !event.end.dateTime) return null;
@@ -137,6 +157,7 @@ function eventJob(event: GoogleCalendarEvent, timeZone: string): CalendarJob | n
     end,
     locationText: event.location?.trim() ?? '',
     blocksDay: false,
+    ...(resourceIds.length > 0 ? { resourceIds } : {}),
   };
 }
 
@@ -180,6 +201,30 @@ export interface NewCalendarJob {
   end: string;
   timeZone: string;
   reference: string;
+  /** Assigned cleaning resources (comma-separated on the event). */
+  resourceIds: string[];
+}
+
+export interface CalendarEventPatch {
+  summary?: string;
+  description?: string;
+  location?: string;
+  start?: string;
+  end?: string;
+  timeZone?: string;
+  resourceIds?: string[];
+}
+
+function eventPrivateProperties(
+  reference: string | undefined,
+  resourceIds: ReadonlyArray<string> | undefined,
+): Record<string, string> {
+  const properties: Record<string, string> = {};
+  if (reference) properties.sparkling_reference = reference;
+  if (resourceIds && resourceIds.length > 0) {
+    properties.sparkling_resources = [...new Set(resourceIds)].join(',');
+  }
+  return properties;
 }
 
 export async function createCalendarEvent(
@@ -203,7 +248,9 @@ export async function createCalendarEvent(
           location: job.location,
           start: { dateTime: job.start, timeZone: job.timeZone },
           end: { dateTime: job.end, timeZone: job.timeZone },
-          extendedProperties: { private: { sparkling_reference: job.reference } },
+          extendedProperties: {
+            private: eventPrivateProperties(job.reference, job.resourceIds),
+          },
         }),
         signal: AbortSignal.timeout(10_000),
       },
@@ -211,6 +258,49 @@ export async function createCalendarEvent(
     const data = (await response.json().catch(() => ({}))) as { id?: string };
     if (!response.ok || !data.id) return { ok: false, reason: 'calendar_unavailable' };
     return { ok: true, eventId: data.id };
+  } catch {
+    return { ok: false, reason: 'calendar_unavailable' };
+  }
+}
+
+/** Updates an existing confirmed event (reschedule or owner reassignment). */
+export async function updateCalendarEvent(
+  env: GoogleCalendarEnv,
+  eventId: string,
+  patch: CalendarEventPatch,
+): Promise<{ ok: boolean; reason?: 'auth_failed' | 'calendar_unavailable' }> {
+  const token = await accessToken(env);
+  if (!token) return { ok: false, reason: 'auth_failed' };
+  const body: Record<string, unknown> = {};
+  if (patch.summary !== undefined) body.summary = patch.summary;
+  if (patch.description !== undefined) body.description = patch.description;
+  if (patch.location !== undefined) body.location = patch.location;
+  if (patch.start !== undefined) {
+    body.start = { dateTime: patch.start, ...(patch.timeZone ? { timeZone: patch.timeZone } : {}) };
+  }
+  if (patch.end !== undefined) {
+    body.end = { dateTime: patch.end, ...(patch.timeZone ? { timeZone: patch.timeZone } : {}) };
+  }
+  if (patch.resourceIds !== undefined) {
+    body.extendedProperties = {
+      private: { sparkling_resources: [...new Set(patch.resourceIds)].join(',') },
+    };
+  }
+  if (Object.keys(body).length === 0) return { ok: true };
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${calendarPath(env)}/events/${encodeURIComponent(eventId)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    return response.ok ? { ok: true } : { ok: false, reason: 'calendar_unavailable' };
   } catch {
     return { ok: false, reason: 'calendar_unavailable' };
   }
@@ -264,6 +354,7 @@ export interface CalendarEventDetails {
   start?: string;
   end?: string;
   status?: string;
+  resourceIds?: string[];
 }
 
 export async function getCalendarEvent(
@@ -285,8 +376,18 @@ export async function getCalendarEvent(
       status?: string;
       start?: { dateTime?: string; date?: string };
       end?: { dateTime?: string; date?: string };
+      extendedProperties?: { private?: Record<string, string> };
     };
     if (!data.id) return null;
+    const rawResources = data.extendedProperties?.private?.sparkling_resources ?? '';
+    const resources = [
+      ...new Set(
+        rawResources
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean),
+      ),
+    ];
     return {
       id: data.id,
       ...(data.summary ? { summary: data.summary } : {}),
@@ -294,6 +395,7 @@ export async function getCalendarEvent(
       ...(data.status ? { status: data.status } : {}),
       ...(data.start?.dateTime ? { start: data.start.dateTime } : {}),
       ...(data.end?.dateTime ? { end: data.end.dateTime } : {}),
+      ...(resources.length > 0 ? { resourceIds: resources } : {}),
     };
   } catch {
     return null;

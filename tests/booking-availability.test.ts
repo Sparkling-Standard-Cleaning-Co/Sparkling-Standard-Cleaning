@@ -12,6 +12,17 @@ const tz = 'America/Chicago';
 const origin = { lat: 30.61, lng: -87.34 };
 const destination = { lat: 30.4111, lng: -87.2164 };
 
+const resources = [
+  { id: 'hayli', workdays: [0, 1, 2, 3, 4, 5, 6], workdayStart: '08:00', workdayEnd: '18:00', origin },
+  {
+    id: 'family-cleaner',
+    workdays: [0, 1, 2, 3, 4, 5, 6],
+    workdayStart: '08:00',
+    workdayEnd: '18:00',
+    origin,
+  },
+];
+
 function request(overrides: Partial<AvailabilityRequest> = {}): AvailabilityRequest {
   return {
     date: '2026-11-10',
@@ -24,12 +35,11 @@ function request(overrides: Partial<AvailabilityRequest> = {}): AvailabilityRequ
     maxAdvanceDays: 60,
     travelBufferMinutes: 15,
     jobBufferMinutes: 15,
-    crewCount: 1,
-    maxConcurrentJobs: 1,
+    resources,
+    crewSize: 1,
     minimumJobMinutes: 60,
     maximumJobMinutes: 600,
     durationMinutes: 120,
-    origin,
     destination,
     jobs: [],
     now: new Date('2026-11-07T12:00:00Z'),
@@ -140,5 +150,125 @@ test('closed days, short-notice dates and invalid durations fail closed', async 
   assert.equal(
     (await calculateAvailability(request({ durationMinutes: 10 }), label)).reason,
     'duration_invalid',
+  );
+});
+
+test('a job assigned to one cleaner leaves the other cleaner available', async () => {
+  const result = await calculateAvailability(
+    request({
+      jobs: [
+        {
+          start: zonedTimeToUtc('2026-11-10', '08:00', tz),
+          end: zonedTimeToUtc('2026-11-10', '09:30', tz),
+          location: destination,
+          resourceIds: ['hayli'],
+        },
+      ],
+    }),
+    label,
+  );
+  assert.equal(result.available, true);
+  const first = result.slots[0]!;
+  assert.equal(label(new Date(first.start)), '9:00 AM');
+  assert.deepEqual(first.resourceIds, ['family-cleaner']);
+});
+
+test('a joint job needs both cleaners and waits for the busy one', async () => {
+  const result = await calculateAvailability(
+    request({
+      crewSize: 2,
+      jobs: [
+        {
+          start: zonedTimeToUtc('2026-11-10', '08:00', tz),
+          end: zonedTimeToUtc('2026-11-10', '09:30', tz),
+          location: destination,
+          resourceIds: ['hayli'],
+        },
+      ],
+    }),
+    label,
+  );
+  assert.equal(result.available, true);
+  for (const slot of result.slots) {
+    assert.equal(slot.resourceIds.length, 2);
+  }
+  assert.equal(label(new Date(result.slots[0]!.start)), '10:30 AM');
+});
+
+test('a legacy calendar event without resource ids blocks every cleaner', async () => {
+  const result = await calculateAvailability(
+    request({
+      jobs: [
+        {
+          start: zonedTimeToUtc('2026-11-10', '08:00', tz),
+          end: zonedTimeToUtc('2026-11-10', '09:30', tz),
+          location: destination,
+        },
+      ],
+    }),
+    label,
+  );
+  assert.equal(result.available, true);
+  assert.equal(label(new Date(result.slots[0]!.start)), '10:30 AM');
+});
+
+test('two simultaneous jobs are schedulable on two cleaners', async () => {
+  const result = await calculateAvailability(
+    request({
+      jobs: [
+        {
+          start: zonedTimeToUtc('2026-11-10', '08:00', tz),
+          end: zonedTimeToUtc('2026-11-10', '10:00', tz),
+          location: destination,
+          resourceIds: ['hayli'],
+        },
+        {
+          start: zonedTimeToUtc('2026-11-10', '08:00', tz),
+          end: zonedTimeToUtc('2026-11-10', '10:00', tz),
+          location: destination,
+          resourceIds: ['family-cleaner'],
+        },
+      ],
+    }),
+    label,
+  );
+  assert.equal(result.available, true);
+  assert.equal(label(new Date(result.slots[0]!.start)), '11:00 AM');
+});
+
+test('an all-day event for one cleaner does not close the other cleaner', async () => {
+  const result = await calculateAvailability(
+    request({
+      jobs: [
+        {
+          start: zonedTimeToUtc('2026-11-10', '00:00', tz),
+          end: zonedTimeToUtc('2026-11-11', '00:00', tz),
+          location: null,
+          blocksDay: true,
+          resourceIds: ['hayli'],
+        },
+      ],
+    }),
+    label,
+  );
+  assert.equal(result.available, true);
+  assert.equal(result.slots[0]?.resourceIds.includes('family-cleaner'), true);
+});
+
+test('an owner-forced resource assignment only uses the requested cleaner', async () => {
+  const result = await calculateAvailability(
+    request({ requiredResourceIds: ['family-cleaner'] }),
+    label,
+  );
+  assert.equal(result.available, true);
+  for (const slot of result.slots) assert.deepEqual(slot.resourceIds, ['family-cleaner']);
+});
+
+test('invalid crew sizes fail closed', async () => {
+  assert.equal((await calculateAvailability(request({ crewSize: 3 }), label)).reason, 'crew_unavailable');
+  assert.equal((await calculateAvailability(request({ crewSize: 0 }), label)).reason, 'crew_unavailable');
+  assert.equal(
+    (await calculateAvailability(request({ requiredResourceIds: ['hayli', 'family-cleaner'], crewSize: 1 }), label)).reason,
+    'insufficient_resources',
   );
 });

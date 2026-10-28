@@ -128,6 +128,7 @@ test('creating a confirmed calendar event sends the exact held interval', async 
         end: '2026-11-10T17:00:00Z',
         timeZone: 'America/Chicago',
         reference: 'SS-20261027-ABC123',
+        resourceIds: ['hayli', 'family-cleaner'],
       });
       assert.equal(created.ok, true);
       assert.equal(created.eventId, 'created-event');
@@ -135,6 +136,10 @@ test('creating a confirmed calendar event sends the exact held interval', async 
   );
   assert.equal((body.start as { dateTime?: string }).dateTime, '2026-11-10T15:00:00Z');
   assert.equal((body.extendedProperties as { private?: { sparkling_reference?: string } }).private?.sparkling_reference, 'SS-20261027-ABC123');
+  assert.equal(
+    (body.extendedProperties as { private?: { sparkling_resources?: string } }).private?.sparkling_resources,
+    'hayli,family-cleaner',
+  );
 });
 
 test('availability stays off until the owner enables booking', async () => {
@@ -199,6 +204,7 @@ test('owner confirmation revalidates the slot and writes one calendar event', as
       destination: { lat: 30.4111, lng: -87.2164 },
       locationText: '100 S Baylen St, Pensacola, FL 32502',
       reference: 'SS-20261027-ABC123',
+      resourceIds: ['hayli'],
     });
     assert.equal(created.ok, true);
     if (!created.ok) return;
@@ -253,6 +259,7 @@ test('owner cancellation deletes the calendar event and releases the hold', asyn
     destination: { lat: 30.4111, lng: -87.2164 },
     locationText: '100 S Baylen St, Pensacola, FL 32502',
     reference: 'TEST-CANCEL',
+    resourceIds: ['hayli'],
   });
   assert.equal(created.ok, true);
   if (!created.ok) return;
@@ -313,6 +320,7 @@ test('an expired hold with a durable pending request can still be owner-confirme
       destination: { lat: 30.4111, lng: -87.2164 },
       locationText: '100 S Baylen St, Pensacola, FL 32502',
       reference: 'TEST-PENDING',
+      resourceIds: ['hayli'],
     });
     assert.equal(created.ok, true);
     if (!created.ok) return;
@@ -352,6 +360,136 @@ test('an expired hold with a durable pending request can still be owner-confirme
     const stored = await getPendingBookingRequest(bucket, pending.id);
     assert.equal(stored?.status, 'confirmed');
     assert.equal(stored?.calendarEventId, 'evt-pending-confirmed');
+  } finally {
+    config.enabled = original;
+  }
+});
+
+test('the owner can reassign a confirmed booking to another cleaner', async () => {
+  const config = bookingConfig as { enabled: boolean };
+  const original = config.enabled;
+  config.enabled = true;
+  try {
+    const bucket = new FakeLedger();
+    const created = await createBookingHold(bucket, {
+      date: '2026-11-10',
+      start: '2026-11-10T15:00:00.000Z',
+      end: '2026-11-10T17:00:00.000Z',
+      durationMinutes: 120,
+      destination: { lat: 30.4111, lng: -87.2164 },
+      locationText: '100 S Baylen St, Pensacola, FL 32502',
+      reference: 'TEST-REASSIGN',
+      resourceIds: ['hayli'],
+    });
+    assert.equal(created.ok, true);
+    if (!created.ok) return;
+    await writeLedgerJson(bucket, holdKey(created.hold.id), {
+      ...created.hold,
+      status: 'confirmed',
+      calendarEventId: 'evt-reassign',
+    });
+
+    let patchBody: Record<string, unknown> = {};
+    await withFetch(
+      async (url, init) => {
+        if (url.includes('oauth2.googleapis.com/token')) return jsonResponse({ access_token: 'access', expires_in: 3600 });
+        if (url.includes('/events/evt-reassign') && init?.method === 'PATCH') {
+          patchBody = JSON.parse(String(init.body ?? '{}')) as Record<string, unknown>;
+          return jsonResponse({});
+        }
+        if (url.includes('/events')) return jsonResponse({ items: [] });
+        if (url.includes('/calendar/v3/calendars/')) return jsonResponse({ summary: 'Bookings', timeZone: 'America/Chicago' });
+        if (url.includes('api.mapmap.ai/route/v1/')) return jsonResponse({ routes: [{ distance: 16093, duration: 900 }] });
+        throw new Error('unexpected fetch: ' + url);
+      },
+      async () => {
+        const request = new Request('https://example.test/api/booking-admin', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: created.hold.id,
+            action: 'reassign',
+            resourceIds: ['family-cleaner'],
+          }),
+        });
+        const response = await bookingAdminPost({
+          request,
+          env: { ...env, PAYMENT_LEDGER: bucket, BOOKING_OWNER_TOKEN: 'owner' } as never,
+        } as never);
+        assert.equal(response.status, 200);
+        const data = (await response.json()) as { slot?: { resourceIds?: string[] } };
+        assert.deepEqual(data.slot?.resourceIds, ['family-cleaner']);
+      },
+    );
+    assert.equal(
+      (patchBody.extendedProperties as { private?: { sparkling_resources?: string } }).private
+        ?.sparkling_resources,
+      'family-cleaner',
+    );
+    const stored = await getBookingHold(bucket, created.hold.id);
+    assert.deepEqual(stored?.resourceIds, ['family-cleaner']);
+    assert.equal(stored?.calendarEventId, 'evt-reassign');
+  } finally {
+    config.enabled = original;
+  }
+});
+
+test('the owner can reschedule a pending request and its confirmation slot', async () => {
+  const config = bookingConfig as { enabled: boolean };
+  const original = config.enabled;
+  config.enabled = true;
+  try {
+    const bucket = new FakeLedger();
+    const created = await createBookingHold(bucket, {
+      date: '2026-11-10',
+      start: '2026-11-10T15:00:00.000Z',
+      end: '2026-11-10T17:00:00.000Z',
+      durationMinutes: 120,
+      destination: { lat: 30.4111, lng: -87.2164 },
+      locationText: '100 S Baylen St, Pensacola, FL 32502',
+      reference: 'TEST-RESCHEDULE',
+      resourceIds: ['hayli'],
+    });
+    assert.equal(created.ok, true);
+    if (!created.ok) return;
+    const pending = await createPendingBookingRequest(bucket, created.hold);
+    await writeLedgerJson(bucket, holdKey(created.hold.id), {
+      ...created.hold,
+      expiresAt: new Date(Date.now() - 60_000).toISOString(),
+    });
+
+    await withFetch(
+      async (url, init) => {
+        if (url.includes('oauth2.googleapis.com/token')) return jsonResponse({ access_token: 'access', expires_in: 3600 });
+        if (url.includes('/events')) return jsonResponse({ items: [] });
+        if (url.includes('/calendar/v3/calendars/')) return jsonResponse({ summary: 'Bookings', timeZone: 'America/Chicago' });
+        if (url.includes('api.mapmap.ai/route/v1/')) return jsonResponse({ routes: [{ distance: 16093, duration: 900 }] });
+        throw new Error('unexpected fetch: ' + url);
+      },
+      async () => {
+        const request = new Request('https://example.test/api/booking-admin', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: pending.id,
+            action: 'reschedule',
+            date: '2026-11-11',
+            start: '2026-11-11T15:00:00.000Z',
+            end: '2026-11-11T17:00:00.000Z',
+          }),
+        });
+        const response = await bookingAdminPost({
+          request,
+          env: { ...env, PAYMENT_LEDGER: bucket, BOOKING_OWNER_TOKEN: 'owner' } as never,
+        } as never);
+        assert.equal(response.status, 200);
+      },
+    );
+    const stored = await getPendingBookingRequest(bucket, pending.id);
+    assert.equal(stored?.date, '2026-11-11');
+    assert.equal(stored?.start, '2026-11-11T15:00:00.000Z');
+    assert.deepEqual(stored?.resourceIds, ['hayli']);
+    assert.equal(stored?.status, 'pending');
   } finally {
     config.enabled = original;
   }
