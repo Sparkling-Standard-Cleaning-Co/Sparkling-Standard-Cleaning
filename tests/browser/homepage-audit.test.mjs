@@ -222,6 +222,51 @@ test('the footer review action uses reading glasses and the contact actions keep
   }
 });
 
+for (const [label, width, height] of [
+  ['desktop', 1440, 1000],
+  ['tablet', 834, 1112],
+  ['mobile', 390, 844],
+]) {
+  test(`footer column headings are centered within their own columns (${label})`, async () => {
+    const context = await browser.newContext({ viewport: { width, height } });
+    const page = await context.newPage();
+    try {
+      await page.goto(BASE + '/', { waitUntil: 'load' });
+      const columns = page.locator('.site-footer__grid > div');
+      assert.equal(await columns.count(), 4, 'four footer columns remain');
+      const headings = ['Services', 'Company', 'Reviews', 'Contact'];
+      for (const [index, expected] of headings.entries()) {
+        const column = columns.nth(index);
+        const heading = column.locator('h3');
+        assert.equal(normalize((await heading.innerText()) ?? ''), expected, `${expected} heading present`);
+        const metrics = await heading.evaluate((element) => {
+          const headingRect = element.getBoundingClientRect();
+          const columnRect = element.parentElement.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const textRect = range.getBoundingClientRect();
+          return {
+            textAlign: getComputedStyle(element).textAlign,
+            headingCenter: headingRect.left + headingRect.width / 2,
+            textCenter: textRect.left + textRect.width / 2,
+            columnCenter: columnRect.left + columnRect.width / 2,
+          };
+        });
+        assert.equal(metrics.textAlign, 'center', `${expected} heading text is centered`);
+        assert.ok(
+          Math.abs(metrics.textCenter - metrics.columnCenter) <= 1,
+          `${expected} heading text sits on the column center`,
+        );
+      }
+      const links = columns.nth(0).locator('ul a').first();
+      const linkAlign = await links.evaluate((element) => getComputedStyle(element.parentElement).textAlign);
+      assert.notEqual(linkAlign, 'center', 'the column links keep their intended alignment');
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 test('the contact form privacy note stays concise and keeps the policy link', async () => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();

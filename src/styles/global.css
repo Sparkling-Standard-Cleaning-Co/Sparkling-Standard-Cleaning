@@ -4096,6 +4096,13 @@ fieldset.input--invalid {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* Owner direction (2026-10-28): each column heading is centered over its own
+   column. The links, buttons and supporting copy below keep their existing
+   alignment. */
+.site-footer__grid > div > h3 {
+  text-align: center;
+}
+
 /* Two columns from tablets, four on wide screens. */
 @media (min-width: 40rem) {
   .site-footer__grid {
