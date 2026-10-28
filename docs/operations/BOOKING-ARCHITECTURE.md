@@ -13,6 +13,30 @@ could be calculated. The owner must choose a provider and supply the connection 
 availability endpoint, holds and booking confirmation can be activated. Do not display fabricated
 slots in the meantime.
 
+**Implemented in Initiative 6.9 (behind `bookingConfig.enabled:false`):**
+
+- Google Calendar OAuth client (`src/lib/booking/google-calendar.ts`) with dedicated-calendar
+  status, event retrieval and event creation.
+- Central-time conversion and DST-safe slot generation (`src/lib/booking/time.ts`).
+- Travel-aware availability with work hours, notice, advance window, existing jobs, preparation
+  buffers and next/previous job travel (`src/lib/booking/availability.ts`, `service.ts`).
+- `GET /api/availability` returns no slots until the calendar and store are connected; any
+  geocode/route/calendar failure withholds slots.
+- Durable R2 booking holds with a per-day conditional lock, overlap prevention and 20-minute expiry
+  (`src/lib/booking/holds.ts`, `POST /api/booking-hold`). Holds are explicitly not confirmed
+  appointments.
+- Owner-only `GET/POST /api/booking-admin` lookup, release and confirmation; confirmation
+  revalidates availability and writes one Google Calendar event.
+- Customer booking picker appears only when `/api/availability` reports `enabled:true`; selecting a
+  slot creates the hold and carries its server-validated id/slot into the lead request.
+- The owner notification labels the hold status, slot and expiry; a forged/expired hold never
+  becomes authoritative.
+
+**Still required for live activation:** the dedicated calendar, OAuth refresh token, owner token and
+owner-approved rules in `docs/operations/GOOGLE-CALENDAR-SETUP.md`; then enable
+`bookingConfig.enabled` and test holds/confirmations against the real calendar. Until then no slots
+render and the existing preferred-date request path remains.
+
 ## The state machine (never interchangeable)
 
 ```

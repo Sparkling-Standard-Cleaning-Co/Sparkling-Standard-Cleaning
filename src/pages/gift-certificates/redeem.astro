@@ -45,6 +45,7 @@ const schema = [
         <p class="eyebrow mb-0">Certificate code</p>
         <p class="gift-redeem-code" data-gift-ref aria-live="polite">Checking the link…</p>
         <p class="small text-muted" data-gift-ref-note></p>
+        <p class="small" data-gift-balance aria-live="polite"></p>
       </div>
 
       <div class="stack mt-5">
@@ -77,8 +78,9 @@ const schema = [
           {hasEmail ? <> email <a href={`mailto:${business.email}`}>{business.email}</a>.</> : null}
         </p>
         <p class="small text-muted">
-          This page only explains the redemption steps. It does not look up, change or transfer a
-          certificate, and it stores no personal information.
+          This page can verify the remaining balance for a certificate code. It never displays the
+          recipient's or purchaser's details, and it never changes the certificate. Balance requests
+          are rate-limited and stored only in private Cloudflare R2 records.
         </p>
       </div>
     </div>
@@ -90,12 +92,42 @@ const schema = [
   // mutation, no PII — the code is only echoed back for the recipient.
   const target = document.querySelector('[data-gift-ref]');
   const note = document.querySelector('[data-gift-ref-note]');
+  const balance = document.querySelector('[data-gift-balance]');
   if (target) {
     const raw = new URLSearchParams(window.location.search).get('ref') ?? '';
     const code = raw.trim().toUpperCase();
     if (/^SSGC-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(code)) {
       target.textContent = code;
       if (note) note.textContent = 'Quote this code when you contact us so we can apply it to your service.';
+      void (async () => {
+        if (!balance) return;
+        try {
+          const response = await fetch(`/api/gift-balance?code=${encodeURIComponent(code)}`, {
+            headers: { Accept: 'application/json' },
+          });
+          const data = (await response.json().catch(() => ({}))) as {
+            ok?: boolean;
+            remainingCents?: number;
+            status?: string;
+            error?: string;
+          };
+          if (response.ok && data.ok === true && typeof data.remainingCents === 'number') {
+            const dollars = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
+              data.remainingCents / 100,
+            );
+            balance.textContent =
+              data.status === 'fully_redeemed'
+                ? 'This certificate has been fully redeemed.'
+                : `Remaining balance: ${dollars}.`;
+          } else if (data.error === 'not_found') {
+            balance.textContent = 'We could not find that code yet. If you just purchased it, contact us.'
+          } else {
+            balance.textContent = 'Balance lookup is unavailable right now. Please contact us with the code.'
+          }
+        } catch {
+          balance.textContent = 'Balance lookup is unavailable right now. Please contact us with the code.'
+        }
+      })();
     } else {
       target.textContent = 'No certificate code found';
       if (note) {

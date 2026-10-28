@@ -137,3 +137,31 @@ without resubmitting the lead. The reservation-without-payment path is unchanged
 
 The R2 records contain payment references and limited purchaser metadata. Keep the bucket private;
 never expose those object keys, Stripe secrets, card data or customer records in logs or reports.
+
+## Initiative 6.9 Pay Now recovery (2026-10-28)
+
+**Root cause of the owner screenshot:** the final summary always showed the "Pay Now Securely"
+marketing sentence, while the button was hidden by the client-side eligibility rule. A manual/ZIP
+address with estimated travel produced a preliminary quote; `clientPaymentEligible()` required a
+verified live route and a precise confirmed destination, so it correctly withheld checkout. The
+summary copy did not reflect that state, leaving a promise with no action.
+
+**Fix:** the final summary now renders its explanation from the actual checkout state:
+
+- Eligible verified quote: Pay Now and Reserve This Cleaning (Pay Later).
+- Exact price but unverified travel/address: **Verify Address & Finalize Price** opens the address
+  resolver and pin confirmation; after confirmation the estimate recalculates and the customer
+  returns to the final step with Pay Now unlocked when the live route is verified.
+- Manual-review or payment-not-ready quote: no Pay Now promise; reservation and owner confirmation
+  are clearly offered.
+
+The server remains authoritative: no preliminary, moved-pin, approximate, stale or manipulated
+quote can create a Checkout Session. The 6.7 SHA-256 idempotency, R2 session/event records, signed
+webhook, retry and duplicate-charge protections are unchanged.
+
+Regression coverage: `tests/browser/initiative-6.9-paynow.test.mjs` reproduces the preliminary state
+at desktop and mobile, asserts that Pay Now is hidden and the verification action is present, then
+confirms the pin and asserts that the real Pay Now button and Pay Later reservation choice appear.
+
+**Not yet proven:** a controlled Stripe test-mode card payment. The production runtime currently has
+a live-mode key; no test-mode credentials were provided, and no live charge was authorized.

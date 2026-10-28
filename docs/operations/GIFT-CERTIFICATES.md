@@ -14,6 +14,24 @@ decided.
 expire and carries no post-sale service, dormancy, maintenance or cash-out fee (Fla. Stat. § 501.95).
 Sales remain off until the owner approves the exact denominations and the activation checklist below.
 
+**2026-10-27 ledger update:** paid webhooks now create one durable certificate record under
+`gifts/certificates/` in the private R2 bucket (idempotent by Stripe event). The record carries the
+original value, remaining balance, purchaser/recipient fields, payment references and every
+redemption. Owner-only lookup and partial redemption are available through
+`/api/gift-admin` using a Bearer token (`GIFT_OWNER_TOKEN` or `PHOTO_OWNER_TOKEN`); it is not a
+public endpoint. Automatic customer delivery and the public purchase UI remain gated.
+
+**Recommended denominations for owner approval (not active):** $50, $100, $150, $200. They are
+listed as `proposedDenominations` and are not shown or accepted until copied into `denominations`.
+**2026-10-28 delivery/balance update:** after a verified paid webhook and one durable issuance, the
+webhook sends the branded certificate (HTML + plain text) to the purchaser and, when supplied, the
+recipient through Resend with idempotency keys. Delivery failure returns a retryable error and never
+creates a second certificate. The redemption page can verify a code's remaining balance through
+`GET /api/gift-balance` without exposing names/contact details. Owner lookup, partial redemption and
+release remain behind `/api/gift-admin`. Sales are still disabled; the automatic delivery path has
+not been exercised with a real Stripe payment.
+
+
 ## 1. What is built
 
 | Piece | Where | Status |

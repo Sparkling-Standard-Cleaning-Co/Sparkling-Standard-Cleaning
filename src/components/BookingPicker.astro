@@ -1,0 +1,26 @@
+---
+interface Props {
+  id: string;
+}
+const { id } = Astro.props;
+---
+<section class="booking-picker" data-booking-picker hidden aria-labelledby={`${id}-heading`}>
+  <div class="booking-picker__head">
+    <p class="eyebrow">Appointment</p>
+    <h3 id={`${id}-heading`}>Choose an available time</h3>
+    <p class="small text-muted">
+      Live times come from Sparkling Standard’s private booking calendar in Central Time. A hold is
+      temporary and is not a confirmed appointment until we confirm it.
+    </p>
+  </div>
+  <div class="booking-picker__date">
+    <div class="field">
+      <label for={`${id}-date`}>Preferred date</label>
+      <input class="input" id={`${id}-date`} type="date" data-booking-date />
+    </div>
+    <button class="btn btn--secondary" type="button" data-booking-check>Check Available Times</button>
+  </div>
+  <div class="booking-picker__slots" data-booking-slots role="list" aria-live="polite"></div>
+  <p class="booking-picker__status small" data-booking-status role="status" aria-live="polite"></p>
+  <p class="booking-picker__hold small" data-booking-hold hidden></p>
+</section>

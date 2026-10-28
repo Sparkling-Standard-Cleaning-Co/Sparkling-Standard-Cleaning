@@ -122,20 +122,36 @@ test('a filled trap field blocks the gift request without sending', async () => 
   }
 });
 
-test('the redeem page echoes a valid code and refuses nonsense without requests', async () => {
+test('the redeem page echoes a valid code, verifies its balance and refuses nonsense', async () => {
   const { context, page } = await open(390, 844);
   try {
+    await page.route('**/api/gift-balance**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          code: 'SSGC-ABCD-2345',
+          status: 'active',
+          valueCents: 10000,
+          redeemedCents: 2500,
+          remainingCents: 7500,
+        }),
+      }),
+    );
     const calls = [];
     page.on('request', (request) => {
       if (request.url().includes('/api/')) calls.push(request.url());
     });
     await page.goto(BASE + '/gift-certificates/redeem/?ref=SSGC-ABCD-2345', { waitUntil: 'load' });
     assert.equal((await page.locator('[data-gift-ref]').textContent())?.trim(), 'SSGC-ABCD-2345');
+    await page.waitForFunction(() => /Remaining balance: \$75\.00/.test(document.querySelector('[data-gift-balance]')?.textContent ?? ''));
     assert.match((await page.textContent('body')) ?? '', /never ask for payment-card details/i);
+    assert.equal(calls.filter((url) => url.includes('/api/gift-balance')).length, 1);
 
     await page.goto(BASE + '/gift-certificates/redeem/?ref=%3Cscript%3E', { waitUntil: 'load' });
     assert.match((await page.locator('[data-gift-ref]').textContent()) ?? '', /No certificate code found/i);
-    assert.equal(calls.length, 0, 'the redeem page never calls an API');
+    assert.equal(calls.filter((url) => url.includes('/api/gift-balance')).length, 1, 'malformed code makes no lookup');
   } finally {
     await context.close();
   }

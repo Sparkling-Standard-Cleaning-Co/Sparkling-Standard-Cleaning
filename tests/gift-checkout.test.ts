@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { giftCertificateConfig } from '../src/config/gift-certificates.ts';
 import { onRequestPost as giftCheckout, resolveGiftAmount } from '../functions/api/gift-checkout.ts';
 import { onRequestPost as stripeWebhook } from '../functions/api/stripe-webhook.ts';
+import { FakeLedger } from './helpers/payment-fakes.ts';
 
 const jsonRequest = (body: unknown, ip = '10.10.0.1') =>
   new Request('https://example.test/api/gift', {
@@ -122,7 +123,7 @@ test('an unpaid session is acknowledged and never authorizes issuance', async ()
       headers: { 'Content-Type': 'application/json', 'stripe-signature': await sign(payload, secret) },
       body: payload,
     }),
-    env: { STRIPE_WEBHOOK_SECRET: secret },
+    env: { STRIPE_WEBHOOK_SECRET: secret, PAYMENT_LEDGER: new FakeLedger() },
   } as never);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { ok: true, received: true, ignored: true });
@@ -153,7 +154,7 @@ test('a paid session with no notification channel returns 500 so Stripe retries'
       headers: { 'Content-Type': 'application/json', 'stripe-signature': await sign(payload, secret) },
       body: payload,
     }),
-    env: { STRIPE_WEBHOOK_SECRET: secret },
+    env: { STRIPE_WEBHOOK_SECRET: secret, PAYMENT_LEDGER: new FakeLedger() },
   } as never);
   assert.equal(response.status, 500, 'a paid purchase must never be silently dropped');
 });

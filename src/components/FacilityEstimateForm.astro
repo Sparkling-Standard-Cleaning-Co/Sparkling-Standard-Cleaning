@@ -33,6 +33,7 @@ import TurnstileWidget from './TurnstileWidget.astro';
 import PhotoUploadSection from './PhotoUploadSection.astro';
 import EstimateReveal from './EstimateReveal.astro';
 import TermsAcceptance from './TermsAcceptance.astro';
+import BookingPicker from './BookingPicker.astro';
 
 type FacilityEngine = 'commercial' | 'church';
 
@@ -512,6 +513,7 @@ const facilityStepDescriptions = church
       </p>
     </div>
 
+    <BookingPicker id={`${engine}-booking`} />
     <PhotoUploadSection engine={engine} />
     <TermsAcceptance id={`${engine}-terms`} />
     <TurnstileWidget />

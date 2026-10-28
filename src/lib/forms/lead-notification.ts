@@ -775,6 +775,15 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Notes — Website message', text(fields, 'message'), 'message');
   add('Notes — Current situation', text(fields, 'current_situation'), 'current_situation');
 
+  if (text(fields, 'booking_hold_status') !== '') {
+    add('Appointment - Hold status', text(fields, 'booking_hold_status'), 'booking_hold_status');
+    add('Appointment - Slot start', text(fields, 'booking_slot_start'), 'booking_slot_start');
+    add('Appointment - Slot end', text(fields, 'booking_slot_end'), 'booking_slot_end');
+    add('Appointment - Hold expires', formatCentral(text(fields, 'booking_hold_expires_at')), 'booking_hold_expires_at');
+    add('Appointment - Hold reference', text(fields, 'booking_hold_reference'), 'booking_hold_reference');
+    add('Appointment - Hold id', text(fields, 'booking_hold_id'), 'booking_hold_id');
+  }
+
   // Transactional agreement: server-verified and timestamped before delivery.
   if (text(fields, 'terms_accepted_at') !== '') {
     add(

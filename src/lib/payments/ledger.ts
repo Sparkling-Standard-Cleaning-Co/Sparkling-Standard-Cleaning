@@ -14,6 +14,7 @@ export interface LedgerObject {
 
 export interface LedgerBucket {
   get(key: string): Promise<LedgerObject | null>;
+  list?(options: { prefix: string }): Promise<{ objects: Array<{ key: string }> }>;
   put(
     key: string,
     value: string,

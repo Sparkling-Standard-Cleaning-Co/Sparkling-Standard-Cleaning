@@ -22,6 +22,7 @@ import PhotoUploadSection from './PhotoUploadSection.astro';
 import ResponseGuarantee from './ResponseGuarantee.astro';
 import EstimateReveal from './EstimateReveal.astro';
 import TermsAcceptance from './TermsAcceptance.astro';
+import BookingPicker from './BookingPicker.astro';
 import { isFormEnabled } from '../config/business';
 
 const configured = isFormEnabled();
@@ -579,6 +580,8 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </div>
         </div>
         </div>
+
+        <BookingPicker id="residential-booking" />
 
         <div class="field-row field-row--2">
           <div class="field">

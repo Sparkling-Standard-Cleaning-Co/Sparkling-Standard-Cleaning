@@ -17,6 +17,8 @@ import { saveSubmissionSummary } from '../lib/forms/submission-receipt';
 import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { attributionFields } from '../lib/attribution';
 import { legalTerms } from '../config/legal';
+import { bookingConfig } from '../config/booking';
+import { initBookingPicker, type BookingPickerHandle } from './booking-picker';
 import { track } from '../lib/analytics/events';
 import {
   calculateFacilityPrice,
@@ -98,6 +100,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   let travelKey = '';
   let revealKey = '';
   let addressVerificationPending = false;
+  let bookingPicker: BookingPickerHandle | null = null;
   let finder: ReturnType<typeof initAddressFinder> = null;
 
   const phone = contactPhone();
@@ -167,6 +170,17 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         : 'Your cleaning request is ready. We will confirm the final scope and price before arranging payment.';
     }
     if (payNowNote) payNowNote.hidden = !payable;
+    if (bookingPicker) {
+      const submitted = finder?.getSubmission();
+      const key =
+        latestWorkload && submitted?.location
+          ? `${field('organization')}:${field('preferred_date')}:${submitted.street}:${submitted.location.lat.toFixed(
+              5,
+            )},${submitted.location.lng.toFixed(5)}`
+          : '';
+      bookingPicker.contextChanged(key);
+      if (currentStep === stepPanels.length && key) void bookingPicker.activate();
+    }
     if (
       addressVerificationPending &&
       currentStep !== stepPanels.length &&
@@ -482,9 +496,47 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       if (confirmedTravel) confirmedTravel.textContent = '';
       renderSummary();
       if (location) void lookupTravel(location.lat, location.lng);
+      const exact =
+        location !== null &&
+        location.precision !== 'street' &&
+        location.precision !== 'approximate' &&
+        field('serviceAddress').trim().length >= 5;
+      if (addressVerificationPending && exact) {
+        addressVerificationPending = false;
+        window.setTimeout(() => showStep(stepPanels.length), 250);
+      }
     },
   });
 
+  const bookingRoot = host.querySelector<HTMLElement>('[data-booking-picker]');
+  if (bookingRoot) {
+    bookingPicker = initBookingPicker(bookingRoot, () => {
+      if (!latestWorkload) return null;
+      const submitted = finder?.getSubmission();
+      if (
+        !submitted?.location ||
+        submitted.street.trim().length < 5 ||
+        submitted.location.precision === 'street' ||
+        submitted.location.precision === 'approximate'
+      ) {
+        return null;
+      }
+      const durationMinutes = Math.max(
+        bookingConfig.minimumJobMinutes,
+        Math.ceil((latestWorkload.laborHours * 60) / bookingConfig.crewCount),
+      );
+      const preferredDate = field('preferred_date');
+      return {
+        durationMinutes,
+        destination: { lat: submitted.location.lat, lng: submitted.location.lng },
+        reference: `FAC-${field('organization') || 'facility'}-${preferredDate}`.slice(0, 120),
+        location: [submitted.street, submitted.city, submitted.state, submitted.zip]
+          .filter(Boolean)
+          .join(', '),
+        preferredDate,
+      };
+    });
+  }
   verifyAddressButton?.addEventListener('click', () => {
     addressVerificationPending = true;
     showStep(1);
@@ -665,6 +717,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       latestPrice = null;
       renderEstimate([]);
     }
+
 
     if (facilityEngine === 'church') {
       const percent = pricing.churchDiscount.percent.value;
@@ -987,6 +1040,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         : {}),
       ...attributionFields(),
     };
+
+    const selectedHold = bookingPicker?.holdFields() ?? null;
+    if (selectedHold) Object.assign(fields, selectedHold);
 
     if (facilityEngine === 'church') {
       if (pricing.churchDiscount.enabled.value) {

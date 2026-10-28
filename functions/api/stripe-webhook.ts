@@ -15,7 +15,9 @@
 // Responses: 200 | 400 | 405 | 500 | 503
 
 import { verifyStripeSignature } from '../../src/lib/gift/stripe-signature.ts';
-import { buildGiftFulfillment } from '../../src/lib/gift/fulfillment.ts';
+import { buildGiftFulfillment, giftCertificateCodeFor } from '../../src/lib/gift/fulfillment.ts';
+import { giftBucket, issueGiftCertificate, remainingCents } from '../../src/lib/gift/ledger.ts';
+import { buildGiftCertificateEmail } from '../../src/lib/gift/delivery.ts';
 import {
   completePaymentEvent,
   failPaymentEvent,
@@ -36,6 +38,8 @@ interface Env extends PaymentStorageEnv {
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
   PUBLIC_SITE_URL?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
 }
 
 interface StripeEvent {
@@ -151,6 +155,37 @@ async function notifyOwner(
   }
 }
 
+async function sendCustomerGiftEmail(
+  env: Env,
+  to: string,
+  subject: string,
+  html: string,
+  text: string,
+  idempotencyKey: string,
+): Promise<boolean> {
+  if (!env.RESEND_API_KEY?.trim()) return false;
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY.trim()}`,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify({
+        from: env.RESEND_FROM_EMAIL?.trim() || 'Sparkling Standard <notifications@sparkling-standard.com>',
+        to: [to],
+        subject,
+        html,
+        text,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
   const secret = env.STRIPE_WEBHOOK_SECRET?.trim();
@@ -292,6 +327,35 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: true, received: true, incomplete: true });
   }
 
+  const giftLedger = giftBucket(env);
+  if (!giftLedger) {
+    if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'gift_ledger_not_configured');
+    return json({ ok: false, error: 'gift_ledger_not_configured' }, 503);
+  }
+  const code = giftCertificateCodeFor({ eventId });
+  let issued;
+  try {
+    issued = await issueGiftCertificate(giftLedger, {
+      version: 1,
+      code,
+      status: 'active',
+      valueCents: Math.round(seed.gift.valueUsd * 100),
+      redeemedCents: 0,
+      recipientName: seed.gift.recipientName,
+      purchaserName: seed.gift.purchaserName,
+      purchaserEmail: seed.gift.purchaserEmail,
+      ...(seed.gift.recipientEmail ? { recipientEmail: seed.gift.recipientEmail } : {}),
+      ...(seed.gift.message ? { message: seed.gift.message } : {}),
+      ...(seed.gift.deliveryDate ? { deliveryDate: seed.gift.deliveryDate } : {}),
+      stripeEventId: eventId,
+      stripeSessionId: session.id ?? '',
+      issuedAt: paidAt,
+      history: [],
+    });
+  } catch {
+    if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'gift_issue_failed');
+    return json({ ok: false, error: 'gift_issue_failed' }, 500);
+  }
   const fulfillment = buildGiftFulfillment({
     eventId,
     sessionId: session.id ?? '',
@@ -305,6 +369,57 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     paidAtIso: paidAt,
     ...(env.PUBLIC_SITE_URL ? { siteUrl: env.PUBLIC_SITE_URL } : {}),
   });
+  fulfillment['Ledger status'] = issued.created ? 'Created once' : 'Existing record reused';
+  fulfillment['Remaining value'] = `$${(remainingCents(issued.record) / 100).toFixed(2)}`;
+  const siteUrl = env.PUBLIC_SITE_URL?.replace(/\/+$/, '') || 'https://sparkling-standard.com';
+  const email = buildGiftCertificateEmail({
+    code,
+    valueUsd: seed.gift.valueUsd,
+    recipientName: seed.gift.recipientName,
+    purchaserName: seed.gift.purchaserName,
+    ...(seed.gift.message ? { message: seed.gift.message } : {}),
+    paidAtIso: paidAt,
+    siteUrl,
+    recipient: 'purchaser',
+  });
+  const purchaserDelivered = await sendCustomerGiftEmail(
+    env,
+    seed.gift.purchaserEmail,
+    email.subject,
+    email.html,
+    email.text,
+    `gift-${eventId}-purchaser`,
+  );
+  let recipientDelivered = true;
+  if (seed.gift.recipientEmail) {
+    const recipientEmail = buildGiftCertificateEmail({
+      code,
+      valueUsd: seed.gift.valueUsd,
+      recipientName: seed.gift.recipientName,
+      purchaserName: seed.gift.purchaserName,
+      ...(seed.gift.message ? { message: seed.gift.message } : {}),
+      paidAtIso: paidAt,
+      siteUrl,
+      recipient: 'recipient',
+    });
+    recipientDelivered = await sendCustomerGiftEmail(
+      env,
+      seed.gift.recipientEmail,
+      recipientEmail.subject,
+      recipientEmail.html,
+      recipientEmail.text,
+      `gift-${eventId}-recipient`,
+    );
+  }
+  fulfillment['Customer delivery'] =
+    purchaserDelivered && recipientDelivered
+      ? 'Sent to purchaser' + (seed.gift.recipientEmail ? ' and recipient' : '')
+      : 'FAILED - retry via Stripe or deliver manually';
+  if (!purchaserDelivered || !recipientDelivered) {
+    if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'customer_delivery_failed');
+    return json({ ok: false, error: 'customer_delivery_failed' }, 500);
+  }
+
   const sent = await notifyOwner(
     env,
     `PAID gift certificate - ${fulfillment['Gift value']} - ${seed.gift.recipientName}`,

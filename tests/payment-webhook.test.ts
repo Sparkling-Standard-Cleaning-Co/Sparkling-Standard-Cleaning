@@ -214,7 +214,8 @@ test('a gift event is fulfilled separately from an estimate event', async () => 
   let notification: Record<string, string> | null = null;
 
   const response = await withFetch(
-    async (_url, init) => {
+    async (url, init) => {
+      if (String(url).includes('api.resend.com')) return jsonResponse({ id: 'email-1' });
       notification = JSON.parse(String(init?.body)) as Record<string, string>;
       return jsonResponse({ success: true });
     },
@@ -224,6 +225,7 @@ test('a gift event is fulfilled separately from an estimate event', async () => 
         env: {
           STRIPE_WEBHOOK_SECRET: secret,
           WEB3FORMS_ACCESS_KEY: 'web3forms_test',
+          RESEND_API_KEY: 'resend_test',
           PAYMENT_LEDGER: ledger,
         },
       } as never),

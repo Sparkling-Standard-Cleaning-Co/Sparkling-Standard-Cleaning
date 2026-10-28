@@ -52,6 +52,7 @@ import { buildPhotoViewUrl } from './photo-auth.ts';
 
 interface R2ObjectLike {
   arrayBuffer?(): Promise<ArrayBuffer>;
+  text?(): Promise<string>;
   body?: ReadableStream;
   size?: number;
   httpMetadata?: { contentType?: string };
@@ -136,6 +137,7 @@ const SERVER_OWNED_KEYS = new Set([
   'ongoing_frequency',
   'photo_count',
   'photo_note',
+  'booking_hold_status',
   'terms_accepted_at',
   'policy_version',
   'terms_acceptance_id',
@@ -523,6 +525,53 @@ export async function onRequestPost(context: {
   // readable summary. The customer's email is set as the provider reply-to and
   // is also shown in the Contact section; every other collected value is
   // preserved (mapped or under "More details").
+  // Optional appointment hold: the browser only supplies the opaque hold id.
+  // The server reads the durable record and carries its own slot/expiry into
+  // the owner notification. A forged/expired hold never becomes authoritative.
+  if (!clean.booking_hold_id) {
+    delete clean.booking_slot_start;
+    delete clean.booking_slot_end;
+    delete clean.booking_hold_expires_at;
+  } else {
+    const holdId = clean.booking_hold_id;
+    delete clean.booking_slot_start;
+    delete clean.booking_slot_end;
+    delete clean.booking_hold_expires_at;
+    if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
+      clean.booking_hold_status = 'invalid';
+    } else if (!env.PHOTOS_BUCKET?.get) {
+      clean.booking_hold_status = 'unavailable';
+    } else {
+      const object = await env.PHOTOS_BUCKET.get(`booking/holds/${holdId}.json`).catch(() => null);
+      if (!object) {
+        clean.booking_hold_status = 'not_found';
+      } else {
+        let hold: {
+          status?: string;
+          start?: string;
+          end?: string;
+          expiresAt?: string;
+          reference?: string;
+        } = {};
+        try {
+          hold = JSON.parse((await object.text?.()) ?? '{}');
+        } catch {
+          hold = {};
+        }
+        if (hold.status !== 'held') clean.booking_hold_status = hold.status ?? 'invalid';
+        else if (!hold.expiresAt || Date.parse(hold.expiresAt) <= Date.now()) {
+          clean.booking_hold_status = 'expired';
+        } else {
+          clean.booking_hold_status = 'held';
+          if (hold.start) clean.booking_slot_start = hold.start;
+          if (hold.end) clean.booking_slot_end = hold.end;
+          if (hold.expiresAt) clean.booking_hold_expires_at = hold.expiresAt;
+          if (hold.reference) clean.booking_hold_reference = hold.reference;
+        }
+      }
+    }
+  }
+
   const notification = buildLeadNotification(clean);
   const attachmentRequestId = (clean.quote_reference || (photoRequestRef ? `PHOTO-${photoRequestRef}` : 'request')).trim();
   if (verifiedPhotos.length > 0 && env.PHOTO_OWNER_TOKEN) {

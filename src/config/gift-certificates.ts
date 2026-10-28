@@ -29,6 +29,12 @@ export const giftCertificateConfig = {
    */
   denominations: [] as ReadonlyArray<number>,
 
+  /**
+   * Recommended starting points for owner review. NOT binding and NOT shown
+   * in the purchase UI until copied into \denominations\ after approval.
+   */
+  proposedDenominations: [50, 100, 150, 200] as ReadonlyArray<number>,
+
   /** Allow a customer-requested amount (owner confirms before payment). */
   allowCustomAmount: true,
   customAmountMinUsd: 25,

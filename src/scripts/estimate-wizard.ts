@@ -40,6 +40,8 @@ import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { track } from '../lib/analytics/events';
 import { attributionFields } from '../lib/attribution';
 import { legalTerms } from '../config/legal';
+import { bookingConfig } from '../config/booking';
+import { initBookingPicker, type BookingPickerHandle } from './booking-picker';
 const TRAVEL_CACHE_PREFIX = 'pcc-travel-';
 
 // ── SPARKLE100 claim state (first-party, no PII) ─────────────────────────────
@@ -153,6 +155,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const photoController = initPhotoUploads(form, {
     engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
   });
+  let bookingPicker: BookingPickerHandle | null = null;
 
   let currentStep = 1;
   let location: ConfirmedLocation | null = null;
@@ -740,6 +743,18 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (!reservationSummary) return;
     const hasQuote = result.status === 'estimated' && latestQuote !== null;
     syncPaymentAvailability(hasQuote);
+    if (bookingPicker) {
+      const bookingContext = submissionAddress();
+      const bookingKey =
+        hasQuote && latestQuote && bookingContext.location
+          ? `${latestQuote.reference}:${latestQuote.amount}:${textValue('preferredDate') ?? ''}:${locationKey(
+              bookingContext.location.lat,
+              bookingContext.location.lng,
+            )}`
+          : '';
+      bookingPicker.contextChanged(bookingKey);
+      if (currentStep === steps.length && bookingKey) void bookingPicker.activate();
+    }
     if (
       addressVerificationPending &&
       currentStep !== steps.length &&
@@ -1388,10 +1403,46 @@ function initEstimateWizard(form: HTMLFormElement): void {
       } else {
         recalc();
       }
+      const confirmedStreet = (textValue('serviceAddress') ?? '').trim();
+      const exact =
+        next !== null &&
+        next.precision !== 'street' &&
+        next.precision !== 'approximate' &&
+        confirmedStreet.length >= 5;
+      if (addressVerificationPending && exact) {
+        addressVerificationPending = false;
+        window.setTimeout(() => showStep(steps.length), 250);
+      }
     },
   });
 
   // ── Fresh start (no drafts are ever stored) ───────────────────────────────
+  const bookingRoot = form.querySelector<HTMLElement>('[data-booking-picker]');
+  if (bookingRoot) {
+    bookingPicker = initBookingPicker(bookingRoot, () => {
+      if (!latestQuote || !latestResult) return null;
+      const submission = submissionAddress();
+      if (
+        !submission.location ||
+        submission.street.trim().length < 5 ||
+        submission.location.precision === 'street' ||
+        submission.location.precision === 'approximate'
+      ) {
+        return null;
+      }
+      const durationMinutes = Math.max(
+        bookingConfig.minimumJobMinutes,
+        Math.ceil((latestResult.pricing.totalLaborHours * 60) / bookingConfig.crewCount),
+      );
+      return {
+        durationMinutes,
+        destination: { lat: submission.location.lat, lng: submission.location.lng },
+        reference: latestQuote.reference,
+        location: formatLocationLine(submission.location),
+        preferredDate: textValue('preferredDate') ?? '',
+      };
+    });
+  }
   verifyAddressButton?.addEventListener('click', () => {
     addressVerificationPending = true;
     showStep(1);
@@ -1414,6 +1465,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   function resetWizard(): void {
     form.reset();
     addressFinder?.reset();
+    bookingPicker?.reset();
     clearAllErrors();
     attemptedSteps.clear();
     location = null;
@@ -1553,6 +1605,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
     // the discount itself and redemption eligibility is confirmed by the owner.
     const claimedCode = claimedPromoCode();
     if (claimedCode) fields.promotion_code = claimedCode;
+    const selectedHold = bookingPicker?.holdFields() ?? null;
+    if (selectedHold) Object.assign(fields, selectedHold);
     if (isReservation && latestQuote) {
       fields.quoted_price = String(latestQuote.amount);
       fields.quote_reference = latestQuote.reference;

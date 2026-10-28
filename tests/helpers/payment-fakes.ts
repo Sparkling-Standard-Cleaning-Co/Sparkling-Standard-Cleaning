@@ -23,15 +23,28 @@ export class FakeLedger implements LedgerBucket {
     options?: { onlyIf?: { etagDoesNotMatch?: string } | Headers },
   ): Promise<unknown> {
     const onlyIf = options?.onlyIf;
-    const createOnce =
-      onlyIf instanceof Headers
-        ? onlyIf.get('If-None-Match') === '*'
-        : onlyIf?.etagDoesNotMatch === '*';
-    if (createOnce && this.values.has(key)) return null;
+    if (onlyIf instanceof Headers) {
+      if (onlyIf.get('If-None-Match') === '*' && this.values.has(key)) return null;
+      const ifMatch = onlyIf.get('If-Match');
+      if (ifMatch) {
+        const existing = this.values.get(key);
+        if (existing === undefined || `"${key}:${this.version}"` !== ifMatch) return null;
+      }
+    } else if (onlyIf?.etagDoesNotMatch === '*' && this.values.has(key)) {
+      return null;
+    }
     this.values.set(key, value);
     this.puts.push(key);
     this.version += 1;
     return { key };
+  }
+
+  async list(options: { prefix: string }): Promise<{ objects: Array<{ key: string }> }> {
+    return {
+      objects: [...this.values.keys()]
+        .filter((key) => key.startsWith(options.prefix))
+        .map((key) => ({ key })),
+    };
   }
 
   async delete(key: string): Promise<void> {
