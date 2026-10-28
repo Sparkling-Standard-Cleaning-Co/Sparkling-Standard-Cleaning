@@ -152,6 +152,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   let paymentRetryAvailable = false;
   let requestAlreadySent = false;
   let addressVerificationPending = false;
+  let addressReviewRequired = false;
   const photoController = initPhotoUploads(form, {
     engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
   });
@@ -667,12 +668,15 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return list;
   }
 
-  function clientPaymentEligible(): boolean {
-    if (!latestQuote?.travelVerified) return false;
+  function addressConfirmed(): boolean {
     const submission = submissionAddress();
     if (submission.street.trim().length < 5) return false;
     const precision = submission.location?.precision;
-    return precision !== 'street' && precision !== 'approximate';
+    return submission.location !== null && precision !== 'street' && precision !== 'approximate';
+  }
+
+  function clientPaymentEligible(): boolean {
+    return latestQuote?.travelVerified === true && addressConfirmed();
   }
 
   function payNowLabel(): string {
@@ -690,7 +694,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   function syncPaymentAvailability(hasQuote: boolean): void {
     const eligible = paymentEnabled && !paymentBlocked && hasQuote && clientPaymentEligible();
-    const canOfferVerification = hasQuote && paymentEnabled && !paymentBlocked && !eligible;
+    const canOfferVerification =
+      hasQuote && paymentEnabled && !paymentBlocked && !addressConfirmed() && !addressReviewRequired;
     if (payNowButton) {
       payNowButton.hidden = !eligible;
       if (!eligible) {
@@ -717,6 +722,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (canOfferVerification) {
       paymentNote.innerHTML =
         '<strong>Verify your service address to finalize your price and unlock secure online payment.</strong> You can still reserve without paying, and Sparkling Standard will confirm the final details.';
+      return;
+    }
+    if (addressReviewRequired) {
+      paymentNote.innerHTML =
+        "<strong>We couldn't verify this address precisely enough for online payment.</strong> Reserve without paying now — we will confirm the exact property and email you a secure payment link.";
       return;
     }
     paymentNote.innerHTML =
@@ -754,21 +764,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
           : '';
       bookingPicker.contextChanged(bookingKey);
       if (currentStep === steps.length && bookingKey) void bookingPicker.activate();
-    }
-    if (
-      addressVerificationPending &&
-      currentStep !== steps.length &&
-      hasQuote &&
-      latestQuote !== null &&
-      clientPaymentEligible()
-    ) {
-      addressVerificationPending = false;
-      if (status) {
-        status.dataset.state = 'info';
-        status.textContent =
-          'Address verified. Your price is finalized for secure online payment. Returning to your estimate…';
-      }
-      window.setTimeout(() => showStep(steps.length), 250);
     }
     reservationSummary.hidden = !hasQuote;
     if (submitButton) {
@@ -1403,16 +1398,20 @@ function initEstimateWizard(form: HTMLFormElement): void {
       } else {
         recalc();
       }
-      const confirmedStreet = (textValue('serviceAddress') ?? '').trim();
-      const exact =
-        next !== null &&
-        next.precision !== 'street' &&
-        next.precision !== 'approximate' &&
-        confirmedStreet.length >= 5;
-      if (addressVerificationPending && exact) {
-        addressVerificationPending = false;
-        window.setTimeout(() => showStep(steps.length), 250);
+      if (!addressVerificationPending) addressReviewRequired = false;
+    },
+    onConfirm: () => {
+      if (!addressVerificationPending) return;
+      const exact = addressConfirmed();
+      addressVerificationPending = false;
+      addressReviewRequired = !exact;
+      if (status) {
+        status.dataset.state = 'info';
+        status.textContent = exact
+          ? 'Address confirmed. Returning to your estimate so we can finalize your price…'
+          : 'We confirmed the general area, but not the exact property. Returning to your estimate so you can reserve without online payment.';
       }
+      window.setTimeout(() => showStep(steps.length), 250);
     },
   });
 
@@ -1443,8 +1442,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       };
     });
   }
-  verifyAddressButton?.addEventListener('click', () => {
-    if (addressVerificationPending) return;
+  verifyAddressButton?.addEventListener('click', async () => {
     addressVerificationPending = true;
     verifyAddressButton.disabled = true;
     verifyAddressButton.setAttribute('aria-busy', 'true');
@@ -1467,15 +1465,25 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
       return;
     }
-    void addressFinder.verifyAddress().finally(() => {
+    try {
+      const outcome = await addressFinder.verifyAddress();
+      if (outcome === 'resolved') return;
+      addressVerificationPending = false;
+      if (outcome === 'unresolved') {
+        addressReviewRequired = true;
+        if (status) {
+          status.dataset.state = 'info';
+          status.textContent =
+            'We could not verify that exact address online. Returning to your estimate so you can reserve and have us confirm the property personally.';
+        }
+        window.setTimeout(() => showStep(steps.length), 250);
+      }
+    } finally {
       verifyAddressButton.disabled = false;
       verifyAddressButton.setAttribute('aria-busy', 'false');
-      verifyAddressButton.textContent =
-        addressVerificationPending ? 'Verify Address & Finalize Price' : 'Address Verified';
-      if (!addressVerificationPending) {
-        verifyAddressButton.hidden = true;
-      }
-    });
+      verifyAddressButton.textContent = 'Verify Address & Finalize Price';
+      syncPaymentAvailability(latestQuote !== null);
+    }
   });
 
   function resetWizard(): void {
@@ -1499,6 +1507,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     paymentBlocked = false;
     requestAlreadySent = false;
     addressVerificationPending = false;
+    addressReviewRequired = false;
     setPayNowBusy(false);
     if (submitButton) submitButton.disabled = false;
     estimateStarted = false;

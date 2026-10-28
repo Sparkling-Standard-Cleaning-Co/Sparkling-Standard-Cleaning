@@ -47,7 +47,14 @@ export interface AddressSubmission {
 export interface AddressFinderOptions {
   form: HTMLFormElement;
   onChange: (location: ConfirmedLocation | null) => void;
+  /** Fires only after an explicit pin confirmation, never while editing. */
+  onConfirm?: (location: ConfirmedLocation) => void;
 }
+
+export type AddressVerificationOutcome =
+  | 'resolved'
+  | 'unresolved'
+  | 'incomplete';
 
 export interface AddressFinderHandle {
   getLocation(): ConfirmedLocation | null;
@@ -60,7 +67,7 @@ export interface AddressFinderHandle {
   /** Open and focus the manual-entry section. */
   focusManual(): void;
   /** Resolve the typed address and show the pin confirmation for checkout eligibility. */
-  verifyAddress(): Promise<void>;
+  verifyAddress(): Promise<AddressVerificationOutcome>;
 }
 
 interface ResolvedCandidate {
@@ -112,7 +119,7 @@ const emptyParts = (): { street: string; unit: string; city: string; state: stri
 });
 
 export function initAddressFinder(options: AddressFinderOptions): AddressFinderHandle | null {
-  const { form, onChange } = options;
+  const { form, onChange, onConfirm } = options;
   const root = form.querySelector<HTMLElement>('[data-address-finder]');
   const streetInput = form.querySelector<HTMLInputElement>('#est-address');
   const unitInput = form.querySelector<HTMLInputElement>('#est-address-unit');
@@ -821,15 +828,15 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     }
   }
 
-  async function manualResolve(): Promise<void> {
+  async function manualResolve(): Promise<boolean> {
     ensureManualMode();
     const street = streetField.value.trim();
     if (street.length < 5) {
       setStatus('Enter your street address first, then press Find My Address.', 'error');
       streetField.focus();
-      return;
+      return false;
     }
-    await requestResolvedAddress(composeQuery());
+    return requestResolvedAddress(composeQuery());
   }
 
   // ── Map + confirmation ────────────────────────────────────────────────────
@@ -965,6 +972,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       setState('confirmed');
       setStatus('Destination confirmed. We will calculate travel to this exact location.', 'success');
       emit();
+      if (gpsConfirmed) onConfirm?.(gpsConfirmed);
       return;
     }
 
@@ -1011,6 +1019,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       'success',
     );
     emit();
+    onConfirm?.(manualConfirmed);
   }
 
   function startChange(): void {
@@ -1183,13 +1192,18 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       if (manualDetails) manualDetails.open = true;
       manualDetails?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       streetField.focus();
+      if (streetField.value.trim().length < 5) {
+        setStatus('Enter your street address first, then verify it on the map.', 'error');
+        streetField.focus();
+        return 'incomplete';
+      }
       if (!cityInput?.value.trim() || !zipInput?.value.trim()) {
         setStatus('Add your city, state and ZIP code so we can verify the exact property.', 'error');
         (cityInput?.value.trim() ? zipInput : cityInput)?.focus();
-        return;
+        return 'incomplete';
       }
       setStatus('Verify your full service address, then confirm the map pin.', 'info');
-      await manualResolve();
+      return (await manualResolve()) ? 'resolved' : 'unresolved';
     },
   };
 }

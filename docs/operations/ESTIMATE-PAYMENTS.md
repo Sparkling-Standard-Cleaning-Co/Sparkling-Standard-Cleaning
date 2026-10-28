@@ -163,5 +163,39 @@ Regression coverage: `tests/browser/initiative-6.9-paynow.test.mjs` reproduces t
 at desktop and mobile, asserts that Pay Now is hidden and the verification action is present, then
 confirms the pin and asserts that the real Pay Now button and Pay Later reservation choice appear.
 
+### Address-verification loop correction (2026-10-28)
+
+Owner testing found two ways the verification action could loop without changing the outcome:
+
+1. The resolver returned the ZIP-area **approximate** pin (or a street-level pin). Confirming it
+   left the customer on the address step; if they moved forward, the same verification action was
+   still offered, but it could only reproduce the same approximate result.
+2. The address resolved **exactly**, but the live travel route was unavailable. The address was not
+   the problem, yet verification remained the only action because checkout eligibility required both
+   an exact address and a verified route.
+
+**Fix:** the address finder now reports an explicit pin-confirmation event and verification outcome
+to the estimate wizards.
+
+- An exact pin returns the customer to the final step. Pay Now appears as soon as the live route is
+  verified; the address is never re-verified just because travel is pending or unavailable.
+- An approximate or street-level confirmation is accepted once for the request, returns to the
+  final step with online payment withheld, and replaces the verification action with a clear
+  manual-review path: reserve without paying, and the owner confirms the exact property and sends a
+  secure payment link.
+- An unresolved or unavailable lookup also returns to the final step with the manual-review path.
+  Missing street/city/ZIP information keeps the customer on the address step with a specific error
+  and does not consume the attempt.
+- Editing the address clears the manual-review state so a corrected address can be verified.
+- The residential/STR and commercial/church forms share the same behavior.
+
+The server is unchanged and remains authoritative: approximate, street-level, unresolved or
+unverified-route quotes still cannot create a Checkout Session.
+
+Regression coverage: `tests/browser/initiative-6.9-paynow.test.mjs` now covers the approximate
+match and the exact-address/unavailable-route cases; `tests/browser/initiative-6.6-content.test.mjs`
+covers the approximate facility path. Each asserts that the verification action is hidden after the
+attempt and that the reservation/manual-review path remains available.
+
 **Not yet proven:** a controlled Stripe test-mode card payment. The production runtime currently has
 a live-mode key; no test-mode credentials were provided, and no live charge was authorized.

@@ -86,6 +86,14 @@ integration results, distinct from the mocked unit/browser suites.
   price/coordinates/verification claims are ignored. Tests: `tests/verify-quote.test.ts`,
   `tests/api.test.ts`.
 - Privacy policy updated for address processing, geocoding, maps and server verification.
+- **Verification handoff (2026-10-28)**: the address finder emits an explicit confirmation event and
+  a verification outcome (`resolved`, `unresolved`, `incomplete`). An exact pin returns to the
+  final estimate; an approximate/street pin or an unresolved lookup returns once with a manual
+  review path instead of offering the same verification again. An exact address with an
+  unavailable route is not re-verified — Pay Now simply stays withheld until the route is verified.
+  Missing street/city/ZIP keeps the customer on the address step with a specific error. Regression:
+  `tests/browser/initiative-6.9-paynow.test.mjs`,
+  `tests/browser/initiative-6.6-content.test.mjs`.
 
 **Live provider check (2026-10-01, `wrangler pages dev` with the branch `.env`):**
 

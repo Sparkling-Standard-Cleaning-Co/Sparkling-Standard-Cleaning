@@ -37,7 +37,7 @@ after(async () => {
   server?.kill();
 });
 
-async function open(width, height) {
+async function open(width, height, { geocode = 'exact', travel = 'verified' } = {}) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   await page.addInitScript(() => {
@@ -62,39 +62,52 @@ async function open(width, height) {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"suggestions":[]}' });
       return;
     }
+    const result =
+      geocode === 'approximate'
+        ? {
+            label: 'Molino area (ZIP 32577)',
+            lat: 30.72,
+            lng: -87.31,
+            zip: '32577',
+            city: 'Molino',
+            state: 'FL',
+            source: 'census',
+            precise: false,
+            approximate: true,
+          }
+        : {
+            label: '100 S Baylen St, Pensacola, FL 32502',
+            lat: 30.4111,
+            lng: -87.2164,
+            zip: '32502',
+            city: 'Pensacola',
+            state: 'FL',
+            source: 'mapmap',
+            precise: true,
+          };
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        result: {
-          label: '100 S Baylen St, Pensacola, FL 32502',
-          lat: 30.4111,
-          lng: -87.2164,
-          zip: '32502',
-          city: 'Pensacola',
-          state: 'FL',
-          source: 'mapmap',
-          precise: true,
-        },
-      }),
+      body: JSON.stringify({ ok: true, result }),
     });
   });
   await page.route('**/api/travel', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        oneWayMiles: 15,
-        durationMinutes: 30,
-        gasPrice: 3.1,
-        gasPriceSource: 'configured_reference',
-        provider: 'mapmap',
-        method: 'route',
-        verified: true,
-        zone: 'core',
-      }),
-    }),
+    travel === 'unavailable'
+      ? route.fulfill({ status: 502, contentType: 'application/json', body: '{"ok":false}' })
+      : route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            oneWayMiles: 15,
+            durationMinutes: 30,
+            gasPrice: 3.1,
+            gasPriceSource: 'configured_reference',
+            provider: 'mapmap',
+            method: 'route',
+            verified: true,
+            zone: 'core',
+          }),
+        }),
   );
   await page.route('**tiles.openfreemap.org/**', (route) => route.abort());
   await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
@@ -174,3 +187,65 @@ for (const [label, width, height] of [
     }
   });
 }
+
+test('an approximate map match returns to the final step for manual review instead of looping', async () => {
+  const { context, page } = await open(1440, 1000, { geocode: 'approximate' });
+  try {
+    await reachFinalWithUnconfirmedAddress(page);
+    await page.click('[data-verify-address]');
+    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
+    await page.click('[data-address-confirm]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="6"]')?.getAttribute('data-active') === 'true',
+      null,
+      { timeout: 15_000 },
+    );
+    await page.waitForFunction(() => document.querySelector('[data-estimate-reveal]')?.hidden === true);
+    assert.equal(await page.locator('[data-pay-now]').isVisible(), false, 'approximate addresses cannot pay online');
+    assert.equal(
+      await page.locator('[data-verify-address]').isVisible(),
+      false,
+      'a failed exact match must not offer the same verification loop again',
+    );
+    const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
+    assert.match(note, /couldn't verify this address|secure payment link/i);
+    assert.doesNotMatch(note, /Verify your service address/i);
+    assert.match(
+      (await page.locator('[data-submit]').innerText()).replace(/\s+/g, ' '),
+      /Reserve This Cleaning/,
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test('an exact address with unavailable travel routes to manual review instead of a verify loop', async () => {
+  const { context, page } = await open(1440, 1000, { travel: 'unavailable' });
+  try {
+    await reachFinalWithUnconfirmedAddress(page);
+    await page.click('[data-verify-address]');
+    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
+    await page.click('[data-address-confirm]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="6"]')?.getAttribute('data-active') === 'true',
+      null,
+      { timeout: 15_000 },
+    );
+    await page.waitForFunction(() => document.querySelector('[data-estimate-reveal]')?.hidden === true);
+    assert.equal(await page.locator('[data-pay-now]').isVisible(), false, 'unverified travel cannot pay online');
+    assert.equal(
+      await page.locator('[data-verify-address]').isVisible(),
+      false,
+      'an exact address must not be re-verified just because travel failed',
+    );
+    const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
+    assert.match(note, /Your cleaning request is ready/i);
+    assert.doesNotMatch(note, /Verify your service address/i);
+    assert.match(
+      (await page.locator('[data-submit]').innerText()).replace(/\s+/g, ' '),
+      /Reserve This Cleaning/,
+    );
+  } finally {
+    await context.close();
+  }
+});

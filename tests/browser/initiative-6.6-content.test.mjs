@@ -347,6 +347,100 @@ test('Pay Now appears only for an exact Tier A facility quote when Stripe is con
     await context.close();
   }
 });
+test('an approximate facility address becomes a manual-review request instead of a verify loop', async () => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  await page.route('**/api/geocode', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        result: {
+          label: 'Molino area (ZIP 32577)',
+          lat: 30.72,
+          lng: -87.31,
+          zip: '32577',
+          city: 'Molino',
+          state: 'FL',
+          source: 'census',
+          precise: false,
+          approximate: true,
+        },
+      }),
+    });
+  });
+  await page.route('**/api/travel', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        oneWayMiles: 15,
+        durationMinutes: 30,
+        gasPrice: 3.1,
+        gasPriceSource: 'configured_reference',
+        provider: 'mapmap',
+        method: 'route',
+        verified: true,
+        zone: 'core',
+      }),
+    });
+  });
+  await page.route('**/api/estimate-checkout', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, enabled: true }),
+    });
+  });
+  await page.route('**tiles.openfreemap.org/**', (route) => route.abort());
+  try {
+    await page.goto(BASE + '/estimate/commercial/', { waitUntil: 'load' });
+    await page.locator('#fac-org').fill('Test Facility');
+    await page.locator('#fac-name').fill('Test Owner');
+    await page.locator('summary.address-manual__summary').click();
+    await page.locator('#est-address').fill('4242 Maplewood Ln');
+    await page.locator('#est-address-city').fill('Molino');
+    await page.locator('#est-address-state').selectOption('FL');
+    await page.locator('#est-zip').fill('32577');
+    await page.locator('[data-address-resolve]').click();
+    await page.locator('[data-address-confirm]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
+    await page.locator('[data-address-confirmed]').waitFor({ state: 'visible' });
+    await page.locator('[data-facility-next]').click();
+    await page.locator('[data-facility-step-panel="2"]').waitFor({ state: 'visible' });
+    await page.selectOption('#fac-type', 'office');
+    await page.fill('#fac-sqft', '2000');
+    await page.fill('#fac-restrooms', '6');
+    await page.selectOption('#fac-frequency', 'weekly');
+    await page.locator('[data-facility-next]').click();
+    await page.locator('[data-facility-step-panel="3"]').waitFor({ state: 'visible' });
+    await page.selectOption('#fac-window', { index: 1 });
+    await page.locator('[data-facility-next]').click();
+    await page.locator('[data-facility-step-panel="4"]').waitFor({ state: 'visible' });
+    await page.locator('[data-facility-verify-address]').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('[data-facility-pay-now]').isVisible(), false);
+    await page.locator('[data-facility-verify-address]').click();
+    await page.locator('[data-address-confirm]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-facility-step-panel="4"]')?.getAttribute('data-active') === 'true',
+      null,
+      { timeout: 15_000 },
+    );
+    await page.waitForFunction(() => document.querySelector('[data-estimate-reveal]')?.hidden === true);
+    assert.equal(await page.locator('[data-facility-pay-now]').isVisible(), false);
+    assert.equal(
+      await page.locator('[data-facility-verify-address]').isVisible(),
+      false,
+      'approximate facility addresses must not offer the same verification loop again',
+    );
+    const guidance = normalize((await page.locator('[data-facility-payment-guidance]').innerText()) ?? '');
+    assert.match(guidance, /couldn't verify the exact facility address/i);
+  } finally {
+    await context.close();
+  }
+});
 test('the GPS action shows a disabled, busy loading state while locating', async () => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();

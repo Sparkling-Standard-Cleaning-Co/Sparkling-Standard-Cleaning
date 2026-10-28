@@ -100,6 +100,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   let travelKey = '';
   let revealKey = '';
   let addressVerificationPending = false;
+  let addressReviewRequired = false;
   let bookingPicker: BookingPickerHandle | null = null;
   let finder: ReturnType<typeof initAddressFinder> = null;
 
@@ -129,15 +130,18 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     payNowButton.textContent = busy ? 'Preparing Secure Checkout...' : payNowLabel();
   }
 
-  function facilityAddressReady(): boolean {
+  function facilityAddressConfirmed(): boolean {
     const submitted = finder?.getSubmission();
     return (
-      travel?.verified === true &&
       Boolean(submitted?.location) &&
       (submitted?.street.trim().length ?? 0) >= 5 &&
       submitted?.location?.precision !== 'street' &&
       submitted?.location?.precision !== 'approximate'
     );
+  }
+
+  function facilityAddressReady(): boolean {
+    return travel?.verified === true && facilityAddressConfirmed();
   }
 
   function syncFacilityPayment(): void {
@@ -152,7 +156,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       eligibleBase &&
       paymentEnabled &&
       !paymentBlocked &&
-      !addressReady;
+      !facilityAddressConfirmed() &&
+      !addressReviewRequired;
     if (payNowButton) {
       payNowButton.hidden = !payable;
       if (!payable) {
@@ -167,7 +172,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       paymentGuidance.hidden = !eligibleBase || payable;
       paymentGuidance.textContent = canVerify
         ? 'Verify your service address to finalize travel and unlock secure online payment. You can still request the visit without paying.'
-        : 'Your cleaning request is ready. We will confirm the final scope and price before arranging payment.';
+        : addressReviewRequired
+          ? "We couldn't verify the exact facility address online. Request the visit without paying — we'll confirm the address and arrange payment personally."
+          : 'Your cleaning request is ready. We will confirm the final scope and price before arranging payment.';
     }
     if (payNowNote) payNowNote.hidden = !payable;
     if (bookingPicker) {
@@ -180,16 +187,6 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
           : '';
       bookingPicker.contextChanged(key);
       if (currentStep === stepPanels.length && key) void bookingPicker.activate();
-    }
-    if (
-      addressVerificationPending &&
-      currentStep !== stepPanels.length &&
-      priceReady &&
-      addressReady
-    ) {
-      addressVerificationPending = false;
-      setStatus('info', 'Address verified. Returning to your final facility estimate…');
-      window.setTimeout(() => showStep(stepPanels.length), 250);
     }
   }
 
@@ -496,15 +493,20 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       if (confirmedTravel) confirmedTravel.textContent = '';
       renderSummary();
       if (location) void lookupTravel(location.lat, location.lng);
-      const exact =
-        location !== null &&
-        location.precision !== 'street' &&
-        location.precision !== 'approximate' &&
-        field('serviceAddress').trim().length >= 5;
-      if (addressVerificationPending && exact) {
-        addressVerificationPending = false;
-        window.setTimeout(() => showStep(stepPanels.length), 250);
-      }
+      if (!addressVerificationPending) addressReviewRequired = false;
+    },
+    onConfirm: () => {
+      if (!addressVerificationPending) return;
+      const exact = facilityAddressConfirmed();
+      addressVerificationPending = false;
+      addressReviewRequired = !exact;
+      setStatus(
+        'info',
+        exact
+          ? 'Address confirmed. Returning to your final facility estimate…'
+          : 'We confirmed the general area, but not the exact facility. Returning to your estimate so you can request the visit without online payment.',
+      );
+      window.setTimeout(() => showStep(stepPanels.length), 250);
     },
   });
 
@@ -537,8 +539,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       };
     });
   }
-  verifyAddressButton?.addEventListener('click', () => {
-    if (addressVerificationPending) return;
+  verifyAddressButton?.addEventListener('click', async () => {
     addressVerificationPending = true;
     verifyAddressButton.disabled = true;
     verifyAddressButton.setAttribute('aria-busy', 'true');
@@ -559,13 +560,24 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       );
       return;
     }
-    void finder.verifyAddress().finally(() => {
+    try {
+      const outcome = await finder.verifyAddress();
+      if (outcome === 'resolved') return;
+      addressVerificationPending = false;
+      if (outcome === 'unresolved') {
+        addressReviewRequired = true;
+        setStatus(
+          'info',
+          'We could not verify that exact facility address online. Returning to your estimate so you can request the visit and have us confirm it personally.',
+        );
+        window.setTimeout(() => showStep(stepPanels.length), 250);
+      }
+    } finally {
       verifyAddressButton.disabled = false;
       verifyAddressButton.setAttribute('aria-busy', 'false');
-      verifyAddressButton.textContent =
-        addressVerificationPending ? 'Verify Address & Finalize Price' : 'Address Verified';
-      if (!addressVerificationPending) verifyAddressButton.hidden = true;
-    });
+      verifyAddressButton.textContent = 'Verify Address & Finalize Price';
+      syncFacilityPayment();
+    }
   });
 
   async function lookupTravel(lat: number, lng: number): Promise<void> {
@@ -1134,6 +1146,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         'success',
         'Request received — not booked yet. Sparkling Standard reviews every request personally and will confirm scope, date and price with you before anything is scheduled.',
       );
+      addressVerificationPending = false;
+      addressReviewRequired = false;
       host.reset();
       renderSummary();
       window.setTimeout(() => {
