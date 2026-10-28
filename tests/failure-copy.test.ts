@@ -57,7 +57,7 @@ test('invalid form data gets a fix-the-form message, never a spam accusation', (
 
 test('email failures are explicit and actionable', () => {
   assert.match(failureCopy('email_required', confirmed), /valid email address/i);
-  assert.match(failureCopy('email_invalid', confirmed), /name@example\.com/i);
+  assert.match(failureCopy('email_invalid', confirmed), /name@yourdomain\.com/i);
 });
 
 test('every failure reason produces an honest message with alternatives', () => {

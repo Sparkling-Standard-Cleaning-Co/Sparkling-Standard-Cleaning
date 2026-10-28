@@ -56,9 +56,9 @@ if (form) {
         not_configured: 'Secure checkout is not connected right now. Please call or email us and we will help.',
         invalid_amount: 'Please choose a valid gift value and try again.',
         email_required: 'Please enter your email address so we can send your receipt and certificate.',
-        email_invalid: 'Please enter a valid email address, such as name@example.com.',
+        email_invalid: 'Please enter a valid email address, such as name@yourdomain.com.',
         recipient_email_required: 'Please enter the recipient’s email address for email or scheduled delivery.',
-        recipient_email_invalid: 'Please enter a valid recipient email address, such as name@example.com.',
+        recipient_email_invalid: 'Please enter a valid recipient email address, such as name@yourdomain.com.',
         delivery_date_required: 'Please choose a future delivery date.',
         rate_limited: 'Too many attempts — please wait a moment and try again.',
       };
