@@ -42,6 +42,7 @@ import { attributionFields } from '../lib/attribution';
 import { legalTerms } from '../config/legal';
 import { bookingConfig } from '../config/booking';
 import { initBookingPicker, type BookingPickerHandle } from './booking-picker';
+import { bookingHoldContextKey } from '../lib/booking/context';
 const TRAVEL_CACHE_PREFIX = 'pcc-travel-';
 
 // ── SPARKLE100 claim state (first-party, no PII) ─────────────────────────────
@@ -785,12 +786,20 @@ function initEstimateWizard(form: HTMLFormElement): void {
     syncPaymentAvailability(hasQuote);
     if (bookingPicker) {
       const bookingContext = submissionAddress();
+      const bookingDurationMinutes =
+        latestResult
+          ? Math.max(
+              bookingConfig.minimumJobMinutes,
+              Math.ceil((latestResult.pricing.totalLaborHours * 60) / bookingConfig.crewCount),
+            )
+          : 0;
       const bookingKey =
-        hasQuote && latestQuote && bookingContext.location
-          ? `${latestQuote.reference}:${latestQuote.amount}:${textValue('preferredDate') ?? ''}:${locationKey(
-              bookingContext.location.lat,
-              bookingContext.location.lng,
-            )}`
+        hasQuote && latestQuote && latestResult && bookingContext.location
+          ? bookingHoldContextKey({
+              durationMinutes: bookingDurationMinutes,
+              preferredDate: textValue('preferredDate') ?? '',
+              locationKey: locationKey(bookingContext.location.lat, bookingContext.location.lng),
+            })
           : '';
       bookingPicker.contextChanged(bookingKey);
       if (currentStep === steps.length - 2 && bookingKey) void bookingPicker.activate();

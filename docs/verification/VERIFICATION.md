@@ -42,7 +42,7 @@ delivery with valid-from activation); Cloudflare Pages deployment
 | Check | Result |
 | --- | --- |
 | Unit suite | **616 tests: 615 passed, 1 pre-existing print-output skip, 0 failed** (local `npm test`) |
-| Browser regression | **156 tests; 155 passed and 1 transient booking-hold failure locally, then that test passed in isolation; GitHub `browser` job succeeded for run `40778698577`** |
+| Browser regression | **156 passed, 0 failed** (local; booking-hold regression covered). The earlier one-off booking-hold failure was a real minute-boundary defect: the hold-invalidating key included the rotating quote reference, which silently discarded the hold. The key now depends only on duration, date and destination. |
 | Type check / build / validation / smoke | passed |
 | Production pages | home, residential estimate, `/gift-admin/`, privacy and sitemap return 200 |
 | Production APIs | `/api/gift-auth` returns 200 `configured:false`; `/api/gift-admin` and photo cleanup unauthorised return 401 |
