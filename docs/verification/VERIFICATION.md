@@ -1,5 +1,28 @@
 # Verification status
 
+## Verified — 2026-10-28 Initiative 6.10 social platform activation
+
+**Release:** `eb8b2bc`; Cloudflare Pages deployment `95b29d45-33fa-4fdf-a695-c058b53bdae2`.
+GitHub `validate`, `browser` and Cloudflare Pages checks passed. Local work from Initiative 6.9
+remains uncommitted and is not part of this deployment.
+
+Owner-confirmed Instagram, YouTube and X URLs were added to `business.socials`. Twelve platforms
+now render in Follow Us: Google Business Profile, Facebook, Nextdoor, Instagram, TikTok, YouTube,
+Pinterest, Rumble, Gab, Parler, Locals and X. The icons are the existing official marks, 52 px
+circular buttons, arranged 4 + 4 + 4 on desktop and mobile. All 12 URLs appear once in the
+LocalBusiness `sameAs` structured data. Instagram, YouTube and X UTM placements remain prepared,
+not placement-confirmed; the existing eight placements are unchanged.
+
+| Check | Result |
+| --- | --- |
+| Type check / unit / build / validation | passed in GitHub `validate` |
+| Browser regression | **150 passed, 0 failed** |
+| Cloudflare Pages | deployment succeeded |
+| Production links | 12 rendered; rows 4 + 4 + 4; Instagram, YouTube and X hrefs match the owner URLs |
+| Structured data | 12 unique `sameAs` entries |
+| Visual evidence | `docs/verification/6.10/` local and production desktop/mobile captures |
+
+
 ## Verified — 2026-10-27 Initiative 6.8 production deployment
 
 **Audit:** `Aaron ss website audit.docx` (three pages, annotated screenshots).

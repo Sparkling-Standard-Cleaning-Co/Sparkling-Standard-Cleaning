@@ -4,7 +4,7 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-27** (Initiative 6.8 deployed and live-verified; Pay Now live mode enabled; final-only price reveal, transactional terms, expanded scripture and corrected pricing badge live; live calendar booking and gift sales remain disabled).
+Last reviewed: **2026-10-28** (Initiative 6.10 social activation: twelve Follow Us profiles live; Instagram, YouTube and X UTM placements remain prepared pending owner confirmation).
 
 **Release status:** production serves GitHub `main`; **Initiative 6.8 is live at
 `6e36c95` plus the HEIC test-stability fix `9fe8764`** (Cloudflare Pages deployments
