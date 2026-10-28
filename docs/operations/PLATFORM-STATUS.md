@@ -4,20 +4,16 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-28** (Initiative 6.9 Pay Now deployed; Google Calendar booking connected and active in owner-approval mode; real availability/holds verified. Local Batch A/B work adds mandatory email, gift purchase/delivery/scheduled records and Hayli-only gift administration; gift sales remain disabled and none of the Batch B work is deployed).
+Last reviewed: **2026-10-28** (security/email release `8edce3a`; gift administration, pricing and estimator release through `f5098ff`; Cloudflare Pages deployment `6251c40a-4a26-4aad-a4f1-f686f91eaccd`; GitHub `validate`, `browser` and Cloudflare checks passed).
 
-**Release status:** production serves GitHub `main`; **Initiative 6.8 is live at
-`6e36c95` plus the HEIC test-stability fix `9fe8764`** (Cloudflare Pages deployments
-`2a0d4f21-8eb8-49b0-b298-f086e3c7473b` and `4afab04f-9f97-47b5-bb2c-778aa7b6f745`; GitHub
-`validate`, `browser` and Cloudflare checks passed). It hides prices through every preliminary
-estimator step and reveals the finished estimate with a shared branded animation on the final step;
-installs the owner-supplied two-of-four Competitive Pricing badge; equalizes the homepage service
-cards; expands KJV scripture; requires a server-verified terms acceptance before reservation or
-payment; and publishes the expanded terms/policy research. **Pay Now readiness is live mode with all
-checks true.** Gift certificates remain in request mode and **live calendar booking is not
-connected**; no fake availability is shown. No new cancellation/reassessment fee is active.
-Initiative 6.7 is at `f111014`, 6.6 at `0b907d4`, 6.5 at `298c1df`, 6.4 at `685031d` and
-earlier releases are historical.
+**Release status:** production serves GitHub `main`; the current release is `f5098ff`
+(Cloudflare Pages deployment `6251c40a-4a26-4aad-a4f1-f686f91eaccd`; GitHub `validate`, `browser`
+and Cloudflare checks passed). It includes Batch A checkout/travel hardening, mandatory customer
+email, privacy preference controls, the password-protected Hayli gift register, 09:00 Central
+scheduled-delivery processor, 30-day photo retention, and the residential 15% extras reduction with
+the exact-three 20% bundle. Gift sales remain disabled and Pay Now remains gated to verified exact
+quotes. Google Calendar booking remains connected in owner-approval mode; owner confirmation still
+requires the private token. No live card charge, Stripe refund or gift purchase has been performed.
 
 **Customer photos are live:** production `/api/photo-upload` reports `enabled:true`; the private R2
 bucket, `PHOTOS_BUCKET` binding and `PHOTO_OWNER_TOKEN` are active. Real JPEG and converted iPhone
