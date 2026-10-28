@@ -1,9 +1,28 @@
 # Verification status
 
-## Verified - 2026-10-28 security, email, gift administration and estimator release
+## Verified - 2026-10-28 gift activation and gift-admin enrollment fix
 
-**Release:** `f5098ff`; Cloudflare Pages deployment
-`6251c40a-4a26-4aad-a4f1-f686f91eaccd`. GitHub `validate`, `browser` and Cloudflare checks passed.
+**Release:** `2e30e6c` (commits `f381b8c` gift-admin PBKDF2 fix and `2e30e6c` immediate gift
+delivery with valid-from activation); Cloudflare Pages deployment
+`350cf9d2-f9b7-481f-a2de-b3037fe611f7`. GitHub `validate` and `browser` jobs succeeded for run
+`40778698577`; the Cloudflare Pages check succeeded.
+
+- **Production enrollment defect:** `POST /api/gift-auth` setup returned HTTP 500 (Cloudflare 1101)
+  because Workers WebCrypto rejects PBKDF2 above 100,000 iterations and the code used 210,000.
+  New hashes use 100,000 iterations in the versioned `pbkdf2-sha256$<iterations>$<salt>$<hash>`
+  format; older higher-cost hashes are recognized and upgraded after a supported login. Crypto
+  failures return sanitized `auth_crypto_unavailable` (503) and write no admin record. Production
+  `GET /api/gift-auth` still reports `configured:false`, so no administrator exists and first-run
+  setup can be retried with the existing `GIFT_ADMIN_SETUP_CODE`.
+- **Local Workers-runtime check:** `wrangler pages dev` (Workers runtime, local R2 binding and the
+  production build) accepted first-run setup with HTTP 200, returned the enrolled session, rejected a
+  wrong password with 401, accepted the correct password on login with 200, and reported
+  `configured:true` afterwards. The runtime was stopped after the check.
+- Gift purchases now deliver immediately after verified payment; a purchaser-selected valid-from
+  date gates redemption at 12:00 AM America/Chicago. The scheduled-delivery processor, its GitHub
+  workflow and durable delivery records are retired.
+- Public `/terms/` and `/gift-certificates/` on production include the valid-from language
+  (verified 2026-10-28 after deployment).
 
 - Batch A: Tier B facility checkout rejected; facility/residential checkout requires a verified live
   route with positive driving duration; facility lead travel is server-owned; hold duration is
@@ -12,10 +31,8 @@
 - Hayli-only `/gift-admin/` password login, PBKDF2 password hash, two-hour HttpOnly/Secure/
   SameSite=Strict session, CSRF, login rate limiting, audit records, backup-email verification and
   single-use recovery links. No legacy browser bearer token.
-- Gift inventory/search/filter/pagination, redemption, unused refund/void, resend, scheduled
-  delivery and delivery failure state. The scheduler workflow is prepared; it stays inactive until
-  `GIFT_DELIVERY_URL` and `GIFT_OWNER_TOKEN` GitHub secrets are configured, and only sends at or
-  after 09:00 America/Chicago.
+- Gift inventory/search/filter/pagination, redemption, unused refund/void, resend and activation
+  status. The scheduled-delivery processor and its GitHub workflow were retired.
 - 30-day customer-photo retention with photo/prefix scope, metadata sidecars, dry-run support and
   financial/legal record exclusion.
 - Residential extras reduced 15% exactly once; exactly three eligible extras receive 20% off the
@@ -24,8 +41,8 @@
 
 | Check | Result |
 | --- | --- |
-| Unit suite | **613 tests: 612 passed, 1 pre-existing print-output skip, 0 failed** |
-| Browser regression | **156 passed, 0 failed** |
+| Unit suite | **616 tests: 615 passed, 1 pre-existing print-output skip, 0 failed** (local `npm test`) |
+| Browser regression | **156 tests; 155 passed and 1 transient booking-hold failure locally, then that test passed in isolation; GitHub `browser` job succeeded for run `40778698577`** |
 | Type check / build / validation / smoke | passed |
 | Production pages | home, residential estimate, `/gift-admin/`, privacy and sitemap return 200 |
 | Production APIs | `/api/gift-auth` returns 200 `configured:false`; `/api/gift-admin` and photo cleanup unauthorised return 401 |
@@ -35,7 +52,7 @@
 **Not yet live-tested:** Hayli's first-run password setup, backup-email delivery/verification,
 password recovery, live Stripe gift purchase/refund, and the GitHub scheduled-delivery trigger.
 No customer data, password, token or payment secret is recorded in this verification.
-## Verified GÇö 2026-10-28 Google Calendar booking activation
+## Verified Gï¿½ï¿½ 2026-10-28 Google Calendar booking activation
 
 **Code:** `fcbbd98`; Cloudflare Pages deployment `6afb9c46-d22b-47cc-b8e9-620127a5154e`. Durable pending requests now survive hold expiry; a submitted appointment remains non-guaranteed until owner confirmation.
 GitHub `validate`, `browser` and Cloudflare checks passed.
@@ -51,7 +68,7 @@ GitHub `validate`, `browser` and Cloudflare checks passed.
 - Live screenshots: `docs/verification/6.9/live-booking-available-desktop.png`,
   `live-booking-hold-desktop.png`, `live-booking-available-mobile.png`.
 
-Current settings are active: one crew, 8:00 a.m.GÇô6:00 p.m. Central, seven days, 24-hour notice,
+Current settings are active: one crew, 8:00 a.m.Gï¿½ï¿½6:00 p.m. Central, seven days, 24-hour notice,
 15-minute buffers, 20-minute holds, `owner_approval`, `autoConfirmAllowed:false`.
 
 **Pending request fix:** a submitted reservation now becomes a durable pending owner-review request separate from the 20-minute hold; it remains after hold expiry, does not block capacity, and confirmation revalidates the slot plus checks for an existing Sparkling event.\n\n**Not yet live-tested:** owner confirmation and Google Calendar event creation/cancellation. The
@@ -70,7 +87,7 @@ real jobs with full addresses before availability reflects live work.
 | Owner confirmation | implemented, mock-tested; live test pending private token |
 
 
-## Verified GÇö 2026-10-28 Initiative 6.9 deployment
+## Verified Gï¿½ï¿½ 2026-10-28 Initiative 6.9 deployment
 
 **Release:** `4e28788`; Cloudflare Pages deployment `7f8a172c-18a9-43d0-9a4e-382094ba211d`.
 GitHub `validate`, `browser` and Cloudflare Pages checks passed. Initiative 6.10 social
@@ -109,7 +126,7 @@ were not supplied; Stripe test-mode credentials were not available; no live paym
 or gift fulfillment was exercised. The deployed code does not advertise unavailable functionality.
 
 
-## Verified GÇö 2026-10-28 Initiative 6.10 social platform activation
+## Verified Gï¿½ï¿½ 2026-10-28 Initiative 6.10 social platform activation
 
 **Release:** `eb8b2bc`; Cloudflare Pages deployment `95b29d45-33fa-4fdf-a695-c058b53bdae2`.
 GitHub `validate`, `browser` and Cloudflare Pages checks passed. Local work from Initiative 6.9
@@ -132,7 +149,7 @@ not placement-confirmed; the existing eight placements are unchanged.
 | Visual evidence | `docs/verification/6.10/` local and production desktop/mobile captures |
 
 
-## Verified GÇö 2026-10-27 Initiative 6.8 production deployment
+## Verified Gï¿½ï¿½ 2026-10-27 Initiative 6.8 production deployment
 
 **Audit:** `Aaron ss website audit.docx` (three pages, annotated screenshots).
 **Start baseline:** `820ad19`; the verified 6.7 payment work was integrated first as `f111014`.
@@ -196,7 +213,7 @@ Known residuals at this checkpoint:
 - **Live calendar booking is not implemented or connected.** No calendar authorization, existing job
   schedule or crew roster exists, so no honest availability could be displayed. The site continues
   to collect a preferred date as a request; it does not claim a confirmed slot. Setup/blockers:
-  `docs/launch/OWNER-INPUT-REQUIRED.md` B1GÇôB6 and `docs/operations/BOOKING-ARCHITECTURE.md`.
+  `docs/launch/OWNER-INPUT-REQUIRED.md` B1Gï¿½ï¿½B6 and `docs/operations/BOOKING-ARCHITECTURE.md`.
 - **Gift sales remain disabled.** No owner-approved denominations were supplied, and the durable
   issuance/redemption activation is not complete.
 - No new cancellation/reassessment fee was activated; the owner and a Florida-licensed attorney must
@@ -205,7 +222,7 @@ Known residuals at this checkpoint:
 - Deployment and production checks are recorded in the release closeout after the push.
 
 
-## Verified GÇö 2026-10-27 Initiative 6.7 payment reliability (local, pending deployment)
+## Verified Gï¿½ï¿½ 2026-10-27 Initiative 6.7 payment reliability (local, pending deployment)
 
 **Baseline:** `820ad19`. The working tree contains the 6.7 payment-reliability changes; they are
 not reset or overwritten by Initiative 6.8. Local verification after the final retry/cancellation
@@ -231,7 +248,7 @@ Stripe test-mode transaction was performed.
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
-## Verified GÇö 2026-10-27 Initiative 6.6 production deployment
+## Verified Gï¿½ï¿½ 2026-10-27 Initiative 6.6 production deployment
 
 **Live branch/commit:** `main` at `0b907d4`. **Cloudflare Pages deployment:**
 `26e3b9f8-7665-426f-8687-7f171588c865`. GitHub `validate`, `browser` and Cloudflare
@@ -282,7 +299,7 @@ checkout before claiming live online payment. No live card charge or live lead s
 GTM Version 5 church/promotion event receipt still needs DebugView/Realtime confirmation. The
 private legal archive is outside Git.
 
-## Verified GÇö 2026-10-26 Initiative 6.5 production deployment
+## Verified Gï¿½ï¿½ 2026-10-26 Initiative 6.5 production deployment
 
 **Live branch/commit:** `main` at `298c1df` (code release; documentation closeout follows).
 **Cloudflare Pages deployment:** `f9b4f61a-58d1-4ff3-8535-c375af8789fc`. GitHub `validate`,
@@ -328,7 +345,7 @@ completes. GitHub `browser` is the regression gate for that class of issue. GTM 
 church/promotion event receipt still needs DebugView/Realtime confirmation; no live lead-email
 submission was made for this release; production R2 signed-link retrieval was not independently
 tested locally. The documentation closeout commit follows this code release.
-## Verified GÇö 2026-10-25 Initiative 6.4 production deployment
+## Verified Gï¿½ï¿½ 2026-10-25 Initiative 6.4 production deployment
 
 **Live branch/commit:** `main` at `685031d` (code release; documentation closeout follows).
 **Cloudflare Pages deployment:** `f9dea1a0-5b55-4cd8-b09e-18efae73c68a`. GitHub `validate`,
@@ -376,7 +393,7 @@ confirmation; production R2 signed-link retrieval was not independently tested l
 lead-email submission was made for this release (the owner photo inbox path remains owner-confirmed).
 The documentation closeout commit follows this code release.
 
-## Verified GÇö 2026-10-25 Initiative 6.3 production deployment
+## Verified Gï¿½ï¿½ 2026-10-25 Initiative 6.3 production deployment
 
 **Live branch/commit:** `main` at `911b5aa` (code release; documentation closeout follows).
 **Cloudflare Pages deployment:** `1b1a854c-4cec-433b-b02d-0daefa012101`. GitHub `validate`,
@@ -410,7 +427,7 @@ did not reprice the company.
 
 | Check | Result |
 | --- | --- |
-| Cloudflare deployment | `1b1a854c-4cec-433b-b02d-0daefa012101` GÇö successful |
+| Cloudflare deployment | `1b1a854c-4cec-433b-b02d-0daefa012101` Gï¿½ï¿½ successful |
 | Homepage white-tile icons | 6 service, 4 value, 5 community-list, 1 review and 1 community-support icon rendered; retired SVG count 0 |
 | Competitive Pricing | Exact four-dollar-sign tile present in the trust banner |
 | Location helper | No GÇ£physically at the propertyGÇ¥ or facility helper text on any estimator; location button remains |
@@ -424,7 +441,7 @@ did not reprice the company.
 confirmation; production R2 signed-link retrieval was not independently tested locally. The owner's
 local master directory is outside Git and is intentionally not deployed. Pricing is unchanged.
 
-## Verified GÇö 2026-10-25 audit-correction production deployment
+## Verified Gï¿½ï¿½ 2026-10-25 audit-correction production deployment
 
 **Live branch/commit:** `main` at `13fa860` (preceded by `3abf2a9`). **Cloudflare Pages
 deployment:** `29c28a52-9669-43e5-9f65-72890d4cc4e8`. GitHub `validate`, `browser` and Cloudflare
@@ -454,7 +471,7 @@ attachment delivery were not changed.
 
 | Check | Result |
 | --- | --- |
-| Cloudflare deployment | `29c28a52-9669-43e5-9f65-72890d4cc4e8` GÇö successful |
+| Cloudflare deployment | `29c28a52-9669-43e5-9f65-72890d4cc4e8` Gï¿½ï¿½ successful |
 | Homepage | HTTP 200; **six service cards**, Church card with representative photo and `/church-cleaning/` CTA |
 | Community Support | Heading, four eligibility groups and `/supportive-home-cleaning/` CTA present on desktop and phone; no page or panel overflow at 390 px |
 | Review cards | Three authentic reviews; stars computed as Google gold `rgb(251, 188, 4)`; names first-name only |
@@ -465,7 +482,7 @@ attachment delivery were not changed.
 | Live reachability | `node scripts/live-check.mjs https://sparkling-standard.com` passed with 0 warnings |
 | Owner photo inbox | **Owner-confirmed**: actual customer-photo attachments reach the business inbox (2026-10-25) |
 
-## Verified GÇö 2026-10-25 Initiative 6.2 production deployment
+## Verified Gï¿½ï¿½ 2026-10-25 Initiative 6.2 production deployment
 
 **Live branch/commit:** `main` at `e635d7f` (fast-forwarded from `af46db4`; previous 6.2 commits
 `5919cbc` and `f3ed6f7`). **Cloudflare Pages deployment:** `877a241a-863b-423b-875b-1284182dcd39`
@@ -492,7 +509,7 @@ completed successfully.
 
 | Check | Result |
 | --- | --- |
-| Cloudflare deployment | `877a241a-863b-423b-875b-1284182dcd39` GÇö successful |
+| Cloudflare deployment | `877a241a-863b-423b-875b-1284182dcd39` Gï¿½ï¿½ successful |
 | `/api/photo-upload` | **enabled:true**, max 6, max 8 MiB/file, 32 MiB total |
 | Private R2 upload | Real JPEGs stored; returned opaque keys under `leads/2026/10/...` |
 | Owner attachment delivery | A production lead with 2 JPEGs and a facility estimate with 1 JPEG both returned **`photoDelivery:"attached"`**; Resend accepted the messages |
@@ -500,7 +517,7 @@ completed successfully.
 | Live engine pages | `/estimate/`, `/estimate/residential/`, `/estimate/str/`, `/estimate/commercial/`, `/estimate/church/` all returned 200 with initialized forms and no page errors |
 | Live pricing | Commercial 2,000 sqft = **$125.00**; Church 4,000 sqft = **$130.50** (10% exact) |
 | Live reachability | `node scripts/live-check.mjs https://sparkling-standard.com` passed with 0 warnings; travel configured and lead function validating |
-| Owner inbox attachments | **Owner-confirmed 2026-10-25** GÇö actual customer-photo attachments reached the business inbox |
+| Owner inbox attachments | **Owner-confirmed 2026-10-25** Gï¿½ï¿½ actual customer-photo attachments reached the business inbox |
 
 **Known residuals:** GTM Version 5 is owner-reported; live receipt of the church/promotion events
 is not yet fully proven. The owner confirmed actual customer-photo attachments reach the business
@@ -530,14 +547,14 @@ quality check.
 
 Recovery note: this work was verified in the recovered standalone repository
 (`Sparkling-Standard-Cleaning`) cloned from the original development directory with full history.
-Windows clones must have `core.autocrlf=false` (or honour the committed `.gitattributes`) GÇö the
+Windows clones must have `core.autocrlf=false` (or honour the committed `.gitattributes`) Gï¿½ï¿½ the
 generated marketing documents are byte-compared by validation.
 
 | Check | Command | Result |
 | --- | --- | --- |
 | TypeScript diagnostics | `npm run check` | 0 errors, 0 warnings, 0 hints |
 | Production build | `npm run build` | 18 pages + sitemap, no errors |
-| Estimator unit tests | `npm test` | Runs the full unit suite in one command (estimator anchors, frequencies, add-ons, minimums, travel, thresholds, malformed input, address ranking, quote verification, promotion engine, Pages Functions) GÇö the exact current count is re-run and recorded at every change, never carried over |
+| Estimator unit tests | `npm test` | Runs the full unit suite in one command (estimator anchors, frequencies, add-ons, minimums, travel, thresholds, malformed input, address ranking, quote verification, promotion engine, Pages Functions) Gï¿½ï¿½ the exact current count is re-run and recorded at every change, never carried over |
 | Internal links | `npm run links` | 982 links across 18 pages, all resolve |
 | SEO checks | `npm run seo` | unique titles/descriptions across 18 pages, canonicals, robots, JSON-LD, sitemap |
 | Marketing registry + QR decode | `npm run marketing:verify` | registry valid, docs in sync, 13 QR asset groups decode-verified against `https://sparkling-standard.com` URLs |
@@ -545,23 +562,23 @@ generated marketing documents are byte-compared by validation.
 | Static smoke test | `npm run smoke` | 17 required pages, layout shell, estimate flow structure, form variants |
 | Fake-testimonial detector | `npm run testimonials` | clean |
 | No-fabrication audit | `npm run audit:facts` | no unsupported claims |
-| PENDING-fact gate | `npm run pending` | **passes** GÇö approved facts (name, domain, phone, email) are in source; no placeholders in the build |
+| PENDING-fact gate | `npm run pending` | **passes** Gï¿½ï¿½ approved facts (name, domain, phone, email) are in source; no placeholders in the build |
 | JSON-LD PENDING guard | `npm run pending` (extended) | verified with a positive control: the pre-fix build failed with "JSON-LD contains a PENDING value"; passes after filtering unconfirmed social URLs |
 | Preview noindex behavior | `PUBLIC_PREVIEW_MODE=true npm run build` + `robots.txt` | verified: `noindex, nofollow`, `Disallow: /` |
 | Production robots behavior | default build | verified: `Allow: /` + sitemap at the real domain |
 | Brand asset regeneration | `node scripts/generate-brand-images.mjs` | favicons, apple-touch-icon, icon-512, OG image regenerated with the confirmed name and tagline |
 | Design tokens applied | `src/styles/global.css` imports `tokens.css` | **fixed a pre-existing defect**: tokens were never imported, so the whole design system was undefined in every previous build. Verified in the built CSS and in computed styles (footer background `rgb(48,36,41)`, body font "Nunito Sans"). |
-| Browser layout pass (Playwright, real Chromium) | 15 pages +ù 360/768/1440 = 45 combinations | 0 horizontal overflow, 0 console errors, 0 missing H1s, no PENDING text; sticky mobile action bar visible; `tel:+18504268479` present; 0 `sms:` links while SMS is unverified |
+| Browser layout pass (Playwright, real Chromium) | 15 pages +ï¿½ 360/768/1440 = 45 combinations | 0 horizontal overflow, 0 console errors, 0 missing H1s, no PENDING text; sticky mobile action bar visible; `tel:+18504268479` present; 0 `sms:` links while SMS is unverified |
 | Accessibility scan (axe-core, WCAG 2.0/2.1/2.2 A+AA) | 15 pages at 360 px | **0 violations**. Fixed: touch-target sizes in footer/standalone links and footer-tagline color contrast found in earlier scans. |
-| Estimator flow (real browser) | 3/2 1600 sq ft, maintained, biweekly, ZIP 32503 | completes the wizard; live range `$235 GÇô $285` shown before submission; matches the internal labor model |
-| Estimator out-of-area behavior | same flow with ZIP 90210 | "Custom confirmation required" with an honest explanation GÇö never a fake price |
+| Estimator flow (real browser) | 3/2 1600 sq ft, maintained, biweekly, ZIP 32503 | completes the wizard; live range `$235 Gï¿½ï¿½ $285` shown before submission; matches the internal labor model |
+| Estimator out-of-area behavior | same flow with ZIP 90210 | "Custom confirmation required" with an honest explanation Gï¿½ï¿½ never a fake price |
 | Estimator draft persistence | reload mid-flow | **Intentionally none**: every visit/reload/back-forward starts a fresh blank estimate. Estimated answers are never stored in localStorage; only a per-session travel cache and the consent/attribution keys exist (browser test asserts the fresh start). Earlier documentation claiming draft restore was stale and has been corrected |
-| Estimator fail-safe travel lookup | static preview (`/api/travel` 404) | falls back to zone-based travel without breaking the estimate GÇö expected until Cloudflare Pages Functions run in deployment |
-| Header reflow | 960/1024/1152/1280/1440 px | wordmark never truncated; navigation reflows; phone button hidden only in the 960GÇô1088 px band where it cannot fit (number remains in mobile menu, footer and contact surfaces) |
+| Estimator fail-safe travel lookup | static preview (`/api/travel` 404) | falls back to zone-based travel without breaking the estimate Gï¿½ï¿½ expected until Cloudflare Pages Functions run in deployment |
+| Header reflow | 960/1024/1152/1280/1440 px | wordmark never truncated; navigation reflows; phone button hidden only in the 960Gï¿½ï¿½1088 px band where it cannot fit (number remains in mobile menu, footer and contact surfaces) |
 | Deployment configuration package | `npm run deploy:secrets` with dummy values + `git check-ignore` | generates the git-ignored `deploy/secrets.env` in the `wrangler pages secret bulk` format; missing required keys exit non-zero; the ignore rules were verified |
 | Operations documentation | `docs/OPERATIONS-HUB.md`, `docs/operations/PLATFORM-STATUS.md`, `docs/operations/AUTOMATION-REGISTER.md` | created as the single entry point, the only platform-status register, and the automation inventory |
 
-## Verified GÇö live production audit (2026-10-01)
+## Verified Gï¿½ï¿½ live production audit (2026-10-01)
 
 Production: `https://sparkling-standard.com` (Git-connected Cloudflare Pages project;
 commit check-runs and deployed bundle hashes verified).
@@ -573,7 +590,7 @@ commit check-runs and deployed bundle hashes verified).
 | Accessibility | axe-core WCAG 2.0/2.1/2.2 A+AA at 360 px | 0 violations on home, estimate, contact |
 | Mobile action bar + contact | Playwright | sticky bar visible; `tel:+18504268479` correct; SMS enabled (`business.flags.smsEnabled: true`, owner-verified) so the text link is present |
 | Consent behavior | Playwright | consent banner shown until a choice is made; GTM (`GTM-KSQ26HMG`) loads only after explicit analytics consent; no analytics request before it. Umami has no ID configured and does not load. The container's GA4 tags are prepared for owner import (`docs/analytics/GTM-CONTAINER-SETUP.md`) |
-| Core Web Vitals (lab) | Chromium, 1.6 Mbps / 150 ms RTT / 4+ù CPU | home LCP 1.65 s / CLS 0.038; estimate LCP 1.37 s / CLS 0; contact LCP 1.26 s / CLS 0 (targets: LCP Gëñ 2.5 s, CLS Gëñ 0.1 GÇö met). INP not measurable without interaction; recorded as unreported |
+| Core Web Vitals (lab) | Chromium, 1.6 Mbps / 150 ms RTT / 4+ï¿½ CPU | home LCP 1.65 s / CLS 0.038; estimate LCP 1.37 s / CLS 0; contact LCP 1.26 s / CLS 0 (targets: LCP Gï¿½ï¿½ 2.5 s, CLS Gï¿½ï¿½ 0.1 Gï¿½ï¿½ met). INP not measurable without interaction; recorded as unreported |
 | `/api/travel` | live POST | deployed and verified (`method: route, verified: true` with the configured origin) |
 | `/api/lead` | live POST (invalid payload, then valid test) | deployed, validating (`400` on bad input), and delivering via the server relay; owner-confirmed inbox delivery (2026-10-02) |
 | Authorized test submission | live contact form, clearly marked test | delivered; failure copy remains channel-accurate (call/email/text) |
@@ -584,21 +601,21 @@ Lighthouse/PageSpeed Insights could not be run: the public PSI API returned a da
 The Core Web Vitals above are direct Chromium measurements with the method recorded, not
 Lighthouse scores.
 
-## Verified GÇö production hotfix (2026-10-01, commit `6afe7a1`)
+## Verified Gï¿½ï¿½ production hotfix (2026-10-01, commit `6afe7a1`)
 
 | Check | Method | Result |
 | --- | --- | --- |
-| Estimator final-step navigation | Committed browser suite, 360/768/1440 px | steps 1GÇô5 show Continue (+Back from step 2); step 6 shows Back + **exactly one primary action** labelled "Send My Request"; no Continue. Root cause fixed at the stylesheet (`[hidden]{display:none!important}` GÇö `.btn`/`.field` display rules were overriding the `hidden` attribute) |
+| Estimator final-step navigation | Committed browser suite, 360/768/1440 px | steps 1Gï¿½ï¿½5 show Continue (+Back from step 2); step 6 shows Back + **exactly one primary action** labelled "Send My Request"; no Continue. Root cause fixed at the stylesheet (`[hidden]{display:none!important}` Gï¿½ï¿½ `.btn`/`.field` display rules were overriding the `hidden` attribute) |
 | Wizard regression suite | `npm run test:browser` | navigation contract at three widths, validation blocks advancement, **fresh start after reload** (no draft is stored), double-submission prevention (button disabled while sending; honest failure; re-enabled), no 360 px overflow |
 | Other `hidden` elements | Browser suite | live estimate panel hidden initially; STR-only field hidden for standard service; honeypot unaffected |
 | Unit tests | `npm test` | 52/52 pass |
 | Deployment | Cloudflare Pages check-run for `6afe7a1` | success; fresh bundle hashes served; site serves the new build |
 | Public (build-time) Web3Forms key | masked bundle inspection | present in the deployed bundle (value not logged) |
-| Runtime Web3Forms relay | live `/api/lead` marked probe | `200 {"ok":true}` GÇö provider accepted |
-| Four live funnels (owner-authorized, clearly marked tests) | real browser submissions | residential, instant estimate, commercial, STR: each `/api/lead` GåÆ `200`; correct success message; redirect to `/thank-you/`; estimate final step showed range `$235 GÇô $285` and one primary action |
-| Inbox delivery | owner inbox | **pending owner confirmation** GÇö API acceptance is not inbox delivery |
+| Runtime Web3Forms relay | live `/api/lead` marked probe | `200 {"ok":true}` Gï¿½ï¿½ provider accepted |
+| Four live funnels (owner-authorized, clearly marked tests) | real browser submissions | residential, instant estimate, commercial, STR: each `/api/lead` Gï¿½ï¿½ `200`; correct success message; redirect to `/thank-you/`; estimate final step showed range `$235 Gï¿½ï¿½ $285` and one primary action |
+| Inbox delivery | owner inbox | **pending owner confirmation** Gï¿½ï¿½ API acceptance is not inbox delivery |
 
-## Verified GÇö lead-submission autofill defect (2026-10-02, commit `fix/lead-submission`)
+## Verified Gï¿½ï¿½ lead-submission autofill defect (2026-10-02, commit `fix/lead-submission`)
 
 Owner report: the six-step estimator answered GÇ£Your request could not be verified. Please try
 againGÇªGÇ¥ and stayed on the form.
@@ -606,7 +623,7 @@ againGÇªGÇ¥ and stayed on the form.
 | Check | Method | Result |
 | --- | --- | --- |
 | Root cause reproduction | Real-browser run against production with the honeypot populated | Exact owner message reproduced with **zero `/api/lead` requests**: the client rejected locally. With the trap empty, the request was complete and valid (40 fields, contact present, no honeypot, no Turnstile token) |
-| Relay health | Live `POST /api/lead` with a clearly labeled synthetic probe | `HTTP 200 {ok:true}` GÇö the relay and provider delivery work; the probe also proved the server has no Turnstile secret configured (no token was required) |
+| Relay health | Live `POST /api/lead` with a clearly labeled synthetic probe | `HTTP 200 {ok:true}` Gï¿½ï¿½ the relay and provider delivery work; the probe also proved the server has no Turnstile secret configured (no token was required) |
 | Turnstile state | Production HTML inspection | No Turnstile widget/site key in the build, so the failure could not be a Turnstile rejection |
 | Root cause resolution | Hidden trap renamed from the autofill-magnet `company_website`/GÇ£Company websiteGÇ¥ to an unintelligible `extra_ref` with password-manager ignore attributes and no label; the old field is no longer a trap so a cached bundle or autofill can never cost a customer their submission | Verified in the built DOM and unit tests |
 | Error classification | New distinct reasons: `verification_failed` (security-check copy + widget reset), `spam_rejected`, `invalid_request` (fix-the-form copy); unknown 400/422 no longer masquerades as spam | Browser regression tests |
@@ -617,26 +634,26 @@ One clearly labeled synthetic probe was delivered during diagnosis
 (`[TEST - ENGINEERING] Turnstile configuration probe - do not schedule`); inbox receipt awaits
 owner confirmation.
 
-## Verified GÇö branding, marketing and lead-notification release (2026-10-02)
+## Verified Gï¿½ï¿½ branding, marketing and lead-notification release (2026-10-02)
 
 | Check | Method | Result |
 | --- | --- | --- |
 | Premium header lockup | Real Chromium at 320/390/768/1024/1280/1440 px; screenshots inspected | Circular mark with script GÇ£SparklingGÇ¥ + spaced GÇ£STANDARDGÇ¥; no descriptor or tagline in the mark; mobile legibility and no overflow verified; `/estimate/` intro spacing reduced |
 | Header/nav contract | `npm run test:browser` | 7/7 header-about tests (fit/alignment at four widths, brand identity, mobile lockup, About page) |
-| Platform registry | Unit/config + browser tests | 19 platforms prepared; only confirmed profiles render; pending platforms never appear. **Superseded (2026-10-03):** eight confirmed profiles now render GÇö see the social Follow Us section below |
-| UTM expansion | `npm run marketing:links` + `npm run marketing:verify` | 51 tracked inbound links (29 ready, 22 prepared GÇö refreshed 2026-10-03); all committed QR assets decode-verified; docs byte-identical on check |
-| GA4 mapping | Documentation | EventGåÆkey-event mapping added; website **generation** verified. 2026-10-03 discovery: the GTM container had **zero tags**, so GA4 receipt was never possible. Import files + exact dashboard steps prepared (`docs/analytics/GTM-CONTAINER-SETUP.md`). **Superseded:** the owner later published GTM Version 3 and GA4 receipt is now owner-confirmed GÇö see the GA4 section below |
+| Platform registry | Unit/config + browser tests | 19 platforms prepared; only confirmed profiles render; pending platforms never appear. **Superseded (2026-10-03):** eight confirmed profiles now render Gï¿½ï¿½ see the social Follow Us section below |
+| UTM expansion | `npm run marketing:links` + `npm run marketing:verify` | 51 tracked inbound links (29 ready, 22 prepared Gï¿½ï¿½ refreshed 2026-10-03); all committed QR assets decode-verified; docs byte-identical on check |
+| GA4 mapping | Documentation | EventGï¿½ï¿½key-event mapping added; website **generation** verified. 2026-10-03 discovery: the GTM container had **zero tags**, so GA4 receipt was never possible. Import files + exact dashboard steps prepared (`docs/analytics/GTM-CONTAINER-SETUP.md`). **Superseded:** the owner later published GTM Version 3 and GA4 receipt is now owner-confirmed Gï¿½ï¿½ see the GA4 section below |
 | Lead notification format | `tests/lead-notification.test.ts` (11 cases) + `tests/api-verification.test.ts` | Ordered sections, exact figures, verbatim notes, mismatch ACTION REQUIRED, raw codes separated, no credentials/origin |
 | Full suites | `npm run check`, `npm test` (252), `npm run test:browser` (64), `npm run validate`, `pending`, `audit:facts`, `smoke` | All pass |
 
 One clearly labeled production format-review submission is sent after deploy; inbox receipt awaits
 owner confirmation.
 
-## Verified GÇö header typography, advance reservations and gift certificates (2026-10-03)
+## Verified Gï¿½ï¿½ header typography, advance reservations and gift certificates (2026-10-03)
 
 | Check | Method | Result |
 | --- | --- | --- |
-| Wordmark treatment | Real Chromium at 320GÇô1440 px + `/brand-preview/` (before removal); screenshots inspected | Owner selected **Brand A2** (`romantic-script` + Great Vibes, already the default); crest unchanged; true Fraunces italic self-hosted; no overflow. The temporary `/brand-preview/` page was removed after the decision |
+| Wordmark treatment | Real Chromium at 320Gï¿½ï¿½1440 px + `/brand-preview/` (before removal); screenshots inspected | Owner selected **Brand A2** (`romantic-script` + Great Vibes, already the default); crest unchanged; true Fraunces italic self-hosted; no overflow. The temporary `/brand-preview/` page was removed after the decision |
 | 60-day advance window | Browser test (attributes + out-of-window rejection) and server test (+90-day date discarded with a note) | Exactly 60 days client-side; server never forwards an out-of-window date |
 | Reservation tracking | Documentation + ledger CSV | Six statuses, unique references, Google Sheet setup, gift-redemption accounting |
 | Gift page + request flow | Browser tests (desktop/mobile) | Request mode only; honeypot trap works; no checkout attempt; success copy states no payment was taken |
@@ -645,15 +662,15 @@ owner confirmation.
 | Stripe security | Unit tests (signature valid/tampered/wrong secret/expired/multi-signature; amount allowlist; disabled/unconfigured/paid-without-notifier gates) | All pass; paid purchase with no notifier returns 500 so Stripe retries |
 | Full suites | `npm run check`, `npm test` (274), `npm run test:browser` (69), `npm run validate`, `pending`, `audit:facts`, `smoke` | All pass |
 
-## Verified GÇö GA4 tracking completion package and Brand A2 finalization (2026-10-03)
+## Verified Gï¿½ï¿½ GA4 tracking completion package and Brand A2 finalization (2026-10-03)
 
 | Check | Method | Result |
 | --- | --- | --- |
 | GTM import artifacts | `npm run analytics:gtm` / `analytics:gtm:verify` + JSON parse (13 tags/12 triggers/7 variables full setup; 12/12/7 events-only) | Generated and byte-stable; unique IDs; every event has an exact-match `{{_event}}` trigger, a GA4 event tag and only allowlisted parameters |
-| Taxonomy Gåö GTM mapping lock | `tests/gtm-import.test.ts` (6 cases) | Parses `src/lib/analytics/events.ts` and the generated JSON: names, parameters, Data Layer Variables and the Google tag all match; no unexpected parameter keys |
+| Taxonomy Gï¿½ï¿½ GTM mapping lock | `tests/gtm-import.test.ts` (6 cases) | Parses `src/lib/analytics/events.ts` and the generated JSON: names, parameters, Data Layer Variables and the Google tag all match; no unexpected parameter keys |
 | Website event generation | `tests/browser/analytics-events.test.mjs` (4 cases) | No Google script and no event before consent; one GTM load after consent; `call_click`/`text_click` fire with allowlisted `cta_slot`; `estimate_start`/`estimate_step`/`estimate_complete` fire in the funnel; `cleaning_request_submit` + `booking_request` fire only after provider acknowledgment; a failed submission emits nothing |
 | Consent protection preserved | Same browser tests + existing `gps-gtm` consent test | Zero Google requests before a choice; exactly one GTM script after accepting; failed submissions never counted |
-| Brand A2 finalization | `npm run check`; header browser tests; build output | `romantic-script` + Great Vibes already the default; temporary `/brand-preview/` page and its sitemap exclusion removed; 7/7 header-about tests pass at 1024GÇô1680 px |
+| Brand A2 finalization | `npm run check`; header browser tests; build output | `romantic-script` + Great Vibes already the default; temporary `/brand-preview/` page and its sitemap exclusion removed; 7/7 header-about tests pass at 1024Gï¿½ï¿½1680 px |
 | Gift-certificate pause | Code inspection + full suites | `enabled: false`, no checkout attempt in request mode, page states no payment is taken; Stripe code dormant |
 | Full suites | `npm run check` (0 errors), `npm test` (280 pass), `npm run test:browser` (73 pass), `npm run build` (21 pages), `npm run validate` (incl. new GTM artifact check) | All pass |
 
@@ -664,7 +681,7 @@ STR submission tests and the analytics consent tests passed; the three primary k
 configured. The live account configuration is authoritative and must not be republished or
 overwritten without authorization.
 
-## Verified GÇö attribution preservation and lead-notification mapping (2026-10-03)
+## Verified Gï¿½ï¿½ attribution preservation and lead-notification mapping (2026-10-03)
 
 **Root cause:** `captureAttribution()` ran on every page and unconditionally overwrote the
 `latest` touch, so any internal navigation, refresh or direct view replaced a campaign with a
@@ -676,12 +693,12 @@ delivered are unchanged; the corrections apply to future attribution and notific
 | Check | Method | Result |
 | --- | --- | --- |
 | Collector rules | `tests/attribution.test.ts` (8 cases) | Facebook arrival + estimator navigation keeps the campaign; multiple Nextdoor internal visits never erase it; a new campaign updates latest-touch but not first-touch; direct visits seed once and never overwrite; external referrals recorded only without a campaign (same-domain referrers ignored); ad click ids survive navigation and a later campaign; identical-campaign refresh is a no-op; long ids clipped, malformed referrers ignored |
-| Notification mapping | `tests/lead-notification.test.ts` (+3 cases; 14 total) | Clear first-touch and latest-touch source/medium/campaign/content labels; landing page/referrer labeled latest-touch; click id appears exactly once; no `More details GÇö *utm*` leakage; legacy plain `utm_*` fallback still maps |
-| End-to-end chain | `tests/browser/attribution.test.mjs` (4 cases) | Facebook campaign page GåÆ real internal navigation to the estimator GåÆ completed request carries `first_utm_source=facebook`, `latest_utm_*`, and the campaign landing page; new campaign vs first-touch; external referral recorded; same-domain navigation never becomes a referral |
+| Notification mapping | `tests/lead-notification.test.ts` (+3 cases; 14 total) | Clear first-touch and latest-touch source/medium/campaign/content labels; landing page/referrer labeled latest-touch; click id appears exactly once; no `More details Gï¿½ï¿½ *utm*` leakage; legacy plain `utm_*` fallback still maps |
+| End-to-end chain | `tests/browser/attribution.test.mjs` (4 cases) | Facebook campaign page Gï¿½ï¿½ real internal navigation to the estimator Gï¿½ï¿½ completed request carries `first_utm_source=facebook`, `latest_utm_*`, and the campaign landing page; new campaign vs first-touch; external referral recorded; same-domain navigation never becomes a referral |
 | Analytics/consent untouched | `tests/browser/analytics-events.test.mjs`, `gps-gtm.test.mjs` re-run | No change to event names, payloads or consent loading behavior; no customer data added to analytics |
 | Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (77 pass), `npm run build` (21 pages), `npm run validate`, `pending`, `testimonials`, `audit:facts`, `smoke` | All pass |
 
-## Release status GÇö deployed (2026-10-03)
+## Release status Gï¿½ï¿½ deployed (2026-10-03)
 
 - **Owner-authorized release deployed:** `origin/main` = **`62a1a46`** (2026-10-03; GitHub Actions
   `validate` runs green; Cloudflare Pages served each build).
@@ -705,19 +722,19 @@ delivered are unchanged; the corrections apply to future attribution and notific
 | --- | --- | --- |
 | Pages + navigation | Live HTTPS + Playwright | Home, estimate, contact, gift certificates, about, recurring and service-area all `200`; header/footer links present; no `brand-preview` links; removed page returns `404` |
 | Sitemap | Live fetch | 16 URLs, correct domain, no `brand-preview`/thank-you/leave-review/gift-utility pages |
-| GA consent control | Playwright, fresh profiles | 0 Google requests before consent; 0 after refusal; after acceptance exactly **1** GTM container (`gtm.js?id=GTM-KSQ26HMG`) and **1** GA4 tag (`gtag/js?id=G-LG222LQRQ2`, injected by the container) GÇö no duplicate tag, no site-installed `gtag.js` |
+| GA consent control | Playwright, fresh profiles | 0 Google requests before consent; 0 after refusal; after acceptance exactly **1** GTM container (`gtm.js?id=GTM-KSQ26HMG`) and **1** GA4 tag (`gtag/js?id=G-LG222LQRQ2`, injected by the container) Gï¿½ï¿½ no duplicate tag, no site-installed `gtag.js` |
 | Gift certificates | Live page | Request mode only (`data-gift-status="request"`), no purchase element, page text confirms no payment is taken |
 | Reservation window | Live estimator | Preferred-date maximum exactly 60 days out (`2026-12-02` on 2026-10-03) |
-| Attribution + notification (one labeled submission) | UTM arrival GåÆ internal navigation to `/contact/` GåÆ single submission labeled "RELEASE ACCEPTANCE TEST (please ignore)" | Campaign preserved after navigation (`first_utm_source=facebook`, `latest_utm_source=facebook`, `latest_utm_campaign=profile`, `landing_page=/`, no same-origin referrer recorded); `/api/lead` returned `ok:true`; the built notification shows `Attribution GÇö First-touch source: facebook`, `Attribution GÇö Latest-touch source: facebook`, `Attribution GÇö Latest-touch campaign: profile`, `Attribution GÇö Latest-touch landing page: /`, with no attribution leakage into "More details" |
+| Attribution + notification (one labeled submission) | UTM arrival Gï¿½ï¿½ internal navigation to `/contact/` Gï¿½ï¿½ single submission labeled "RELEASE ACCEPTANCE TEST (please ignore)" | Campaign preserved after navigation (`first_utm_source=facebook`, `latest_utm_source=facebook`, `latest_utm_campaign=profile`, `landing_page=/`, no same-origin referrer recorded); `/api/lead` returned `ok:true`; the built notification shows `Attribution Gï¿½ï¿½ First-touch source: facebook`, `Attribution Gï¿½ï¿½ Latest-touch source: facebook`, `Attribution Gï¿½ï¿½ Latest-touch campaign: profile`, `Attribution Gï¿½ï¿½ Latest-touch landing page: /`, with no attribution leakage into "More details" |
 | CI | GitHub Actions | `validate` run `37132056171` completed successfully on the pushed SHA |
 
 One labeled acceptance inquiry was sent (no repeats). Inbox confirmation by the owner remains the
 final external check.
 
-## Verified GÇö six new social profiles and the Follow Us upgrade (2026-10-03)
+## Verified Gï¿½ï¿½ six new social profiles and the Follow Us upgrade (2026-10-03)
 
 Owner-supplied profiles added: TikTok, Pinterest, Rumble, Gab, Parler and Locals (plus the
-existing Facebook and Nextdoor) GÇö **eight confirmed profiles render**. Each supplied URL returned
+existing Facebook and Nextdoor) Gï¿½ï¿½ **eight confirmed profiles render**. Each supplied URL returned
 HTTP 200 on 2026-10-03 (destination reachable; not independent identity verification).
 
 | Check | Method | Result |
@@ -725,9 +742,9 @@ HTTP 200 on 2026-10-03 (destination reachable; not independent identity verifica
 | Eight confirmed profiles | `tests/browser/social-links.test.mjs` (4 cases) | Correct labels, exact URLs, `target="_blank"`, `rel="noopener noreferrer"`, accessible new-tab text; pending platforms (GBP, Bing Places, Yelp, Instagram, YouTube, X, Threads, LinkedIn, Alignable, Reddit) never render |
 | Official brand marks | Browser test + screenshot inspection | Every confirmed profile uses a real mark, never a monogram placeholder; Nextdoor is the official house-"n" favicon geometry in official brand green (`#1B8751`); Gab, Parler and Locals use their official assets (`src/components/SocialIcon.astro` records each source); no counterfeit hand-drawn logos |
 | UTMs | Browser test | Outbound profile URLs never carry UTM parameters |
-| Responsive layout (pill design, later superseded) | Screenshots at 1280/768/390/320 + browser tests | 4-column grid on tablet/desktop (two tidy rows), 2-column on phones, single column under 26rem; zero horizontal overflow at every width; no label truncation at 320px; GëÑ44px touch targets. **Superseded by the logo-only redesign below** |
+| Responsive layout (pill design, later superseded) | Screenshots at 1280/768/390/320 + browser tests | 4-column grid on tablet/desktop (two tidy rows), 2-column on phones, single column under 26rem; zero horizontal overflow at every width; no label truncation at 320px; Gï¿½ï¿½44px touch targets. **Superseded by the logo-only redesign below** |
 | Locals link registry | `npm run marketing:links` + `npm run marketing:verify` | Locals profile link generated from the registry (`?utm_source=locals&utm_medium=organic_social&utm_campaign=profile`); registry now 51 links (29 active, 22 prepared); documents regenerated and byte-identical on check; QR assets unchanged |
-| Tracked-link placement reconciliation (owner-confirmed 2026-10-03) | Registry flags + `npm run marketing:verify` | The owner confirms the basic tracked UTM website/bio links are placed on the eight live profiles (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals); their registry entries flipped to active (`pending: false`) and the generated docs regenerated. Instagram, YouTube, GBP and the other platforms remain prepared, not placed GÇö account existence, placement and verification stay distinct |
+| Tracked-link placement reconciliation (owner-confirmed 2026-10-03) | Registry flags + `npm run marketing:verify` | The owner confirms the basic tracked UTM website/bio links are placed on the eight live profiles (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals); their registry entries flipped to active (`pending: false`) and the generated docs regenerated. Instagram, YouTube, GBP and the other platforms remain prepared, not placed Gï¿½ï¿½ account existence, placement and verification stay distinct |
 | Scope safety | Git diff + full suites | No changes to GA4/GTM, consent, estimator pricing, customer forms, reservations or payment systems; `functions/` untouched |
 | Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (78 pass), `npm run build` (21 pages), `npm run validate`, `pending`, `smoke`, `testimonials`, `audit:facts` | All pass |
 
@@ -737,41 +754,41 @@ HTTP 200 on 2026-10-03 (destination reachable; not independent identity verifica
 | --- | --- | --- |
 | CI | GitHub Actions | `validate` run `37139504672` completed successfully on the pushed SHA |
 | Deployed build | Live production fetch | The Locals profile link is live; the deployed Follow Us section contains all eight platforms |
-| Eight links + destinations | Live Playwright + HTTP checks | Exact owner-supplied hrefs, `target="_blank"`, `rel="noopener noreferrer"`, accessible labels, no UTMs. Seven destinations returned HTTP 200 to the scripted check; Facebook returned HTTP 400 (typical anti-bot response GÇö the owner-confirmed URL is unchanged and was already rendering) |
+| Eight links + destinations | Live Playwright + HTTP checks | Exact owner-supplied hrefs, `target="_blank"`, `rel="noopener noreferrer"`, accessible labels, no UTMs. Seven destinations returned HTTP 200 to the scripted check; Facebook returned HTTP 400 (typical anti-bot response Gï¿½ï¿½ the owner-confirmed URL is unchanged and was already rendering) |
 | Official marks | Live DOM inspection + production screenshots | Nextdoor renders the official house-"n" favicon geometry in `#1B8751`; Gab, Parler and Locals render their official assets; no monogram placeholders among the eight |
 | Layout | Production screenshots at 1280/768/390/320 | 4-column desktop/tablet, 2-column phone, single column at 320px; zero horizontal overflow; no truncated labels at any width |
 | Consent + unrelated functionality | Live Playwright | 0 Google requests before consent/after refusal; after acceptance exactly 1 GTM + 1 container-injected GA4 tag; home/estimate/contact/gift/about/recurring all `200`; gift certificates still request-only; reservation window still 60 days (`2026-12-02`). No form submissions were made |
 
-## Verified GÇö Follow Us logo-only redesign (2026-10-03)
+## Verified Gï¿½ï¿½ Follow Us logo-only redesign (2026-10-03)
 
-The owner rejected the large white pill-shaped links. The approved direction GÇö compact,
-logo-only circular buttons GÇö was implemented directly (no alternative layouts).
+The owner rejected the large white pill-shaped links. The approved direction Gï¿½ï¿½ compact,
+logo-only circular buttons Gï¿½ï¿½ was implemented directly (no alternative layouts).
 
 | Check | Method | Result |
 | --- | --- | --- |
 | Appearance | Real Chromium + screenshots | Eight official marks in single 52px warm off-white circles (1px sand border, 12px gaps), no visible labels, no nested circles, no heavy shadows; plum background, Follow Us heading and gold panel border unchanged; compact padding |
 | Interaction | Screenshots + CSS | Restrained hover (gold border, 1px lift) and a clearly visible gold keyboard-focus ring (`outline: 3px solid var(--color-champagne-300)`); reduced-motion support retained |
-| Accessible names | Browser test via role query | Every link exposes `<platform> GÇö Sparkling Standard (opens in a new tab)`; no visible label element remains |
-| Links/security | Browser test | All eight exact owner-supplied URLs, `target="_blank"`, `rel="noopener noreferrer"`, no UTM parameters, GëÑ44px targets |
+| Accessible names | Browser test via role query | Every link exposes `<platform> Gï¿½ï¿½ Sparkling Standard (opens in a new tab)`; no visible label element remains |
+| Links/security | Browser test | All eight exact owner-supplied URLs, `target="_blank"`, `rel="noopener noreferrer"`, no UTM parameters, Gï¿½ï¿½44px targets |
 | Layout | Screenshots at 1280/768/390/320 + browser tests | Desktop: heading left + one row of eight right (section 124px tall); tablet: stacked naturally (189px); phones: two balanced rows of four (247px); 320px no horizontal overflow, no clipped icons |
 | Icons preserved | Browser test | Official Nextdoor house-"n" (`#1B8751`), Gab, Parler and Locals marks unchanged; no monogram placeholders among the eight |
 | Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (78 pass), `npm run build` (21 pages), `npm run validate`, `pending`, `smoke`, `testimonials`, `audit:facts` | All pass |
 
-Screenshots (kept outside the repository): `%TEMP%\opencode\social-redesign-shots\` GÇö
+Screenshots (kept outside the repository): `%TEMP%\opencode\social-redesign-shots\` Gï¿½ï¿½
 `desktop-1280-follow.png`, `tablet-768-follow.png`, `mobile-390-follow.png`,
 `mobile-320-follow.png`, `desktop-focus.png`.
 
-## Verified GÇö founder portrait on the About page (2026-10-03)
+## Verified Gï¿½ï¿½ founder portrait on the About page (2026-10-03)
 
 The owner supplied a professional portrait (`assets/owner/Headshot.jpg`) and requested it be displayed
 prominently on `/about/`. It was converted to `src/assets/images/hayli-founder.webp`
-(1164 +ù 1351, 42.9 KB, metadata stripped) for Astro's image pipeline and replaces the
+(1164 +ï¿½ 1351, 42.9 KB, metadata stripped) for Astro's image pipeline and replaces the
 representative cleaning photograph beside the founder narrative.
 
 | Check | Method | Result |
 | --- | --- | --- |
 | Genuine owner asset | Asset conversion + browser test | `hayli-founder.webp` derived from the owner's `Headshot.jpg`; no stock or AI replacement; the browser test asserts the `hayli-founder` source and the alt text naming Hayli |
-| Natural proportions | Browser test | Loaded image is 1164 +ù 1351 (ratio Gëê 0.861); never cropped to a stock aspect ratio; no facial cropping |
+| Natural proportions | Browser test | Loaded image is 1164 +ï¿½ 1351 (ratio Gï¿½ï¿½ 0.861); never cropped to a stock aspect ratio; no facial cropping |
 | Identification | Browser test | Visible "Hayli" + "Founder / Owner-Operator" beside the portrait (from `business.founder`, never hard-coded) |
 | Responsive delivery | Astro `<Image>` | WebP output with `widths={[420, 640, 900]}` and `sizes="(min-width: 56rem) 30rem, 92vw"`; explicit dimensions prevent layout shift; lazy/async |
 | Content preserved | Browser test | Founder story (`#story`, `#pace`) and heritage (`#heritage`) intact; the detail-first checklist moved to its own card (no longer sharing the founder card); estimate CTAs unchanged |
@@ -779,26 +796,26 @@ representative cleaning photograph beside the founder narrative.
 | Layout | Screenshots at 1280/768/390 + browser checks | Portrait leads the founder section on phones (order swap) and sits beside the story on desktop; no overflow or clipping |
 | Full suites | `npm run check` (0 errors), `npm test` (291 pass), `npm run test:browser` (79 pass), `npm run build`, `npm run validate`, `pending`, `smoke`, `testimonials`, `audit:facts` | All pass |
 
-## Verified GÇö GBP status update + execution layer (2026-10-08)
+## Verified Gï¿½ï¿½ GBP status update + execution layer (2026-10-08)
 
 Owner-confirmed fact: **Google Business Profile is verified and publicly visible.** At the time of
 this check the exact profile URL and "Ask for reviews" link were **not present anywhere in the
 repository** (`business.socials.googleProfile`, `business.reviews.profileUrl`,
-`business.reviews.submissionUrl` were still `PENDING`) GÇö capturing them was the remaining owner
+`business.reviews.submissionUrl` were still `PENDING`) Gï¿½ï¿½ capturing them was the remaining owner
 action, and no URL was constructed. *(Superseded later the same day: the owner supplied the exact
-URLs GÇö see the next section.)*
+URLs Gï¿½ï¿½ see the next section.)*
 
 | Check | Method | Result |
 | --- | --- | --- |
 | GBP status propagated | Repository-wide grep sweep (`*.md`, `*.ts`, `*.astro`, `*.mjs`) | No stale GBP "verification pending / in progress / not publicly visible" statements remain; the only surviving "verification in progress" references are Instagram (legitimate) and the generic status-vocabulary row |
-| Tracked GBP links activated | `src/config/marketing-links.ts` pending flags | The four GBP links (`gbp_home`, `gbp_estimate`, `gbp_deep_clean`, `gbp_gift_post`) moved prepared GåÆ ready (registry now 38 ready / 18 prepared) |
+| Tracked GBP links activated | `src/config/marketing-links.ts` pending flags | The four GBP links (`gbp_home`, `gbp_estimate`, `gbp_deep_clean`, `gbp_gift_post`) moved prepared Gï¿½ï¿½ ready (registry now 38 ready / 18 prepared) |
 | Generated link docs | `npm run marketing:links` + `npm run marketing:verify` | 3 documents + 57 QR files written; registry valid, documents in sync, every QR decodes to its intended URL |
 | Execution layer | `docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md` created | Daily/weekly operating front door; linked from `OPERATIONS-HUB.md`, `GROWTH-SYSTEM.md` and the AGENTS.md system map |
 | Internal references | Automated `docs/...` reference check across all markdown | All references resolve |
 | No fabricated facts | `business.ts` unchanged in behavior (comments only); review/profile URLs were still PENDING at that point | No invented URL, review, or claim |
 | Full suites | `npm run verify` (astro check 0 errors/0 warnings, build 21 pages, validate 1,264 links + SEO + registry + GTM + checklist leak), `npm test` (304 pass, 1 skip, 0 fail), `npm run test:print` (8 pass, 1 skip, 0 fail), `pending` (24 files), `smoke` (17 pages), `testimonials`, `audit:facts` | All pass; `audit:facts` context-review terms are pre-existing and unchanged |
 
-## Verified GÇö GBP profile + review URLs captured and live (2026-10-08)
+## Verified Gï¿½ï¿½ GBP profile + review URLs captured and live (2026-10-08)
 
 The owner supplied the exact Google Business Profile URLs. They are now the canonical configured
 values (never modified, shortened or reconstructed):
@@ -818,27 +835,27 @@ values (never modified, shortened or reconstructed):
 | Stale sweep | Repository-wide grep (`*.md`, `*.ts`, `*.astro`, `*.mjs`) | No remaining claim that GBP verification, profile capture or review-link capture is pending (Instagram/YouTube remain legitimately pending) |
 | Full suites | `npm run verify` (astro check 0 errors/0 warnings, build 21 pages, validate 1,263 links + SEO + registry + GTM + checklist leak), `npm test` (304 pass, 1 skip, 0 fail), `npm run test:browser` (79 pass, 0 fail), `npm run test:print` (8 pass, 1 skip, 0 fail), `marketing:verify`, `pending` (24 files), `smoke` (17 pages), `testimonials`, `audit:facts` | All pass; `audit:facts` context-review terms are pre-existing and unchanged |
 
-## Verified GÇö form/email workflow completion (2026-10-08)
+## Verified Gï¿½ï¿½ form/email workflow completion (2026-10-08)
 
 What was wrong, what was built, and what was actually run.
 
 | Check | Method | Result |
 | --- | --- | --- |
 | Key/env handling | Source + docs audit | **Correct as designed and kept:** `WEB3FORMS_ACCESS_KEY` is a Cloudflare runtime Secret read only by `functions/api/lead.ts`; `PUBLIC_WEB3FORMS_ACCESS_KEY` is a build-time Text variable (same key, client-safe public identifier) for the static fallback. No secret is committed; `.env.example` and DEPLOYMENT.md match the code |
-| Stale form-status docs | Doc review | `docs/marketing/COMPETITIVE-COMPARISON.md` form-delivery/travel/SMS "blocker" rows and the `VERIFICATION.md` "live form delivery pending" row were stale (all resolved 2026-10-01/02) GÇö reconciled to the verified state |
-| Owner email | `tests/lead-notification.test.ts` (19 cases) | At-a-glance `Summary GÇö GÇª` block added (request -+ customer -+ location -+ price + verdict -+ action); detail sections unchanged; order, honesty and no-credential invariants still asserted |
+| Stale form-status docs | Doc review | `docs/marketing/COMPETITIVE-COMPARISON.md` form-delivery/travel/SMS "blocker" rows and the `VERIFICATION.md` "live form delivery pending" row were stale (all resolved 2026-10-01/02) Gï¿½ï¿½ reconciled to the verified state |
+| Owner email | `tests/lead-notification.test.ts` (19 cases) | At-a-glance `Summary Gï¿½ï¿½ GÇª` block added (request -+ customer -+ location -+ price + verdict -+ action); detail sections unchanged; order, honesty and no-credential invariants still asserted |
 | Customer confirmation email | `tests/customer-confirmation.test.ts` (10 cases) | Branded email-client-safe HTML + plain-text fallback + intro text; never says booked/paid/invoice/receipt; escaping, estimate labeling, gift/commercial variants, contact block |
 | Shared request summary | `tests/request-summary.test.ts` (11 cases) | Same facts as the email; internal fields never surfaced; missing address marked "to be confirmed", never invented |
 | Single-use session receipt | `tests/submission-receipt.test.ts` (5 cases) | Sanitized allowlist, single-use read, length caps, storage failures never break a submission |
 | Thank-you flow | Browser `journey.test.mjs` | Summary card hidden on a direct visit; renders the stored request once; hidden again after reload; page keeps the request-only wording |
-| Invalid email | Browser `journey.test.mjs` | Native validation blocks submission GÇö zero network requests, no success state |
+| Invalid email | Browser `journey.test.mjs` | Native validation blocks submission Gï¿½ï¿½ zero network requests, no success state |
 | Double submission | Browser `journey.test.mjs` | Button disabled while sending; a second click sends exactly one request |
 | Provider/API failure, missing config, spam, Turnstile | `tests/api.test.ts`, `tests/failure-copy.test.ts`, browser wizard suite | Unchanged and passing (provider failure never reported as success; 503 not_configured falls back; distinct honest failure copy) |
 | Commercial invoice | `tests/invoice.test.ts` (9 cases) + `node scripts/commercial-invoice.mjs --sample` | Totals to the cent; tax only with label+rate; owner-completion placeholders; no invented bank details/tax IDs/terms; HTML + text + Letter PDF written to git-ignored `invoice-out/` |
 | Customer confirmation tool | `node scripts/customer-confirmation.mjs --sample` | Writes HTML + text to git-ignored `confirmation-out/`; verified contact drift guard |
 | Full suites | `npm run check` (0 errors/0 warnings/0 hints, 102 files), `npm run verify` (build 21 pages; validate 1,264 links + SEO + registry/QR + GTM + checklist leak), `npm test` (344 pass, 1 skip, 0 fail), `npm run test:browser` (81 pass, 0 fail), `npm run marketing:verify`, `pending` (24 files), `smoke` (17 pages), `testimonials`, `audit:facts` | All pass; no new audit context items |
 
-## Verified GÇö Resend customer-confirmation delivery (2026-10-08)
+## Verified Gï¿½ï¿½ Resend customer-confirmation delivery (2026-10-08)
 
 The second transactional path: after the Web3Forms owner notification is accepted, the lead
 relay sends the branded customer confirmation through Resend. The lead flow is unchanged; the
@@ -850,46 +867,46 @@ customer email is additive and best-effort.
 | Lead-function integration | `tests/api.test.ts` (7 new cases, Resend mocked) | One send after owner success; correct recipient + subject `We received your Sparkling Standard request`; HTML/text generated; Resend failure after owner success still returns `200 { ok: true }`; owner failure (`502`) never triggers a confirmation; phone-only and invalid-email requests skip safely; no duplicate send per invocation; no secret/config detail in the response |
 | Failure logging | Test-captured `console.error` | `customer-confirmation: failed (provider 500)` recorded server-side; assertions prove the line contains no customer address and no API key |
 | Existing paths unchanged | Full api/verification suites | Owner notification, quote verification, Turnstile, honeypot and fallback behavior unchanged and passing |
-| Config/docs | `.env.example`, `scripts/generate-deploy-secrets.mjs`, `DEPLOYMENT.md` -º4/-º4a, `README.md`, `PLATFORM-STATUS.md`, `OWNER-INPUT-REQUIRED.md`, `AUTOMATION-REGISTER.md`, `CUSTOMER-CONFIRMATION-EMAIL.md`, `COMMUNICATION-TEMPLATES.md`, `GIFT-CERTIFICATES.md`, `LEAD-NOTIFICATION-FORMAT.md`, `privacy.astro` | Secret is server-side only (`RESEND_API_KEY`); sender-domain verification and the one controlled live test documented; no remaining claim that a Web3Forms paid autoresponder is required |
+| Config/docs | `.env.example`, `scripts/generate-deploy-secrets.mjs`, `DEPLOYMENT.md` -ï¿½4/-ï¿½4a, `README.md`, `PLATFORM-STATUS.md`, `OWNER-INPUT-REQUIRED.md`, `AUTOMATION-REGISTER.md`, `CUSTOMER-CONFIRMATION-EMAIL.md`, `COMMUNICATION-TEMPLATES.md`, `GIFT-CERTIFICATES.md`, `LEAD-NOTIFICATION-FORMAT.md`, `privacy.astro` | Secret is server-side only (`RESEND_API_KEY`); sender-domain verification and the one controlled live test documented; no remaining claim that a Web3Forms paid autoresponder is required |
 | Full suites | `npm run check` (0 errors/0 warnings/0 hints, 103 files), `npm run verify` (build 21 pages; validate 1,264 links + SEO + registry/QR + GTM + checklist leak), `npm test` (361 pass, 1 skip, 0 fail), `npm run test:browser` (81 pass, 0 fail), `smoke` (17 pages), `pending` (24 files), `testimonials`, `audit:facts`, `marketing:verify` | All pass; no real email sent (all provider calls mocked) |
 
-## Verified GÇö production deployment + controlled live form test (2026-10-08)
+## Verified Gï¿½ï¿½ production deployment + controlled live form test (2026-10-08)
 
 Deployed `c8a9723` (form/email/invoicing workflow) and `f92719c` (address ZIP fix) via GitHub
-`main` GåÆ Cloudflare Pages; production serves the new build (thank-you summary markup + Resend
+`main` Gï¿½ï¿½ Cloudflare Pages; production serves the new build (thank-you summary markup + Resend
 privacy disclosure live).
 
-**Controlled live test** GÇö Playwright against production, clearly marked data (`SS Live Form
+**Controlled live test** Gï¿½ï¿½ Playwright against production, clearly marked data (`SS Live Form
 Test`, `owner@sparkling-standard.com` as the customer address, notes
-`LIVE TEST GÇö NOT A REAL CUSTOMER GÇö VERIFY OWNER + CUSTOMER EMAIL DELIVERY`):
+`LIVE TEST Gï¿½ï¿½ NOT A REAL CUSTOMER Gï¿½ï¿½ VERIFY OWNER + CUSTOMER EMAIL DELIVERY`):
 
 | Stage | Result |
 | --- | --- |
-| Address + ZIP | **PASS** GÇö suggestion GåÆ pin GåÆ ZIP `32502` auto-filled GåÆ step advanced |
-| Submission | **PASS** GÇö exactly one `/api/lead` request: `200 {"ok":true,"verification":{"status":"verified","travel_verified":true,"travel_method":"route","config_match":"match"}}` |
+| Address + ZIP | **PASS** Gï¿½ï¿½ suggestion Gï¿½ï¿½ pin Gï¿½ï¿½ ZIP `32502` auto-filled Gï¿½ï¿½ step advanced |
+| Submission | **PASS** Gï¿½ï¿½ exactly one `/api/lead` request: `200 {"ok":true,"verification":{"status":"verified","travel_verified":true,"travel_method":"route","config_match":"match"}}` |
 | Owner notification | Accepted by Web3Forms (`200`). Inbox arrival **owner-side confirmation pending** |
 | Customer confirmation | Send path exercised exactly once (no duplicate send). Inbox arrival **owner-side confirmation pending** |
-| Success UI + thank-you | **PASS** GÇö summary accurate (service/home/address/date/provisional range `$225GÇô$275`/reference `SS-20261009-OYL0G8`), hidden after reload (single-use) |
-| Analytics | **PASS** GÇö `estimate_start`, `estimate_complete`, `cleaning_request_submit`, `booking_request` each fired once; no duplicate conversion; attribution intact |
-| Console / network | **PASS** GÇö no console errors, no page errors, no failed responses |
+| Success UI + thank-you | **PASS** Gï¿½ï¿½ summary accurate (service/home/address/date/provisional range `$225Gï¿½ï¿½$275`/reference `SS-20261009-OYL0G8`), hidden after reload (single-use) |
+| Analytics | **PASS** Gï¿½ï¿½ `estimate_start`, `estimate_complete`, `cleaning_request_submit`, `booking_request` each fired once; no duplicate conversion; attribution intact |
+| Console / network | **PASS** Gï¿½ï¿½ no console errors, no page errors, no failed responses |
 
 **Defect found and fixed (`f92719c`):** exact provider suggestions with embedded coordinates skip
 the resolver, so the required ZIP stayed empty and the address step could not advance (typing the
 ZIP afterwards invalidated the confirmed pin). Fix: fill the ZIP from the provider label under the
 same `applyingResolved` guard the resolver path uses. Regression test added
-(`tests/browser/journey.test.mjs`, `exactSuggestion` mock) GÇö fails without the fix, passes with it.
+(`tests/browser/journey.test.mjs`, `exactSuggestion` mock) Gï¿½ï¿½ fails without the fix, passes with it.
 
-**Not claimed:** inbox delivery of the two emails and the Resend dashboard status GÇö those require
+**Not claimed:** inbox delivery of the two emails and the Resend dashboard status Gï¿½ï¿½ those require
 the owner's inbox/account and remain owner-side. Production checks: home, `/contact/`,
 `/estimate/`, `/thank-you/` and `/leave-review/` all return `200` with the expected markup; no
 server-secret names in client chunks.
 
 **CI note:** the `validate` workflow fails at `tests/routes/privacy.test.ts`
-(`git check-ignore canvass-out`) GÇö pre-existing and environment-dependent (passes locally where
+(`git check-ignore canvass-out`) Gï¿½ï¿½ pre-existing and environment-dependent (passes locally where
 `canvass-out/` exists; fails in a fresh checkout because `.gitignore` uses the directory pattern
 `canvass-out/`). Identical failure on the three preceding pushes; unrelated to this work.
 
-## Pending (cannot be verified in this environment GÇö owner or tooling required)
+## Pending (cannot be verified in this environment Gï¿½ï¿½ owner or tooling required)
 
 | Item | Why pending | How to verify |
 | --- | --- | --- |
