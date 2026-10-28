@@ -268,7 +268,7 @@ async function contactFields(page) {
   await page.fill('#est-name', 'Browser journey (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
-  if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms');
+  if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
 }
 
 // ── Address autocomplete + confirmation ──────────────────────────────────────

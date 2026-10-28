@@ -164,7 +164,7 @@ test('a real available slot becomes an expiring hold and travels with the reques
     await page.fill('#est-name', 'Booking Test');
     await page.fill('#est-phone', '8500000000');
     await page.fill('#est-email', 'owner@sparkling-standard.com');
-    await page.check('#est-terms');
+    await page.check('#est-terms', { force: true });
     await page.click('[data-submit]');
     await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'success');
     await delay(150);

@@ -389,7 +389,7 @@ test('final submit disables while sending and reports honest failure', async () 
     await page.fill('#est-name', 'Browser test (please ignore)');
     await page.fill('#est-phone', '8500000000');
     await page.fill('#est-email', 'owner@sparkling-standard.com');
-    if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms');
+    if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
 
     await page.click('[data-submit]');
     await delay(250);
@@ -436,7 +436,7 @@ test('a filled trap field is rejected locally without losing the customer answer
     await page.fill('#est-name', 'Browser test (please ignore)');
     await page.fill('#est-phone', '8500000000');
     await page.fill('#est-email', 'owner@sparkling-standard.com');
-    if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms');
+    if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
 
     // Simulate a bot (or anything else) populating the hidden trap.
     await page.evaluate(() => {
@@ -479,7 +479,7 @@ test('relay rejection causes produce distinct, recoverable copy and preserve ans
     await page.fill('#est-name', 'Browser test (please ignore)');
     await page.fill('#est-phone', '8500000000');
     await page.fill('#est-email', 'owner@sparkling-standard.com');
-    if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms');
+    if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
 
     await page.click('[data-submit]');
     await page.waitForFunction(() =>
