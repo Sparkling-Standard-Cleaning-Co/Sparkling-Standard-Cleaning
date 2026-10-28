@@ -6,42 +6,69 @@ recipient exactly as for any customer. The public configuration lives in
 `src/config/gift-certificates.ts`.
 
 **Current public state: sales are DISABLED.** The page offers a request form only — no payment is
-taken, no amount is advertised, and no certificate is issued until payment verification exists and
-the owner approves the terms. This document records how the system works and what remains to be
-decided.
+taken, no amount is charged, and no certificate is issued until final legal review and a live test
+purchase are approved. The purchase UI, approved amounts, delivery choices, scheduled delivery,
+ledger and owner register are implemented behind the activation gate.
 
-**2026-10-27 policy update:** the public terms now state that a purchased certificate does not
-expire and carries no post-sale service, dormancy, maintenance or cash-out fee (Fla. Stat. § 501.95).
-Sales remain off until the owner approves the exact denominations and the activation checklist below.
+**2026-10-27 policy update:** the public terms state that a purchased certificate does not expire
+and carries no post-sale service, dormancy, maintenance or cash-out fee (Fla. Stat. § 501.95).
 
-**2026-10-27 ledger update:** paid webhooks now create one durable certificate record under
-`gifts/certificates/` in the private R2 bucket (idempotent by Stripe event). The record carries the
-original value, remaining balance, purchaser/recipient fields, payment references and every
-redemption. Owner-only lookup and partial redemption are available through
-`/api/gift-admin` using a Bearer token (`GIFT_OWNER_TOKEN` or `PHOTO_OWNER_TOKEN`); it is not a
-public endpoint. Automatic customer delivery and the public purchase UI remain gated.
+**2026-10-28 owner decisions:** approved denominations are **$50, $100, $150, $200**; custom amounts
+are **$25–$500**; a completely unused certificate may be refunded within **14 days**; certificates
+are transferable by valid code, partial redemption is allowed, and the remaining balance is
+preserved. No voluntary cash redemption except where legally required. The final public wording
+still needs legal review.
 
-**Recommended denominations for owner approval (not active):** $50, $100, $150, $200. They are
-listed as `proposedDenominations` and are not shown or accepted until copied into `denominations`.
+**2026-10-28 gift administration:** paid webhooks create one durable certificate under
+`gifts/certificates/` (idempotent by Stripe event). The certificate ledger records original value,
+remaining balance, purchaser/recipient fields, payment references and every redemption. Owner-only
+lookup, partial redemption, summary metrics and financial controls are under `/api/gift-admin`.
+**Only `GIFT_OWNER_TOKEN` authorizes gift administration.** The photo-access token is deliberately
+not accepted for gift financial actions. Sales remain disabled.
+
 **2026-10-28 delivery/balance update:** after a verified paid webhook and one durable issuance, the
-webhook sends the branded certificate (HTML + plain text) to the purchaser and, when supplied, the
-recipient through Resend with idempotency keys. Delivery failure returns a retryable error and never
-creates a second certificate. The redemption page can verify a code's remaining balance through
-`GET /api/gift-balance` without exposing names/contact details. Owner lookup, partial redemption and
-release remain behind `/api/gift-admin`. Sales are still disabled; the automatic delivery path has
-not been exercised with a real Stripe payment.
+webhook sends the branded certificate (HTML + plain text) to the purchaser and, when the purchaser
+selected email delivery, the recipient through Resend with idempotency keys. Delivery failure
+returns a retryable error and never creates a second certificate. Scheduled recipient delivery is
+stored durably under `gifts/deliveries/` and is processed by the Hayli-only
+`POST /api/gift-delivery` owner/cron trigger; no scheduler is configured in this repository. The
+redemption page can verify a code's remaining balance through `GET /api/gift-balance` without
+exposing names/contact details. The purchase has not been exercised with a real Stripe payment.
+
+
+**2026-10-28 password administration:** `/gift-admin/` no longer asks for a bearer token.
+The owner creates the administrator password once using `GIFT_ADMIN_SETUP_CODE` (a Cloudflare
+secret), then signs in normally. Passwords use PBKDF2-SHA-256 (210,000 iterations, random salt);
+only the hash is stored server-side. Sessions are random opaque tokens in a `__Host-` HttpOnly,
+Secure, SameSite=Strict cookie with a two-hour expiry. Every financial POST requires the session
+CSRF token and the administrator password again (step-up). Login is rate-limited and returns a
+generic failure. The dashboard lists/search/filters/paginates the certificate inventory, shows
+liability totals, lets Hayli review a record, resend, redeem, refund or void an unused
+certificate, and exposes delivery failure state. Backup-email verification and single-use
+recovery links are implemented through Resend. Phone OTP is deliberately not offered until an
+SMS provider is approved, configured and tested; the page does not claim otherwise.
+**2026-10-28 refund/void update:** `POST /api/gift-admin` accepts `action: "refund"` or
+`action: "void"` for an **active, completely unused** certificate. A refund retrieves the original
+Checkout Session's PaymentIntent, submits a Stripe refund with the fixed idempotency key
+`gift-refund-<certificate code>`, and only then marks the durable ledger `refunded` with the Stripe
+refund id. A retry reuses the same Stripe idempotency key, so it cannot issue a second refund. A void
+marks the unused certificate `void` without moving money. Both actions record a ledger adjustment and
+cancel a pending scheduled delivery; the scheduled processor also rechecks certificate status before
+sending. No live Stripe refund or void has been performed.
 
 
 ## 1. What is built
 
 | Piece | Where | Status |
 | --- | --- | --- |
-| Public page (explanation, sample, request form) | `/gift-certificates/` | **Live (request mode)** |
+| Public page (explanation, sample, delivery choices, request/purchase UI) | `/gift-certificates/` | **Live (request mode)**; purchase UI gated |
 | Safe redemption instructions page (QR target) | `/gift-certificates/redeem/` | **Live**, noindex, never looks up or changes a certificate |
 | Checkout-return page (noindex, never claims issuance) | `/gift-certificates/success/` | **Live** |
 | Printable certificate + working QR (owner tool) | `scripts/gift-certificate.mjs` (`npm run gift:certificate`) | **Working**, QR self-verified |
-| Stripe Checkout session creator | `functions/api/gift-checkout.ts` | **Built, dormant** (`enabled: false` → 403; no key → 503) |
-| Stripe webhook (signature-verified payment confirmation) | `functions/api/stripe-webhook.ts` | **Built, dormant** (no webhook secret configured) |
+| Stripe Checkout session creator | `functions/api/gift-checkout.ts` | **Built**, amounts/delivery/email validated; dormant behind `enabled: false` |
+| Stripe webhook (signature-verified payment confirmation) | `functions/api/stripe-webhook.ts` | **Built**, idempotent issuance and scheduled-delivery records |
+| Scheduled delivery processor | `functions/api/gift-delivery.ts` | **Built**, Hayli-only; owner/cron-triggered, no scheduler configured |
+| Owner gift register | `/gift-admin/` + `/api/gift-admin` | **Built**, noindex; token entered per session; summary, lookup, redemption, unused refund and void controls |
 | Fulfillment notification (paid → owner alert with code) | `src/lib/gift/fulfillment.ts` | **Built**, unit-tested |
 
 ## 2. Purchase lifecycle
@@ -65,35 +92,41 @@ can never mint a second code; the ledger records the Stripe event id as the dura
 | Step | Automatic today | Manual today |
 | --- | --- | --- |
 | Public explanation + request capture | ✔ (website, lead relay) | — |
-| Amount/terms confirmation | — | ✔ owner |
-| Card payment | ✖ (disabled) | ✔ owner sends a Stripe link/invoice if the customer wants to prepay |
-| Payment verification | Webhook code exists but is dormant | ✔ owner checks Stripe |
-| Certificate generation | ✔ tool produces the printable file with QR | ✔ owner runs it and prints/sends |
-| Certificate delivery to purchaser/recipient | — | ✔ owner emails the file (Gmail; Web3Forms does not send outbound branded mail) |
-| Redemption + balance updates | — | ✔ owner ledger |
+| Purchase amount/email/delivery validation | ✔ server-side | — |
+| Card payment | ✖ (gate closed) | Owner activation required |
+| Payment verification | ✔ signature-verified paid webhook | — |
+| Certificate issuance | ✔ idempotent durable ledger | — |
+| Purchaser certificate email | ✔ Resend, purchaser confirmation | — |
+| Immediate recipient email | ✔ when selected | — |
+| Scheduled recipient delivery | ✔ durable record; owner/cron processor | Trigger must be configured |
+| Printable certificate | ✔ tool produces the file with QR | Owner prints/sends if chosen |
+| Redemption + balance updates | ✔ server ledger/admin | Owner approves redemption |
+| Refunds/voids | ✔ unused certificate, Stripe refund + durable adjustment | Owner action; no live test yet |
 
-The request acknowledgment is now automatic: the on-page summary is immediate, and the branded
-confirmation email is sent through Resend once configured
-(`docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`). Certificate delivery itself remains manual
-because it attaches the generated certificate file — the automated email sends the standard
-confirmation only.
+The request acknowledgment is automatic. Certificate email delivery uses Resend with idempotency
+keys; a failure is retryable and never mints a second certificate. The printable file remains
+available through `npm run gift:certificate`. The public sales gate remains off.
 
 ## 4. Activation checklist (owner decisions required)
 
-1. **Approve denominations** (exact amounts) or keep custom amounts only — set
-   `giftCertificateConfig.denominations` and `allowCustomAmount` bounds.
-2. **Approve the public terms**: coverage wording, redemption steps, refund/cancellation handling.
-   The 2026-10-27 public terms already prohibit expiration and post-sale fees; keep those rules
-   unless a lawyer confirms a stricter requirement. Florida and Alabama unclaimed-property treatment
-   still requires review.
-3. **Stripe**: confirm enabled payment methods and set `STRIPE_SECRET_KEY` (Secret) and
+1. **Denominations:** approved values and custom bounds are already in
+   `giftCertificateConfig.denominations` / `allowCustomAmount`; do not re-approve.
+2. **Final legal review:** coverage wording, redemption steps, refund/transfer/unclaimed-property
+   language, and the scheduled-delivery consent. The 2026-10-27 public terms prohibit expiration
+   and post-sale fees; keep them unless counsel confirms a stricter requirement.
+3. **Stripe:** confirm enabled payment methods and set `STRIPE_SECRET_KEY` (Secret) and
    `STRIPE_WEBHOOK_SECRET` (Secret) in the Cloudflare **production** environment, register the
    webhook endpoint `https://sparkling-standard.com/api/stripe-webhook` for
-   `checkout.session.completed`, and turn on Stripe's email receipts.
-4. **Flip `enabled: true`** in `src/config/gift-certificates.ts` (one line) after 1–3 are done.
-5. **Test**: one owner-authorized live purchase at the smallest denomination, confirm the webhook
-   alert, generate and deliver the certificate, then redeem it against a real reservation.
-6. Keep the reservation 60-day window out of certificate validity — they are different policies.
+   `checkout.session.completed`, and turn on Stripe receipts.
+4. **Configure `GIFT_OWNER_TOKEN`** (never reuse the photo token) and, if scheduled delivery is to
+   run automatically, configure a secure cron trigger for `/api/gift-delivery`.
+5. **Flip `enabled: true`** only after 1–4 are done.
+6. **Test:** one owner-authorized live purchase at the smallest denomination, confirm the webhook
+   alert, purchaser email, certificate, optional recipient delivery, one partial redemption and the
+   owner register. Test one scheduled delivery with the processor in a non-production path first.
+   Test one unused certificate refund and one unused certificate void in Stripe test mode; confirm
+   the ledger adjustment and pending-delivery cancellation.
+7. Keep the reservation 60-day window out of certificate validity — they are different policies.
 
 ## 5. Accounting (obligations, not revenue)
 
@@ -128,3 +161,27 @@ payment). Never store card numbers anywhere — Stripe holds only payment refere
 - Certificate QR codes contain only `/gift-certificates/redeem/?ref=<code>` — no names, emails or
   addresses — and that page neither looks up nor mutates anything.
 - Codes use an unambiguous alphabet (no I/L/O/0/1) and are deterministic per purchase.
+- Gift financial actions accept **only** `GIFT_OWNER_TOKEN`; the photo owner token is not a fallback.
+- Scheduled deliveries are stored under `gifts/deliveries/` and use an idempotency key; a sent record
+  is not resent. The owner processor is token-protected.
+- The owner register is noindex, stores no password in the browser, and keeps only the CSRF token
+  in memory/session state. The session cookie is HttpOnly, Secure and SameSite=Strict.
+- Refunds use the original Checkout Session's PaymentIntent and a fixed per-certificate idempotency
+  key. The ledger is marked only after Stripe confirms; a failed ledger update is reported for
+  retry. No live refund or void was performed.
+- Backup and retention separation are documented in `docs/operations/R2-STORAGE-AND-BACKUP.md`.
+
+## 7. Known gaps before live gift sales
+
+- No customer-facing gift-code application inside the cleaning estimator/checkout yet. The owner
+  ledger can record an owner-approved redemption against a job reference, but automatic gift credit
+  against a live Stripe difference is not implemented.
+- Stripe refund execution, unused-certificate voiding and scheduled-delivery cancellation are
+  implemented but have not been exercised against live Stripe. Chargeback/dispute reconciliation
+  remains manual.
+- No scheduler is configured for `/api/gift-delivery`; scheduled records are durable, but the
+  owner/cron processor must be triggered explicitly.
+- The owner register supports redemption, refund and void for unused certificates; it is not a
+  general accounting replacement, and partial refunds/chargeback adjustments are not exposed.
+- The final gift terms/legal review and a live test purchase are still required before
+  `enabled: true`.

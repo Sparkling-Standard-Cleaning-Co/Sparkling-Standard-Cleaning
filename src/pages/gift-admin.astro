@@ -1,0 +1,251 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Gift Certificate Administration | Sparkling Standard"
+  description="Private gift certificate administration."
+  noindex={true}
+>
+  <section class="section section--tight">
+    <div class="container">
+      <div data-gift-auth-loading>
+        <p class="eyebrow">Private administration</p>
+        <h1>Gift certificate register</h1>
+        <p class="lead">Checking this browser's administrator session…</p>
+      </div>
+
+      <section data-gift-auth-login hidden>
+        <p class="eyebrow">Owner only</p>
+        <h1>Gift certificate register</h1>
+        <p class="lead">Sign in with the administrator password. Gift financial access is limited to Hayli.</p>
+        <form class="form-card stack auth-card" data-gift-login-form>
+          <div class="field">
+            <label for="gift-login-password">Administrator password</label>
+            <input class="input" id="gift-login-password" type="password" autocomplete="current-password" data-gift-login-password required />
+          </div>
+          <div class="btn-row">
+            <button class="btn btn--primary" type="submit">Sign in</button>
+            <button class="btn btn--ghost" type="button" data-gift-show-recovery>Forgot password?</button>
+          </div>
+          <p class="form-status" data-gift-login-status role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section data-gift-auth-setup hidden>
+        <p class="eyebrow">One-time setup</p>
+        <h1>Create the administrator password</h1>
+        <p class="lead">
+          This setup runs once. Use a long, unique password and a backup email you can access.
+          The private setup code is configured by the owner in Cloudflare and is never shown here.
+        </p>
+        <form class="form-card stack auth-card" data-gift-setup-form>
+          <div class="field">
+            <label for="gift-setup-code">Private setup code</label>
+            <input class="input" id="gift-setup-code" type="password" autocomplete="off" data-gift-setup-code required />
+          </div>
+          <div class="field">
+            <label for="gift-setup-password">New administrator password</label>
+            <input class="input" id="gift-setup-password" type="password" autocomplete="new-password" minlength="12" data-gift-setup-password required />
+            <span class="hint">At least 12 characters with three of: lowercase, uppercase, number and symbol.</span>
+          </div>
+          <div class="field">
+            <label for="gift-setup-confirm">Confirm password</label>
+            <input class="input" id="gift-setup-confirm" type="password" autocomplete="new-password" data-gift-setup-confirm required />
+          </div>
+          <div class="field">
+            <label for="gift-setup-email">Backup recovery email</label>
+            <input class="input" id="gift-setup-email" type="email" autocomplete="email" data-gift-setup-email required />
+            <span class="hint">We send a verification link before this address can reset the password.</span>
+          </div>
+          <button class="btn btn--primary" type="submit">Create administrator</button>
+          <p class="form-status" data-gift-setup-status role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section data-gift-auth-recovery hidden>
+        <p class="eyebrow">Account recovery</p>
+        <h1>Recover administrator access</h1>
+        <p class="lead">If a verified recovery channel is enrolled, a single-use link will be sent.</p>
+        <form class="form-card stack auth-card" data-gift-recovery-form>
+          <div class="field">
+            <label for="gift-recovery-channel">Recovery method</label>
+            <select class="select" id="gift-recovery-channel" data-gift-recovery-channel>
+              <option value="email">Verified backup email</option>
+              <option value="phone" disabled>Verified phone (SMS provider not configured)</option>
+            </select>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn--primary" type="submit">Send recovery link</button>
+            <button class="btn btn--ghost" type="button" data-gift-show-login>Back to sign in</button>
+          </div>
+          <p class="form-status" data-gift-recovery-status role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section data-gift-auth-reset hidden>
+        <p class="eyebrow">Secure reset</p>
+        <h1>Choose a new password</h1>
+        <form class="form-card stack auth-card" data-gift-reset-form>
+          <div class="field">
+            <label for="gift-reset-password">New administrator password</label>
+            <input class="input" id="gift-reset-password" type="password" autocomplete="new-password" minlength="12" data-gift-reset-password required />
+          </div>
+          <div class="field">
+            <label for="gift-reset-confirm">Confirm password</label>
+            <input class="input" id="gift-reset-confirm" type="password" autocomplete="new-password" data-gift-reset-confirm required />
+          </div>
+          <button class="btn btn--primary" type="submit">Reset password</button>
+          <p class="form-status" data-gift-reset-status role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section data-gift-auth-verify hidden>
+        <p class="eyebrow">Recovery email</p>
+        <h1>Verify your backup email</h1>
+        <p class="lead">Confirm this address so it can receive password recovery links.</p>
+        <div class="form-card stack auth-card">
+          <button class="btn btn--primary" type="button" data-gift-verify-email>Verify this email</button>
+          <p class="form-status" data-gift-verify-status role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section data-gift-dashboard hidden>
+        <div class="admin-header">
+          <div>
+            <p class="eyebrow">Owner register</p>
+            <h1>Gift certificates</h1>
+            <p class="lead">Financial liability, redemptions, delivery state and adjustments.</p>
+          </div>
+          <button class="btn btn--ghost btn--small" type="button" data-gift-logout>Sign out</button>
+        </div>
+
+        <div class="summary-groups" data-gift-summary></div>
+
+        <div class="admin-toolbar">
+          <form class="admin-filters" data-gift-filter-form>
+            <div class="field">
+              <label for="gift-search">Search</label>
+              <input class="input" id="gift-search" type="search" placeholder="Code, purchaser or recipient" data-gift-search />
+            </div>
+            <div class="field">
+              <label for="gift-status-filter">Status</label>
+              <select class="select" id="gift-status-filter" data-gift-status>
+                <option value="">All statuses</option>
+                <option value="active">Active</option>
+                <option value="fully_redeemed">Fully redeemed</option>
+                <option value="refunded">Refunded</option>
+                <option value="void">Void</option>
+              </select>
+            </div>
+            <button class="btn btn--secondary" type="submit">Filter</button>
+          </form>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <caption class="visually-hidden">Gift certificate inventory</caption>
+            <thead>
+              <tr>
+                <th scope="col">Certificate</th>
+                <th scope="col">Status</th>
+                <th scope="col">Original</th>
+                <th scope="col">Remaining</th>
+                <th scope="col">Purchaser</th>
+                <th scope="col">Recipient</th>
+                <th scope="col">Delivery</th>
+                <th scope="col"><span class="visually-hidden">Review</span></th>
+              </tr>
+            </thead>
+            <tbody data-gift-rows></tbody>
+          </table>
+        </div>
+        <div class="admin-pagination">
+          <button class="btn btn--ghost btn--small" type="button" data-gift-prev>Previous</button>
+          <p class="small text-muted" data-gift-page-label></p>
+          <button class="btn btn--ghost btn--small" type="button" data-gift-next>Next</button>
+        </div>
+        <p class="form-status" data-gift-list-status role="status" aria-live="polite"></p>
+
+        <section class="mt-6" data-gift-detail hidden aria-labelledby="gift-detail-heading">
+          <div class="admin-header">
+            <div>
+              <p class="eyebrow">Certificate record</p>
+              <h2 id="gift-detail-heading">Certificate details</h2>
+            </div>
+            <button class="btn btn--ghost btn--small" type="button" data-gift-close-detail>Close</button>
+          </div>
+          <div class="summary-groups" data-gift-detail-metrics></div>
+          <div class="admin-detail-grid">
+            <div>
+              <h3 class="card__title">Identity and delivery</h3>
+              <ul class="summary-list" data-gift-detail-identity></ul>
+            </div>
+            <div>
+              <h3 class="card__title">Payment</h3>
+              <ul class="summary-list" data-gift-detail-payment></ul>
+            </div>
+          </div>
+          <h3 class="card__title mt-4">Redemption history</h3>
+          <ul class="summary-list" data-gift-detail-history></ul>
+          <h3 class="card__title mt-4">Refund and void history</h3>
+          <ul class="summary-list" data-gift-detail-adjustments></ul>
+
+          <div class="form-card stack mt-4" data-gift-actions hidden>
+            <h3 class="card__title">Financial actions</h3>
+            <p class="gift-admin__hint">
+              Every financial action requires the administrator password and is recorded in the
+              audit trail. Refunds and voids are limited to unused certificates.
+            </p>
+            <div class="field">
+              <label for="gift-action-password">Administrator password</label>
+              <input class="input" id="gift-action-password" type="password" autocomplete="current-password" data-gift-action-password />
+            </div>
+            <div class="field">
+              <label for="gift-action-amount">Redemption amount (USD)</label>
+              <input class="input" id="gift-action-amount" type="number" min="0.01" step="0.01" data-gift-action-amount />
+            </div>
+            <div class="field">
+              <label for="gift-action-note">Note</label>
+              <input class="input" id="gift-action-note" type="text" maxlength="500" data-gift-action-note />
+            </div>
+            <div class="field">
+              <label for="gift-action-reference">Reference</label>
+              <input class="input" id="gift-action-reference" type="text" maxlength="120" data-gift-action-reference />
+            </div>
+            <div class="btn-row">
+              <button class="btn btn--secondary" type="button" data-gift-redeem>Record redemption</button>
+              <button class="btn btn--ghost" type="button" data-gift-refund>Refund via Stripe</button>
+              <button class="btn btn--ghost" type="button" data-gift-void>Void unused</button>
+              <button class="btn btn--ghost" type="button" data-gift-resend>Resend certificate</button>
+            </div>
+            <p class="form-status" data-gift-action-status role="status" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <section class="form-card stack mt-6" data-gift-recovery-settings>
+          <h2 class="card__title">Recovery settings</h2>
+          <p class="gift-admin__hint" data-gift-recovery-state></p>
+          <div class="field">
+            <label for="gift-new-recovery-email">Backup email</label>
+            <input class="input" id="gift-new-recovery-email" type="email" autocomplete="email" data-gift-new-recovery-email />
+          </div>
+          <div class="field">
+            <label for="gift-recovery-password">Administrator password</label>
+            <input class="input" id="gift-recovery-password" type="password" autocomplete="current-password" data-gift-recovery-password />
+          </div>
+          <button class="btn btn--secondary" type="button" data-gift-update-recovery>Update backup email</button>
+          <p class="form-status" data-gift-recovery-settings-status role="status" aria-live="polite"></p>
+          <p class="gift-admin__hint">
+            Phone recovery is not offered until an SMS provider is configured and tested. The
+            infrastructure will not claim SMS delivery without a working provider.
+          </p>
+        </section>
+      </section>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  import '../scripts/gift-admin';
+</script>

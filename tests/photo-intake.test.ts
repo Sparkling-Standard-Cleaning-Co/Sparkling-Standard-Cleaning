@@ -259,6 +259,7 @@ test('associates verified photos with the correct inquiry and uses signed links 
         request_focus: 'question',
         name: 'Photo Test',
         phone: '8500000000',
+        email: 'photo-test@example.test',
         service_type: 'standard',
         photo_request_ref: REF,
         photo_keys: `bathroom:${key},bathroom:${foreign}`,
@@ -291,13 +292,16 @@ test('cleanup requires owner authentication, supports dry runs and removes expir
   const old = new Date(Date.now() - 100 * 86_400_000);
   const recent = new Date();
   const keys = [keyFor(REF, 'bathroom', '1'.repeat(32)), keyFor(REF, 'kitchen', '2'.repeat(32))];
+  const sidecar = `${keys[0]}.meta.json`;
   const deleted: string[] = [];
   const bucket = {
     async list() {
       return {
         objects: [
           { key: keys[0]!, uploaded: old },
+          { key: sidecar, uploaded: old },
           { key: keys[1]!, uploaded: recent },
+          { key: 'leads/not-a-photo-record.json', uploaded: old },
         ],
         truncated: false,
       };
@@ -320,7 +324,7 @@ test('cleanup requires owner authentication, supports dry runs and removes expir
     env: { PHOTOS_BUCKET: bucket, PHOTO_OWNER_TOKEN: OWNER },
   });
   assert.equal(dry.status, 200);
-  assert.equal(((await dry.json()) as { eligible: number }).eligible, 1);
+  assert.equal(((await dry.json()) as { eligible: number }).eligible, 2);
   assert.equal(deleted.length, 0);
 
   const real = await photoCleanupPost({
@@ -331,8 +335,8 @@ test('cleanup requires owner authentication, supports dry runs and removes expir
     env: { PHOTOS_BUCKET: bucket, PHOTO_OWNER_TOKEN: OWNER },
   });
   assert.equal(real.status, 200);
-  assert.equal(((await real.json()) as { deleted: number }).deleted, 1);
-  assert.deepEqual(deleted, [keys[0]]);
+  assert.equal(((await real.json()) as { deleted: number }).deleted, 2);
+  assert.deepEqual(deleted.sort(), [keys[0], sidecar].sort());
 });
 
 test('sends verified photos as real Resend attachments and skips the Web3Forms fallback', async () => {
@@ -367,6 +371,7 @@ test('sends verified photos as real Resend attachments and skips the Web3Forms f
         request_type: 'contact',
         name: 'Photo Test',
         phone: '8500000000',
+        email: 'photo-test@example.test',
         service_type: 'standard',
         quote_reference: 'SS-20261025-ABC123',
         photo_request_ref: REF,
@@ -390,9 +395,14 @@ test('sends verified photos as real Resend attachments and skips the Web3Forms f
   assert.equal(result.photoCount, 1);
   assert.equal(result.photoDelivery, 'attached');
   assert.equal(web3Calls.length, 0, 'attachments go through Resend, not the attachment-less Web3Forms plan');
-  assert.equal(resendCalls.length, 1);
-  assert.match(resendCalls[0]?.headers['Idempotency-Key'] ?? '', /^owner-notification\/SS-20261025-ABC123\/part-1\/v1$/);
-  const body = JSON.parse(resendCalls[0]?.body ?? '{}') as {
+  assert.equal(resendCalls.length, 2, 'owner attachment plus the mandatory customer confirmation');
+  const ownerCall = resendCalls.find((call) => {
+    const parsed = JSON.parse(call.body) as { to?: string[] };
+    return parsed.to?.includes('owner@sparkling-standard.com');
+  });
+  assert.ok(ownerCall);
+  assert.match(ownerCall.headers['Idempotency-Key'] ?? '', /^owner-notification\/SS-20261025-ABC123\/part-1\/v1$/);
+  const body = JSON.parse(ownerCall.body) as {
     to: string[];
     subject: string;
     attachments: Array<{ filename: string; content: string; content_type: string }>;
@@ -431,6 +441,7 @@ test('falls back to Web3Forms with an explicit attachment-failure note when Rese
         request_type: 'contact',
         name: 'Photo Test',
         phone: '8500000000',
+        email: 'photo-test@example.test',
         service_type: 'standard',
         photo_request_ref: REF,
         photo_keys: `bathroom:${key}`,
@@ -451,7 +462,7 @@ test('falls back to Web3Forms with an explicit attachment-failure note when Rese
   assert.equal(response.status, 200);
   const body = (await response.json()) as { photoDelivery: string };
   assert.equal(body.photoDelivery, 'links_only');
-  assert.equal(resendAttempts, 1, '422 is not retried');
+  assert.equal(resendAttempts, 2, 'one attempt for the owner attachment and one independent customer confirmation');
   assert.equal(web3.length, 1);
   assert.match(String(web3[0]?.['Photos - Attachment delivery'] ?? ''), /FAILED/i);
   assert.match(String(web3[0]?.['Photos - Private owner links'] ?? ''), /sig=/);
@@ -483,6 +494,7 @@ test('a missing R2 body is not reported as an attachment and falls back honestly
         request_type: 'contact',
         name: 'Photo Test',
         phone: '8500000000',
+        email: 'photo-test@example.test',
         service_type: 'standard',
         photo_request_ref: REF,
         photo_keys: `bathroom:${key}`,

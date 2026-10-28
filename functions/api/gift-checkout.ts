@@ -14,6 +14,7 @@
 
 import { giftCertificateConfig } from '../../src/config/gift-certificates.ts';
 import { legalTerms } from '../../src/config/legal.ts';
+import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
 
 interface Env {
   STRIPE_SECRET_KEY?: string;
@@ -21,7 +22,6 @@ interface Env {
 }
 
 const MAX_NAME = 120;
-const MAX_EMAIL = 200;
 const MAX_MESSAGE = giftCertificateConfig.maxMessageLength;
 const WINDOW_MS = 60_000;
 const PER_IP_PER_MINUTE = 10;
@@ -38,8 +38,9 @@ function cleanText(value: unknown, max: number): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
-function isEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+function isIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return Number.isFinite(Date.parse(`${value}T12:00:00Z`));
 }
 
 function throttled(request: Request): boolean {
@@ -94,17 +95,43 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
 
   const purchaserName = cleanText(payload.purchaserName, MAX_NAME);
-  const purchaserEmail = cleanText(payload.purchaserEmail, MAX_EMAIL);
+  const purchaserEmail = normalizeCustomerEmail(payload.purchaserEmail);
   const recipientName = cleanText(payload.recipientName, MAX_NAME);
-  const recipientEmail = cleanText(payload.recipientEmail, MAX_EMAIL);
+  const recipientEmail = normalizeCustomerEmail(payload.recipientEmail);
   const message = cleanText(payload.message, MAX_MESSAGE);
-  const deliveryDate = cleanText(payload.deliveryDate, 10);
+  const requestedDeliveryDate = cleanText(payload.deliveryDate, 10);
+  const deliveryMethod =
+    payload.deliveryMethod === 'recipient_email'
+      ? 'recipient_email'
+      : payload.deliveryMethod === 'print' || payload.deliveryMethod === undefined
+        ? 'print'
+        : null;
+  const deliveryTiming =
+    payload.deliveryTiming === 'scheduled'
+      ? 'scheduled'
+      : payload.deliveryTiming === 'immediate' || payload.deliveryTiming === undefined
+        ? 'immediate'
+        : null;
 
-  if (!purchaserName || !recipientName || !isEmail(purchaserEmail)) {
+  if (!purchaserName || !deliveryMethod || !deliveryTiming) {
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
-  if (recipientEmail && !isEmail(recipientEmail)) {
-    return json({ ok: false, error: 'invalid_request' }, 400);
+  const purchaserEmailProblem = customerEmailProblem(purchaserEmail);
+  if (purchaserEmailProblem) return json({ ok: false, error: purchaserEmailProblem }, 400);
+  const wantsRecipientEmail = deliveryMethod === 'recipient_email' || deliveryTiming === 'scheduled';
+  if (wantsRecipientEmail) {
+    const recipientProblem = customerEmailProblem(recipientEmail);
+    if (recipientProblem) {
+      return json(
+        { ok: false, error: recipientProblem === 'email_required' ? 'recipient_email_required' : 'recipient_email_invalid' },
+        400,
+      );
+    }
+  } else if (recipientEmail && customerEmailProblem(recipientEmail)) {
+    return json({ ok: false, error: 'recipient_email_invalid' }, 400);
+  }
+  if (deliveryTiming === 'scheduled' && !isIsoDate(requestedDeliveryDate)) {
+    return json({ ok: false, error: 'delivery_date_required' }, 400);
   }
   const amount = resolveGiftAmount(payload.denominationUsd, payload.amountUsd);
   if (amount === null) return json({ ok: false, error: 'invalid_amount' }, 400);
@@ -126,9 +153,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('metadata[gift_value_usd]', String(amount));
   body.set('metadata[recipient_name]', recipientName);
   body.set('metadata[purchaser_name]', purchaserName);
+  body.set('metadata[delivery_method]', deliveryMethod);
+  body.set('metadata[delivery_timing]', deliveryTiming);
   if (recipientEmail) body.set('metadata[recipient_email]', recipientEmail);
   if (message) body.set('metadata[gift_message]', message);
-  if (deliveryDate) body.set('metadata[delivery_date]', deliveryDate);
+  if (deliveryTiming === 'scheduled') body.set('metadata[delivery_date]', requestedDeliveryDate);
 
   try {
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {

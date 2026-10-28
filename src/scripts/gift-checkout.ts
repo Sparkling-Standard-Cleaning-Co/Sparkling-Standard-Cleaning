@@ -32,6 +32,8 @@ if (form) {
       recipientEmail: String(data.get('recipient_email') ?? ''),
       message: String(data.get('gift_message') ?? ''),
       deliveryDate: String(data.get('delivery_date') ?? ''),
+      deliveryMethod: String(data.get('delivery_method') ?? 'print'),
+      deliveryTiming: String(data.get('delivery_timing') ?? 'immediate'),
       denominationUsd: data.get('denominationUsd') ? Number(data.get('denominationUsd')) : undefined,
       amountUsd: data.get('gift_value') ? Number(data.get('gift_value')) : undefined,
       termsAccepted: data.get('termsAccepted') === 'yes',
@@ -53,6 +55,11 @@ if (form) {
         not_enabled: 'Gift certificate purchases are not open yet — please use the request form or call us.',
         not_configured: 'Secure checkout is not connected right now. Please call or email us and we will help.',
         invalid_amount: 'Please choose a valid gift value and try again.',
+        email_required: 'Please enter your email address so we can send your receipt and certificate.',
+        email_invalid: 'Please enter a valid email address, such as name@example.com.',
+        recipient_email_required: 'Please enter the recipient’s email address for email or scheduled delivery.',
+        recipient_email_invalid: 'Please enter a valid recipient email address, such as name@example.com.',
+        delivery_date_required: 'Please choose a future delivery date.',
         rate_limited: 'Too many attempts — please wait a moment and try again.',
       };
       setStatus(

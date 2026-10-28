@@ -168,3 +168,144 @@ test('the checkout-return page is noindex and never claims issuance', async () =
     await context.close();
   }
 });
+
+test('the owner gift register requires a session password and exposes data only after login', async () => {
+  const { context, page } = await open();
+  try {
+    let refundBody = null;
+    let certificate = {
+      code: 'SSGC-ABCD-2345',
+      status: 'active',
+      valueCents: 10000,
+      redeemedCents: 0,
+      remainingCents: 10000,
+      recipientName: 'Synthetic Recipient',
+      recipientEmail: 'recipient@example.com',
+      purchaserName: 'Synthetic Purchaser',
+      purchaserEmail: 'purchaser@example.com',
+      issuedAt: '2026-10-28T12:00:00.000Z',
+      history: [],
+      adjustments: [],
+    };
+    await page.route('**/api/gift-auth**', async (route) => {
+      const request = route.request();
+      if (request.method() === 'POST') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            session: {
+              csrf: 'csrf-test-token',
+              admin: { recoveryEmail: 'recovery@example.com', recoveryEmailVerified: true },
+            },
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, configured: true, authenticated: false, phoneRecovery: { available: false } }),
+      });
+    });
+    await page.route('**/api/gift-admin**', async (route) => {
+      const request = route.request();
+      if (request.method() === 'POST') {
+        refundBody = request.postDataJSON();
+        certificate = {
+          ...certificate,
+          status: 'refunded',
+          remainingCents: 0,
+          adjustments: [
+            {
+              at: '2026-10-28T13:00:00.000Z',
+              kind: 'refund',
+              amountCents: 10000,
+              note: 'Owner-approved refund',
+              reference: 'REF-1',
+              stripeRefundId: 're_test_1',
+            },
+          ],
+        };
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true, refundId: 're_test_1', certificate }),
+        });
+        return;
+      }
+      if (request.url().includes('summary=1')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            summary: {
+              issuedCount: 1,
+              activeCount: 1,
+              totalOriginalCents: 10000,
+              totalRedeemedCents: 0,
+              totalOutstandingCents: 10000,
+              totalRefundedCents: 0,
+              totalVoidedCents: 0,
+              pendingDeliveries: 0,
+              failedDeliveries: 0,
+            },
+          }),
+        });
+        return;
+      }
+      if (request.url().includes('list=1')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            page: 1,
+            pageSize: 20,
+            total: 1,
+            totalPages: 1,
+            items: [{ ...certificate, deliveryStatus: 'sent', deliveryDate: '', lastRedemptionAt: '' }],
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, certificate }),
+      });
+    });
+
+    await page.goto(BASE + '/gift-admin/', { waitUntil: 'load' });
+    assert.match((await page.locator('meta[name="robots"]').getAttribute('content')) ?? '', /noindex/);
+    assert.equal(await page.locator('#gift-admin-token').count(), 0, 'the legacy token field is gone');
+    assert.equal(await page.locator('[data-gift-auth-login]').isVisible(), true);
+    assert.doesNotMatch((await page.textContent('body')) ?? '', /SSGC-ABCD-2345/);
+
+    await page.fill('#gift-login-password', 'Synthetic-Admin-Password-1!');
+    await page.click('[data-gift-login-form] button[type="submit"]');
+    await page.waitForSelector('[data-gift-dashboard]:not([hidden])');
+    await page.waitForSelector('[data-gift-rows] tr');
+    assert.match((await page.textContent('body')) ?? '', /Synthetic Recipient/);
+
+    await page.click('[data-gift-rows] button');
+    await page.waitForSelector('[data-gift-detail]:not([hidden])');
+    await page.waitForSelector('[data-gift-actions]:not([hidden])');
+    await page.fill('#gift-action-password', 'Synthetic-Admin-Password-1!');
+    await page.fill('#gift-action-note', 'Owner-approved refund');
+    await page.fill('#gift-action-reference', 'REF-1');
+    page.on('dialog', (dialog) => void dialog.accept());
+    await page.click('[data-gift-refund]');
+    await page.waitForFunction(() => /Refund completed in Stripe/.test(document.querySelector('[data-gift-action-status]')?.textContent ?? ''));
+    assert.equal(refundBody?.action, 'refund');
+    assert.equal(refundBody?.password, 'Synthetic-Admin-Password-1!');
+    assert.equal(refundBody?.code, 'SSGC-ABCD-2345');
+    assert.equal(refundBody?.note, 'Owner-approved refund');
+    assert.equal(refundBody?.reference, 'REF-1');
+    await page.waitForFunction(() => document.querySelector('[data-gift-actions]')?.hasAttribute('hidden'));
+  } finally {
+    await context.close();
+  }
+});

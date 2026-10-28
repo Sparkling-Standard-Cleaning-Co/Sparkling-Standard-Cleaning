@@ -40,8 +40,14 @@ test('amounts are resolved only from approved config', () => {
   assert.equal(resolveGiftAmount(undefined, 24), null, 'below the minimum');
   assert.equal(resolveGiftAmount(undefined, 501), null, 'above the maximum');
   assert.equal(resolveGiftAmount(undefined, 'not-a-number'), null);
-  // A denomination is only accepted when the owner has approved that value.
-  assert.equal(resolveGiftAmount(100, undefined), null, 'unapproved denomination value');
+  // Approved owner denominations are accepted.
+  assert.equal(resolveGiftAmount(50, undefined), 50);
+  assert.equal(resolveGiftAmount(100, undefined), 100);
+  assert.equal(resolveGiftAmount(150, undefined), 150);
+  assert.equal(resolveGiftAmount(200, undefined), 200);
+  assert.equal(resolveGiftAmount(undefined, 25), 25, 'custom minimum');
+  assert.equal(resolveGiftAmount(undefined, 500), 500, 'custom maximum');
+  assert.equal(resolveGiftAmount(undefined, 75), 75, 'unlisted custom amount');
 });
 
 test('gift checkout is refused while sales are disabled', async () => {
@@ -89,6 +95,65 @@ test('gift checkout rejects invalid amounts before any provider call', async () 
     } as never);
     assert.equal(response.status, 400);
     assert.deepEqual(await response.json(), { ok: false, error: 'invalid_amount' });
+  } finally {
+    config.enabled = original;
+  }
+});
+
+test('gift checkout requires a valid purchaser email and recipient email for email delivery', async () => {
+  const config = giftCertificateConfig as { enabled: boolean };
+  const original = config.enabled;
+  config.enabled = true;
+  const base = {
+    purchaserName: 'Purchaser',
+    recipientName: 'Recipient',
+    amountUsd: 100,
+    termsAccepted: true,
+    termsVersion: '2026-10-27.terms.v1',
+  };
+  try {
+    const missing = await giftCheckout({
+      request: jsonRequest({ ...base }, '10.10.0.10'),
+      env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+    } as never);
+    assert.equal(missing.status, 400);
+    assert.deepEqual(await missing.json(), { ok: false, error: 'email_required' });
+
+    const invalid = await giftCheckout({
+      request: jsonRequest({ ...base, purchaserEmail: 'not-an-email' }, '10.10.0.11'),
+      env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+    } as never);
+    assert.equal(invalid.status, 400);
+    assert.deepEqual(await invalid.json(), { ok: false, error: 'email_invalid' });
+
+    const recipientMissing = await giftCheckout({
+      request: jsonRequest(
+        {
+          ...base,
+          purchaserEmail: 'buyer@example.com',
+          deliveryMethod: 'recipient_email',
+        },
+        '10.10.0.12',
+      ),
+      env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+    } as never);
+    assert.equal(recipientMissing.status, 400);
+    assert.deepEqual(await recipientMissing.json(), { ok: false, error: 'recipient_email_required' });
+
+    const scheduledNoDate = await giftCheckout({
+      request: jsonRequest(
+        {
+          ...base,
+          purchaserEmail: 'buyer@example.com',
+          recipientEmail: 'recipient@example.com',
+          deliveryTiming: 'scheduled',
+        },
+        '10.10.0.13',
+      ),
+      env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+    } as never);
+    assert.equal(scheduledNoDate.status, 400);
+    assert.deepEqual(await scheduledNoDate.json(), { ok: false, error: 'delivery_date_required' });
   } finally {
     config.enabled = original;
   }

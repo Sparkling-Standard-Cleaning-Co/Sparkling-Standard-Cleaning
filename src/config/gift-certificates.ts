@@ -19,26 +19,33 @@ export const giftCertificateConfig = {
   noExpiration: true,
   noPostSaleFees: true,
 
-  /** Sales activation still requires an approved denomination list and terms. */
+  /** Sales activation still requires legal review and a live test purchase. */
   termsVersion: '2026-10-27.terms.v1',
 
   /**
-   * Owner-approved monetary denominations (USD). EMPTY = not approved yet.
+   * Owner-approved monetary denominations (USD), approved 2026-10-28.
    * The purchase UI only offers values listed here; a client-supplied amount
    * is never trusted when creating a checkout session.
    */
-  denominations: [] as ReadonlyArray<number>,
+  denominations: [50, 100, 150, 200] as ReadonlyArray<number>,
 
-  /**
-   * Recommended starting points for owner review. NOT binding and NOT shown
-   * in the purchase UI until copied into \denominations\ after approval.
-   */
-  proposedDenominations: [50, 100, 150, 200] as ReadonlyArray<number>,
-
-  /** Allow a customer-requested amount (owner confirms before payment). */
+  /** Owner-approved custom range (USD), inclusive. */
   allowCustomAmount: true,
   customAmountMinUsd: 25,
   customAmountMaxUsd: 500,
+
+  /** Owner-approved commercial terms; final public wording still needs review. */
+  refundWindowDays: 14,
+  transferable: true,
+  partialRedemption: true,
+  noCashRedemption: true,
+
+  /** Delivery choices offered by the purchase UI. */
+  deliveryMethods: {
+    printable: true,
+    recipientEmail: true,
+    scheduled: true,
+  },
 
   /**
    * Draft public terms — PROPOSED wording only. Not published as binding

@@ -7,10 +7,54 @@ import {
   issueGiftCertificate,
   lookupGiftCertificate,
   redeemGiftCertificate,
+  refundGiftCertificate,
   remainingCents,
+  voidGiftCertificate,
   type GiftCertificateRecord,
 } from '../src/lib/gift/ledger.ts';
 import { onRequestGet as adminGet, onRequestPost as adminPost } from '../functions/api/gift-admin.ts';
+import {
+  ADMIN_COOKIE,
+  createAdmin,
+  createSession,
+  hashPassword,
+} from '../src/lib/admin/auth.ts';
+
+const ADMIN_PASSWORD = 'Correct-Horse-9-Battery!';
+
+async function adminAccess(bucket: FakeLedger): Promise<{
+  env: { PHOTOS_BUCKET: FakeLedger };
+  cookie: string;
+  csrf: string;
+  password: string;
+}> {
+  await createAdmin(bucket, {
+    version: 1,
+    passwordHash: await hashPassword(ADMIN_PASSWORD),
+    recoveryEmailVerified: false,
+    recoveryPhoneVerified: false,
+    createdAt: '2026-10-28T12:00:00.000Z',
+    updatedAt: '2026-10-28T12:00:00.000Z',
+  });
+  const { token, session } = await createSession(bucket, {});
+  return {
+    env: { PHOTOS_BUCKET: bucket },
+    cookie: `${ADMIN_COOKIE}=${token}`,
+    csrf: session.csrf,
+    password: ADMIN_PASSWORD,
+  };
+}
+
+function authedRequest(url: string, access: Awaited<ReturnType<typeof adminAccess>>, body?: unknown): Request {
+  return new Request(url, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: {
+      Cookie: access.cookie,
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json', 'X-CSRF-Token': access.csrf }),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+}
 
 function record(overrides: Partial<GiftCertificateRecord> = {}): GiftCertificateRecord {
   return {
@@ -73,44 +117,181 @@ test('over-redemption and duplicate full redemption are rejected', async () => {
   if (!again.ok) assert.equal(again.error, 'inactive');
 });
 
-test('owner admin lookup requires the bearer token and returns the balance', async () => {
+test('owner admin lookup requires an authenticated session and returns the balance', async () => {
   const bucket = new FakeLedger();
   await issueGiftCertificate(bucket, record());
-  const request = (auth?: string) =>
-    new Request('https://example.test/api/gift-admin?code=SSGC-ABCD-2345', {
-      headers: auth ? { Authorization: auth } : {},
-    });
+  const access = await adminAccess(bucket);
 
-  const denied = await adminGet({ request: request(), env: { PHOTOS_BUCKET: bucket, GIFT_OWNER_TOKEN: 'secret' } } as never);
+  const denied = await adminGet({
+    request: new Request('https://example.test/api/gift-admin?code=SSGC-ABCD-2345'),
+    env: access.env,
+  } as never);
   assert.equal(denied.status, 401);
 
   const allowed = await adminGet({
-    request: request('Bearer secret'),
-    env: { PHOTOS_BUCKET: bucket, GIFT_OWNER_TOKEN: 'secret' } as never,
+    request: authedRequest('https://example.test/api/gift-admin?code=SSGC-ABCD-2345', access),
+    env: access.env,
   } as never);
   assert.equal(allowed.status, 200);
   const payload = (await allowed.json()) as { certificate?: { remainingCents?: number } };
   assert.equal(payload.certificate?.remainingCents, 10000);
 });
 
+test('photo or booking bearer tokens cannot perform gift financial actions', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const response = await adminGet({
+    request: new Request('https://example.test/api/gift-admin?code=SSGC-ABCD-2345', {
+      headers: { Authorization: 'Bearer photo-only-token' },
+    }),
+    env: {
+      PHOTOS_BUCKET: bucket,
+      PHOTO_OWNER_TOKEN: 'photo-only-token',
+      GIFT_OWNER_TOKEN: 'legacy-token',
+    } as never,
+  } as never);
+  assert.equal(response.status, 401);
+});
+
+test('owner gift summary distinguishes issued, redeemed and outstanding value', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  await issueGiftCertificate(
+    bucket,
+    record({ code: 'SSGC-WXYZ-6789', valueCents: 5000, stripeEventId: 'evt_test_2' }),
+  );
+  await redeemGiftCertificate(bucket, 'SSGC-ABCD-2345', 2500, '', 'JOB-1');
+  const access = await adminAccess(bucket);
+  const response = await adminGet({
+    request: authedRequest('https://example.test/api/gift-admin?summary=1', access),
+    env: access.env,
+  } as never);
+  assert.equal(response.status, 200);
+  const payload = (await response.json()) as {
+    summary?: {
+      issuedCount: number;
+      activeCount: number;
+      totalOriginalCents: number;
+      totalRedeemedCents: number;
+      totalOutstandingCents: number;
+    };
+  };
+  assert.equal(payload.summary?.issuedCount, 2);
+  assert.equal(payload.summary?.activeCount, 2);
+  assert.equal(payload.summary?.totalOriginalCents, 15000);
+  assert.equal(payload.summary?.totalRedeemedCents, 2500);
+  assert.equal(payload.summary?.totalOutstandingCents, 12500);
+});
+
 test('owner redemption writes a durable financial record', async () => {
   const bucket = new FakeLedger();
   await issueGiftCertificate(bucket, record());
-  const request = new Request('https://example.test/api/gift-admin', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer secret', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      code: 'SSGC-ABCD-2345',
-      amountCents: 3000,
-      note: 'Applied to invoice 1001',
-      reference: 'INV-1001',
-    }),
+  const access = await adminAccess(bucket);
+  const request = authedRequest('https://example.test/api/gift-admin', access, {
+    code: 'SSGC-ABCD-2345',
+    password: access.password,
+    amountCents: 3000,
+    note: 'Applied to invoice 1001',
+    reference: 'INV-1001',
   });
-  const response = await adminPost({
-    request,
-    env: { PHOTOS_BUCKET: bucket, GIFT_OWNER_TOKEN: 'secret' } as never,
-  } as never);
+  const response = await adminPost({ request, env: access.env } as never);
   assert.equal(response.status, 200);
   const stored = await lookupGiftCertificate(bucket, 'SSGC-ABCD-2345');
   assert.equal(stored?.redeemedCents, 3000);
+});
+
+test('an unused certificate can be refunded once and the remaining value becomes zero', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const first = await refundGiftCertificate(
+    bucket,
+    'SSGC-ABCD-2345',
+    'Unused within 14 days',
+    'REF-1',
+    're_test_1',
+    new Date('2026-10-28T12:00:00Z'),
+  );
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  assert.equal(first.record.status, 'refunded');
+  assert.equal(remainingCents(first.record), 0);
+  assert.equal(first.record.adjustments?.[0]?.stripeRefundId, 're_test_1');
+  assert.equal(first.record.adjustments?.[0]?.amountCents, 10000);
+  const second = await refundGiftCertificate(bucket, 'SSGC-ABCD-2345', '', '', 're_test_1');
+  assert.equal(second.ok, true);
+  if (second.ok) assert.equal(second.already, true);
+  assert.equal(bucket.puts.filter((key) => key === giftKey('SSGC-ABCD-2345')).length, 2, 'one issue + one refund');
+});
+
+test('a redeemed certificate cannot be refunded or voided', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  await redeemGiftCertificate(bucket, 'SSGC-ABCD-2345', 1000, '', 'JOB-1');
+  const refund = await refundGiftCertificate(bucket, 'SSGC-ABCD-2345', '', '', 're_test_1');
+  assert.equal(refund.ok, false);
+  if (!refund.ok) assert.equal(refund.error, 'redeemed');
+  const voided = await voidGiftCertificate(bucket, 'SSGC-ABCD-2345', '', '');
+  assert.equal(voided.ok, false);
+  if (!voided.ok) assert.equal(voided.error, 'redeemed');
+});
+
+test('a void records the action without changing money and is idempotent', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const first = await voidGiftCertificate(bucket, 'SSGC-ABCD-2345', 'Duplicate code', 'TICKET-1');
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  assert.equal(first.record.status, 'void');
+  assert.equal(first.record.redeemedCents, 0);
+  assert.equal(remainingCents(first.record), 0);
+  assert.equal(first.record.adjustments?.[0]?.kind, 'void');
+  const second = await voidGiftCertificate(bucket, 'SSGC-ABCD-2345', '', '');
+  assert.equal(second.ok, true);
+  if (second.ok) assert.equal(second.already, true);
+});
+
+test('owner refund uses the server refund provider before marking the ledger', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const access = await adminAccess(bucket);
+  let calledWith = '';
+  const response = await adminPost({
+    request: authedRequest('https://example.test/api/gift-admin', access, {
+      action: 'refund',
+      code: 'SSGC-ABCD-2345',
+      password: access.password,
+      note: 'Owner-approved refund',
+      reference: 'REF-1',
+    }),
+    env: {
+      ...access.env,
+      STRIPE_REFUNDER: async (sessionId: string, code: string) => {
+        calledWith = `${sessionId}:${code}`;
+        return { ok: true, refundId: 're_test_1' };
+      },
+    },
+  } as never);
+  assert.equal(response.status, 200);
+  assert.equal(calledWith, 'cs_test_1:SSGC-ABCD-2345');
+  const stored = await lookupGiftCertificate(bucket, 'SSGC-ABCD-2345');
+  assert.equal(stored?.status, 'refunded');
+  assert.equal(stored?.adjustments?.[0]?.stripeRefundId, 're_test_1');
+});
+
+test('owner refund fails closed without Stripe or a server refund provider', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const access = await adminAccess(bucket);
+  const response = await adminPost({
+    request: authedRequest('https://example.test/api/gift-admin', access, {
+      action: 'refund',
+      code: 'SSGC-ABCD-2345',
+      password: access.password,
+    }),
+    env: access.env,
+  } as never);
+  assert.equal(response.status, 503);
+  assert.equal((await response.json() as { error?: string }).error, 'stripe_not_configured');
+  const stored = await lookupGiftCertificate(bucket, 'SSGC-ABCD-2345');
+  assert.equal(stored?.status, 'active');
 });

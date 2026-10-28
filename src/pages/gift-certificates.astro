@@ -164,10 +164,33 @@ const sampleCode = 'SSGC-SAMP-LE42';
             <label for="gift-recipient-name">Recipient's name</label>
             <input class="input" id="gift-recipient-name" name="recipient_name" type="text" required />
           </div>
-          <div class="field">
-            <label for="gift-recipient-email">Recipient's email <span class="text-muted">(optional)</span></label>
+          <div class="field" data-gift-recipient-email-field>
+            <label for="gift-recipient-email">
+              Recipient's email
+              <span class="text-muted" data-gift-recipient-email-note>(optional unless emailing the certificate)</span>
+            </label>
             <input class="input" id="gift-recipient-email" name="recipient_email" type="email" autocomplete="off" />
           </div>
+        </div>
+        <div class="field-row field-row--2">
+          <div class="field">
+            <label for="gift-delivery-method">How should we deliver it?</label>
+            <select class="select" id="gift-delivery-method" name="delivery_method" data-gift-delivery-method>
+              <option value="print">Printable certificate</option>
+              <option value="recipient_email">Email the certificate to the recipient</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="gift-delivery-timing">When?</label>
+            <select class="select" id="gift-delivery-timing" name="delivery_timing" data-gift-delivery-timing>
+              <option value="immediate">Immediately after purchase</option>
+              <option value="scheduled">On a future date</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" data-gift-delivery-date-field hidden>
+          <label for="gift-delivery-date">Recipient delivery date</label>
+          <input class="input" id="gift-delivery-date" name="delivery_date" type="date" data-gift-delivery-date />
         </div>
         <div class="field-row field-row--2">
           <div class="field">
@@ -190,8 +213,10 @@ const sampleCode = 'SSGC-SAMP-LE42';
             </span>
           </div>
           <div class="field">
-            <label for="gift-delivery-date">Delivery date <span class="text-muted">(optional)</span></label>
-            <input class="input" id="gift-delivery-date" name="delivery_date" type="date" />
+            <label for="gift-delivery-note">Delivery note</label>
+            <p class="hint" id="gift-delivery-note" data-gift-delivery-note>
+              The purchaser always receives a confirmation and certificate copy.
+            </p>
           </div>
         </div>
         <div class="field">
@@ -250,8 +275,8 @@ const sampleCode = 'SSGC-SAMP-LE42';
           <p class="eyebrow mb-0">Terms status</p>
           <p class="card__text mt-2">
             Purchased certificates do not expire and carry no post-sale service, dormancy,
-            maintenance or cash-out fee. The owner is still approving the final denomination list,
-            automated delivery and redemption records before public sales open. The full
+            maintenance or cash-out fee. The owner-approved amounts and delivery options are ready
+            for final legal review before public sales open. The full
             <a href="/terms/#gift-certificates">gift certificate terms</a> explain redemption,
             balances and applicable unclaimed-property rules. Nothing on this page limits a
             recipient&rsquo;s statutory rights.
@@ -280,6 +305,7 @@ const sampleCode = 'SSGC-SAMP-LE42';
 <script>
   // The form handler matches the current mode: the request form uses the
   // shared lead handler; the future purchase mode uses the checkout client.
+  import('../scripts/gift-delivery-choice');
   if (document.querySelector('[data-gift-purchase]')) {
     import('../scripts/gift-checkout');
   } else {

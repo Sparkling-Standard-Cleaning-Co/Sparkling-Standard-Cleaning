@@ -52,6 +52,8 @@ const NOINDEX_PAGES = new Set([
   '/thank-you/',
   '/leave-review/index.html',
   '/leave-review/',
+  '/gift-admin/index.html',
+  '/gift-admin/',
   '/gift-certificates/redeem/index.html',
   '/gift-certificates/redeem/',
   '/gift-certificates/success/index.html',

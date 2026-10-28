@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { FakeLedger } from './helpers/payment-fakes.ts';
-import { issueGiftCertificate, type GiftCertificateRecord } from '../src/lib/gift/ledger.ts';
+import { issueGiftCertificate, voidGiftCertificate, type GiftCertificateRecord } from '../src/lib/gift/ledger.ts';
 import { onRequestGet as balanceGet } from '../functions/api/gift-balance.ts';
 
 function record(): GiftCertificateRecord {
@@ -47,4 +47,18 @@ test('unknown and malformed codes do not expose a ledger record', async () => {
     env: { PHOTOS_BUCKET: bucket },
   } as never);
   assert.equal(malformed.status, 400);
+});
+
+test('a void certificate reports zero remaining value without exposing private fields', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, { ...record(), redeemedCents: 0 });
+  await voidGiftCertificate(bucket, 'SSGC-ABCD-2345', 'Owner void', 'TICKET-1');
+  const response = await balanceGet({
+    request: new Request('https://example.test/api/gift-balance?code=SSGC-ABCD-2345'),
+    env: { PHOTOS_BUCKET: bucket },
+  } as never);
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as { remainingCents?: number; status?: string };
+  assert.equal(data.status, 'void');
+  assert.equal(data.remainingCents, 0);
 });

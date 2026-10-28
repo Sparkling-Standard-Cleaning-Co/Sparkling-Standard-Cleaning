@@ -2062,6 +2062,103 @@ div[id] {
   margin: 0;
 }
 
+.auth-card {
+  max-width: 34rem;
+}
+
+.admin-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.admin-header h1,
+.admin-header h2 {
+  margin-bottom: var(--space-2);
+}
+
+.admin-toolbar {
+  margin: var(--space-5) 0;
+}
+
+.admin-filters {
+  display: flex;
+  align-items: end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.admin-filters .field {
+  margin-bottom: 0;
+  min-width: 12rem;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 54rem;
+  font-size: var(--text-sm);
+}
+
+.admin-table th,
+.admin-table td {
+  padding: var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.admin-table th {
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: var(--color-surface-warm);
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.admin-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+@media (max-width: 720px) {
+  .admin-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .gift-redeem-code {
   font-family: 'Courier New', monospace;
   font-size: var(--text-xl);
@@ -3724,6 +3821,33 @@ fieldset.input--invalid {
   border: 1px solid var(--color-rose-200);
   border-radius: var(--radius-lg);
   background: var(--color-cream-50);
+}
+
+.custom-bundle {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-rose-300);
+  border-radius: var(--radius-lg);
+  background: var(--color-rose-50);
+}
+
+.custom-bundle__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--color-rose-800);
+}
+
+.custom-bundle__copy {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.custom-bundle__math {
+  margin: var(--space-3) 0 0;
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-900);
 }
 
 .bundle-offers__title {
