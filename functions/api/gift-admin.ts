@@ -18,8 +18,8 @@ import {
   type GiftCertificateRecord,
   type GiftStorageEnv,
 } from '../../src/lib/gift/ledger.ts';
-import { cancelScheduledGiftDelivery, scheduledDeliveryKey, type ScheduledGiftDelivery } from '../../src/lib/gift/scheduled-delivery.ts';
 import { buildGiftCertificateEmail } from '../../src/lib/gift/delivery.ts';
+import { activationInstantFor, activationDateFor, isGiftActive } from '../../src/lib/gift/activation.ts';
 import { refundStripeGiftPayment, type GiftRefundResult } from '../../src/lib/gift/stripe-refund.ts';
 import { readLedgerJson } from '../../src/lib/payments/ledger.ts';
 import {
@@ -55,8 +55,6 @@ interface GiftSummary {
   totalOutstandingCents: number;
   totalRefundedCents: number;
   totalVoidedCents: number;
-  pendingDeliveries: number;
-  failedDeliveries: number;
   recentRedemptions: Array<{
     code: string;
     at: string;
@@ -120,7 +118,10 @@ function publicRecord(record: GiftCertificateRecord) {
     purchaserName: record.purchaserName,
     purchaserEmail: record.purchaserEmail,
     message: record.message ?? '',
-    deliveryDate: record.deliveryDate ?? '',
+    validFromDate: activationDateFor(record),
+    activatesAt: activationInstantFor(record),
+    activationTimezone: 'America/Chicago',
+    active: isGiftActive(record),
     issuedAt: record.issuedAt,
     stripeSessionId: record.stripeSessionId,
     stripeEventId: record.stripeEventId,
@@ -169,13 +170,6 @@ async function sendGiftEmail(
   }
 }
 
-async function readDelivery(
-  bucket: NonNullable<ReturnType<typeof giftBucket>>,
-  code: string,
-): Promise<ScheduledGiftDelivery | null> {
-  return (await readLedgerJson<ScheduledGiftDelivery>(bucket, scheduledDeliveryKey(code)).catch(() => null))?.value ?? null;
-}
-
 async function allGiftRecords(bucket: NonNullable<ReturnType<typeof giftBucket>>): Promise<GiftCertificateRecord[]> {
   if (!bucket.list) return [];
   const listed = await bucket.list({ prefix: 'gifts/certificates/' });
@@ -196,8 +190,6 @@ async function giftSummary(bucket: NonNullable<ReturnType<typeof giftBucket>>): 
     totalOutstandingCents: 0,
     totalRefundedCents: 0,
     totalVoidedCents: 0,
-    pendingDeliveries: 0,
-    failedDeliveries: 0,
     recentRedemptions: [],
   };
   const records = await allGiftRecords(bucket);
@@ -213,9 +205,6 @@ async function giftSummary(bucket: NonNullable<ReturnType<typeof giftBucket>>): 
     } else if (record.status === 'void') {
       summary.totalVoidedCents += record.valueCents;
     }
-    const delivery = await readDelivery(bucket, record.code);
-    if (delivery?.status === 'pending') summary.pendingDeliveries += 1;
-    if (delivery?.status === 'failed') summary.failedDeliveries += 1;
     for (const redemption of record.history) {
       summary.recentRedemptions.push({ code: record.code, ...redemption });
     }
@@ -230,8 +219,7 @@ async function giftList(
   url: URL,
 ): Promise<{
   items: Array<ReturnType<typeof publicRecord> & {
-    deliveryStatus: string;
-    deliveryDate: string;
+    activationStatus: string;
     lastRedemptionAt: string;
   }>;
   page: number;
@@ -259,11 +247,9 @@ async function giftList(
   const pageRecords = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
   const items = [];
   for (const record of pageRecords) {
-    const delivery = await readDelivery(bucket, record.code);
     items.push({
       ...publicRecord(record),
-      deliveryStatus: delivery?.status ?? 'not_scheduled',
-      deliveryDate: delivery?.deliveryDate ?? record.deliveryDate ?? '',
+      activationStatus: isGiftActive(record) ? 'active' : 'not_yet_active',
       lastRedemptionAt: record.history.at(-1)?.at ?? '',
     });
   }
@@ -347,7 +333,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!result.ok) {
       return json({ ok: false, error: result.error }, adjustmentStatus(result.error));
     }
-    const cancelledDelivery = await cancelScheduledGiftDelivery(bucket, code).catch(() => false);
     await audit(bucket, 'gift.void', {
       success: true,
       ip: requestIp(request),
@@ -357,7 +342,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({
       ok: true,
       already: result.already,
-      cancelledDelivery,
       certificate: publicRecord(result.record),
     });
   }
@@ -376,6 +360,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       recipientName: existing.recipientName,
       purchaserName: existing.purchaserName,
       ...(existing.message ? { message: existing.message } : {}),
+      validFromDate: activationDateFor(existing),
       paidAtIso: existing.issuedAt,
       siteUrl,
       recipient: existing.recipientEmail ? 'recipient' : 'purchaser',
@@ -393,7 +378,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({
       ok: true,
       already: true,
-      cancelledDelivery: await cancelScheduledGiftDelivery(bucket, code).catch(() => false),
       certificate: publicRecord(existing),
     });
   }
@@ -427,7 +411,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     // a fixed idempotency key; the owner must not treat this as complete yet.
     return json({ ok: false, error: 'ledger_update_failed' }, 500);
   }
-  const cancelledDelivery = await cancelScheduledGiftDelivery(bucket, code).catch(() => false);
   await audit(bucket, 'gift.refund', {
     success: true,
     ip: requestIp(request),
@@ -437,7 +420,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   return json({
     ok: true,
     already: result.already,
-    cancelledDelivery,
     refundId: refund.refundId,
     certificate: publicRecord(result.record),
   });

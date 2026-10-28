@@ -3,6 +3,7 @@
  * liability until redeemed, so every value change is recorded and protected
  * by an ETag-guarded update. R2 is used through the existing private bucket.
  */
+import { isGiftActive } from './activation.ts';
 import {
   createLedgerJson,
   readLedgerJson,
@@ -37,7 +38,9 @@ export interface GiftCertificateRecord {
   purchaserEmail: string;
   recipientEmail?: string;
   message?: string;
-  deliveryDate?: string;
+  validFromDate?: string;
+  activatesAt?: string;
+  activationTimezone?: string;
   stripeEventId: string;
   stripeSessionId: string;
   issuedAt: string;
@@ -90,7 +93,7 @@ export async function redeemGiftCertificate(
   now = new Date(),
 ): Promise<
   | { ok: true; record: GiftCertificateRecord; redeemedCents: number }
-  | { ok: false; error: 'not_found' | 'inactive' | 'invalid_amount' | 'insufficient_balance' | 'conflict' }
+  | { ok: false; error: 'not_found' | 'inactive' | 'not_active_yet' | 'invalid_amount' | 'insufficient_balance' | 'conflict' }
 > {
   if (!Number.isInteger(amountCents) || amountCents <= 0) return { ok: false, error: 'invalid_amount' };
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -98,6 +101,7 @@ export async function redeemGiftCertificate(
     if (!stored) return { ok: false, error: 'not_found' };
     const record = stored.value;
     if (record.status !== 'active') return { ok: false, error: 'inactive' };
+    if (!isGiftActive(record, now)) return { ok: false, error: 'not_active_yet' };
     if (amountCents > remainingCents(record)) return { ok: false, error: 'insufficient_balance' };
     const redeemedCents = record.redeemedCents + amountCents;
     const updated: GiftCertificateRecord = {

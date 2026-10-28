@@ -621,7 +621,7 @@ test('estimate checkout: missing Stripe fails closed without charging', async ()
         service_type: 'standard',
         quoted_price: '250',
         terms_accepted: 'yes',
-        terms_version: '2026-10-27.terms.v1',
+        terms_version: '2026-10-28.terms.v2',
       },
       returnPath: '/estimate/residential/',
     }),

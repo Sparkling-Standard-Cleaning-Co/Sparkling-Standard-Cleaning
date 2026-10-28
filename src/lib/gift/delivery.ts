@@ -1,3 +1,4 @@
+import { activationLabel } from './activation.ts';
 import { certificateHtml, formatGiftValue, redeemUrl } from './certificate.ts';
 
 export interface GiftEmailData {
@@ -6,6 +7,7 @@ export interface GiftEmailData {
   recipientName: string;
   purchaserName: string;
   message?: string;
+  validFromDate: string;
   paidAtIso: string;
   siteUrl: string;
   recipient: 'purchaser' | 'recipient';
@@ -28,6 +30,7 @@ export function buildGiftCertificateEmail(data: GiftEmailData): GiftEmail {
     purchaserName: data.purchaserName,
     ...(data.message ? { message: data.message } : {}),
     issuedOn,
+    validFrom: data.validFromDate,
     redeemUrl: url,
     contact: {
       phone: '(850) 426-8479',
@@ -50,6 +53,7 @@ export function buildGiftCertificateEmail(data: GiftEmailData): GiftEmail {
     `Recipient: ${data.recipientName}`,
     `From: ${data.purchaserName}`,
     `Code: ${data.code}`,
+    activationLabel(data.validFromDate),
     `Redeem: ${url}`,
     ...(data.message ? ['', `Message: ${data.message}`] : []),
     '',

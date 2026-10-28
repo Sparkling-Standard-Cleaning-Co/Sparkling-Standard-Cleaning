@@ -164,7 +164,7 @@ function validFacilityInput(engine: 'commercial' | 'church' = 'commercial') {
       organization: engine === 'church' ? 'Synthetic Church' : 'Synthetic Facility',
       phone: '8500000000',
       terms_accepted: 'yes',
-      terms_version: '2026-10-27.terms.v1',
+      terms_version: '2026-10-28.terms.v2',
     },
   };
 }
@@ -214,7 +214,7 @@ function tierBFacilityInput() {
       organization: 'Synthetic Tier B Facility',
       phone: '8500000000',
       terms_accepted: 'yes',
-      terms_version: '2026-10-27.terms.v1',
+      terms_version: '2026-10-28.terms.v2',
     } as Record<string, string>,
   };
 }
@@ -496,7 +496,7 @@ function validResidentialInput(serviceType: 'standard' | 'str_turnover') {
       name: 'Synthetic Customer',
       phone: '8500000000',
       terms_accepted: 'yes',
-      terms_version: '2026-10-27.terms.v1',
+      terms_version: '2026-10-28.terms.v2',
     } as Record<string, string>,
   };
 }

@@ -20,7 +20,7 @@ export const giftCertificateConfig = {
   noPostSaleFees: true,
 
   /** Sales activation still requires legal review and a live test purchase. */
-  termsVersion: '2026-10-27.terms.v1',
+  termsVersion: '2026-10-28.terms.v2',
 
   /**
    * Owner-approved monetary denominations (USD), approved 2026-10-28.
@@ -40,12 +40,14 @@ export const giftCertificateConfig = {
   partialRedemption: true,
   noCashRedemption: true,
 
-  /** Delivery choices offered by the purchase UI. */
+  /** Delivery is immediate; a future valid-from date delays redemption only. */
   deliveryMethods: {
     printable: true,
     recipientEmail: true,
-    scheduled: true,
+    immediate: true,
   },
+  activationTimeZone: 'America/Chicago',
+  activationTime: '00:00',
 
   /**
    * Draft public terms — PROPOSED wording only. Not published as binding

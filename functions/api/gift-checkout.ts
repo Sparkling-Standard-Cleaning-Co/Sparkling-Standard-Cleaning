@@ -15,6 +15,7 @@
 import { giftCertificateConfig } from '../../src/config/gift-certificates.ts';
 import { legalTerms } from '../../src/config/legal.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
+import { centralToday, isValidCalendarDate } from '../../src/lib/gift/activation.ts';
 
 interface Env {
   STRIPE_SECRET_KEY?: string;
@@ -36,11 +37,6 @@ function json(body: unknown, status = 200): Response {
 
 function cleanText(value: unknown, max: number): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
-}
-
-function isIsoDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  return Number.isFinite(Date.parse(`${value}T12:00:00Z`));
 }
 
 function throttled(request: Request): boolean {
@@ -99,26 +95,20 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const recipientName = cleanText(payload.recipientName, MAX_NAME);
   const recipientEmail = normalizeCustomerEmail(payload.recipientEmail);
   const message = cleanText(payload.message, MAX_MESSAGE);
-  const requestedDeliveryDate = cleanText(payload.deliveryDate, 10);
+  const todayCentral = centralToday();
+  const validFromDate = cleanText(payload.validFromDate, 10) || todayCentral;
   const deliveryMethod =
     payload.deliveryMethod === 'recipient_email'
       ? 'recipient_email'
       : payload.deliveryMethod === 'print' || payload.deliveryMethod === undefined
         ? 'print'
         : null;
-  const deliveryTiming =
-    payload.deliveryTiming === 'scheduled'
-      ? 'scheduled'
-      : payload.deliveryTiming === 'immediate' || payload.deliveryTiming === undefined
-        ? 'immediate'
-        : null;
-
-  if (!purchaserName || !deliveryMethod || !deliveryTiming) {
+  if (!purchaserName || !deliveryMethod) {
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
   const purchaserEmailProblem = customerEmailProblem(purchaserEmail);
   if (purchaserEmailProblem) return json({ ok: false, error: purchaserEmailProblem }, 400);
-  const wantsRecipientEmail = deliveryMethod === 'recipient_email' || deliveryTiming === 'scheduled';
+  const wantsRecipientEmail = deliveryMethod === 'recipient_email';
   if (wantsRecipientEmail) {
     const recipientProblem = customerEmailProblem(recipientEmail);
     if (recipientProblem) {
@@ -130,8 +120,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   } else if (recipientEmail && customerEmailProblem(recipientEmail)) {
     return json({ ok: false, error: 'recipient_email_invalid' }, 400);
   }
-  if (deliveryTiming === 'scheduled' && !isIsoDate(requestedDeliveryDate)) {
-    return json({ ok: false, error: 'delivery_date_required' }, 400);
+  if (!isValidCalendarDate(validFromDate) || validFromDate < todayCentral) {
+    return json({ ok: false, error: 'valid_from_date_invalid' }, 400);
   }
   const amount = resolveGiftAmount(payload.denominationUsd, payload.amountUsd);
   if (amount === null) return json({ ok: false, error: 'invalid_amount' }, 400);
@@ -154,10 +144,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('metadata[recipient_name]', recipientName);
   body.set('metadata[purchaser_name]', purchaserName);
   body.set('metadata[delivery_method]', deliveryMethod);
-  body.set('metadata[delivery_timing]', deliveryTiming);
+  body.set('metadata[valid_from_date]', validFromDate);
   if (recipientEmail) body.set('metadata[recipient_email]', recipientEmail);
   if (message) body.set('metadata[gift_message]', message);
-  if (deliveryTiming === 'scheduled') body.set('metadata[delivery_date]', requestedDeliveryDate);
+
 
   try {
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {

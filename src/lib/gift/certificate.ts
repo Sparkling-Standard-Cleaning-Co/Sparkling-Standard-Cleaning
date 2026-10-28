@@ -71,6 +71,8 @@ export interface CertificateData {
   purchaserName?: string;
   message?: string;
   issuedOn: string;
+  /** Human-readable valid-from date, when future-dated. */
+  validFrom?: string;
   redeemUrl: string;
   /** Optional QR data URI (the owner script embeds a real, decodable QR). */
   qrDataUri?: string;
@@ -137,6 +139,7 @@ h1 { text-align: center; font-size: 21px; letter-spacing: .28em; text-transform:
 .message { max-width: 5.6in; margin: 0 auto 26px; text-align: center; font-style: italic;
   font-size: 17px; color: var(--rose-deep); }
 .message::before, .message::after { content: '"'; color: var(--gold); }
+.activation { max-width: 5.6in; margin: 16px auto 0; text-align: center; font-family: 'Nunito Sans', system-ui, sans-serif; font-size: 11px; color: var(--rose-deep); }
 .redeem { max-width: 6in; margin: 0 auto; }
 .redeem h2 { font-family: 'Nunito Sans', system-ui, sans-serif; font-size: 10px; letter-spacing: .22em;
   text-transform: uppercase; color: var(--gold); margin: 0 0 8px; }
@@ -171,6 +174,7 @@ h1 { text-align: center; font-size: 21px; letter-spacing: .28em; text-transform:
       <div class="field"><span class="label">From</span><span class="value-text">${e(data.purchaserName ?? 'A friend')}</span></div>
     </div>
     ${data.message ? `<p class="message">${e(data.message)}</p>` : ''}
+    ${data.validFrom ? `<p class="activation"><strong>Valid beginning ${e(data.validFrom)} at 12:00 AM Central Time.</strong></p>` : ''}
     <div class="redeem">
       <h2>How to redeem</h2>
       <ol>${steps}</ol>

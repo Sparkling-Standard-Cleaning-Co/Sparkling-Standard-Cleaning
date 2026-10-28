@@ -179,18 +179,13 @@ const sampleCode = 'SSGC-SAMP-LE42';
               <option value="print">Printable certificate</option>
               <option value="recipient_email">Email the certificate to the recipient</option>
             </select>
+            <span class="hint">Delivery is immediate after verified payment.</span>
           </div>
           <div class="field">
-            <label for="gift-delivery-timing">When?</label>
-            <select class="select" id="gift-delivery-timing" name="delivery_timing" data-gift-delivery-timing>
-              <option value="immediate">Immediately after purchase</option>
-              <option value="scheduled">On a future date</option>
-            </select>
+            <label for="gift-valid-from">Valid from</label>
+            <input class="input" id="gift-valid-from" name="valid_from_date" type="date" data-gift-valid-from />
+            <span class="hint">Redeemable at 12:00 AM Central Time on this date. Leave blank for today.</span>
           </div>
-        </div>
-        <div class="field" data-gift-delivery-date-field hidden>
-          <label for="gift-delivery-date">Recipient delivery date</label>
-          <input class="input" id="gift-delivery-date" name="delivery_date" type="date" data-gift-delivery-date />
         </div>
         <div class="field-row field-row--2">
           <div class="field">
@@ -280,6 +275,14 @@ const sampleCode = 'SSGC-SAMP-LE42';
             <a href="/terms/#gift-certificates">gift certificate terms</a> explain redemption,
             balances and applicable unclaimed-property rules. Nothing on this page limits a
             recipient&rsquo;s statutory rights.
+          </p>
+        </div>
+        <div class="card">
+          <h3 class="card__title">Can I choose when the certificate becomes valid?</h3>
+          <p class="card__text">
+            Yes. The certificate is delivered immediately after verified payment, and you may choose
+            a future date for it to become redeemable. Redemption opens at 12:00 AM Central Time on
+            that date. A valid-from date does not make the certificate expire later.
           </p>
         </div>
         <div class="card">

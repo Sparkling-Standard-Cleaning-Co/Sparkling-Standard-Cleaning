@@ -88,7 +88,7 @@ test('gift checkout rejects invalid amounts before any provider call', async () 
   try {
     const response = await giftCheckout({
       request: jsonRequest(
-        { purchaserName: 'A', purchaserEmail: 'a@example.com', recipientName: 'B', amountUsd: 5, termsAccepted: true, termsVersion: '2026-10-27.terms.v1' },
+        { purchaserName: 'A', purchaserEmail: 'a@example.com', recipientName: 'B', amountUsd: 5, termsAccepted: true, termsVersion: '2026-10-28.terms.v2' },
         '10.10.0.4',
       ),
       env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
@@ -109,7 +109,7 @@ test('gift checkout requires a valid purchaser email and recipient email for ema
     recipientName: 'Recipient',
     amountUsd: 100,
     termsAccepted: true,
-    termsVersion: '2026-10-27.terms.v1',
+    termsVersion: '2026-10-28.terms.v2',
   };
   try {
     const missing = await giftCheckout({
@@ -140,20 +140,20 @@ test('gift checkout requires a valid purchaser email and recipient email for ema
     assert.equal(recipientMissing.status, 400);
     assert.deepEqual(await recipientMissing.json(), { ok: false, error: 'recipient_email_required' });
 
-    const scheduledNoDate = await giftCheckout({
+    const invalidValidFrom = await giftCheckout({
       request: jsonRequest(
         {
           ...base,
           purchaserEmail: 'buyer@example.com',
           recipientEmail: 'recipient@example.com',
-          deliveryTiming: 'scheduled',
+          validFromDate: 'not-a-date',
         },
         '10.10.0.13',
       ),
       env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
     } as never);
-    assert.equal(scheduledNoDate.status, 400);
-    assert.deepEqual(await scheduledNoDate.json(), { ok: false, error: 'delivery_date_required' });
+    assert.equal(invalidValidFrom.status, 400);
+    assert.deepEqual(await invalidValidFrom.json(), { ok: false, error: 'valid_from_date_invalid' });
   } finally {
     config.enabled = original;
   }

@@ -31,9 +31,8 @@ if (form) {
       recipientName: String(data.get('recipient_name') ?? ''),
       recipientEmail: String(data.get('recipient_email') ?? ''),
       message: String(data.get('gift_message') ?? ''),
-      deliveryDate: String(data.get('delivery_date') ?? ''),
+      validFromDate: String(data.get('valid_from_date') ?? ''),
       deliveryMethod: String(data.get('delivery_method') ?? 'print'),
-      deliveryTiming: String(data.get('delivery_timing') ?? 'immediate'),
       denominationUsd: data.get('denominationUsd') ? Number(data.get('denominationUsd')) : undefined,
       amountUsd: data.get('gift_value') ? Number(data.get('gift_value')) : undefined,
       termsAccepted: data.get('termsAccepted') === 'yes',
@@ -57,9 +56,9 @@ if (form) {
         invalid_amount: 'Please choose a valid gift value and try again.',
         email_required: 'Please enter your email address so we can send your receipt and certificate.',
         email_invalid: 'Please enter a valid email address, such as name@yourdomain.com.',
-        recipient_email_required: 'Please enter the recipient’s email address for email or scheduled delivery.',
+        recipient_email_required: 'Please enter the recipient’s email address for email delivery.',
         recipient_email_invalid: 'Please enter a valid recipient email address, such as name@yourdomain.com.',
-        delivery_date_required: 'Please choose a future delivery date.',
+        valid_from_date_invalid: 'Please choose today or a future valid-from date.',
         rate_limited: 'Too many attempts — please wait a moment and try again.',
       };
       setStatus(

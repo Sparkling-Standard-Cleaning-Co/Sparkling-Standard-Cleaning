@@ -14,9 +14,8 @@ export interface GiftPurchase {
   purchaserEmail: string;
   recipientEmail?: string;
   message?: string;
-  deliveryDate?: string;
+  validFromDate?: string;
   deliveryMethod?: 'print' | 'recipient_email';
-  deliveryTiming?: 'immediate' | 'scheduled';
   paidAtIso: string;
   siteUrl?: string;
 }
@@ -40,9 +39,10 @@ export function buildGiftFulfillment(purchase: GiftPurchase): Record<string, str
   };
   if (purchase.recipientEmail) fields['Recipient email'] = purchase.recipientEmail;
   if (purchase.message) fields['Gift message'] = purchase.message;
-  if (purchase.deliveryDate) fields['Requested delivery date'] = purchase.deliveryDate;
+  if (purchase.validFromDate) {
+    fields['Valid from'] = `${purchase.validFromDate} at 12:00 AM Central Time`;
+  }
   if (purchase.deliveryMethod) fields['Delivery method'] = purchase.deliveryMethod;
-  if (purchase.deliveryTiming) fields['Delivery timing'] = purchase.deliveryTiming;
   fields['Redemption URL'] = redeemUrl(code, purchase.siteUrl);
   fields['Stripe event id'] = purchase.eventId;
   fields['Stripe session id'] = purchase.sessionId;

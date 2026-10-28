@@ -1,5 +1,6 @@
 // GET /api/gift-balance?code=SSGC-XXXX-XXXX — safe balance lookup.
 // Returns only status and value; never recipient/purchaser details.
+import { activationDateFor, activationInstantFor, isGiftActive } from '../../src/lib/gift/activation.ts';
 import {
   giftBucket,
   lookupGiftCertificate,
@@ -46,5 +47,9 @@ export async function onRequestGet(context: { request: Request; env: GiftStorage
     valueCents: record.valueCents,
     redeemedCents: record.redeemedCents,
     remainingCents: remainingCents(record),
+    validFromDate: activationDateFor(record),
+    activatesAt: activationInstantFor(record),
+    activationTimezone: 'America/Chicago',
+    active: isGiftActive(record),
   });
 }

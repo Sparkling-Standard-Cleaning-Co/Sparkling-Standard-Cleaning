@@ -18,7 +18,7 @@ import { verifyStripeSignature } from '../../src/lib/gift/stripe-signature.ts';
 import { buildGiftFulfillment, giftCertificateCodeFor } from '../../src/lib/gift/fulfillment.ts';
 import { giftBucket, issueGiftCertificate, remainingCents } from '../../src/lib/gift/ledger.ts';
 import { buildGiftCertificateEmail } from '../../src/lib/gift/delivery.ts';
-import { createScheduledGiftDelivery, type ScheduledGiftDelivery } from '../../src/lib/gift/scheduled-delivery.ts';
+import { activationInstant, centralToday, isValidCalendarDate } from '../../src/lib/gift/activation.ts';
 import {
   completePaymentEvent,
   failPaymentEvent,
@@ -227,6 +227,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const paidAt = event.created
     ? new Date(event.created * 1000).toISOString()
     : new Date().toISOString();
+  const validFromDate = isValidCalendarDate(metadata.valid_from_date ?? '')
+    ? metadata.valid_from_date!
+    : centralToday(new Date(paidAt));
 
   const seed: Omit<
     PaymentEventRecord,
@@ -249,15 +252,14 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             purchaserEmail: customerEmail,
             ...(metadata.recipient_email ? { recipientEmail: metadata.recipient_email } : {}),
             ...(metadata.gift_message ? { message: metadata.gift_message } : {}),
-            ...(metadata.delivery_date ? { deliveryDate: metadata.delivery_date } : {}),
+            validFromDate,
+            activatesAt: activationInstant(validFromDate),
             ...(metadata.delivery_method === 'recipient_email' || metadata.delivery_method === 'print'
               ? { deliveryMethod: metadata.delivery_method }
               : metadata.recipient_email
                 ? { deliveryMethod: 'recipient_email' as const }
                 : { deliveryMethod: 'print' as const }),
-            ...(metadata.delivery_timing === 'scheduled' || metadata.delivery_timing === 'immediate'
-              ? { deliveryTiming: metadata.delivery_timing }
-              : { deliveryTiming: 'immediate' as const }),
+
           },
         }
       : {}),
@@ -355,7 +357,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       purchaserEmail: seed.gift.purchaserEmail,
       ...(seed.gift.recipientEmail ? { recipientEmail: seed.gift.recipientEmail } : {}),
       ...(seed.gift.message ? { message: seed.gift.message } : {}),
-      ...(seed.gift.deliveryDate ? { deliveryDate: seed.gift.deliveryDate } : {}),
+      validFromDate,
+      activatesAt: activationInstant(validFromDate),
+      activationTimezone: 'America/Chicago',
       stripeEventId: eventId,
       stripeSessionId: session.id ?? '',
       issuedAt: paidAt,
@@ -365,44 +369,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'gift_issue_failed');
     return json({ ok: false, error: 'gift_issue_failed' }, 500);
   }
-  const todayCentral = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Chicago',
-  }).format(new Date());
-  const scheduled =
-    seed.gift.deliveryTiming === 'scheduled' &&
-    Boolean(seed.gift.recipientEmail) &&
-    Boolean(seed.gift.deliveryDate) &&
-    (seed.gift.deliveryDate ?? '') > todayCentral;
-  let scheduledRecord: ScheduledGiftDelivery | null = null;
-  if (scheduled) {
-    try {
-      const created = await createScheduledGiftDelivery(giftLedger, {
-        version: 1,
-        code,
-        valueUsd: seed.gift.valueUsd,
-        recipientName: seed.gift.recipientName,
-        recipientEmail: seed.gift.recipientEmail!,
-        purchaserName: seed.gift.purchaserName,
-        purchaserEmail: seed.gift.purchaserEmail,
-        ...(seed.gift.message ? { message: seed.gift.message } : {}),
-        deliveryDate: seed.gift.deliveryDate!,
-        deliveryMethod: 'recipient_email',
-        deliveryTiming: 'scheduled',
-        paidAtIso: paidAt,
-        stripeEventId: eventId,
-        stripeSessionId: session.id ?? '',
-        status: 'pending',
-        attempts: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      scheduledRecord = created.delivery;
-    } catch {
-      if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'gift_schedule_failed');
-      return json({ ok: false, error: 'gift_schedule_failed' }, 500);
-    }
-  }
-
   const fulfillment = buildGiftFulfillment({
     eventId,
     sessionId: session.id ?? '',
@@ -412,9 +378,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     purchaserEmail: seed.gift.purchaserEmail,
     ...(seed.gift.recipientEmail ? { recipientEmail: seed.gift.recipientEmail } : {}),
     ...(seed.gift.message ? { message: seed.gift.message } : {}),
-    ...(seed.gift.deliveryDate ? { deliveryDate: seed.gift.deliveryDate } : {}),
+    validFromDate,
     ...(seed.gift.deliveryMethod ? { deliveryMethod: seed.gift.deliveryMethod } : {}),
-    ...(seed.gift.deliveryTiming ? { deliveryTiming: seed.gift.deliveryTiming } : {}),
     paidAtIso: paidAt,
     ...(env.PUBLIC_SITE_URL ? { siteUrl: env.PUBLIC_SITE_URL } : {}),
   });
@@ -427,6 +392,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     recipientName: seed.gift.recipientName,
     purchaserName: seed.gift.purchaserName,
     ...(seed.gift.message ? { message: seed.gift.message } : {}),
+    validFromDate,
     paidAtIso: paidAt,
     siteUrl,
     recipient: 'purchaser',
@@ -440,18 +406,14 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     `gift-${eventId}-purchaser`,
   );
   let recipientDelivered = true;
-  if (scheduledRecord) {
-    fulfillment['Scheduled recipient delivery'] = `Pending for ${scheduledRecord.deliveryDate} (owner delivery processor)`;
-  } else if (
-    seed.gift.deliveryMethod === 'recipient_email' &&
-    seed.gift.recipientEmail
-  ) {
+  if (seed.gift.deliveryMethod === 'recipient_email' && seed.gift.recipientEmail) {
     const recipientEmail = buildGiftCertificateEmail({
       code,
       valueUsd: seed.gift.valueUsd,
       recipientName: seed.gift.recipientName,
       purchaserName: seed.gift.purchaserName,
       ...(seed.gift.message ? { message: seed.gift.message } : {}),
+      validFromDate,
       paidAtIso: paidAt,
       siteUrl,
       recipient: 'recipient',
@@ -467,10 +429,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
   fulfillment['Customer delivery'] =
     purchaserDelivered && recipientDelivered
-      ? scheduledRecord
-        ? 'Purchaser confirmed; recipient delivery scheduled'
-        : 'Sent to purchaser' +
-          (seed.gift.deliveryMethod === 'recipient_email' && seed.gift.recipientEmail ? ' and recipient' : '')
+      ? 'Sent to purchaser' +
+        (seed.gift.deliveryMethod === 'recipient_email' && seed.gift.recipientEmail ? ' and recipient' : '')
       : 'FAILED - retry via Stripe or deliver manually';
   if (!purchaserDelivered || !recipientDelivered) {
     if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'customer_delivery_failed');

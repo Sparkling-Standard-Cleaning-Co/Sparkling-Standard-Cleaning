@@ -10,6 +10,7 @@ test('automatic gift delivery contains a code, value, recipient and no-expiry te
     recipientName: 'Synthetic Recipient',
     purchaserName: 'Synthetic Purchaser',
     message: 'Enjoy a beautifully kept home.',
+    validFromDate: '2026-12-25',
     paidAtIso: '2026-10-27T12:00:00.000Z',
     siteUrl: 'https://sparkling-standard.com',
     recipient: 'purchaser',
@@ -19,6 +20,8 @@ test('automatic gift delivery contains a code, value, recipient and no-expiry te
   assert.match(email.html, /\$100/);
   assert.match(email.html, /Synthetic Recipient/);
   assert.match(email.html, /does not expire/i);
+  assert.match(email.html, /Valid beginning 2026-12-25 at 12:00 AM Central Time/i);
+  assert.match(email.text, /2026-12-25/);
   assert.match(email.html, /no post-sale service/i);
   assert.match(email.text, /https:\/\/sparkling-standard\.com\/gift-certificates\/redeem\//);
 });

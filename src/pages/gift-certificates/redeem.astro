@@ -109,6 +109,8 @@ const schema = [
             ok?: boolean;
             remainingCents?: number;
             status?: string;
+            validFromDate?: string;
+            active?: boolean;
             error?: string;
           };
           if (response.ok && data.ok === true && typeof data.remainingCents === 'number') {
@@ -118,7 +120,9 @@ const schema = [
             balance.textContent =
               data.status === 'fully_redeemed'
                 ? 'This certificate has been fully redeemed.'
-                : `Remaining balance: ${dollars}.`;
+                : data.active === false
+                  ? `This certificate is valid beginning ${data.validFromDate ?? ''} at 12:00 AM Central Time. Remaining balance: ${dollars}.`
+                  : `Remaining balance: ${dollars}.`;
           } else if (data.error === 'not_found') {
             balance.textContent = 'We could not find that code yet. If you just purchased it, contact us.'
           } else {

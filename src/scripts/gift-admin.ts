@@ -203,8 +203,7 @@ function renderSummary(data: Record<string, number>): void {
   metric('Redeemed value', money(data.totalRedeemedCents ?? 0));
   metric('Refunded value', money(data.totalRefundedCents ?? 0));
   metric('Voided value', money(data.totalVoidedCents ?? 0));
-  metric('Pending deliveries', String(data.pendingDeliveries ?? 0));
-  metric('Failed deliveries', String(data.failedDeliveries ?? 0));
+
 }
 
 function renderRows(items: Array<Record<string, unknown>>): void {
@@ -227,7 +226,7 @@ function renderRows(items: Array<Record<string, unknown>>): void {
       money(Number(item.remainingCents ?? 0)),
       String(item.purchaserName ?? ''),
       String(item.recipientName ?? ''),
-      String(item.deliveryStatus ?? '').replaceAll('_', ' '),
+      String(item.activationStatus ?? '').replaceAll('_', ' '),
     ];
     for (const value of values) {
       const cell = document.createElement('td');
@@ -306,7 +305,12 @@ function renderDetail(certificate: Record<string, unknown>): void {
     textRow(detailIdentity, 'Recipient email', String(certificate.recipientEmail ?? ''));
     textRow(detailIdentity, 'Gift message', String(certificate.message ?? ''));
     textRow(detailIdentity, 'Issued', String(certificate.issuedAt ?? ''));
-    textRow(detailIdentity, 'Requested delivery', String(certificate.deliveryDate ?? ''));
+    textRow(detailIdentity, 'Valid from', String(certificate.validFromDate ?? ''));
+    textRow(
+      detailIdentity,
+      'Activates',
+      `${String(certificate.validFromDate ?? '')} at 12:00 AM Central Time`,
+    );
   }
   if (detailPayment) {
     textRow(detailPayment, 'Stripe event', String(certificate.stripeEventId ?? ''));
@@ -389,6 +393,7 @@ async function financialAction(action: 'redeem' | 'refund' | 'void' | 'resend'):
         payment_not_found: 'Stripe could not find the original payment. Nothing was recorded.',
         ledger_update_failed: 'Stripe may have refunded the payment, but the ledger update failed. Retry before doing anything else.',
         inactive: 'This certificate is not active.',
+        not_active_yet: 'This certificate cannot be redeemed until 12:00 AM Central Time on its valid-from date.',
         redeemed: 'A certificate with a redemption cannot be refunded or voided here.',
         recipient_email_required: 'No recipient or purchaser email is available.',
         stripe_not_configured: 'Stripe is not configured for this environment.',
