@@ -4,19 +4,20 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-27** (Initiative 6.6 owner audit deployed and live-verified; three add-on bundles live; Pay Now code live but disabled until Stripe runtime secrets are configured; R2/photo intake still enabled).
+Last reviewed: **2026-10-27** (Initiative 6.8 deployed and live-verified; Pay Now live mode enabled; final-only price reveal, transactional terms, expanded scripture and corrected pricing badge live; live calendar booking and gift sales remain disabled).
 
-**Release status:** production serves GitHub `main`; the **Initiative 6.6 code release is live at
-`0b907d4`**, deployed to Cloudflare Pages on 2026-10-27 (deployment
-`26e3b9f8-7665-426f-8687-7f171588c865`; GitHub `validate`, `browser` and Cloudflare checks
-passed). It completes the 13-page owner audit: approved homepage/Community Support/Deep Cleaning/
-Service Area copy, four-column value strip and relocated KJV verses, move-in/out icon, FL/AL state
-restriction with Georgia coming soon, GPS loading and exact address-failure copy, optional facility
-ZIP after a confirmed location, centered facility intros and human-readable drive times. Three
-owner-approved add-on bundles are live. Stripe Pay Now is implemented for exact residential/STR
-and Tier A facility quotes but production reports `enabled:false` until the owner configures the
-Stripe secrets. Custom/range quotes remain reservation-only. Initiative 6.5 at `298c1df`, 6.4 at
-`685031d`, 6.3 at `911b5aa` and earlier releases are historical.
+**Release status:** production serves GitHub `main`; **Initiative 6.8 is live at
+`6e36c95` plus the HEIC test-stability fix `9fe8764`** (Cloudflare Pages deployments
+`2a0d4f21-8eb8-49b0-b298-f086e3c7473b` and `4afab04f-9f97-47b5-bb2c-778aa7b6f745`; GitHub
+`validate`, `browser` and Cloudflare checks passed). It hides prices through every preliminary
+estimator step and reveals the finished estimate with a shared branded animation on the final step;
+installs the owner-supplied two-of-four Competitive Pricing badge; equalizes the homepage service
+cards; expands KJV scripture; requires a server-verified terms acceptance before reservation or
+payment; and publishes the expanded terms/policy research. **Pay Now readiness is live mode with all
+checks true.** Gift certificates remain in request mode and **live calendar booking is not
+connected**; no fake availability is shown. No new cancellation/reassessment fee is active.
+Initiative 6.7 is at `f111014`, 6.6 at `0b907d4`, 6.5 at `298c1df`, 6.4 at `685031d` and
+earlier releases are historical.
 
 **Customer photos are live:** production `/api/photo-upload` reports `enabled:true`; the private R2
 bucket, `PHOTOS_BUCKET` binding and `PHOTO_OWNER_TOKEN` are active. Real JPEG and converted iPhone

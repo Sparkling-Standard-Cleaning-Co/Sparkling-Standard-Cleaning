@@ -1,10 +1,14 @@
 # Verification status
 
-## Verified — 2026-10-27 Initiative 6.8 local release (deployment pending)
+## Verified — 2026-10-27 Initiative 6.8 production deployment
 
 **Audit:** `Aaron ss website audit.docx` (three pages, annotated screenshots).
 **Start baseline:** `820ad19`; the verified 6.7 payment work was integrated first as `f111014`.
 The 6.8 tree was verified locally before its release commit.
+
+**Production:** code `6e36c95` and HEIC test-stability fix `9fe8764`; Cloudflare Pages deployments
+`2a0d4f21-8eb8-49b0-b298-f086e3c7473b` and `4afab04f-9f97-47b5-bb2c-778aa7b6f745`. GitHub
+`validate`, `browser` and Cloudflare checks passed on the final code/test commit.
 
 | Check | Command | Result |
 | --- | --- | --- |
@@ -18,6 +22,18 @@ The 6.8 tree was verified locally before its release commit.
 | Transactional terms | server-enforced | missing/outdated acceptance rejected; current acceptance server-stamped and recorded in private R2 |
 | Payment reliability | preserved | 6.7 verified-only checkout, durable idempotency, webhook claims and cancellation/status pages retained |
 | Live payment / booking / gift sales | **not claimed** | no card charge, no calendar connection, no gift sale activation |
+
+### Production live verification
+
+| Check | Result |
+| --- | --- |
+| Live routes | Homepage, `/terms/`, `/privacy/`, four estimate routes, gift page, payment success and payment canceled all return 200 |
+| Pay Now readiness | `GET /api/estimate-checkout` returns 200 with `enabled:true`, `mode:"live"` and all checks true |
+| Homepage scripture | 1 Peter 4:10 and Proverbs 16:3 render; footer carries Matthew 5:16 |
+| Estimate experience | `data-estimate-reveal`, `est-terms` and no `data-price-preview` in the live residential page |
+| Terms | live page contains the three-business-day continuing-service right and no-expiration gift rule |
+| Gift page | still `Online purchase is not open yet`; no sale is claimed |
+| Payment-canceled page | 200 with `noindex` |
 
 Implemented:
 
