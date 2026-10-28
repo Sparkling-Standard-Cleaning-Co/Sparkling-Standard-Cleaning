@@ -170,10 +170,16 @@ test('converts a real HEIC fixture to a JPEG before upload', async () => {
   const { context, page } = await open('/estimate/commercial/');
   try {
     await advanceCommercialToStep4(page);
+    await page.locator('[data-photo-section]').waitFor({ state: 'visible' });
     await page.locator('[data-photo-input]').setInputFiles(HEIC);
     await page.waitForFunction(() => document.querySelectorAll('[data-photo-grid] img').length === 1, null, {
       timeout: 30_000,
     });
+    await page.waitForFunction(
+      () => /photo-sample\.jpg/.test(document.querySelector('[data-photo-grid]')?.textContent ?? ''),
+      null,
+      { timeout: 10_000 },
+    );
     assert.match(await page.locator('[data-photo-grid]').innerText(), /photo-sample\.jpg/);
     const status = await page.locator('[data-photo-status]').innerText();
     assert.match(status, /attached/);
