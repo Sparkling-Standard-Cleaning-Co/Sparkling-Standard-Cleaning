@@ -130,7 +130,7 @@ ${baseLinks.map((link) => `| ${link.channel} | ${link.placement} | ${linkUrl(lin
 
 ## Pending — prepared, do NOT publish yet (${pendingLinks.length})
 
-These URLs are prepared for when the public profiles exist. Do **not** paste them anywhere yet.
+These URLs are prepared. Do **not** paste one into a profile or post until the owner confirms that specific placement.
 
 | Channel | Placement | Prepared URL (not active) | Why pending |
 | --- | --- | --- | --- |

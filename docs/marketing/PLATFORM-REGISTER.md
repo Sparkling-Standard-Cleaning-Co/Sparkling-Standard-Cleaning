@@ -19,12 +19,14 @@ verification.
 **Tracked-link placements (owner-confirmed 2026-10-03; GBP 2026-10-08):** the owner confirms the
 basic UTM website/bio links have been placed on the eight existing profiles (Facebook, Nextdoor,
 TikTok, Pinterest, Rumble, Gab, Parler, Locals). Their registry entries are therefore **active**
-(`pending: false`). The Google Business Profile is **verified, and its public profile URL and
+(`pending: false`). Instagram, YouTube and X are **owner-confirmed active accounts as of 2026-10-27**,
+but their UTM placement is not confirmed; their links remain prepared (`pending: true`) until the
+owner confirms each placement. The Google Business Profile is **verified, and its public profile URL and
 "Ask for reviews" link are captured** (owner-supplied 2026-10-08), so its four tracked links
 (`gbp_home`, `gbp_estimate`, `gbp_deep_clean`, `gbp_gift_post`) are now also **ready to paste**
-into the live profile. Placements on not-yet-created or unverified platforms (Instagram, YouTube,
-X, Threads, LinkedIn, Alignable, Reddit, Yelp, Bing Places) remain **prepared** and are not
-presented as live. Account existence, tracked-link placement and verification are three separate
+into the live profile. Placements on YouTube, Threads, LinkedIn, Alignable, Reddit, Yelp and Bing Places remain **prepared**
+and are not presented as live. Instagram and X account URLs are live, but their UTM placement is
+not yet owner-confirmed and remains prepared. Account existence, tracked-link placement and verification are three separate
 statuses; this document keeps them distinct.
 
 Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/components/SocialLinks.astro`
@@ -45,9 +47,9 @@ Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/compone
 | Platform | Category | Priority | Status | Public URL | Owner action / notes |
 | --- | --- | --- | --- | --- | --- |
 | Google Business Profile | Local discovery | **1 — local acquisition** | **Verified — profile + review links captured (owner-confirmed 2026-10-08)** | `https://www.google.com/search?kgmid=/g/11zz5t1059&hl=en-US&q=Sparkling+Standard+Cleaning+Co.` | The profile is verified and publicly visible; the exact public profile URL and the "Ask for reviews" link are configured in `business.ts` (review link: `https://g.page/r/CXAcv1Pp7OI2ECE/review`). **Remaining owner action:** paste the four tracked GBP links (`gbp_home`, `gbp_estimate`, `gbp_deep_clean`, `gbp_gift_post`) and run the weekly rhythm (`docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md`, `docs/marketing/LOCAL-AUTHORITY.md`). |
-| Instagram | Primary content | **2 — primary content** | **Verification in progress (owner-confirmed 2026-10-03)** | Not published | The account is undergoing verification. Do **not** mark it verified and do **not** publish an unconfirmed URL; the URL stays PENDING in `business.ts` until the owner supplies the verified profile. Tracked bio link is prepared (`instagram_profile`). Also feeds Threads. |
+| Instagram | Primary content | **2 - primary content** | **Confirmed active (owner-supplied 2026-10-27)** | `https://www.instagram.com/sparkling_standard_cleaning/` | Rendering in Follow Us and `sameAs`. The tracked bio link is **prepared, not placement-confirmed** (`instagram_profile`, `pending: true`). Also feeds Threads. |
 | TikTok | Primary content | **3 — primary content** | **Confirmed (owner-supplied 2026-10-03)** | `https://www.tiktok.com/@sparkling_standard?lang=en` | Account created; tracked bio link placed (owner-confirmed). Vertical detail videos. |
-| YouTube | Primary content | **4 — primary content** | **Deferred (not abandoned) — Google Workspace eligibility** | — | Channel creation is temporarily blocked by new Google Workspace account eligibility. Revisit when eligible; do not purchase or add paid services to work around it. Tracked channel link stays prepared (`youtube_profile`). |
+| YouTube | Primary content | **4 - primary content** | **Confirmed active (owner-supplied 2026-10-27)** | `https://youtube.com/@sparklingstandardcleaning?si=XowTyCK2KJbYnvD9` | Rendering in Follow Us and `sameAs`. Tracked channel link is **prepared, not placement-confirmed** (`youtube_profile`, `pending: true`). |
 | Facebook | Local discovery | Confirmed | **Confirmed** | `https://www.facebook.com/profile.php?id=61595026949584` | Locally relevant posts and selected videos; tracked website link placed (owner-confirmed). |
 | Nextdoor | Local discovery | Confirmed | **Confirmed** | `https://nextdoor.com/page/sparkling-standard-cleaning-co/` | Neighborhood posting is area-limited; local communication rather than every video; tracked website link placed (owner-confirmed). |
 | Pinterest | Adapted distribution | Later | **Confirmed (owner-supplied 2026-10-03)** | `https://www.pinterest.com/SparklingStandard/` | Created; tracked profile link placed (owner-confirmed). Stills/pins from the weekly asset. |
@@ -56,7 +58,7 @@ Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/compone
 | Parler | Adapted distribution | Later | **Confirmed (owner-supplied 2026-10-03)** | `https://app.parler.com/Sparkling-Standard` | Created; tracked profile link placed (owner-confirmed). Adapted reposts. |
 | Locals | Additional distribution / community | Later | **Confirmed (owner-supplied 2026-10-03)** | `https://sparkling-standards.locals.com` | Created; tracked profile link placed (owner-confirmed). Proposed role: a secondary distribution/community channel for the same master content (adapted posts, not a separate production line). |
 | Bing Places | Local discovery | Later | Pending | — | Create/import from Google Business (**GBP is verified**); paste the tracked Bing Places UTM link as the website. |
-| X | Adapted distribution | Later | Pending | — | Profile bio link; reposts of short tips. |
+| X | Adapted distribution | Later | **Confirmed active (owner-supplied 2026-10-27)** | `https://x.com/SparklnStandard` | Rendering in Follow Us and `sameAs`. Tracked bio link is **prepared, not placement-confirmed** (`pending: true`); reposts of short tips. |
 | Threads | Adapted distribution | Later | Pending | — | Tied to the Instagram account; link in bio. |
 | LinkedIn | Professional | Later | Pending | — | Company page; commercial/office outreach. |
 | Alignable | Professional | Later | Pending | — | Local business network profile (business email required). |
@@ -67,8 +69,8 @@ Related: `docs/operations/PLATFORM-STATUS.md` (operational status), `src/compone
 
 Priority note: creating more accounts must not dilute production effort. **Immediate execution
 priority is filming Hayli's founder introduction, producing the first cleaning videos and
-acquiring local recurring customers.** Instagram (verification in progress), TikTok and YouTube
-(deferred) remain the primary content channels; Pinterest, Rumble, Gab, Parler and Locals receive
+acquiring local recurring customers.** Instagram, TikTok and YouTube remain the primary content
+channels; Pinterest, Rumble, Gab, Parler and Locals receive
 adapted reposts of the same master content, and Facebook/Nextdoor receive locally relevant
 communication. The weekly cadence and production plan are unchanged
 (`docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`, `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`).

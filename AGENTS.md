@@ -81,8 +81,8 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   with the private `TRAVEL_ORIGIN` configured in Cloudflare; Web3Forms lead delivery (owner-
   confirmed); Cloudflare Turnstile optional; **GA4 analytics owner-confirmed operational**
   (`GTM-KSQ26HMG` / `G-LG222LQRQ2`; owner reports GTM Version 5, earlier Version 3 receipt of all
-  three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now code deployed but disabled until the owner configures runtime secrets; eight confirmed
-  social profiles rendering (Facebook, Nextdoor, TikTok, Pinterest, Rumble, Gab, Parler, Locals);
+  three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now code deployed but disabled until the owner configures runtime secrets; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
+  YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
 - **Current release:** **Initiative 6.8** is live at `6e36c95` plus the HEIC test-stability fix `9fe8764` (Cloudflare Pages deployments `2a0d4f21-8eb8-49b0-b298-f086e3c7473b` and `4afab04f-9f97-47b5-bb2c-778aa7b6f745`; `validate`, `browser` and Cloudflare checks passed). It implements the three-page owner audit: prices stay hidden through every preliminary estimator step and are revealed at the final stage with a shared branded animation across all four engines; the owner-supplied **two-of-four** Competitive Pricing badge is installed; homepage service cards use one equal-height grid; KJV scripture is expanded through a shared component; and all transactional forms require an unchecked-by-default, server-verified terms acceptance with a private R2 record. The public Terms were expanded with Florida cancellation/gift research, condition/access, payment/refund, damage, safety, recurring, commercial/church, dispute and version rules. Gift certificates remain in **request mode** (sales disabled) because no owner-approved denominations/fulfillment activation were supplied; live calendar booking is **not connected**, so preferred dates remain requests and no fake availability is shown. No new cancellation/reassessment fee is active; owner and Florida counsel approval gates are documented in `docs/legal/TERMS-RESEARCH.md` and `docs/launch/OWNER-INPUT-REQUIRED.md`. No pricing mathematics changed.
 - **Prior Initiative 6.7:** live at `f111014`; checkout readiness now checks key, webhook secret/endpoint, notifier, ledger and mode; verified-only quotes, explicit price-change acceptance, SHA-256 checkout idempotency with R2 session reuse, durable webhook event claims, retryable notifications, safe cancellation/status pages and no duplicate lead on payment retry. Production `/api/estimate-checkout` is live mode with all readiness checks true. No live card charge or Stripe test-mode transaction was performed.
@@ -99,9 +99,8 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
 - **Marketing phase (2026-10-03):** the business is transitioning from development into active
   marketing. **Immediate execution priorities: film Hayli's founder introduction, produce the
   first cleaning videos and acquire local recurring customers.** Two growth engines (audience
-  growth vs. local customer acquisition), priority content platforms (TikTok live; Instagram in
-  verification; YouTube deferred; Google Business Profile verified with its profile + review links
-  captured), the proposed "30 Days. 30 Details." content plan, the 30-day
+  growth vs. local customer acquisition), priority content platforms (Instagram, TikTok and YouTube live; Google Business Profile verified
+  with its profile + review links captured; X active), the proposed "30 Days. 30 Details." content plan, the 30-day
   launch schedule and the owner account checklist are documented under `docs/marketing/`. The
   primary business objective is dependable weekly/biweekly residential customers. The owner's
   pending marketing actions live in `docs/launch/OWNER-INPUT-REQUIRED.md` (M2–M7; M1 — the
@@ -357,8 +356,8 @@ collections are intentionally empty — not errors.
 - **Operational:** production site and deploy pipeline, estimator (GPS + manual + street-level
   pin confirmation for streets the provider only knows by name), MapMap geocode and routing,
   Web3Forms delivery, consent-gated GTM container installation with verified website event
-  generation, SMS, eight confirmed social profiles (Facebook, Nextdoor, TikTok, Pinterest,
-  Rumble, Gab, Parler, Locals), the owner-approved circular logo/favicon kit (2026-10-19),
+  generation, SMS, twelve active social profiles (Google Business Profile, Facebook, Nextdoor,
+  Instagram, TikTok, YouTube, Pinterest, Rumble, Gab, Parler, Locals, X), the owner-approved circular logo/favicon kit (2026-10-19),
   sitemap/robots, quote verification and owner notification. Published hours are **7:00 a.m. –
   7:00 p.m., seven days per week**, sitewide. A new recurring residential maintenance arrangement
   requires a **Deep Cleaning first, without exception**; the estimator requires explicit
@@ -559,17 +558,16 @@ collections are intentionally empty — not errors.
   use the exact supplied URLs, never modify or construct them.
 - **Social profiles + Follow Us icons (2026-10-03; GBP added 2026-10-08):** the owner supplied six
   additional profile
-  URLs (TikTok, Pinterest, Rumble, Gab, Parler, Locals) — eight social profiles render in the
-  Follow Us section (plus the verified Google Business Profile, 2026-10-08) as **logo-only 52px
-  circular buttons** (one tidy row on desktop/tablet, rows capped at four on phones — nine
-  profiles wrap as 4 + 4 + 1 — natural wrapping for future profiles). Platform names are visually
+  URLs (TikTok, Pinterest, Rumble, Gab, Parler, Locals). Instagram, YouTube and X were added
+  2026-10-27, so **twelve profiles render** in the Follow Us section (including the verified Google
+  Business Profile) as **logo-only 52px circular buttons** in four columns (4 + 4 + 4 on phones). Platform names are visually
   hidden but remain each link's explicit accessible name. Icons use official marks, including
   Nextdoor's house-"n" favicon, the official Gab and Parler marks and the official Locals logo
   (`src/components/SocialIcon.astro` documents each source). **The owner confirms the basic
-  tracked UTM links are placed on all eight** (registry entries active). **Instagram is
-  undergoing verification** and **YouTube is deferred** by new Google Workspace account
-  eligibility (not abandoned; no paid workarounds); never render a PENDING platform or publish an
-  unconfirmed URL. Tracked links and the checklist: `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
+  tracked UTM links are placed on the original eight** (registry entries active). Instagram, YouTube
+  and X are **owner-confirmed active accounts (2026-10-27)** and render; their UTM placements remain
+  prepared, not placement-confirmed, until the owner confirms each one. Never render a PENDING
+  platform or publish an unconfirmed URL. Tracked links and the checklist: `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
 - **Circular logo kit (2026-10-19):** the owner replaced the old crest + descriptor + tagline
   lockup with a single circular mark — script "Sparkling" above spaced "STANDARD" inside a gold
   ring with sparkles. `logoSvg()` in `src/config/brand.ts` is the shared artwork; regenerate the
@@ -621,8 +619,7 @@ collections are intentionally empty — not errors.
   programs, appreciation discounts and Founding-10 remain disabled until owner terms are approved.
   Financial review: `docs/launch/PROMOTION-PROPOSALS.md`; regenerate with `npm run promotions:impact`.
 - **Pending owner input:** insurance/bonding/licensing claims,
-  Instagram verification, the deferred
-  YouTube channel (Google Workspace eligibility), Umami website ID, final cancellation
+  Instagram/YouTube/X UTM placement confirmation, Umami website ID, final cancellation
   percentages, marketing-launch approvals (M2–M7; M1 deployed 2026-10-03), the Resend
   customer-email setup (`RESEND_API_KEY` + sender-domain verification, DEPLOYMENT.md section 4a),
   Stripe Pay Now runtime secrets and a test-mode checkout (`STRIPE_SECRET_KEY`,

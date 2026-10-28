@@ -28,8 +28,16 @@ const CONFIRMED = [
     href: 'https://nextdoor.com/page/sparkling-standard-cleaning-co/',
   },
   {
+    label: 'Instagram',
+    href: 'https://www.instagram.com/sparkling_standard_cleaning/',
+  },
+  {
     label: 'TikTok',
     href: 'https://www.tiktok.com/@sparkling_standard?lang=en',
+  },
+  {
+    label: 'YouTube',
+    href: 'https://youtube.com/@sparklingstandardcleaning?si=XowTyCK2KJbYnvD9',
   },
   {
     label: 'Pinterest',
@@ -51,15 +59,16 @@ const CONFIRMED = [
     label: 'Locals',
     href: 'https://sparkling-standards.locals.com',
   },
+  {
+    label: 'X',
+    href: 'https://x.com/SparklnStandard',
+  },
 ];
 
 // Platforms that must NEVER render while business.ts carries PENDING URLs.
 const PENDING_LABELS = [
   'Bing Places',
   'Yelp',
-  'Instagram',
-  'YouTube',
-  'X',
   'Threads',
   'LinkedIn',
   'Alignable',
@@ -123,6 +132,24 @@ test('the footer shows a distinct Follow Us section with only confirmed platform
       assert.doesNotMatch(profile.href, /[?&]utm_/, 'outbound profile URLs never carry UTMs');
     }
 
+    // Structured data carries the same confirmed profile URLs, once each.
+    const ldJson = await page.locator('script[type="application/ld+json"]').allTextContents();
+    const entities = ldJson.flatMap((raw) => {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        return [];
+      }
+    });
+    const localBusiness = entities.find((entry) => entry['@type'] === 'LocalBusiness');
+    assert.ok(localBusiness, 'LocalBusiness structured data renders');
+    const sameAs = localBusiness.sameAs ?? [];
+    assert.equal(sameAs.length, CONFIRMED.length, 'sameAs carries every active social profile');
+    assert.equal(new Set(sameAs).size, sameAs.length, 'sameAs has no duplicates');
+    for (const profile of CONFIRMED) {
+      assert.ok(sameAs.includes(profile.href), `${profile.label} is present in sameAs`);
+    }
     // Logo-only presentation: no visible platform labels, but every link keeps
     // an explicit, descriptive accessible name.
     assert.equal(
@@ -189,18 +216,18 @@ test('the Follow Us section adapts to mobile without horizontal overflow', async
       const box = await links.nth(index).boundingBox();
       assert.ok(box && box.height >= 44, `link ${index} target height ${box?.height}`);
     }
-    // Phones: rows capped at four buttons (nine profiles wrap as 4 + 4 + 1).
+    // Phones: rows capped at four buttons (twelve profiles wrap as 4 + 4 + 4).
     const rows = await links.evaluateAll((nodes) => {
       const tops = nodes.map((node) => Math.round(node.getBoundingClientRect().top));
       return [...new Set(tops)].map((top) => tops.filter((value) => value === top).length);
     });
-    assert.deepEqual(rows, [4, 4, 1], 'icons wrap as four per row');
+    assert.deepEqual(rows, [4, 4, 4], 'icons wrap as four per row');
   } finally {
     await context.close();
   }
 });
 
-test('very narrow phones show nine circular buttons without overflow', async () => {
+test('very narrow phones show twelve circular buttons without overflow', async () => {
   const { context, page } = await open('/', 320, 780);
   try {
     const section = page.locator('[data-social-follow]');

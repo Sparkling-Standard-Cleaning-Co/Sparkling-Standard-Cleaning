@@ -191,7 +191,8 @@ export const business = {
   // Pinterest, Rumble, Gab, Parler and Locals. Google Business Profile is
   // VERIFIED and its public profile URL was supplied by the owner
   // (2026-10-08); use the exact URL — never modify, shorten or reconstruct it.
-  // Instagram, YouTube and every other platform stay PENDING until the owner
+  // Owner-confirmed active 2026-10-27: Instagram, YouTube and X. Use the exact
+  // supplied URLs. The remaining platforms stay PENDING until the owner
   // supplies a real profile URL; the Follow Us section never renders a PENDING
   // platform and never invents a handle. Adding a platform later means editing
   // only this block (the platform register is docs/marketing/PLATFORM-REGISTER.md).
@@ -204,17 +205,17 @@ export const business = {
     facebook: 'https://www.facebook.com/profile.php?id=61595026949584',
     nextdoor: 'https://nextdoor.com/page/sparkling-standard-cleaning-co/',
     yelp: PENDING as Fact<string>,
-    // Visual and video — confirmed 2026-10-03 except Instagram/YouTube
-    instagram: PENDING as Fact<string>,
+    // Visual and video — confirmed 2026-10-03; Instagram/YouTube 2026-10-27
+    instagram: 'https://www.instagram.com/sparkling_standard_cleaning/',
     tiktok: 'https://www.tiktok.com/@sparkling_standard?lang=en',
-    youtube: PENDING as Fact<string>,
+    youtube: 'https://youtube.com/@sparklingstandardcleaning?si=XowTyCK2KJbYnvD9',
     pinterest: 'https://www.pinterest.com/SparklingStandard/',
     rumble: 'https://rumble.com/user/SparklingStandard',
     // Additional social distribution — all confirmed 2026-10-03
     gab: 'https://gab.com/Sparkling_Standard',
     parler: 'https://app.parler.com/Sparkling-Standard',
     locals: 'https://sparkling-standards.locals.com',
-    x: PENDING as Fact<string>,
+    x: 'https://x.com/SparklnStandard',
     threads: PENDING as Fact<string>,
     // Professional networking
     linkedin: PENDING as Fact<string>,

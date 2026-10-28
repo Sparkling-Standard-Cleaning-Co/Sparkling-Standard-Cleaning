@@ -11,9 +11,10 @@ infrastructure and review requests are unblocked (§ Google Business Profile bel
 render in the Follow Us section (Google Business Profile plus the eight below). The owner confirms
 the **basic tracked UTM website/bio links are placed** on the eight social profiles, so their
 registry entries are active (`pending: false`) and their tracked URLs are recorded below.
-**Instagram is undergoing verification** (do not mark verified or publish an unconfirmed URL).
-**YouTube creation is deferred** — temporarily blocked by new Google Workspace account
-eligibility, not abandoned; do not add paid services to work around it.
+**Instagram, YouTube and X are owner-confirmed active accounts as of 2026-10-27.** Their exact URLs
+are configured and rendering. Their tracked UTM website/bio links remain **prepared, not
+placement-confirmed**, until the owner confirms each placement. Account existence and tracked-link
+placement are separate facts.
 
 **Immediate execution priority (owner direction):** film Hayli's founder introduction, produce the
 first cleaning videos and acquire local recurring customers. Account setup is no longer the
@@ -29,9 +30,10 @@ and `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md`. Tracked links: generated
 | Order | Platform | Current status | Role |
 | --- | --- | --- | --- |
 | 1 | Google Business Profile | **Verified (owner-confirmed 2026-10-08)** | Local discovery; reviews; high-intent search |
-| 2 | Instagram | **Verification in progress (2026-10-03) — URL not published** | Primary content channel (Reels) |
+| 2 | Instagram | **Confirmed active (owner-supplied 2026-10-27)** — tracked link placement pending | Primary content channel (Reels) |
 | 3 | TikTok | **Confirmed — account created; tracked bio link placed** | Primary content channel (short-form reach) |
-| 4 | YouTube | **Deferred — Google Workspace account eligibility (not abandoned)** | Primary content channel (Shorts + founder/process long-form) |
+| 4 | YouTube | **Confirmed active (owner-supplied 2026-10-27)** — tracked link placement pending | Primary content channel (Shorts + founder/process long-form) |
+| - | X | **Confirmed active (owner-supplied 2026-10-27)** — tracked link placement pending | Short tips and adapted reposts |
 | — | Facebook | Confirmed — tracked website link placed | Local communication and community visibility |
 | — | Nextdoor | Confirmed — tracked website link placed | Neighborhood credibility and local posts |
 | — | Pinterest, Rumble, Gab, Parler, Locals | **Confirmed — accounts created; tracked links placed (2026-10-03)** | Adapted distribution of the same master content; not a separate production line |
@@ -78,21 +80,18 @@ The profile is **verified and publicly visible**, and its exact public profile U
 - [ ] Reviews: request after every satisfied job using the configured review link
       (`docs/marketing/REVIEW-GROWTH-SYSTEM.md`); never buy, gate or invent reviews.
 
-### Instagram (priority 2 — verification in progress)
+### Instagram (priority 2 — confirmed active, link placement pending)
 
-- [x] Account exists and is undergoing verification (owner-confirmed 2026-10-03).
-- [ ] **Do not mark verified and do not publish a URL** until the owner supplies the verified
-      profile; it stays PENDING in `business.ts` and never renders.
-- [ ] When verification completes: confirm the professional/business account settings, approved
-      crest photo, consistent name, contact facts (no street address) and bio positioning.
-- [ ] Website field: the tracked **Instagram → Bio link** (`instagram_profile`, currently
-      prepared).
-- [ ] Story/link-sticker estimate pushes: tracked **Instagram → estimate** link
-      (`instagram_estimate`).
-- [ ] Content: vertical 9:16 Reels (see the production system); captions on; highlights for real
-      series ("Details", "Founder", "Reviews" only when genuine reviews exist).
-- [ ] Then update `PLATFORM-REGISTER.md` with the real URL and (with owner approval) add it to
-      `business.socials` so it renders on the site.
+- [x] Account is owner-confirmed active (2026-10-27).
+- [x] Exact URL configured and rendering: `https://www.instagram.com/sparkling_standard_cleaning/`.
+- [ ] Confirm the professional/business account settings, approved crest photo, consistent name,
+      contact facts (no street address) and bio positioning.
+- [ ] Website field: place the tracked **Instagram → Bio link** (`instagram_profile`); placement is
+      **not yet owner-confirmed**.
+- [ ] Story/link-sticker estimate pushes: place the tracked **Instagram → estimate** link
+      (`instagram_estimate`); placement is not yet confirmed.
+- [ ] Content: vertical 9:16 Reels; captions on; highlights for real series ("Details", "Founder",
+      "Reviews") only when genuine reviews exist.
 
 ### TikTok (priority 3 — account created; tracked bio link placed)
 
@@ -104,18 +103,19 @@ The profile is **verified and publicly visible**, and its exact public profile U
       link is placed.
 - [ ] Verification: complete whatever email/phone verification the platform requires.
 
-### YouTube (priority 4 — deferred, not abandoned)
+### YouTube (priority 4 — confirmed active, link placement pending)
 
-- [ ] **Deferred:** channel creation is temporarily blocked by new Google Workspace account
-      eligibility. Revisit when eligible; do not purchase or add paid services to work around it.
-- [ ] When unblocked: create the brand channel owned by the business email (not personal);
-      approved crest avatar, consistent name, slogan and service area.
-- [ ] Links section: the tracked **YouTube → channel link** (`youtube_profile`, prepared).
-- [ ] Video descriptions: the tracked **YouTube → detail video** link (`youtube_detail_video`) on
-      marketing uploads; never invent a URL.
+- [x] Channel is owner-confirmed active (2026-10-27).
+- [x] Exact URL configured and rendering: `https://youtube.com/@sparklingstandardcleaning?si=XowTyCK2KJbYnvD9`.
+- [ ] Confirm the approved crest avatar, consistent name, slogan and service area.
+- [ ] Links section: place the tracked **YouTube → channel link** (`youtube_profile`); placement is
+      not yet owner-confirmed.
+- [ ] Video descriptions: place the tracked **YouTube → detail video** link
+      (`youtube_detail_video`) on marketing uploads; placement is not yet confirmed.
 - [ ] Content: vertical Shorts from the master short-form edit; a longer founder/process cut when
       available; 16:9 for long-form.
 - [ ] Never buy subscribers or views.
+
 
 ## Confirmed placements — tracked website links (placed 2026-10-03)
 
@@ -136,9 +136,16 @@ this table as the record when auditing each profile.
 | Locals | Profile → Website | `https://sparkling-standard.com/?utm_source=locals&utm_medium=organic_social&utm_campaign=profile` |
 
 Never add these UTMs to internal site navigation or to the outbound profile links on the website —
-they belong only on the inbound campaign links placed inside the platforms. Instagram and YouTube
-links remain **prepared, not placed**. The four GBP links are now **ready to paste** into the
+they belong only on the inbound campaign links placed inside the platforms. Instagram, YouTube and X links remain **prepared, not placement-confirmed**. The four GBP links are now **ready to paste** into the
 verified profile (owner action).
+
+### X (confirmed active, link placement pending)
+
+- [x] Account is owner-confirmed active (2026-10-27).
+- [x] Exact URL configured and rendering: `https://x.com/SparklnStandard`.
+- [ ] Place the tracked **X → profile** link (`x_profile`); placement is not yet owner-confirmed.
+- [ ] Place `x_recurring` and `x_gift_certificate` links only when posting those campaigns.
+- [ ] Keep posts factual, concise and consistent with the website; no invented claims.
 
 ### Facebook and Nextdoor (confirmed — tracked links placed)
 

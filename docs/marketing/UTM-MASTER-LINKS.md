@@ -32,7 +32,7 @@ Source of truth: `src/config/marketing-links.ts`. Site: https://sparkling-standa
 
 ## Pending — prepared, do NOT publish yet (18)
 
-These URLs are prepared for when the public profiles exist. Do **not** paste them anywhere yet.
+These URLs are prepared. Do **not** paste one into a profile or post until the owner confirms that specific placement.
 
 | Channel | Placement | Prepared URL (not active) | Why pending |
 | --- | --- | --- | --- |

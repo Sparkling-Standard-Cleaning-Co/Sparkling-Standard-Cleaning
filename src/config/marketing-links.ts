@@ -74,8 +74,9 @@ export type MarketingLink = {
    */
   promo?: 'SPARKLE100';
   /**
-   * Prepared but NOT active: the public profile/placement does not exist yet.
-   * Pending links are listed separately and are never presented as ready.
+   * Prepared but NOT active: the owner has not confirmed this specific
+   * placement. A live profile can still have a pending link. Pending links
+   * are listed separately and are never presented as ready.
    */
   pending?: boolean;
 };
