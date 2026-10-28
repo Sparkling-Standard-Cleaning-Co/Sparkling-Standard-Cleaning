@@ -9,18 +9,76 @@ const configured = analyticsConfigured();
 
 {
   configured && (
-    <div class="consent-banner" data-consent-banner data-visible="false" role="region" aria-label="Analytics choice">
-      <p>
-        <strong>Your privacy comes first.</strong> We use privacy-friendly analytics to understand
-        which pages help people — nothing is loaded until you say so, and we never sell data or run
-        ads. You can change your choice anytime on the <a href="/privacy/">privacy page</a>.
-      </p>
-      <div class="consent-banner__actions">
-        <button class="btn btn--primary btn--small" type="button" data-consent="allow">
-          <Icon name="check" size={16} /> Allow analytics
-        </button>
-        <button class="btn btn--ghost btn--small" type="button" data-consent="deny">No thanks</button>
+    <>
+      <div
+        class="consent-banner"
+        data-consent-banner
+        data-visible="false"
+        role="region"
+        aria-label="Privacy choices"
+      >
+        <p>
+          <strong>Your privacy comes first.</strong> We use privacy-friendly analytics to understand
+          which pages help people — nothing is loaded until you say so, and we never sell data or run
+          ads. You can change your choice anytime on the <a href="/privacy/">privacy page</a> or in
+          privacy settings.
+        </p>
+        <div class="consent-banner__actions">
+          <button class="btn btn--primary btn--small" type="button" data-consent="allow">
+            <Icon name="check" size={16} /> Allow analytics
+          </button>
+          <button class="btn btn--ghost btn--small" type="button" data-consent="deny">No thanks</button>
+          <button class="btn btn--ghost btn--small" type="button" data-consent="customize">
+            Customize
+          </button>
+        </div>
       </div>
-    </div>
+
+      <dialog class="consent-settings" data-consent-settings aria-labelledby="consent-settings-title">
+        <form method="dialog" data-consent-settings-form>
+          <h2 id="consent-settings-title">Privacy settings</h2>
+          <p class="small text-muted">
+            Essential storage is required for forms, checkout and security. Optional categories are
+            off unless you turn them on.
+          </p>
+          <div class="consent-settings__row">
+            <label>
+              <input type="checkbox" checked disabled />
+              <span><strong>Essential</strong> — forms, checkout, security and your saved choices.</span>
+            </label>
+          </div>
+          <div class="consent-settings__row">
+            <label>
+              <input type="checkbox" data-consent-analytics />
+              <span><strong>Analytics</strong> — consent-gated page and conversion measurement.</span>
+            </label>
+          </div>
+          <div class="consent-settings__row">
+            <label>
+              <input type="checkbox" disabled />
+              <span><strong>Advertising</strong> — not active. No ad tags, pixels or remarketing run.</span>
+            </label>
+          </div>
+          <div class="consent-settings__row">
+            <label>
+              <input type="checkbox" disabled />
+              <span
+                ><strong>Partner referrals</strong> — not active. No customer data is shared with
+                referral businesses.</span
+              >
+            </label>
+          </div>
+          <div class="consent-banner__actions">
+            <button class="btn btn--primary btn--small" type="button" data-consent-save>
+              Save choices
+            </button>
+            <button class="btn btn--ghost btn--small" type="button" data-consent="deny">
+              Turn optional off
+            </button>
+            <button class="btn btn--ghost btn--small" type="button" data-consent-close>Close</button>
+          </div>
+        </form>
+      </dialog>
+    </>
   )
 }

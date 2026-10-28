@@ -185,6 +185,27 @@ test('no Google script loads and no event fires before an analytics choice', asy
   }
 });
 
+test('customize keeps optional analytics off until the visitor saves it', async () => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  try {
+    await mockApis(page);
+    await page.goto(BASE + '/', { waitUntil: 'load' });
+    await page.waitForSelector('[data-consent-banner][data-visible="true"]', { timeout: 15000 });
+    await page.click('[data-consent="customize"]');
+    await page.waitForSelector('[data-consent-settings][open]', { timeout: 5000 });
+    assert.equal(await page.locator('script[src*="googletagmanager.com"]').count(), 0);
+    assert.equal(await page.locator('[data-consent-analytics]').isChecked(), false);
+    assert.equal(await page.locator('[data-consent-analytics]').isDisabled(), false);
+    assert.equal(await page.locator('[data-consent-settings] input[disabled]').count(), 3, 'essential, ads and partner are not optional');
+    await page.click('[data-consent-save]');
+    await page.waitForFunction(() => window.pccConsent?.granted() === false);
+    assert.equal(await page.locator('script[src*="googletagmanager.com"]').count(), 0);
+  } finally {
+    await context.close();
+  }
+});
+
 test('phone and text intent events fire only after consent', async () => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();

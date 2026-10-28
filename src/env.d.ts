@@ -33,6 +33,7 @@ interface Window {
     choice(): boolean | null;
     allow(): void;
     deny(): void;
+    openSettings(): void;
   };
   /** GTM data layer (only used after analytics consent). */
   dataLayer?: unknown[];

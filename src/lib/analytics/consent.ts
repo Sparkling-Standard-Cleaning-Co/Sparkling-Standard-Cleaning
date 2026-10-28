@@ -17,7 +17,9 @@ export interface StoredConsent {
   analytics: boolean;
   /** Advertising consent is always false on this site. */
   ads: false;
-  v: 1;
+  /** Partner-referral data sharing is always false; no transfer is active. */
+  partner: false;
+  v: 2;
 }
 
 export function readConsent(): StoredConsent | null {
@@ -26,7 +28,7 @@ export function readConsent(): StoredConsent | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<StoredConsent>;
     if (typeof parsed.analytics !== 'boolean') return null;
-    return { analytics: parsed.analytics, ads: false, v: 1 };
+    return { analytics: parsed.analytics, ads: false, partner: false, v: 2 };
   } catch {
     return null;
   }
@@ -34,7 +36,10 @@ export function readConsent(): StoredConsent | null {
 
 export function writeConsent(analytics: boolean): void {
   try {
-    window.localStorage.setItem(CONSENT_KEY, JSON.stringify({ analytics: !!analytics, ads: false, v: 1 }));
+    window.localStorage.setItem(
+      CONSENT_KEY,
+      JSON.stringify({ analytics: !!analytics, ads: false, partner: false, v: 2 }),
+    );
   } catch {
     // In-memory state still applies for this visit.
   }

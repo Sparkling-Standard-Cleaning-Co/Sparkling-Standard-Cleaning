@@ -110,10 +110,16 @@ function firePendingReceipt(): void {
   }
 }
 
+function closeSettings(): void {
+  const dialog = document.querySelector<HTMLDialogElement>('[data-consent-settings]');
+  if (dialog?.open) dialog.close();
+}
+
 function allow(): void {
   granted = true;
   writeConsent(true);
   document.querySelector('[data-consent-banner]')?.setAttribute('data-visible', 'false');
+  closeSettings();
   if (GTM_ID) {
     window.gtag = gtag;
     gtag('consent', 'update', { analytics_storage: 'granted' });
@@ -127,6 +133,7 @@ function deny(): void {
   granted = false;
   writeConsent(false);
   document.querySelector('[data-consent-banner]')?.setAttribute('data-visible', 'false');
+  closeSettings();
   if (GTM_ID) {
     window.gtag = gtag;
     // Consent Mode withdrawal: GA4 (configured inside the GTM container)
@@ -141,11 +148,19 @@ function deny(): void {
   }
 }
 
+function openSettings(): void {
+  const dialog = document.querySelector<HTMLDialogElement>('[data-consent-settings]');
+  const checkbox = document.querySelector<HTMLInputElement>('[data-consent-analytics]');
+  if (checkbox) checkbox.checked = readConsent()?.analytics === true;
+  if (dialog && !dialog.open) dialog.showModal();
+}
+
 window.pccConsent = {
   granted: () => granted,
   choice: () => readConsent()?.analytics ?? null,
   allow,
   deny,
+  openSettings,
 };
 
 function boot(): void {
@@ -157,6 +172,28 @@ function boot(): void {
 
   const banner = document.querySelector<HTMLElement>('[data-consent-banner]');
   const stored = readConsent();
+
+  // Bind the controls even when a choice is already stored, so the privacy
+  // page can reopen settings without clearing storage.
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-consent="allow"]')) {
+    button.addEventListener('click', () => {
+      const checkbox = document.querySelector<HTMLInputElement>('[data-consent-analytics]');
+      if (checkbox) checkbox.checked = true;
+      allow();
+    });
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-consent="deny"]')) {
+    button.addEventListener('click', deny);
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-consent="customize"]')) {
+    button.addEventListener('click', openSettings);
+  }
+  document.querySelector('[data-consent-save]')?.addEventListener('click', () => {
+    const checkbox = document.querySelector<HTMLInputElement>('[data-consent-analytics]');
+    if (checkbox?.checked) allow();
+    else deny();
+  });
+  document.querySelector('[data-consent-close]')?.addEventListener('click', closeSettings);
 
   if (stored?.analytics === true) {
     allow();
@@ -170,8 +207,6 @@ function boot(): void {
   }
 
   banner?.setAttribute('data-visible', 'true');
-  banner?.querySelector('[data-consent="allow"]')?.addEventListener('click', allow);
-  banner?.querySelector('[data-consent="deny"]')?.addEventListener('click', deny);
 }
 
 if (document.readyState === 'loading') {

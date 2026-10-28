@@ -58,6 +58,7 @@ interface ConsentWindow extends Window {
     choice(): boolean | null;
     allow(): void;
     deny(): void;
+    openSettings(): void;
   };
   dataLayer?: unknown[];
   umami?: { track(name: string, data?: Record<string, unknown>): void };

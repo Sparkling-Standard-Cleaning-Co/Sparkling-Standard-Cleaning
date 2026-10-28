@@ -156,14 +156,34 @@ const hasEmail = !isPending(business.email);
           }
           <p>
             <strong>Advertising:</strong> this site runs no advertising and grants no advertising
-            consent. If you refuse analytics, nothing is collected — and if you allow it later,
-            events from before your permission are never replayed.
+            consent. No ad pixels, remarketing tags or advertising storage are active. If you refuse
+            analytics, nothing is collected — and if you allow it later, events from before your
+            permission are never replayed.
           </p>
           <p>
-            <strong>Change your mind anytime:</strong> clear this site's data in your browser (or
-            contact us) and the consent prompt returns. Withdrawal stops further collection
+            <strong>Partner referrals:</strong> not active. We do not sell customer information or
+            share it with referral businesses. If a future referral program is approved, it will
+            require separate explicit consent and will never include private home photos, access
+            instructions or payment information.
+          </p>
+          <p>
+            <strong>Essential storage:</strong> form, checkout, security and consent records are
+            required for the service you request; they are not optional marketing consent.
+          </p>
+          <p>
+            <strong>Change your mind anytime:</strong> open your privacy settings below, clear this
+            site's data in your browser, or contact us. Withdrawal stops further collection
             immediately.
           </p>
+          {
+            analyticsLive && (
+              <p>
+                <button class="btn btn--secondary btn--small" type="button" data-consent="customize">
+                  Open privacy settings
+                </button>
+              </p>
+            )
+          }
         </section>
 
         <section>
