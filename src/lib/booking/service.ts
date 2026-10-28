@@ -86,6 +86,9 @@ export async function availabilityForDate(
     });
   }
   const travelMinutes = async (from: LatLng, to: LatLng): Promise<number | null> => {
+    // A hold/job at the same destination has zero travel; providers may return
+    // a zero-distance route that resolveRoute treats as unverified.
+    if (Math.abs(from.lat - to.lat) < 0.00002 && Math.abs(from.lng - to.lng) < 0.00002) return 0;
     const route = await resolveRoute(env, from, to).catch(() => null);
     if (!route || !route.verified || route.durationMinutes === null) return null;
     return Math.ceil(route.durationMinutes);
