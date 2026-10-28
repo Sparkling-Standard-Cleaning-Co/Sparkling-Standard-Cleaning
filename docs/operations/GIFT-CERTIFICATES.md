@@ -49,7 +49,8 @@ generic failure. The dashboard lists/search/filters/paginates the certificate in
 liability totals, lets Hayli review a record, resend, redeem, refund or void an unused
 certificate, and shows activation status. Backup-email verification and single-use
 recovery links are implemented through Resend. Phone OTP is deliberately not offered until an
-SMS provider is approved, configured and tested; the page does not claim otherwise.
+SMS provider is approved, configured and tested; the page does not claim otherwise. Provider
+research and the security design are in `docs/operations/SMS-RECOVERY-RESEARCH.md`.
 
 **2026-10-28 production PBKDF2 compatibility fix:** Cloudflare Workers WebCrypto raises
 `NotSupportedError` for PBKDF2 above **100,000 iterations**; the previous 210,000-iteration

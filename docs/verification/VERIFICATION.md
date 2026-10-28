@@ -1,5 +1,42 @@
 # Verification status
 
+## Verified - 2026-10-28 scheduling, auth hardening and retention release
+
+**Release:** `7bb91ff` (commits `74fbf05` booking-hold fix and `7bb91ff` security/retention).
+Cloudflare Pages deployment `5529baa6-591b-4501-b40f-8d23f6f273b9`. GitHub run `40783479501`:
+`validate` and `browser` both succeeded; Cloudflare Pages check succeeded.
+
+- **Booking hold defect fixed:** the hold context key included the rotating quote reference. Crossing
+  a minute boundary between slot selection and submission silently cleared the hold, so the request
+  carried no hold. The key now depends only on duration, preferred date and destination; a pure
+  regression test and the browser hold test pass. This was a real defect, not a test flake.
+- **Distributed auth limits:** setup, login (per-IP and account-wide), recovery and reset now use
+  durable conditional-write counters in the ledger instead of per-isolate `Map` state. Identifiers
+  are hashed; raw IPs are not stored. Unit tests cover the window, concurrency, clearing and storage.
+- **Financial page caching:** `public/_headers` sends `Cache-Control: no-store` and
+  `X-Robots-Tag: noindex, nofollow` (plus `nosniff`/`no-referrer`) for `/gift-admin/*`,
+  `/gift-certificates/redeem/*`, and both payment-result pages. Production `/gift-admin/` returned
+  those headers on 2026-10-28.
+- **Photo retention:** `.github/workflows/photo-cleanup.yml` runs daily and calls
+  `POST /api/photo-cleanup?days=30`; it skips until the `PHOTO_OWNER_TOKEN` repository secret is
+  present. An R2 lifecycle rule on `leads/` is documented as the zero-secret alternative. **No
+  scheduled run or lifecycle execution has been observed yet**, so retention execution remains
+  unverified.
+- **Gift concurrency:** a simultaneous-redemption test proves the ETag/CAS path can spend a balance
+  only once.
+- **Owner enrollment:** Hayli reported successful enrollment; production `GET /api/gift-auth`
+  returned `configured:true` on 2026-10-28. Backup-email delivery, verification and live recovery
+  are still owner tests.
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **624 tests: 623 passed, 1 pre-existing print-output skip, 0 failed** |
+| Browser regression | **156 passed, 0 failed** |
+| Type check / build / validation | passed; 2,055 internal links |
+| Production route | `/gift-admin/` 200 with no-store/noindex headers |
+| Scheduled retention | prepared; not yet activated or observed |
+| SMS recovery | research only; no provider purchased or integrated |
+
 ## Verified - 2026-10-28 gift activation and gift-admin enrollment fix
 
 **Release:** `2e30e6c` (commits `f381b8c` gift-admin PBKDF2 fix and `2e30e6c` immediate gift

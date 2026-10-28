@@ -200,8 +200,9 @@ weekly operations; the strategy system above is the reference behind it.
 **Start here:** `README.md`, this hub, `docs/operations/PLATFORM-STATUS.md`,
 `docs/operations/AUTOMATION-REGISTER.md`.
 
-**Launch & operations:** `docs/launch/OWNER-INPUT-REQUIRED.md`,
-`docs/launch/PRICING-PROPOSAL.md`, `docs/launch/REVENUE-READINESS-PLAN.md`,
+**Launch & operations:** `docs/launch/LAUNCH-READINESS.md` (evidence-backed status checklist),
+`docs/launch/OWNER-INPUT-REQUIRED.md`, `docs/launch/PRICING-PROPOSAL.md`,
+`docs/launch/REVENUE-READINESS-PLAN.md`, `docs/operations/SMS-RECOVERY-RESEARCH.md`,
 `docs/operations/ESTIMATOR-CALIBRATION.md`, `docs/operations/FACILITY-CALIBRATION.md`,
 `docs/operations/ESTIMATOR-LOCATION-ENGINE.md`, `docs/operations/OWNER-SETTINGS-GUIDE.md`,
 `docs/operations/SEARCH-CONSOLE-SETUP.md`,
