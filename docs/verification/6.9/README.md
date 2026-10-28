@@ -54,7 +54,7 @@ Sales remain disabled. No real Stripe test-mode purchase, delivery or redemption
 ## Verification
 
 - `npm run check`: 173 files, 0 errors.
-- `npm test`: 573 tests, 572 passed, 1 pre-existing skip, 0 failed.
+- `npm test`: 574 tests, 573 passed, 1 pre-existing skip, 0 failed.
 - `npm run test:browser`: 151 passed, 0 failed.
 - Focused Pay Now/booking/gift browser tests pass with mocked providers.
 

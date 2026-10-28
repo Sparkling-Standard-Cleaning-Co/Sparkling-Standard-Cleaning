@@ -2,7 +2,7 @@
 
 ## Verified — 2026-10-28 Google Calendar booking activation
 
-**Code:** `1228140`; Cloudflare Pages deployment `c84e974f-5e11-4ed3-9e4c-a723e29f58fd`.
+**Code:** `fcbbd98`; Cloudflare Pages deployment `6afb9c46-d22b-47cc-b8e9-620127a5154e`. Durable pending requests now survive hold expiry; a submitted appointment remains non-guaranteed until owner confirmation.
 GitHub `validate`, `browser` and Cloudflare checks passed.
 
 - All five production secrets are present (presence-only probe; no values exposed).
@@ -26,7 +26,7 @@ real jobs with full addresses before availability reflects live work.
 
 | Check | Result |
 | --- | --- |
-| Unit suite | **573 tests: 572 passed, 1 pre-existing skip, 0 failed** |
+| Unit suite | **574 tests: 573 passed, 1 pre-existing skip, 0 failed** |
 | Browser regression | **151 passed, 0 failed** |
 | Type check / build / validation / smoke | passed |
 | Production booking status | enabled true; all five secrets present; connected; eventReadOk true |
