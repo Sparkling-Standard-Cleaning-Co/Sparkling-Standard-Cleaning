@@ -6,6 +6,12 @@ availability/holds have been verified. Booking remains `owner_approval`; auto-co
 No Sunshine Climate Solutions calendar or credentials are used. The owner still needs to add real
 jobs with full addresses and run one owner-confirmation/event-creation test.
 
+**Pending requests:** a temporary hold lasts 20 minutes, but a submitted reservation remains a durable
+**pending owner-review request** after the hold expires. Pending requests are non-guaranteed and do
+not block capacity. Owner confirmation uses the request ID, revalidates availability and detects a
+previously created Sparkling calendar event before writing another. If the slot was taken, the owner
+must offer an alternative; it is never silently confirmed.
+
 ## 1. Create the dedicated calendar
 
 Use the Sparkling Standard Google Workspace account (not Sunshine Climate Solutions).

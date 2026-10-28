@@ -177,7 +177,7 @@ export function initBookingPicker(
       }).format(new Date(data.expiresAt));
       if (holdNote) {
         holdNote.hidden = false;
-        holdNote.textContent = `Temporary hold until ${expires} Central. This is not a confirmed appointment; Sparkling Standard will confirm it personally.`;
+        holdNote.textContent = `Temporary hold until ${expires} Central. This is not a confirmed appointment. After it expires, your submitted request remains pending owner review, but the time may be offered to another customer; Sparkling Standard will confirm the appointment or offer an alternative.`;
       }
       setStatus('Time held temporarily. Send your request to keep the confirmation process moving.', 'success');
     } catch {

@@ -19,7 +19,7 @@ GitHub `validate`, `browser` and Cloudflare checks passed.
 Current settings are active: one crew, 8:00 a.m.–6:00 p.m. Central, seven days, 24-hour notice,
 15-minute buffers, 20-minute holds, `owner_approval`, `autoConfirmAllowed:false`.
 
-**Not yet live-tested:** owner confirmation and Google Calendar event creation/cancellation. The
+**Pending request fix:** a submitted reservation now becomes a durable pending owner-review request separate from the 20-minute hold; it remains after hold expiry, does not block capacity, and confirmation revalidates the slot plus checks for an existing Sparkling event.\n\n**Not yet live-tested:** owner confirmation and Google Calendar event creation/cancellation. The
 endpoint requires the private `BOOKING_OWNER_TOKEN`, which engineering cannot read; the flow is
 covered by mocked integration tests. The calendar currently has zero jobs, so the owner must add
 real jobs with full addresses before availability reflects live work.

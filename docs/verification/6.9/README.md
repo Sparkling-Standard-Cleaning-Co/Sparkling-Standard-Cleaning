@@ -36,7 +36,7 @@ Live verification: production availability returned real slots (9:00 AM–4:00 P
 desktop/mobile picker rendered live slots without overflow. The owner confirmation/deletion path is
 covered by mocked integration tests. A live owner-confirmation and Google event creation test was
 not possible because the owner secret token cannot be read by engineering; no test event was left in
-the calendar.
+the calendar. Submitted reservations now create durable pending owner-review requests that survive hold expiry; pending requests are non-guaranteed and do not block capacity. Confirmation revalidates the slot and checks for an existing Sparkling event before creating another.
 
 ## Gift certificates
 

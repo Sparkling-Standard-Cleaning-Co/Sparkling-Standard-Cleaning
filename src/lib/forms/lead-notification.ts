@@ -782,6 +782,8 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
     add('Appointment - Hold expires', formatCentral(text(fields, 'booking_hold_expires_at')), 'booking_hold_expires_at');
     add('Appointment - Hold reference', text(fields, 'booking_hold_reference'), 'booking_hold_reference');
     add('Appointment - Hold id', text(fields, 'booking_hold_id'), 'booking_hold_id');
+    add('Appointment - Request id', text(fields, 'booking_request_id'), 'booking_request_id');
+    add('Appointment - Request status', text(fields, 'booking_request_status'), 'booking_request_status');
   }
 
   // Transactional agreement: server-verified and timestamped before delivery.

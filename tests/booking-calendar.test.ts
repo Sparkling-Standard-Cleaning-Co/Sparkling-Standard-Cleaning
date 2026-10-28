@@ -11,6 +11,7 @@ import { onRequestGet as availabilityGet } from '../functions/api/availability.t
 import { FakeLedger } from './helpers/payment-fakes.ts';
 import { onRequestPost as bookingAdminPost } from '../functions/api/booking-admin.ts';
 import { createBookingHold, getBookingHold, holdKey } from '../src/lib/booking/holds.ts';
+import { createPendingBookingRequest, getPendingBookingRequest } from '../src/lib/booking/requests.ts';
 import { writeLedgerJson } from '../src/lib/payments/ledger.ts';
 
 const env = {
@@ -285,4 +286,62 @@ test('owner cancellation deletes the calendar event and releases the hold', asyn
   );
   assert.equal(deleted, 1);
   assert.equal((await getBookingHold(bucket, created.hold.id))?.status, 'released');
+});
+
+test('an expired hold with a durable pending request can still be owner-confirmed', async () => {
+  const config = bookingConfig as { enabled: boolean };
+  const original = config.enabled;
+  config.enabled = true;
+  try {
+    const bucket = new FakeLedger();
+    const created = await createBookingHold(bucket, {
+      date: '2026-11-10',
+      start: '2026-11-10T15:00:00.000Z',
+      end: '2026-11-10T17:00:00.000Z',
+      durationMinutes: 120,
+      destination: { lat: 30.4111, lng: -87.2164 },
+      locationText: '100 S Baylen St, Pensacola, FL 32502',
+      reference: 'TEST-PENDING',
+    });
+    assert.equal(created.ok, true);
+    if (!created.ok) return;
+    const pending = await createPendingBookingRequest(bucket, created.hold);
+    await writeLedgerJson(bucket, holdKey(created.hold.id), {
+      ...created.hold,
+      expiresAt: new Date(Date.now() - 60_000).toISOString(),
+    });
+
+    let createdEvent = 0;
+    await withFetch(
+      async (url, init) => {
+        if (url.includes('oauth2.googleapis.com/token')) return jsonResponse({ access_token: 'access', expires_in: 3600 });
+        if (url.includes('/calendar/v3/calendars/') && url.includes('/events') && init?.method === 'POST') {
+          createdEvent += 1;
+          return jsonResponse({ id: 'evt-pending-confirmed' });
+        }
+        if (url.includes('/calendar/v3/calendars/') && url.includes('/events')) return jsonResponse({ items: [] });
+        if (url.includes('/calendar/v3/calendars/')) return jsonResponse({ summary: 'Sparkling Standard - Bookings', timeZone: 'America/Chicago' });
+        if (url.includes('api.mapmap.ai/route/v1/')) return jsonResponse({ routes: [{ distance: 16093, duration: 900 }] });
+        throw new Error('unexpected fetch: ' + url);
+      },
+      async () => {
+        const request = new Request('https://example.test/api/booking-admin', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: pending.id, action: 'confirm' }),
+        });
+        const response = await bookingAdminPost({
+          request,
+          env: { ...env, PAYMENT_LEDGER: bucket, BOOKING_OWNER_TOKEN: 'owner' } as never,
+        } as never);
+        assert.equal(response.status, 200);
+      },
+    );
+    assert.equal(createdEvent, 1);
+    const stored = await getPendingBookingRequest(bucket, pending.id);
+    assert.equal(stored?.status, 'confirmed');
+    assert.equal(stored?.calendarEventId, 'evt-pending-confirmed');
+  } finally {
+    config.enabled = original;
+  }
 });

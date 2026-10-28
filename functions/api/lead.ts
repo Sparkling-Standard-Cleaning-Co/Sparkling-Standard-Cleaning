@@ -49,6 +49,9 @@ import {
   type OwnerEmailAttachment,
 } from '../../src/lib/forms/owner-email.ts';
 import { buildPhotoViewUrl } from './photo-auth.ts';
+import { createPendingBookingRequest } from '../../src/lib/booking/requests.ts';
+import type { BookingHold } from '../../src/lib/booking/holds.ts';
+import type { LedgerBucket } from '../../src/lib/payments/ledger.ts';
 
 interface R2ObjectLike {
   arrayBuffer?(): Promise<ArrayBuffer>;
@@ -142,6 +145,8 @@ const SERVER_OWNED_KEYS = new Set([
   'policy_version',
   'terms_acceptance_id',
   'terms_record_status',
+  'booking_request_id',
+  'booking_request_status',
 ]);
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -567,6 +572,18 @@ export async function onRequestPost(context: {
           if (hold.end) clean.booking_slot_end = hold.end;
           if (hold.expiresAt) clean.booking_hold_expires_at = hold.expiresAt;
           if (hold.reference) clean.booking_hold_reference = hold.reference;
+          if (hold.status === 'held' && env.PHOTOS_BUCKET?.put) {
+            try {
+              const request = await createPendingBookingRequest(
+                env.PHOTOS_BUCKET as unknown as LedgerBucket,
+                hold as unknown as BookingHold,
+              );
+              clean.booking_request_id = request.id;
+              clean.booking_request_status = 'pending_owner_review';
+            } catch {
+              clean.booking_request_status = 'pending_request_storage_failed';
+            }
+          }
         }
       }
     }

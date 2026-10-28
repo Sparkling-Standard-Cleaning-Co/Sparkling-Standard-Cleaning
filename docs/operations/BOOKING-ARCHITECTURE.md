@@ -12,6 +12,16 @@ availability and holds are real. Confirmation is owner-approval only (`autoConfi
 a hold is never advertised as confirmed. The calendar currently has no jobs, so real availability
 reflects only the configured working window and travel from the origin until the owner adds jobs.
 
+**Hold vs pending request lifecycle (2026-10-28):** a 20-minute hold protects only the checkout
+window. When the customer submits the lead, the server creates a durable pending booking request
+(`booking/requests/BR-<hold>.json`) linked to the hold, quote and slot. Pending requests are
+**non-guaranteed** and do not block availability. After the hold expires the request remains for
+owner review; confirmation revalidates the calendar/travel slot and fails closed if another customer
+now holds or books it. Customer language states the slot may be released and an alternative may be
+offered. Owner confirmation accepts a request or hold ID, detects an existing calendar event by its
+Sparkling reference before creating another, and cancellation deletes the event and releases both
+records.
+
 **Implemented and active:**
 
 

@@ -234,3 +234,26 @@ export async function deleteCalendarEvent(
     return { ok: false, reason: 'calendar_unavailable' };
   }
 }
+export async function findCalendarEventByReference(
+  env: GoogleCalendarEnv,
+  reference: string,
+): Promise<string | null> {
+  const token = await accessToken(env);
+  if (!token || !reference.trim()) return null;
+  const params = new URLSearchParams({
+    privateExtendedProperty: `sparkling_reference=${reference}`,
+    maxResults: '1',
+    singleEvents: 'true',
+  });
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${calendarPath(env)}/events?${params}`,
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
+    );
+    if (!response.ok) return null;
+    const data = (await response.json().catch(() => ({}))) as { items?: Array<{ id?: string }> };
+    return data.items?.[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
