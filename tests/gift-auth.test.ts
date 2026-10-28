@@ -4,6 +4,10 @@ import assert from 'node:assert/strict';
 import {
   ADMIN_COOKIE,
   ADMIN_KEY,
+  PASSWORD_HASH_ALGORITHM,
+  PASSWORD_ITERATIONS,
+  hashNeedsUpgrade,
+  hashPassword,
   hashToken,
   readAdmin,
   sessionKey,
@@ -93,6 +97,76 @@ async function createConfiguredAdmin(bucket: FakeLedger): Promise<{ cookie: stri
   assert.match(sent, /recovery@example\.test/);
   return { cookie: cookieFrom(response), session: body.session as Record<string, unknown>, emailBody: sent };
 }
+
+test('password hashing stays inside the Cloudflare Workers PBKDF2 ceiling', async () => {
+  const original = crypto.subtle.deriveBits.bind(crypto.subtle);
+  const requested: number[] = [];
+  crypto.subtle.deriveBits = async (algorithm, key, length) => {
+    if (algorithm.name === 'PBKDF2' && algorithm.iterations > 100_000) {
+      throw new DOMException(
+        'Pbkdf2 failed: iteration counts above 100000 are not supported',
+        'NotSupportedError',
+      );
+    }
+    requested.push(algorithm.iterations);
+    return original(algorithm, key, length);
+  };
+  try {
+    const hash = await hashPassword(PASSWORD);
+    assert.deepEqual(requested, [PASSWORD_ITERATIONS]);
+    assert.ok(PASSWORD_ITERATIONS <= 100_000);
+    assert.ok(hash.startsWith(`${PASSWORD_HASH_ALGORITHM}$${PASSWORD_ITERATIONS}$`));
+    assert.equal(await verifyPassword(PASSWORD, hash), true);
+    assert.equal(await verifyPassword('wrong password', hash), false);
+  } finally {
+    crypto.subtle.deriveBits = original;
+  }
+});
+
+test('legacy PBKDF2 hashes remain versioned and distinguishable from current hashes', async () => {
+  const iterations = 210_000;
+  const salt = new Uint8Array(16).fill(7);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(PASSWORD),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    key,
+    256,
+  );
+  const legacy = `${PASSWORD_HASH_ALGORITHM}$${iterations}$${Buffer.from(salt).toString('base64url')}$${Buffer.from(bits).toString('base64url')}`;
+  assert.equal(await verifyPassword(PASSWORD, legacy), true);
+  assert.equal(hashNeedsUpgrade(legacy), true);
+  assert.equal(hashNeedsUpgrade(`${PASSWORD_HASH_ALGORITHM}$${PASSWORD_ITERATIONS}$c2FsdA$aGFzaA`), false);
+});
+
+test('an unsupported password KDF returns a sanitized error and writes no admin', async () => {
+  const bucket = new FakeLedger();
+  const original = crypto.subtle.deriveBits.bind(crypto.subtle);
+  crypto.subtle.deriveBits = async () => {
+    throw new DOMException('Pbkdf2 failed: iteration counts above 100000 are not supported', 'NotSupportedError');
+  };
+  try {
+    const response = await authPost({
+      request: request({
+        action: 'setup',
+        setupCode: SETUP_CODE,
+        password: PASSWORD,
+        recoveryEmail: 'recovery@example.test',
+      }, '198.51.100.12'),
+      env: { PAYMENT_LEDGER: bucket, GIFT_ADMIN_SETUP_CODE: SETUP_CODE },
+    } as never);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { ok: false, error: 'auth_crypto_unavailable' });
+    assert.equal(await readAdmin(bucket), null);
+  } finally {
+    crypto.subtle.deriveBits = original;
+  }
+});
 
 test('first-run setup hashes the password, sets a hardened cookie and never returns the hash', async () => {
   const bucket = new FakeLedger();

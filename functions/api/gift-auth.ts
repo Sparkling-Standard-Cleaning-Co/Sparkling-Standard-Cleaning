@@ -15,6 +15,7 @@ import {
   createSession,
   deleteSession,
   expiredSessionCookie,
+  hashNeedsUpgrade,
   hashPassword,
   invalidateAllSessions,
   passwordProblem,
@@ -105,6 +106,17 @@ function text(value: unknown, max = 300): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
+async function safeHashPassword(password: string): Promise<string | null> {
+  try {
+    return await hashPassword(password);
+  } catch (error) {
+    console.error('[gift-auth] password_hash_failed', {
+      name: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  }
+}
+
 function sessionPublic(session: AdminSession, admin: AdminRecord) {
   return {
     csrf: session.csrf,
@@ -193,10 +205,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const recoveryEmail = normalizeCustomerEmail(payload.recoveryEmail);
     const emailIssue = recoveryEmail ? customerEmailProblem(recoveryEmail) : null;
     if (emailIssue) return json({ ok: false, error: 'recovery_email_invalid' }, 400);
+    const passwordHash = await safeHashPassword(password);
+    if (!passwordHash) return json({ ok: false, error: 'auth_crypto_unavailable' }, 503);
     const now = new Date().toISOString();
     const admin: AdminRecord = {
       version: 1,
-      passwordHash: await hashPassword(password),
+      passwordHash,
       ...(recoveryEmail ? { recoveryEmail } : {}),
       recoveryEmailVerified: false,
       recoveryPhoneVerified: false,
@@ -237,6 +251,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       return json({ ok: false, error: 'invalid_credentials' }, 401);
     }
     clearFailures(ip);
+    if (hashNeedsUpgrade(admin.passwordHash)) {
+      const upgraded = await safeHashPassword(password);
+      if (upgraded) {
+        await writeAdmin(bucket, {
+          ...admin,
+          passwordHash: upgraded,
+          updatedAt: new Date().toISOString(),
+        }).catch(() => undefined);
+      }
+    }
     const { token, session } = await createSession(bucket, { ip, userAgent });
     await audit(bucket, 'admin.login', { success: true, ip, actor: 'hayli' });
     return json(
@@ -281,6 +305,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const password = typeof payload.password === 'string' ? payload.password : '';
     const passwordIssue = passwordProblem(password);
     if (passwordIssue) return json({ ok: false, error: 'weak_password', message: passwordIssue }, 400);
+    const passwordHash = await safeHashPassword(password);
+    if (!passwordHash) return json({ ok: false, error: 'auth_crypto_unavailable' }, 503);
     const challenge = await consumeChallenge(bucket, token, 'reset_password');
     if (!challenge) {
       recordFailure(`reset:${ip}`);
@@ -293,7 +319,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     await writeAdmin(bucket, {
       ...admin,
-      passwordHash: await hashPassword(password),
+      passwordHash,
       updatedAt: new Date().toISOString(),
     });
     await invalidateAllSessions(bucket);

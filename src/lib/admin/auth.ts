@@ -14,7 +14,16 @@ import {
 export const ADMIN_COOKIE = '__Host-ss_admin';
 export const SESSION_TTL_SECONDS = 2 * 60 * 60;
 export const RECOVERY_TTL_SECONDS = 30 * 60;
-export const PASSWORD_ITERATIONS = 210_000;
+/**
+ * Cloudflare Workers WebCrypto rejects PBKDF2 iteration counts above 100,000
+ * with NotSupportedError. Keep the new-hash cost at that runtime ceiling and
+ * document the OWASP gap in docs/operations/GIFT-CERTIFICATES.md. The stored
+ * format carries its own algorithm and cost so existing hashes remain
+ * distinguishable and verifiable where the runtime supports their cost.
+ */
+export const PASSWORD_ITERATIONS = 100_000;
+export const PASSWORD_HASH_ALGORITHM = 'pbkdf2-sha256';
+export const WORKERS_PBKDF2_MAX_ITERATIONS = 100_000;
 export const ADMIN_KEY = 'auth/admin.json';
 const SESSION_PREFIX = 'auth/sessions/';
 const CHALLENGE_PREFIX = 'auth/challenges/';
@@ -108,12 +117,17 @@ export async function hashPassword(password: string): Promise<string> {
     key,
     256,
   );
-  return `pbkdf2-sha256$${PASSWORD_ITERATIONS}$${toBase64Url(salt)}$${toBase64Url(new Uint8Array(bits))}`;
+  return `${PASSWORD_HASH_ALGORITHM}$${PASSWORD_ITERATIONS}$${toBase64Url(salt)}$${toBase64Url(new Uint8Array(bits))}`;
+}
+
+export function hashNeedsUpgrade(stored: string): boolean {
+  const parts = stored.split('$');
+  return parts.length !== 4 || parts[0] !== PASSWORD_HASH_ALGORITHM || Number(parts[1]) !== PASSWORD_ITERATIONS;
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const parts = stored.split('$');
-  if (parts.length !== 4 || parts[0] !== 'pbkdf2-sha256') return false;
+  if (parts.length !== 4 || parts[0] !== PASSWORD_HASH_ALGORITHM) return false;
   const iterations = Number(parts[1]);
   if (!Number.isSafeInteger(iterations) || iterations < 100_000 || iterations > 1_000_000) return false;
   try {
