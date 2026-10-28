@@ -5,7 +5,7 @@
  */
 export const bookingConfig = {
   /** Master switch. Requires a connected calendar and a verified availability probe. */
-  enabled: false,
+  enabled: true,
 
   timeZone: 'America/Chicago',
   timeZoneLabel: 'Central Time',

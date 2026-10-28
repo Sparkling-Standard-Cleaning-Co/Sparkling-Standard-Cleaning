@@ -135,16 +135,23 @@ test('creating a confirmed calendar event sends the exact held interval', async 
   assert.equal((body.extendedProperties as { private?: { sparkling_reference?: string } }).private?.sparkling_reference, 'SS-20261027-ABC123');
 });
 
-test('availability stays off until the owner enables booking and calendar credentials exist', async () => {
-  const request = new Request(
-    `https://example.test/api/availability?date=${futureDate()}&durationMinutes=120&lat=30.4111&lng=-87.2164`,
-  );
-  const disabled = await availabilityGet({ request, env: {} } as never);
-  const disabledData = (await disabled.json()) as { enabled?: boolean; reason?: string; slots?: unknown[] };
-  assert.equal(disabled.status, 200);
-  assert.equal(disabledData.enabled, false);
-  assert.equal(disabledData.reason, 'booking_not_enabled');
-  assert.deepEqual(disabledData.slots, []);
+test('availability stays off until the owner enables booking', async () => {
+  const config = bookingConfig as { enabled: boolean };
+  const original = config.enabled;
+  config.enabled = false;
+  try {
+    const request = new Request(
+      `https://example.test/api/availability?date=${futureDate()}&durationMinutes=120&lat=30.4111&lng=-87.2164`,
+    );
+    const disabled = await availabilityGet({ request, env: {} } as never);
+    const disabledData = (await disabled.json()) as { enabled?: boolean; reason?: string; slots?: unknown[] };
+    assert.equal(disabled.status, 200);
+    assert.equal(disabledData.enabled, false);
+    assert.equal(disabledData.reason, 'booking_not_enabled');
+    assert.deepEqual(disabledData.slots, []);
+  } finally {
+    config.enabled = original;
+  }
 });
 
 test('enabled availability returns real slots and never includes customer details', async () => {
