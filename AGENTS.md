@@ -514,15 +514,18 @@ collections are intentionally empty — not errors.
 - **Five-step estimator (owner priority UX directive, 2026-10-28):** the residential and STR
   journey is exactly **When & Where → Service & Home → Condition & Frequency → Optional Extras →
   Your Estimate** (`src/lib/estimate/steps.ts`, `src/lib/estimate/engines.ts`). Step 1 is a
-  premium appointment calendar (`BookingCalendar.astro`, `booking-calendar.ts`) followed by an
-  always-visible manual address card. There is **no customer map/pin confirmation and no separate
-  address-verification page** for residential; the typed address is resolved in the background,
-  the city/state are parsed from the provider label when needed, and a ZIP fallback preserves an
-  eligible request when exact geocoding fails. Suggestions are strictly FL/AL only server-side
-  (`functions/api/geocode.ts`, `suggestion-ranking.ts`). The selected date/time is provisional;
-  the final step revalidates the real duration against the two-resource scheduler, creates a
-  temporary hold, and offers real alternatives. Facility/commercial/church forms remain their own
-  four-step request flows.
+  premium appointment calendar (`BookingCalendar.astro`, `booking-calendar.ts`) with a compact
+  First Appointment (7:00–8:30 AM) / Afternoon Appointment (12:30–2:30 PM) hour-and-minute picker,
+  followed by an always-visible manual address card. There is **no customer map/pin confirmation
+  and no separate address-verification page** for residential; the typed address is resolved in
+  the background, the city/state are parsed from the provider label when needed, and a ZIP
+  fallback preserves an eligible request when exact geocoding fails. Suggestions are strictly
+  FL/AL only server-side (`functions/api/geocode.ts`, `suggestion-ranking.ts`). Photos are
+  collected in Condition & Frequency; they are required before booking confirmation, but the
+  customer may pay now and confirm later. The Community Support discount is one small eligibility
+  checkbox linked to the Terms. The selected date/time is provisional; the final step revalidates
+  the real duration against the two-resource scheduler, creates a temporary hold, and offers real
+  alternatives. Facility/commercial/church forms remain their own four-step request flows.
 - **Service-driven estimator questionnaire (2026-10-23 finishing pass; current map/quote status through 6.4):** the selected cleaning
   service determines which questions exist — `src/lib/estimate/service-matrix.ts` is the single
   source of truth for service/frequency compatibility: **Residential house cleaning** offers

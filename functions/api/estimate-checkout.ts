@@ -40,6 +40,7 @@ import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.t
 import { legalTerms } from '../../src/config/legal.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
 import { calculateServiceTax, type ServiceTaxResult } from '../../src/lib/tax/engine.ts';
+import type { ReceiptLine } from '../../src/lib/payments/receipt.ts';
 
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   STRIPE_SECRET_KEY?: string;
@@ -77,6 +78,19 @@ interface CheckoutRecord {
   tax?: ServiceTaxResult;
   cleaningAmountCents?: number;
   quotedTotalCents?: number;
+  /** Server-owned line data for the customer receipt. */
+  receipt?: {
+    service: string;
+    serviceLocation: string;
+    customerName?: string;
+    customerEmail: string;
+    lines: ReceiptLine[];
+    subtotalCents: number;
+    taxCents: number;
+    taxRatePercent: number | null;
+    taxJurisdiction: string | null;
+    totalCents: number;
+  };
 }
 
 interface StripeSession {
@@ -101,6 +115,18 @@ interface VerifiedCandidate {
   reference: string;
   serviceType: string;
   tax: ServiceTaxResult;
+  receipt: {
+    service: string;
+    serviceLocation: string;
+    customerName?: string;
+    customerEmail: string;
+    lines: ReceiptLine[];
+    subtotalCents: number;
+    taxCents: number;
+    taxRatePercent: number | null;
+    taxJurisdiction: string | null;
+    totalCents: number;
+  };
   priceChanged: boolean;
 }
 
@@ -174,6 +200,97 @@ function serviceLabel(fields: Record<string, string>): string {
     church_cleaning: 'Church Cleaning',
   };
   return labels[raw] ?? 'Cleaning';
+}
+
+function receiptLocation(fields: Record<string, string>): string {
+  return [fields.service_address, fields.address_city, fields.address_state, fields.zip]
+    .map((part) => (part ?? '').trim())
+    .filter(Boolean)
+    .join(', ');
+}
+
+function sumLines(lines: ReceiptLine[]): number {
+  return lines.reduce((sum, line) => sum + line.amountCents, 0);
+}
+
+function reconcileReceiptLines(lines: ReceiptLine[], expectedCents: number): ReceiptLine[] {
+  const difference = expectedCents - sumLines(lines);
+  if (difference === 0) return lines;
+  return [
+    ...lines,
+    {
+      label: 'Adjustment',
+      amountCents: difference,
+      kind: difference < 0 ? 'discount' : 'charge',
+    },
+  ];
+}
+
+function residentialReceiptLines(
+  verification: QuoteVerification,
+  service: string,
+  totalCents: number,
+): ReceiptLine[] {
+  const breakdown = verification.breakdown;
+  if (!breakdown) {
+    return [{ label: `Cleaning service — ${service}`, amountCents: totalCents, kind: 'charge' }];
+  }
+  const lines: ReceiptLine[] = [
+    {
+      label: `Cleaning service — ${service}`,
+      amountCents: cents(breakdown.basePrice) + cents(breakdown.roundingAdjustment),
+      kind: 'charge',
+    },
+  ];
+  for (const extra of breakdown.selectedExtras) {
+    lines.push({ label: extra.label, amountCents: cents(extra.charge), kind: 'charge' });
+  }
+  if (breakdown.discount && breakdown.discount.amount > 0) {
+    lines.push({
+      label: breakdown.discount.label,
+      amountCents: -cents(breakdown.discount.amount),
+      kind: 'discount',
+    });
+  }
+  if (breakdown.travelAdjustment > 0) {
+    lines.push({
+      label: 'Travel adjustment',
+      amountCents: cents(breakdown.travelAdjustment),
+      kind: 'travel',
+    });
+  }
+  if (breakdown.globalFactor !== 1 && breakdown.globalAdjustment !== 0) {
+    lines.push({
+      label: 'Estimate calibration adjustment',
+      amountCents: cents(breakdown.globalAdjustment),
+      kind: breakdown.globalAdjustment < 0 ? 'discount' : 'charge',
+    });
+  }
+  return reconcileReceiptLines(lines, totalCents);
+}
+
+function facilityReceiptLines(
+  verification: { expectedCleaning: number | null; discountAmount: number | null; discountLabel: string | null },
+  service: string,
+  totalCents: number,
+): ReceiptLine[] {
+  const cleaningAfterDiscount = cents(verification.expectedCleaning ?? 0);
+  const discount = cents(verification.discountAmount ?? 0);
+  const lines: ReceiptLine[] = [
+    {
+      label: `Cleaning service — ${service}`,
+      amountCents: cleaningAfterDiscount + discount,
+      kind: 'charge',
+    },
+  ];
+  if (discount > 0) {
+    lines.push({
+      label: verification.discountLabel ?? 'Discount',
+      amountCents: -discount,
+      kind: 'discount',
+    });
+  }
+  return reconcileReceiptLines(lines, totalCents);
 }
 
 function cents(value: number): number {
@@ -387,6 +504,18 @@ async function verifyFacilityPayment(
     reference,
     serviceType,
     tax,
+    receipt: {
+      service: serviceLabel(fields),
+      serviceLocation: receiptLocation(fields),
+      ...(fields.name?.trim() ? { customerName: fields.name.trim() } : {}),
+      customerEmail: fields.email?.trim() ?? '',
+      lines: facilityReceiptLines(verification, serviceLabel(fields), cleaningAmountCents),
+      subtotalCents: cleaningAmountCents,
+      taxCents: cents(tax.taxAmount ?? 0),
+      taxRatePercent: tax.ratePercent,
+      taxJurisdiction: tax.jurisdictionLabel,
+      totalCents: amountCents,
+    },
     priceChanged:
       needsExplicitAcceptance(quotedCents, cleaningAmountCents) ||
       (quotedTotalCents !== null && needsExplicitAcceptance(quotedTotalCents, amountCents)),
@@ -448,6 +577,18 @@ async function verifyResidentialPayment(
     reference: await residentialReference(verification, fields, amountCents),
     serviceType,
     tax,
+    receipt: {
+      service: serviceLabel(fields),
+      serviceLocation: receiptLocation(fields),
+      ...(fields.name?.trim() ? { customerName: fields.name.trim() } : {}),
+      customerEmail: fields.email?.trim() ?? '',
+      lines: residentialReceiptLines(verification, serviceLabel(fields), cleaningAmountCents),
+      subtotalCents: cleaningAmountCents,
+      taxCents: cents(tax.taxAmount ?? 0),
+      taxRatePercent: tax.ratePercent,
+      taxJurisdiction: tax.jurisdictionLabel,
+      totalCents: amountCents,
+    },
     priceChanged:
       needsExplicitAcceptance(quotedCents, cleaningAmountCents) ||
       (quotedTotalCents !== null && needsExplicitAcceptance(quotedTotalCents, amountCents)),
@@ -648,6 +789,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('metadata[tax_treatment]', candidate.tax.treatment);
   body.set('metadata[tax_rate_percent]', String(candidate.tax.ratePercent ?? ''));
   body.set('metadata[tax_jurisdiction]', candidate.tax.jurisdictionKey ?? '');
+  body.set(
+    'metadata[photos_outstanding]',
+    fields.photos_outstanding === 'yes' ? 'yes' : 'no',
+  );
   body.set('customer_email', email);
 
   try {
@@ -738,6 +883,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         ? Number(session.metadata.tax_rate_percent)
         : null,
     taxJurisdiction: session.metadata?.tax_jurisdiction || null,
+    photosOutstanding: session.metadata?.photos_outstanding === 'yes',
     reference: session.metadata?.quote_reference ?? '',
     serviceType: session.metadata?.service_type ?? '',
     livemode: session.livemode ?? null,

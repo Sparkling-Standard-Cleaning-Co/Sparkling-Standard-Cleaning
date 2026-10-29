@@ -1,5 +1,7 @@
 ---
-// Shared optional customer-photo section for all four estimate engines.
+// Shared customer-photo section for all four estimate engines.
+// Residential photos are required before booking confirmation, but the
+// customer may continue without them and confirm later.
 // Hidden until /api/photo-upload confirms private R2 storage is available.
 import type { PhotoEngine } from '../lib/photos';
 import { PHOTO_CATEGORY_OPTIONS, PHOTO_ENGINE_COPY } from '../lib/photos';
@@ -16,15 +18,19 @@ const options = PHOTO_CATEGORY_OPTIONS[engine];
 
 <section class="photo-upload" data-photo-section aria-labelledby="photo-upload-title" hidden>
   <h3 class="photo-upload__title" id="photo-upload-title" data-photo-title>
-    {copy.title}{engine === 'residential' ? ' (optional)' : ''}
+    {copy.title}
   </h3>
-  <p class="photo-upload__hint" data-photo-hint>{copy.hint}</p>
+  <p class="photo-upload__hint" data-photo-hint>
+    Photos of the areas to be cleaned are required before your booking can be confirmed. Upload
+    them now if you can; you may continue without them, and we will follow up before confirming.
+  </p>
+  <p class="photo-upload__hint">{copy.hint}</p>
   {
     engine === 'residential' && (
       <p class="photo-upload__hint">
-        Photos are recommended but optional. Your estimate assumes the home matches the condition
-        and details you provided. If conditions differ materially, we will discuss any necessary
-        adjustments before additional work. See our <a href="/terms/">Terms and Conditions</a>.
+        Your estimate assumes the home matches the condition and details you provided. If
+        conditions differ materially, we will discuss any necessary adjustments before additional
+        work. See our <a href="/terms/">Terms and Conditions</a>.
       </p>
     )
   }

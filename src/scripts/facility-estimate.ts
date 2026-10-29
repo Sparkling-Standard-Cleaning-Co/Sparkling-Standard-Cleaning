@@ -453,7 +453,6 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
 
   async function advance(): Promise<void> {
     if (currentStep === 1 && finder) {
-      setStatus('info', 'Saving your facility address so we can prepare the most accurate estimate…');
       await finder.verifyAddress();
     }
     const errors = validateStep(currentStep);

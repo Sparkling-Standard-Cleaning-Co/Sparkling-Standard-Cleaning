@@ -105,6 +105,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const nextButton = form.querySelector<HTMLButtonElement>('[data-next]');
   const submitButton = form.querySelector<HTMLButtonElement>('[data-submit]');
   const payNowButton = form.querySelector<HTMLButtonElement>('[data-pay-now]');
+  const photoGate = form.querySelector<HTMLElement>('[data-photo-gate]');
+  const photoGateUpload = form.querySelector<HTMLButtonElement>('[data-photo-upload-now]');
+  const photoGatePayLater = form.querySelector<HTMLButtonElement>('[data-photo-pay-later]');
+  const photoSummary = form.querySelector<HTMLElement>('[data-photo-summary]');
   const verifyAddressButton = form.querySelector<HTMLButtonElement>('[data-verify-address]');
   const paymentNote = form.querySelector<HTMLElement>('[data-payment-note]');
   const paymentUnavailable = form.querySelector<HTMLElement>('[data-payment-unavailable]');
@@ -161,6 +165,45 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const photoController = initPhotoUploads(form, {
     engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
   });
+  let photosDeferred = false;
+
+  function photoStorageAvailable(): boolean {
+    const section = form.querySelector<HTMLElement>('[data-photo-section]');
+    return Boolean(section && !section.hasAttribute('hidden'));
+  }
+
+  function photosOutstanding(): boolean {
+    return photoStorageAvailable() && photoController.photoCount() === 0;
+  }
+
+  function updatePhotoSummary(): void {
+    if (!photoSummary) return;
+    if (!photoStorageAvailable()) {
+      photoSummary.hidden = true;
+      hidePhotoGate();
+      return;
+    }
+    const count = photoController.photoCount();
+    photoSummary.hidden = false;
+    photoSummary.textContent =
+      count > 0
+        ? `${count} photo${count === 1 ? '' : 's'} attached.`
+        : 'Photos are required before your booking can be confirmed. You can upload them now or pay now and confirm later.';
+    if (count > 0) hidePhotoGate();
+  }
+
+  function hidePhotoGate(): void {
+    if (photoGate) photoGate.hidden = true;
+  }
+
+  function showPhotoGate(): void {
+    if (!photoGate) return;
+    photoGate.hidden = false;
+    updatePhotoSummary();
+    photoGate.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    photoGateUpload?.focus();
+  }
+
   let bookingCalendar: BookingCalendarHandle | null = null;
   let bookingFinalizedKey = '';
   let bookingFinalizeNote = '';
@@ -824,6 +867,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       });
     }
     updateAppointmentSummary();
+    updatePhotoSummary();
     reservationSummary.hidden = !hasQuote;
     if (submitButton) {
       submitButton.textContent = requestAlreadySent
@@ -1619,6 +1663,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
     bookingCalendar?.reset();
     bookingFinalizedKey = '';
     bookingFinalizeNote = '';
+    photosDeferred = false;
+    hidePhotoGate();
     clearAllErrors();
     attemptedSteps.clear();
     location = null;
@@ -1790,6 +1836,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
       fields.photo_request_ref = photoController.requestRef;
       fields.photo_count = String(photoController.photoCount());
     }
+    if (photosDeferred) fields.photos_deferred = 'yes';
+    fields.photos_outstanding = photosOutstanding() ? 'yes' : 'no';
     return { ...fields, ...attributionFields() };
   }
 
@@ -2164,10 +2212,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
   // ── Wiring ────────────────────────────────────────────────────────────────
   async function advanceStep(): Promise<void> {
     if (currentStep === 1 && addressFinder) {
-      if (status) {
-        status.dataset.state = 'info';
-        status.textContent = 'Saving your address so we can prepare the most accurate estimate…';
-      }
       await addressFinder.verifyAddress();
       const submission = submissionAddress();
       bookingCalendar?.setContext({
@@ -2224,6 +2268,26 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   payNowButton?.addEventListener('click', () => {
+    if (photosOutstanding()) {
+      showPhotoGate();
+      return;
+    }
+    hidePhotoGate();
+    void handleSubmit(undefined, 'pay_now');
+  });
+
+  photoGateUpload?.addEventListener('click', () => {
+    hidePhotoGate();
+    showStep(3);
+    const section = form.querySelector<HTMLElement>('[data-photo-section]');
+    section?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    form.querySelector<HTMLInputElement>('[data-photo-input]')?.focus();
+  });
+
+  photoGatePayLater?.addEventListener('click', () => {
+    photosDeferred = true;
+    hidePhotoGate();
+    updatePhotoSummary();
     void handleSubmit(undefined, 'pay_now');
   });
 

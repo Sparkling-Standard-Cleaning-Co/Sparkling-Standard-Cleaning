@@ -728,6 +728,25 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   add('Photos - Attached', text(fields, 'photo_count') ? `${text(fields, 'photo_count')} private photo(s)` : '', 'photo_count');
   add('Photos - Attachment note', text(fields, 'photo_note'), 'photo_note');
   add('Photos - Private references', '', 'photo_keys', 'photo_request_ref');
+  add(
+    'Photos - Required before confirmation',
+    text(fields, 'photo_storage') === 'available'
+      ? 'Yes — required before booking confirmation'
+      : 'Photo storage unavailable — follow up with the customer',
+    'photo_storage',
+  );
+  add(
+    'Photos - Outstanding',
+    text(fields, 'photos_outstanding') === 'yes'
+      ? 'YES — do not confirm the booking until photos are received and reviewed'
+      : 'No',
+    'photos_outstanding',
+  );
+  add(
+    'Photos - Customer chose Pay Now, Confirm Later',
+    text(fields, 'photos_deferred') === 'yes' ? 'Yes' : 'No',
+    'photos_deferred',
+  );
 
   // ── E. Requested extras ─────────────────────────────────────────────────
   const addonLabels = text(fields, 'addons');

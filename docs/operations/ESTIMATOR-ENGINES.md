@@ -32,15 +32,30 @@
 wizard is now exactly **five steps** — **When & Where → Service & Home →
 Condition & Frequency → Optional Extras → Your Estimate**. Step 1 presents a
 premium appointment calendar before an always-visible manual address card. The
-customer may type the full address (or use the location button); there is no
+calendar uses a compact First Appointment (7:00–8:30 AM) / Afternoon Appointment
+(12:30–2:30 PM) hour-and-minute picker in 15-minute increments instead of a large
+list of time buttons. The customer may type the full address (or use the
+location button); there is no
 map/pin confirmation or separate address-verification page. Suggestions are
 strictly limited to Florida and Alabama, exact/close resolution happens in the
 background, and a ZIP fallback keeps an eligible request moving. The preferred
 date/time is provisional until the real job duration is known; the final step
 revalidates the slot against the two-resource scheduler, converts it to a
-temporary hold, and offers real alternatives when needed. Commercial/church
-continue to use their dedicated four-step facility request forms and their own
-explicit address verification.
+temporary hold, and offers real alternatives when needed.
+
+**Owner corrections (2026-10-29):** photos are collected in **Condition &
+Frequency** and are required before booking confirmation. The customer may
+continue without them; Pay Now then offers **Upload Photos Now** or **Pay Now,
+Confirm Later**. Payment with photos outstanding is recorded honestly and the
+payment-status page does not claim the booking is confirmed. The former large
+Community Support panel is now one small eligibility checkbox linked to
+`/terms/#community-support`; the discount calculation is unchanged. The
+residential time list is the compact First/Afternoon hour-and-minute picker.
+
+Commercial/church continue to use their dedicated four-step facility request
+forms; their addresses also resolve in the background without a customer
+verification screen, and commercial start times are not restricted to the
+residential 7:00–8:30 / 12:30–2:30 windows.
 
 Initiative 6.0 restructured the customer estimate experience into **four
 specialized engines unified by one system**. This is the authoritative guide to

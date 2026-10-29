@@ -276,6 +276,18 @@ export function buildRequestSummary(fields: Record<string, string>): RequestSumm
   if (photoCount && Number(photoCount) > 0) {
     add('Photos attached', `${photoCount} private photo${Number(photoCount) === 1 ? '' : 's'}`);
   }
+  if (text(fields, 'photos_outstanding') === 'yes') {
+    add(
+      'Photos required',
+      'Photos of the areas to be cleaned are required before booking confirmation. We will follow up for them.',
+    );
+  }
+  if (text(fields, 'photos_deferred') === 'yes') {
+    add(
+      'Booking confirmation',
+      'Pending required photos and owner review. This is not a confirmed appointment yet.',
+    );
+  }
   const taxStatus = text(fields, 'tax_status');
   const taxAmount = text(fields, 'tax_amount');
   const taxRate = text(fields, 'tax_rate');

@@ -75,12 +75,42 @@ const { id = 'estimate-calendar' } = Astro.props;
     <div class="booking-calendar__times-card">
       <p class="booking-calendar__times-eyebrow">Preferred start</p>
       <p class="booking-calendar__selected" data-calendar-selected-label>Select a date first</p>
+
       <div
-        class="booking-calendar__times"
-        data-calendar-times
+        class="booking-calendar__period"
+        data-calendar-period
         role="group"
-        aria-label="Preferred start times"
-      ></div>
+        aria-label="Appointment window"
+        hidden
+      >
+        <button class="booking-calendar__period-btn" type="button" data-period="first">
+          <span class="booking-calendar__period-name">First Appointment</span>
+          <span class="booking-calendar__period-window">7:00–8:30 AM</span>
+        </button>
+        <button class="booking-calendar__period-btn" type="button" data-period="afternoon">
+          <span class="booking-calendar__period-name">Afternoon Appointment</span>
+          <span class="booking-calendar__period-window">12:30–2:30 PM</span>
+        </button>
+      </div>
+
+      <div class="booking-calendar__time-picker" data-calendar-picker hidden>
+        <div class="booking-calendar__time-fields">
+          <label class="booking-calendar__time-field">
+            <span>Hour</span>
+            <select class="select select--small" data-time-hour aria-label="Preferred start hour"></select>
+          </label>
+          <span class="booking-calendar__time-separator" aria-hidden="true">:</span>
+          <label class="booking-calendar__time-field">
+            <span>Minute</span>
+            <select class="select select--small" data-time-minute aria-label="Preferred start minute"></select>
+          </label>
+          <span class="booking-calendar__meridiem" data-time-meridiem>AM</span>
+        </div>
+        <p class="hint booking-calendar__picker-note" data-time-picker-note>
+          Choose a preferred start. We recheck live availability before your booking is confirmed.
+        </p>
+      </div>
+
       <p class="booking-calendar__time-note small" data-calendar-time-note>
         Times are shown in Central Time.
       </p>

@@ -33,6 +33,7 @@ async function load(): Promise<void> {
       paid?: boolean;
       status?: string;
       paymentStatus?: string;
+      photosOutstanding?: boolean;
       reference?: string;
       error?: string;
     };
@@ -47,7 +48,9 @@ async function load(): Promise<void> {
     setReference(data.reference);
     if (data.paid) {
       setState(
-        'Your payment was received. Sparkling Standard will confirm the requested date, scope and final details with you personally before the cleaning is scheduled.',
+        data.photosOutstanding
+          ? 'Your payment was received. Booking confirmation is pending the required photos and owner review. Sparkling Standard will follow up for the photos and confirm the requested date, scope and final details personally.'
+          : 'Your payment was received. Sparkling Standard will confirm the requested date, scope and final details with you personally before the cleaning is scheduled.',
       );
       return;
     }

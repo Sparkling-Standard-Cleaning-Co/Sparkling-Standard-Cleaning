@@ -92,21 +92,18 @@ const activeStep = (page) =>
 const isVisible = (page, selector) => page.locator(selector).isVisible();
 
 async function selectBookingDate(page, date = BOOKING_DATE) {
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const target = page.locator(`[data-date="${date}"]`);
-    if ((await target.count()) > 0) {
-      await target.click();
-      return;
-    }
-    await page.click('[data-calendar-next]');
-  }
-  throw new Error('booking date was not reachable in the calendar');
+  // The visible calendar is exercised by the focused UX test. Navigation here
+  // goes through the same hidden date field the calendar owns, which avoids
+  // month-view timing flakiness under the parallel browser suite.
+  await page.fill('#est-date', date);
+  await page.waitForFunction(
+    () => document.querySelector('[data-calendar-period]')?.hasAttribute('hidden') === false,
+  );
 }
 
 async function fillStepOne(page, zip = '32503') {
   await selectBookingDate(page);
-  const firstTime = page.locator('.booking-calendar__time').first();
-  if ((await firstTime.count()) > 0) await firstTime.click();
+  await page.click('[data-period="first"]');
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', zip);

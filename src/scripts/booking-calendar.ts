@@ -1,17 +1,12 @@
 // Owner-approved premium appointment calendar (2026-10-28).
 //
-// The customer chooses a preferred date and start time before the property
-// details (and therefore the real job duration) are known. This controller:
-//  - renders a branded month calendar with accessible date buttons;
-//  - loads genuine owner-calendar availability when a service address context
-//    is available, using a provisional duration;
-//  - keeps the choice provisional and revalidates it at the final step with
-//    the real duration and destination;
-//  - creates the temporary hold only after revalidation, and offers real
-//    alternatives when the choice is no longer available.
+// Residential/STR rules: the customer first chooses First Appointment
+// (7:00–8:30 AM) or Afternoon Appointment (12:30–2:30 PM), then a compact
+// hour-and-minute start in 15-minute increments. No large list of time buttons.
 //
-// It never invents a confirmed appointment and never presents a fallback
-// preferred window as guaranteed availability.
+// The choice is provisional. The final step revalidates the real duration and
+// destination against the two-resource scheduler, creates the temporary hold,
+// and offers real alternatives when the time is no longer available.
 import { zipReference } from '../config/geography';
 
 export interface BookingContext {
@@ -51,7 +46,6 @@ export interface BookingFinalizeResult {
 export interface BookingCalendarHandle {
   setContext(context: BookingContext): void;
   selection(): BookingCalendarSelection | null;
-  /** Apply an alternative chosen in the final step. */
   selectSlot(start: string, end: string, startLabel: string): void;
   finalize(input: BookingFinalizeInput): Promise<BookingFinalizeResult>;
   reset(): void;
@@ -64,7 +58,13 @@ interface Slot {
   endLabel: string;
 }
 
-const PREFERRED_STARTS = ['07:00', '07:15', '07:30', '07:45', '08:00', '08:15', '08:30'];
+type Period = 'first' | 'afternoon';
+
+const PERIODS: Record<Period, { label: string; startMinutes: number; endMinutes: number }> = {
+  first: { label: 'First Appointment', startMinutes: 7 * 60, endMinutes: 8 * 60 + 30 },
+  afternoon: { label: 'Afternoon Appointment', startMinutes: 12 * 60 + 30, endMinutes: 14 * 60 + 30 },
+};
+
 const PROVISIONAL_DURATION = 120;
 
 function localDateKey(date: Date, timeZone: string): string {
@@ -100,6 +100,24 @@ function shortDateLabel(dateKey: string): string {
   }).format(new Date(Date.UTC(year!, (month ?? 1) - 1, day ?? 1, 12)));
 }
 
+function minutesToLabel(minutes: number): string {
+  const hour24 = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const hour12 = ((hour24 + 11) % 12) + 1;
+  return `${hour12}:${String(minute).padStart(2, '0')} ${hour24 >= 12 ? 'PM' : 'AM'}`;
+}
+
+function periodMinutes(period: Period): number[] {
+  const { startMinutes, endMinutes } = PERIODS[period];
+  const values: number[] = [];
+  for (let minutes = startMinutes; minutes <= endMinutes; minutes += 15) values.push(minutes);
+  return values;
+}
+
+function hour12(hour24: number): number {
+  return ((hour24 + 11) % 12) + 1;
+}
+
 export function initBookingCalendar(
   root: HTMLElement,
   onChange?: (selection: BookingCalendarSelection | null) => void,
@@ -110,7 +128,12 @@ export function initBookingCalendar(
   const monthEl = root.querySelector<HTMLElement>('[data-calendar-month]');
   const prevButton = root.querySelector<HTMLButtonElement>('[data-calendar-prev]');
   const nextButton = root.querySelector<HTMLButtonElement>('[data-calendar-next]');
-  const timesEl = root.querySelector<HTMLElement>('[data-calendar-times]');
+  const periodEl = root.querySelector<HTMLElement>('[data-calendar-period]');
+  const periodButtons = [...root.querySelectorAll<HTMLButtonElement>('[data-period]')];
+  const picker = root.querySelector<HTMLElement>('[data-calendar-picker]');
+  const hourSelect = root.querySelector<HTMLSelectElement>('[data-time-hour]');
+  const minuteSelect = root.querySelector<HTMLSelectElement>('[data-time-minute]');
+  const meridiemEl = root.querySelector<HTMLElement>('[data-time-meridiem]');
   const selectedLabel = root.querySelector<HTMLElement>('[data-calendar-selected-label]');
   const statusEl = root.querySelector<HTMLElement>('[data-calendar-status]');
   const timeNote = root.querySelector<HTMLElement>('[data-calendar-time-note]');
@@ -129,16 +152,15 @@ export function initBookingCalendar(
   let viewMonth = Number(today.slice(5, 7)) - 1;
   let selectedDate = '';
   let selectedTime: BookingCalendarSelection | null = null;
+  let selectedPeriod: Period | null = null;
+  let availableSlots: Slot[] = [];
+  let liveAvailability = false;
   let timesSeq = 0;
 
   function setStatus(message: string, kind: 'info' | 'error' | 'success' = 'info'): void {
     if (!statusEl) return;
     statusEl.textContent = message;
     statusEl.dataset.state = kind;
-  }
-
-  function setTimesNote(message: string): void {
-    if (timeNote) timeNote.textContent = message;
   }
 
   function setInputs(): void {
@@ -162,77 +184,141 @@ export function initBookingCalendar(
     onChange?.(selectedTime);
   }
 
-  function clearTimes(message = 'Select a date to see preferred start times.'): void {
-    if (timesEl) timesEl.innerHTML = '';
-    setStatus(message);
+  function slotForMinutes(minutes: number): Slot | null {
+    const label = minutesToLabel(minutes);
+    return availableSlots.find((slot) => slot.startLabel === label) ?? null;
   }
 
-  function renderTimes(slots: Slot[], live: boolean): void {
-    if (!timesEl) return;
-    timesEl.innerHTML = '';
-    if (slots.length === 0) {
-      clearTimes('No online times are available for this date. Choose another date.');
-      if (selectedLabel) selectedLabel.textContent = shortDateLabel(selectedDate);
+  function timeIsEnabled(minutes: number): boolean {
+    if (!liveAvailability) return true;
+    return Boolean(slotForMinutes(minutes));
+  }
+
+  function setPeriod(period: Period): void {
+    selectedPeriod = period;
+    for (const button of periodButtons) {
+      const pressed = button.dataset.period === period;
+      button.setAttribute('aria-pressed', String(pressed));
+      button.classList.toggle('is-selected', pressed);
+    }
+    populatePicker();
+  }
+
+  function populatePicker(): void {
+    if (!selectedPeriod || !picker || !hourSelect || !minuteSelect) return;
+    const times = periodMinutes(selectedPeriod).filter(timeIsEnabled);
+    if (times.length === 0) {
+      picker.hidden = true;
+      selectedTime = null;
+      if (selectedLabel && selectedDate) selectedLabel.textContent = shortDateLabel(selectedDate);
+      setStatus('No online times are available in that window. Choose another window or date.', 'error');
+      notify();
       return;
     }
-    for (const slot of slots) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'booking-calendar__time';
-      button.dataset.start = slot.start;
-      button.dataset.end = slot.end;
-      button.dataset.label = slot.startLabel;
-      button.setAttribute('aria-pressed', 'false');
-      button.textContent = slot.startLabel;
-      button.addEventListener('click', () => {
-        selectedTime = {
-          date: selectedDate,
-          timeLabel: slot.startLabel,
-          start: slot.start,
-          end: slot.end,
-          live,
-        };
-        for (const other of timesEl.querySelectorAll<HTMLElement>('.booking-calendar__time')) {
-          other.setAttribute('aria-pressed', String(other === button));
-          other.classList.toggle('is-selected', other === button);
-        }
-        if (selectedLabel) {
-          selectedLabel.textContent = `${shortDateLabel(selectedDate)} at ${slot.startLabel}`;
-        }
-        setStatus(
-          live
-            ? 'Preferred time selected. We will recheck it with your final details.'
-            : 'Preferred time saved. Our team confirms the exact available time.',
-          'success',
-        );
-        notify();
-      });
-      timesEl.appendChild(button);
+    picker.hidden = false;
+    const hours = [...new Set(times.map((minutes) => Math.floor(minutes / 60)))];
+    const previousHour = Number(hourSelect.value);
+    const targetHour = hours.includes(previousHour) ? previousHour : hours[0]!;
+    hourSelect.innerHTML = '';
+    for (const hour of hours) {
+      const option = document.createElement('option');
+      option.value = String(hour);
+      option.textContent = String(hour12(hour)).padStart(2, '0');
+      hourSelect.appendChild(option);
     }
-    setTimesNote(
-      live
-        ? 'Live times from the Sparkling Standard booking calendar in Central Time.'
-        : 'These are preferred start windows. Our team confirms the exact available time.',
+    hourSelect.value = String(targetHour);
+    populateMinutes(targetHour);
+    updateSelectedTime();
+  }
+
+  function populateMinutes(hour: number): void {
+    if (!minuteSelect || !selectedPeriod) return;
+    const times = periodMinutes(selectedPeriod).filter(
+      (minutes) => Math.floor(minutes / 60) === hour && timeIsEnabled(minutes),
     );
-    setStatus(
-      live
-        ? 'Choose the start time that works best for you.'
-        : 'Live times are unavailable right now. Choose a preferred start and we will confirm it.',
+    const previousMinute = Number(minuteSelect.value);
+    minuteSelect.innerHTML = '';
+    for (const minutes of times) {
+      const minute = minutes % 60;
+      const option = document.createElement('option');
+      option.value = String(minute);
+      option.textContent = String(minute).padStart(2, '0');
+      minuteSelect.appendChild(option);
+    }
+    if (times.length === 0) return;
+    const previousAvailable = times.some((minutes) => minutes % 60 === previousMinute);
+    minuteSelect.value = String(
+      previousAvailable ? previousMinute : times[0]! % 60,
     );
   }
 
-  function fallbackSlots(): Slot[] {
-    return PREFERRED_STARTS.map((time) => {
-      const [hour, minute] = time.split(':').map(Number);
-      return {
-        // A preferred window has no server-verified ISO interval. The final
-        // revalidation matches it by label against a real available slot.
-        start: '',
-        end: '',
-        startLabel: `${((hour! + 11) % 12) + 1}:${String(minute!).padStart(2, '0')} ${hour! >= 12 ? 'PM' : 'AM'}`,
-        endLabel: '',
-      };
-    });
+  function updateSelectedTime(): void {
+    if (!selectedPeriod || !hourSelect || !minuteSelect || !selectedDate) return;
+    const hour = Number(hourSelect.value);
+    const minute = Number(minuteSelect.value);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return;
+    const minutes = hour * 60 + minute;
+    const label = minutesToLabel(minutes);
+    if (meridiemEl) meridiemEl.textContent = hour >= 12 ? 'PM' : 'AM';
+    const slot = slotForMinutes(minutes);
+    selectedTime = {
+      date: selectedDate,
+      timeLabel: label,
+      start: slot?.start ?? '',
+      end: slot?.end ?? '',
+      live: Boolean(slot),
+    };
+    if (selectedLabel) {
+      selectedLabel.textContent = `${shortDateLabel(selectedDate)} at ${label}`;
+    }
+    setStatus(
+      slot
+        ? 'Preferred time selected. We will recheck it with your final details.'
+        : 'Preferred start saved. Our team confirms the exact available time.',
+      'success',
+    );
+    notify();
+  }
+
+  function renderPeriods(): void {
+    if (!periodEl) return;
+    if (!selectedDate) {
+      periodEl.hidden = true;
+      if (picker) picker.hidden = true;
+      return;
+    }
+    periodEl.hidden = false;
+    for (const button of periodButtons) {
+      const period = button.dataset.period as Period | undefined;
+      if (!period) continue;
+      const available = periodMinutes(period).some(timeIsEnabled);
+      button.disabled = liveAvailability && !available;
+      button.classList.toggle('is-unavailable', liveAvailability && !available);
+    }
+    if (selectedPeriod && liveAvailability) {
+      const stillAvailable = periodMinutes(selectedPeriod).some(timeIsEnabled);
+      if (!stillAvailable) {
+        selectedPeriod = null;
+        selectedTime = null;
+        for (const button of periodButtons) {
+          button.setAttribute('aria-pressed', 'false');
+          button.classList.remove('is-selected');
+        }
+        if (picker) picker.hidden = true;
+        if (selectedLabel) selectedLabel.textContent = shortDateLabel(selectedDate);
+      }
+    }
+    if (selectedPeriod) populatePicker();
+  }
+
+  function clearTimes(message = 'Select a date to see preferred start times.'): void {
+    availableSlots = [];
+    liveAvailability = false;
+    selectedPeriod = null;
+    selectedTime = null;
+    if (periodEl) periodEl.hidden = true;
+    if (picker) picker.hidden = true;
+    setStatus(message);
   }
 
   function coordinates(): { lat: number; lng: number } | null {
@@ -255,8 +341,10 @@ export function initBookingCalendar(
     const seq = ++timesSeq;
     const point = coordinates();
     if (!point) {
-      renderTimes(fallbackSlots(), false);
-      setStatus('Enter your address below to see live availability.');
+      availableSlots = [];
+      liveAvailability = false;
+      setStatus('Enter your address above to see live availability. Choose a preferred start below.');
+      renderPeriods();
       return;
     }
     setStatus('Checking available times…');
@@ -275,23 +363,28 @@ export function initBookingCalendar(
         ok?: boolean;
         enabled?: boolean;
         slots?: Slot[];
-        reason?: string;
       };
-      if (!response.ok || data.ok !== true) {
-        renderTimes(fallbackSlots(), false);
-        setStatus('Live times are unavailable right now. Choose a preferred start.');
+      if (!response.ok || data.ok !== true || data.enabled !== true) {
+        availableSlots = [];
+        liveAvailability = false;
+        setStatus('Live scheduling is unavailable right now. Choose a preferred start.');
+        renderPeriods();
         return;
       }
-      if (data.enabled !== true) {
-        renderTimes(fallbackSlots(), false);
-        setStatus('Live scheduling is not connected yet. Choose a preferred start.');
-        return;
+      availableSlots = data.slots ?? [];
+      liveAvailability = true;
+      if (timeNote) {
+        timeNote.textContent =
+          'Live times from the Sparkling Standard booking calendar in Central Time.';
       }
-      renderTimes(data.slots ?? [], true);
+      setStatus('Choose First Appointment or Afternoon Appointment.');
+      renderPeriods();
     } catch {
       if (seq !== timesSeq) return;
-      renderTimes(fallbackSlots(), false);
+      availableSlots = [];
+      liveAvailability = false;
       setStatus('We could not reach the booking calendar. Choose a preferred start.');
+      renderPeriods();
     }
   }
 
@@ -327,6 +420,7 @@ export function initBookingCalendar(
       button.addEventListener('click', () => {
         selectedDate = dateKey;
         selectedTime = null;
+        selectedPeriod = null;
         renderCalendar();
         notify();
         void refreshTimes();
@@ -359,6 +453,21 @@ export function initBookingCalendar(
     renderCalendar();
   });
 
+  for (const button of periodButtons) {
+    button.addEventListener('click', () => {
+      const period = button.dataset.period as Period | undefined;
+      if (!period || button.disabled) return;
+      setPeriod(period);
+    });
+  }
+  hourSelect?.addEventListener('change', () => {
+    populateMinutes(Number(hourSelect.value));
+    updateSelectedTime();
+  });
+  minuteSelect?.addEventListener('change', () => {
+    updateSelectedTime();
+  });
+
   if (dateInput) {
     dateInput.min = today;
     dateInput.max = latest;
@@ -368,6 +477,7 @@ export function initBookingCalendar(
       if (value === selectedDate) return;
       selectedDate = value;
       selectedTime = null;
+      selectedPeriod = null;
       renderCalendar();
       notify();
       void refreshTimes();
@@ -499,19 +609,15 @@ export function initBookingCalendar(
           live: true,
         };
         setInputs();
-        // The wizard reads these hidden fields; the hold remains a temporary
-        // capacity reservation, not a confirmed appointment.
         const holdIdInput = document.createElement('input');
         holdIdInput.type = 'hidden';
         holdIdInput.name = 'booking_hold_id';
         holdIdInput.value = holdData.holdId;
-        for (const inputEl of root.querySelectorAll('input[name="booking_hold_id"]')) inputEl.remove();
         root.appendChild(holdIdInput);
         const expiryInput = document.createElement('input');
         expiryInput.type = 'hidden';
         expiryInput.name = 'booking_hold_expires_at';
         expiryInput.value = holdData.expiresAt;
-        for (const inputEl of root.querySelectorAll('input[name="booking_hold_expires_at"]')) inputEl.remove();
         root.appendChild(expiryInput);
         setStatus('Time held temporarily. Send your request to continue.', 'success');
         return {
@@ -532,6 +638,9 @@ export function initBookingCalendar(
     reset() {
       selectedDate = '';
       selectedTime = null;
+      selectedPeriod = null;
+      availableSlots = [];
+      liveAvailability = false;
       viewYear = Number(today.slice(0, 4));
       viewMonth = Number(today.slice(5, 7)) - 1;
       setInputs();

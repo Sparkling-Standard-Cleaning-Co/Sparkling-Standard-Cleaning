@@ -103,8 +103,8 @@ test('the supportive preset opens the optional 10% pathway without preselecting 
     assert.equal(await eligible.count(), 1);
     assert.equal(await eligible.isChecked(), false, 'eligibility is never preselected');
     assert.equal(await page.locator('a[href="/supportive-home-cleaning/"]').count() >= 1, true);
-    const notes = page.locator('#est-supportive-notes');
-    assert.equal(await notes.getAttribute('required'), null, 'supportive notes are optional');
+    assert.equal(await page.locator('a[href="/terms/#community-support"]').count(), 1);
+    assert.equal(await page.locator('#est-supportive-notes').count(), 0, 'the large notes field is removed');
   } finally {
     await context.close();
   }

@@ -258,7 +258,9 @@ Cloudflare secrets.
 | Setting | Current | File |
 | --- | ---: | --- |
 | Customer journey | exactly five steps: When & Where → Service & Home → Condition & Frequency → Optional Extras → Your Estimate | `src/lib/estimate/steps.ts` |
-| Appointment selection | premium calendar in step 1; 7:00 AM earliest starts; 15-minute grid; provisional until final-duration revalidation | `src/components/BookingCalendar.astro`, `src/scripts/booking-calendar.ts` |
+| Appointment selection | premium calendar in step 1; compact First Appointment (7:00–8:30 AM) / Afternoon Appointment (12:30–2:30 PM) hour-and-minute picker; 15-minute increments; provisional until final-duration revalidation | `src/components/BookingCalendar.astro`, `src/scripts/booking-calendar.ts` |
+| Photos | collected in Condition & Frequency; required before booking confirmation; Pay Now without photos offers Upload Now or Pay Now, Confirm Later | `src/components/PhotoUploadSection.astro`, `src/scripts/estimate-wizard.ts` |
+| Community Support | one small eligibility checkbox linked to `/terms/#community-support`; discount calculation unchanged | `src/components/EstimateWizard.astro`, `src/pages/terms.astro` |
 | Address entry | always-visible manual fields; background exact/close resolution; no map/pin confirmation; FL/AL suggestions only; ZIP fallback | `src/scripts/address-finder.ts`, `functions/api/geocode.ts` |
 | Advance reservation window | 60 days | `scheduling.ts` |
 | Required initial Deep Cleaning for new recurring residential | true | `scheduling.ts` |

@@ -7,8 +7,8 @@ import { chromium } from 'playwright';
 const PORT = 4506;
 const BASE = `http://localhost:${PORT}`;
 const BOOKING_DATE = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-const SLOT_START = `${BOOKING_DATE}T15:00:00.000Z`;
-const SLOT_END = `${BOOKING_DATE}T17:00:00.000Z`;
+const SLOT_START = `${BOOKING_DATE}T13:00:00.000Z`;
+const SLOT_END = `${BOOKING_DATE}T15:00:00.000Z`;
 
 let server;
 let browser;
@@ -97,7 +97,7 @@ test('a real available slot becomes an expiring hold and travels with the reques
           date: BOOKING_DATE,
           durationMinutes: 120,
           available: true,
-          slots: [{ start: SLOT_START, end: SLOT_END, startLabel: '9:00 AM', endLabel: '11:00 AM' }],
+          slots: [{ start: SLOT_START, end: SLOT_END, startLabel: '7:00 AM', endLabel: '9:00 AM' }],
         }),
       }),
     );
@@ -137,8 +137,7 @@ test('a real available slot becomes an expiring hold and travels with the reques
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32502');
     await page.fill('#est-date', BOOKING_DATE);
-    await page.waitForSelector('.booking-calendar__time', { state: 'visible' });
-    await page.click('.booking-calendar__time');
+    await page.click('[data-period="first"]');
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',

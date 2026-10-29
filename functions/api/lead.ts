@@ -158,6 +158,8 @@ const SERVER_OWNED_KEYS = new Set([
   'ongoing_frequency',
   'photo_count',
   'photo_note',
+  'photos_outstanding',
+  'photo_storage',
   'booking_hold_status',
   'preferred_slot_start',
   'preferred_slot_end',
@@ -616,6 +618,16 @@ export async function onRequestPost(context: {
       clean.photo_note = `Only ${verifiedPhotos.length} of ${claimedPhotos.length} submitted photo(s) were verified in private storage.`;
     }
   }
+  // Owner direction (2026-10-29): photos are required before booking
+  // confirmation. The customer may still submit/pay and choose "confirm
+  // later"; the server records that honestly. Storage availability is always
+  // server-derived so an unconfigured bucket never invents an outstanding item.
+  clean.photo_storage = env.PHOTOS_BUCKET ? 'available' : 'unavailable';
+  clean.photo_count = String(verifiedPhotos.length);
+  clean.photos_outstanding =
+    env.PHOTOS_BUCKET && verifiedPhotos.length === 0 ? 'yes' : 'no';
+  clean.photos_deferred =
+    clean.photos_outstanding === 'yes' && clean.photos_deferred === 'yes' ? 'yes' : 'no';
 
   // Owner notification presentation: the flat field map becomes an ordered,
   // readable summary. The customer's email is set as the provider reply-to and

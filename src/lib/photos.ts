@@ -70,8 +70,8 @@ export const PHOTO_ENGINE_COPY: Record<
   { title: string; hint: string; privacy: string }
 > = {
   residential: {
-    title: 'Help Us Get to Know Your Space',
-    hint: 'If possible, include your bathroom, kitchen and main living area. Photos of appliances or areas needing extra attention are especially useful.',
+    title: 'Photos of Your Space',
+    hint: 'Include your bathroom, kitchen and main living area. Photos of appliances or areas needing extra attention are especially useful.',
     privacy: 'Photos are private, used only to prepare your cleaning estimate, and never posted publicly. Please only share photos of the space — no ID documents or personal paperwork.',
   },
   str: {
