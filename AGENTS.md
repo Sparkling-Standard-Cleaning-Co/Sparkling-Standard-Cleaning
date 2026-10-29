@@ -84,7 +84,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release:** **`7352cf2`** is live (owner-audit release code; Cloudflare Pages deployment `2c4662db-3af5-4d97-96c9-bfbaa21ca03f`; GitHub `validate` and `browser` for run `40912669924` passed). It enables public gift-certificate sales, final-checkout Community Support and priced extras/bundles, restores Step 1 interactive map confirmation, simplifies the photo-requirement popup, fixes the desktop appointment calendar, adds automatic confirmation for complete paid bookings, and retains gift redemption/receipts/tax/scheduling work. No live card charge, live gift purchase or production calendar-event test was performed.
+- **Current release:** **`c79a1f6`** is live (Cloudflare Pages deployment `30a5943c-6761-476a-9949-31ea7bdcc663`; GitHub run `40925663035`; `validate`, `browser` and Cloudflare checks passed). It adds progressive Step 1 reveal, a fixed mobile Continue bar, monthly recurring eligibility for SPARKLE100/Recurring Care, and defensive address-label parsing. It retains the owner-audit release `7352cf2`/`a84ae3b`: public gift-certificate sales, final-checkout Community Support and priced extras/bundles, restored Step 1 interactive map confirmation, the photo-requirement popup, the desktop appointment calendar, automatic confirmation for complete paid bookings, gift redemption/receipts/tax/scheduling work, and address-suggestion dismissal. No live card charge, live gift purchase or production calendar-event test was performed.
 - **Prior Initiative 6.8:** live at `6e36c95` plus the HEIC test-stability fix `9fe8764` (Cloudflare Pages deployments `2a0d4f21-8eb8-49b0-b298-f086e3c7473b` and `4afab04f-9f97-47b5-bb2c-778aa7b6f745`; `validate`, `browser` and Cloudflare checks passed). It implements the three-page owner audit: prices stay hidden through every preliminary estimator step and are revealed at the final stage with a shared branded animation across all four engines; the owner-supplied **two-of-four** Competitive Pricing badge is installed; homepage service cards use one equal-height grid; KJV scripture is expanded through a shared component; and all transactional forms require an unchecked-by-default, server-verified terms acceptance with a private R2 record. The public Terms were expanded with Florida cancellation/gift research, condition/access, payment/refund, damage, safety, recurring, commercial/church, dispute and version rules. Gift certificates remain in **request mode** (sales disabled) because no owner-approved denominations/fulfillment activation were supplied; live calendar booking is **not connected**, so preferred dates remain requests and no fake availability is shown. No new cancellation/reassessment fee is active; owner and Florida counsel approval gates are documented in `docs/legal/TERMS-RESEARCH.md` and `docs/launch/OWNER-INPUT-REQUIRED.md`. No pricing mathematics changed.
 - **Prior Initiative 6.7:** live at `f111014`; checkout readiness now checks key, webhook secret/endpoint, notifier, ledger and mode; verified-only quotes, explicit price-change acceptance, SHA-256 checkout idempotency with R2 session reuse, durable webhook event claims, retryable notifications, safe cancellation/status pages and no duplicate lead on payment retry. Production `/api/estimate-checkout` is live mode with all readiness checks true. No live card charge or Stripe test-mode transaction was performed.
 - **Prior Initiative 6.6:** live at `0b907d4` (Cloudflare Pages deployment `26e3b9f8-7665-426f-8687-7f171588c865`); it completed the 13-page owner audit, approved homepage/Community Support/Deep Cleaning/Service Area copy, FL/AL state restriction, GPS loading, optional facility ZIP, centered facility intros, add-on bundles, and the original Pay Now/reservation path. Private legal records were organized in the master archive.
@@ -220,7 +220,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
 | Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` §4a |
 | Reservation window, statuses, ledger | `src/config/scheduling.ts` + `src/scripts/estimate-wizard.ts` | `docs/operations/RESERVATION-TRACKING.md` |
-| Gift certificates (sales disabled pending approval) | `src/config/gift-certificates.ts`, `src/lib/gift/`, `src/pages/gift-certificates/`, `src/pages/gift-admin.astro`, `functions/api/gift-checkout.ts`, `stripe-webhook.ts`, `gift-auth.ts`, `gift-admin.ts`, `gift-balance.ts`, `src/lib/gift/activation.ts`, `src/lib/admin/` | `docs/operations/GIFT-CERTIFICATES.md`, `docs/operations/R2-STORAGE-AND-BACKUP.md` |
+| Gift certificates (sales live) | `src/config/gift-certificates.ts`, `src/lib/gift/`, `src/pages/gift-certificates/`, `src/pages/gift-admin.astro`, `functions/api/gift-checkout.ts`, `stripe-webhook.ts`, `gift-auth.ts`, `gift-admin.ts`, `gift-balance.ts`, `src/lib/gift/activation.ts`, `src/lib/admin/` | `docs/operations/GIFT-CERTIFICATES.md`, `docs/operations/R2-STORAGE-AND-BACKUP.md` |
 | Platform accounts, status, owner actions | `src/config/business.ts` `socials` + `src/components/SocialLinks.astro` | `docs/marketing/PLATFORM-REGISTER.md`, `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` |
 | Lead capture, notification fields, provider relay | `functions/api/lead.ts`, `src/lib/forms/` | `docs/verification/VERIFICATION.md` |
 | Services, FAQs, checklists, page copy | `src/content/`, `src/content/site/` | `docs/CONTENT-GUIDE.md` |
@@ -511,21 +511,24 @@ collections are intentionally empty — not errors.
   `richard.md`, `laura.md` (quote text verbatim; never fabricate or "improve" it). Never
   fabricate additional reviews or aggregate/Review schema; new genuine entries render
   automatically and the verified Google reviews link stays intact.
-- **Five-step estimator (owner priority UX directive, 2026-10-28):** the residential and STR
-  journey is exactly **When & Where → Service & Home → Condition & Frequency → Optional Extras →
-  Your Estimate** (`src/lib/estimate/steps.ts`, `src/lib/estimate/engines.ts`). Step 1 is a
+- **Five-step estimator (owner priority UX directive; current 2026-10-29):** the residential and STR
+  journey is exactly **When & Where → Service & Home → Condition & Frequency → Your Details →
+  Extras & Payment** (`src/lib/estimate/steps.ts`, `src/lib/estimate/engines.ts`). Step 1 is a
   premium appointment calendar (`BookingCalendar.astro`, `booking-calendar.ts`) with a compact
-  First Appointment (7:00–8:30 AM) / Afternoon Appointment (12:30–2:30 PM) hour-and-minute picker,
-  followed by an always-visible manual address card. There is **no customer map/pin confirmation
-  and no separate address-verification page** for residential; the typed address is resolved in
-  the background, the city/state are parsed from the provider label when needed, and a ZIP
+  First Appointment (7:00–8:30 AM) / Afternoon Appointment (12:30–2:30 PM) hour-and-minute picker.
+  It reveals progressively: calendar, then period/time, then the address card, then city/state/ZIP
+  after street entry. Reveals smooth-scroll unless reduced motion is active. The confirmed
+  MapLibre/OpenFreeMap pin remains required for a resolved address; there is no separate
+  address-verification page. The typed address is resolved in the background, city/state are
+  parsed defensively, street-only provider rows are labeled and never become a city, and a ZIP
   fallback preserves an eligible request when exact geocoding fails. Suggestions are strictly
   FL/AL only server-side (`functions/api/geocode.ts`, `suggestion-ranking.ts`). Photos are
   collected in Condition & Frequency; they are required before booking confirmation, but the
   customer may pay now and confirm later. The Community Support discount is one small eligibility
-  checkbox linked to the Terms. The selected date/time is provisional; the final step revalidates
-  the real duration against the two-resource scheduler, creates a temporary hold, and offers real
-  alternatives. Facility/commercial/church forms remain their own four-step request flows.
+  checkbox linked to the Terms. The mobile Continue action is fixed above the safe-area inset. The
+  selected date/time is provisional; the final step revalidates the real duration against the
+  two-resource scheduler, creates a temporary hold, and offers real alternatives.
+  Facility/commercial/church forms remain their own four-step request flows.
 - **Service-driven estimator questionnaire (2026-10-23 finishing pass; current map/quote status through 6.4):** the selected cleaning
   service determines which questions exist — `src/lib/estimate/service-matrix.ts` is the single
   source of truth for service/frequency compatibility: **Residential house cleaning** offers
@@ -548,7 +551,7 @@ collections are intentionally empty — not errors.
   alongside (`EstimateResult.ongoing`, wizard live panel/summary, `first_visit_total` /
   `ongoing_price_per_visit` / `ongoing_frequency` submission fields, server-owned in the lead
   relay). The SPARKLE100 campaign discounts ONLY the first visit and only when the customer's
-  arrangement is weekly or biweekly (`campaignArrangement` in
+  arrangement is weekly, biweekly or monthly (`campaignArrangement` in
   `src/lib/estimate/promotions.ts`); the ongoing rhythm is never discounted.
 - **Homepage refinement (2026-10-23):** the homepage hero carries a four-slide representative
   interior carousel (`src/components/HeroCarousel.astro`, auto-advance respects
@@ -611,11 +614,11 @@ collections are intentionally empty — not errors.
 - **Advance reservations and gift certificates (2026-10-03):** requests are bounded to a
   configurable 60-day window (`src/config/scheduling.ts`) with no priority tier; reservation
   statuses and the private ledger workflow live in `docs/operations/RESERVATION-TRACKING.md`.
-  Gift certificates are live in **request mode only** (`enabled: false`); approved values are configured but public sales remain gated. Stripe Checkout and the
-  signature-verified webhook exist but are dormant until the owner approves terms/denominations
-  and configures the secrets; the printable certificate tool is `npm run gift:certificate`
-  (output in git-ignored `gift-out/`). Never enable sales or advertise amounts without the written
-  owner decisions in `docs/launch/OWNER-INPUT-REQUIRED.md` (G1–G5).
+  Gift certificates are **live for public purchase** (`enabled: true`): approved denominations plus
+  custom amounts, recipient delivery, valid-from activation, Stripe Checkout, the signature-verified
+  webhook, redemption and gift-only/card-remainder checkout. The printable certificate tool is
+  `npm run gift:certificate` (output in git-ignored `gift-out/`). A live gift purchase, refund and
+  production calendar-event test remain owner-authorized activities; never invent them.
 - **Lead-notification format (2026-10-02):** owner emails are built by
   `src/lib/forms/lead-notification.ts` (ordered sections, customer email as reply-to, mismatch
   action warning, raw technical codes separated). Format and testing:

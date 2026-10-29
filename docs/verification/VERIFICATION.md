@@ -1,5 +1,43 @@
 # Verification status
 
+## Verified - 2026-10-29 progressive estimator, monthly recurring and address release
+
+**Release:** `c79a1f6` (includes the `a84ae3b` address-suggestion dismissal hotfix). Cloudflare
+Pages deployment `30a5943c-6761-476a-9949-31ea7bdcc663`. GitHub run `40925663035`: `validate`
+(52 s) and `browser` (4 m 18 s) both succeeded; the Cloudflare Pages check succeeded.
+
+- **Step 1 progressive reveal:** the appointment calendar is first; the period/time picker follows
+  a selected date; the address card follows a selected time; city/state/ZIP follow street entry.
+  Previously answered fields stay editable. Reveals smooth-scroll unless reduced motion is active;
+  ordinary typing does not move the page.
+- **Mobile Continue:** the action bar is fixed above the safe-area inset, and each wizard step
+  reserves bottom padding so the final field is never covered. Validation still focuses the first
+  invalid control.
+- **Monthly recurring:** monthly is recurring for the required first Deep Cleaning, ongoing price,
+  booking validation and service matrix. SPARKLE100 and the Recurring Care Bundle explicitly
+  include weekly, biweekly and monthly; specialty/one-time services remain excluded.
+- **Address correctness:** `regionFromLabel` parses provider labels defensively. Street-only rows
+  render `(street only)`, never put a state or street in the city field, and leave city/ZIP blank
+  until verified. The earlier MapMap wrong-street/wrong-state rejection remains in force.
+- **Live production checks:** `/estimate/residential/` returned `200`; address stayed hidden after
+  date selection and appeared after time; details appeared after street entry; the live
+  `Jacks Branch Road, Florida, United States` suggestion displayed `(street only)` with city `""`,
+  state `FL`, ZIP `""`; a resolved address opened the map and confirmation control; mobile
+  `.wizard__nav` computed `position: fixed` at viewport bottom. A monthly journey reached the final
+  step with the required Deep Cleaning acknowledgment and showed **First Visit - Deep Cleaning
+  $335**, **ongoing monthly visits $260 each**, and frequency **Monthly**. No request was submitted,
+  no lead was created and no payment occurred.
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **667 tests: 666 passed, 1 pre-existing print-output skip, 0 failed** |
+| Browser regression | **164 passed, 0 failed** |
+| Type check / build / validation | passed (0 errors); smoke passed across 21 pages |
+| GitHub `validate` | passed (configuration, type check, unit, build, pricing impact, links/SEO/QR, smoke, testimonials, facts) |
+| GitHub `browser` | passed |
+| Cloudflare Pages | deployment succeeded |
+| Live payment / gift purchase | not performed |
+
 ## Verified - 2026-10-28 scheduling, auth hardening and retention release
 
 **Release:** `7352cf2` (owner-audit release code). Cloudflare Pages deployment
