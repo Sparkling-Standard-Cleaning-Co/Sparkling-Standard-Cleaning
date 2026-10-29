@@ -1,5 +1,39 @@
 # Verification status
 
+## Verified - 2026-10-29 final checkout and payment-integrity release
+
+**Release:** `c03394d`. Cloudflare Pages deployment
+`7bcb95b4-cf86-46d2-91c6-b0605765c084`. GitHub run `40969672226`: `validate`, `browser` and the
+Cloudflare Pages check all succeeded.
+
+- **Final actions:** one green **Pay Now and Reserve This Cleaning** action and one smaller
+  **Request to Reserve This Cleaning (Pay Later)** action; the duplicate in-form pay button is
+  removed. Mobile keeps Back and both final actions in the fixed estimator bar.
+- **Financial summary:** one vertical reconciliation of the true base/deep price, extras, rounding,
+  the single discount, travel, tax and final total. Community Support sits immediately above the
+  simplified Terms/Privacy acceptance.
+- **Extras:** six bundles and individual extras live in a collapsed **Your Cleaning Details**
+  accordion; its summary shows selected extras and updates immediately.
+- **Confirmation policy:** paid, fully verified bookings auto-confirm (owner-approved
+  `auto_confirm`); the hold must match the paid quote, server-derived photos must be complete, and
+  any missing requirement leaves the booking visibly pending. Public copy, emails, receipts, FAQs,
+  privacy and terms now state this one policy.
+- **Integrity:** checkout persistence fails closed and expires an unrecorded Stripe session; photo
+  status is derived from private R2; gift refunds/voids are blocked while a reservation is active;
+  gift checkout has readiness, idempotency and durable attempt/terms records; booking-admin no
+  longer accepts gift/photo tokens; day-lock takeover is ownership-safe; CSP/HSTS/frame/permissions
+  headers are live.
+- **D1 foundation:** `migrations/0001_operational_foundation.sql` defines 44 relational tables and
+  was syntax-checked against in-memory SQLite. No D1 database is provisioned, no migration is
+  applied and no `/admin` interface exists. See `docs/operations/ADMIN-DATA-FOUNDATION.md`.
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **674 tests: 673 passed, 1 pre-existing print-output skip, 0 failed** |
+| Browser regression | **168 passed, 0 failed** in CI |
+| Type check / build / validation | passed; smoke passed across 21 pages |
+| Production headers | CSP, HSTS, X-Frame-Options, Permissions-Policy and nosniff confirmed |
+| Live checkout / refund / gift purchase | not performed |
 ## Verified - 2026-10-29 dirt guide and estimator mobile navigation release
 
 **Release:** `a6180a3`. Cloudflare Pages deployment
