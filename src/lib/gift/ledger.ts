@@ -27,6 +27,15 @@ export interface GiftAdjustment {
   stripeRefundId?: string;
 }
 
+export interface GiftReservation {
+  id: string;
+  amountCents: number;
+  reference: string;
+  createdAt: string;
+  expiresAt: string;
+  status: 'reserved' | 'committed' | 'released';
+}
+
 export interface GiftCertificateRecord {
   version: 1;
   code: string;
@@ -46,6 +55,8 @@ export interface GiftCertificateRecord {
   issuedAt: string;
   history: GiftRedemption[];
   adjustments?: GiftAdjustment[];
+  /** Temporary checkout reservations reduce available value until committed/released. */
+  reservations?: GiftReservation[];
 }
 
 export interface GiftStorageEnv extends PaymentStorageEnv {
@@ -60,9 +71,15 @@ export function giftKey(code: string): string {
   return `gifts/certificates/${code.trim().toUpperCase()}.json`;
 }
 
-export function remainingCents(record: GiftCertificateRecord): number {
+export function remainingCents(record: GiftCertificateRecord, now = new Date()): number {
   if (record.status === 'refunded' || record.status === 'void') return 0;
-  return Math.max(0, record.valueCents - record.redeemedCents);
+  const reserved = (record.reservations ?? [])
+    .filter(
+      (reservation) =>
+        reservation.status === 'reserved' && Date.parse(reservation.expiresAt) > now.getTime(),
+    )
+    .reduce((sum, reservation) => sum + reservation.amountCents, 0);
+  return Math.max(0, record.valueCents - record.redeemedCents - reserved);
 }
 
 export async function issueGiftCertificate(
@@ -82,6 +99,150 @@ export async function lookupGiftCertificate(
 ): Promise<GiftCertificateRecord | null> {
   const stored = await readLedgerJson<GiftCertificateRecord>(bucket, giftKey(code));
   return stored?.value ?? null;
+}
+
+export type GiftReservationError =
+  | 'not_found'
+  | 'inactive'
+  | 'not_active_yet'
+  | 'invalid_amount'
+  | 'insufficient_balance'
+  | 'conflict'
+  | 'not_reserved'
+  | 'already_committed'
+  | 'released';
+
+export async function reserveGiftCredit(
+  bucket: LedgerBucket,
+  code: string,
+  amountCents: number,
+  reference: string,
+  options: { ttlMinutes?: number; now?: Date } = {},
+): Promise<
+  | { ok: true; record: GiftCertificateRecord; reservation: GiftReservation }
+  | { ok: false; error: GiftReservationError }
+> {
+  if (!Number.isInteger(amountCents) || amountCents <= 0) {
+    return { ok: false, error: 'invalid_amount' };
+  }
+  const now = options.now ?? new Date();
+  const ttlMinutes = Math.min(120, Math.max(5, Math.round(options.ttlMinutes ?? 30)));
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const stored = await readLedgerJson<GiftCertificateRecord>(bucket, giftKey(code));
+    if (!stored) return { ok: false, error: 'not_found' };
+    const record = stored.value;
+    if (record.status !== 'active') return { ok: false, error: 'inactive' };
+    if (!isGiftActive(record, now)) return { ok: false, error: 'not_active_yet' };
+    if (amountCents > remainingCents(record, now)) {
+      return { ok: false, error: 'insufficient_balance' };
+    }
+    const reservation: GiftReservation = {
+      id: `GR-${crypto.randomUUID()}`,
+      amountCents,
+      reference: reference.trim().slice(0, 120),
+      createdAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + ttlMinutes * 60_000).toISOString(),
+      status: 'reserved',
+    };
+    const updated: GiftCertificateRecord = {
+      ...record,
+      reservations: [...(record.reservations ?? []), reservation],
+    };
+    if (!stored.etag) return { ok: false, error: 'conflict' };
+    try {
+      const result = await bucket.put(giftKey(code), JSON.stringify(updated), {
+        onlyIf: new Headers({ 'If-Match': stored.etag }),
+      });
+      if (result !== null && result !== undefined) {
+        return { ok: true, record: updated, reservation };
+      }
+    } catch {
+      // Retry from a fresh read.
+    }
+  }
+  return { ok: false, error: 'conflict' };
+}
+
+export async function commitGiftReservation(
+  bucket: LedgerBucket,
+  code: string,
+  reservationId: string,
+  note: string,
+  now = new Date(),
+): Promise<
+  | { ok: true; record: GiftCertificateRecord; already: boolean }
+  | { ok: false; error: GiftReservationError }
+> {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const stored = await readLedgerJson<GiftCertificateRecord>(bucket, giftKey(code));
+    if (!stored) return { ok: false, error: 'not_found' };
+    const record = stored.value;
+    const reservation = (record.reservations ?? []).find((entry) => entry.id === reservationId);
+    if (!reservation) return { ok: false, error: 'not_reserved' };
+    if (reservation.status === 'committed') return { ok: true, record, already: true };
+    if (reservation.status === 'released') return { ok: false, error: 'released' };
+    const redeemedCents = record.redeemedCents + reservation.amountCents;
+    if (redeemedCents > record.valueCents) return { ok: false, error: 'insufficient_balance' };
+    const updated: GiftCertificateRecord = {
+      ...record,
+      redeemedCents,
+      status: redeemedCents >= record.valueCents ? 'fully_redeemed' : 'active',
+      reservations: (record.reservations ?? []).map((entry) =>
+        entry.id === reservationId ? { ...entry, status: 'committed' as const } : entry,
+      ),
+      history: [
+        ...record.history,
+        {
+          at: now.toISOString(),
+          amountCents: reservation.amountCents,
+          note: note.trim().slice(0, 500),
+          reference: reservation.reference,
+        },
+      ],
+    };
+    if (!stored.etag) return { ok: false, error: 'conflict' };
+    try {
+      const result = await bucket.put(giftKey(code), JSON.stringify(updated), {
+        onlyIf: new Headers({ 'If-Match': stored.etag }),
+      });
+      if (result !== null && result !== undefined) return { ok: true, record: updated, already: false };
+    } catch {
+      // Retry from a fresh read.
+    }
+  }
+  return { ok: false, error: 'conflict' };
+}
+
+export async function releaseGiftReservation(
+  bucket: LedgerBucket,
+  code: string,
+  reservationId: string,
+): Promise<{ ok: true; record: GiftCertificateRecord } | { ok: false; error: GiftReservationError }> {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const stored = await readLedgerJson<GiftCertificateRecord>(bucket, giftKey(code));
+    if (!stored) return { ok: false, error: 'not_found' };
+    const record = stored.value;
+    const reservation = (record.reservations ?? []).find((entry) => entry.id === reservationId);
+    if (!reservation) return { ok: false, error: 'not_reserved' };
+    if (reservation.status === 'committed') return { ok: false, error: 'already_committed' };
+    if (reservation.status === 'released') return { ok: true, record };
+    const updated: GiftCertificateRecord = {
+      ...record,
+      reservations: (record.reservations ?? []).map((entry) =>
+        entry.id === reservationId ? { ...entry, status: 'released' as const } : entry,
+      ),
+    };
+    if (!stored.etag) return { ok: false, error: 'conflict' };
+    try {
+      const result = await bucket.put(giftKey(code), JSON.stringify(updated), {
+        onlyIf: new Headers({ 'If-Match': stored.etag }),
+      });
+      if (result !== null && result !== undefined) return { ok: true, record: updated };
+    } catch {
+      // Retry from a fresh read.
+    }
+  }
+  return { ok: false, error: 'conflict' };
 }
 
 export async function redeemGiftCertificate(

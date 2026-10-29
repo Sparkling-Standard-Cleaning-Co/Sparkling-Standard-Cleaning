@@ -7,6 +7,9 @@ import {
   issueGiftCertificate,
   lookupGiftCertificate,
   redeemGiftCertificate,
+  reserveGiftCredit,
+  commitGiftReservation,
+  releaseGiftReservation,
   refundGiftCertificate,
   remainingCents,
   voidGiftCertificate,
@@ -340,4 +343,68 @@ test('the owner inventory is paginated and searchable without exposing all recor
   const filteredPayload = (await filtered.json()) as { total?: number; items?: Array<{ code?: string }> };
   assert.equal(filteredPayload.total, 1);
   assert.equal(filteredPayload.items?.[0]?.code, 'SSGC-CCCC-3333');
+});
+
+test('a gift reservation reduces available value until it is committed', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const reserved = await reserveGiftCredit(bucket, 'SSGC-ABCD-2345', 4000, 'SS-2026-TEST');
+  assert.equal(reserved.ok, true);
+  if (!reserved.ok) return;
+  assert.equal(remainingCents(reserved.record), 6000);
+  const committed = await commitGiftReservation(
+    bucket,
+    'SSGC-ABCD-2345',
+    reserved.reservation.id,
+    'Applied to cleaning SS-2026-TEST',
+  );
+  assert.equal(committed.ok, true);
+  if (!committed.ok) return;
+  assert.equal(committed.record.redeemedCents, 4000);
+  assert.equal(remainingCents(committed.record), 6000);
+  assert.equal(committed.record.history.length, 1);
+  const again = await commitGiftReservation(
+    bucket,
+    'SSGC-ABCD-2345',
+    reserved.reservation.id,
+    'retry',
+  );
+  assert.equal(again.ok, true);
+  if (again.ok) assert.equal(again.already, true);
+});
+
+test('releasing a reservation restores the available balance', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const reserved = await reserveGiftCredit(bucket, 'SSGC-ABCD-2345', 5000, 'SS-2026-TEST');
+  assert.equal(reserved.ok, true);
+  if (!reserved.ok) return;
+  assert.equal(remainingCents(reserved.record), 5000);
+  const released = await releaseGiftReservation(bucket, 'SSGC-ABCD-2345', reserved.reservation.id);
+  assert.equal(released.ok, true);
+  if (released.ok) assert.equal(remainingCents(released.record), 10000);
+});
+
+test('concurrent gift reservations cannot exceed the available balance', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const first = await reserveGiftCredit(bucket, 'SSGC-ABCD-2345', 7000, 'SS-A');
+  assert.equal(first.ok, true);
+  const second = await reserveGiftCredit(bucket, 'SSGC-ABCD-2345', 4000, 'SS-B');
+  assert.equal(second.ok, false);
+  if (!second.ok) assert.equal(second.error, 'insufficient_balance');
+});
+
+test('expired reservations stop reducing the available balance', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const now = new Date('2026-10-29T12:00:00.000Z');
+  const reserved = await reserveGiftCredit(bucket, 'SSGC-ABCD-2345', 6000, 'SS-EXP', {
+    ttlMinutes: 30,
+    now,
+  });
+  assert.equal(reserved.ok, true);
+  if (!reserved.ok) return;
+  assert.equal(remainingCents(reserved.record, new Date('2026-10-29T12:10:00.000Z')), 4000);
+  assert.equal(remainingCents(reserved.record, new Date('2026-10-29T12:31:00.000Z')), 10000);
 });
