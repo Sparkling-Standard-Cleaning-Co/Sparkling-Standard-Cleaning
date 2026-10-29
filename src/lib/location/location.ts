@@ -135,3 +135,31 @@ export const US_STATES: ReadonlyArray<{ code: string; name: string; disabled?: b
   { code: 'AL', name: 'Alabama' },
   { code: 'GA', name: 'Georgia — Coming Soon', disabled: true },
 ] as const;
+
+/** Parses city/state from a provider label without treating a street or state as a city. */
+export function regionFromLabel(label: string): { city?: string; state?: string } {
+  const parts = label
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return {};
+  const stateIndex = parts.findIndex((part) =>
+    /\b(FL|Fla\.?|Florida|AL|Ala\.?|Alabama)\b/i.test(part),
+  );
+  if (stateIndex < 0) return {};
+  const stateToken =
+    parts[stateIndex]?.match(/\b(FL|Fla\.?|Florida|AL|Ala\.?|Alabama)\b/i)?.[1] ?? '';
+  const state = /^fl/i.test(stateToken) ? 'FL' : 'AL';
+  const candidate = stateIndex >= 2 ? parts[stateIndex - 1] ?? '' : '';
+  const city =
+    candidate &&
+    candidate !== parts[0] &&
+    !/^(county|united states|usa)$/i.test(candidate) &&
+    !/\b(FL|Fla\.?|Florida|AL|Ala\.?|Alabama)\b/i.test(candidate)
+      ? candidate
+      : '';
+  return {
+    ...(city ? { city } : {}),
+    state,
+  };
+}

@@ -133,11 +133,13 @@ test('a real available slot becomes an expiring hold and travels with the reques
 
     await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
     await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner,.promo-popup{display:none!important}' });
+    await page.fill('#est-date', BOOKING_DATE);
+    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+    await page.click('[data-period="first"]');
+    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32502');
-    await page.fill('#est-date', BOOKING_DATE);
-    await page.click('[data-period="first"]');
     await page.click('[data-address-resolve]');
     await page.locator('[data-address-map]').waitFor({ state: 'visible' });
     await page.locator('[data-address-confirm]').click();

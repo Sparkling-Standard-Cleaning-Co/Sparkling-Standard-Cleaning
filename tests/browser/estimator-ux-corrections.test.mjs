@@ -119,6 +119,9 @@ async function open(width = 1440, height = 1000) {
 
 async function stepTwo(page) {
   await page.fill('#est-date', BOOKING_DATE);
+  await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+  await page.click('[data-period="first"]');
+  await page.locator('[data-address-card]').waitFor({ state: 'visible' });
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', '32502');
@@ -196,6 +199,35 @@ test('the time picker is compact and uses the two residential windows', async ()
   }
 });
 
+test('Step 1 reveals time, address and details progressively', async () => {
+  const { context, page } = await open();
+  try {
+    assert.equal(await page.locator('[data-address-card]').isVisible(), false, 'address waits for a time');
+    assert.equal(await page.locator('[data-calendar-period]').isVisible(), false, 'period waits for a date');
+    await page.fill('#est-date', BOOKING_DATE);
+    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+    assert.equal(await page.locator('[data-address-card]').isVisible(), false, 'address still waits for a time');
+    await page.click('[data-period="first"]');
+    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('[data-address-details]').isVisible(), false, 'city waits for a street');
+    await page.fill('#est-address', '100 S Baylen St');
+    await page.locator('[data-address-details]').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#est-address-city').isVisible(), true);
+    assert.equal(await page.locator('#est-zip').isVisible(), true);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the Continue button is sticky on mobile', async () => {
+  const { context, page } = await open(390, 844);
+  try {
+    const position = await page.locator('.wizard__nav').evaluate((el) => getComputedStyle(el).position);
+    assert.equal(position, 'fixed');
+  } finally {
+    await context.close();
+  }
+});
 test('photos are in Condition & Frequency, and the last step has no photo upload', async () => {
   const { context, page } = await open();
   try {
@@ -256,6 +288,9 @@ test('the removed review and address-saving copy is absent', async () => {
     assert.doesNotMatch(body, /USING THE DETAILS YOU CONFIRMED/i);
     assert.doesNotMatch(body, /Saving your address so we can prepare/i);
     await page.fill('#est-date', BOOKING_DATE);
+    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+    await page.click('[data-period="first"]');
+    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32502');

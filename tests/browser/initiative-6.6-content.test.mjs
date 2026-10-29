@@ -455,6 +455,10 @@ test('the GPS action shows a disabled, busy loading state while locating', async
   });
   try {
     await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
+    await page.fill('#est-date', new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10));
+    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+    await page.click('[data-period="first"]');
+    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
     const button = page.locator('[data-address-gps]');
     await button.click();
     await page.waitForFunction(() => document.querySelector('[data-address-gps]')?.getAttribute('aria-busy') === 'true');

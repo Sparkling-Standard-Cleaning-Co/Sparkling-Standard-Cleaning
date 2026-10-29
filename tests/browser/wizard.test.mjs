@@ -104,6 +104,7 @@ async function selectBookingDate(page, date = BOOKING_DATE) {
 async function fillStepOne(page, zip = '32503') {
   await selectBookingDate(page);
   await page.click('[data-period="first"]');
+  await page.locator('[data-address-card]').waitFor({ state: 'visible' });
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', zip);
@@ -205,7 +206,7 @@ for (const [name, width, height] of [
         true,
         'STR-only fields hidden for standard',
       );
-      assert.equal(await isVisible(page, '[data-address-finder]'), true, 'address finder shares step 1');
+      assert.equal(await isVisible(page, '[data-address-finder]'), false, 'address waits for the appointment time');
 
       await fillStepOne(page);
       assert.equal(await activeStep(page), 2);
@@ -271,7 +272,8 @@ test('step 1 requires a preferred date and a complete address before advancing',
     );
 
     await selectBookingDate(page);
-    await page.fill('#est-zip', '32503');
+    await page.click('[data-period="first"]');
+    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
     await page.click('[data-next]');
     assert.equal(await activeStep(page), 1, 'stayed without a street address');
     assert.equal(await page.locator('#est-address').getAttribute('aria-invalid'), 'true');
@@ -282,6 +284,7 @@ test('step 1 requires a preferred date and a complete address before advancing',
 
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
+    await page.fill('#est-zip', '32503');
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',

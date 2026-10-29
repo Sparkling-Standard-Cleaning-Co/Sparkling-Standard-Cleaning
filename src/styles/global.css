@@ -2789,6 +2789,28 @@ fieldset {
   background: var(--color-bg-alt);
 }
 
+@media (max-width: 47.99rem) {
+  .wizard__step {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+
+  .wizard__nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    margin-top: 0;
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+    background: var(--color-surface);
+    box-shadow: 0 -8px 24px rgba(48, 36, 41, 0.12);
+  }
+
+  .wizard__nav .btn {
+    min-height: 2.75rem;
+  }
+}
+
 .wizard__nav .spacer {
   flex: 1;
 }

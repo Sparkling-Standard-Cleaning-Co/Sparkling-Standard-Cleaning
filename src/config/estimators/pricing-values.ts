@@ -174,7 +174,7 @@ export interface CampaignPromotionConfig {
   label: string;
   /** Service types the discounted first clean may be (standard or deep). */
   services: PricingServiceType[];
-  /** Qualifying recurring frequencies (weekly or biweekly only). */
+  /** Qualifying recurring frequencies (weekly, biweekly or monthly). */
   frequencies: Frequency[];
   /** ISO date after which the campaign must not apply; null = no expiry. */
   expiresOn: string | null;
@@ -640,7 +640,7 @@ export const ownerPricing: OwnerPricingConfig = {
         label: 'Recurring Care Bundle',
         enabled: true,
         requiredAddonIds: ['bed_linen_change', 'dishes', 'laundry'],
-        eligibleFrequencies: ['weekly', 'biweekly'],
+        eligibleFrequencies: ['weekly', 'biweekly', 'monthly'],
         requiresRecurring: true,
         kind: 'percent',
         value: 0.1,
@@ -699,7 +699,7 @@ export const ownerPricing: OwnerPricingConfig = {
     },
     // ── SPARKLE100 (owner-approved 2026-10-21) ──────────────────────────────
     // $100 off the first qualifying cleaning for new recurring residential
-    // customers (weekly or biweekly). Claim-based, never automatic. To
+    // customers (weekly, biweekly or monthly). Claim-based, never automatic. To
     // retract the campaign: set `enabled: false` here — every surface (popup,
     // estimator, print, server verification) follows this one switch. Any
     // change to the amount, copy or eligibility also requires updating the
@@ -711,7 +711,7 @@ export const ownerPricing: OwnerPricingConfig = {
       value: 100,
       label: 'SPARKLE100 — $100 off your first clean',
       services: ['standard', 'deep'],
-      frequencies: ['weekly', 'biweekly'],
+      frequencies: ['weekly', 'biweekly', 'monthly'],
       expiresOn: null,
       stackable: false,
       popup: {
@@ -721,7 +721,7 @@ export const ownerPricing: OwnerPricingConfig = {
         ctaLabel: 'Claim My $100 Offer',
         secondaryLabel: 'Maybe Later',
         termsLine:
-          'New recurring residential customers. Weekly or biweekly service. One per household. Applied to your first qualifying cleaning — no cash value, not retroactive, and it cannot combine with another promotion.',
+          'New recurring residential customers. Weekly, biweekly or monthly service. One per household. Applied to your first qualifying cleaning — no cash value, not retroactive, and it cannot combine with another promotion.',
         activeSeconds: 3,
         dismissedCooldownDays: 30,
       },

@@ -136,6 +136,11 @@ test('the address field exposes combobox semantics and keyboard selection', asyn
     assert.equal(await field.getAttribute('aria-expanded'), 'false');
     assert.equal(await field.getAttribute('aria-controls'), 'est-address-suggestions');
 
+    const accessibilityDate = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
+    await page.fill('#est-date', accessibilityDate);
+    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+    await page.click('[data-period="first"]');
+    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
     await field.fill('100 S Baylen');
     await page.waitForSelector('#est-address-suggestions', { state: 'visible' });
     assert.equal(await field.getAttribute('aria-expanded'), 'true', 'expanded while suggestions show');
@@ -158,6 +163,11 @@ test('the address field exposes combobox semantics and keyboard selection', asyn
 test('interactive controls have accessible names and no positive tabindex', async () => {
   const { context, page } = await openEstimate();
   try {
+    const interactiveDate = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
+    await page.fill('#est-date', interactiveDate);
+    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+    await page.click('[data-period="first"]');
+    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
@@ -207,6 +217,9 @@ test('the five-step navigator exposes state and locks future steps accessibly', 
 
     const bookingDate = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10);
     await page.fill('#est-date', bookingDate);
+    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+    await page.click('[data-period="first"]');
+    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32503');

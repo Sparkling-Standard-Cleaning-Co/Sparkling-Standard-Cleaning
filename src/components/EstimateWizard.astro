@@ -114,7 +114,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
         <BookingCalendar id="residential-calendar" />
 
-        <div class="address-card" data-address-finder data-state="idle" data-method="manual">
+        <div class="address-card" data-address-finder data-address-card data-state="idle" data-method="manual" hidden>
           <div class="address-card__head">
             <h3 class="address-card__title">Where should we clean?</h3>
             <p class="address-card__copy">
@@ -187,6 +187,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             </div>
 
 
+            <div data-address-details hidden>
             <div class="field-row field-row--3">
               <div class="field field--grow">
                 <label for="est-address-city">City</label>
@@ -219,6 +220,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
               </button>
             </div>
             <p class="hint address-finder__status" data-address-status data-kind="" aria-live="polite"></p>
+            </div>
           </div>
 
           <div class="address-map" data-address-map hidden>

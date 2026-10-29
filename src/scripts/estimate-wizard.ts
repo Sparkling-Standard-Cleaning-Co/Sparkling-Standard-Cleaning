@@ -131,6 +131,35 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const liveReference = form.querySelector<HTMLElement>('[data-estimate-reference]');
   const liveFlags = form.querySelector<HTMLElement>('[data-estimate-flags]');
   const status = form.querySelector<HTMLElement>('[data-form-status]');
+  const addressCardEl = form.querySelector<HTMLElement>('[data-address-card]');
+  const addressDetailsEl = form.querySelector<HTMLElement>('[data-address-details]');
+  const streetInputEl = form.querySelector<HTMLInputElement>('#est-address');
+  let addressCardRevealed = false;
+  let addressDetailsRevealed = false;
+
+  function smoothReveal(element: HTMLElement): void {
+    requestAnimationFrame(() => {
+      element.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        block: 'center',
+      });
+    });
+  }
+
+  function revealAddressCard(): void {
+    if (!addressCardEl || addressCardRevealed) return;
+    addressCardEl.hidden = false;
+    addressCardRevealed = true;
+    smoothReveal(addressCardEl);
+  }
+
+  function revealAddressDetails(scroll: boolean): void {
+    if (!addressDetailsEl || addressDetailsRevealed) return;
+    if ((streetInputEl?.value.trim().length ?? 0) < 5) return;
+    addressDetailsEl.hidden = false;
+    addressDetailsRevealed = true;
+    if (scroll) smoothReveal(addressDetailsEl);
+  }
   const resetButton = document.querySelector<HTMLButtonElement>('[data-estimate-reset]');
   const reservationSummary = form.querySelector<HTMLElement>('[data-reservation-summary]');
   const estimateReveal = form.querySelector<HTMLElement>('[data-estimate-reveal]');
@@ -599,7 +628,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
       if (!priceNode) continue;
       if (!frequencyAllowed) {
-        priceNode.textContent = 'Available with weekly or biweekly service.';
+        priceNode.textContent = 'Available with recurring service.';
         continue;
       }
       const applied = result.pricing.discount;
@@ -1348,6 +1377,19 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
     }
 
+    if (step === 1) {
+      const booking = form.querySelector<HTMLElement>('[data-booking-calendar]');
+      const selection = bookingCalendar?.selection();
+      if (!selection?.timeLabel) {
+        const message = 'Choose a preferred appointment time to continue.';
+        if (booking) {
+          setFieldError(booking, message);
+          errors.push({ field: booking, message });
+        }
+      } else if (booking) {
+        clearFieldError(booking);
+      }
+    }
     for (const field of stepFields(step)) {
       if (field instanceof HTMLInputElement && field.type === 'radio') continue;
       // The calendar's hidden date is validated above (format + window); the
@@ -1600,10 +1642,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
     },
   });
 
+  streetInputEl?.addEventListener('input', () => revealAddressDetails(false));
+  streetInputEl?.addEventListener('change', () => revealAddressDetails(true));
+
   // ── Fresh start (no drafts are ever stored) ───────────────────────────────
   const calendarRoot = form.querySelector<HTMLElement>('[data-booking-calendar]');
   if (calendarRoot) {
     const calendar = initBookingCalendar(calendarRoot, () => {
+      if (bookingCalendar?.selection()?.timeLabel) revealAddressCard();
       bookingFinalizedKey = '';
       bookingFinalizeNote = '';
       updateAppointmentSummary();
@@ -1672,6 +1718,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
     form.reset();
     addressFinder?.reset();
     bookingCalendar?.reset();
+    if (addressCardEl) addressCardEl.hidden = true;
+    if (addressDetailsEl) addressDetailsEl.hidden = true;
+    addressCardRevealed = false;
+    addressDetailsRevealed = false;
     bookingFinalizedKey = '';
     bookingFinalizeNote = '';
     photosDeferred = false;

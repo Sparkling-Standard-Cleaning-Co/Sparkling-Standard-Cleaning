@@ -99,6 +99,12 @@ async function openEstimate(page) {
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
 }
 
+async function startAddressStep(page) {
+  await page.fill('#est-date', BOOKING_DATE);
+  await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+  await page.click('[data-period="first"]');
+  await page.locator('[data-address-card]').waitFor({ state: 'visible' });
+}
 const addressFilled = async (page) => page.locator('[data-address-finder]').getAttribute('data-state');
 
 test('the five-step address card restores map and pin confirmation controls', async () => {
@@ -106,7 +112,11 @@ test('the five-step address card restores map and pin confirmation controls', as
   const page = await context.newPage();
   try {
     await openEstimate(page);
+    await startAddressStep(page);
     assert.equal(await page.locator('#est-address').isVisible(), true);
+    assert.equal(await page.locator('#est-address-city').isVisible(), false, 'city waits for a street');
+    await page.fill('#est-address', '100 S Baylen St');
+    await page.locator('[data-address-details]').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#est-address-city').isVisible(), true);
     assert.equal(await page.locator('#est-zip').isVisible(), true);
     assert.equal(await page.locator('[data-address-map]').count(), 1);
@@ -128,7 +138,7 @@ test('a typed address opens the map and advances only after confirmation', async
     await openWithMocks(page, {
       resolve: { label: '100 S Baylen St, Pensacola, FL 32502', lat: 30.4111, lng: -87.2164, zip: '32502', city: 'Pensacola', state: 'FL', source: 'mapmap', precise: true },
     });
-    await page.fill('#est-date', BOOKING_DATE);
+    await startAddressStep(page);
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32502');
@@ -151,7 +161,7 @@ test('a failed exact lookup keeps the typed address and uses the ZIP fallback', 
   try {
     await openEstimate(page);
     await openWithMocks(page, { suggestions: [] });
-    await page.fill('#est-date', BOOKING_DATE);
+    await startAddressStep(page);
     await page.fill('#est-address', '777 Nowhere Road');
     await page.fill('#est-address-city', 'Milton');
     await page.fill('#est-zip', '32570');
@@ -172,6 +182,7 @@ test('the suggestion provider only receives Florida and Alabama searches', async
   try {
     await openEstimate(page);
     const captured = await openWithMocks(page, { suggestions: [] });
+    await startAddressStep(page);
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForFunction(() => true);
     await delay(600);
@@ -180,6 +191,36 @@ test('the suggestion provider only receives Florida and Alabama searches', async
       assert.equal(request.state, 'FL');
     }
     assert.equal(await page.locator('[data-address-map]').count(), 1);
+  } finally {
+    await context.close();
+  }
+});
+test('a street-only suggestion never puts the state into the city field', async () => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  try {
+    await openEstimate(page);
+    await openWithMocks(page, {
+      suggestions: [
+        {
+          id: 'osm:street-jacks',
+          label: 'Jacks Branch Road, Florida, United States',
+          kind: 'street',
+          lat: 30.6,
+          lng: -87.3,
+        },
+      ],
+    });
+    await startAddressStep(page);
+    await page.fill('#est-address', '3370 Jacks Branch Rd');
+    await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
+    const suggestion = (await page.locator('#est-address-suggestions li').first().textContent()) ?? '';
+    assert.match(suggestion, /street only/i);
+    await page.locator('#est-address-suggestions li').first().click();
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    assert.notEqual(await page.inputValue('#est-address-city'), 'Florida');
+    assert.equal(await page.inputValue('#est-address-state'), 'FL');
+    assert.equal(await page.inputValue('#est-zip'), '');
   } finally {
     await context.close();
   }

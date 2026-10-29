@@ -78,13 +78,12 @@ test('a claimed weekly arrangement discounts the first visit by exactly $100 —
   assert.ok(claimed.flags.some((flag) => flag.code === 'INITIAL_DEEP_CLEAN_REQUIRED'));
 });
 
-test('a monthly arrangement fails closed for the campaign but still prices the deep first visit', () => {
+test('a monthly arrangement receives the campaign and prices the deep first visit', () => {
   const monthly = calculateEstimate(input({ frequency: 'monthly' }), context(CLAIMED));
   assert.equal(monthly.status, 'estimated');
   assert.ok(monthly.ongoing);
   assert.equal(monthly.ongoing.frequency, 'monthly');
-  // Weekly or biweekly only — the claim cannot buy a monthly discount.
-  assert.equal(monthly.pricing.discount, null);
+  assert.equal(monthly.pricing.discount?.amount, 100);
   assert.equal(monthly.ongoing.pricing.discount, null);
   // And the first visit is still the required Deep Cleaning.
   const oneTimeStandard = calculateEstimate(input({ frequency: 'one_time' }), context());

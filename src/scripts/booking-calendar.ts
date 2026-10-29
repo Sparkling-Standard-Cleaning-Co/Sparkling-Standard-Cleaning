@@ -153,6 +153,7 @@ export function initBookingCalendar(
   let selectedDate = '';
   let selectedTime: BookingCalendarSelection | null = null;
   let selectedPeriod: Period | null = null;
+  let revealedPeriodDate = '';
   let availableSlots: Slot[] = [];
   let liveAvailability = false;
   let timesSeq = 0;
@@ -283,6 +284,15 @@ export function initBookingCalendar(
       return;
     }
     periodEl.hidden = false;
+    if (revealedPeriodDate !== selectedDate) {
+      revealedPeriodDate = selectedDate;
+      requestAnimationFrame(() => {
+        periodEl.scrollIntoView({
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+          block: 'center',
+        });
+      });
+    }
     for (const button of periodButtons) {
       const period = button.dataset.period as Period | undefined;
       if (!period) continue;
@@ -634,6 +644,7 @@ export function initBookingCalendar(
       selectedDate = '';
       selectedTime = null;
       selectedPeriod = null;
+      revealedPeriodDate = '';
       availableSlots = [];
       liveAvailability = false;
       viewYear = Number(today.slice(0, 4));

@@ -384,7 +384,7 @@ export const pricing = {
      */
     campaign: approved(
       ownerPricing.promotions.campaign,
-      'Owner-approved $100-off first-clean welcome campaign for new weekly/biweekly recurring residential customers (2026-10-21). Claim-only; redemption confirmed by the owner; never stacks with another promotion.',
+      'Owner-approved $100-off first-clean welcome campaign for new weekly, biweekly or monthly recurring residential customers (2026-10-21). Claim-only; redemption confirmed by the owner; never stacks with another promotion.',
     ),
     note: 'Prepared, unpublished promotion programs ship disabled with no terms until owner approval. The SPARKLE100 campaign is the single approved exception.',
   },

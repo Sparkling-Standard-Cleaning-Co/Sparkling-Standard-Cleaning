@@ -21,7 +21,7 @@ const campaignConfig: CampaignPromotionConfig = {
   value: 100,
   label: 'SPARKLE100 — $100 off your first clean',
   services: ['standard', 'deep'],
-  frequencies: ['weekly', 'biweekly'],
+  frequencies: ['weekly', 'biweekly', 'monthly'],
   expiresOn: null,
   stackable: false,
   popup: {
@@ -30,7 +30,7 @@ const campaignConfig: CampaignPromotionConfig = {
     offer: 'Get $100 OFF your first clean when you sign up for recurring residential cleaning.',
     ctaLabel: 'Claim My $100 Offer',
     secondaryLabel: 'Maybe Later',
-    termsLine: 'New recurring residential customers. Weekly or biweekly service. One per household.',
+    termsLine: 'New recurring residential customers. Weekly, biweekly or monthly service. One per household.',
     activeSeconds: 3,
     dismissedCooldownDays: 30,
   },
@@ -413,7 +413,7 @@ test('the campaign respects service and frequency eligibility', () => {
   const monthly = evaluatePromotions(
     overrides({ campaign: campaignConfig, frequency: 'monthly', claimedCampaignCode: 'SPARKLE100' }),
   );
-  assert.equal(monthly.discount, null, 'monthly is not eligible — weekly or biweekly only');
+  assert.equal(monthly.discount?.id, 'SPARKLE100', 'monthly recurring service is eligible');
 
   const str = evaluatePromotions(
     overrides({
@@ -452,7 +452,8 @@ test('a first-visit computation under an arrangement follows the ARRANGEMENT for
       campaignArrangement: { serviceType: 'standard', frequency: 'monthly' },
     }),
   );
-  assert.equal(monthlyArrangement.discount, null, 'monthly arrangements are outside the campaign terms');
+  assert.equal(monthlyArrangement.discount?.id, 'SPARKLE100', 'monthly arrangements qualify');
+  assert.equal(monthlyArrangement.discount?.amount, 100);
 
   const withoutArrangement = evaluatePromotions(
     overrides({

@@ -202,6 +202,9 @@ const isVisible = (page, selector) => page.locator(selector).isVisible();
 
 async function step1(page) {
   await page.fill('#est-date', BOOKING_DATE);
+  await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+  await page.click('[data-period="first"]');
+  await page.locator('[data-address-card]').waitFor({ state: 'visible' });
 }
 
 async function confirmMapIfShown(page) {

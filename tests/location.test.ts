@@ -11,6 +11,7 @@ import {
   isPlausibleCoordinate,
   labelHasHouseNumber,
   locationKey,
+  regionFromLabel,
   streetLineFromLabel,
   US_STATES,
   zipFromLabel,
@@ -108,4 +109,18 @@ test('the state selector supports Florida and Alabama and disables Georgia', () 
   assert.ok(US_STATES.some((state) => state.name === 'Florida'));
   assert.ok(US_STATES.some((state) => state.name === 'Alabama'));
   assert.equal(new Set(US_STATES.map((state) => state.code)).size, US_STATES.length, 'no duplicate states');
+});
+
+test('regionFromLabel never treats the state or street as the city', () => {
+  assert.deepEqual(regionFromLabel('Jacks Branch Road, Florida, United States'), {
+    state: 'FL',
+  });
+  assert.deepEqual(regionFromLabel('3370 Jacks Branch Rd, Cantonment, FL 32533'), {
+    city: 'Cantonment',
+    state: 'FL',
+  });
+  assert.deepEqual(regionFromLabel('100 S Baylen St, Pensacola, Alabama 32502'), {
+    city: 'Pensacola',
+    state: 'AL',
+  });
 });

@@ -139,3 +139,15 @@ deployment, activation and actual provider verification.
 - Paid bookings with a live hold, no outstanding photos and a valid calendar slot confirm
   automatically; other cases remain pending owner review.
 - No live gift purchase, live card charge or production calendar-event test has been performed.
+
+## 2026-10-29 estimator UX and recurring corrections
+
+- Step 1 progressively reveals the appointment calendar, period/time picker, location/address entry,
+  city/state/ZIP details and map confirmation. Previously answered questions remain editable.
+- Newly revealed sections smooth-scroll into view; ordinary typing does not jump the page.
+- The mobile Continue action is fixed above the safe-area inset, with content padding so it never
+  traps the final field. Validation still focuses the first invalid control.
+- Monthly cleaning is recurring throughout pricing, booking and the required first deep clean.
+  SPARKLE100 now explicitly accepts weekly, biweekly and monthly recurring residential service.
+- Address suggestions remain a compact dropdown. Street-only provider rows are labeled and never
+  place a state or street into the city field; city/ZIP are left blank unless verified.

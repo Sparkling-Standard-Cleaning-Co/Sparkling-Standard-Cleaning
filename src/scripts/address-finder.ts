@@ -20,6 +20,7 @@ import {
   houseNumberFromStreet,
   isPlausibleCoordinate,
   labelHasHouseNumber,
+  regionFromLabel,
   streetLineFromLabel,
   zipFromLabel,
   type ConfirmedLocation,
@@ -118,6 +119,7 @@ interface ResolveResult {
 
 type PermissionReason = 'denied' | 'unavailable' | 'timeout' | 'unsupported';
 
+/** Parses city/state from a provider label when the payload omits them. */
 const emptyParts = (): { street: string; unit: string; city: string; state: string; zip: string } => ({
   street: '',
   unit: '',
@@ -284,7 +286,9 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       item.setAttribute('role', 'option');
       item.setAttribute('aria-selected', String(index === activeIndex));
       item.dataset.index = String(index);
-      item.textContent = suggestion.label;
+      const houseNumber = houseNumberFromStreet(streetField.value);
+      const complete = suggestion.kind === 'address' && labelHasHouseNumber(suggestion.label, houseNumber);
+      item.textContent = complete ? suggestion.label : `${suggestion.label} (street only)`;
       item.addEventListener('pointerdown', (event) => {
         // Pointer-down covers touch and mouse; firing before the input blurs
         // means the tap reliably selects the suggestion on mobile.
@@ -385,21 +389,6 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   /** Parses city/state from a provider label when the payload omits them. */
-  function regionFromLabel(label: string): { city?: string; state?: string } {
-    const parts = label
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean);
-    if (parts.length < 2) return {};
-    const statePart = parts[parts.length - 1] ?? '';
-    const state = statePart.match(/\b(FL|AL)\b/i)?.[1]?.toUpperCase();
-    const city = parts.length >= 3 ? parts[parts.length - 2] : '';
-    return {
-      ...(city ? { city } : {}),
-      ...(state ? { state } : {}),
-    };
-  }
-
   function showManualCandidate(resolved: ResolvedCandidate): void {
     setMethod('manual');
     const region = regionFromLabel(resolved.label);

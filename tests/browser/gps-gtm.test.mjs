@@ -140,6 +140,12 @@ async function confirmMapIfShown(page) {
     );
   }
 }
+async function startAddressStep(page, date = BOOKING_DATE) {
+  await page.fill('#est-date', date);
+  await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+  await page.click('[data-period="first"]');
+  await page.locator('[data-address-card]').waitFor({ state: 'visible' });
+}
 async function advanceAddressStep(page) {
   await page.click('[data-next]');
   await page.locator('[data-address-map]').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
@@ -197,6 +203,7 @@ test('GPS resolves an exact address and saves it without a separate confirmation
     mockOptions: { reverseResult: MOLINO_RESULT },
   });
   try {
+    await startAddressStep(page);
     await page.click('[data-address-gps]');
     await page.locator('[data-address-map]').waitFor({ state: 'visible' });
     assert.equal(reverseRequests.length, 1);
@@ -222,6 +229,7 @@ test('a street-level reverse result never invents a street address', async () =>
     },
   });
   try {
+    await startAddressStep(page);
     await page.click('[data-address-gps]');
     await page.locator('[data-address-map]').waitFor({ state: 'visible' });
     assert.equal(await page.inputValue('#est-address'), '', 'street is not invented');
@@ -241,17 +249,19 @@ test('a street-level reverse result never invents a street address', async () =>
 
 // ── Manual section is closed by default ──────────────────────────────────────
 
-test('the manual address fields are always visible and preserve answers', async () => {
+test('the manual address fields reveal after time selection and preserve answers', async () => {
   const { context, page } = await openEstimate({});
   try {
-    assert.equal(await page.locator('#est-address').isVisible(), true, 'manual fields visible on load');
-    assert.equal(await page.locator('#est-address-city').isVisible(), true);
-    assert.equal(await page.locator('#est-zip').isVisible(), true);
+    assert.equal(await page.locator('[data-address-card]').isVisible(), false, 'address waits for time');
+    await startAddressStep(page);
+    assert.equal(await page.locator('#est-address').isVisible(), true, 'manual fields reveal after time');
+    assert.equal(await page.locator('#est-address-city').isVisible(), false, 'city waits for a street');
     const placeholder = await page.locator('#est-address').getAttribute('placeholder');
     assert.match(placeholder ?? '', /123 Super Clean Way/, 'fictional example placeholder');
-    assert.doesNotMatch(placeholder ?? '', /Maplewood|4242/i, 'no test fixture address leaks into the placeholder');
-    await page.fill('#est-date', BOOKING_DATE);
+    assert.doesNotMatch(placeholder ?? '', /Maplewood|4242/i, 'no test fixture address leaks for the placeholder');
     await page.fill('#est-address', '100 S Baylen St');
+    await page.locator('[data-address-details]').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#est-zip').isVisible(), true);
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32503');
     await page.click('[data-address-resolve]');
@@ -281,6 +291,7 @@ test('poor GPS accuracy never auto-fills the street address', async () => {
     mockOptions: { reverseResult: MOLINO_RESULT },
   });
   try {
+    await startAddressStep(page);
     await page.click('[data-address-gps]');
     await page.locator('[data-address-map]').waitFor({ state: 'visible' });
     assert.equal(await page.inputValue('#est-address'), '', 'street stays empty at poor accuracy');
@@ -295,6 +306,7 @@ test('poor GPS accuracy never auto-fills the street address', async () => {
 test('permission denial shows device-specific guidance with retry and manual actions', async () => {
   const { context, page } = await openEstimate({ permissions: [], width: 360, height: 740 });
   try {
+    await startAddressStep(page);
     await page.click('[data-address-gps]');
     await page.waitForSelector('[data-address-permission]', { state: 'visible', timeout: 20000 });
     const panel = (await page.locator('[data-address-permission]').textContent()) ?? '';
@@ -316,6 +328,7 @@ test('permission denial shows device-specific guidance with retry and manual act
 test('Try Location Again succeeds after permission is granted', async () => {
   const { context, page } = await openEstimate({ permissions: [], mockOptions: { reverseResult: MOLINO_RESULT } });
   try {
+    await startAddressStep(page);
     await page.click('[data-address-gps]');
     await page.waitForSelector('[data-address-permission]', { state: 'visible', timeout: 20000 });
     await context.grantPermissions(['geolocation'], { origin: BASE });
@@ -334,6 +347,7 @@ test('Try Location Again succeeds after permission is granted', async () => {
 test('manual entry works after declining GPS', async () => {
   const { context, page } = await openEstimate({ permissions: [] });
   try {
+    await startAddressStep(page);
     await page.click('[data-address-gps]');
     await page.waitForSelector('[data-address-permission]', { state: 'visible', timeout: 20000 });
     await page.click('[data-address-manual-open]');
@@ -355,6 +369,7 @@ test('switching from manual to GPS isolates the old address everywhere', async (
     mockOptions: { reverseResult: DEVICE_RESULT },
   });
   try {
+    await startAddressStep(page);
     // Type a wrong manual address first.
     await page.fill('#est-address', '111 Old Manual Road');
     await page.fill('#est-address-city', 'Oldtown');
@@ -405,14 +420,23 @@ test('missing required fields show an error summary, field errors and focus', as
     await page.waitForSelector('[data-error-summary]', { state: 'visible' });
     const summary = (await page.locator('[data-error-summary-list]').textContent()) ?? '';
     assert.match(summary, /preferred date/i);
-    assert.match(summary, /street address/i);
+    assert.match(summary, /preferred appointment time/i);
+    assert.doesNotMatch(summary, /street address/i, 'street waits for the time selection');
+
+    await startAddressStep(page);
+    await page.click('[data-next]');
+    await page.waitForSelector('[data-error-summary]', { state: 'visible' });
+    const streetSummary = (await page.locator('[data-error-summary-list]').textContent()) ?? '';
+    assert.match(streetSummary, /street address/i);
     assert.equal(await page.locator('#est-address').getAttribute('aria-invalid'), 'true');
     assert.match((await page.locator('[data-error-for="est-address"]').textContent()) ?? '', /Please enter your street address/i);
+
+    await page.fill('#est-address', '100 S Baylen St');
+    await page.click('[data-next]');
+    await page.waitForSelector('[data-error-summary]', { state: 'visible' });
     assert.match((await page.locator('[data-error-for="est-zip"]').textContent()) ?? '', /Please enter a valid ZIP code/i);
 
     // Correcting the fields clears the errors and reaches the service step.
-    await page.fill('#est-date', BOOKING_DATE);
-    await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32503');
     await page.click('[data-address-resolve]');
@@ -432,22 +456,21 @@ test('missing required fields show an error summary, field errors and focus', as
   }
 });
 
-test('a GPS pin without a reverse-geocoded address is saved and needs only a date', async () => {
+test('a GPS pin without a reverse-geocoded address confirms and advances', async () => {
   const { context, page } = await openEstimate({
     geolocation: { ...MOLINO, accuracy: 20 },
     permissions: ['geolocation'],
     mockOptions: { reverseResult: null },
   });
   try {
+    await startAddressStep(page);
     await page.click('[data-address-gps]');
     await page.locator('[data-address-map]').waitFor({ state: 'visible' });
     await advanceAddressStep(page);
-    assert.equal(await page.locator('.wizard__step[data-active="true"][data-step="1"]').count(), 1, 'date is still required');
-    await page.fill('#est-date', BOOKING_DATE);
-    await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
     );
+    assert.equal(await page.locator('.wizard__step[data-active="true"][data-step="2"]').count(), 1);
   } finally {
     await context.close();
   }
@@ -458,6 +481,7 @@ test('a GPS pin without a reverse-geocoded address is saved and needs only a dat
 test('an unresolved manual address can still be submitted for confirmation', async () => {
   const { context, page, leadPayloads } = await openEstimate({ mockOptions: { resolveResult: null } });
   try {
+    await startAddressStep(page);
     await page.fill('#est-address', '777 Nowhere Road');
     await page.fill('#est-address-city', 'Molino');
     await page.fill('#est-zip', '32577');

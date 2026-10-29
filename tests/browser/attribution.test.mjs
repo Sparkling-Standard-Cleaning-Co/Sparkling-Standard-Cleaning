@@ -116,6 +116,9 @@ async function mockApis(page) {
 
 async function completeEstimate(page) {
   await page.fill('#est-date', BOOKING_DATE);
+  await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
+  await page.click('[data-period="first"]');
+  await page.locator('[data-address-card]').waitFor({ state: 'visible' });
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', '32502');
