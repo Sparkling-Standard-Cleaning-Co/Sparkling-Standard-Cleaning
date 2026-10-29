@@ -2,35 +2,49 @@
 import { analyticsConfigured } from '../lib/analytics/consent';
 import Icon from './Icon.astro';
 
+interface Props {
+  compact?: boolean;
+}
+
 // Rendered only when at least one analytics service is configured. The
 // controller script shows/hides it based on the stored choice.
 const configured = analyticsConfigured();
+const { compact = false } = Astro.props;
 ---
 
 {
   configured && (
     <>
       <div
-        class="consent-banner"
+        class:list={['consent-banner', { 'consent-banner--compact': compact }]}
         data-consent-banner
         data-visible="false"
         role="region"
         aria-label="Privacy choices"
       >
-        <p>
-          <strong>Your privacy comes first.</strong> We use privacy-friendly analytics to understand
-          which pages help people — nothing is loaded until you say so, and we never sell data or run
-          ads. You can change your choice anytime on the <a href="/privacy/">privacy page</a> or in
-          privacy settings.
-        </p>
+        {compact ? (
+          <p>
+            <strong>Privacy:</strong> analytics stay off until you choose. No ads or data sales.
+            <a href="/privacy/">Details</a>
+          </p>
+        ) : (
+          <p>
+            <strong>Your privacy comes first.</strong> We use privacy-friendly analytics to understand
+            which pages help people — nothing is loaded until you say so, and we never sell data or
+            run ads. You can change your choice anytime on the <a href="/privacy/">privacy page</a>
+            or in privacy settings.
+          </p>
+        )}
         <div class="consent-banner__actions">
           <button class="btn btn--primary btn--small" type="button" data-consent="allow">
             <Icon name="check" size={16} /> Allow analytics
           </button>
           <button class="btn btn--ghost btn--small" type="button" data-consent="deny">No thanks</button>
-          <button class="btn btn--ghost btn--small" type="button" data-consent="customize">
-            Customize
-          </button>
+          {!compact && (
+            <button class="btn btn--ghost btn--small" type="button" data-consent="customize">
+              Customize
+            </button>
+          )}
         </div>
       </div>
 

@@ -332,8 +332,8 @@ test('Pay Now appears only for an exact Tier A facility quote when Stripe is con
     await page.locator('[data-facility-next]').click();
     await page.locator('[data-facility-step-panel="4"]').waitFor({ state: 'visible' });
     await page.locator('[data-facility-pay-now]').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('[data-facility-pay-now]').innerText(), 'Pay Now Securely');
-    assert.match(normalize((await page.locator('[data-facility-pay-note]').innerText()) ?? ''), /without paying upfront/);
+    assert.equal(await page.locator('[data-facility-pay-now]').innerText(), 'Pay Now and Reserve This Cleaning');
+    assert.match(normalize((await page.locator('[data-facility-pay-note]').innerText()) ?? ''), /Pay now to reserve this cleaning/i);
     await page.fill('#fac-phone', '8500000000');
     await page.fill('#fac-email', 'customer@example.test');
     await page.check('#commercial-terms');

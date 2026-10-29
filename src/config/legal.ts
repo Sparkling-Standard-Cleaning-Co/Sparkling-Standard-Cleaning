@@ -10,5 +10,5 @@ export const legalTerms = {
   cancellationPath: '/terms/#cancellation-rescheduling',
   privacyPath: '/privacy/',
   acceptanceLabel:
-    'I have read and agree to Sparkling Standard’s Terms and Conditions and applicable Policies.',
+    "I have read and agree to Sparkling Standard's Terms and Conditions and acknowledge the Privacy Policy.",
 } as const;

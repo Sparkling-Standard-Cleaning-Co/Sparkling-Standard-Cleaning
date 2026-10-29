@@ -21,10 +21,22 @@ export type AutoConfirmResult =
 export async function autoConfirmPaidBooking(
   env: BookingEnv,
   holdId: string,
+  expectedReference = '',
 ): Promise<AutoConfirmResult> {
+  if (!bookingConfig.autoConfirmAllowed || bookingConfig.confirmationMode !== 'auto_confirm') {
+    return { ok: false, reason: 'auto_confirm_disabled' };
+  }
+
+  if (expectedReference && !expectedReference.match(/^SS-[0-9]{8}-[0-9A-Z]{6}$/)) {
+    return { ok: false, reason: 'reference_invalid' };
+  }
+
   const bucket = bookingStore(env);
   if (!bucket) return { ok: false, reason: 'booking_store_not_configured' };
   const hold = await getBookingHold(bucket, holdId);
+  if (expectedReference && hold?.reference !== expectedReference) {
+    return { ok: false, reason: 'hold_reference_mismatch' };
+  }
   if (hold?.status === 'confirmed' && hold.calendarEventId) {
     return { ok: true, eventId: hold.calendarEventId, hold };
   }

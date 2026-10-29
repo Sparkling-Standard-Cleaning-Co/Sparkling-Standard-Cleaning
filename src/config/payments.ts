@@ -12,5 +12,5 @@ export const estimatePaymentConfig = {
   /** Used on the Stripe Checkout line item and the payment-success page. */
   productLabel: 'Sparkling Standard Cleaning',
   checkoutNote:
-    'Secure payment is processed by Stripe. Your request is reviewed personally; payment does not by itself confirm a date or final scope.',
+    'Secure payment is processed by Stripe. Complete paid bookings confirm automatically when the address, required photos, requested time and resource availability all verify. If a requirement is outstanding, the booking remains pending and we follow up.',
 } as const;

@@ -6,7 +6,6 @@
 import { activeBookingResources, bookingConfig, validResourceIds } from '../../config/booking.ts';
 import {
   createLedgerJson,
-  deleteLedgerKey,
   paymentLedger,
   readLedgerJson,
   writeLedgerJson,
@@ -62,6 +61,7 @@ async function withDayLock<T>(
 ): Promise<{ ok: true; value: T } | { ok: false; error: 'busy' }> {
   const key = lockKey(date);
   let acquired = false;
+  let activeToken = '';
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const token = crypto.randomUUID();
     const created = await createLedgerJson(bucket, key, {
@@ -70,12 +70,32 @@ async function withDayLock<T>(
     });
     if (created) {
       acquired = true;
+      activeToken = token;
       break;
     }
     const existing = await readLedgerJson<{ expiresAt?: string }>(bucket, key).catch(() => null);
     const expiresAt = existing?.value.expiresAt ? Date.parse(existing.value.expiresAt) : 0;
     if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
-      await bucket.delete?.(key);
+      if (existing?.etag) {
+        try {
+          const nextToken = crypto.randomUUID();
+          const stolen = await bucket.put(
+            key,
+            JSON.stringify({
+              token: nextToken,
+              expiresAt: new Date(Date.now() + 8_000).toISOString(),
+            }),
+            { onlyIf: new Headers({ 'If-Match': existing.etag }) },
+          );
+          if (stolen !== null && stolen !== undefined) {
+            acquired = true;
+            activeToken = nextToken;
+            break;
+          }
+        } catch {
+          // Another request won the stale-lock takeover.
+        }
+      }
       continue;
     }
     await sleep(120);
@@ -84,7 +104,14 @@ async function withDayLock<T>(
   try {
     return { ok: true, value: await run() };
   } finally {
-    await deleteLedgerKey(bucket, key).catch(() => undefined);
+    const current = await readLedgerJson<{ token?: string }>(bucket, key).catch(() => null);
+    if (current?.etag && current.value.token === activeToken) {
+      await bucket.put(
+        key,
+        JSON.stringify({ token: activeToken, expiresAt: new Date(0).toISOString() }),
+        { onlyIf: new Headers({ 'If-Match': current.etag }) },
+      ).catch(() => undefined);
+    }
   }
 }
 

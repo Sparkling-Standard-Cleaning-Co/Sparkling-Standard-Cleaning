@@ -72,7 +72,16 @@ recorded, the customer receipt is emailed and the owner is notified. A card rema
 by the paid webhook, while `checkout.session.expired` releases the reservation. The gift ledger uses
 `GIFT_LEDGER` when configured, otherwise `PAYMENT_LEDGER`.
 
-## Automatic booking confirmation\n\nA paid estimate that carries a live, unexpired booking hold and has no outstanding photos is\nrevalidated against the two-resource calendar and confirmed automatically. The webhook creates the\ncalendar event, marks the hold and pending request confirmed, and the payment-success page reports\nthe confirmed appointment. Missing/expired holds, outstanding photos, manual-review quotes or\ncalendar failures remain pending_owner_review; payment is never discarded. A repeated webhook\nreuses the existing calendar event and cannot double-book.\n\n## Owner notification
+## Automatic booking confirmation
+
+A paid estimate that carries a live, unexpired booking hold and has no outstanding photos is
+revalidated against the two-resource calendar and confirmed automatically. The webhook creates the
+calendar event, marks the hold and pending request confirmed, and the payment-success page reports
+the confirmed appointment. Missing/expired holds, outstanding photos, manual-review quotes or
+calendar failures remain pending_owner_review; payment is never discarded. A repeated webhook
+reuses the existing calendar event and cannot double-book.
+
+## Owner notification
 
 The estimate request arrives through the normal lead relay with the customer's payment preference.
 A separate **PAID estimate** email is sent only from the verified webhook, with the Stripe amount and
@@ -84,8 +93,9 @@ event exists.
 
 - Live Stripe configuration has not been independently verified in the code repository; the secret
   is environment-only.
-- Payment by itself does not book an appointment. Sparkling Standard still confirms scope, date and
-  final details.
+- A complete paid booking confirms automatically only after the server verifies the payment, quote,
+  hold, address, required photos, requested time and resource availability. Anything unresolved
+  remains pending.
 - The success page does not say "paid" unless the server verifies the Checkout Session.
 - No refund/cancellation policy is invented here; the existing owner-approved terms govern.
 

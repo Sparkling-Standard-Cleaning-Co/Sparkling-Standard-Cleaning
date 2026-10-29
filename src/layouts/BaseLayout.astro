@@ -32,7 +32,7 @@ const { title, description, noindex = false, schema = [], showMobileActionBar = 
     </main>
     <Footer />
     {showMobileActionBar && <MobileActionBar />}
-    <ConsentBanner />
+    <ConsentBanner compact={!showMobileActionBar} />
     <PromoPopup />
     <script>
       import '../scripts/consent-controller';

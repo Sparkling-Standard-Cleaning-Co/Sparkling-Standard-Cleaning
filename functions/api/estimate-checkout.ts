@@ -51,6 +51,12 @@ import {
 } from '../../src/lib/gift/ledger.ts';
 import { isGiftActive } from '../../src/lib/gift/activation.ts';
 import { sendCustomerReceipt } from '../../src/lib/forms/customer-receipt.ts';
+import {
+  normalizePhotoEntries,
+  photoKeyBelongsToRequest,
+  sanitizePhotoRequestRef,
+} from '../../src/lib/photos.ts';
+import { bookingStore, getBookingHold, holdIsActive } from '../../src/lib/booking/holds.ts';
 
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   STRIPE_SECRET_KEY?: string;
@@ -194,6 +200,55 @@ function throttled(request: Request): boolean {
   return entry.count > PER_IP_PER_MINUTE;
 }
 
+
+async function authoritativePhotosOutstanding(
+  fields: Record<string, string>,
+  env: Env,
+): Promise<boolean> {
+  const photoBucket = env.PHOTOS_BUCKET as unknown as
+    | { head?: (key: string) => Promise<unknown> }
+    | undefined;
+  if (!photoBucket?.head) return false;
+  const requestRef = sanitizePhotoRequestRef(fields.photo_request_ref ?? '');
+  const claimed = normalizePhotoEntries(fields.photo_keys ?? '', requestRef);
+  if (claimed.length === 0) return true;
+  for (const photo of claimed) {
+    if (!photoKeyBelongsToRequest(photo.key, requestRef)) continue;
+    try {
+      if (await photoBucket.head(photo.key)) return false;
+    } catch {
+      // Treat a failed head as unverified, never as proof of a photo.
+    }
+  }
+  return true;
+}
+
+async function expireCheckoutSession(env: Env, sessionId: string): Promise<void> {
+  if (!env.STRIPE_SECRET_KEY?.trim() || !sessionId) return;
+  await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}/expire`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY.trim()}` },
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => undefined);
+}
+async function authoritativeHoldId(
+  fields: Record<string, string>,
+  env: Env,
+): Promise<{ ok: true; holdId: string } | { ok: false; error: string }> {
+  const holdId = (fields.booking_hold_id ?? '').trim();
+  if (!holdId) return { ok: true, holdId: '' };
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
+    return { ok: false, error: 'booking_hold_invalid' };
+  }
+  const store = bookingStore(env);
+  if (!store) return { ok: false, error: 'booking_hold_unavailable' };
+  const hold = await getBookingHold(store, holdId).catch(() => null);
+  if (!hold || !holdIsActive(hold)) return { ok: false, error: 'booking_hold_expired' };
+  if (hold.reference !== (fields.quote_reference ?? '').trim()) {
+    return { ok: false, error: 'booking_hold_mismatch' };
+  }
+  return { ok: true, holdId };
+}
 function sanitizeFields(value: unknown): Record<string, string> {
   if (typeof value !== 'object' || value === null) return {};
   const clean: Record<string, string> = {};
@@ -855,6 +910,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       ? payload.returnPath
       : '/estimate/';
 
+  const photosOutstanding = await authoritativePhotosOutstanding(fields, env);
+  fields.photos_outstanding = photosOutstanding ? 'yes' : 'no';
+  const hold = await authoritativeHoldId(fields, env);
+  if (!hold.ok) return json({ ok: false, error: hold.error }, 400);
+  if (hold.holdId) fields.booking_hold_id = hold.holdId;
+  else delete fields.booking_hold_id;
+
   const ready = await paymentReadiness(env);
   if (!ready.enabled) {
     console.error('[estimate-checkout] payment_not_ready', {
@@ -968,7 +1030,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     cleaningAmountCents: candidate.cleaningAmountCents,
     ...(candidate.quotedTotalCents !== null ? { quotedTotalCents: candidate.quotedTotalCents } : {}),
     tax: candidate.tax,
-    photosOutstanding: fields.photos_outstanding === 'yes',
+    photosOutstanding,
     receipt: { ...candidate.receipt, customerEmail: email },
   };
   const claimed = await createLedgerJson(bucket, key, claim).catch((error) => {
@@ -1066,10 +1128,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('metadata[tax_rate_percent]', String(candidate.tax.ratePercent ?? ''));
   body.set('metadata[tax_jurisdiction]', candidate.tax.jurisdictionKey ?? '');
   if (fields.booking_hold_id) body.set('metadata[booking_hold_id]', fields.booking_hold_id);
-  body.set(
-    'metadata[photos_outstanding]',
-    fields.photos_outstanding === 'yes' ? 'yes' : 'no',
-  );
+  body.set('metadata[photos_outstanding]', photosOutstanding ? 'yes' : 'no');
   if (gift) body.set('expires_at', String(Math.floor(Date.now() / 1000) + 31 * 60));
   body.set('customer_email', email);
 
@@ -1113,11 +1172,28 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       sessionUrl: data.url,
       updatedAt: new Date().toISOString(),
     };
-    await writeLedgerJson(bucket, key, record).catch((error) => {
-      console.error('[estimate-checkout] ledger_write_failed', {
-        name: error instanceof Error ? error.name : 'unknown',
-      });
-    });
+    let persisted = false;
+    for (let attempt = 0; attempt < 3 && !persisted; attempt += 1) {
+      try {
+        await writeLedgerJson(bucket, key, record);
+        persisted = true;
+      } catch (error) {
+        console.error('[estimate-checkout] ledger_write_retry', {
+          attempt: attempt + 1,
+          name: error instanceof Error ? error.name : 'unknown',
+        });
+      }
+    }
+    if (!persisted) {
+      await expireCheckoutSession(env, data.id);
+      if (gift && giftLedger) {
+        await releaseGiftReservation(giftLedger, gift.code, gift.reservationId).catch(
+          () => undefined,
+        );
+      }
+      console.error('[estimate-checkout] checkout_state_uncertain', { sessionId: data.id });
+      return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
+    }
     return json({ ok: true, url: data.url });
   } catch (error) {
     if (gift && giftLedger) {

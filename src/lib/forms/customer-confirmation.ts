@@ -93,7 +93,7 @@ function introFor(kind: RequestSummary['kind'], priced: boolean): string {
   }
 }
 
-function nextStepsFor(kind: RequestSummary['kind'], priced: boolean): string[] {
+function nextStepsFor(kind: RequestSummary['kind'], priced: boolean, payNow: boolean): string[] {
   switch (kind) {
     case 'facility_estimate':
       return priced
@@ -131,11 +131,17 @@ function nextStepsFor(kind: RequestSummary['kind'], priced: boolean): string[] {
         'We reply personally as soon as we can.',
       ];
     default:
-      return [
-        'We review your scope, condition details and preferred date — usually the same day.',
-        'We reply with final scope, price and the exact date and arrival details.',
-        'Only after you confirm is your cleaning placed on the calendar.',
-      ];
+      return payNow
+        ? [
+            'We verify your payment, service address, required photos and requested time.',
+            'When everything verifies, your appointment confirms automatically and appears on the calendar.',
+            'We send the final arrival details before the cleaning. If a requirement is outstanding, we follow up.',
+          ]
+        : [
+            'We review your scope, condition details and preferred date - usually the same day.',
+            'We reply with final scope, price and the exact date and arrival details.',
+            'Your cleaning is placed on the calendar after you approve the request.',
+          ];
   }
 }
 
@@ -220,8 +226,8 @@ function buildHtml(
           <table role="presentation" width="536" cellpadding="0" cellspacing="0" style="margin:20px 0 0;background:${PALETTE.roseBg};border-radius:8px;">
             <tr>
               <td style="padding:14px 16px;">
-                <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:${PALETTE.rose};">This is not a confirmed appointment.</p>
-                <p style="margin:0;font-size:13px;line-height:1.5;color:${PALETTE.inkSoft};">${payNow ? "Your secure payment step opens separately through Stripe. Payment is processed there; this email is not a payment receipt. Sparkling Standard confirms the final scope, price and date before the cleaning is scheduled." : "Final scope, pricing and availability may require confirmation before anything is scheduled. Please don&rsquo;t send payment until we&rsquo;ve confirmed an amount and a payment method with you."}</p>
+                <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:${PALETTE.rose};">${payNow ? "Your appointment is not confirmed yet." : "This is a request, not a confirmed appointment."}</p>
+                <p style="margin:0;font-size:13px;line-height:1.5;color:${PALETTE.inkSoft};">${payNow ? "Complete secure checkout through Stripe. When payment, address, required photos, requested time and resource availability verify, your appointment confirms automatically. If a requirement is outstanding, we follow up. This email is not a payment receipt." : "We will review the request and confirm the scope, price and date with you before the cleaning is scheduled. Please don&rsquo;t send payment until we&rsquo;ve confirmed an amount and payment method with you."}</p>
               </td>
             </tr>
           </table>
@@ -281,11 +287,11 @@ function buildText(
     lines.push(`Reference: ${summary.reference}`);
     lines.push('');
   }
-  lines.push('THIS IS NOT A CONFIRMED APPOINTMENT.');
+  lines.push(payNow ? 'YOUR APPOINTMENT IS NOT CONFIRMED YET.' : 'THIS IS A REQUEST, NOT A CONFIRMED APPOINTMENT.');
   lines.push(
     payNow
-      ? 'Your secure payment step opens separately through Stripe. Payment is processed there; this email is not a payment receipt. Sparkling Standard confirms the final scope, price and date before the cleaning is scheduled.'
-      : "Final scope, pricing and availability may require confirmation before anything is scheduled. Please don't send payment until we've confirmed an amount and a payment method with you.",
+      ? 'Complete secure checkout through Stripe. When payment, address, required photos, requested time and resource availability verify, your appointment confirms automatically. If a requirement is outstanding, we follow up. This email is not a payment receipt.'
+      : "We will review the request and confirm the scope, price and date with you before the cleaning is scheduled. Please don't send payment until we've confirmed an amount and payment method with you.",
   );
   lines.push('');
   lines.push('WHAT HAPPENS NEXT');
@@ -314,8 +320,8 @@ export function buildCustomerConfirmation(
 ): CustomerConfirmation {
   const summary = buildRequestSummary(fields);
   const intro = introFor(summary.kind, summary.estimate !== null);
-  const steps = nextStepsFor(summary.kind, summary.estimate !== null);
   const payNow = fields.payment_choice === 'pay_now';
+  const steps = nextStepsFor(summary.kind, summary.estimate !== null, payNow);
   return {
     // Fixed subject for every request type — never "booking confirmed",
     // "your receipt" or "your invoice" (see docs/operations/FINANCIAL-WORKFLOW.md).

@@ -628,7 +628,7 @@ export function initBookingCalendar(
         return {
           status: 'held',
           message:
-            'Your preferred time is temporarily held while you send the request. It is not a confirmed appointment until Sparkling Standard approves it.',
+            'Your preferred time is temporarily held while you continue. Complete checkout to reserve when eligible, or send a pay-later request for review.',
           alternatives: [],
         };
       } catch {

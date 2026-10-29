@@ -1,16 +1,12 @@
-# Booking & checkout architecture - live owner-approval availability
+# Booking & checkout architecture - live paid auto-confirmation
 
 Owner directive: Smart Estimate System 2.0, Part 6. This documents how the
-current Astro/Cloudflare architecture can grow into direct booking WITHOUT
-rebuilding the estimator. **No appointments are auto-confirmed.** The current release offers an
-optional Pay Now for exact estimate quotes, but it is not a booking or deposit system and does not
-hold a calendar slot.
-
-**Initiative 6.9 status (2026-10-28):** live booking is **connected and active** against the
-dedicated **Sparkling Standard - Bookings** Google Calendar in `America/Chicago`. Production
-availability and holds are real. Confirmation is owner-approval only (`autoConfirmAllowed:false`);
-a hold is never advertised as confirmed. The calendar currently has no jobs, so real availability
-reflects only the configured working window and travel from the origin until the owner adds jobs.
+Astro/Cloudflare booking path works. Live booking is connected against the
+dedicated **Sparkling Standard - Bookings** Google Calendar in `America/Chicago`.
+A hold is not a confirmed appointment. A complete paid booking confirms
+automatically only after the payment record, quote reference, hold, address,
+required photos, requested time and resource availability all verify. Anything
+unresolved remains visibly pending for owner follow-up.
 
 **Resource-aware scheduler (2026-10-28):** the model now schedules the two real cleaning resources
 (`src/config/booking.ts` → `bookingResources`: Hayli and the family cleaner), not a single crew with

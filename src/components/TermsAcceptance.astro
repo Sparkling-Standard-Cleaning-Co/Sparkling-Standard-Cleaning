@@ -16,16 +16,13 @@ const { id } = Astro.props;
       type="checkbox"
       value="yes"
       required
-      data-error-required="Please agree to the Terms and Conditions and applicable Policies to continue."
+      data-error-required="Please agree to the Terms and Conditions and acknowledge the Privacy Policy to continue."
     />
     <span>
-      {legalTerms.acceptanceLabel}
-      <a href={legalTerms.termsPath} target="_blank" rel="noopener noreferrer">Terms and Conditions</a>,
-      <a href={legalTerms.cancellationPath} target="_blank" rel="noopener noreferrer"
-        >Cancellation and Rescheduling Policy</a
-      >, and
-      <a href={legalTerms.privacyPath} target="_blank" rel="noopener noreferrer">Privacy Policy</a
-      >.
+      I have read and agree to Sparkling Standard&rsquo;s
+      <a href={legalTerms.termsPath} target="_blank" rel="noopener noreferrer">Terms and Conditions</a>
+      and acknowledge the
+      <a href={legalTerms.privacyPath} target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
     </span>
   </label>
   <p class="terms-acceptance__note">

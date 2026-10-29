@@ -4,19 +4,14 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-28** (release `7bb91ff`; Cloudflare Pages deployment `5529baa6-591b-4501-b40f-8d23f6f273b9`; GitHub `validate`, `browser` and Cloudflare checks passed).
+Last reviewed: **2026-10-29** (owner-facing estimator and payment-integrity release).
 
-**Release status:** production serves GitHub `main`; the current release is `7bb91ff`
-(Cloudflare Pages deployment `5529baa6-591b-4501-b40f-8d23f6f273b9`; GitHub `validate` and `browser`
-for run `40783479501`, and the Cloudflare check, all succeeded). It includes the booking-hold
-minute-boundary fix, distributed persisted admin rate limiting (IP and account), no-store/noindex
-headers for financial pages, the daily photo-cleanup workflow and R2 lifecycle guidance, and the
-simultaneous-redemption test. It carries forward Batch A checkout/travel hardening, mandatory
-customer email, privacy preference controls, the password-protected Hayli gift register, immediate
-gift delivery with future valid-from activation at 12:00 AM America/Chicago, the Workers-compatible
-100,000-iteration PBKDF2 fix for gift administrator enrollment, 30-day photo retention policy, and
-the residential 15% extras reduction with the exact-three 20% bundle. Gift sales remain disabled and Pay Now remains gated to verified exact quotes. Google Calendar booking remains connected in owner-approval mode; owner confirmation still
-requires the private token. No live card charge, Stripe refund or gift purchase has been performed.
+**Release status:** production serves GitHub `main`. Gift certificates are **live for public
+purchase**, including custom amounts, recipient delivery and valid-from activation. A complete paid
+booking confirms automatically only when the payment, authoritative quote, bound hold, address,
+required photos, requested time and resource availability all verify. Anything unresolved remains
+pending with the specific outstanding requirement. Pay Now remains limited to verified exact
+quotes. No live card charge, live Stripe refund or live gift purchase has been performed.
 
 **Customer photos are live:** production `/api/photo-upload` reports `enabled:true`; the private R2
 bucket, `PHOTOS_BUCKET` binding and `PHOTO_OWNER_TOKEN` are active. Real JPEG and converted iPhone

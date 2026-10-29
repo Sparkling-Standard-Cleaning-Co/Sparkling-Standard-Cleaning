@@ -237,6 +237,7 @@ test('the dirt guide is a compact single-select with ten explained levels', asyn
   const { context, page } = await open();
   try {
     await reachCondition(page);
+    await page.selectOption('#est-frequency', 'one_time');
     const guide = page.locator('[data-dirt-guide]');
     const summary = guide.locator('summary');
     assert.equal((await summary.innerText()).trim(), 'Choose a dirt level (1–10)');
@@ -257,6 +258,7 @@ test('Continue opens the dirt guide, scrolls to it and shows the red error', asy
   const { context, page } = await open(390, 844);
   try {
     await reachCondition(page);
+    await page.selectOption('#est-frequency', 'one_time');
     await page.click('[data-next]');
     const guide = page.locator('[data-dirt-guide]');
     assert.equal(await guide.locator('details').evaluate((el) => el.open), true, 'the invalid guide opens');
@@ -278,14 +280,15 @@ test('photos are in Condition & Frequency, and the last step has no photo upload
   const { context, page } = await open();
   try {
     await reachCondition(page);
+    await page.selectOption('#est-frequency', 'one_time');
+    await page.locator('[data-dirt-guide] summary').click();
+    await page.locator('[data-dirt-level="2"]').click();
     const section = page.locator('[data-photo-section]');
     assert.equal(await section.isVisible(), true);
     assert.equal(
       await section.evaluate((el) => el.closest('[data-step]')?.getAttribute('data-step')),
       '3',
     );
-    await page.selectOption('#est-frequency', 'one_time');
-    await page.locator('[data-dirt-guide] summary').click(); await page.locator('[data-dirt-level="2"]').click();
     await page.selectOption('#est-last-clean', 'within_month');
     await page.selectOption('#est-pets', 'none');
     await page.click('[data-next]');
@@ -353,6 +356,7 @@ test('final checkout shows calculated add-on prices and bundle savings', async (
   const { context, page } = await open();
   try {
     await reachFinal(page);
+    await page.locator('[data-extras-accordion] summary').click();
     const step = await page.evaluate(() =>
       document.querySelector('[data-addon-price]')?.closest('[data-step]')?.getAttribute('data-step'),
     );
@@ -368,6 +372,34 @@ test('final checkout shows calculated add-on prices and bundle savings', async (
     );
     const bundleText = (await page.locator('.bundle-offers').innerText()).replace(/\s+/g, ' ');
     assert.match(bundleText, /\$\d+.*save|save.*\$\d+/i, 'bundle price and savings are shown');
+  } finally {
+    await context.close();
+  }
+});
+
+test('the final step has one green pay action, one pay-later action and a stacked total', async () => {
+  const { context, page } = await open();
+  try {
+    await reachFinal(page);
+    const actions = page.locator('.wizard__final-actions');
+    assert.equal(await actions.isVisible(), true);
+    assert.equal(await page.locator('[data-pay-now]').count(), 1, 'no duplicate pay button in the form');
+    assert.equal(await page.locator('[data-pay-now]').isVisible(), true);
+    assert.equal(await page.locator('[data-pay-now]').evaluate((el) => el.classList.contains('btn--success')), true);
+    assert.match((await page.locator('[data-pay-now]').innerText()).trim(), /Pay Now and Reserve This Cleaning/);
+    assert.match((await page.locator('[data-submit]').innerText()).trim(), /Request to Reserve This Cleaning \(Pay Later\)/);
+    const breakdown = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+    assert.match(breakdown, /Sales tax \$0\.00/);
+    assert.match(breakdown, /ESTIMATED TOTAL \$/);
+    assert.equal(await page.locator('[data-extras-accordion]').evaluate((el) => el.open), false, 'extras start collapsed');
+    assert.match((await page.locator('[data-extras-summary]').innerText()).trim(), /No extras selected/);
+    const support = page.locator('[data-supportive-section]');
+    await support.waitFor({ state: 'visible' });
+    assert.equal(
+      await support.evaluate((el) => el.nextElementSibling?.classList.contains('terms-acceptance')),
+      true,
+      'Community Support sits immediately before the terms acceptance',
+    );
   } finally {
     await context.close();
   }

@@ -83,11 +83,7 @@ function constantTimeEqual(a: string, b: string): boolean {
 }
 
 function authorized(request: Request, env: Env): boolean {
-  const expected =
-    env.BOOKING_OWNER_TOKEN?.trim() ||
-    env.GIFT_OWNER_TOKEN?.trim() ||
-    env.PHOTO_OWNER_TOKEN?.trim() ||
-    '';
+  const expected = env.BOOKING_OWNER_TOKEN?.trim() ?? '';
   if (!expected) return false;
   const match = /^Bearer\s+(.+)$/i.exec((request.headers.get('Authorization') ?? '').trim());
   return Boolean(match && constantTimeEqual(match[1]!.trim(), expected));

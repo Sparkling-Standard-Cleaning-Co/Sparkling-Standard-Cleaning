@@ -77,14 +77,13 @@ export const bookingConfig = {
   holdMinutes: 20,
 
   /**
-   * owner_approval = a selected slot is a held request, never a confirmed
-   * booking until Hayli approves. auto_confirm is intentionally unavailable
-   * until the calendar + payment reconciliation are proven live.
+   * Paid, fully verified bookings confirm automatically. Incomplete or
+   * review-required requests remain pending for owner action.
    */
-  confirmationMode: 'owner_approval' as 'owner_approval' | 'auto_confirm',
+  confirmationMode: 'auto_confirm' as 'owner_approval' | 'auto_confirm',
 
-  /** Do not allow online booking to promise a confirmed event before this is true. */
-  autoConfirmAllowed: false,
+  /** Gate for automatic confirmation of fully verified paid bookings. */
+  autoConfirmAllowed: true,
 } as const;
 
 /** The active resources that may receive work. */

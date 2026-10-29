@@ -206,6 +206,7 @@ test('owner redemption writes a durable financial record', async () => {
   await issueGiftCertificate(bucket, record());
   const access = await adminAccess(bucket);
   const request = authedRequest('https://example.test/api/gift-admin', access, {
+    action: 'redeem',
     code: 'SSGC-ABCD-2345',
     password: access.password,
     amountCents: 3000,
@@ -445,4 +446,61 @@ test('expired reservations stop reducing the available balance', async () => {
   if (!reserved.ok) return;
   assert.equal(remainingCents(reserved.record, new Date('2026-10-29T12:10:00.000Z')), 4000);
   assert.equal(remainingCents(reserved.record, new Date('2026-10-29T12:31:00.000Z')), 10000);
+});
+
+test('a certificate with an active reservation cannot be refunded or voided', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const reserved = await reserveGiftCredit(bucket, 'SSGC-ABCD-2345', 3000, 'SS-20261029-ABC123');
+  assert.equal(reserved.ok, true);
+  if (!reserved.ok) return;
+
+  const refund = await refundGiftCertificate(
+    bucket,
+    'SSGC-ABCD-2345',
+    'Refund attempt',
+    'REF-ACTIVE',
+    're_active',
+  );
+  assert.equal(refund.ok, false);
+  if (!refund.ok) assert.equal(refund.error, 'reserved');
+
+  const voided = await voidGiftCertificate(bucket, 'SSGC-ABCD-2345', 'Void attempt', 'VOID-ACTIVE');
+  assert.equal(voided.ok, false);
+  if (!voided.ok) assert.equal(voided.error, 'reserved');
+});
+
+test('a released or refunded certificate cannot be reactivated by a delayed commit', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const now = new Date('2026-10-29T12:00:00Z');
+  const reserved = await reserveGiftCredit(bucket, 'SSGC-ABCD-2345', 3000, 'SS-20261029-ABC123', {
+    now,
+  });
+  assert.equal(reserved.ok, true);
+  if (!reserved.ok) return;
+
+  const afterExpiry = new Date(now.getTime() + 31 * 60_000);
+  const refunded = await refundGiftCertificate(
+    bucket,
+    'SSGC-ABCD-2345',
+    'Unused',
+    'REF-DELAYED',
+    're_delayed',
+    afterExpiry,
+  );
+  assert.equal(refunded.ok, true);
+
+  const committed = await commitGiftReservation(
+    bucket,
+    'SSGC-ABCD-2345',
+    reserved.reservation.id,
+    'Late commit',
+    new Date(afterExpiry.getTime() + 60_000),
+  );
+  assert.equal(committed.ok, false);
+  if (!committed.ok) assert.equal(committed.error, 'inactive');
+  const stored = await lookupGiftCertificate(bucket, 'SSGC-ABCD-2345');
+  assert.equal(stored?.redeemedCents, 0);
+  assert.equal(stored?.status, 'refunded');
 });

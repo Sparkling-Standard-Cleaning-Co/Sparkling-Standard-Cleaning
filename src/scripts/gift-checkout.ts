@@ -14,6 +14,10 @@ if (form) {
   const customField = form.querySelector<HTMLElement>('[data-gift-custom-field]');
   const customValue = form.querySelector<HTMLInputElement>('[data-gift-custom-value]');
   const validFrom = form.querySelector<HTMLInputElement>('[data-gift-valid-from]');
+  let checkoutAttempt = crypto.randomUUID();
+  form.addEventListener('input', () => {
+    checkoutAttempt = crypto.randomUUID();
+  });
 
   const syncCustomValue = (): void => {
     const custom = denomination?.value === 'custom';
@@ -62,6 +66,7 @@ if (form) {
         : undefined,
       termsAccepted: data.get('termsAccepted') === 'yes',
       termsVersion: legalTerms.termsVersion,
+      checkoutAttempt,
     };
 
     try {
@@ -85,6 +90,11 @@ if (form) {
         recipient_email_invalid: 'Please enter a valid recipient email address, such as name@yourdomain.com.',
         valid_from_date_invalid: 'Please choose today or a future valid-from date.',
         rate_limited: 'Too many attempts — please wait a moment and try again.',
+        checkout_in_progress: 'This checkout is already opening. Please wait a moment or refresh the page.',
+        already_purchased: 'This gift purchase was already completed. Check your email for the certificate.',
+        checkout_state_uncertain: 'We could not safely register the checkout. No charge has been made; please try again.',
+        ledger_not_configured: 'Secure gift checkout is not fully configured yet. Please contact us.',
+        provider_failed: 'Secure checkout could not open. No charge has been made; please try again.',
       };
       setStatus(
         'error',

@@ -56,7 +56,7 @@ async function load(): Promise<void> {
     if (data.paid) {
       if (data.bookingStatus === 'confirmed') {
         setState(
-          'Your payment was received and your appointment is confirmed. Sparkling Standard will send the final details before the cleaning.',
+          'Your payment was received and your appointment is confirmed. We will send the final details before the cleaning.',
         );
         return;
       }
@@ -64,16 +64,16 @@ async function load(): Promise<void> {
         setState(
           `Your gift certificate covered $${(data.giftApplied ?? 0).toFixed(2)} of this payment. ${
             data.photosOutstanding
-              ? 'Booking confirmation is pending the required photos and owner review. Sparkling Standard will follow up for the photos and confirm the requested date, scope and final details personally.'
-              : 'Sparkling Standard will confirm the requested date, scope and final details with you personally before the cleaning is scheduled.'
+              ? 'Please upload the required photos so we can finish confirming the appointment. We will follow up with you.'
+              : 'We are finishing the appointment confirmation and will follow up with you.'
           }`,
         );
         return;
       }
       setState(
         data.photosOutstanding
-          ? 'Your payment was received. Booking confirmation is pending the required photos and owner review. Sparkling Standard will follow up for the photos and confirm the requested date, scope and final details personally.'
-          : 'Your payment was received. Sparkling Standard will confirm the requested date, scope and final details with you personally before the cleaning is scheduled.',
+          ? 'Your payment was received. Please upload the required photos so we can finish confirming the appointment. We will follow up with you.'
+          : 'Your payment was received. We are finishing the appointment confirmation and will follow up with you.',
       );
       return;
     }

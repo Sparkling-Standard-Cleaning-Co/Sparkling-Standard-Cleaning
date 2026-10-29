@@ -293,15 +293,18 @@ async function deliverEstimateReceipt(
       : giftAppliedCents > 0
       ? {
           notes: photosOutstanding
-            ? 'Payment received with gift-certificate credit. Required photos are still outstanding, so booking confirmation is pending photo review and owner approval. This receipt is not a confirmed appointment.'
-            : 'Payment received with gift-certificate credit. Sparkling Standard confirms the requested date, scope and final details personally before scheduling. This receipt is not a confirmed appointment.',
+            ? 'Payment received with gift-certificate credit. Required photos are still outstanding, so appointment confirmation is pending those photos. Upload them so we can finish confirming.'
+            : 'Payment received with gift-certificate credit. Appointment confirmation is pending final eligibility or manual review; we will follow up.',
         }
       : photosOutstanding
         ? {
             notes:
-              'Payment received. Required photos are still outstanding, so booking confirmation is pending photo review and owner approval. This receipt is not a confirmed appointment.',
+              'Payment received. Required photos are still outstanding, so appointment confirmation is pending those photos. Upload them so we can finish confirming.',
           }
-        : {}),
+        : {
+            notes:
+              'Payment received. Appointment confirmation is pending final eligibility or manual review; we will follow up.',
+          }),
   };
   const outcome = await sendCustomerReceipt(data, env, `receipt-${eventId}`);
   return { status: describeReceiptOutcome(outcome), sent: outcome.status === 'sent' };
@@ -470,11 +473,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         | { status: CheckoutLedgerRecord['bookingStatus']; eventId?: string; reason?: string }
         | undefined;
       const holdId = metadata.booking_hold_id ?? '';
+      const quoteReference = metadata.quote_reference ?? checkout?.reference ?? '';
       if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
-        if (checkout?.photosOutstanding === true || metadata.photos_outstanding === 'yes') {
+        if (!checkout) {
+          booking = { status: 'pending_owner_review', reason: 'checkout_record_missing' };
+        } else if (checkout.reference !== quoteReference) {
+          booking = { status: 'pending_owner_review', reason: 'quote_reference_mismatch' };
+        } else if (checkout.photosOutstanding === true || metadata.photos_outstanding === 'yes') {
           booking = { status: 'pending_owner_review', reason: 'photos_outstanding' };
         } else {
-          const confirmed = await autoConfirmPaidBooking(env, holdId);
+          const confirmed = await autoConfirmPaidBooking(env, holdId, quoteReference);
           booking = confirmed.ok
             ? { status: 'confirmed', eventId: confirmed.eventId }
             : { status: 'pending_owner_review', reason: confirmed.reason };
@@ -672,6 +680,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (!sent) {
     if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'notification_failed');
     return json({ ok: false, error: 'notification_failed' }, 500);
+  }
+  if (bucket && metadata.checkout_attempt) {
+    const attemptKey = ledgerKey('gift-checkouts', metadata.checkout_attempt.toLowerCase());
+    const stored = await readLedgerJson<Record<string, unknown>>(bucket, attemptKey).catch(() => null);
+    if (stored?.value) {
+      await writeLedgerJson(bucket, attemptKey, {
+        ...stored.value,
+        status: 'completed',
+        code,
+        sessionId: session.id ?? '',
+        completedAt: paidAt,
+      }).catch(() => undefined);
+    }
   }
   markInMemory(eventId);
   if (bucket && record) {

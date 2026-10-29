@@ -272,6 +272,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             }
           </div>
         </fieldset>
+        <div data-reveal-group="home" data-reveal-trigger="serviceType" hidden>
         <div class="field">
           <label for="est-property">Property type</label>
           <select class="select" id="est-property" name="propertyType" required>
@@ -344,6 +345,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </select>
           <span class="hint">Hayli confirms the linen plan with you before the first turnover.</span>
         </div>
+        </div>
       </section>
 
       <!-- Step 3 — condition + frequency -->
@@ -374,6 +376,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         </div>
 
 
+        <div data-reveal-group="dirt" data-reveal-trigger="frequency" hidden>
         <fieldset
           class="field dirt-guide"
           data-dirt-guide
@@ -414,6 +417,8 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </details>
           <p class="hint dirt-guide__impact" data-dirt-impact aria-live="polite" hidden></p>
         </fieldset>
+        </div>
+        <div data-reveal-group="history" data-reveal-trigger="dirtLevel" hidden>
         <div class="field">
           <label for="est-last-clean">When was the home last professionally cleaned?</label>
           <select class="select" id="est-last-clean" name="lastClean" required>
@@ -432,6 +437,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </select>
         </div>
         <PhotoUploadSection engine="residential" />
+        </div>
       </section>
 
       <!-- Step 4 — contact details -->
@@ -479,8 +485,17 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         </div>
         <div class="booking-alternatives" data-booking-alternatives hidden></div>
 
-          <div class="final-extras">
-            <h3 class="bundle-offers__title">Want to bundle and save?</h3>
+          <details class="extras-accordion" data-extras-accordion>
+            <summary class="extras-accordion__summary">
+              <span class="extras-accordion__heading">Your Cleaning Details</span>
+              <span class="extras-accordion__hint"
+                >Add extras, choose a bundle, or customize your cleaning.</span
+              >
+              <span class="extras-accordion__selected" data-extras-summary>No extras selected</span>
+              <Icon name="chevron-down" size={18} class="extras-accordion__chevron" />
+            </summary>
+            <div class="final-extras">
+            <h3 class="bundle-offers__title">Bundles &amp; individual extras</h3>
         <fieldset class="field">
           <legend>Individual extras</legend>
           <p class="hint" style="margin-bottom: var(--space-3)">
@@ -568,15 +583,18 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             ))}
           </div>
         </fieldset>
-          </div>
-
-
+            </div>
+          </details>
 
         <div class="estimate-reveal-stage">
           <EstimateReveal />
           <div class="reservation-summary" data-reservation-summary hidden>
           <p class="reservation-summary__eyebrow" data-reservation-eyebrow>Your proposed cleaning price</p>
-          <p class="reservation-summary__price" data-reservation-price>—</p>
+          <p class="reservation-summary__price">
+            <span data-reservation-price>—</span>
+            <span class="reservation-summary__price-suffix" data-reservation-price-suffix></span>
+          </p>
+          <p class="reservation-summary__ongoing" data-reservation-ongoing hidden></p>
           <p class="reservation-summary__meta" data-reservation-reference hidden></p>
           <p class="reservation-summary__meta" data-reservation-validity hidden></p>
 
@@ -584,20 +602,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <div class="summary-groups" data-reservation-scope></div>
           <p class="reservation-summary__qualification" data-reservation-qualification></p>
 
-          <label class="supportive-check" data-supportive-section hidden>
-            <input type="checkbox" name="supportiveEligible" value="yes" data-supportive-eligible />
-            <span>
-              I qualify for Sparkling Standard&rsquo;s{communitySupportEnabled ? ` ${communitySupportPercent}%` : ''}
-              Community Support discount.
-              <a href="/terms/#community-support" class="supportive-check__link">Eligibility terms</a>
-            </span>
-          </label>
 
           <div class="reservation-actions">
-            <p class="reservation-actions__note" data-payment-note>
-              Your estimate is ready. Sparkling Standard confirms the final details, date and price
-              before the cleaning is booked.
-            </p>
+            <p class="reservation-actions__note" data-payment-note></p>
             <div class="field gift-code-field" data-gift-field hidden>
               <label for="est-gift-code">Gift certificate code <span class="text-muted">(optional)</span></label>
               <input
@@ -616,13 +623,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
                 We will apply the certificate's available balance. Any remaining balance is paid securely.
               </p>
             </div>
-            <button class="btn btn--primary btn--large" type="button" data-pay-now hidden>
-              Pay Now Securely
-            </button>
-            <p class="small text-muted" data-payment-unavailable hidden>
-              Secure online payment is not available for this estimate yet. You can still reserve
-              without paying, or call or text us to arrange payment.
-            </p>
+            <p class="small text-muted" data-payment-unavailable hidden></p>
             <div class="reservation-actions__links">
               {phone && (
                 <a class="btn btn--ghost btn--small" data-reserve-call href={phone.href}>
@@ -662,6 +663,14 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </div>
         </div>
         <p class="small photo-summary" data-photo-summary hidden></p>
+        <label class="supportive-check" data-supportive-section hidden>
+          <input type="checkbox" name="supportiveEligible" value="yes" data-supportive-eligible />
+          <span>
+            I qualify for Sparkling Standard&rsquo;s{communitySupportEnabled ? ` ${communitySupportPercent}%` : ''}
+            Community Support discount.
+            <a href="/terms/#community-support" class="supportive-check__link">Eligibility terms</a>
+          </span>
+        </label>
         <TermsAcceptance id="est-terms" />
         <TurnstileWidget />
         <div class="honeypot" aria-hidden="true">
@@ -677,11 +686,6 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             data-protonpass-ignore
           />
         </div>
-        <p class="small text-muted">
-          Sending this request does not book anything. Sparkling Standard reviews it, confirms the
-          scope, date and final price with you, and only then is your cleaning booked. See our
-          <a href="/privacy/">privacy policy</a>.
-        </p>
       </section>
     </div>
 
@@ -691,9 +695,14 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       </button>
       <span class="spacer"></span>
       <button class="btn btn--primary" type="button" data-next>Continue <Icon name="arrow-right" size={16} /></button>
-      <button class="btn btn--primary btn--large" type="submit" data-submit hidden data-cta="estimate-submit">
-        Reserve This Cleaning
-      </button>
+      <div class="wizard__final-actions" data-final-actions hidden>
+        <button class="btn btn--secondary btn--small" type="submit" data-submit hidden data-cta="estimate-submit">
+          Request to Reserve This Cleaning (Pay Later)
+        </button>
+        <button class="btn btn--success btn--large" type="button" data-pay-now hidden>
+          Pay Now and Reserve This Cleaning
+        </button>
+      </div>
     </div>
     <p class="form-status" data-form-status role="status" aria-live="polite" style="margin: 0 var(--space-6) var(--space-5)"></p>
   </form>
@@ -707,9 +716,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         proposed total before choosing what to do next.
       </p>
       <p class="card__text">
-        Pay securely through Stripe now, or send your reservation request without paying anything
-        upfront. Sparkling Standard personally reviews and confirms the final details before your
-        cleaning is scheduled.
+        Pay securely through Stripe to reserve a verified slot, or send a pay-later request for
+        personal review. Paid bookings with complete details and photos confirm automatically when
+        the calendar accepts them.
       </p>
       <p class="card__text"><strong>Your home. Your estimate. Your schedule. Your choice.</strong></p>
     </div>
@@ -720,22 +729,22 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         <li class="timeline__stage">
           <span class="timeline__number" aria-hidden="true">1</span>
           <div class="timeline__content">
-            <p class="timeline__title">Request received</p>
-            <p class="timeline__text">Sparkling Standard receives your cleaning details and proposed estimate.</p>
+            <p class="timeline__title">Estimate or reserve</p>
+            <p class="timeline__text">Pay now when checkout is available, or send a request to pay later.</p>
           </div>
         </li>
         <li class="timeline__stage">
           <span class="timeline__number" aria-hidden="true">2</span>
           <div class="timeline__content">
-            <p class="timeline__title">Owner review</p>
-            <p class="timeline__text">We review your requirements, confirm your final price and check the preferred time.</p>
+            <p class="timeline__title">Requirements checked</p>
+            <p class="timeline__text">We verify the address, photos, payment and requested time.</p>
           </div>
         </li>
         <li class="timeline__stage">
           <span class="timeline__number" aria-hidden="true">3</span>
           <div class="timeline__content">
             <p class="timeline__title">Appointment confirmed</p>
-            <p class="timeline__text">After our approval, your appointment is confirmed and we take care of the rest.</p>
+            <p class="timeline__text">Complete paid bookings confirm automatically; anything outstanding stays visibly pending.</p>
           </div>
         </li>
       </ol>

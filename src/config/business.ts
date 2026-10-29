@@ -259,7 +259,7 @@ export const business = {
     alternate: ['Cash', 'Check', 'Cash App', 'Venmo', 'Zelle', 'PayPal'],
     /** Residential payment timing, owner-approved October 21, 2026. */
     residentialTiming:
-      'Residential cleaning may be paid securely online through Stripe when Pay Now is offered for an exact estimate, or upon completion when you choose a reservation without upfront payment. Pay Now does not by itself confirm a date. Commercial cleaning is invoiced monthly with Net 15 terms. No standard deposit or late fee applies initially; large projects may be considered separately with written terms.',
+      'Residential cleaning may be paid securely online through Stripe when Pay Now is offered, or upon completion when you choose a reservation without upfront payment. A complete paid booking confirms automatically when the payment, address, required photos, requested time and resource availability all verify. Commercial cleaning is invoiced monthly with Net 15 terms. No standard deposit or late fee applies initially; large projects may be considered separately with written terms.',
     /** Owner-confirmed processor. */
     processor: 'Stripe',
   },

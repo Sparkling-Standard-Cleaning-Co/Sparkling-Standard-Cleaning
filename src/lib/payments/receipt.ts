@@ -175,7 +175,7 @@ export function buildReceipt(data: ReceiptData): BuiltReceipt {
           ${balanceRow}
         </table>
 
-        <p style="margin:22px 0 0;font-size:12px;line-height:1.6;color:${PALETTE.muted};">${escapeHtml(data.notes ?? 'Payment does not by itself confirm the appointment date or final scope. Sparkling Standard confirms those personally.')}</p>
+        <p style="margin:22px 0 0;font-size:12px;line-height:1.6;color:${PALETTE.muted};">${escapeHtml(data.notes ?? 'Complete paid bookings confirm automatically when the address, photos, requested time and resource availability verify. If a requirement is outstanding, the booking remains pending and we follow up.')}</p>
         <p style="margin:16px 0 0;font-size:12px;line-height:1.6;color:${PALETTE.inkSoft};">Questions? Reply to this email or call <strong>(850) 426-8479</strong>. Sparkling Standard LLC · sparkling-standard.com</p>
       </td></tr>
     </table>
@@ -202,7 +202,7 @@ export function buildReceipt(data: ReceiptData): BuiltReceipt {
     `Paid: ${money(data.paidCents)}`,
     ...(data.balanceCents > 0 ? [`Outstanding balance: ${money(data.balanceCents)}`] : []),
     '',
-    data.notes ?? 'Payment does not by itself confirm the appointment date or final scope.',
+    data.notes ?? 'Payment received. Appointment confirmation is shown separately on the payment status page.',
     'Questions? Reply to this email or call (850) 426-8479.',
   ];
 

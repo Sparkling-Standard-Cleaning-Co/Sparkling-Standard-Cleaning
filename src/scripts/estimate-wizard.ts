@@ -110,6 +110,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const backButton = form.querySelector<HTMLButtonElement>('[data-back]');
   const nextButton = form.querySelector<HTMLButtonElement>('[data-next]');
   const submitButton = form.querySelector<HTMLButtonElement>('[data-submit]');
+  const finalActions = form.querySelector<HTMLElement>('[data-final-actions]');
   const payNowButton = form.querySelector<HTMLButtonElement>('[data-pay-now]');
   const photoGate = form.querySelector<HTMLElement>('[data-photo-gate]');
   const photoGateUpload = form.querySelector<HTMLButtonElement>('[data-photo-upload-now]');
@@ -167,6 +168,34 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (scroll) smoothReveal(addressDetailsEl);
   }
 
+
+  const revealGroups = [...form.querySelectorAll<HTMLElement>('[data-reveal-group]')];
+
+  function revealTriggerSatisfied(name: string): boolean {
+    const radios = form.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`);
+    if (radios.length > 0) return [...radios].some((input) => input.checked);
+    const field = form.elements.namedItem(name);
+    if (field instanceof HTMLSelectElement || field instanceof HTMLInputElement) {
+      return field.value.trim() !== '';
+    }
+    return false;
+  }
+
+  function syncRevealGroups(scroll: boolean): number {
+    let revealed = 0;
+    for (const group of revealGroups) {
+      const name = group.dataset.revealTrigger ?? '';
+      const visible = revealTriggerSatisfied(name);
+      const wasHidden = group.hidden;
+      group.hidden = !visible;
+      if (visible && wasHidden) {
+        revealed += 1;
+        if (scroll) smoothReveal(group);
+      }
+    }
+    return revealed;
+  }
+
   const dirtGuide = form.querySelector<HTMLDetailsElement>('[data-dirt-guide] details');
   const dirtSelected = form.querySelector<HTMLElement>('[data-dirt-selected]');
   const dirtImpact = form.querySelector<HTMLElement>('[data-dirt-impact]');
@@ -202,6 +231,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const estimateReveal = form.querySelector<HTMLElement>('[data-estimate-reveal]');
   const reservationEyebrow = form.querySelector<HTMLElement>('[data-reservation-eyebrow]');
   const reservationPrice = form.querySelector<HTMLElement>('[data-reservation-price]');
+  const reservationOngoing = form.querySelector<HTMLElement>('[data-reservation-ongoing]');
+  const reservationPriceSuffix = form.querySelector<HTMLElement>('[data-reservation-price-suffix]');
   const reservationReference = form.querySelector<HTMLElement>('[data-reservation-reference]');
   const reservationValidity = form.querySelector<HTMLElement>('[data-reservation-validity]');
   const reservationScope = form.querySelector<HTMLElement>('[data-reservation-scope]');
@@ -215,6 +246,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const customBundleEl = form.querySelector<HTMLElement>('[data-custom-bundle]');
   const customBundleText = form.querySelector<HTMLElement>('[data-custom-bundle-text]');
   const bundleOffers = [...form.querySelectorAll<HTMLElement>('[data-bundle-id]')];
+  const extrasSummary = form.querySelector<HTMLElement>('[data-extras-summary]');
   const reserveCall = document.querySelector<HTMLAnchorElement>('[data-reserve-call]');
   const reserveText = document.querySelector<HTMLAnchorElement>('[data-reserve-text]');
   const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
@@ -412,6 +444,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         : null;
     renderResult(result);
     renderAddonPrices(result);
+    renderExtrasSummary(result);
     renderIncentive(result);
     renderCustomBundle(result);
     renderBundles(result);
@@ -586,6 +619,15 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
   }
 
+  function renderExtrasSummary(result: EstimateResult): void {
+    if (!extrasSummary) return;
+    const count = result.status === 'estimated' ? result.addons.length : 0;
+    if (count === 0) {
+      extrasSummary.textContent = 'No extras selected';
+      return;
+    }
+    extrasSummary.textContent = `${count} selected — ${formatUsd(result.pricing.extrasSubtotal, { forceCents: true })}`;
+  }
   function renderIncentive(result: EstimateResult): void {
     if (!addonIncentiveEl || !addonIncentiveText) return;
     const discount = result.status === 'estimated' ? result.pricing.discount : null;
@@ -701,11 +743,15 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (result.status !== 'estimated' || p.subtotal <= 0) return [];
     const tax = taxPresentationForService(radioValue('serviceType'));
     const lines: Array<{ label: string; value: string; strong?: boolean }> = [];
+    const firstVisit = Boolean(result.ongoing);
     if (p.minimumApplied) {
       lines.push({ label: 'Minimum visit price', value: formatUsd(p.basePrice) });
       if (p.selectedExtras.length > 0) lines.push({ label: 'Selected extras', value: 'Included' });
     } else {
-      lines.push({ label: 'Base cleaning', value: formatUsd(p.basePrice) });
+      lines.push({
+        label: firstVisit ? 'True Deep Cleaning Price' : 'Base cleaning',
+        value: formatUsd(p.basePrice, { forceCents: true }),
+      });
       for (const extra of p.selectedExtras) {
         lines.push({ label: extra.label, value: `+${formatUsd(extra.charge, { forceCents: true })}` });
       }
@@ -718,7 +764,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     if (p.discount) {
       lines.push({
-        label: p.discount.label,
+        label: p.discount.source === 'campaign' ? 'SPARKLE100 Discount' : p.discount.label,
         value: `\u2212${formatUsd(Math.abs(p.discount.amount), { forceCents: true })}`,
       });
     }
@@ -732,19 +778,19 @@ function initEstimateWizard(form: HTMLFormElement): void {
       lines.push({ label: 'Travel', value: formatUsd(p.travelAdjustment, { forceCents: true }) });
     }
     lines.push({
-      label: 'Proposed total',
-      value: formatUsd(p.subtotal),
+      label: 'Sales tax',
+      value:
+        tax.treatment === 'not_taxable'
+          ? formatUsd(0, { forceCents: true })
+          : tax.mayApply
+            ? 'Calculated after address verification'
+            : '—',
+    });
+    lines.push({
+      label: firstVisit ? 'FIRST VISIT TOTAL' : 'ESTIMATED TOTAL',
+      value: formatUsd(p.subtotal, { forceCents: true }),
       strong: true,
     });
-    lines.push({ label: 'Sales tax', value: tax.label });
-    // P12: a new recurring arrangement shows the ongoing rhythm right under the
-    // first-visit total — informational, never part of the sum above.
-    if (result.ongoing) {
-      lines.push({
-        label: `Then ongoing ${FREQUENCY_RHYTHMS[result.ongoing.frequency]} visits (after the required first deep clean)`,
-        value: `${formatUsd(result.ongoing.perVisitPrice)} each`,
-      });
-    }
     return lines;
   }
 
@@ -825,7 +871,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   function payNowLabel(): string {
     if (acceptedPaymentAmount !== null) return `Pay ${formatUsd(acceptedPaymentAmount)} Securely`;
-    return paymentRetryAvailable ? 'Try Secure Payment Again' : 'Pay Now Securely';
+    return paymentRetryAvailable
+      ? 'Try Secure Payment Again'
+      : 'Pay Now and Reserve This Cleaning';
   }
 
   function setPayNowBusy(busy: boolean): void {
@@ -850,6 +898,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
         payNowButton.textContent = payNowLabel();
       }
     }
+    if (submitButton) {
+      submitButton.classList.toggle('btn--primary', !eligible);
+      submitButton.classList.toggle('btn--secondary', eligible);
+      submitButton.classList.toggle('btn--large', !eligible);
+      submitButton.classList.toggle('btn--small', eligible);
+    }
     if (verifyAddressButton) verifyAddressButton.hidden = !canOfferVerification;
     if (paymentUnavailable) {
       paymentUnavailable.hidden = !hasQuote || eligible || canOfferVerification || (paymentEnabled && !paymentBlocked);
@@ -860,22 +914,22 @@ function initEstimateWizard(form: HTMLFormElement): void {
       return;
     }
     if (eligible) {
-      paymentNote.innerHTML =
-        '<strong>Your estimate is ready.</strong> Pay securely now or reserve without paying upfront. Payment does not by itself confirm an appointment date.';
+      paymentNote.textContent =
+        'Pay now to reserve this cleaning. If required photos are still outstanding, we will mark the booking pending photos.';
       return;
     }
     if (canOfferVerification) {
-      paymentNote.innerHTML =
-        '<strong>Verify your service address to finalize your price and unlock secure online payment.</strong> You can still reserve without paying, and Sparkling Standard will confirm the final details.';
+      paymentNote.textContent =
+        'Verify the service address to unlock secure payment. You can also request to reserve and pay later.';
       return;
     }
     if (addressReviewRequired) {
-      paymentNote.innerHTML =
-        "<strong>We couldn't verify this address precisely enough for online payment.</strong> Reserve without paying now — we will confirm the exact property and email you a secure payment link.";
+      paymentNote.textContent =
+        "We'll confirm the exact property and payment options with you before charging anything.";
       return;
     }
-    paymentNote.innerHTML =
-      '<strong>Your cleaning request is ready.</strong> Sparkling Standard will confirm the final scope and price before arranging payment. Reserve without paying upfront, or call or text us.';
+    paymentNote.textContent =
+      "Request to reserve and we'll confirm any outstanding detail with you.";
   }
   function maybeRevealEstimate(): void {
     if (!reservationSummary) return;
@@ -942,11 +996,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (submitButton) {
       submitButton.textContent = requestAlreadySent
         ? 'Request Received'
-        : hasQuote
-          ? paymentEnabled && !paymentBlocked && clientPaymentEligible() && !requestAlreadySent
-            ? 'Reserve This Cleaning (Pay Later)'
-            : 'Reserve This Cleaning'
-          : 'Send My Request';
+        : 'Request to Reserve This Cleaning (Pay Later)';
       if (requestAlreadySent) submitButton.disabled = true;
     }
     if (!hasQuote || !latestQuote) {
@@ -967,15 +1017,28 @@ function initEstimateWizard(form: HTMLFormElement): void {
       summarySubmission.location.precision !== 'approximate' &&
       summarySubmission.location.precision !== 'street';
     if (reservationPrice) reservationPrice.textContent = formatUsd(latestQuote.amount);
-    if (reservationEyebrow) reservationEyebrow.textContent = primaryPriceHeading(result);
+    if (reservationPriceSuffix) {
+      reservationPriceSuffix.textContent = result.ongoing ? 'First Visit' : '';
+    }
+    if (reservationOngoing) {
+      if (result.ongoing) {
+        const rhythm =
+          FREQUENCY_RHYTHMS[result.ongoing.frequency] ?? result.ongoing.frequency;
+        reservationOngoing.hidden = false;
+        reservationOngoing.textContent = `${formatUsd(result.ongoing.perVisitPrice)} — ${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)} Thereafter`;
+      } else {
+        reservationOngoing.hidden = true;
+        reservationOngoing.textContent = '';
+      }
+    }
+    if (reservationEyebrow) reservationEyebrow.textContent = 'Your Cleaning Estimate';
     if (reservationReference) {
       reservationReference.hidden = false;
       reservationReference.textContent = `Estimate reference ${latestQuote.reference}`;
     }
     if (reservationValidity) {
-      reservationValidity.hidden = false;
-      reservationValidity.textContent =
-        'Proposed price — not a held reservation or a binding offer. Sparkling Standard confirms the final price before booking.';
+      reservationValidity.hidden = true;
+      reservationValidity.textContent = '';
     }
     if (reservationQualification) {
       reservationQualification.textContent = travelFullyVerified
@@ -1122,6 +1185,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     if (backButton) backButton.hidden = currentStep === 1;
     if (nextButton) nextButton.hidden = currentStep === steps.length;
+    if (finalActions) finalActions.hidden = currentStep !== steps.length;
     if (submitButton) {
       submitButton.hidden = currentStep !== steps.length;
       if (currentStep === steps.length) {
@@ -1396,6 +1460,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     // Radio groups (service type, condition).
     for (const group of section.querySelectorAll<HTMLElement>('fieldset[data-group-error]')) {
+      if (group.closest('[hidden]')) continue;
       const name = group.dataset.groupError ?? '';
       const message = radioGroupMessage(section, name);
       if (message) {
@@ -1447,6 +1512,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
     }
     for (const field of stepFields(step)) {
+      if (field.closest('[hidden]')) continue;
       if (field instanceof HTMLInputElement && field.type === 'radio') continue;
       // The calendar's hidden date is validated above (format + window); the
       // generic hidden-input pass would otherwise clear that error.
@@ -1500,10 +1566,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const section = steps[index - 1];
       if (!section) continue;
       for (const group of section.querySelectorAll<HTMLElement>('fieldset[data-group-error]')) {
+        if (group.closest('[hidden]')) continue;
         const name = group.dataset.groupError ?? '';
         if (!form.querySelector(`input[name="${name}"]:checked`)) return false;
       }
       for (const field of stepFields(index)) {
+        if (field.closest('[hidden]')) continue;
         if (field instanceof HTMLInputElement && field.type === 'radio') continue;
         if (messageFor(field)) return false;
       }
@@ -1780,6 +1848,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (addressDetailsEl) addressDetailsEl.hidden = true;
     if (dirtGuide) dirtGuide.open = false;
     syncDirtGuide();
+    syncRevealGroups(false);
     addressCardRevealed = false;
     addressDetailsRevealed = false;
     bookingFinalizedKey = '';
@@ -2376,6 +2445,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         ...(submission.zip ? { zip: submission.zip } : {}),
       });
     }
+    if (syncRevealGroups(true) > 0) return;
     if (!validateStep(currentStep)) return;
     const serviceType = currentServiceType();
     track('estimate_step', {
@@ -2469,6 +2539,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
     }
     syncConditionalFields();
+    syncRevealGroups(true);
     recalc();
   });
 
@@ -2496,6 +2567,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
     }
     syncConditionalFields();
+    syncRevealGroups(true);
     recalc();
     if (target instanceof HTMLInputElement && target.name === 'dirtLevel' && dirtGuide) {
       dirtGuide.open = false;

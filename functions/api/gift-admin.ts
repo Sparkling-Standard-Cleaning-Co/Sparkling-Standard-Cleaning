@@ -297,11 +297,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const reference = typeof payload.reference === 'string' ? payload.reference : '';
   const password = typeof payload.password === 'string' ? payload.password : '';
   const action =
-    payload.action === 'refund' || payload.action === 'void' || payload.action === 'resend'
+    payload.action === 'redeem' ||
+    payload.action === 'refund' ||
+    payload.action === 'void' ||
+    payload.action === 'resend'
       ? payload.action
-      : payload.action === undefined || payload.action === 'redeem'
-        ? 'redeem'
-        : null;
+      : null;
   if (!action) return json({ ok: false, error: 'invalid_action' }, 400);
   if (!/^SSGC-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(code)) {
     return json({ ok: false, error: 'invalid_code' }, 400);
@@ -383,6 +384,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
   if (existing.status !== 'active') return json({ ok: false, error: 'inactive' }, 400);
   if (existing.redeemedCents > 0) return json({ ok: false, error: 'redeemed' }, 400);
+  if ((existing.reservations ?? []).some((entry) => entry.status === 'reserved' && Date.parse(entry.expiresAt) > Date.now())) {
+    return json({ ok: false, error: 'reserved' }, 409);
+  }
 
   const secretKey = env.STRIPE_SECRET_KEY?.trim() ?? '';
   const refunder: StripeRefunder | null =

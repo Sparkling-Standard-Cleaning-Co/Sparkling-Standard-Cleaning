@@ -227,7 +227,7 @@ test('the commercial engine shows a preliminary per-visit price for an ordinary 
     const tax = (await page.locator('[data-facility-estimate-tax]').textContent()) ?? '';
     assert.match(tax, /sales tax of 7\.5% applies|taxable at 7\.5%/i);
     const reviewNote = (await page.locator('[data-facility-review-note]').textContent()) ?? '';
-    assert.match(reviewNote, /nonbinding preliminary estimate/i, 'a priced request is not called a scope review');
+    assert.match(reviewNote, /preliminary estimate/i, 'a priced request is not called a scope review');
     assert.doesNotMatch(reviewNote, /scope-review request/i);
   } finally {
     await context.close();
@@ -274,7 +274,7 @@ test('the church engine reconciles the configured discount and routes very large
     assert.match(reviewText, /confirm this with you/i);
     const reviewNote = (await page.locator('[data-facility-review-note]').textContent()) ?? '';
     assert.match(reviewNote, /personal review/i, 'Tier C is described as a personal review');
-    assert.doesNotMatch(reviewNote, /nonbinding preliminary estimate/i);
+    assert.doesNotMatch(reviewNote, /preliminary estimate/i);
   } finally {
     await context.close();
   }

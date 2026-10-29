@@ -326,6 +326,10 @@ async function extrasStep(page, addons = []) {
   if (!(await page.locator(`label.option:has(input[name="addons"][value="${firstAddon}"])`).isVisible())) {
     await timingStep(page);
   }
+  const accordion = page.locator('[data-extras-accordion]');
+  if ((await accordion.count()) > 0 && (await accordion.getAttribute('open')) === null) {
+    await accordion.locator('summary').click();
+  }
   for (const id of addons) {
     // Click the styled label (the visible option), not the hidden input.
     await page.click(`label.option:has(input[name="addons"][value="${id}"])`);
@@ -384,7 +388,8 @@ test('an exact provider suggestion fills the required ZIP and advances', async (
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
     );
-    assert.equal(await isVisible(page, '#est-property'), true, 'the wizard advances to Service & Home');
+    assert.equal(await isVisible(page, '[data-service-fieldset]'), true, 'the wizard advances to Service & Home');
+    assert.equal(await isVisible(page, '#est-property'), false, 'home details wait for the service choice');
   } finally {
     await context.close();
   }

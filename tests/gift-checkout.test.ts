@@ -9,6 +9,13 @@ import { onRequestPost as giftCheckout, resolveGiftAmount } from '../functions/a
 import { onRequestPost as stripeWebhook } from '../functions/api/stripe-webhook.ts';
 import { FakeLedger } from './helpers/payment-fakes.ts';
 
+const checkoutEnv = (ledger = new FakeLedger()) => ({
+  STRIPE_SECRET_KEY: 'sk_test_dummy',
+  STRIPE_WEBHOOK_SECRET: 'whsec_test_dummy',
+  PAYMENT_LEDGER: ledger,
+  PUBLIC_SITE_URL: 'https://example.test',
+});
+
 const jsonRequest = (body: unknown, ip = '10.10.0.1') =>
   new Request('https://example.test/api/gift', {
     method: 'POST',
@@ -80,7 +87,7 @@ test('gift checkout reports missing payment configuration without side effects',
 
     const invalid = await giftCheckout({
       request: jsonRequest({ purchaserName: '', purchaserEmail: 'x', recipientName: '', amountUsd: 5 }, '10.10.0.3'),
-      env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+      env: checkoutEnv(),
     } as never);
     assert.equal(invalid.status, 400);
   } finally {
@@ -98,7 +105,7 @@ test('gift checkout rejects invalid amounts before any provider call', async () 
         { purchaserName: 'A', purchaserEmail: 'a@example.com', recipientName: 'B', amountUsd: 5, termsAccepted: true, termsVersion: '2026-10-28.terms.v2' },
         '10.10.0.4',
       ),
-      env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+      env: checkoutEnv(),
     } as never);
     assert.equal(response.status, 400);
     assert.deepEqual(await response.json(), { ok: false, error: 'invalid_amount' });
@@ -121,14 +128,14 @@ test('gift checkout requires a valid purchaser email and recipient email for ema
   try {
     const missing = await giftCheckout({
       request: jsonRequest({ ...base }, '10.10.0.10'),
-      env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+      env: checkoutEnv(),
     } as never);
     assert.equal(missing.status, 400);
     assert.deepEqual(await missing.json(), { ok: false, error: 'email_required' });
 
     const invalid = await giftCheckout({
       request: jsonRequest({ ...base, purchaserEmail: 'not-an-email' }, '10.10.0.11'),
-      env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+      env: checkoutEnv(),
     } as never);
     assert.equal(invalid.status, 400);
     assert.deepEqual(await invalid.json(), { ok: false, error: 'email_invalid' });
@@ -142,7 +149,7 @@ test('gift checkout requires a valid purchaser email and recipient email for ema
         },
         '10.10.0.12',
       ),
-      env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+      env: checkoutEnv(),
     } as never);
     assert.equal(recipientMissing.status, 400);
     assert.deepEqual(await recipientMissing.json(), { ok: false, error: 'recipient_email_required' });
@@ -157,7 +164,7 @@ test('gift checkout requires a valid purchaser email and recipient email for ema
         },
         '10.10.0.13',
       ),
-      env: { STRIPE_SECRET_KEY: 'sk_test_dummy' },
+      env: checkoutEnv(),
     } as never);
     assert.equal(invalidValidFrom.status, 400);
     assert.deepEqual(await invalidValidFrom.json(), { ok: false, error: 'valid_from_date_invalid' });
@@ -242,7 +249,7 @@ test('an enabled purchase sends the selected value, recipient and valid-from dat
   let body: URLSearchParams | null = null;
   globalThis.fetch = (async (_url: string | URL, init?: RequestInit) => {
     body = init?.body as URLSearchParams;
-    return new Response(JSON.stringify({ url: 'https://checkout.stripe.test/gift' }), {
+    return new Response(JSON.stringify({ id: 'cs_test_gift_1', url: 'https://checkout.stripe.test/gift' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -260,10 +267,11 @@ test('an enabled purchase sends the selected value, recipient and valid-from dat
           denominationUsd: 100,
           termsAccepted: true,
           termsVersion: '2026-10-28.terms.v2',
+          checkoutAttempt: 'checkout-attempt-1',
         },
         '10.10.0.20',
       ),
-      env: { STRIPE_SECRET_KEY: 'sk_test_dummy', PUBLIC_SITE_URL: 'https://example.test' },
+      env: checkoutEnv(),
     } as never);
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, url: 'https://checkout.stripe.test/gift' });

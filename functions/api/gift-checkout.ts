@@ -16,9 +16,19 @@ import { giftCertificateConfig } from '../../src/config/gift-certificates.ts';
 import { legalTerms } from '../../src/config/legal.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
 import { centralToday, isValidCalendarDate } from '../../src/lib/gift/activation.ts';
+import {
+  createLedgerJson,
+  ledgerKey,
+  paymentHash,
+  paymentLedger,
+  readLedgerJson,
+  writeLedgerJson,
+  type PaymentStorageEnv,
+} from '../../src/lib/payments/ledger.ts';
 
-interface Env {
+interface Env extends PaymentStorageEnv {
   STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
   PUBLIC_SITE_URL?: string;
 }
 
@@ -73,11 +83,24 @@ export function resolveGiftAmount(
   return null;
 }
 
+async function expireGiftSession(env: Env, sessionId: string): Promise<void> {
+  if (!env.STRIPE_SECRET_KEY?.trim() || !sessionId) return;
+  await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}/expire`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY.trim()}` },
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => undefined);
+}
+
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
   if (throttled(request)) return json({ ok: false, error: 'rate_limited' }, 429);
   if (!giftCertificateConfig.enabled) return json({ ok: false, error: 'not_enabled' }, 403);
-  if (!env.STRIPE_SECRET_KEY?.trim()) return json({ ok: false, error: 'not_configured' }, 503);
+  if (!env.STRIPE_SECRET_KEY?.trim() || !env.STRIPE_WEBHOOK_SECRET?.trim()) {
+    return json({ ok: false, error: 'not_configured' }, 503);
+  }
+  const bucket = paymentLedger(env);
+  if (!bucket) return json({ ok: false, error: 'ledger_not_configured' }, 503);
 
   let payload: Record<string, unknown>;
   try {
@@ -125,6 +148,46 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
   const amount = resolveGiftAmount(payload.denominationUsd, payload.amountUsd);
   if (amount === null) return json({ ok: false, error: 'invalid_amount' }, 400);
+  const checkoutAttempt = cleanText(payload.checkoutAttempt, 120);
+  if (!checkoutAttempt) return json({ ok: false, error: 'invalid_request' }, 400);
+  const attempt = await paymentHash(checkoutAttempt);
+  const key = ledgerKey('gift-checkouts', attempt);
+  const existing = await readLedgerJson<{
+    status: string;
+    url?: string;
+    code?: string;
+    createdAt?: string;
+  }>(bucket, key).catch(() => null);
+  if (existing?.value.status === 'open' && existing.value.url) {
+    return json({ ok: true, url: existing.value.url });
+  }
+  if (existing?.value.status === 'completed') {
+    return json({ ok: false, error: 'already_purchased' }, 409);
+  }
+  if (
+    existing?.value.status === 'creating' &&
+    Date.now() - Date.parse(existing.value.createdAt ?? '') < 120_000
+  ) {
+    return json({ ok: false, error: 'checkout_in_progress' }, 409);
+  }
+
+  const claim = {
+    status: 'creating',
+    amount,
+    purchaserEmail,
+    recipientEmail,
+    validFromDate,
+    termsVersion: legalTerms.termsVersion,
+    createdAt: new Date().toISOString(),
+  };
+  const created = await createLedgerJson(bucket, key, claim);
+  if (!created) {
+    const raced = await readLedgerJson<{ status: string; url?: string }>(bucket, key).catch(() => null);
+    if (raced?.value.status === 'open' && raced.value.url) {
+      return json({ ok: true, url: raced.value.url });
+    }
+    return json({ ok: false, error: 'checkout_in_progress' }, 409);
+  }
 
   const site = (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
   const body = new URLSearchParams();
@@ -140,7 +203,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     'line_items[0][price_data][product_data][description]',
     'Gift certificate value toward Sparkling Standard cleaning services. Redeemed by code with the owner.',
   );
+  body.set('metadata[checkout_kind]', 'gift_certificate');
+  body.set('metadata[checkout_attempt]', attempt);
   body.set('metadata[gift_value_usd]', String(amount));
+  body.set('metadata[terms_version]', legalTerms.termsVersion);
+  body.set('metadata[terms_accepted_at]', new Date().toISOString());
   body.set('metadata[recipient_name]', recipientName);
   body.set('metadata[purchaser_name]', purchaserName);
   body.set('metadata[delivery_method]', deliveryMethod);
@@ -155,13 +222,38 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       headers: {
         Authorization: `Bearer ${env.STRIPE_SECRET_KEY.trim()}`,
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Idempotency-Key': 'gift-' + attempt,
       },
       body,
       signal: AbortSignal.timeout(10_000),
     });
-    const data = (await response.json().catch(() => ({}))) as { url?: string; error?: { message?: string } };
-    if (!response.ok || !data.url) {
+    const data = (await response.json().catch(() => ({}))) as {
+      id?: string;
+      url?: string;
+      error?: { message?: string };
+    };
+    if (!response.ok || !data.url || !data.id) {
       return json({ ok: false, error: 'provider_failed' }, 502);
+    }
+    const record = {
+      ...claim,
+      status: 'open',
+      sessionId: data.id,
+      url: data.url,
+      updatedAt: new Date().toISOString(),
+    };
+    let persisted = false;
+    for (let attemptCount = 0; attemptCount < 3 && !persisted; attemptCount += 1) {
+      try {
+        await writeLedgerJson(bucket, key, record);
+        persisted = true;
+      } catch {
+        // Retry the durable write before exposing the payment URL.
+      }
+    }
+    if (!persisted) {
+      await expireGiftSession(env, data.id);
+      return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
     }
     return json({ ok: true, url: data.url });
   } catch {

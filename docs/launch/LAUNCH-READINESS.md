@@ -166,3 +166,25 @@ deployment, activation and actual provider verification.
   commercial/church show their own Back/Continue/Request actions.
 - Continue on an incomplete step opens an invalid dirt guide, shows the red inline error and error
   summary, focuses the first missing control and scrolls it into view.
+
+## 2026-10-29 final checkout, truthful confirmation and integrity release
+
+- The final estimate uses one green **Pay Now and Reserve This Cleaning** action and one smaller
+  **Request to Reserve This Cleaning (Pay Later)** action. The duplicate pay button inside the form
+  is removed. Mobile keeps Back and the two final actions in the fixed estimator bar.
+- The final total is a single vertical reconciliation: true deep-clean/base price, extras, rounding,
+  the single applied discount, travel, sales tax and the final total. Recurring first-visit and
+  ongoing prices remain separate.
+- Extras and all six bundles sit in a collapsed **Your Cleaning Details** accordion. The selected
+  extras and subtotal appear in its summary and update immediately.
+- Community Support moved immediately above the simplified Terms/Privacy acceptance. The
+  cancellation policy remains inside `/terms/`.
+- Paid, complete bookings confirm automatically only after the server verifies payment, the quote,
+  the bound hold, address, required photos, requested time and resource availability. Pending
+  requirements stay visible. Pay-later requests remain owner-reviewed.
+- Checkout state persistence now fails closed, gift refunds are blocked while a reservation is
+  active, gift checkout has readiness/idempotency/terms records, booking-admin tokens are separated
+  and day-lock takeover preserves ownership.
+- The first D1 relational schema is committed as an inactive foundation; no database is provisioned,
+  no migration is applied and no `/admin` interface is live. See
+  `docs/operations/ADMIN-DATA-FOUNDATION.md`.

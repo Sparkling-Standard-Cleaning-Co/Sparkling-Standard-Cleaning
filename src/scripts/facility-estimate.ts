@@ -123,7 +123,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
 
   function payNowLabel(): string {
     if (acceptedPaymentAmount !== null) return `Pay ${formatUsd(acceptedPaymentAmount)} Securely`;
-    return paymentRetryAvailable ? 'Try Secure Payment Again' : 'Pay Now Securely';
+    return paymentRetryAvailable
+      ? 'Try Secure Payment Again'
+      : 'Pay Now and Reserve This Cleaning';
   }
 
   function setPayNowBusy(busy: boolean): void {
@@ -172,6 +174,12 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         payNowButton.textContent = payNowLabel();
       }
     }
+    if (submitButton) {
+      submitButton.classList.toggle('btn--primary', !payable);
+      submitButton.classList.toggle('btn--secondary', payable);
+      submitButton.classList.toggle('btn--large', !payable);
+      submitButton.classList.toggle('btn--small', payable);
+    }
     if (giftField) giftField.hidden = !payable;
     if (verifyAddressButton) verifyAddressButton.hidden = !canVerify;
     if (paymentGuidance) {
@@ -179,10 +187,10 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       paymentGuidance.textContent = !taxReady
         ? 'Sales tax for this service address needs personal confirmation before online payment. Send your request and Sparkling Standard will confirm the tax and payment options with you.'
         : canVerify
-          ? 'Verify your service address to finalize travel and unlock secure online payment. You can still request the visit without paying.'
+          ? 'Verify the service address to unlock secure payment. You can also request to reserve and pay later.'
           : addressReviewRequired
             ? "We couldn't verify the exact facility address online. Request the visit without paying — we'll confirm the address and arrange payment personally."
-            : 'Your cleaning request is ready. We will confirm the final scope and price before arranging payment.';
+            : "Request to reserve and we'll confirm any outstanding detail with you.";
     }
     if (payNowNote) payNowNote.hidden = !payable;
     if (bookingPicker) {
@@ -809,7 +817,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       const percent = pricing.churchDiscount.percent.value;
       lines.push(`<li><span>Church discount</span><strong>${percent}% off eligible cleaning, applied to the cleaning subtotal</strong></li>`);
     }
-    lines.push('<li><span>Final price</span><strong>Confirmed personally before booking</strong></li>');
+    lines.push('<li><span>Reservation</span><strong>Pay Now when offered, or request to reserve</strong></li>');
     if (reviewLines) reviewLines.innerHTML = lines.join('');
     renderReviewNote();
     syncFacilityPayment();
@@ -819,27 +827,22 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     if (!reviewNote) return;
     if (!numericEstimatesEnabled) {
       reviewNote.textContent = facilityEngine === 'church'
-        ? `This is a scope-review request, not a confirmed contract. The ${churchDiscountLabel} applies to the confirmed cleaning quote, and Sparkling Standard confirms the scope and price personally before anything is scheduled.`
-        : 'This is a scope-review request, not a confirmed contract. Sparkling Standard confirms the scope and price personally before anything is scheduled.';
+        ? `This is a scope-review request. The ${churchDiscountLabel} applies to the confirmed cleaning quote, and we will confirm the scope and price with you.`
+        : 'This is a scope-review request. We will confirm the scope and price with you before scheduling.';
       return;
     }
     if (latestPrice?.priced) {
       reviewNote.textContent = facilityEngine === 'church'
-        ? `The amount above is a nonbinding preliminary estimate with the ${churchDiscountLabel} applied. Final scope and price are confirmed personally before anything is scheduled.`
-        : 'The amount above is a nonbinding preliminary estimate. Final scope and price are confirmed personally before anything is scheduled.';
+        ? `This is a preliminary estimate with the ${churchDiscountLabel} applied. Pay Now is offered only when we can verify the address, photos, time and resources; otherwise we will confirm the visit with you.`
+        : 'This is a preliminary estimate. Pay Now is offered only when we can verify the address, photos, time and resources; otherwise we will confirm the visit with you.';
       return;
     }
     if (latestPrice) {
-      reviewNote.textContent = facilityEngine === 'church'
-        ? `This scope needs a personal review before a responsible price can be given. The ${churchDiscountLabel} applies to the confirmed cleaning quote, and Sparkling Standard confirms the scope and price personally.`
-        : 'This scope needs a personal review before a responsible price can be given. Sparkling Standard confirms the scope and price personally before anything is scheduled.';
+      reviewNote.textContent = 'This scope needs a personal review before a responsible price can be given. Send the details and we will confirm the scope and price with you.';
       return;
     }
-    reviewNote.textContent = facilityEngine === 'church'
-      ? `Enter the facility details to see a preliminary estimate. The ${churchDiscountLabel} applies to the confirmed cleaning quote, and Sparkling Standard confirms the scope and price personally before anything is scheduled.`
-      : 'Enter the facility details to see a preliminary estimate. Final scope and price are confirmed personally before anything is scheduled.';
+    reviewNote.textContent = 'Enter the facility details to see a preliminary estimate.';
   }
-
   function escapeHtml(value: string): string {
     return value
       .replaceAll('&', '&amp;')

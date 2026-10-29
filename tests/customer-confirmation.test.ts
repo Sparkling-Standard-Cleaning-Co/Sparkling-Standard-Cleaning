@@ -36,8 +36,8 @@ test('the confirmation says "request received" — never a confirmed booking', (
   const confirmation = buildCustomerConfirmation(reservation, business);
   assert.equal(confirmation.subject, 'We received your Sparkling Standard request');
   assert.match(confirmation.text, /WE RECEIVED YOUR REQUEST/);
-  assert.match(confirmation.text, /THIS IS NOT A CONFIRMED APPOINTMENT\./);
-  assert.match(confirmation.text, /Final scope, pricing and availability may require confirmation/i);
+  assert.match(confirmation.text, /THIS IS A REQUEST, NOT A CONFIRMED APPOINTMENT\./);
+  assert.match(confirmation.text, /We will review the request and confirm the scope/i);
   assert.doesNotMatch(confirmation.text, /your appointment is confirmed|booking confirmed|you are booked/i);
 });
 
@@ -184,7 +184,7 @@ test('the plain-text fallback mirrors the HTML content without markup', () => {
 test('a Pay Now request explains the separate Stripe step without telling the customer not to pay', () => {
   const confirmation = buildCustomerConfirmation({ ...reservation, payment_choice: 'pay_now' }, business);
   for (const body of [confirmation.text, confirmation.html]) {
-    assert.match(body, /secure payment step opens separately through Stripe/i);
+    assert.match(body, /Complete secure checkout through Stripe/i);
     assert.match(body, /not a payment receipt/i);
     assert.doesNotMatch(body, /Please don't send payment until/i);
     assert.doesNotMatch(body, /payment received|amount charged|paid in full/i);

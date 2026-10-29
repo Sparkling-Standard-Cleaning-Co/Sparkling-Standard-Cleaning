@@ -515,8 +515,8 @@ const facilityStepDescriptions = church
       </ul>
       <p class="facility-review__note" data-facility-review-note>
         {numericEstimatesEnabled
-          ? 'A preliminary estimate is not a confirmed contract. Sparkling Standard confirms the scope and final price personally before anything is scheduled.'
-          : 'This is a scope-review request, not a confirmed contract. Sparkling Standard confirms the scope and price personally before anything is scheduled.'}
+          ? 'A preliminary estimate based on the scope you entered. Pay Now is offered only when the address, photos, time and resources verify.'
+          : 'This is a scope-review request. We will confirm the scope and price with you.'}
       </p>
     </div>
 
@@ -537,9 +537,6 @@ const facilityStepDescriptions = church
         data-protonpass-ignore
       />
     </div>
-    <p class="small text-muted">
-      Sending this request does not book anything. See our <a href="/privacy/">privacy policy</a>.
-    </p>
 
   </section>
 
@@ -550,8 +547,11 @@ const facilityStepDescriptions = church
     <button class="btn btn--primary" type="button" data-facility-next>
       Continue <Icon name="arrow-right" size={18} />
     </button>
-    <button class="btn btn--primary btn--large btn--block" type="submit" data-facility-submit data-cta={church ? 'church-submit' : 'commercial-submit'} hidden>
-      <Icon name="send" size={18} /> {church ? 'Request Our Church Estimate' : 'Request My Facility Estimate'}
+    <button class="btn btn--secondary btn--small" type="submit" data-facility-submit data-cta={church ? 'church-submit' : 'commercial-submit'} hidden>
+      Request to Reserve This Cleaning (Pay Later)
+    </button>
+    <button class="btn btn--success btn--large" type="button" data-facility-pay-now hidden>
+      Pay Now and Reserve This Cleaning
     </button>
     <button class="btn btn--secondary btn--large btn--block" type="button" data-facility-verify-address hidden>
       Verify Address &amp; Finalize Price
@@ -576,15 +576,13 @@ const facilityStepDescriptions = church
         We will apply the certificate's available balance. Any remaining balance is paid securely.
       </p>
     </div>
-    <button class="btn btn--secondary btn--large btn--block" type="button" data-facility-pay-now hidden>
-      Pay Now Securely
-    </button>
+
     <p class="small text-muted" data-facility-payment-guidance hidden>
       Verify your service address to finalize travel and unlock secure online payment.
     </p>
     <p class="small text-muted" data-facility-pay-note hidden>
-      Your estimate is ready. Pay securely now or request the visit without paying upfront. Payment
-      does not by itself confirm an appointment.
+      Pay now to reserve this cleaning. If required photos are still outstanding, we will mark the booking
+      pending photos.
     </p>
   </div>
   <p class="form-status" data-form-status role="status" aria-live="polite"></p>

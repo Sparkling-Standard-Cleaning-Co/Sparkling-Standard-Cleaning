@@ -179,6 +179,7 @@ export async function commitGiftReservation(
     const record = stored.value;
     const reservation = (record.reservations ?? []).find((entry) => entry.id === reservationId);
     if (!reservation) return { ok: false, error: 'not_reserved' };
+    if (record.status === 'refunded' || record.status === 'void') return { ok: false, error: 'inactive' };
     if (reservation.status === 'committed') return { ok: true, record, already: true };
     if (reservation.status === 'released') return { ok: false, error: 'released' };
     const otherReservedCents = (record.reservations ?? [])
@@ -305,7 +306,7 @@ export async function redeemGiftCertificate(
   return { ok: false, error: 'conflict' };
 }
 
-export type GiftAdjustmentError = 'not_found' | 'inactive' | 'redeemed' | 'conflict';
+export type GiftAdjustmentError = 'not_found' | 'inactive' | 'redeemed' | 'reserved' | 'conflict';
 
 async function adjustGiftCertificate(
   bucket: LedgerBucket,
@@ -328,6 +329,9 @@ async function adjustGiftCertificate(
     }
     if (record.status !== 'active') return { ok: false, error: 'inactive' };
     if (record.redeemedCents > 0) return { ok: false, error: 'redeemed' };
+    if ((record.reservations ?? []).some((entry) => entry.status === 'reserved' && Date.parse(entry.expiresAt) > now.getTime())) {
+      return { ok: false, error: 'reserved' };
+    }
     const updated: GiftCertificateRecord = {
       ...record,
       status: kind === 'refund' ? 'refunded' : 'void',

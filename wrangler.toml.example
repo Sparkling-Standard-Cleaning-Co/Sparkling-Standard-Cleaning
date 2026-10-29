@@ -37,3 +37,10 @@ compatibility_date = "2026-10-01"
 # Secrets (PHOTO_OWNER_TOKEN, optional TURNSTILE_SECRET_KEY / PHOTO_LINK_TTL_DAYS)
 # must be added in the Cloudflare dashboard or with `wrangler pages secret put`,
 # never in [vars].
+# Operational relational database (Milestone 3). Provision D1 first, then add
+# the same binding in the Cloudflare Pages dashboard before production use.
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "sparkling-standard-operations"
+# database_id = "REPLACE_WITH_THE_D1_DATABASE_ID"
