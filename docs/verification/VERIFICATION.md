@@ -1,5 +1,38 @@
 # Verification status
 
+## Verified - 2026-10-29 dirt guide and estimator mobile navigation release
+
+**Release:** `a6180a3`. Cloudflare Pages deployment
+`9ca8b665-d615-457f-936a-30da7a856585`. GitHub run `40939327571`: `validate`, `browser` and the
+Cloudflare Pages check all succeeded.
+
+- **Ten-level dirt guide:** Condition & Frequency now requires one level from 1 (Disney Princess
+  Clean) through 10 (Full Restoration Clean), each with a plain-English description. The guide is
+  a presentation/input refinement of the existing five condition tiers:
+  1–2 = maintained, 3–4 = average, 5–6 = needs attention, 7–9 = heavy, 10 = severe. Level 10 keeps
+  the personal-review gate; levels 1–9 price through the approved labor multipliers.
+- **One pricing path:** the submitted level is authoritative in browser calculation, server
+  verification and owner notification. A conflicting submitted condition is ignored; malformed
+  levels fail closed. Initial-visit condition still applies to the first recurring Deep Cleaning,
+  while the ongoing visit continues to price at maintained condition.
+- **Mobile navigation:** all four estimate forms no longer render the sitewide Call/Text/Estimate
+  bar. Residential/STR show the wizard Back/Continue/Reserve actions; commercial/church show their
+  fixed Back/Continue/Request actions. Step padding keeps the fixed bar clear of controls.
+- **Validation:** Continue on an incomplete step opens the dirt guide when it is the first missing
+  control, displays the red inline and summary errors, focuses the first invalid control and
+  scrolls it into view without erasing answers.
+- **Visual verification:** desktop and mobile screenshots confirmed the collapsed/expanded guide,
+  selected summary/impact text, and the fixed mobile action bar; local browser checks covered
+  390×844 and 1440×1000 viewports.
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **672 tests: 671 passed, 1 pre-existing print-output skip, 0 failed** |
+| Browser regression | **167 passed, 0 failed** |
+| Type check / build / validation | passed; smoke passed across 21 pages |
+| Production route | `/estimate/residential/` 200 with `data-dirt-guide`; sitewide mobile bar absent |
+| Live payment / gift purchase | not performed |
+
 ## Verified - 2026-10-29 progressive estimator, monthly recurring and address release
 
 **Release:** `c79a1f6` (includes the `a84ae3b` address-suggestion dismissal hotfix). Cloudflare
