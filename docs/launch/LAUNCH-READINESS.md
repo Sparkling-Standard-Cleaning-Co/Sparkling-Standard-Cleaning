@@ -47,7 +47,7 @@ deployment, activation and actual provider verification.
 | Secure Stripe checkout | Implemented, tested, deployed | Live mode configured; verified-quote-only, idempotent session creation, signature-verified webhook. |
 | Pay Now | Deployed, activated for verified exact quotes | **No live charge has been made.** |
 | Reserve Without Payment | Implemented, tested, deployed, activated | Request remains non-guaranteed until owner confirmation. |
-| Itemized customer receipts | **Not implemented** | Invoice generator exists for commercial use; customer receipt delivery is not complete. |
+| Itemized customer receipts | Implemented, tested locally; deployed in `2e2e5e3` | Stripe-paid estimate receipts are built from the server-owned checkout record and sent through Resend with subtotal, travel, extras, discounts, tax, total, paid, balance and reference. Receipt failures are logged and surfaced to the owner. No live payment/receipt has been executed. |
 | Refund synchronization / reconciliation | Partial | Gift unused-certificate refund/void path exists; no live Stripe refund; general reconciliation not complete. |
 | Tax accounting | Implemented, tested, deployed in the next release | Tax is stored with the checkout record and carried into the owner notification/customer summary. No live tax-inclusive charge has yet been run. |
 
@@ -96,7 +96,7 @@ deployment, activation and actual provider verification.
 1. **Gift sales:** final gift-terms legal review, a live/test-mode Stripe purchase, valid-from
    redemption, refund and reconciliation exercise, and explicit activation authorization.
 2. **Checkout redemption:** gift-code application at cleaning checkout is not built.
-3. **Receipts:** itemized customer receipts and ledger reconciliation are incomplete.
+3. **Receipts:** itemized receipt delivery is implemented, but no live paid transaction has exercised Resend or Stripe receipt reconciliation.
 4. **Backups:** no independent backup or successful restore.
 5. **Photo retention:** scheduled execution not yet activated or observed.
 6. **Email recovery:** implemented, but the live verified-email recovery path still needs an owner
@@ -120,7 +120,7 @@ deployment, activation and actual provider verification.
 ## Next safe engineering actions
 
 1. Build gift redemption at checkout with durable reservation/commit semantics.
-2. Add itemized receipt generation and Stripe ledger reconciliation.
+2. Exercise the itemized receipt path with an owner-authorized test-mode payment and reconcile it against Stripe.
 3. Implement independent backups and run a restore test.
 4. Complete customer/job history and the agreement signing workflow after legal review.
 5. Re-verify the Florida county surtaxes for 2027 before the rate table expires.
