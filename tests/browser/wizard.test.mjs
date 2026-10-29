@@ -1,4 +1,4 @@
-// Browser tests — six-step wizard navigation, navigator behavior, fresh-start
+// Browser tests — five-step wizard navigation, navigator behavior, fresh-start
 // guarantees, validation, submission failure handling and mobile overflow.
 //
 // Run with: npm run test:browser   (builds first, then serves the build on :4399)
@@ -79,7 +79,6 @@ async function openWizard(width, height) {
   await mockApis(page);
   await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
-  await page.click('[data-address-manual-summary]');
   return { context, page };
 }
 
@@ -92,14 +91,35 @@ const activeStep = (page) =>
 
 const isVisible = (page, selector) => page.locator(selector).isVisible();
 
+async function selectBookingDate(page, date = BOOKING_DATE) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const target = page.locator(`[data-date="${date}"]`);
+    if ((await target.count()) > 0) {
+      await target.click();
+      return;
+    }
+    await page.click('[data-calendar-next]');
+  }
+  throw new Error('booking date was not reachable in the calendar');
+}
+
 async function fillStepOne(page, zip = '32503') {
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+  await selectBookingDate(page);
+  const firstTime = page.locator('.booking-calendar__time').first();
+  if ((await firstTime.count()) > 0) await firstTime.click();
   await page.fill('#est-address', '100 S Baylen St');
+  await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', zip);
   await page.click('[data-next]');
+  // Address resolution is intentionally automatic; wait for the wizard to
+  // finish its background lookup and advance.
+  await page.waitForFunction(
+    () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+  );
 }
 
 async function fillHome(page) {
+  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
   await page.selectOption('#est-property', 'house');
   await page.fill('#est-sqft', '1600');
   await page.fill('#est-bedrooms', '3');
@@ -150,11 +170,7 @@ test('a new recurring residential request requires the Deep Cleaning acknowledgm
 });
 
 async function fillExtrasAndScheduling(page) {
-  await page.click('[data-next]'); // scheduling
-  await page.fill('#est-date', BOOKING_DATE);
-  await page.selectOption('#est-arrival', 'morning');
-  await page.click('[data-next]'); // extras
-  await page.click('[data-next]'); // final summary
+  await page.click('[data-next]'); // extras -> final summary
 }
 
 // ── Navigation contract at every viewport ────────────────────────────────────
@@ -164,19 +180,19 @@ for (const [name, width, height] of [
   ['tablet', 768, 1024],
   ['desktop', 1440, 900],
 ]) {
-  test(`six-step navigation contract (${name})`, async () => {
+  test(`five-step navigation contract (${name})`, async () => {
     const { context, page } = await openWizard(width, height);
     try {
-      // Navigator: six items, first current, future steps locked.
-      assert.equal(await page.locator('[data-step-item]').count(), 6);
-      assert.equal(await page.locator('.wizard__step').count(), 6);
+      // Navigator: five items, first current, future steps locked.
+      assert.equal(await page.locator('[data-step-item]').count(), 5);
+      assert.equal(await page.locator('.wizard__step').count(), 5);
       assert.equal(await page.locator('[data-step-item="1"]').getAttribute('data-state'), 'current');
       assert.equal(await page.locator('[data-step-item="2"]').getAttribute('data-state'), 'upcoming');
       assert.equal(await page.locator('[data-step-jump="2"]').isDisabled(), true, 'future steps cannot be skipped');
       assert.equal(await page.locator('[data-step-jump="1"]').getAttribute('aria-current'), 'step');
       assert.equal(
         await page.locator('[data-step-jump="2"]').getAttribute('aria-label'),
-        'Step 2: Your Home',
+        'Step 2: Service & Home',
       );
 
       assert.equal(await activeStep(page), 1);
@@ -201,7 +217,7 @@ for (const [name, width, height] of [
       await fillCondition(page);
       assert.equal(await activeStep(page), 4);
       await fillExtrasAndScheduling(page);
-      assert.equal(await activeStep(page), 6);
+      assert.equal(await activeStep(page), 5);
 
       // Final step: Back + ONE primary action.
       assert.equal(await isVisible(page, '[data-back]'), true, 'Back visible on final step');
@@ -211,7 +227,7 @@ for (const [name, width, height] of [
       assert.equal(visiblePrimary, 1, 'exactly one primary action on the final step');
 
       await page.click('[data-back]');
-      assert.equal(await activeStep(page), 5);
+      assert.equal(await activeStep(page), 4);
       assert.equal(await isVisible(page, '[data-next]'), true, 'Continue visible after going back');
       assert.equal(await isVisible(page, '[data-submit]'), false, 'Submit hidden after going back');
     } finally {
@@ -244,28 +260,34 @@ test('completed steps can be revisited from the navigator without losing answers
 
 // ── Validation blocks advancement ────────────────────────────────────────────
 
-test('step 1 requires a service selection and a ZIP before advancing', async () => {
+test('step 1 requires a preferred date and a complete address before advancing', async () => {
   const { context, page } = await openWizard(390, 900);
   try {
     await page.click('[data-next]');
-    assert.equal(await activeStep(page), 1, 'stayed without a service choice');
+    assert.equal(await activeStep(page), 1, 'stayed without a date or address');
+    assert.match(
+      (await page.locator('[data-error-for="est-date"]').textContent()) ?? '',
+      /preferred date/i,
+    );
 
-    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+    await selectBookingDate(page);
+    await page.fill('#est-zip', '32503');
     await page.click('[data-next]');
-    assert.equal(await activeStep(page), 1, 'stayed without an address');
+    assert.equal(await activeStep(page), 1, 'stayed without a street address');
     assert.equal(await page.locator('#est-address').getAttribute('aria-invalid'), 'true');
     assert.match(
       (await page.locator('[data-error-for="est-address"]').textContent()) ?? '',
       /Please enter your street address/i,
     );
 
-    await page.fill('#est-zip', '32503');
-    await page.click('[data-next]');
-    assert.equal(await activeStep(page), 1, 'stayed without a street address');
-
     await page.fill('#est-address', '100 S Baylen St');
+    await page.fill('#est-address-city', 'Pensacola');
     await page.click('[data-next]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+    );
     assert.equal(await activeStep(page), 2, 'advances once step 1 is complete');
+    assert.equal(await page.locator('input[name="serviceType"]:checked').count(), 0);
   } finally {
     await context.close();
   }
@@ -346,12 +368,7 @@ test('step transitions keep the questionnaire in a stable viewport across widths
   for (const [width, height] of [[390, 844], [768, 1024], [1280, 900]]) {
     const { context, page } = await openWizard(width, height);
     try {
-      await page.click('label.option:has(input[name="serviceType"][value="standard"])');
-      await page.fill('#est-address', '100 S Baylen St');
-      await page.fill('#est-zip', '32503');
-      // Simulate reaching the Continue button at the bottom of the page.
-      await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
-      await page.click('[data-next]');
+      await fillStepOne(page);
       assert.equal(await activeStep(page), 2, `${width}px: Next advances`);
       const top = await page.evaluate(
         () => document.querySelector('[data-estimate-form]').getBoundingClientRect().top,
@@ -510,10 +527,6 @@ test('relay rejection causes produce distinct, recoverable copy and preserve ans
 test('the preferred date is bounded to the configured advance-reservation window', async () => {
   const { context, page } = await openWizard(1280, 900);
   try {
-    await fillStepOne(page);
-    await fillHome(page);
-    await fillCondition(page);
-    await page.click('[data-next]'); // step 4 (extras) → step 5 (scheduling)
     const bounds = await page.$eval('#est-date', (input) => ({
       min: input.min,
       max: input.max,

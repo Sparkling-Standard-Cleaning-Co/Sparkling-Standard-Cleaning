@@ -2,14 +2,16 @@
 // the instant estimate works on a fully static page and keeps working when the
 // travel API is unavailable. Nothing is ever auto-booked.
 //
-// Journey: service & address → home → condition & frequency → extras →
-// scheduling → proposed price + reservation request.
+// Journey (owner-approved, 2026-10-28): When & Where → Service & Home →
+// Condition & Frequency → Optional Extras → Your Estimate. Step 1 chooses a
+// provisional preferred date/time and the service address.
 //
 // Behavior rules:
 //  - Every page visit starts a FRESH blank estimate at step 1. Nothing is
 //    restored from localStorage; there is no automatic draft recovery.
-//  - A confirmed street address and its coordinates are the ONLY destination
-//    source; a ZIP centroid never silently replaces a confirmed pin.
+//  - A resolved street address and its coordinates are the destination source
+//    when available. The typed address is preserved; a failed exact lookup
+//    falls back to the customer's ZIP without inventing a house location.
 //  - Prices shown here are proposals built by the ONE authoritative model
 //    (labor-hours × approved rate, with the add-on display and discount coming
 //    from the same breakdown). The server recalculates every reservation; the
@@ -18,6 +20,7 @@
 //    price or form contents.
 
 import { pricing } from '../config/pricing';
+import { zipReferenceFor } from '../config/geography';
 import { business, contactPhone, isPending } from '../config/business';
 import { schedulingConfig } from '../config/scheduling';
 import { calculateEstimate, type EstimateContext } from '../lib/estimate/calculate';
@@ -41,8 +44,7 @@ import { track } from '../lib/analytics/events';
 import { attributionFields } from '../lib/attribution';
 import { legalTerms } from '../config/legal';
 import { bookingConfig } from '../config/booking';
-import { initBookingPicker, type BookingPickerHandle } from './booking-picker';
-import { bookingHoldContextKey } from '../lib/booking/context';
+import { initBookingCalendar, type BookingCalendarHandle } from './booking-calendar';
 const TRAVEL_CACHE_PREFIX = 'pcc-travel-';
 
 // ── SPARKLE100 claim state (first-party, no PII) ─────────────────────────────
@@ -98,9 +100,6 @@ if (formHost) {
 }
 
 function initEstimateWizard(form: HTMLFormElement): void {
-  const extrasSection = form.querySelector<HTMLElement>('.wizard__step[data-step="4"]');
-  const schedulingSection = form.querySelector<HTMLElement>('.wizard__step[data-step="5"]');
-  if (extrasSection && schedulingSection) extrasSection.before(schedulingSection);
   const steps = [...form.querySelectorAll<HTMLElement>('.wizard__step')];
   const backButton = form.querySelector<HTMLButtonElement>('[data-back]');
   const nextButton = form.querySelector<HTMLButtonElement>('[data-next]');
@@ -162,7 +161,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const photoController = initPhotoUploads(form, {
     engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
   });
-  let bookingPicker: BookingPickerHandle | null = null;
+  let bookingCalendar: BookingCalendarHandle | null = null;
+  let bookingFinalizedKey = '';
+  let bookingFinalizeNote = '';
 
   let currentStep = 1;
   let location: ConfirmedLocation | null = null;
@@ -780,30 +781,49 @@ function initEstimateWizard(form: HTMLFormElement): void {
     void playEstimateReveal({ reveal: estimateReveal, target: reservationSummary });
   }
 
+  function appointmentDateLabel(date: string): string {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+    const parsed = new Date(`${date}T12:00:00Z`);
+    if (!Number.isFinite(parsed.getTime())) return '';
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: 'UTC',
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    }).format(parsed);
+  }
+
+  function updateAppointmentSummary(): void {
+    const dateEl = form.querySelector<HTMLElement>('[data-appointment-date]');
+    const timeEl = form.querySelector<HTMLElement>('[data-appointment-time]');
+    const date = textValue('preferredDate') ?? '';
+    const time = textValue('preferredTime') ?? '';
+    if (dateEl) {
+      dateEl.textContent = date
+        ? appointmentDateLabel(date)
+        : 'Choose a date in step 1';
+    }
+    if (timeEl) {
+      timeEl.textContent = time
+        ? `Preferred start: ${time} — confirmed after our team reviews your request.`
+        : 'No specific start time selected — we will confirm one with you.';
+    }
+  }
+
   function renderReservationSummary(result: EstimateResult): void {
     if (!reservationSummary) return;
     const hasQuote = result.status === 'estimated' && latestQuote !== null;
     syncPaymentAvailability(hasQuote);
-    if (bookingPicker) {
+    if (bookingCalendar) {
       const bookingContext = submissionAddress();
-      const bookingDurationMinutes =
-        latestResult
-          ? Math.max(
-              bookingConfig.minimumJobMinutes,
-              Math.ceil((latestResult.pricing.totalLaborHours * 60) / bookingConfig.defaultCrewSize),
-            )
-          : 0;
-      const bookingKey =
-        hasQuote && latestQuote && latestResult && bookingContext.location
-          ? bookingHoldContextKey({
-              durationMinutes: bookingDurationMinutes,
-              preferredDate: textValue('preferredDate') ?? '',
-              locationKey: locationKey(bookingContext.location.lat, bookingContext.location.lng),
-            })
-          : '';
-      bookingPicker.contextChanged(bookingKey);
-      if (currentStep === steps.length - 2 && bookingKey) void bookingPicker.activate();
+      bookingCalendar.setContext({
+        ...(bookingContext.location
+          ? { lat: bookingContext.location.lat, lng: bookingContext.location.lng }
+          : {}),
+        ...(bookingContext.zip ? { zip: bookingContext.zip } : {}),
+      });
     }
+    updateAppointmentSummary();
     reservationSummary.hidden = !hasQuote;
     if (submitButton) {
       submitButton.textContent = requestAlreadySent
@@ -898,21 +918,31 @@ function initEstimateWizard(form: HTMLFormElement): void {
         );
 
         const scheduleRows = summaryGroup('Schedule', reservationScope);
-        addSummaryRow(scheduleRows, 'Preferred date', textValue('preferredDate') ?? '');
-        addSummaryRow(scheduleRows, 'Arrival', textValue('arrivalPreference')?.replaceAll('-', ' ') ?? '');
-        const held = bookingPicker?.holdFields();
+        const preferredDate = textValue('preferredDate') ?? '';
+        addSummaryRow(
+          scheduleRows,
+          'Preferred date',
+          preferredDate ? appointmentDateLabel(preferredDate) : 'To be confirmed',
+        );
+        addSummaryRow(
+          scheduleRows,
+          'Preferred start',
+          textValue('preferredTime') ?? 'We will confirm a time with you',
+        );
+        const holdId = textValue('booking_hold_id');
+        const holdExpiry = textValue('booking_hold_expires_at');
         addSummaryRow(
           scheduleRows,
           'Status',
-          held
-            ? `Temporary hold until ${held.booking_hold_expires_at.slice(11, 16)} Central — not confirmed`
+          holdId && holdExpiry
+            ? `Temporary hold until ${holdExpiry.slice(11, 16)} Central — not confirmed`
             : 'Pending owner confirmation',
         );
         const editButton = document.createElement('button');
         editButton.type = 'button';
         editButton.className = 'btn btn--ghost btn--small';
         editButton.textContent = 'Edit date or time';
-        editButton.addEventListener('click', () => showStep(steps.length - 2));
+        editButton.addEventListener('click', () => showStep(1));
         scheduleRows.appendChild(editButton);
 
         const locationRows = summaryGroup('Location', reservationScope);
@@ -990,7 +1020,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     updateChrome();
     recalc();
-    if (currentStep === steps.length - 2 && latestQuote) void bookingPicker?.activate();
     if (!changed) return;
 
     // Accessible focus management without scrolling the document.
@@ -1137,8 +1166,17 @@ function initEstimateWizard(form: HTMLFormElement): void {
   /** Method-aware message for one control, or null when it is valid. */
   function messageFor(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): string | null {
     const submission = submissionAddress();
-    // Hidden manual fields never block a GPS-based request.
-    if (submission.method === 'gps' && (field.id === 'est-address' || field.id === 'est-zip')) return null;
+    // Manual fields never block a GPS-based request; the confirmed device pin
+    // is the destination source.
+    if (
+      submission.method === 'gps' &&
+      (field.id === 'est-address' ||
+        field.id === 'est-zip' ||
+        field.id === 'est-address-city' ||
+        field.id === 'est-address-state')
+    ) {
+      return null;
+    }
     const value = field.value.trim();
     if (field instanceof HTMLInputElement && field.type === 'checkbox') {
       return field.required && !field.checked
@@ -1242,8 +1280,34 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
     }
 
+    if (step === 1) {
+      const calendar = form.querySelector<HTMLElement>('[data-booking-calendar]');
+      const dateField = form.querySelector<HTMLInputElement>('#est-date');
+      const preferredDate = textValue('preferredDate') ?? '';
+      const outOfRange =
+        dateField !== null &&
+        preferredDate !== '' &&
+        ((dateField.min && preferredDate < dateField.min) ||
+          (dateField.max && preferredDate > dateField.max));
+      const errorTarget = dateField ?? calendar;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(preferredDate) || outOfRange) {
+        if (errorTarget) {
+          const message = outOfRange
+            ? `Please choose a date from today up to ${schedulingConfig.advanceReservationDays} days ahead.`
+            : 'Choose a preferred date to continue.';
+          setFieldError(errorTarget, message);
+          errors.push({ field: errorTarget, message });
+        }
+      } else if (errorTarget) {
+        clearFieldError(errorTarget);
+      }
+    }
+
     for (const field of stepFields(step)) {
       if (field instanceof HTMLInputElement && field.type === 'radio') continue;
+      // The calendar's hidden date is validated above (format + window); the
+      // generic hidden-input pass would otherwise clear that error.
+      if (field.id === 'est-date') continue;
       const message = messageFor(field);
       if (message) {
         setFieldError(field, message);
@@ -1437,6 +1501,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   // ── Address finder wiring ─────────────────────────────────────────────────
   const addressFinder: AddressFinderHandle | null = initAddressFinder({
     form,
+    autoConfirm: true,
     onChange: (next) => {
       // Editing the address invalidates any previous route instantly, so a
       // stale ZIP/centroid route can never price a different destination.
@@ -1446,13 +1511,20 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const previousKey = location ? locationKey(location.lat, location.lng) : null;
       location = next;
       const nextKey = next ? locationKey(next.lat, next.lng) : null;
-      if (previousKey !== nextKey) {
-        recalc();
+      recalc();
+      // Any address edit invalidates the previous route. Re-run the lookup
+      // even when the coordinates are unchanged: a corrected ZIP or a
+      // background resolution can change the travel key without moving the
+      // pin. lookupTravel dedupes by key.
+      if (previousKey !== nextKey || routed === undefined) {
         void lookupTravel();
-      } else {
-        recalc();
       }
       if (!addressVerificationPending) addressReviewRequired = false;
+      const current = submissionAddress();
+      bookingCalendar?.setContext({
+        ...(next ? { lat: next.lat, lng: next.lng } : {}),
+        ...(current.zip ? { zip: current.zip } : {}),
+      });
     },
     onConfirm: () => {
       if (!addressVerificationPending) return;
@@ -1470,31 +1542,28 @@ function initEstimateWizard(form: HTMLFormElement): void {
   });
 
   // ── Fresh start (no drafts are ever stored) ───────────────────────────────
-  const bookingRoot = form.querySelector<HTMLElement>('[data-booking-picker]');
-  if (bookingRoot) {
-    bookingPicker = initBookingPicker(bookingRoot, () => {
-      if (!latestQuote || !latestResult) return null;
-      const submission = submissionAddress();
-      if (
-        !submission.location ||
-        submission.street.trim().length < 5 ||
-        submission.location.precision === 'street' ||
-        submission.location.precision === 'approximate'
-      ) {
-        return null;
+  const calendarRoot = form.querySelector<HTMLElement>('[data-booking-calendar]');
+  if (calendarRoot) {
+    const calendar = initBookingCalendar(calendarRoot, () => {
+      bookingFinalizedKey = '';
+      bookingFinalizeNote = '';
+      updateAppointmentSummary();
+      const alternatives = form.querySelector<HTMLElement>('[data-booking-alternatives]');
+      if (alternatives) {
+        alternatives.hidden = true;
+        alternatives.innerHTML = '';
       }
-      const durationMinutes = Math.max(
-        bookingConfig.minimumJobMinutes,
-        Math.ceil((latestResult.pricing.totalLaborHours * 60) / bookingConfig.defaultCrewSize),
-      );
-      return {
-        durationMinutes,
-        destination: { lat: submission.location.lat, lng: submission.location.lng },
-        reference: latestQuote.reference,
-        location: formatLocationLine(submission.location),
-        preferredDate: textValue('preferredDate') ?? '',
-      };
     });
+    bookingCalendar = calendar;
+    if (calendar) {
+      const bookingContext = submissionAddress();
+      calendar.setContext({
+        ...(bookingContext.location
+          ? { lat: bookingContext.location.lat, lng: bookingContext.location.lng }
+          : {}),
+        ...(bookingContext.zip ? { zip: bookingContext.zip } : {}),
+      });
+    }
   }
   verifyAddressButton?.addEventListener('click', async () => {
     addressVerificationPending = true;
@@ -1543,7 +1612,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
   function resetWizard(): void {
     form.reset();
     addressFinder?.reset();
-    bookingPicker?.reset();
+    bookingCalendar?.reset();
+    bookingFinalizedKey = '';
+    bookingFinalizeNote = '';
     clearAllErrors();
     attemptedSteps.clear();
     location = null;
@@ -1666,7 +1737,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
           }
         : {}),
       preferred_date: textValue('preferredDate') ?? '',
-      arrival_preference: textValue('arrivalPreference') ?? '',
+      preferred_time: textValue('preferredTime') ?? '',
+      preferred_slot_start: textValue('preferredSlotStart') ?? '',
+      preferred_slot_end: textValue('preferredSlotEnd') ?? '',
       notes: textValue('notes') ?? '',
       name: textValue('name') ?? '',
       phone: textValue('phone') ?? '',
@@ -1684,8 +1757,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
     // the discount itself and redemption eligibility is confirmed by the owner.
     const claimedCode = claimedPromoCode();
     if (claimedCode) fields.promotion_code = claimedCode;
-    const selectedHold = bookingPicker?.holdFields() ?? null;
-    if (selectedHold) Object.assign(fields, selectedHold);
+    const holdId = textValue('booking_hold_id');
+    const holdExpiry = textValue('booking_hold_expires_at');
+    if (holdId && holdExpiry) {
+      fields.booking_hold_id = holdId;
+      fields.booking_hold_expires_at = holdExpiry;
+    }
     if (isReservation && latestQuote) {
       fields.quoted_price = String(latestQuote.amount);
       fields.quote_reference = latestQuote.reference;
@@ -1845,6 +1922,101 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (!started.ok) handlePaymentFailure(started);
   }
 
+  function renderBookingAlternatives(
+    alternatives: Array<{ start: string; end: string; startLabel: string; endLabel: string }>,
+    message: string,
+  ): void {
+    const container = form.querySelector<HTMLElement>('[data-booking-alternatives]');
+    if (!container) return;
+    container.innerHTML = '';
+    if (alternatives.length === 0) {
+      if (message && status) {
+        status.dataset.state = 'info';
+        status.textContent = message;
+      }
+      container.hidden = true;
+      return;
+    }
+    container.hidden = false;
+    const intro = document.createElement('p');
+    intro.className = 'booking-alternatives__title';
+    intro.textContent = 'Choose an available time';
+    const copy = document.createElement('p');
+    copy.className = 'booking-alternatives__copy';
+    copy.textContent = message;
+    const list = document.createElement('div');
+    list.className = 'booking-alternatives__list';
+    for (const slot of alternatives) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'booking-calendar__time';
+      button.textContent = slot.startLabel;
+      button.addEventListener('click', () => {
+        bookingCalendar?.selectSlot(slot.start, slot.end, slot.startLabel);
+        bookingFinalizedKey = '';
+        container.hidden = true;
+        container.innerHTML = '';
+        updateAppointmentSummary();
+        if (status) {
+          status.dataset.state = 'success';
+          status.textContent =
+            'Preferred time updated. Send your request to continue — the appointment still requires owner approval.';
+        }
+      });
+      list.appendChild(button);
+    }
+    container.append(intro, copy, list);
+  }
+
+  async function finalizeBookingForSubmit(result: EstimateResult): Promise<{
+    blockedPayment: boolean;
+    note: string;
+  }> {
+    if (!bookingCalendar || result.status !== 'estimated' || !latestQuote) {
+      return { blockedPayment: false, note: '' };
+    }
+    const submission = submissionAddress();
+    const fallback = submission.location ? null : zipReferenceFor(submission.zip);
+    const destination = submission.location
+      ? { lat: submission.location.lat, lng: submission.location.lng }
+      : fallback
+        ? { lat: fallback.lat, lng: fallback.lng }
+        : null;
+    if (!destination) {
+      return { blockedPayment: false, note: 'Your preferred date is saved; we will confirm the time with you.' };
+    }
+    const durationMinutes = Math.max(
+      bookingConfig.minimumJobMinutes,
+      Math.ceil((result.pricing.totalLaborHours * 60) / bookingConfig.defaultCrewSize),
+    );
+    const key = [
+      textValue('preferredDate') ?? '',
+      textValue('preferredTime') ?? '',
+      String(durationMinutes),
+      destination.lat.toFixed(5),
+      destination.lng.toFixed(5),
+    ].join('|');
+    if (key === bookingFinalizedKey) {
+      return { blockedPayment: false, note: bookingFinalizeNote };
+    }
+    bookingFinalizedKey = key;
+    const outcome = await bookingCalendar.finalize({
+      durationMinutes,
+      destination,
+      reference: latestQuote.reference,
+      location: submission.location
+        ? formatLocationLine(submission.location)
+        : `ZIP ${submission.zip}`,
+    });
+    bookingFinalizeNote = outcome.message;
+    renderBookingAlternatives(outcome.alternatives, outcome.message);
+    updateAppointmentSummary();
+    return {
+      blockedPayment: outcome.status === 'alternatives',
+      note: outcome.message,
+    };
+  }
+
   async function handleSubmit(event?: Event, paymentChoice: 'reserve' | 'pay_now' = 'reserve'): Promise<void> {
     event?.preventDefault();
     if (paymentChoice === 'pay_now' && pendingPaymentFields) {
@@ -1876,6 +2048,23 @@ function initEstimateWizard(form: HTMLFormElement): void {
         status.textContent = result.issues?.[0] ?? 'Please complete the estimate before sending.';
       }
       return;
+    }
+
+    if (currentStep === steps.length) {
+      if (status) {
+        status.dataset.state = 'info';
+        status.textContent = 'Checking your preferred time against the live schedule…';
+      }
+      const finalized = await finalizeBookingForSubmit(result);
+      if (paymentChoice === 'pay_now' && finalized.blockedPayment) {
+        setPayNowBusy(false);
+        if (status) {
+          status.dataset.state = 'info';
+          status.textContent =
+            'That start time is no longer available with your final details. Choose an available time above, or reserve without paying and we will help.';
+        }
+        return;
+      }
     }
 
     if (submitButton) submitButton.disabled = true;
@@ -1969,7 +2158,21 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   // ── Wiring ────────────────────────────────────────────────────────────────
-  nextButton?.addEventListener('click', () => {
+  async function advanceStep(): Promise<void> {
+    if (currentStep === 1 && addressFinder) {
+      if (status) {
+        status.dataset.state = 'info';
+        status.textContent = 'Saving your address so we can prepare the most accurate estimate…';
+      }
+      await addressFinder.verifyAddress();
+      const submission = submissionAddress();
+      bookingCalendar?.setContext({
+        ...(submission.location
+          ? { lat: submission.location.lat, lng: submission.location.lng }
+          : {}),
+        ...(submission.zip ? { zip: submission.zip } : {}),
+      });
+    }
     if (!validateStep(currentStep)) return;
     const serviceType = currentServiceType();
     track('estimate_step', {
@@ -1977,10 +2180,18 @@ function initEstimateWizard(form: HTMLFormElement): void {
       ...(serviceType ? { service_type: serviceType } : {}),
     });
     showStep(currentStep + 1);
+  }
+
+  nextButton?.addEventListener('click', () => {
+    void advanceStep();
   });
 
   backButton?.addEventListener('click', () => {
     showStep(currentStep - 1);
+  });
+
+  form.querySelectorAll<HTMLButtonElement>('[data-appointment-edit]').forEach((button) => {
+    button.addEventListener('click', () => showStep(1));
   });
 
   for (const jump of stepJumps) {

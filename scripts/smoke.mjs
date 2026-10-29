@@ -73,7 +73,8 @@ for (const [label, needle] of [
   ['progress indicator', 'data-progress-fill'],
   ['step navigator', 'data-wizard-steps'],
   ['step 1', 'data-step="1"'],
-  ['step 6', 'data-step="6"'],
+  ['step 5', 'data-step="5"'],
+  ['premium booking calendar', 'data-booking-calendar'],
   ['submit button', 'data-submit'],
   ['live estimate panel', 'data-estimate-live'],
   ['address finder', 'data-address-finder'],
@@ -81,9 +82,7 @@ for (const [label, needle] of [
   ['city field', 'id="est-address-city"'],
   ['state selector', 'id="est-address-state"'],
   ['ZIP field', 'id="est-zip"'],
-  ['map confirmation card', 'data-address-map'],
-  ['find-my-address control', 'data-address-resolve'],
-  ['manual address section', 'data-address-manual-details'],
+  ['always-visible manual address', 'address-manual__body'],
   ['location permission guidance', 'data-address-permission'],
   ['use-my-current-location control', 'data-address-gps'],
   ['reservation summary', 'data-reservation-summary'],
@@ -93,11 +92,11 @@ for (const [label, needle] of [
 ]) {
   if (!estimate.includes(needle)) problems.push(`estimate page: missing ${label}`);
 }
-if ((estimate.match(/data-step="/g) ?? []).length !== 6) {
-  problems.push('estimate page: expected exactly 6 steps');
+if ((estimate.match(/data-step="/g) ?? []).length !== 5) {
+  problems.push('estimate page: expected exactly 5 steps');
 }
-if ((estimate.match(/data-step-item="/g) ?? []).length !== 6) {
-  problems.push('estimate page: expected exactly 6 navigator items');
+if ((estimate.match(/data-step-item="/g) ?? []).length !== 5) {
+  problems.push('estimate page: expected exactly 5 navigator items');
 }
 if (estimate.includes('owner review') || estimate.includes('Our server recalculates')) {
   problems.push('estimate page: internal/technical copy leaked into the customer UI');

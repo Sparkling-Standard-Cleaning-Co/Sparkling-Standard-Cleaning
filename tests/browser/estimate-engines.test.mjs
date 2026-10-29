@@ -118,8 +118,8 @@ test('the STR page runs the turnover engine without a second service choice', as
     assert.equal(await page.locator('input[name="serviceType"][value="str_turnover"]').isChecked(), true);
     assert.equal(await page.locator('[data-service-fieldset]').isVisible(), false, 'no duplicate service picker');
     const headings = await page.locator('[data-step-title]').allTextContents();
-    assert.equal(headings[0].trim(), 'Property & Address');
-    assert.equal(headings[5].trim(), 'Your Turnover Estimate');
+    assert.equal(headings[0].trim(), 'When & Where');
+    assert.equal(headings[4].trim(), 'Your Turnover Estimate');
     // Turnover-specific facts are enabled; the residential supportive block is not.
     assert.equal(
       await page.locator('#est-rental-properties').evaluate((el) => el.closest('[data-str-only]').hidden),
@@ -170,8 +170,12 @@ test('the church engine presents the owner-directed 10% discount and optional pa
 async function completeFacilityStepOne(page, organization = 'Test facility (please ignore)') {
   await page.fill('#fac-org', organization);
   await page.fill('#fac-name', 'Test Contact');
-  await page.click('[data-address-manual-summary]');
+  await page.evaluate(() => {
+    const details = document.querySelector('[data-address-manual-details]');
+    if (details instanceof HTMLDetailsElement) details.open = true;
+  });
   await page.fill('#est-address', '100 S Baylen St');
+  await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', '32502');
   await page.click('[data-facility-next]');
   await page.waitForFunction(() => document.querySelector('[data-facility-step-panel="2"]')?.hidden === false);
@@ -221,7 +225,7 @@ test('the commercial engine shows a preliminary per-visit price for an ordinary 
     const note = (await page.locator('[data-facility-estimate-note]').textContent()) ?? '';
     assert.match(note, /Nonbinding preliminary estimate/i);
     const tax = (await page.locator('[data-facility-estimate-tax]').textContent()) ?? '';
-    assert.match(tax, /applicable tax/i);
+    assert.match(tax, /sales tax of 7\.5% applies|taxable at 7\.5%/i);
     const reviewNote = (await page.locator('[data-facility-review-note]').textContent()) ?? '';
     assert.match(reviewNote, /nonbinding preliminary estimate/i, 'a priced request is not called a scope review');
     assert.doesNotMatch(reviewNote, /scope-review request/i);
@@ -256,7 +260,7 @@ test('the church engine reconciles the configured discount and routes very large
       assert.equal(priceText, formatUsd(expected.price.total, { forceCents: true }), 'the exact discounted price reconciles');
     }
     const tax = (await page.locator('[data-facility-estimate-tax]').textContent()) ?? '';
-    assert.match(tax, /unless exempt/i);
+    assert.match(tax, /unless a current Florida exemption certificate is on file/i);
     // A very large facility must not receive an invented number. Return to the
     // scope step, change the size, and advance back to the final review.
     await page.click('[data-facility-step-jump="2"]');

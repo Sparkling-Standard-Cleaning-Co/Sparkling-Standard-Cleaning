@@ -45,9 +45,16 @@ test('engine links and residential presets stay inside the registry', () => {
   assert.equal(parseResidentialServiceParam('commercial'), null);
 });
 
-test('each calculator family has six intentional step titles', () => {
-  assert.equal(ENGINE_STEPS.residential.titles.length, 6);
-  assert.equal(ENGINE_STEPS.str.titles.length, 6);
+test('each calculator family has five intentional step titles', () => {
+  assert.equal(ENGINE_STEPS.residential.titles.length, 5);
+  assert.equal(ENGINE_STEPS.str.titles.length, 5);
+  assert.deepEqual(ENGINE_STEPS.residential.titles, [
+    'When & Where',
+    'Service & Home',
+    'Condition & Frequency',
+    'Optional Extras',
+    'Your Estimate',
+  ]);
   assert.notEqual(ENGINE_STEPS.residential.titles[1], ENGINE_STEPS.str.titles[1]);
 });
 

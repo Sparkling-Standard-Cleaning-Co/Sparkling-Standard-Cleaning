@@ -214,10 +214,7 @@ test('a confirmed facility location can continue without a ZIP code', async () =
     await page.locator('#est-address').fill('123 Main St');
     await page.locator('#est-address-city').fill('Pensacola');
     await page.locator('#est-address-state').selectOption('FL');
-    await page.locator('[data-address-resolve]').click();
-    await page.locator('[data-address-confirm]').waitFor({ state: 'visible' });
-    await page.locator('[data-address-confirm]').click();
-    await page.locator('[data-address-confirmed]').waitFor({ state: 'visible' });
+    // The five-step journey resolves and accepts the typed address automatically.
     await page.locator('[data-facility-next]').click();
     await page.locator('[data-facility-step-panel="2"]').waitFor({ state: 'visible' });
     assert.match(normalize((await page.locator('[data-facility-step-label]').innerText()) ?? ''), /Step 2 of 4/);
@@ -309,10 +306,7 @@ test('Pay Now appears only for an exact Tier A facility quote when Stripe is con
     await page.locator('#est-address-city').fill('Pensacola');
     await page.locator('#est-address-state').selectOption('FL');
     await page.locator('#est-zip').fill('32502');
-    await page.locator('[data-address-resolve]').click();
-    await page.locator('[data-address-confirm]').waitFor({ state: 'visible' });
-    await page.locator('[data-address-confirm]').click();
-    await page.locator('[data-address-confirmed]').waitFor({ state: 'visible' });
+    // The five-step journey resolves and accepts the typed address automatically.
     await page.locator('[data-facility-next]').click();
     await page.locator('[data-facility-step-panel="2"]').waitFor({ state: 'visible' });
     await page.selectOption('#fac-type', 'office');
@@ -403,10 +397,7 @@ test('an approximate facility address becomes a manual-review request instead of
     await page.locator('#est-address-city').fill('Molino');
     await page.locator('#est-address-state').selectOption('FL');
     await page.locator('#est-zip').fill('32577');
-    await page.locator('[data-address-resolve]').click();
-    await page.locator('[data-address-confirm]').waitFor({ state: 'visible' });
-    await page.locator('[data-address-confirm]').click();
-    await page.locator('[data-address-confirmed]').waitFor({ state: 'visible' });
+    // The five-step journey resolves and accepts the typed address automatically.
     await page.locator('[data-facility-next]').click();
     await page.locator('[data-facility-step-panel="2"]').waitFor({ state: 'visible' });
     await page.selectOption('#fac-type', 'office');
@@ -418,22 +409,12 @@ test('an approximate facility address becomes a manual-review request instead of
     await page.selectOption('#fac-window', { index: 1 });
     await page.locator('[data-facility-next]').click();
     await page.locator('[data-facility-step-panel="4"]').waitFor({ state: 'visible' });
-    await page.locator('[data-facility-verify-address]').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('[data-facility-pay-now]').isVisible(), false);
-    await page.locator('[data-facility-verify-address]').click();
-    await page.locator('[data-address-confirm]').waitFor({ state: 'visible' });
-    await page.locator('[data-address-confirm]').click();
-    await page.waitForFunction(
-      () => document.querySelector('[data-facility-step-panel="4"]')?.getAttribute('data-active') === 'true',
-      null,
-      { timeout: 15_000 },
-    );
     await page.waitForFunction(() => document.querySelector('[data-estimate-reveal]')?.hidden === true);
     assert.equal(await page.locator('[data-facility-pay-now]').isVisible(), false);
     assert.equal(
       await page.locator('[data-facility-verify-address]').isVisible(),
       false,
-      'approximate facility addresses must not offer the same verification loop again',
+      'no address-verification loop exists',
     );
     const guidance = normalize((await page.locator('[data-facility-payment-guidance]').innerText()) ?? '');
     assert.match(guidance, /couldn't verify the exact facility address/i);

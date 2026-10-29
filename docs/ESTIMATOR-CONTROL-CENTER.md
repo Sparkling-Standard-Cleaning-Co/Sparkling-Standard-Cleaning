@@ -257,15 +257,20 @@ Cloudflare secrets.
 
 | Setting | Current | File |
 | --- | ---: | --- |
+| Customer journey | exactly five steps: When & Where → Service & Home → Condition & Frequency → Optional Extras → Your Estimate | `src/lib/estimate/steps.ts` |
+| Appointment selection | premium calendar in step 1; 7:00 AM earliest starts; 15-minute grid; provisional until final-duration revalidation | `src/components/BookingCalendar.astro`, `src/scripts/booking-calendar.ts` |
+| Address entry | always-visible manual fields; background exact/close resolution; no map/pin confirmation; FL/AL suggestions only; ZIP fallback | `src/scripts/address-finder.ts`, `functions/api/geocode.ts` |
 | Advance reservation window | 60 days | `scheduling.ts` |
 | Required initial Deep Cleaning for new recurring residential | true | `scheduling.ts` |
 | Service/frequency matrix | standard has rhythms; deep/move/STR one-time | `service-matrix.ts` |
-| Tax rates | none configured | `src/lib/estimate/tax.ts` |
-| Tax treatment | residential/STR non-taxable; commercial taxable pending; church exemption pending | `tax.ts` |
+| Two cleaning resources | Hayli + family cleaner; per-resource availability, holds, joint jobs and owner reassignment | `src/config/booking.ts`, `src/lib/booking/` |
+| Tax rates | Florida 2026: Escambia 7.5%, Santa Rosa 7.0%; Alabama cleaning services outside the sales-tax base | `src/config/tax.ts` |
+| Tax treatment | residential/STR not taxable; FL commercial/church taxable unless a verified exemption applies; unresolved jurisdiction fails closed | `src/lib/tax/engine.ts` |
 
-Tax is never invented: the site shows “+ applicable tax” and the final quote
-confirms the amount for the address. Do not add a rate without the owner’s
-confirmed tax setup.
+Tax is calculated server-side from the confirmed service location. If the
+jurisdiction or effective rate cannot be verified, online payment is withheld
+and the owner confirms the tax personally. Do not add or change a rate without
+official-source verification and the effective-date update.
 
 ---
 

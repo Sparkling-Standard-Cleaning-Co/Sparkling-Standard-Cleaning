@@ -789,6 +789,7 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
 
   // ── G. Scheduling and customer notes ────────────────────────────────────
   add('Scheduling — Arrival preference', ARRIVAL_LABELS[text(fields, 'arrival_preference')] ?? text(fields, 'arrival_preference'), 'arrival_preference');
+  add('Scheduling — Preferred start time', text(fields, 'preferred_time'), 'preferred_time');
   add('Scheduling — Preferred days', text(fields, 'preferred_days'), 'preferred_days');
   add('Scheduling — Time preference', text(fields, 'time_preference'), 'time_preference');
   add('Scheduling — Checkout time', text(fields, 'checkout_time'), 'checkout_time');

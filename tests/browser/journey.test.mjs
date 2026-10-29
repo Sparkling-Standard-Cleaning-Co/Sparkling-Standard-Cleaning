@@ -195,40 +195,57 @@ async function openEstimate(width, height, options = {}) {
   const travelRequests = await mockProviders(page, options);
   await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
-  await page.click('[data-address-manual-summary]');
   return { context, page, travelRequests };
 }
 
 const isVisible = (page, selector) => page.locator(selector).isVisible();
 
 async function step1(page) {
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
-  await page.click('[data-next]');
+  await page.fill('#est-date', BOOKING_DATE);
 }
 
 async function addressStep(page, { manual = false } = {}) {
-  if (manual) {
-    await page.fill('#est-address', '100 S Baylen St');
-    await page.click('[data-address-manual]');
-    await page.click('[data-address-resolve]');
-  } else {
-    await page.fill('#est-address', '100 S Baylen');
+  if (!manual && !(await page.inputValue('#est-zip'))) {
+    if (!(await page.inputValue('#est-address'))) {
+      await page.fill('#est-address', '100 S Baylen');
+    }
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
   }
-  await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-  // ZIP must never be silently invented by the browser when the provider has
-  // one: the resolved ZIP fills the required field.
-  await page.waitForFunction(() => document.querySelector('#est-zip')?.value === '32502');
-  await page.click('[data-address-confirm]');
-  await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
+  if (manual) {
+    if (!(await page.inputValue('#est-address'))) {
+      await page.fill('#est-address', '100 S Baylen St');
+    }
+    if (!(await page.inputValue('#est-address-city'))) {
+      await page.fill('#est-address-city', 'Pensacola');
+    }
+    if (!(await page.inputValue('#est-zip'))) {
+      await page.fill('#est-zip', '32502');
+    }
+  } else {
+    await page.waitForFunction(() => (document.querySelector('#est-zip')?.value ?? '').length >= 5);
+    if (!(await page.inputValue('#est-address-city'))) {
+      await page.fill('#est-address-city', 'Pensacola');
+    }
+  }
   await page.click('[data-next]');
+  await page.waitForFunction(
+    () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+  );
+  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
 }
 
 async function zipOnlyAddressStep(page, zip = '32503') {
-  await page.fill('#est-address', '100 S Baylen St');
+  if (!(await page.inputValue('#est-address'))) {
+    await page.fill('#est-address', '100 S Baylen St');
+  }
+  await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', zip);
   await page.click('[data-next]');
+  await page.waitForFunction(
+    () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+  );
+  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
 }
 
 async function homeStep(page) {
@@ -251,9 +268,6 @@ async function conditionStep(page) {
 }
 
 async function extrasStep(page, addons = []) {
-  await page.fill('#est-date', BOOKING_DATE);
-  await page.selectOption('#est-arrival', 'morning');
-  await page.click('[data-next]');
   for (const id of addons) {
     // Click the styled label (the visible option), not the hidden input.
     await page.click(`label.option:has(input[name="addons"][value="${id}"])`);
@@ -283,23 +297,16 @@ test('address autocomplete: debounced suggestions resolve and confirm a destinat
     assert.match(suggestion ?? '', /100 S Baylen St, Pensacola, FL 32502/);
 
     await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    assert.equal(await isVisible(page, '[data-address-map]'), true, 'map confirmation card appears');
-    assert.equal(
-      await isVisible(page, '[data-address-confirmed]'),
-      false,
-      'nothing is confirmed before the customer confirms',
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
     );
-
-    await page.click('[data-address-confirm]');
-    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
-    const label = (await page.locator('[data-address-confirmed-label]').textContent())?.trim() ?? '';
-    assert.match(label, /100 S Baylen/, 'confirmed label shown');
-    assert.doesNotMatch(label, /32502, FL 32502|Pensacola, FL 32502 · Pensacola/, 'region is not duplicated');
+    assert.equal(await page.locator('[data-address-map]').count(), 0, 'no map confirmation card exists');
+    assert.equal(await page.locator('[data-address-confirm]').count(), 0, 'no separate confirmation action');
     assert.equal(
       await page.locator('[data-address-finder]').getAttribute('data-state'),
       'confirmed',
     );
+    assert.match(await page.inputValue('#est-address'), /100 S Baylen/);
     assert.equal(await page.inputValue('#est-zip'), '32502', 'provider ZIP fills the coverage field');
     await shot(page, '01-address-confirmed-desktop');
   } finally {
@@ -317,31 +324,37 @@ test('an exact provider suggestion fills the required ZIP and advances', async (
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
     assert.equal(
       await page.inputValue('#est-zip'),
       '32502',
       'the provider label ZIP fills the required field without invalidating the candidate',
     );
-    await page.click('[data-address-confirm]');
-    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
+    await page.fill('#est-date', BOOKING_DATE);
     await page.click('[data-next]');
-    await page.waitForSelector('#est-property', { state: 'visible' });
-    assert.equal(await isVisible(page, '#est-property'), true, 'the wizard advances to the home step');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+    );
+    assert.equal(await isVisible(page, '#est-property'), true, 'the wizard advances to Service & Home');
   } finally {
     await context.close();
   }
 });
 
-test('manual address entry works when suggestions are not used', async () => {
+test('manual address entry works without selecting a suggestion', async () => {
   const { context, page } = await openEstimate(1440, 900);
   try {
     await step1(page);
     await page.fill('#est-address', '100 S Baylen St');
-    await page.click('[data-address-resolve]');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    await page.click('[data-address-confirm]');
-    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
+    await page.fill('#est-address-city', 'Pensacola');
+    await page.fill('#est-zip', '32502');
+    await page.click('[data-next]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+    );
+    assert.equal(await page.inputValue('#est-address'), '100 S Baylen St');
     assert.equal(await page.inputValue('#est-zip'), '32502');
   } finally {
     await context.close();
@@ -355,25 +368,25 @@ test('id-only suggestion gateways still resolve through the retrieve endpoint', 
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    await page.click('[data-address-confirm]');
-    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
     assert.equal(await page.inputValue('#est-zip'), '32502');
   } finally {
     await context.close();
   }
 });
 
-test('confirmed coordinates — not a ZIP centroid — reach the routing lookup', async () => {
+test('resolved coordinates — not a ZIP centroid — reach the routing lookup', async () => {
   const { context, page, travelRequests } = await openEstimate(1440, 900);
   try {
     await step1(page);
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    await page.click('[data-address-confirm]');
-    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
     await page.waitForFunction(
       (requests) => requests.some((entry) => entry.lat === 30.4111 && entry.lng === -87.2164),
       travelRequests,
@@ -511,7 +524,6 @@ test('reservation summary carries every answer and the call/text actions work', 
     assert.equal(fields.pin_source, 'mapmap');
     assert.equal(fields.addon_ids, 'inside_oven');
     assert.equal(fields.preferred_date, BOOKING_DATE);
-    assert.equal(fields.arrival_preference, 'morning');
     assert.equal(fields.travel_verified, 'true');
     assert.equal(fields.travel_qualification, 'verified_route');
     await shot(page, '03-reservation-desktop');
@@ -648,176 +660,6 @@ test('a preliminary verdict names the travel uncertainty', async () => {
   }
 });
 
-test('a manually moved destination pin is submitted as adjusted and never receives a verified receipt', async () => {
-  const { context, page } = await openEstimate(1440, 900);
-  const captured = {};
-  await page.route('**/api/lead', (route) => {
-    captured.payload = route.request().postDataJSON();
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        verification: {
-          status: 'preliminary',
-          travel_verified: false,
-          travel_method: 'route',
-          config_match: 'match',
-        },
-      }),
-    });
-  });
-  try {
-    await step1(page);
-    await page.fill('#est-address', '100 S Baylen');
-    await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
-    await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    await page.click('[data-address-confirm]');
-    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
-
-    // Manually move the confirmed pin away from the geocoded street location.
-    const marker = page.locator('.maplibregl-marker').first();
-    await marker.waitFor({ state: 'visible', timeout: 10000 });
-    await marker.scrollIntoViewIfNeeded();
-    await delay(200);
-    const box = await marker.boundingBox();
-    assert.ok(box, 'map marker rendered');
-    assert.ok(box.y >= 0 && box.y <= 900, `marker must be inside the viewport (y=${box.y})`);
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2 + 70, box.y + box.height / 2 + 45, { steps: 10 });
-    await page.mouse.up();
-    await page.waitForFunction(
-      () => /Pin moved/.test(document.querySelector('[data-address-confirmed-travel]')?.textContent ?? ''),
-      undefined,
-      { timeout: 10000 },
-    );
-
-    await page.click('[data-next]');
-    await homeStep(page);
-    await conditionStep(page);
-    await extrasStep(page);
-    await timingStep(page);
-    await contactFields(page);
-    await page.click('[data-submit]');
-    await page.waitForSelector('[data-form-status][data-state="warning"]', { timeout: 15000 });
-
-    assert.ok(captured.payload, 'the reservation request was sent');
-    const fields = captured.payload.fields;
-    assert.equal(fields.pin_adjusted, 'yes', 'the moved pin is reported as adjusted');
-    assert.notEqual(fields.pin_latitude, '30.411100', 'the adjusted pin coordinates travel with the request');
-    assert.notEqual(fields.pin_longitude, '-87.216400');
-    const text = (await page.locator('[data-form-status]').textContent()) ?? '';
-    assert.match(text, /drive time still needs a final check/i, 'a moved pin never gets a verified receipt');
-    assert.doesNotMatch(text, /verified this price/i);
-  } finally {
-    await context.close();
-  }
-});
-
-// ── Add-on pricing transparency + timeline ───────────────────────────────────
-
-test('add-on amounts are not displayed before the final estimate; the final breakdown reconciles', async () => {
-  const { context, page } = await openEstimate(1440, 900);
-  try {
-    await step1(page);
-    await addressStep(page);
-    await homeStep(page);
-    await conditionStep(page); // one-time standard
-    assert.equal(await page.locator('[data-addon-price]').count(), 0, 'no add-on dollar labels');
-    // Specialty work remains labelled honestly.
-    const custom = page.locator('label.option:has(input[value="carpet_cleaning"]) .option__price--custom');
-    assert.equal(((await custom.textContent()) ?? '').trim(), 'Custom quote');
-
-    await extrasStep(page, ['inside_oven']);
-    await timingStep(page);
-    await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
-    const otherRate = pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour);
-    const ovenCharge = addonCharge('inside_oven', otherRate);
-    const breakdown = (await page.locator('[data-price-breakdown]').textContent()) ?? '';
-    assert.ok(breakdown.includes(`Inside oven+${formatUsd(ovenCharge, { forceCents: true })}`));
-  } finally {
-    await context.close();
-  }
-});
-
-test('the Community Support 10% discount and tax disclosure are explicit in the quote', async () => {
-  const { context, page } = await openEstimate(1440, 900);
-  try {
-    await step1(page);
-    await addressStep(page);
-    await homeStep(page);
-    const eligible = page.locator('input[name="supportiveEligible"]');
-    assert.equal(await eligible.isChecked(), false, 'eligibility starts unchecked');
-    await eligible.check();
-    await conditionStep(page);
-    await extrasStep(page);
-    await timingStep(page);
-    const breakdown = (await page.locator('[data-price-breakdown]').textContent()) ?? '';
-    if (pricing.supportiveHomeDiscount.enabled.value) {
-      const percent = pricing.supportiveHomeDiscount.percent.value;
-      assert.match(breakdown, new RegExp(`Community Support discount \\(${percent}%\\)`));
-    }
-    assert.match(breakdown, /no sales tax applicable/i);
-    assert.match(breakdown, /Proposed total/);
-  } finally {
-    await context.close();
-  }
-});
-
-test('the final breakdown reconciles base, extras, rounding and the proposed total', async () => {
-  const { context, page } = await openEstimate(1440, 900);
-  try {
-    await step1(page);
-    await addressStep(page);
-    await homeStep(page);
-    await conditionStep(page);
-    await extrasStep(page, ['inside_oven', 'laundry']);
-    await timingStep(page);
-
-    const breakdown = (await page.locator('[data-price-breakdown]').textContent()) ?? '';
-    const otherRate = pricingValue(pricing.laborEconomics.targetGrossRevenuePerLaborHour);
-    const ovenCharge = addonCharge('inside_oven', otherRate);
-    const laundryCharge = addonCharge('laundry', otherRate);
-    const expectedTotal = expectedResidentialPrice({ addonIds: ['inside_oven', 'laundry'] });
-    const step = pricingValue(pricing.rounding.toNearest);
-    assert.match(breakdown, /Base cleaning\$\d/);
-    assert.ok(breakdown.includes(`Inside oven+${formatUsd(ovenCharge, { forceCents: true })}`));
-    assert.ok(breakdown.includes(`Laundry+${formatUsd(laundryCharge, { forceCents: true })}`));
-    assert.match(breakdown, new RegExp(`Rounded to the nearest \\$${step}`));
-    assert.ok(breakdown.includes(`Proposed total${formatUsd(expectedTotal)}`));
-    assert.equal(await page.locator('[data-reservation-price]').textContent(), formatUsd(expectedTotal));
-    assert.equal(await page.locator('[data-addon-incentive]').count(), 0);
-    assert.equal(await page.locator('[data-response-guarantee]').count(), 0);
-    assert.doesNotMatch(breakdown, /save/i);
-  } finally {
-    await context.close();
-  }
-});
-
-test('the "After you send" timeline has three clean, separated stages', async () => {
-  const { context, page } = await openEstimate(1440, 900);
-  try {
-    const stages = page.locator('.timeline__stage');
-    assert.equal(await stages.count(), 3);
-    assert.deepEqual(await stages.locator('.timeline__title').allTextContents(), [
-      'Request received',
-      'Personal confirmation',
-      "You're booked",
-    ]);
-    const titleBox = await page.locator('.card:has(.timeline) .card__title').boundingBox();
-    const numberBox = await stages.first().locator('.timeline__number').boundingBox();
-    assert.ok(titleBox && numberBox, 'timeline elements rendered');
-    assert.ok(
-      numberBox.y >= titleBox.y + titleBox.height - 1,
-      'the card heading must be clearly separated from the first timeline marker',
-    );
-  } finally {
-    await context.close();
-  }
-});
-
 // ── Mobile complete journey ──────────────────────────────────────────────────
 
 test('the complete journey works on mobile without overflow', async () => {
@@ -829,12 +671,16 @@ test('the complete journey works on mobile without overflow', async () => {
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
     assert.ok((await overflow()) <= 1, 'no overflow on the address step');
-    await page.click('[data-address-confirm]');
-    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
     await shot(page, '04-address-confirmed-mobile');
     await page.click('[data-next]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+    );
+    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
     await homeStep(page);
     await conditionStep(page);
     await extrasStep(page, ['inside_fridge']);

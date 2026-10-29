@@ -1,8 +1,8 @@
 ---
 metaTitle: Residential Cleaning Estimate | Sparkling Standard
-metaDescription: Get a residential cleaning estimate from Sparkling Standard. Enter your address, answer six short steps, see a proposed price, and confirm the final scope personally before anything is scheduled.
+metaDescription: Get a residential cleaning estimate from Sparkling Standard. Enter your address, answer five short steps, see a proposed price, and confirm the final scope personally before anything is scheduled.
 hero:
-  headline: Six Short Steps to a
+  headline: Five Short Steps to a
   accent: Sparkling Standard!
   lead: ""
   ctaLabel: Start Below

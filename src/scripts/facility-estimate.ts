@@ -451,7 +451,11 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     if (focus) stepPanels[currentStep - 1]?.querySelector<HTMLElement>('[data-facility-step-title]')?.focus();
   }
 
-  function advance(): void {
+  async function advance(): Promise<void> {
+    if (currentStep === 1 && finder) {
+      setStatus('info', 'Saving your facility address so we can prepare the most accurate estimate…');
+      await finder.verifyAddress();
+    }
     const errors = validateStep(currentStep);
     if (errors.length > 0) return;
     maxVisitedStep = Math.max(maxVisitedStep, Math.min(stepPanels.length, currentStep + 1));
@@ -479,7 +483,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       showStep(index + 1);
     });
   }
-  nextButton?.addEventListener('click', advance);
+  nextButton?.addEventListener('click', () => {
+    void advance();
+  });
   backButton?.addEventListener('click', goBack);
   host.addEventListener('input', (event) => {
     const name = (event.target as HTMLElement | null)?.getAttribute('name');
@@ -492,13 +498,19 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   showStep(1, false);
   finder = initAddressFinder({
     form: host,
+    autoConfirm: true,
     onChange: (location) => {
       travel = null;
       travelKey = location ? `pin:${location.lat},${location.lng}` : '';
       if (confirmedTravel) confirmedTravel.textContent = '';
       renderSummary();
       if (location) void lookupTravel(location.lat, location.lng);
-      if (!addressVerificationPending) addressReviewRequired = false;
+      if (!addressVerificationPending) {
+        addressReviewRequired = Boolean(
+          location &&
+            (location.precision === 'approximate' || location.precision === 'street'),
+        );
+      }
     },
     onConfirm: () => {
       if (!addressVerificationPending) return;

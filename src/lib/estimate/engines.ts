@@ -130,48 +130,45 @@ export function engineEstimateHref(
 }
 
 /**
- * Wizard step titles per calculator family. Residential keeps the owner's
- * six-step journey; turnover hosts see a property/linen-specific sequence.
+ * Wizard step titles per calculator family. Both residential and STR use the
+ * owner-approved five-section layout; turnover hosts see rental-specific
+ * wording without extra residential questions.
  * The DOM derives its headings, labels, and progress text from this registry.
  */
 export interface EngineSteps {
-  titles: readonly [string, string, string, string, string, string];
-  blurbs: readonly [string, string, string, string, string, string];
+  titles: readonly [string, string, string, string, string];
+  blurbs: readonly [string, string, string, string, string];
 }
 
 export const ENGINE_STEPS: Record<'residential' | 'str', EngineSteps> = {
   residential: {
     titles: [
-      'Service & Address',
-      'Your Home',
+      'When & Where',
+      'Service & Home',
       'Condition & Frequency',
-      'Scheduling',
       'Optional Extras',
       'Your Estimate',
     ],
     blurbs: [
-      'Choose your cleaning and confirm your address on the map.',
-      'Size, bedrooms and bathrooms — the facts that actually move labor time.',
+      'Choose your preferred date and time, then tell us where to clean.',
+      'Choose your cleaning and tell us about the home.',
       'How the home has been kept, and how often you would like it cleaned.',
-      'Your preferred date and the arrival window that works for you.',
       'Focused extras with the price shown beside each one before you choose.',
       'Your proposed price, the full scope and your reservation request.',
     ],
   },
   str: {
     titles: [
-      'Property & Address',
+      'When & Where',
       'Rental Details',
       'Turnover Setup',
-      'Scheduling',
       'Turnover Extras',
       'Your Turnover Estimate',
     ],
     blurbs: [
-      'Confirm the rental property on the map.',
+      'Choose your preferred turnover date and time, then the rental location.',
       'Property size, bedrooms, bathrooms and beds to reset.',
       'Turnover rhythm, linen handling and guest windows.',
-      'Your preferred turnover date and arrival window.',
       'Focused extras with the price shown beside each one before you choose.',
       'Your per-turnover estimate and host request.',
     ],

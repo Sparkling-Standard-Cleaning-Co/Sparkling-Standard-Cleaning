@@ -49,6 +49,14 @@ export interface AddressFinderOptions {
   onChange: (location: ConfirmedLocation | null) => void;
   /** Fires only after an explicit pin confirmation, never while editing. */
   onConfirm?: (location: ConfirmedLocation) => void;
+  /**
+   * Owner direction (2026-10-28): the residential five-step journey must not
+   * require a customer map/pin confirmation. When true, a successful resolve
+   * (exact, street-level or ZIP-area) is accepted immediately in the
+   * background and the typed address remains editable. GPS results are also
+   * accepted without a confirmation card.
+   */
+  autoConfirm?: boolean;
 }
 
 export type AddressVerificationOutcome =
@@ -120,6 +128,7 @@ const emptyParts = (): { street: string; unit: string; city: string; state: stri
 
 export function initAddressFinder(options: AddressFinderOptions): AddressFinderHandle | null {
   const { form, onChange, onConfirm } = options;
+  const autoConfirm = options.autoConfirm === true;
   const root = form.querySelector<HTMLElement>('[data-address-finder]');
   const streetInput = form.querySelector<HTMLInputElement>('#est-address');
   const unitInput = form.querySelector<HTMLInputElement>('#est-address-unit');
@@ -356,9 +365,30 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     };
   }
 
+  /** Parses city/state from a provider label when the payload omits them. */
+  function regionFromLabel(label: string): { city?: string; state?: string } {
+    const parts = label
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts.length < 2) return {};
+    const statePart = parts[parts.length - 1] ?? '';
+    const state = statePart.match(/\b(FL|AL)\b/i)?.[1]?.toUpperCase();
+    const city = parts.length >= 3 ? parts[parts.length - 2] : '';
+    return {
+      ...(city ? { city } : {}),
+      ...(state ? { state } : {}),
+    };
+  }
+
   function showManualCandidate(resolved: ResolvedCandidate): void {
     setMethod('manual');
-    manualCandidate = resolved;
+    const region = regionFromLabel(resolved.label);
+    manualCandidate = {
+      ...resolved,
+      ...(!resolved.city && region.city ? { city: region.city } : {}),
+      ...(!resolved.state && region.state ? { state: region.state } : {}),
+    };
     clearSuggestions();
     // The provider label carries the ZIP even when the resolve response does
     // not: exact suggestions with embedded coordinates skip the resolver, and
@@ -366,13 +396,17 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     // confirmed candidate, so fill it here under the same guard the resolver
     // path uses — never leaving a confirmed pin with an empty required ZIP.
     const zip = resolved.zip ?? zipFromLabel(resolved.label) ?? undefined;
-    if (zip) {
-      applyingResolved = true;
-      try {
-        fillField(zipInput, zip);
-      } finally {
-        applyingResolved = false;
+    applyingResolved = true;
+    try {
+      if (zip) fillField(zipInput, zip);
+      if (manualCandidate.city && cityInput && !cityInput.value.trim()) {
+        fillField(cityInput, manualCandidate.city);
       }
+      if (manualCandidate.state && stateInput && !stateInput.value) {
+        fillField(stateInput, manualCandidate.state);
+      }
+    } finally {
+      applyingResolved = false;
     }
     settleDestinationValues();
     if (mapCard) mapCard.hidden = false;
@@ -380,12 +414,16 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     setState('resolved');
     setStatus(
       resolved.approximate
-        ? 'This is the general area for your ZIP — not your exact house. Drag the pin to your property if you can, or confirm and we will verify the exact address with you.'
+        ? 'This is the general area for your ZIP — not your exact house. We will verify the exact address with you.'
         : resolved.streetLevel
-          ? 'We found the street. Drag the pin to your property, then confirm — we will verify the exact address with you.'
-          : 'Address found — confirm your location on the map.',
+          ? 'We found the street. We will verify the exact property address with you.'
+          : 'Address saved. We will calculate travel to this exact location.',
       'info',
     );
+    if (autoConfirm) {
+      commitManualCandidate(false);
+      return;
+    }
     void showMap(resolved);
     confirmButton?.focus();
   }
@@ -488,9 +526,11 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       source: 'gps',
       adjusted: false,
     };
-    if (mapCard) mapCard.hidden = false;
+    if (!autoConfirm) {
+      if (mapCard) mapCard.hidden = false;
+      void showMap(gpsCandidate);
+    }
     setState('gps');
-    void showMap(gpsCandidate);
     setStatus(
       poorAccuracy
         ? `Your location is only accurate to about ${Math.round(accuracy)} m — check the pin and add the address if needed.`
@@ -527,6 +567,19 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
             ...(gpsParts.state ? { state: gpsParts.state } : {}),
           };
         }
+        if (autoConfirm) {
+          applyingResolved = true;
+          try {
+            if (gpsParts.street) fillField(streetField, gpsParts.street);
+            fillField(cityInput, gpsParts.city);
+            fillField(stateInput, gpsParts.state);
+            fillField(zipInput, gpsParts.zip);
+          } finally {
+            applyingResolved = false;
+          }
+          commitGpsCandidate(false);
+          return;
+        }
         if (gpsParts.street) {
           setStatus('We found this address — confirm this is the property you want cleaned.', 'info');
         } else {
@@ -544,12 +597,14 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         "We couldn't look up the address from your location — check the pin, then confirm your map location.",
         'info',
       );
+      if (autoConfirm) commitGpsCandidate(false);
     } catch {
       if (method !== 'gps') return;
       setStatus(
         'We found your location, but the address lookup is unavailable — check the pin, then confirm your map location.',
         'info',
       );
+      if (autoConfirm) commitGpsCandidate(false);
     }
   }
 
@@ -786,7 +841,9 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         clearSuggestions();
         setState('unavailable');
         setStatus(
-          'Address suggestions are not connected right now — press Find My Address or continue with your ZIP.',
+          autoConfirm
+            ? 'Address suggestions are not connected right now — continue with your ZIP.'
+            : 'Address suggestions are not connected right now — press Find My Address or continue with your ZIP.',
           'info',
         );
         return;
@@ -811,9 +868,19 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       activeIndex = -1;
       setState(suggestions.length > 0 ? 'suggestions' : 'idle');
       if (suggestions.length === 0) {
-        setStatus('No matching addresses yet — press Find My Address or add your city or ZIP.', 'info');
+        setStatus(
+          autoConfirm
+            ? 'No matching addresses yet — add your city or ZIP.'
+            : 'No matching addresses yet — press Find My Address or add your city or ZIP.',
+          'info',
+        );
       } else {
-        setStatus('Choose your address from the list, or press Find My Address.', 'info');
+        setStatus(
+          autoConfirm
+            ? 'Choose your address from the list, or continue with what you typed.'
+            : 'Choose your address from the list, or press Find My Address.',
+          'info',
+        );
       }
       renderSuggestions();
     } catch (error) {
@@ -822,7 +889,9 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       clearSuggestions();
       setState('idle');
       setStatus(
-        'Address lookup is unavailable right now — press Find My Address or continue with your ZIP.',
+        autoConfirm
+          ? 'Address lookup is unavailable right now — continue with your ZIP.'
+          : 'Address lookup is unavailable right now — press Find My Address or continue with your ZIP.',
         'info',
       );
     }
@@ -832,7 +901,12 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     ensureManualMode();
     const street = streetField.value.trim();
     if (street.length < 5) {
-      setStatus('Enter your street address first, then press Find My Address.', 'error');
+      setStatus(
+        autoConfirm
+          ? 'Enter your street address, city and ZIP to continue.'
+          : 'Enter your street address first, then press Find My Address.',
+        'error',
+      );
       streetField.focus();
       return false;
     }
@@ -941,26 +1015,26 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     }
   }
 
-  function confirmLocation(): void {
-    if (methodIsGps()) {
-      if (!gpsCandidate) return;
-      // A reliable ZIP from reverse geocoding is preserved automatically; when
-      // there is none, coverage and travel use the confirmed coordinates and
-      // the address is confirmed personally. No ZIP is ever fabricated.
-      const zip = gpsParts.zip;
-      gpsConfirmed = {
-        label: gpsCandidate.label || 'Current location from your device',
-        street: gpsParts.street,
-        lat: gpsCandidate.lat,
-        lng: gpsCandidate.lng,
-        ...(zip ? { zip } : {}),
-        ...(gpsParts.city ? { city: gpsParts.city } : {}),
-        ...(gpsParts.state ? { state: gpsParts.state } : {}),
-        source: 'gps',
-        precision: 'gps',
-        ...(gpsCandidate.adjusted ? { adjusted: true } : {}),
-        confirmedAt: new Date().toISOString(),
-      };
+  function commitGpsCandidate(showUi: boolean): void {
+    if (!gpsCandidate) return;
+    // A reliable ZIP from reverse geocoding is preserved automatically; when
+    // there is none, coverage and travel use the confirmed coordinates and
+    // the address is confirmed personally. No ZIP is ever fabricated.
+    const zip = gpsParts.zip;
+    gpsConfirmed = {
+      label: gpsCandidate.label || 'Current location from your device',
+      street: gpsParts.street,
+      lat: gpsCandidate.lat,
+      lng: gpsCandidate.lng,
+      ...(zip ? { zip } : {}),
+      ...(gpsParts.city ? { city: gpsParts.city } : {}),
+      ...(gpsParts.state ? { state: gpsParts.state } : {}),
+      source: 'gps',
+      precision: 'gps',
+      ...(gpsCandidate.adjusted ? { adjusted: true } : {}),
+      confirmedAt: new Date().toISOString(),
+    };
+    if (showUi) {
       if (mapCard) mapCard.hidden = false;
       if (confirmedCard) confirmedCard.hidden = false;
       if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(gpsConfirmed);
@@ -971,53 +1045,76 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       );
       setState('confirmed');
       setStatus('Destination confirmed. We will calculate travel to this exact location.', 'success');
-      emit();
-      if (gpsConfirmed) onConfirm?.(gpsConfirmed);
+    } else {
+      setState('confirmed');
+      setStatus('Location saved. We will confirm any details we still need with you.', 'success');
+    }
+    emit();
+    onConfirm?.(gpsConfirmed);
+  }
+
+  function confirmLocation(): void {
+    if (methodIsGps()) {
+      commitGpsCandidate(true);
       return;
     }
 
     if (!manualCandidate) return;
+    commitManualCandidate(true);
+  }
+
+  function buildManualConfirmed(candidate: ResolvedCandidate): ConfirmedLocation {
     const streetText = streetField.value.trim();
-    manualConfirmed = {
-      label: manualCandidate.label,
-      street: streetText || streetLineFromLabel(manualCandidate.label),
+    return {
+      label: candidate.label,
+      street: streetText || streetLineFromLabel(candidate.label),
       ...(unitInput?.value.trim() ? { unit: unitInput.value.trim() } : {}),
-      lat: manualCandidate.lat,
-      lng: manualCandidate.lng,
-      ...(manualCandidate.zip || zipInput?.value.trim()
-        ? { zip: manualCandidate.zip ?? zipInput?.value.trim() ?? '' }
+      lat: candidate.lat,
+      lng: candidate.lng,
+      ...(candidate.zip || zipInput?.value.trim()
+        ? { zip: candidate.zip ?? zipInput?.value.trim() ?? '' }
         : {}),
-      ...(manualCandidate.city || cityInput?.value.trim()
-        ? { city: manualCandidate.city ?? cityInput?.value.trim() ?? '' }
+      ...(candidate.city || cityInput?.value.trim()
+        ? { city: candidate.city ?? cityInput?.value.trim() ?? '' }
         : {}),
-      ...(manualCandidate.state || stateInput?.value
-        ? { state: manualCandidate.state ?? stateInput?.value ?? '' }
+      ...(candidate.state || stateInput?.value
+        ? { state: candidate.state ?? stateInput?.value ?? '' }
         : {}),
-      source: manualCandidate.source,
-      precision: manualCandidate.approximate ? 'approximate' : manualCandidate.streetLevel ? 'street' : 'exact',
-      ...(manualCandidate.adjusted ? { adjusted: true } : {}),
+      source: candidate.source,
+      precision: candidate.approximate ? 'approximate' : candidate.streetLevel ? 'street' : 'exact',
+      ...(candidate.adjusted ? { adjusted: true } : {}),
       confirmedAt: new Date().toISOString(),
     };
+  }
+
+  function commitManualCandidate(showUi: boolean): void {
+    if (!manualCandidate) return;
+    manualConfirmed = buildManualConfirmed(manualCandidate);
     settleDestinationValues();
-    if (mapCard) mapCard.hidden = false;
-    if (confirmedCard) confirmedCard.hidden = false;
-    if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(manualConfirmed);
-    setTravelNote(
-      manualCandidate.approximate
-        ? 'Travel is estimated from this approximate area, not your exact house. Drag the pin to your property for a sharper price, or confirm and we will verify the exact address with you.'
-        : manualCandidate.streetLevel
-          ? 'Travel will be estimated from this street-level pin. We will confirm the exact property address with you before your cleaning.'
-          : 'Travel will be calculated from our base to this confirmed pin when your price is prepared.',
-    );
-    setState('confirmed');
-    setStatus(
-      manualCandidate.approximate
-        ? 'Approximate area confirmed. We will verify your exact address before booking.'
-        : manualCandidate.streetLevel
-          ? 'Street-level destination confirmed. We will verify the exact address with you.'
-          : 'Destination confirmed. We will calculate travel to this exact location.',
-      'success',
-    );
+    if (showUi) {
+      if (mapCard) mapCard.hidden = false;
+      if (confirmedCard) confirmedCard.hidden = false;
+      if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(manualConfirmed);
+      setTravelNote(
+        manualCandidate.approximate
+          ? 'Travel is estimated from this approximate area, not your exact house. Drag the pin to your property for a sharper price, or confirm and we will verify the exact address with you.'
+          : manualCandidate.streetLevel
+            ? 'Travel will be estimated from this street-level pin. We will confirm the exact property address with you before your cleaning.'
+            : 'Travel will be calculated from our base to this confirmed pin when your price is prepared.',
+      );
+      setState('confirmed');
+      setStatus(
+        manualCandidate.approximate
+          ? 'Approximate area confirmed. We will verify your exact address before booking.'
+          : manualCandidate.streetLevel
+            ? 'Street-level destination confirmed. We will verify the exact address with you.'
+            : 'Destination confirmed. We will calculate travel to this exact location.',
+        'success',
+      );
+    } else {
+      setState('confirmed');
+      setStatus('Address saved. We will confirm any details we still need with you.', 'success');
+    }
     emit();
     onConfirm?.(manualConfirmed);
   }
@@ -1188,21 +1285,31 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     focus: () => streetField.focus(),
     focusManual: () => openManualSection(),
     verifyAddress: async () => {
+      if (methodIsGps()) return gpsConfirmed ? 'resolved' : 'incomplete';
       ensureManualMode();
       if (manualDetails) manualDetails.open = true;
-      manualDetails?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      streetField.focus();
+      if (manualConfirmed) return 'resolved';
       if (streetField.value.trim().length < 5) {
-        setStatus('Enter your street address first, then verify it on the map.', 'error');
-        streetField.focus();
+        if (!autoConfirm) {
+          setStatus('Enter your street address first, then verify it on the map.', 'error');
+          streetField.focus();
+        }
         return 'incomplete';
       }
       if (!cityInput?.value.trim() || !zipInput?.value.trim()) {
-        setStatus('Add your city, state and ZIP code so we can verify the exact property.', 'error');
-        (cityInput?.value.trim() ? zipInput : cityInput)?.focus();
+        if (!autoConfirm) {
+          setStatus('Add your city, state and ZIP code so we can verify the exact property.', 'error');
+          (cityInput?.value.trim() ? zipInput : cityInput)?.focus();
+        }
         return 'incomplete';
       }
-      setStatus('Verify your full service address, then confirm the map pin.', 'info');
+      if (autoConfirm) {
+        setStatus('Checking your address so we can prepare the most accurate estimate…', 'info');
+      } else {
+        manualDetails?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        streetField.focus();
+        setStatus('Verify your full service address, then confirm the map pin.', 'info');
+      }
       return (await manualResolve()) ? 'resolved' : 'unresolved';
     },
   };

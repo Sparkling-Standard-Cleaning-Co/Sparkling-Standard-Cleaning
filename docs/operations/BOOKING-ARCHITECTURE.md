@@ -27,6 +27,14 @@ silently auto-selecting a different cleaner.
 grid is 15 minutes; later starts are calculated from duration and travel; normal completion is by
 6:00 PM in `America/Chicago`. Public contact hours remain 7:00 AM–7:00 PM.
 
+**Five-step calendar integration (2026-10-28):** the residential/STR wizard now chooses a preferred
+date and start time in step 1 (`BookingCalendar.astro` + `booking-calendar.ts`) before the property
+details are known. The controller requests availability with a provisional duration and keeps the
+choice provisional. At the final step the wizard calls `finalize()` with the real duration and
+destination; the controller re-requests availability, finds the same start (or matches a preferred
+fallback window by label), creates the temporary hold, and renders legitimate alternatives when the
+time is no longer available. A customer's held resource assignment is honored by owner confirmation.
+
 **Hold vs pending request lifecycle (2026-10-28):** a 20-minute hold protects only the checkout
 window. When the customer submits the lead, the server creates a durable pending booking request
 (`booking/requests/BR-<hold>.json`) linked to the hold, quote and slot. Pending requests are

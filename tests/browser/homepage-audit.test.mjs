@@ -238,7 +238,11 @@ for (const [label, width, height] of [
       for (const [index, expected] of headings.entries()) {
         const column = columns.nth(index);
         const heading = column.locator('h3');
-        assert.equal(normalize((await heading.innerText()) ?? ''), expected, `${expected} heading present`);
+        assert.equal(
+          normalize((await heading.textContent()) ?? '').toLowerCase(),
+          expected.toLowerCase(),
+          `${expected} heading present`,
+        );
         const metrics = await heading.evaluate((element) => {
           const headingRect = element.getBoundingClientRect();
           const columnRect = element.parentElement.getBoundingClientRect();

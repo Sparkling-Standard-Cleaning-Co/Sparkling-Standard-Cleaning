@@ -141,7 +141,18 @@ function parseSuggestPayload(data: unknown): RawSuggestion[] {
   for (const feature of features ?? []) {
     const label = featureLabel(feature);
     const id = featureId(feature);
-    if (label && id) list.push({ id, name: label, context: '' });
+    if (!label || !id) continue;
+    // Preserve the state signal so the strict FL/AL allow-list can evaluate
+    // Photon-style payloads. A label like "100 S Baylen St, Pensacola, FL
+    // 32502" becomes the structured context "Pensacola, FL".
+    const properties = feature.properties ?? {};
+    const state =
+      typeof properties.state === 'string' && properties.state.trim()
+        ? properties.state.trim()
+        : label.match(/,\s*([A-Za-z]{2})(?:\s+\d{5}(?:-\d{4})?)?\s*$/)?.[1] ?? '';
+    const city = typeof properties.city === 'string' ? properties.city.trim() : '';
+    const context = [city, state].filter(Boolean).join(', ');
+    list.push({ id, name: label, context, ...(state ? { state } : {}) });
   }
   return list;
 }
@@ -185,9 +196,15 @@ async function suggestionsForAddress(env: Env, parts: SuggestParts): Promise<{
   const providerQuery = [parts.street, parts.city].filter(Boolean).join(', ') || parts.query;
   const location = { street: parts.street, city: parts.city, state: parts.state, zip: parts.zip };
   const houseNumber = parts.street.trim().match(/^(\d+[a-z]?)\b/i)?.[1]?.toLowerCase() ?? null;
+  // The public estimator only serves Florida and Alabama addresses. A caller
+  // that explicitly asks for another state gets no predictions at all.
+  if (parts.state && parts.state !== 'FL' && parts.state !== 'AL') {
+    return { suggestions: [], needsLocation: false };
+  }
+  const rankOptions = { allowedStates: ['FL', 'AL'] as const };
 
   let rows = await providerSuggest(env, providerQuery);
-  let result = rankSuggestions(rows, location, houseNumber);
+  let result = rankSuggestions(rows, location, houseNumber, rankOptions);
 
   // Alternate query forms handle road-name variations (Hwy/SR/state
   // directions), street-suffix spelling (Ln/Lane, St/Street, Rd/Road …) and
@@ -198,7 +215,7 @@ async function suggestionsForAddress(env: Env, parts: SuggestParts): Promise<{
       const variantRows = await providerSuggest(env, variant);
       if (variantRows.length > 0) {
         rows = variantRows;
-        result = rankSuggestions(rows, location, houseNumber);
+        result = rankSuggestions(rows, location, houseNumber, rankOptions);
         if (result.ranked.length > 0) break;
       }
     }

@@ -117,25 +117,29 @@ async function openEstimate(width, height, path = '/estimate/residential/') {
     await page.waitForURL(/\/estimate\/(residential|str)\//);
   }
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
-  await page.click('[data-address-manual-summary]');
   return { context, page, captured };
 }
 
-async function addressAndHome(page, { beds } = {}) {
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
-  await page.click('[data-next]');
+async function addressAndHome(page, { service = 'standard', beds } = {}) {
+  const bookingDate = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+  await page.fill('#est-date', bookingDate);
   await page.fill('#est-address', '100 S Baylen');
   await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
   await page.click('#est-address-suggestions li');
-  await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
   await page.waitForFunction(() => document.querySelector('#est-zip')?.value === '32502');
-  await page.click('[data-address-confirm]');
-  await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
+  await page.fill('#est-address-city', 'Pensacola');
   await page.click('[data-next]');
-  await page.selectOption('#est-property', 'house');
-  await page.fill('#est-sqft', '1600');
-  await page.fill('#est-bedrooms', '3');
-  await page.fill('#est-full-baths', '2');
+  await page.waitForFunction(
+    () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+  );
+  const serviceFieldset = page.locator('[data-service-fieldset]');
+  if (await serviceFieldset.isVisible()) {
+    await page.click(`label.option:has(input[name="serviceType"][value="${service}"])`);
+  }
+  await page.selectOption('#est-property', service === 'str_turnover' ? 'condo' : 'house');
+  await page.fill('#est-sqft', service === 'str_turnover' ? '900' : '1600');
+  await page.fill('#est-bedrooms', service === 'str_turnover' ? '2' : '3');
+  await page.fill('#est-full-baths', service === 'str_turnover' ? '1' : '2');
   await page.fill('#est-half-baths', '0');
   if (beds !== undefined) {
     const bedsInput = page.locator('input[name="beds"]');
@@ -152,10 +156,6 @@ async function finishAndSubmit(page, captured, { deepAck = false } = {}) {
     await page.waitForSelector('input[name="initialDeepCleanAcknowledged"]', { state: 'visible' });
     await page.check('input[name="initialDeepCleanAcknowledged"]');
   }
-  await page.click('[data-next]'); // scheduling
-  const bookingDate = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-  await page.fill('#est-date', bookingDate);
-  await page.selectOption('#est-arrival', 'morning');
   await page.click('[data-next]'); // extras
   await page.click('[data-next]'); // final summary
   await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
@@ -172,23 +172,7 @@ async function finishAndSubmit(page, captured, { deepAck = false } = {}) {
 test('move-in/move-out: the frequency question never appears and the quote is one-time', async () => {
   const { context, page, captured } = await openEstimate(1440, 900);
   try {
-    // Select move-in/out on step 1 (service drives the rest).
-    await page.click('label.option:has(input[name="serviceType"][value="move_in_out"])');
-    await page.click('[data-next]');
-    await page.fill('#est-address', '100 S Baylen');
-    await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
-    await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    await page.waitForFunction(() => document.querySelector('#est-zip')?.value === '32502');
-    await page.click('[data-address-confirm]');
-    await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
-    await page.click('[data-next]');
-    await page.selectOption('#est-property', 'house');
-    await page.fill('#est-sqft', '1600');
-    await page.fill('#est-bedrooms', '3');
-    await page.fill('#est-full-baths', '2');
-    await page.fill('#est-half-baths', '0');
-    await page.click('[data-next]');
+    await addressAndHome(page, { service: 'move_in_out' });
 
     // Step 3: the frequency field is HIDDEN for a one-time service.
     const frequencyField = page.locator('[data-frequency-field]');
@@ -215,21 +199,7 @@ test('move-in/move-out: the frequency question never appears and the quote is on
 test('deep cleaning is one-time: no rhythm question, one_time in the payload', async () => {
   const { context, page, captured } = await openEstimate(1440, 900);
   try {
-    await page.click('label.option:has(input[name="serviceType"][value="deep"])');
-    await page.click('[data-next]');
-    await page.fill('#est-address', '100 S Baylen');
-    await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
-    await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    await page.waitForFunction(() => document.querySelector('#est-zip')?.value === '32502');
-    await page.click('[data-address-confirm]');
-    await page.click('[data-next]');
-    await page.selectOption('#est-property', 'house');
-    await page.fill('#est-sqft', '1600');
-    await page.fill('#est-bedrooms', '3');
-    await page.fill('#est-full-baths', '2');
-    await page.fill('#est-half-baths', '0');
-    await page.click('[data-next]');
+    await addressAndHome(page, { service: 'deep' });
     assert.equal(await page.locator('[data-frequency-field]').isHidden(), true, 'no rhythm question for deep cleaning');
     const fields = await finishAndSubmit(page, captured);
     assert.equal(fields.service_type, 'deep');
@@ -243,24 +213,7 @@ test('STR turnover: beds are asked, the rhythm is not, and the payload is per-tu
   const { context, page, captured } = await openEstimate(1440, 900, '/estimate/str/');
   try {
     await page.waitForFunction(() => document.querySelector('[data-engine-note]')?.hidden === false);
-    await page.click('[data-next]');
-    await page.fill('#est-address', '100 S Baylen');
-    await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
-    await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    await page.waitForFunction(() => document.querySelector('#est-zip')?.value === '32502');
-    await page.click('[data-address-confirm]');
-    await page.click('[data-next]');
-    // STR-only field: beds to reset.
-    const bedsInput = page.locator('input[name="beds"]');
-    await bedsInput.waitFor({ state: 'visible' });
-    await bedsInput.fill('4');
-    await page.selectOption('#est-property', 'condo');
-    await page.fill('#est-sqft', '900');
-    await page.fill('#est-bedrooms', '2');
-    await page.fill('#est-full-baths', '1');
-    await page.fill('#est-half-baths', '0');
-    await page.click('[data-next]');
+    await addressAndHome(page, { service: 'str_turnover', beds: 4 });
     assert.equal(await page.locator('[data-frequency-field]').isHidden(), true, 'no rhythm question for a turnover');
     const fields = await finishAndSubmit(page, captured);
     assert.equal(fields.service_type, 'str_turnover');
@@ -299,11 +252,10 @@ test('switching services mid-wizard clears stale rhythm and STR values', async (
     // Choose a weekly rhythm while on residential cleaning…
     await page.selectOption('#est-frequency', 'weekly');
     await page.waitForSelector('input[name="initialDeepCleanAcknowledged"]', { state: 'visible' });
-    // …then walk back to step 1 and switch to move-in/out.
-    await page.click('[data-step-jump="1"]');
+    // …then walk back to Service & Home and switch to move-in/out.
+    await page.click('[data-step-jump="2"]');
     await page.click('label.option:has(input[name="serviceType"][value="move_in_out"])');
-    await page.click('[data-next]'); // address step (still valid)
-    await page.click('[data-next]'); // home step
+    await page.click('[data-next]'); // condition step
     // Step 3: the rhythm control is hidden AND normalized — the stale weekly
     // value must never survive into the quote or the submission.
     assert.equal(await page.locator('[data-frequency-field]').isHidden(), true, 'rhythm hidden after the switch');
@@ -330,7 +282,7 @@ test('the legacy STR deep link opens the isolated turnover engine', async () => 
     );
     assert.equal(await page.locator('[data-service-fieldset]').isVisible(), false, 'no duplicate service picker');
     const headings = await page.locator('[data-step-title]').allTextContents();
-    assert.equal(headings[0].trim(), 'Property & Address');
+    assert.equal(headings[0].trim(), 'When & Where');
     // Residential pages never offer or submit stale STR details.
     await page.goto(BASE + '/estimate/?service=deep', { waitUntil: 'load' });
     await page.waitForURL(/\/estimate\/residential\//);

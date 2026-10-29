@@ -87,7 +87,6 @@ async function openEstimate(width = 1280, height = 900) {
   await page.route('**tiles.openfreemap.org/**', (route) => route.abort());
   await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
-  await page.click('[data-address-manual-summary]');
   return { context, page };
 }
 
@@ -125,8 +124,6 @@ test('every estimable form control has an accessible name', async () => {
 test('the address field exposes combobox semantics and keyboard selection', async () => {
   const { context, page } = await openEstimate();
   try {
-    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
-
     const field = page.locator('#est-address');
     assert.equal(await field.getAttribute('role'), 'combobox');
     assert.equal(await field.getAttribute('aria-expanded'), 'false');
@@ -143,12 +140,11 @@ test('the address field exposes combobox semantics and keyboard selection', asyn
     const active = await field.getAttribute('aria-activedescendant');
     assert.match(active ?? '', /^est-address-option-0$/, 'arrow keys move the active option');
     await page.keyboard.press('Enter');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
     assert.equal(await field.getAttribute('aria-expanded'), 'false', 'collapsed after selection');
-
-    // Focus moves to the confirmation action.
-    const focused = await page.evaluate(() => document.activeElement?.getAttribute('data-address-confirm') !== null);
-    assert.equal(focused, true, 'focus lands on Confirm this location');
+    assert.equal(await page.locator('[data-address-confirm]').count(), 0, 'no separate confirmation step');
   } finally {
     await context.close();
   }
@@ -157,11 +153,12 @@ test('the address field exposes combobox semantics and keyboard selection', asyn
 test('interactive controls have accessible names and no positive tabindex', async () => {
   const { context, page } = await openEstimate();
   try {
-    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
 
     const buttons = await page.evaluate(() =>
       [...document.querySelectorAll('button, a[href]')]
@@ -193,22 +190,27 @@ test('the page keeps one h1 and a main landmark', async () => {
   }
 });
 
-test('the six-step navigator exposes state and locks future steps accessibly', async () => {
+test('the five-step navigator exposes state and locks future steps accessibly', async () => {
   const { context, page } = await openEstimate();
   try {
     const nav = page.locator('nav[data-wizard-steps]');
     assert.equal(await nav.getAttribute('aria-label'), 'Estimate steps');
-    assert.equal(await nav.locator('[data-step-jump]').count(), 6);
+    assert.equal(await nav.locator('[data-step-jump]').count(), 5);
 
     const current = page.locator('[data-step-jump="1"]');
     assert.equal(await current.getAttribute('aria-current'), 'step');
-    assert.equal(await current.getAttribute('aria-label'), 'Step 1: Service & Address');
+    assert.equal(await current.getAttribute('aria-label'), 'Step 1: When & Where');
     assert.equal(await page.locator('[data-step-jump="2"]').isDisabled(), true, 'future steps are disabled');
 
-    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+    const bookingDate = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10);
+    await page.fill('#est-date', bookingDate);
     await page.fill('#est-address', '100 S Baylen St');
+    await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32503');
     await page.click('[data-next]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+    );
 
     assert.equal(await page.locator('[data-step-jump="2"]').getAttribute('aria-current'), 'step');
     assert.equal(await page.locator('[data-step-jump="1"]').isDisabled(), false, 'completed steps are reachable');

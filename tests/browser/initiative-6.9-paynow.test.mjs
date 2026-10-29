@@ -112,17 +112,19 @@ async function open(width, height, { geocode = 'exact', travel = 'verified' } = 
   await page.route('**tiles.openfreemap.org/**', (route) => route.abort());
   await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner,.promo-popup{display:none!important}' });
-  await page.click('[data-address-manual-summary]');
   return { context, page };
 }
 
-async function reachFinalWithUnconfirmedAddress(page) {
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+async function reachFinal(page) {
+  await page.fill('#est-date', BOOKING_DATE);
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
-  await page.selectOption('#est-address-state', 'FL');
   await page.fill('#est-zip', '32502');
   await page.click('[data-next]');
+  await page.waitForFunction(
+    () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+  );
+  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
   await page.selectOption('#est-property', 'house');
   await page.fill('#est-sqft', '1600');
   await page.fill('#est-bedrooms', '3');
@@ -133,83 +135,39 @@ async function reachFinalWithUnconfirmedAddress(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
-    await page.click('[data-next]');
-    await page.fill('#est-date', BOOKING_DATE);
-  await page.selectOption('#est-arrival', 'morning');
-  await page.click('[data-next]');
-await page.click('[data-next]');
+  await page.click('[data-next]'); // extras
+  await page.click('[data-next]'); // final
   await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
 }
-
 for (const [label, width, height] of [
   ['desktop', 1440, 1000],
   ['mobile', 390, 844],
 ]) {
-  test(`preliminary address hides Pay Now, offers verification, then reveals it (${label})`, async () => {
+  test(`an exact address reaches the final step with Pay Now available (${label})`, async () => {
     const { context, page } = await open(width, height);
     try {
-      await reachFinalWithUnconfirmedAddress(page);
-      assert.equal(await page.locator('[data-pay-now]').isVisible(), false, 'no hidden promise: Pay Now is hidden');
-      assert.equal(await page.locator('[data-verify-address]').isVisible(), true, 'verification path is visible');
+      await reachFinal(page);
+      assert.equal(await page.locator('[data-pay-now]').isVisible(), true, 'Pay Now is visible for the verified exact address');
+      assert.equal(await page.locator('[data-verify-address]').count(), 0, 'no separate address verification control');
       const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
-      assert.match(note, /Verify your service address/i);
-      assert.doesNotMatch(note, /Pay securely now/i);
+      assert.match(note, /Your estimate is ready/i);
       assert.match(
         (await page.locator('[data-submit]').innerText()).replace(/\s+/g, ' '),
         /Reserve This Cleaning/,
-      );
-
-      await page.click('[data-verify-address]');
-      assert.equal(
-        await page.evaluate(() => document.querySelector('.wizard__step[data-step="1"]')?.getAttribute('data-active')),
-        'true',
-        'verification returns to the address step',
-      );
-      await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-      await page.click('[data-address-confirm]');
-      await page.waitForFunction(
-        () => document.querySelector('.wizard__step[data-step="6"]')?.getAttribute('data-active') === 'true',
-        null,
-        { timeout: 15_000 },
-      );
-      await page.waitForFunction(() => document.querySelector('[data-estimate-reveal]')?.hidden === true);
-      assert.equal(await page.locator('[data-pay-now]').isVisible(), true, 'Pay Now becomes visible');
-      assert.equal(await page.locator('[data-verify-address]').isVisible(), false);
-      const readyNote = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
-      assert.match(readyNote, /Your estimate is ready/i);
-      assert.match(readyNote, /Pay securely now/i);
-      assert.match(
-        (await page.locator('[data-submit]').innerText()).replace(/\s+/g, ' '),
-        /Reserve This Cleaning \(Pay Later\)/,
       );
     } finally {
       await context.close();
     }
   });
 }
-
-test('an approximate map match returns to the final step for manual review instead of looping', async () => {
+test('an approximate address is reservation-only and never becomes payable', async () => {
   const { context, page } = await open(1440, 1000, { geocode: 'approximate' });
   try {
-    await reachFinalWithUnconfirmedAddress(page);
-    await page.click('[data-verify-address]');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    await page.click('[data-address-confirm]');
-    await page.waitForFunction(
-      () => document.querySelector('.wizard__step[data-step="6"]')?.getAttribute('data-active') === 'true',
-      null,
-      { timeout: 15_000 },
-    );
-    await page.waitForFunction(() => document.querySelector('[data-estimate-reveal]')?.hidden === true);
+    await reachFinal(page);
     assert.equal(await page.locator('[data-pay-now]').isVisible(), false, 'approximate addresses cannot pay online');
-    assert.equal(
-      await page.locator('[data-verify-address]').isVisible(),
-      false,
-      'a failed exact match must not offer the same verification loop again',
-    );
+    assert.equal(await page.locator('[data-verify-address]').count(), 0, 'no verification loop exists');
     const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
-    assert.match(note, /couldn't verify this address|secure payment link/i);
-    assert.doesNotMatch(note, /Verify your service address/i);
+    assert.match(note, /couldn't verify this address|secure payment link|confirm/i);
     assert.match(
       (await page.locator('[data-submit]').innerText()).replace(/\s+/g, ' '),
       /Reserve This Cleaning/,
@@ -219,28 +177,14 @@ test('an approximate map match returns to the final step for manual review inste
   }
 });
 
-test('an exact address with unavailable travel routes to manual review instead of a verify loop', async () => {
+test('an exact address with unavailable travel stays reservation-only', async () => {
   const { context, page } = await open(1440, 1000, { travel: 'unavailable' });
   try {
-    await reachFinalWithUnconfirmedAddress(page);
-    await page.click('[data-verify-address]');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    await page.click('[data-address-confirm]');
-    await page.waitForFunction(
-      () => document.querySelector('.wizard__step[data-step="6"]')?.getAttribute('data-active') === 'true',
-      null,
-      { timeout: 15_000 },
-    );
-    await page.waitForFunction(() => document.querySelector('[data-estimate-reveal]')?.hidden === true);
+    await reachFinal(page);
     assert.equal(await page.locator('[data-pay-now]').isVisible(), false, 'unverified travel cannot pay online');
-    assert.equal(
-      await page.locator('[data-verify-address]').isVisible(),
-      false,
-      'an exact address must not be re-verified just because travel failed',
-    );
+    assert.equal(await page.locator('[data-verify-address]').count(), 0, 'no verification control');
     const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
-    assert.match(note, /Your cleaning request is ready/i);
-    assert.doesNotMatch(note, /Verify your service address/i);
+    assert.match(note, /Your cleaning request is ready|couldn't verify|confirm/i);
     assert.match(
       (await page.locator('[data-submit]').innerText()).replace(/\s+/g, ' '),
       /Reserve This Cleaning/,

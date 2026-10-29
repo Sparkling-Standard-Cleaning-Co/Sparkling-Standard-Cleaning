@@ -28,6 +28,20 @@
 > confined to step 4. The underlying pricing mathematics, bundles, discounts, minimums, travel and
 > configuration versioning are unchanged.
 
+**2026-10-28 (owner priority UX directive) update:** the residential and STR
+wizard is now exactly **five steps** — **When & Where → Service & Home →
+Condition & Frequency → Optional Extras → Your Estimate**. Step 1 presents a
+premium appointment calendar before an always-visible manual address card. The
+customer may type the full address (or use the location button); there is no
+map/pin confirmation or separate address-verification page. Suggestions are
+strictly limited to Florida and Alabama, exact/close resolution happens in the
+background, and a ZIP fallback keeps an eligible request moving. The preferred
+date/time is provisional until the real job duration is known; the final step
+revalidates the slot against the two-resource scheduler, converts it to a
+temporary hold, and offers real alternatives when needed. Commercial/church
+continue to use their dedicated four-step facility request forms and their own
+explicit address verification.
+
 Initiative 6.0 restructured the customer estimate experience into **four
 specialized engines unified by one system**. This is the authoritative guide to
 how they work, which parts are production-enabled, and how the owner changes

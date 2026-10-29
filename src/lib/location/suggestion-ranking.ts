@@ -276,13 +276,26 @@ function proximityScore(lat: number | undefined, lng: number | undefined): numbe
  * Filters and ranks provider suggestions for the entered address parts.
  * `houseNumber` is the customer's typed house number, if any.
  */
+export interface RankOptions {
+  /**
+   * Strict allow-list of USPS state codes. The public estimator passes FL/AL
+   * so a distant provider prediction can never be displayed, even when no
+   * state was typed. Rows whose state cannot be established are dropped.
+   */
+  allowedStates?: ReadonlyArray<string>;
+}
+
 export function rankSuggestions(
   rows: RawSuggestion[],
   location: SuggestionLocation,
   houseNumber: string | null,
+  options: RankOptions = {},
 ): RankResult {
   const stateCode = (location.state ?? '').trim().toUpperCase();
   const hasStateFilter = Boolean(STATE_NAMES[stateCode]);
+  const allowedStates = new Set(
+    (options.allowedStates ?? []).map((code) => code.trim().toUpperCase()),
+  );
   const requestedZip = (location.zip ?? '').trim().match(/^(\d{5})/)?.[1] ?? null;
   const requestedCity = (location.city ?? '').trim().toLowerCase();
   const requestedStreet = (location.street ?? '').trim();
@@ -291,11 +304,18 @@ export function rankSuggestions(
   rows.forEach((row, providerIndex) => {
     const label = suggestionLabel(row);
     const haystack = `${row.name} ${row.context}`.toLowerCase();
+    const signals = stateSignals(row);
+
+    // Strict service-state allow-list. This is the public estimator's hard
+    // geographic boundary; provider ranking and user IP never override it.
+    if (allowedStates.size > 0) {
+      if (![...signals].some((signal) => allowedStates.has(signal))) return;
+    }
 
     // State rule: when a state is selected, require a positive signal for that
     // state. Rows with no state signal at all are dropped (fail closed) so an
     // unrelated Atlanta/Georgia match can never answer a Florida search.
-    if (hasStateFilter && !stateSignals(row).has(stateCode)) return;
+    if (hasStateFilter && !signals.has(stateCode)) return;
 
     // ZIP rule: a conflicting ZIP is never displayed.
     const zip = suggestionZip(row);

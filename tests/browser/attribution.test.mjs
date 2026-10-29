@@ -1,4 +1,4 @@
-// Attribution integration tests — the full chain from a campaign landing page
+// Attribution integration tests â€” the full chain from a campaign landing page
 // through internal navigation to the lead payload the owner receives.
 // Run with: npm run test:browser on :4409.
 
@@ -115,17 +115,15 @@ async function mockApis(page) {
 }
 
 async function completeEstimate(page) {
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
-  await page.click('[data-address-manual-summary]');
+  await page.fill('#est-date', BOOKING_DATE);
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', '32502');
-  await page.click('[data-address-resolve]');
-  await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-  await page.click('[data-address-confirm]');
-  await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
-
-  await page.click('[data-next]'); // step 2
+  await page.click('[data-next]');
+  await page.waitForFunction(
+    () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+  );
+  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
   await page.selectOption('#est-property', 'house');
   await page.fill('#est-sqft', '1600');
   await page.fill('#est-bedrooms', '3');
@@ -136,11 +134,8 @@ async function completeEstimate(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
-    await page.click('[data-next]');
-    await page.fill('#est-date', BOOKING_DATE);
-  await page.selectOption('#est-arrival', 'morning');
-  await page.click('[data-next]');
-await page.click('[data-next]');
+  await page.click('[data-next]'); // extras
+  await page.click('[data-next]'); // final
   await page.fill('#est-name', 'UX test (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');

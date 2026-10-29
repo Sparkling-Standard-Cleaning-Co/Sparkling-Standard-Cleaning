@@ -133,13 +133,17 @@ test('a real available slot becomes an expiring hold and travels with the reques
 
     await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
     await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner,.promo-popup{display:none!important}' });
-    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
-    await page.click('[data-address-manual-summary]');
     await page.fill('#est-address', '100 S Baylen St');
-    await page.click('[data-address-resolve]');
-    await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-    await page.click('[data-address-confirm]');
+    await page.fill('#est-address-city', 'Pensacola');
+    await page.fill('#est-zip', '32502');
+    await page.fill('#est-date', BOOKING_DATE);
+    await page.waitForSelector('.booking-calendar__time', { state: 'visible' });
+    await page.click('.booking-calendar__time');
     await page.click('[data-next]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+    );
+    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
     await page.selectOption('#est-property', 'house');
     await page.fill('#est-sqft', '1600');
     await page.fill('#est-bedrooms', '3');
@@ -150,14 +154,6 @@ test('a real available slot becomes an expiring hold and travels with the reques
     await page.click('label.option:has(input[name="condition"][value="maintained"])');
     await page.selectOption('#est-last-clean', 'within_month');
     await page.selectOption('#est-pets', 'none');
-        await page.click('[data-next]');
-        await page.fill('#est-date', BOOKING_DATE);
-    await page.selectOption('#est-arrival', 'morning');
-    await page.waitForSelector('[data-booking-picker]', { state: 'visible' });
-    await page.waitForSelector('.booking-picker__slot', { state: 'visible' });
-    await page.click('.booking-picker__slot');
-    await page.waitForFunction(() => !document.querySelector('[data-booking-hold]')?.hidden);
-    assert.match((await page.locator('[data-booking-hold]').innerText()).replace(/\s+/g, ' '), /Temporary hold until .* Central/i);
     await page.click('[data-next]');
     await page.click('[data-next]');
 
@@ -170,8 +166,8 @@ test('a real available slot becomes an expiring hold and travels with the reques
     await delay(150);
     const fields = captured.payload.fields;
     assert.equal(fields.booking_hold_id, `${BOOKING_DATE}__12345678-1234-1234-1234-123456789abc`);
-    assert.equal(fields.booking_slot_start, SLOT_START);
-    assert.equal(fields.booking_slot_end, SLOT_END);
+    assert.equal(fields.preferred_slot_start, SLOT_START);
+    assert.equal(fields.preferred_slot_end, SLOT_END);
   } finally {
     await context.close();
   }

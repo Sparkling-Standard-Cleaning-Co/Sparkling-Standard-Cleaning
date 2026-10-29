@@ -1,15 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// The six estimate steps — ONE shared definition.
+// The five estimate steps — ONE shared definition.
 //
 // The progress navigator, the progress bar, each section heading in the
 // wizard, the wizard's step labels and the estimate page's "what to expect"
 // section all derive from this list. Change the journey here and every
 // surface follows.
+//
+// Owner-approved sequence (2026-10-28): When & Where → Service & Home →
+// Condition & Frequency → Optional Extras → Your Estimate.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface EstimateStepDefinition {
   /** Stable id used by tests and analytics. */
-  id: 'service-address' | 'home' | 'condition' | 'extras' | 'scheduling' | 'estimate';
+  id: 'when-where' | 'service-home' | 'condition' | 'extras' | 'estimate';
   /** Full title shown in the navigator and section headings. */
   title: string;
   /** One-line explanation used on the page's "what to expect" section. */
@@ -18,24 +21,19 @@ export interface EstimateStepDefinition {
 
 export const ESTIMATE_STEPS: readonly EstimateStepDefinition[] = [
   {
-    id: 'service-address',
-    title: 'Service & Address',
-    blurb: 'Choose your cleaning and confirm your address on the map.',
+    id: 'when-where',
+    title: 'When & Where',
+    blurb: 'Choose your preferred date and time, then tell us where to clean.',
   },
   {
-    id: 'home',
-    title: 'Your Home',
-    blurb: 'Size, bedrooms and bathrooms — the facts that actually move labor time.',
+    id: 'service-home',
+    title: 'Service & Home',
+    blurb: 'Choose your cleaning and tell us about the home.',
   },
   {
     id: 'condition',
     title: 'Condition & Frequency',
     blurb: 'How the home has been kept, and how often you would like it cleaned.',
-  },
-  {
-    id: 'scheduling',
-    title: 'Scheduling',
-    blurb: 'Your preferred date and the arrival window that works for you.',
   },
   {
     id: 'extras',

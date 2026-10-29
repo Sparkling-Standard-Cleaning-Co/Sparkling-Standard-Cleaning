@@ -159,6 +159,8 @@ const SERVER_OWNED_KEYS = new Set([
   'photo_count',
   'photo_note',
   'booking_hold_status',
+  'preferred_slot_start',
+  'preferred_slot_end',
   'terms_accepted_at',
   'policy_version',
   'terms_acceptance_id',

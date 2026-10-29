@@ -136,20 +136,20 @@ async function openEstimate(page) {
   await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
   await acceptAnalytics(page);
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner,.promo-popup{display:none!important}' });
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+  // The first real interaction starts the funnel (the preferred date).
+  await page.fill('#est-date', BOOKING_DATE);
 }
 
 async function fillAddressAndDetails(page) {
-  await page.click('[data-address-manual-summary]');
+  await page.fill('#est-date', BOOKING_DATE);
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', '32502');
-  await page.click('[data-address-resolve]');
-  await page.waitForSelector('[data-address-confirm]', { state: 'visible' });
-  await page.click('[data-address-confirm]');
-  await page.waitForSelector('[data-address-confirmed]', { state: 'visible' });
-
-  await page.click('[data-next]'); // step 2
+  await page.click('[data-next]'); // when & where -> service & home
+  await page.waitForFunction(
+    () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+  );
+  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
   await page.selectOption('#est-property', 'house');
   await page.fill('#est-sqft', '1600');
   await page.fill('#est-bedrooms', '3');
@@ -160,11 +160,8 @@ async function fillAddressAndDetails(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
-    await page.click('[data-next]');
-    await page.fill('#est-date', BOOKING_DATE);
-  await page.selectOption('#est-arrival', 'morning');
-  await page.click('[data-next]');
-await page.click('[data-next]');
+  await page.click('[data-next]'); // condition -> extras
+  await page.click('[data-next]'); // extras -> your estimate
   await page.fill('#est-name', 'UX test (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
@@ -243,7 +240,7 @@ test('the estimator emits start, step and complete events, and a delivered reque
     await page.waitForFunction(() => (window.dataLayer ?? []).some((entry) => entry?.event === 'estimate_complete'));
 
     const started = await eventPayload(page, 'estimate_start');
-    assert.equal(started.service_type, 'standard');
+    assert.ok(started, 'the first interaction emits estimate_start');
     const complete = await eventPayload(page, 'estimate_complete');
     assert.equal(complete.outcome, 'estimated');
 

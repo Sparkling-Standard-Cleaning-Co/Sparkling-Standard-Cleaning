@@ -1,8 +1,11 @@
 # Launch readiness — evidence-backed status
 
-**Last updated:** 2026-10-28. **Release under review:** `7bb91ff` (Cloudflare Pages deployment
+**Last updated:** 2026-10-28. **Last production release:** `7bb91ff` (Cloudflare Pages deployment
 `5529baa6-591b-4501-b40f-8d23f6f273b9`; GitHub run `40783479501` passed `validate` and `browser`,
-and the Cloudflare check passed).
+and the Cloudflare check passed). **Local unreleased work:** five-step residential/STR estimator,
+premium appointment calendar, automatic address resolution, strict FL/AL suggestions, two-resource
+scheduler and service-location tax engine. Local verification: 647 unit tests (646 pass, 1 skip),
+154 browser tests pass, `npm run check` 0 errors, `npm run verify` and `npm run smoke` pass.
 This is the working checklist required by the launch directive. It distinguishes implementation from
 deployment, activation and actual provider verification.
 
@@ -21,7 +24,10 @@ deployment, activation and actual provider verification.
 | Capability | Status | Evidence / limitation |
 | --- | --- | --- |
 | Public marketing site | Deployed, activated, production-verified | 29 pages build; live routes return 200; 2,055 internal links, SEO and QR validation pass. |
-| Residential estimator | Implemented, tested, deployed, activated | Browser journey and server quote verification pass; prices reveal at the final step. |
+| Five-step residential/STR journey | Implemented, tested locally; **not deployed** | Exactly When & Where → Service & Home → Condition & Frequency → Optional Extras → Your Estimate. 154 browser tests pass, including 360/768/1440 layouts and no-overflow checks. Screenshot review completed; production verification pending deployment. |
+| Premium appointment calendar | Implemented, tested locally; **not deployed** | Month calendar, preferred start times, live availability, provisional selection, final-duration revalidation, temporary hold and real alternatives. Browser tests cover the hold path. |
+| Simplified address entry | Implemented, tested locally; **not deployed** | Manual fields always visible; background exact/close resolution; no map/pin confirmation; FL/AL-only suggestions; ZIP fallback. Street-level/approximate results stay preliminary. |
+| Residential estimator | Implemented, tested, deployed, activated | Browser journey and server quote verification pass; prices reveal at the final step. Five-step redesign is in the unreleased local build. |
 | Commercial estimator | Implemented, tested, deployed, activated | Tier A/B provisional numbers; Tier C scope review; owner kill switch enforced server-side. |
 | STR estimator | Implemented, tested, deployed, activated | Per-turnover model; one-time semantics; optional turnover context. |
 | Church estimator | Implemented, tested, deployed, activated | 10% eligible discount, reconciliation and Tier C review verified. |

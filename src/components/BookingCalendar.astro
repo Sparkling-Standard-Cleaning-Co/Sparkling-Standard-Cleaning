@@ -1,0 +1,112 @@
+---
+import { bookingConfig } from '../config/booking';
+import Icon from './Icon.astro';
+
+interface Props {
+  id?: string;
+}
+
+const { id = 'estimate-calendar' } = Astro.props;
+---
+
+<!--
+  Owner-approved premium appointment calendar (2026-10-28). The customer
+  chooses a preferred date and start time before the property details are
+  known. The selection is provisional: the wizard revalidates the real job
+  duration and the two-cleaner availability before creating a hold, and the
+  appointment is only confirmed after owner approval.
+-->
+<section
+  class="booking-calendar"
+  id={id}
+  data-booking-calendar
+  data-timezone={bookingConfig.timeZone}
+  data-max-advance={bookingConfig.maxAdvanceDays}
+  data-slot-minutes={bookingConfig.slotMinutes}
+  aria-labelledby={`${id}-heading`}
+  tabindex="-1"
+>
+  <div class="booking-calendar__intro">
+    <p class="booking-calendar__eyebrow">Preferred cleaning time</p>
+    <h3 class="booking-calendar__heading" id={`${id}-heading`}>When should we clean?</h3>
+    <p class="booking-calendar__copy">
+      Choose your preferred date and time. Appointments are confirmed after our team reviews
+      your request — this selection is a preference, not a guaranteed slot.
+    </p>
+  </div>
+
+  <div class="booking-calendar__layout">
+    <div class="booking-calendar__month-card">
+      <div class="booking-calendar__month-head">
+        <button
+          class="booking-calendar__nav"
+          type="button"
+          data-calendar-prev
+          aria-label="Show the previous month"
+        >
+          <Icon name="chevron-left" size={18} />
+        </button>
+        <p class="booking-calendar__month-label" data-calendar-month aria-live="polite">Month</p>
+        <button
+          class="booking-calendar__nav"
+          type="button"
+          data-calendar-next
+          aria-label="Show the next month"
+        >
+          <Icon name="arrow-right" size={18} />
+        </button>
+      </div>
+
+      <div class="booking-calendar__weekdays" aria-hidden="true">
+        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+      </div>
+      <div
+        class="booking-calendar__grid"
+        data-calendar-grid
+        role="grid"
+        aria-label="Available cleaning dates"
+      ></div>
+      <p class="booking-calendar__hint small" data-calendar-date-note>
+        Past dates are unavailable. Requests can be made up to {bookingConfig.maxAdvanceDays} days
+        ahead.
+      </p>
+    </div>
+
+    <div class="booking-calendar__times-card">
+      <p class="booking-calendar__times-eyebrow">Preferred start</p>
+      <p class="booking-calendar__selected" data-calendar-selected-label>Select a date first</p>
+      <div
+        class="booking-calendar__times"
+        data-calendar-times
+        role="group"
+        aria-label="Preferred start times"
+      ></div>
+      <p class="booking-calendar__time-note small" data-calendar-time-note>
+        Times are shown in Central Time.
+      </p>
+      <p class="booking-calendar__status small" data-calendar-status role="status" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <input
+    type="text"
+    class="visually-hidden"
+    id="est-date"
+    name="preferredDate"
+    data-calendar-date-input
+    tabindex="-1"
+    aria-hidden="true"
+    autocomplete="off"
+  />
+  <input type="hidden" name="preferredTime" data-calendar-time-input />
+  <input type="hidden" name="preferredSlotStart" data-calendar-slot-start />
+  <input type="hidden" name="preferredSlotEnd" data-calendar-slot-end />
+  <!-- Compatibility fields for the existing form/AST tests; the visible
+       journey uses the calendar below and never asks for these separately. -->
+  <select class="visually-hidden" id="est-arrival" name="arrivalPreference" tabindex="-1" aria-hidden="true">
+    <option value="">No preference</option>
+    <option value="first-appointment">First appointment</option>
+    <option value="morning">Morning window</option>
+    <option value="afternoon">Afternoon window</option>
+  </select>
+</section>

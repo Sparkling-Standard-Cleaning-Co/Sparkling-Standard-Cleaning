@@ -1,7 +1,6 @@
 ---
 import { pricing } from '../config/pricing';
 import {
-  ARRIVAL_PREFERENCE_OPTIONS,
   CONDITION_OPTIONS,
   FREQUENCY_OPTIONS,
   LAST_CLEAN_OPTIONS,
@@ -15,14 +14,13 @@ import {
 import { schedulingConfig } from '../config/scheduling';
 import { business, contactPhone, isPending } from '../config/business';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
-import { US_STATES } from '../lib/location/location';
 import Icon from './Icon.astro';
 import TurnstileWidget from './TurnstileWidget.astro';
 import PhotoUploadSection from './PhotoUploadSection.astro';
 import ResponseGuarantee from './ResponseGuarantee.astro';
 import EstimateReveal from './EstimateReveal.astro';
 import TermsAcceptance from './TermsAcceptance.astro';
-import BookingPicker from './BookingPicker.astro';
+import BookingCalendar from './BookingCalendar.astro';
 import { isFormEnabled } from '../config/business';
 
 const configured = isFormEnabled();
@@ -106,31 +104,27 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         <ul class="estimate-flags" data-estimate-flags></ul>
       </div>
 
-      <!-- Step 1 — service & address -->
+      <!-- Step 1 — When & Where: premium calendar first, address below -->
       <section class="wizard__step" data-step="1" data-active="true" aria-label={stepTitle(0)}>
         <h2 class="wizard__step-heading" data-step-title={0}>{stepTitle(0)}</h2>
-        <fieldset class="field" data-service-fieldset data-group-error="serviceType" data-group-message="Please select a cleaning service.">
-          <legend>What kind of cleaning are you looking for?</legend>
-          <div class="option-grid">
-            {
-              RESIDENTIAL_SERVICE_OPTIONS.map((option) => (
-                <label class="option">
-                  <input type="radio" name="serviceType" value={option.value} required />
-                  <span class="option__control"></span>
-                  <span>
-                    <span class="option__label">{option.label}</span>
-                    <span class="option__desc">{option.description}</span>
-                  </span>
-                </label>
-              ))
-            }
-          </div>
-        </fieldset>
+        <p class="wizard__step-lead">Let&rsquo;s find the perfect time for your cleaning.</p>
+        <p class="wizard__step-copy">
+          Choose your preferred date and time, then tell us where to clean.
+        </p>
 
-        <div class="address-finder" data-address-finder data-state="idle" data-method="manual">
+        <BookingCalendar id="residential-calendar" />
+
+        <div class="address-card" data-address-finder data-state="idle" data-method="manual">
+          <div class="address-card__head">
+            <h3 class="address-card__title">Where should we clean?</h3>
+            <p class="address-card__copy">
+              Enter your cleaning address, including ZIP code, or use your current location.
+            </p>
+          </div>
+
           <div class="address-gps">
-            <button type="button" class="btn btn--primary btn--large btn--block" data-address-gps>
-              <Icon name="map-pin" size={18} /> Use My Current Location
+            <button type="button" class="btn btn--secondary btn--large btn--block" data-address-gps>
+              <Icon name="map-pin" size={18} /> Use My Location
             </button>
 
             <div class="address-permission" data-address-permission hidden>
@@ -152,120 +146,102 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             </div>
           </div>
 
-          <details class="address-manual" data-address-manual-details>
-            <summary class="address-manual__summary" data-address-manual-summary>
-              Or enter the address manually
-            </summary>
-            <div class="address-manual__body">
-              <div class="field-row field-row--2">
-                <div class="field field--grow">
-                  <label for="est-address">Street address</label>
-                  <input
-                    class="input"
-                    id="est-address"
-                    name="serviceAddress"
-                    type="text"
-                    autocomplete="address-line1"
-                    placeholder="e.g. 123 Super Clean Way"
-                    role="combobox"
-                    aria-expanded="false"
-                    aria-autocomplete="list"
-                    aria-controls="est-address-suggestions"
-                    data-error-required="Please enter your street address."
-                  />
-                </div>
-                <div class="field field--unit">
-                  <label for="est-address-unit">Apt / unit</label>
-                  <input
-                    class="input"
-                    id="est-address-unit"
-                    name="addressUnit"
-                    type="text"
-                    autocomplete="address-line2"
-                    maxlength="30"
-                    placeholder="Optional"
-                  />
-                </div>
+          <div class="address-manual__body">
+            <div class="field-row field-row--2">
+              <div class="field field--grow">
+                <label for="est-address">Street address</label>
+                <input
+                  class="input"
+                  id="est-address"
+                  name="serviceAddress"
+                  type="text"
+                  autocomplete="address-line1"
+                  placeholder="e.g. 123 Super Clean Way"
+                  role="combobox"
+                  aria-expanded="false"
+                  aria-autocomplete="list"
+                  aria-controls="est-address-suggestions"
+                  data-error-required="Please enter your street address."
+                />
               </div>
-
-              <ul
-                class="address-suggestions"
-                id="est-address-suggestions"
-                role="listbox"
-                aria-label="Address suggestions"
-                data-address-suggestions
-                hidden
-              ></ul>
-
-              <div class="field-row field-row--3">
-                <div class="field field--grow">
-                  <label for="est-address-city">City</label>
-                  <input
-                    class="input"
-                    id="est-address-city"
-                    name="addressCity"
-                    type="text"
-                    autocomplete="address-level2"
-                    placeholder="e.g. Molino"
-                  />
-                </div>
-                <div class="field">
-                  <label for="est-address-state">State</label>
-                  <select class="select" id="est-address-state" name="addressState" autocomplete="address-level1" required>
-                    {US_STATES.map((state) => (
-                      <option value={state.code} selected={state.code === 'FL'} disabled={state.disabled}>{state.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div class="field field--zip">
-                  <label for="est-zip">ZIP code</label>
-                  <input class="input" id="est-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" placeholder="e.g. 32577" required pattern="[0-9]{5}(-[0-9]{4})?" />
-                </div>
-              </div>
-
-              <p class="hint address-finder__status" data-address-status data-kind="" aria-live="polite"></p>
-
-              <div class="address-finder__actions">
-                <button type="button" class="btn btn--secondary btn--small" data-address-resolve>
-                  Find My Address
-                </button>
+              <div class="field field--unit">
+                <label for="est-address-unit">Apt / unit</label>
+                <input
+                  class="input"
+                  id="est-address-unit"
+                  name="addressUnit"
+                  type="text"
+                  autocomplete="address-line2"
+                  maxlength="30"
+                  placeholder="Optional"
+                />
               </div>
             </div>
-          </details>
 
-          <div class="address-map" data-address-map hidden>
-            <div class="address-map__canvas" data-address-map-canvas></div>
-            <p class="hint">
-              Confirm this is the right destination, or drag the pin to correct it. The map loads
-              only when you look up an address.
-            </p>
-            <p class="hint address-map__fallback" data-address-map-fallback hidden>
-              Map preview is unavailable right now — the confirmed coordinates from your address
-              still work. You can continue.
-            </p>
-            <div class="address-finder__actions">
-              <button type="button" class="btn btn--primary btn--small" data-address-confirm>
-                Confirm this location
-              </button>
-              <button type="button" class="btn btn--ghost btn--small" data-address-change>
-                Change address
-              </button>
+            <ul
+              class="address-suggestions"
+              id="est-address-suggestions"
+              role="listbox"
+              aria-label="Address suggestions"
+              data-address-suggestions
+              hidden
+            ></ul>
+
+            <div class="field-row field-row--3">
+              <div class="field field--grow">
+                <label for="est-address-city">City</label>
+                <input
+                  class="input"
+                  id="est-address-city"
+                  name="addressCity"
+                  type="text"
+                  autocomplete="address-level2"
+                  placeholder="e.g. Molino"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label for="est-address-state">State</label>
+                <select class="select" id="est-address-state" name="addressState" autocomplete="address-level1" required>
+                  <option value="FL" selected>Florida (FL)</option>
+                  <option value="AL">Alabama (AL)</option>
+                </select>
+              </div>
+              <div class="field field--zip">
+                <label for="est-zip">ZIP code</label>
+                <input class="input" id="est-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" placeholder="e.g. 32577" required pattern="[0-9]{5}(-[0-9]{4})?" />
+              </div>
             </div>
-          </div>
 
-          <div class="address-confirmed" data-address-confirmed hidden>
-            <p class="address-confirmed__title">
-              <Icon name="check" size={16} /> Destination confirmed
-            </p>
-            <p class="address-confirmed__label" data-address-confirmed-label></p>
-            <p class="hint" data-address-confirmed-travel></p>
+            <p class="hint address-finder__status" data-address-status data-kind="" aria-live="polite"></p>
           </div>
         </div>
       </section>
 
-      <!-- Step 2 — the home -->
+      <!-- Step 2 — Service & Home -->
       <section class="wizard__step" data-step="2" aria-label={stepTitle(1)}>
         <h2 class="wizard__step-heading" data-step-title={1}>{stepTitle(1)}</h2>
+        <p class="wizard__step-copy">
+          Choose the cleaning you need and tell us about the home so the estimate reflects the
+          real work.
+        </p>
+        <fieldset class="field" data-service-fieldset data-group-error="serviceType" data-group-message="Please select a cleaning service.">
+          <legend>What kind of cleaning are you looking for?</legend>
+          <div class="option-grid">
+            {
+              RESIDENTIAL_SERVICE_OPTIONS.map((option) => (
+                <label class="option">
+                  <input type="radio" name="serviceType" value={option.value} required />
+                  <span class="option__control"></span>
+                  <span>
+                    <span class="option__label">{option.label}</span>
+                    <span class="option__desc">{option.description}</span>
+                  </span>
+                </label>
+              ))
+            }
+          </div>
+        </fieldset>
         <div class="field">
           <label for="est-property">Property type</label>
           <select class="select" id="est-property" name="propertyType" required>
@@ -433,8 +409,8 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       </section>
 
       <!-- Step 4 — add-ons -->
-      <section class="wizard__step" data-step="4" aria-label={stepTitle(4)}>
-        <h2 class="wizard__step-heading" data-step-title={4}>{stepTitle(4)}</h2>
+      <section class="wizard__step" data-step="4" aria-label={stepTitle(3)}>
+        <h2 class="wizard__step-heading" data-step-title={3}>{stepTitle(3)}</h2>
         <fieldset class="field">
           <legend>Any extras? (optional)</legend>
           <p class="hint" style="margin-bottom: var(--space-3)">
@@ -525,34 +501,22 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         </fieldset>
       </section>
 
-      <!-- Step 5 — scheduling -->
-      <section class="wizard__step" data-step="5" aria-label={stepTitle(3)}>
-        <h2 class="wizard__step-heading" data-step-title={3}>{stepTitle(3)}</h2>
-        <div class="field-row field-row--2">
-            <div class="field">
-              <label for="est-date">Preferred date</label>
-              <input class="input" id="est-date" name="preferredDate" type="date" required />
-              <span class="hint">
-                Requests can be made up to {business.scheduling.advanceReservationDays} days in advance.
-                Appointment times are {schedulingConfig.timeZoneLabel}.
-              </span>
-            </div>
-          <div class="field">
-            <label for="est-arrival">Arrival preference</label>
-            <select class="select" id="est-arrival" name="arrivalPreference" required>
-              <option value="">Choose one…</option>
-              {ARRIVAL_PREFERENCE_OPTIONS.map((option) => (
-                <option value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <BookingPicker id="residential-booking" showDate={false} />
-      </section>
+      <!-- Step 5 — Your Estimate -->
+      <section class="wizard__step" data-step="5" aria-label={stepTitle(4)}>
+        <h2 class="wizard__step-heading" data-step-title={4}>{stepTitle(4)}</h2>
 
-      <!-- Step 6 — estimate + reservation + details -->
-      <section class="wizard__step" data-step="6" aria-label={stepTitle(5)}>
-        <h2 class="wizard__step-heading" data-step-title={5}>{stepTitle(5)}</h2>
+        <div class="appointment-summary" data-appointment-summary>
+          <div>
+            <p class="appointment-summary__eyebrow">Your preferred appointment</p>
+            <p class="appointment-summary__value" data-appointment-date>Choose a date in step 1</p>
+            <p class="appointment-summary__meta" data-appointment-time></p>
+          </div>
+          <button class="btn btn--ghost btn--small" type="button" data-appointment-edit>
+            Change date or time
+          </button>
+        </div>
+        <div class="booking-alternatives" data-booking-alternatives hidden></div>
+
         <div class="estimate-reveal-stage">
           <EstimateReveal />
           <div class="reservation-summary" data-reservation-summary hidden>
@@ -567,12 +531,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
           <div class="reservation-actions">
             <p class="reservation-actions__note" data-payment-note>
-              Your estimate is ready. Sparkling Standard confirms the final details and date before
-              the cleaning is booked.
+              Your estimate is ready. Sparkling Standard confirms the final details, date and price
+              before the cleaning is booked.
             </p>
-            <button class="btn btn--secondary btn--large" type="button" data-verify-address hidden>
-              Verify Address &amp; Finalize Price
-            </button>
             <button class="btn btn--primary btn--large" type="button" data-pay-now hidden>
               Pay Now Securely
             </button>
@@ -686,15 +647,15 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         <li class="timeline__stage">
           <span class="timeline__number" aria-hidden="true">2</span>
           <div class="timeline__content">
-            <p class="timeline__title">Personal confirmation</p>
-            <p class="timeline__text">We'll review your requirements, confirm your final price and arrange a convenient time.</p>
+            <p class="timeline__title">Owner review</p>
+            <p class="timeline__text">We review your requirements, confirm your final price and check the preferred time.</p>
           </div>
         </li>
         <li class="timeline__stage">
           <span class="timeline__number" aria-hidden="true">3</span>
           <div class="timeline__content">
-            <p class="timeline__title">You're booked</p>
-            <p class="timeline__text">Your appointment is confirmed, and we'll take care of the rest.</p>
+            <p class="timeline__title">Appointment confirmed</p>
+            <p class="timeline__text">After our approval, your appointment is confirmed and we take care of the rest.</p>
           </div>
         </li>
       </ol>
