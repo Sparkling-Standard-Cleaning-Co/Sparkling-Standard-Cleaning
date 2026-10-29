@@ -131,7 +131,25 @@ async function openEstimate({ geolocation, permissions, width = 1280, height = 9
   return { context, page, ...captured };
 }
 
+async function confirmMapIfShown(page) {
+  const map = page.locator('[data-address-map]');
+  if (await map.isVisible()) {
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
+  }
+}
+async function advanceAddressStep(page) {
+  await page.click('[data-next]');
+  await page.locator('[data-address-map]').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+  if (await page.locator('[data-address-map]').isVisible()) {
+    await confirmMapIfShown(page);
+    await page.click('[data-next]');
+  }
+}
 async function completeRemainingSteps(page) {
+  await confirmMapIfShown(page);
   const active = () =>
     page.evaluate(
       () =>
@@ -159,12 +177,15 @@ async function completeRemainingSteps(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
-  await page.click('[data-next]'); // condition -> extras
-  await page.click('[data-next]'); // extras -> your estimate
+  await page.click('[data-next]'); // condition -> your details
   await page.fill('#est-name', 'UX test (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
-  if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
+  await page.click('[data-next]'); // details -> extras & payment
+  await page.waitForFunction(
+    () => document.querySelector('.wizard__step[data-step="5"]')?.getAttribute('data-active') === 'true',
+  );
+  await page.check('#est-terms', { force: true });
 }
 
 // ── 3) GPS resolves an exact address ─────────────────────────────────────────
@@ -177,14 +198,13 @@ test('GPS resolves an exact address and saves it without a separate confirmation
   });
   try {
     await page.click('[data-address-gps]');
-    await page.waitForFunction(() => /Location saved/.test(document.querySelector('[data-address-status]')?.textContent ?? ''));
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
     assert.equal(reverseRequests.length, 1);
     assert.match(await page.inputValue('#est-address'), /MAPLEWOOD LN/i);
-    assert.equal(await page.locator('[data-address-confirm]').count(), 0, 'no pin confirmation step exists');
-    assert.equal(
-      await page.locator('[data-address-finder]').getAttribute('data-state'),
-      'confirmed',
-      'the resolved location is accepted in the background',
+    assert.equal(await page.locator('[data-address-confirm]').count(), 1, 'map confirmation is shown');
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
     );
   } finally {
     await context.close();
@@ -203,9 +223,10 @@ test('a street-level reverse result never invents a street address', async () =>
   });
   try {
     await page.click('[data-address-gps]');
-    await page.waitForFunction(() => /Location saved/.test(document.querySelector('[data-address-status]')?.textContent ?? ''));
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
     assert.equal(await page.inputValue('#est-address'), '', 'street is not invented');
-    assert.equal(await page.locator('[data-address-confirm]').count(), 0);
+    assert.equal(await page.locator('[data-address-confirm]').count(), 1);
+    await page.locator('[data-address-confirm]').click();
     await page.fill('#est-date', BOOKING_DATE);
     await page.click('[data-next]');
     assert.equal(
@@ -233,6 +254,12 @@ test('the manual address fields are always visible and preserve answers', async 
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32503');
+    await page.click('[data-address-resolve]');
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -255,9 +282,9 @@ test('poor GPS accuracy never auto-fills the street address', async () => {
   });
   try {
     await page.click('[data-address-gps]');
-    await page.waitForFunction(() => /Location saved/.test(document.querySelector('[data-address-status]')?.textContent ?? ''));
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
     assert.equal(await page.inputValue('#est-address'), '', 'street stays empty at poor accuracy');
-    assert.equal(await page.locator('[data-address-confirm]').count(), 0, 'no confirmation step');
+    assert.equal(await page.locator('[data-address-confirm]').count(), 1, 'confirmation remains available');
   } finally {
     await context.close();
   }
@@ -276,7 +303,7 @@ test('permission denial shows device-specific guidance with retry and manual act
     assert.match(panel, /Settings/i);
     assert.equal(await page.locator('[data-address-gps-retry]').isVisible(), true);
     assert.equal(await page.locator('[data-address-manual-open]').isVisible(), true);
-    assert.equal(await page.locator('[data-address-confirm]').count(), 0, 'no pin confirmation step exists');
+    assert.equal(await page.locator('[data-address-map]').isVisible(), false, 'no map without a location');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     assert.ok(overflow <= 1, 'permission guidance fits mobile without overflow');
   } finally {
@@ -294,8 +321,9 @@ test('Try Location Again succeeds after permission is granted', async () => {
     await context.grantPermissions(['geolocation'], { origin: BASE });
     await context.setGeolocation({ ...MOLINO, accuracy: 20 });
     await page.click('[data-address-gps-retry]');
-    await page.waitForFunction(() => /Location saved/.test(document.querySelector('[data-address-status]')?.textContent ?? ''));
-    assert.equal(await page.locator('[data-address-confirm]').count(), 0);
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('[data-address-confirm]').count(), 1);
+    await page.locator('[data-address-confirm]').click();
   } finally {
     await context.close();
   }
@@ -334,7 +362,8 @@ test('switching from manual to GPS isolates the old address everywhere', async (
 
     // Switch to GPS: the old values must be ignored, not merged.
     await page.click('[data-address-gps]');
-    await page.waitForFunction(() => /Location saved/.test(document.querySelector('[data-address-status]')?.textContent ?? ''));
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await confirmMapIfShown(page);
     const confirmed = await page.inputValue('#est-address');
     assert.match(confirmed, /DEVICE WAY/);
     assert.doesNotMatch(confirmed, /Old Manual|Oldtown|11111/);
@@ -342,6 +371,8 @@ test('switching from manual to GPS isolates the old address everywhere', async (
 
     await completeRemainingSteps(page);
     await page.click('[data-submit]');
+    await page.waitForTimeout(150);
+    if (await page.locator('[data-photo-gate]').isVisible()) await page.click('[data-photo-pay-later]');
     await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'warning');
     await delay(150);
 
@@ -384,6 +415,12 @@ test('missing required fields show an error summary, field errors and focus', as
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32503');
+    await page.click('[data-address-resolve]');
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -403,8 +440,8 @@ test('a GPS pin without a reverse-geocoded address is saved and needs only a dat
   });
   try {
     await page.click('[data-address-gps]');
-    await page.waitForFunction(() => /Location saved/.test(document.querySelector('[data-address-status]')?.textContent ?? ''));
-    await page.click('[data-next]');
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await advanceAddressStep(page);
     assert.equal(await page.locator('.wizard__step[data-active="true"][data-step="1"]').count(), 1, 'date is still required');
     await page.fill('#est-date', BOOKING_DATE);
     await page.click('[data-next]');
@@ -433,6 +470,8 @@ test('an unresolved manual address can still be submitted for confirmation', asy
     await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
     assert.match((await page.locator('[data-reservation-price]').textContent()) ?? '', /^\$\d+/);
     await page.click('[data-submit]');
+    await page.waitForTimeout(150);
+    if (await page.locator('[data-photo-gate]').isVisible()) await page.click('[data-photo-pay-later]');
     await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'warning');
     await delay(150);
     const fields = leadPayloads[0].fields;

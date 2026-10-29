@@ -119,6 +119,12 @@ async function completeEstimate(page) {
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', '32502');
+  await page.click('[data-address-resolve]');
+  await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+  await page.locator('[data-address-confirm]').click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+  );
   await page.click('[data-next]');
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -134,13 +140,15 @@ async function completeEstimate(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
-  await page.click('[data-next]'); // extras
-  await page.click('[data-next]'); // final
+  await page.click('[data-next]'); // your details
   await page.fill('#est-name', 'UX test (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
+  await page.click('[data-next]'); // extras & payment
   if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
   await page.click('[data-submit]');
+  await page.waitForTimeout(150);
+  if (await page.locator('[data-photo-gate]').isVisible()) await page.click('[data-photo-pay-later]');
   await page.waitForFunction(() => {
     const state = document.querySelector('[data-form-status]')?.dataset.state;
     return state === 'success' || state === 'warning' || state === 'error';

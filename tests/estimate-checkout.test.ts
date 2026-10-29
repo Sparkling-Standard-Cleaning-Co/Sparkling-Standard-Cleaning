@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  onRequestGet,
   onRequestPost,
   paymentReadiness,
 } from '../functions/api/estimate-checkout.ts';
@@ -16,6 +17,12 @@ import { travelConfig } from '../src/config/estimators/travel.ts';
 import { pricing } from '../src/config/pricing.ts';
 import { calculateServiceTax } from '../src/lib/tax/engine.ts';
 import { FakeLedger } from './helpers/payment-fakes.ts';
+import {
+  issueGiftCertificate,
+  lookupGiftCertificate,
+  remainingCents,
+  type GiftCertificateRecord,
+} from '../src/lib/gift/ledger.ts';
 
 let ip = 0;
 let secretSerial = 0;
@@ -228,6 +235,28 @@ function tierBFacilityInput() {
       terms_version: '2026-10-28.terms.v2',
     } as Record<string, string>,
   };
+}
+
+async function activeGift(ledger: FakeLedger, valueCents = 50_000): Promise<GiftCertificateRecord> {
+  const record: GiftCertificateRecord = {
+    version: 1,
+    code: 'SSGC-TEST-2345',
+    status: 'active',
+    valueCents,
+    redeemedCents: 0,
+    recipientName: 'Synthetic Recipient',
+    purchaserName: 'Synthetic Purchaser',
+    purchaserEmail: 'buyer@example.test',
+    validFromDate: '2026-10-01',
+    activatesAt: '2026-10-01T05:00:00.000Z',
+    activationTimezone: 'America/Chicago',
+    stripeEventId: 'evt_synthetic_gift',
+    stripeSessionId: 'cs_synthetic_gift',
+    issuedAt: '2026-10-01T12:00:00.000Z',
+    history: [],
+  };
+  await issueGiftCertificate(ledger, record);
+  return record;
 }
 
 test('readiness requires the key, webhook secret, notification and durable ledger', async () => {
@@ -604,4 +633,127 @@ test('concurrent Pay Now requests cannot create two Checkout Sessions', async ()
   const statuses = responses.map((response) => response.status).sort();
   assert.ok(statuses.includes(200), 'one request returns the session');
   assert.ok(statuses.every((status) => status === 200 || status === 409));
+});
+test('a gift certificate reduces the Stripe charge and reserves its balance', async () => {
+  const ledger = new FakeLedger();
+  const env = { ...makeEnv(ledger), WEB3FORMS_ENDPOINT: 'https://notify.test/submit' };
+  await activeGift(ledger);
+  const provider = providerStub();
+  const { price, tax, fields } = validFacilityInput();
+  const totalCents = Math.round((tax.total ?? price.total) * 100);
+  let unitAmount = '';
+
+  const response = await withFetch(
+    async (url, init) => {
+      if (String(url) === 'https://notify.test/submit') return jsonResponse({ success: true });
+      if (String(url).includes('/v1/checkout/sessions') && !String(url).includes('/v1/checkout/sessions/')) {
+        const body = init?.body as URLSearchParams;
+        unitAmount = body.get('line_items[0][price_data][unit_amount]') ?? '';
+        assert.equal(body.get('metadata[gift_applied_cents]'), '5000');
+        assert.equal(body.get('metadata[total_amount_cents]'), String(totalCents));
+      }
+      return provider.stub(url, init);
+    },
+    () =>
+      onRequestPost({
+        request: jsonRequest({
+          fields: { ...fields, gift_code: 'ssgc-test-2345', gift_apply_amount: '50' },
+          returnPath: '/estimate/commercial/',
+        }),
+        env,
+      } as never),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(provider.postCount(), 1);
+  assert.equal(unitAmount, String(totalCents - 5000));
+  const gift = await lookupGiftCertificate(ledger, 'SSGC-TEST-2345');
+  assert.ok(gift);
+  assert.equal(gift.reservations?.[0]?.amountCents, 5000);
+  assert.equal(gift.reservations?.[0]?.status, 'reserved');
+  assert.equal(remainingCents(gift), 45_000);
+});
+
+test('a gift certificate covering the full total completes without a card charge', async () => {
+  const ledger = new FakeLedger();
+  const env = { ...makeEnv(ledger), WEB3FORMS_ENDPOINT: 'https://notify.test/submit' };
+  await activeGift(ledger, 500_000);
+  const provider = providerStub();
+  const { fields } = validFacilityInput();
+  let ownerNotified = false;
+
+  const response = await withFetch(
+    async (url, init) => {
+      if (String(url) === 'https://notify.test/submit') {
+        ownerNotified = true;
+        return jsonResponse({ success: true });
+      }
+      return provider.stub(url, init);
+    },
+    () =>
+      onRequestPost({
+        request: jsonRequest({ fields: { ...fields, gift_code: 'SSGC-TEST-2345' }, returnPath: '/estimate/commercial/' }),
+        env,
+      } as never),
+  );
+
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as { giftOrder?: boolean; url?: string; pricePaidByGift?: number };
+  assert.equal(data.giftOrder, true);
+  assert.ok(data.pricePaidByGift && data.pricePaidByGift > 0);
+  assert.equal(provider.postCount(), 0, 'no Stripe session is created for a gift-covered order');
+  assert.equal(ownerNotified, true);
+
+  const gift = await lookupGiftCertificate(ledger, 'SSGC-TEST-2345');
+  assert.ok(gift);
+  assert.equal(gift.status, 'active');
+  assert.ok(gift.redeemedCents > 0);
+  assert.equal(gift.reservations?.[0]?.status, 'committed');
+
+  const attempt = new URL(data.url ?? '').searchParams.get('gift_order');
+  assert.match(attempt ?? '', /^[a-f0-9]{64}$/);
+  const checkout = ledger.json<{ status?: string; gift?: { paidByGift?: boolean } }>(
+    `payments/checkouts/${attempt}`,
+  );
+  assert.equal(checkout?.status, 'completed');
+  assert.equal(checkout?.gift?.paidByGift, true);
+
+  const status = await onRequestGet({
+    request: new Request(
+      `https://example.test/api/estimate-checkout?gift_order=${attempt}`,
+    ),
+    env,
+  } as never);
+  assert.equal(status.status, 200);
+  const statusData = (await status.json()) as {
+    paid?: boolean;
+    giftOrder?: boolean;
+    giftApplied?: number;
+    photosOutstanding?: boolean;
+  };
+  assert.equal(statusData.paid, true);
+  assert.equal(statusData.giftOrder, true);
+  assert.equal(statusData.photosOutstanding, false);
+
+  const invalid = await onRequestGet({
+    request: new Request('https://example.test/api/estimate-checkout?gift_order=not-a-hash'),
+    env,
+  } as never);
+  assert.equal(invalid.status, 400);
+});
+
+test('an unknown gift code is rejected before any Stripe session or reservation', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub();
+  const { fields } = validFacilityInput();
+  const response = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ fields: { ...fields, gift_code: 'SSGC-AAAA-2222' }, returnPath: '/estimate/commercial/' }),
+      env,
+    } as never),
+  );
+  assert.equal(response.status, 404);
+  assert.equal(((await response.json()) as { error?: string }).error, 'gift_not_found');
+  assert.equal(provider.postCount(), 0);
 });

@@ -161,7 +161,7 @@ const facilityStepDescriptions = church
     <div class="address-finder" data-address-finder data-state="idle" data-method="manual">
       <div class="address-gps">
         <button type="button" class="btn btn--primary btn--block" data-address-gps>
-          <Icon name="map-pin" size={18} /> Use My Current Location
+          <Icon name="map-pin" size={18} /> Find My Location
         </button>
 
         <div class="address-permission" data-address-permission hidden>
@@ -179,7 +179,7 @@ const facilityStepDescriptions = church
         <summary class="address-manual__summary" data-address-manual-summary>Or enter the facility address manually</summary>
         <div class="address-manual__body">
           <div class="field-row field-row--2">
-            <div class="field field--grow">
+            <div class="field field--grow address-street-wrap">
               <label for="est-address">Street address</label>
               <input
                 class="input"
@@ -193,6 +193,14 @@ const facilityStepDescriptions = church
                 aria-autocomplete="list"
                 aria-controls="est-address-suggestions"
               />
+              <ul
+                class="address-suggestions"
+                id="est-address-suggestions"
+                role="listbox"
+                aria-label="Address suggestions"
+                data-address-suggestions
+                hidden
+              ></ul>
             </div>
             <div class="field field--unit">
               <label for="est-address-unit">Suite / unit</label>
@@ -217,7 +225,6 @@ const facilityStepDescriptions = church
               <input class="input" id="est-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="10" placeholder="e.g. 32503" pattern="[0-9]{5}(-[0-9]{4})?" />
             </div>
           </div>
-          <ul class="address-suggestions" id="est-address-suggestions" role="listbox" aria-label="Address suggestions" data-address-suggestions hidden></ul>
           <p class="hint address-finder__status" data-address-status aria-live="polite">
             Start typing the facility address — suggestions appear as you type.
           </p>
@@ -549,6 +556,26 @@ const facilityStepDescriptions = church
     <button class="btn btn--secondary btn--large btn--block" type="button" data-facility-verify-address hidden>
       Verify Address &amp; Finalize Price
     </button>
+    <div class="field" data-facility-gift hidden>
+      <label for={`${engine}-gift-code`}>
+        Gift certificate code <span class="text-muted">(optional)</span>
+      </label>
+      <input
+        class="input"
+        id={`${engine}-gift-code`}
+        name="gift_code"
+        type="text"
+        autocomplete="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        maxlength="20"
+        placeholder="SSGC-XXXX-XXXX"
+        data-facility-gift-code
+      />
+      <p class="small text-muted">
+        We will apply the certificate's available balance. Any remaining balance is paid securely.
+      </p>
+    </div>
     <button class="btn btn--secondary btn--large btn--block" type="button" data-facility-pay-now hidden>
       Pay Now Securely
     </button>

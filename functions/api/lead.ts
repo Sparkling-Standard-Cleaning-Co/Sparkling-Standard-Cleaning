@@ -95,6 +95,7 @@ const SAFE_KEY = /^[a-z0-9_]{1,40}$/i;
 
 /** Fields the server owns; any client-supplied copy is discarded. */
 const SERVER_OWNED_KEYS = new Set([
+  'gift_code',
   'quote_verified',
   'verified_price',
   'client_price',

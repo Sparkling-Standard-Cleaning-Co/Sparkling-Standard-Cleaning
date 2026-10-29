@@ -128,19 +128,6 @@ const sampleCode = 'SSGC-SAMP-LE42';
         </p>
       </div>
 
-      {
-        enabled && giftCertificateConfig.denominations.length > 0 && (
-          <div class="field">
-            <label for="gift-denomination">Gift value</label>
-            <select class="select" id="gift-denomination" name="denominationUsd">
-              {giftCertificateConfig.denominations.map((amount) => (
-                <option value={String(amount)}>${amount}</option>
-              ))}
-            </select>
-          </div>
-        )
-      }
-
       <form
         class="stack"
         data-lead-form={!enabled ? true : undefined}
@@ -149,6 +136,43 @@ const sampleCode = 'SSGC-SAMP-LE42';
         action="#"
         method="post"
       >
+        {enabled && (
+          <div class="field">
+            <label for="gift-denomination">Gift value</label>
+            <select
+              class="select"
+              id="gift-denomination"
+              name="denominationUsd"
+              data-gift-denomination
+              required
+            >
+              {giftCertificateConfig.denominations.map((amount) => (
+                <option value={String(amount)}>${amount}</option>
+              ))}
+              <option value="custom">Other amount</option>
+            </select>
+            <span class="hint">
+              The recipient can use the value toward any cleaning service.
+            </span>
+          </div>
+        )}
+        {enabled && (
+          <div class="field" data-gift-custom-field hidden>
+            <label for="gift-custom-value">Custom gift value (USD)</label>
+            <input
+              class="input"
+              id="gift-custom-value"
+              name="gift_custom_value"
+              type="number"
+              inputmode="numeric"
+              min={giftCertificateConfig.customAmountMinUsd}
+              max={giftCertificateConfig.customAmountMaxUsd}
+              step="5"
+              placeholder={`$${giftCertificateConfig.customAmountMinUsd}-$${giftCertificateConfig.customAmountMaxUsd}`}
+              data-gift-custom-value
+            />
+          </div>
+        )}
         <div class="field-row field-row--2">
           <div class="field">
             <label for="gift-purchaser-name">Your name</label>
@@ -187,32 +211,11 @@ const sampleCode = 'SSGC-SAMP-LE42';
             <span class="hint">Redeemable at 12:00 AM Central Time on this date. Leave blank for today.</span>
           </div>
         </div>
-        <div class="field-row field-row--2">
-          <div class="field">
-            <label for="gift-value">Preferred gift value (USD)</label>
-            <input
-              class="input"
-              id="gift-value"
-              name="gift_value"
-              type="number"
-              inputmode="numeric"
-              min={giftCertificateConfig.customAmountMinUsd}
-              max={giftCertificateConfig.customAmountMaxUsd}
-              step="5"
-              placeholder={`$${giftCertificateConfig.customAmountMinUsd}–$${giftCertificateConfig.customAmountMaxUsd}`}
-              required={!enabled || giftCertificateConfig.denominations.length === 0}
-            />
-            <span class="hint">
-              Suggested range ${giftCertificateConfig.customAmountMinUsd}–${giftCertificateConfig.customAmountMaxUsd};
-              we confirm the amount with you before any payment.
-            </span>
-          </div>
-          <div class="field">
-            <label for="gift-delivery-note">Delivery note</label>
-            <p class="hint" id="gift-delivery-note" data-gift-delivery-note>
-              The purchaser always receives a confirmation and certificate copy.
-            </p>
-          </div>
+        <div class="field">
+          <label for="gift-delivery-note">Delivery note</label>
+          <p class="hint" id="gift-delivery-note" data-gift-delivery-note>
+            The purchaser always receives a confirmation and certificate copy.
+          </p>
         </div>
         <div class="field">
           <label for="gift-message">Personal message <span class="text-muted">(optional)</span></label>
@@ -267,11 +270,10 @@ const sampleCode = 'SSGC-SAMP-LE42';
       </div>
       <div class="stack">
         <div class="card card--muted">
-          <p class="eyebrow mb-0">Terms status</p>
+          <p class="eyebrow mb-0">Certificate terms</p>
           <p class="card__text mt-2">
             Purchased certificates do not expire and carry no post-sale service, dormancy,
-            maintenance or cash-out fee. The owner-approved amounts and delivery options are ready
-            for final legal review before public sales open. The full
+            maintenance or cash-out fee. The full
             <a href="/terms/#gift-certificates">gift certificate terms</a> explain redemption,
             balances and applicable unclaimed-property rules. Nothing on this page limits a
             recipient&rsquo;s statutory rights.

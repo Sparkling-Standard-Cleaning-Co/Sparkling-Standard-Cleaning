@@ -124,7 +124,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
           <div class="address-gps">
             <button type="button" class="btn btn--secondary btn--large btn--block" data-address-gps>
-              <Icon name="map-pin" size={18} /> Use My Location
+              <Icon name="map-pin" size={18} /> Find My Location
             </button>
 
             <div class="address-permission" data-address-permission hidden>
@@ -148,7 +148,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
           <div class="address-manual__body">
             <div class="field-row field-row--2">
-              <div class="field field--grow">
+              <div class="field field--grow address-street-wrap">
                 <label for="est-address">Street address</label>
                 <input
                   class="input"
@@ -163,6 +163,14 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
                   aria-controls="est-address-suggestions"
                   data-error-required="Please enter your street address."
                 />
+                <ul
+                  class="address-suggestions"
+                  id="est-address-suggestions"
+                  role="listbox"
+                  aria-label="Address suggestions"
+                  data-address-suggestions
+                  hidden
+                ></ul>
               </div>
               <div class="field field--unit">
                 <label for="est-address-unit">Apt / unit</label>
@@ -178,14 +186,6 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
               </div>
             </div>
 
-            <ul
-              class="address-suggestions"
-              id="est-address-suggestions"
-              role="listbox"
-              aria-label="Address suggestions"
-              data-address-suggestions
-              hidden
-            ></ul>
 
             <div class="field-row field-row--3">
               <div class="field field--grow">
@@ -213,7 +213,35 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
               </div>
             </div>
 
+            <div class="address-finder__actions">
+              <button type="button" class="btn btn--secondary btn--small" data-address-resolve>
+                Find My Address
+              </button>
+            </div>
             <p class="hint address-finder__status" data-address-status data-kind="" aria-live="polite"></p>
+          </div>
+
+          <div class="address-map" data-address-map hidden>
+            <div class="address-map__canvas" data-address-map-canvas></div>
+            <p class="hint">Confirm this is the right destination, or drag the pin to correct it.</p>
+            <p class="hint address-map__fallback" data-address-map-fallback hidden>
+              Map preview is unavailable right now - the confirmed coordinates still work. You can
+              continue.
+            </p>
+            <div class="address-finder__actions">
+              <button type="button" class="btn btn--primary btn--small" data-address-confirm>
+                Confirm this location
+              </button>
+              <button type="button" class="btn btn--ghost btn--small" data-address-change>
+                Change address
+              </button>
+            </div>
+          </div>
+
+          <div class="address-confirmed" data-address-confirmed hidden>
+            <p class="address-confirmed__title"><Icon name="check" size={16} /> Destination confirmed</p>
+            <p class="address-confirmed__label" data-address-confirmed-label></p>
+            <p class="hint" data-address-confirmed-travel></p>
           </div>
         </div>
       </section>
@@ -343,14 +371,6 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </label>
         </div>
 
-        <label class="supportive-check" data-supportive-section hidden>
-          <input type="checkbox" name="supportiveEligible" value="yes" data-supportive-eligible />
-          <span>
-            I qualify for Sparkling Standard&rsquo;s{communitySupportEnabled ? ` ${communitySupportPercent}%` : ''}
-            Community Support discount.
-            <a href="/terms/#community-support" class="supportive-check__link">Eligibility terms</a>
-          </span>
-        </label>
 
         <fieldset class="field" data-group-error="condition" data-group-message="Please choose the home's current condition.">
           <legend>What condition is the home in today?</legend>
@@ -389,15 +409,58 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         <PhotoUploadSection engine="residential" />
       </section>
 
-      <!-- Step 4 — add-ons -->
+      <!-- Step 4 — contact details -->
       <section class="wizard__step" data-step="4" aria-label={stepTitle(3)}>
         <h2 class="wizard__step-heading" data-step-title={3}>{stepTitle(3)}</h2>
+        <p class="hint">So we can confirm your estimate, request and appointment.</p>
+        <div class="field-row field-row--2">
+          <div class="field">
+            <label for="est-name">Your name</label>
+            <input class="input" id="est-name" name="name" type="text" autocomplete="name" required />
+          </div>
+          <div class="field">
+            <label for="est-phone">Phone</label>
+            <input class="input" id="est-phone" name="phone" type="tel" autocomplete="tel" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="est-email">Email</label>
+          <input class="input" id="est-email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="est-notes">Notes (optional)</label>
+          <textarea
+            class="textarea"
+            id="est-notes"
+            name="notes"
+            rows="4"
+            placeholder="Anything we should know - pets, parking, access details, priorities."
+          ></textarea>
+        </div>
+      </section>
+      <!-- Step 5 — Your Estimate -->
+      <section class="wizard__step" data-step="5" aria-label={stepTitle(4)}>
+        <h2 class="wizard__step-heading" data-step-title={4}>{stepTitle(4)}</h2>
+
+        <div class="appointment-summary" data-appointment-summary>
+          <div>
+            <p class="appointment-summary__eyebrow">Your preferred appointment</p>
+            <p class="appointment-summary__value" data-appointment-date>Choose a date in step 1</p>
+            <p class="appointment-summary__meta" data-appointment-time></p>
+          </div>
+          <button class="btn btn--ghost btn--small" type="button" data-appointment-edit>
+            Change date or time
+          </button>
+        </div>
+        <div class="booking-alternatives" data-booking-alternatives hidden></div>
+
+          <div class="final-extras">
+            <h3 class="bundle-offers__title">Want to bundle and save?</h3>
         <fieldset class="field">
-          <legend>Any extras? (optional)</legend>
+          <legend>Individual extras</legend>
           <p class="hint" style="margin-bottom: var(--space-3)">
-            The price beside each extra is calculated from your service and current scope — it is
-            included in your proposed total when selected. Items marked “Custom quote” are priced
-            individually.
+            Prices are calculated from your service and scope. Items marked "Custom quote" are
+            priced individually.
           </p>
 
           {
@@ -471,7 +534,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
                     {addon.customQuote ? (
                       <span class="option__price option__price--custom">Custom quote</span>
                     ) : (
-                      <span class="option__price">Optional extra</span>
+                      <span class="option__price" data-addon-price={addon.id}>Calculating...</span>
                     )}
                   </span>
                   <span class="option__desc">{addon.blurb}</span>
@@ -480,23 +543,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             ))}
           </div>
         </fieldset>
-      </section>
-
-      <!-- Step 5 — Your Estimate -->
-      <section class="wizard__step" data-step="5" aria-label={stepTitle(4)}>
-        <h2 class="wizard__step-heading" data-step-title={4}>{stepTitle(4)}</h2>
-
-        <div class="appointment-summary" data-appointment-summary>
-          <div>
-            <p class="appointment-summary__eyebrow">Your preferred appointment</p>
-            <p class="appointment-summary__value" data-appointment-date>Choose a date in step 1</p>
-            <p class="appointment-summary__meta" data-appointment-time></p>
           </div>
-          <button class="btn btn--ghost btn--small" type="button" data-appointment-edit>
-            Change date or time
-          </button>
-        </div>
-        <div class="booking-alternatives" data-booking-alternatives hidden></div>
+
+
 
         <div class="estimate-reveal-stage">
           <EstimateReveal />
@@ -510,11 +559,38 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <div class="summary-groups" data-reservation-scope></div>
           <p class="reservation-summary__qualification" data-reservation-qualification></p>
 
+          <label class="supportive-check" data-supportive-section hidden>
+            <input type="checkbox" name="supportiveEligible" value="yes" data-supportive-eligible />
+            <span>
+              I qualify for Sparkling Standard&rsquo;s{communitySupportEnabled ? ` ${communitySupportPercent}%` : ''}
+              Community Support discount.
+              <a href="/terms/#community-support" class="supportive-check__link">Eligibility terms</a>
+            </span>
+          </label>
+
           <div class="reservation-actions">
             <p class="reservation-actions__note" data-payment-note>
               Your estimate is ready. Sparkling Standard confirms the final details, date and price
               before the cleaning is booked.
             </p>
+            <div class="field gift-code-field" data-gift-field hidden>
+              <label for="est-gift-code">Gift certificate code <span class="text-muted">(optional)</span></label>
+              <input
+                class="input"
+                id="est-gift-code"
+                name="gift_code"
+                type="text"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                maxlength="20"
+                placeholder="SSGC-XXXX-XXXX"
+                data-gift-code
+              />
+              <p class="small text-muted">
+                We will apply the certificate's available balance. Any remaining balance is paid securely.
+              </p>
+            </div>
             <button class="btn btn--primary btn--large" type="button" data-pay-now hidden>
               Pay Now Securely
             </button>
@@ -538,43 +614,26 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         </div>
         </div>
 
-        <div class="field-row field-row--2">
-          <div class="field">
-            <label for="est-name">Your name</label>
-            <input class="input" id="est-name" name="name" type="text" autocomplete="name" required />
-          </div>
-          <div class="field">
-            <label for="est-phone">Phone</label>
-            <input class="input" id="est-phone" name="phone" type="tel" autocomplete="tel" required />
-          </div>
-        </div>
-        <div class="field">
-          <label for="est-email">Email</label>
-          <input class="input" id="est-email" name="email" type="email" autocomplete="email" required />
-        </div>
-        <div class="field">
-          <label for="est-notes">Notes (optional)</label>
-          <textarea
-            class="textarea"
-            id="est-notes"
-            name="notes"
-            rows="4"
-            placeholder="Anything we should know — pets, parking, access details, priorities."
-          ></textarea>
-        </div>
-        <div class="photo-gate" data-photo-gate hidden>
-          <p class="photo-gate__title">Photos are needed before your booking can be confirmed.</p>
-          <p class="photo-gate__copy">
-            Upload photos of the areas to be cleaned now, or pay now and we will confirm your
-            booking after receiving and reviewing them.
-          </p>
-          <div class="btn-row">
-            <button class="btn btn--secondary" type="button" data-photo-upload-now>
-              Upload Photos Now
-            </button>
-            <button class="btn btn--primary" type="button" data-photo-pay-later>
-              Pay Now, Confirm Later
-            </button>
+        <div
+          class="photo-gate"
+          data-photo-gate
+          hidden
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="photo-gate-title"
+        >
+          <div class="photo-gate__dialog">
+            <p class="photo-gate__title" id="photo-gate-title">
+              Photos are required for an accurate estimate and confirmed booking.
+            </p>
+            <div class="btn-row">
+              <button class="btn btn--secondary" type="button" data-photo-upload-now>
+                Upload Photos Now
+              </button>
+              <button class="btn btn--primary" type="button" data-photo-pay-later>
+                I&rsquo;ll Submit Them Later
+              </button>
+            </div>
           </div>
         </div>
         <p class="small photo-summary" data-photo-summary hidden></p>

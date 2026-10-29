@@ -395,6 +395,44 @@ test('concurrent gift reservations cannot exceed the available balance', async (
   if (!second.ok) assert.equal(second.error, 'insufficient_balance');
 });
 
+test('an expired reservation cannot be committed over a newer active reservation', async () => {
+  const bucket = new FakeLedger();
+  await issueGiftCertificate(bucket, record());
+  const start = new Date('2026-10-29T12:00:00.000Z');
+  const older = await reserveGiftCredit(bucket, 'SSGC-ABCD-2345', 7000, 'SS-OLD', {
+    ttlMinutes: 30,
+    now: start,
+  });
+  assert.equal(older.ok, true);
+  if (!older.ok) return;
+  const later = await reserveGiftCredit(
+    bucket,
+    'SSGC-ABCD-2345',
+    7000,
+    'SS-NEW',
+    { ttlMinutes: 30, now: new Date('2026-10-29T12:31:00.000Z') },
+  );
+  assert.equal(later.ok, true);
+  if (!later.ok) return;
+  const refused = await commitGiftReservation(
+    bucket,
+    'SSGC-ABCD-2345',
+    older.reservation.id,
+    'late retry',
+    new Date('2026-10-29T12:32:00.000Z'),
+  );
+  assert.equal(refused.ok, false);
+  if (!refused.ok) assert.equal(refused.error, 'insufficient_balance');
+  const allowed = await commitGiftReservation(
+    bucket,
+    'SSGC-ABCD-2345',
+    later.reservation.id,
+    'current checkout',
+    new Date('2026-10-29T12:32:00.000Z'),
+  );
+  assert.equal(allowed.ok, true);
+});
+
 test('expired reservations stop reducing the available balance', async () => {
   const bucket = new FakeLedger();
   await issueGiftCertificate(bucket, record());

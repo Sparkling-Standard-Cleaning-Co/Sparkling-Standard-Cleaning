@@ -1,6 +1,5 @@
-// Focused five-step address tests — automatic background resolution, ZIP
-// fallback, no customer map/pin confirmation, and the strict FL/AL suggestion
-// boundary.
+// Focused five-step address tests — restored map/pin confirmation, ZIP
+// fallback, and the strict FL/AL suggestion boundary.
 //
 // Run with: npm run test:browser on :4404.
 
@@ -102,7 +101,7 @@ async function openEstimate(page) {
 
 const addressFilled = async (page) => page.locator('[data-address-finder]').getAttribute('data-state');
 
-test('the five-step address card has no separate inspection or confirmation controls', async () => {
+test('the five-step address card restores map and pin confirmation controls', async () => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   try {
@@ -110,9 +109,10 @@ test('the five-step address card has no separate inspection or confirmation cont
     assert.equal(await page.locator('#est-address').isVisible(), true);
     assert.equal(await page.locator('#est-address-city').isVisible(), true);
     assert.equal(await page.locator('#est-zip').isVisible(), true);
-    assert.equal(await page.locator('[data-address-map]').count(), 0);
-    assert.equal(await page.locator('[data-address-confirm]').count(), 0);
-    assert.equal(await page.locator('[data-address-resolve]').count(), 0);
+    assert.equal(await page.locator('[data-address-map]').count(), 1);
+    assert.equal(await page.locator('[data-address-map]').isVisible(), false);
+    assert.equal(await page.locator('[data-address-confirm]').count(), 1);
+    assert.equal(await page.locator('[data-address-resolve]').count(), 1);
     assert.equal(await page.locator('[data-address-manual-details]').count(), 0);
     assert.equal(await page.locator('[data-booking-calendar]').count(), 1);
   } finally {
@@ -120,7 +120,7 @@ test('the five-step address card has no separate inspection or confirmation cont
   }
 });
 
-test('a typed address resolves in the background and advances without a map step', async () => {
+test('a typed address opens the map and advances only after confirmation', async () => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   try {
@@ -132,11 +132,14 @@ test('a typed address resolves in the background and advances without a map step
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32502');
+    await page.click('[data-address-resolve]');
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
     );
-    assert.equal(await page.locator('[data-address-confirm]').count(), 0);
+    assert.equal(await page.locator('[data-address-confirm]').count(), 1);
   } finally {
     await context.close();
   }
@@ -176,7 +179,7 @@ test('the suggestion provider only receives Florida and Alabama searches', async
     for (const request of captured.suggest) {
       assert.equal(request.state, 'FL');
     }
-    assert.equal(await page.locator('[data-address-map]').count(), 0);
+    assert.equal(await page.locator('[data-address-map]').count(), 1);
   } finally {
     await context.close();
   }

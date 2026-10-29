@@ -268,3 +268,13 @@ from mocked threshold tests; no expected driving times are hard-coded from guess
    end-to-end estimate for one in-boundary and one boundary ZIP.
 
 No pricing change is part of this work.
+
+## 2026-10-29 map restoration (owner directive)
+
+The residential/STR and facility Step 1 flows again show the interactive MapLibre map after a GPS
+lookup, a selected suggestion, or **Find My Address**. The customer can drag the pin and must press
+**Confirm this location** before Step 1 can advance when the map is available. The five-step
+structure, manual address fields, FL/AL suggestion restriction and ZIP fallback are unchanged. GPS
+reverse-geocoded address fields populate before confirmation; a GPS location without a resolved
+street still confirms from its pin and never invents a house number. If the map preview itself
+fails to load, the confirmed coordinates remain usable and the customer can continue.

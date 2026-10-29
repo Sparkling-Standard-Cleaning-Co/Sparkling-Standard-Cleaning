@@ -50,13 +50,20 @@ test('amounts are resolved only from approved config', () => {
   assert.equal(resolveGiftAmount(undefined, 75), 75, 'unlisted custom amount');
 });
 
-test('gift checkout is refused while sales are disabled', async () => {
-  const response = await giftCheckout({
-    request: jsonRequest({ purchaserName: 'A', purchaserEmail: 'a@example.com', recipientName: 'B' }),
-    env: {},
-  } as never);
-  assert.equal(response.status, 403);
-  assert.deepEqual(await response.json(), { ok: false, error: 'not_enabled' });
+test('gift checkout still honours an explicit sales-off switch', async () => {
+  const config = giftCertificateConfig as { enabled: boolean };
+  const original = config.enabled;
+  config.enabled = false;
+  try {
+    const response = await giftCheckout({
+      request: jsonRequest({ purchaserName: 'A', purchaserEmail: 'a@example.com', recipientName: 'B' }),
+      env: {},
+    } as never);
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { ok: false, error: 'not_enabled' });
+  } finally {
+    config.enabled = original;
+  }
 });
 
 test('gift checkout reports missing payment configuration without side effects', async () => {
@@ -228,4 +235,46 @@ test('the webhook only accepts POST', async () => {
   const { onRequestGet } = await import('../functions/api/stripe-webhook.ts');
   const response = await onRequestGet();
   assert.equal(response.status, 405);
+});
+
+test('an enabled purchase sends the selected value, recipient and valid-from date to Stripe', async () => {
+  const original = globalThis.fetch;
+  let body: URLSearchParams | null = null;
+  globalThis.fetch = (async (_url: string | URL, init?: RequestInit) => {
+    body = init?.body as URLSearchParams;
+    return new Response(JSON.stringify({ url: 'https://checkout.stripe.test/gift' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as typeof fetch;
+  try {
+    const response = await giftCheckout({
+      request: jsonRequest(
+        {
+          purchaserName: 'Synthetic Purchaser',
+          purchaserEmail: 'purchaser@example.com',
+          recipientName: 'Synthetic Recipient',
+          recipientEmail: 'recipient@example.com',
+          deliveryMethod: 'recipient_email',
+          validFromDate: '2027-01-15',
+          denominationUsd: 100,
+          termsAccepted: true,
+          termsVersion: '2026-10-28.terms.v2',
+        },
+        '10.10.0.20',
+      ),
+      env: { STRIPE_SECRET_KEY: 'sk_test_dummy', PUBLIC_SITE_URL: 'https://example.test' },
+    } as never);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, url: 'https://checkout.stripe.test/gift' });
+    assert.ok(body);
+    assert.equal(body?.get('line_items[0][price_data][unit_amount]'), '10000');
+    assert.equal(body?.get('metadata[gift_value_usd]'), '100');
+    assert.equal(body?.get('metadata[recipient_name]'), 'Synthetic Recipient');
+    assert.equal(body?.get('metadata[recipient_email]'), 'recipient@example.com');
+    assert.equal(body?.get('metadata[delivery_method]'), 'recipient_email');
+    assert.equal(body?.get('metadata[valid_from_date]'), '2027-01-15');
+  } finally {
+    globalThis.fetch = original;
+  }
 });

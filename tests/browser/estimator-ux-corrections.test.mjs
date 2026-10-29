@@ -122,6 +122,12 @@ async function stepTwo(page) {
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', '32502');
+  await page.click('[data-address-resolve]');
+  await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+  await page.locator('[data-address-confirm]').click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+  );
   await page.click('[data-next]');
   await page.waitForFunction(() => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true');
 }
@@ -143,20 +149,21 @@ async function reachFinal(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
-  await page.click('[data-next]'); // extras
-  await page.click('[data-next]'); // final
-  await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
+  await page.click('[data-next]'); // your details
   await page.fill('#est-name', 'UX correction test (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
+  await page.click('[data-next]'); // extras & payment
+  await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
   await page.check('#est-terms', { force: true });
 }
 
 test('Community Support is one small checkbox linked to the terms', async () => {
   const { context, page } = await open();
   try {
-    await reachCondition(page);
+    await reachFinal(page);
     const check = page.locator('.supportive-check');
+    await check.waitFor({ state: 'visible' });
     assert.equal(await check.isVisible(), true);
     assert.match((await check.innerText()).replace(/\s+/g, ' '), /I qualify for Sparkling Standard.?s 10% Community Support discount\./);
     assert.equal(await check.locator('a[href="/terms/#community-support"]').count(), 1);
@@ -218,7 +225,7 @@ test('Pay Now without photos offers Upload Now or Pay Now, Confirm Later', async
     await page.click('[data-pay-now]');
     const gate = page.locator('[data-photo-gate]');
     assert.equal(await gate.isVisible(), true);
-    assert.match((await gate.innerText()).replace(/\s+/g, ' '), /Photos are needed before your booking can be confirmed/i);
+    assert.match((await gate.innerText()).replace(/\s+/g, ' '), /Photos are required for an accurate estimate and confirmed booking/i);
     assert.equal(leadPayloads.length, 0, 'no request is sent before the customer chooses');
 
     await page.click('[data-photo-upload-now]');
@@ -257,6 +264,29 @@ test('the removed review and address-saving copy is absent', async () => {
     const after = (await page.textContent('body')) ?? '';
     assert.doesNotMatch(after, /Saving your address so we can prepare/i);
     assert.doesNotMatch(after, /USING THE DETAILS YOU CONFIRMED/i);
+  } finally {
+    await context.close();
+  }
+});
+test('final checkout shows calculated add-on prices and bundle savings', async () => {
+  const { context, page } = await open();
+  try {
+    await reachFinal(page);
+    const step = await page.evaluate(() =>
+      document.querySelector('[data-addon-price]')?.closest('[data-step]')?.getAttribute('data-step'),
+    );
+    assert.equal(step, '5', 'extras live in the final checkout step');
+    const oven = page.locator('[data-addon-price="inside_oven"]');
+    assert.match((await oven.textContent()) ?? '', /\$\d/, 'individual extra shows a dollar price');
+    assert.doesNotMatch((await oven.textContent()) ?? '', /Optional extra|Calculating/i);
+    const bundles = page.locator('.bundle-offer');
+    assert.ok((await bundles.count()) >= 6, 'expanded bundle menu is present');
+    await page.locator('label.option:has(input[name="addons"][value="inside_oven"])').click();
+    await page.waitForFunction(() =>
+      /\$\d/.test(document.querySelector('[data-addon-price="inside_oven"]')?.textContent ?? ''),
+    );
+    const bundleText = (await page.locator('.bundle-offers').innerText()).replace(/\s+/g, ' ');
+    assert.match(bundleText, /\$\d+.*save|save.*\$\d+/i, 'bundle price and savings are shown');
   } finally {
     await context.close();
   }

@@ -5,10 +5,9 @@ fixed amount covers a complete cleaning; the service, scope and price are confir
 recipient exactly as for any customer. The public configuration lives in
 `src/config/gift-certificates.ts`.
 
-**Current public state: sales are DISABLED.** The page offers a request form only — no payment is
-taken, no amount is charged, and no certificate is issued until final legal review and a live test
-purchase are approved. The purchase UI, approved amounts, immediate delivery, valid-from
-activation, ledger and owner register are implemented behind the activation gate.
+**Current public state: sales are ENABLED (owner directive 2026-10-29).** The public page sells
+the approved denominations and custom amounts through Stripe-hosted Checkout. The webhook issues
+and emails the certificate only after verified payment. A live purchase has not yet been run.
 
 **2026-10-28 policy update (`2026-10-28.terms.v2`):** the public terms state that a purchased certificate does not expire
 and carries no post-sale service, dormancy, maintenance or cash-out fee (Fla. Stat. § 501.95).
@@ -26,7 +25,7 @@ lookup, inventory, partial redemption, summary metrics and financial controls ar
 `/api/gift-admin`. **Gift administration is protected by Hayli's password session.** `/gift-admin/`
 has a normal login screen, HttpOnly session cookie, CSRF protection, rate limiting, audit records
 and a verified-email recovery flow. The legacy shared bearer token is no longer accepted by the
-register; the photo token has no financial authority. Sales remain disabled.
+register; the photo token has no financial authority.
 
 **2026-10-28 delivery/balance update:** after a verified paid webhook and one durable issuance, the
 webhook sends the branded certificate (HTML + plain text) to the purchaser immediately and, when
@@ -191,11 +190,24 @@ payment). Never store card numbers anywhere — Stripe holds only payment refere
   retry. No live refund or void was performed.
 - Backup and retention separation are documented in `docs/operations/R2-STORAGE-AND-BACKUP.md`.
 
-## 7. Known gaps before live gift sales
+## 7. Checkout gift redemption
 
-- No customer-facing gift-code application inside the cleaning estimator/checkout yet. The owner
-  ledger can record an owner-approved redemption against a job reference, but automatic gift credit
-  against a live Stripe difference is not implemented.
+`POST /api/estimate-checkout` accepts the optional `gift_code` field from the residential, STR and
+facility payment forms. The server validates the code, active status and Central-Time activation,
+then durably reserves the available balance for up to 120 minutes. Only the remaining amount is sent to
+Stripe, with a minimum card remainder of $0.50. A fully gift-covered order creates no Stripe
+session: the server commits the reservation, records the order, emails the customer receipt and
+notifies the owner. `checkout.session.completed` commits a reservation after the card remainder is
+paid; `checkout.session.expired` releases it. Idempotency includes the gift reservation amount, and
+gift codes are stripped from the ordinary lead relay. Automated tests cover partial redemption,
+gift-only completion, unknown codes and webhook commit/release; no live redemption has been
+performed.
+
+## 8. Known gaps before live gift sales
+
+- Automatic gift credit is implemented but has not been exercised with a real certificate or live
+  Stripe checkout. Post-payment cancellation/refund handling must restore or refund the gift credit
+  through the owner workflow; it is not automatic yet.
 - Stripe refund execution and unused-certificate voiding are implemented but have not been
   exercised against live Stripe. Chargeback/dispute reconciliation remains manual.
 - The owner register supports redemption, refund and void for unused certificates; it is not a

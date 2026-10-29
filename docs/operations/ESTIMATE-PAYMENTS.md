@@ -63,12 +63,22 @@ The success URL is:
 https://sparkling-standard.com/estimate/payment-success/?session_id={CHECKOUT_SESSION_ID}
 ```
 
-## Owner notification
+## Gift certificate redemption
+
+The final step accepts an optional gift-certificate code. The server validates it and reserves the
+available balance for up to 120 minutes; Stripe is charged only the remainder (minimum $0.50). A gift that
+covers the full total completes without a Stripe session: the reservation is committed, the order is
+recorded, the customer receipt is emailed and the owner is notified. A card remainder is committed
+by the paid webhook, while `checkout.session.expired` releases the reservation. The gift ledger uses
+`GIFT_LEDGER` when configured, otherwise `PAYMENT_LEDGER`.
+
+## Automatic booking confirmation\n\nA paid estimate that carries a live, unexpired booking hold and has no outstanding photos is\nrevalidated against the two-resource calendar and confirmed automatically. The webhook creates the\ncalendar event, marks the hold and pending request confirmed, and the payment-success page reports\nthe confirmed appointment. Missing/expired holds, outstanding photos, manual-review quotes or\ncalendar failures remain pending_owner_review; payment is never discarded. A repeated webhook\nreuses the existing calendar event and cannot double-book.\n\n## Owner notification
 
 The estimate request arrives through the normal lead relay with the customer's payment preference.
 A separate **PAID estimate** email is sent only from the verified webhook, with the Stripe amount and
 quote reference. Do not treat the customer's "Pay Now" selection as paid until that separate notice
-arrives.
+arrives. A fully gift-covered order sends its own **PAID BY GIFT** notice because no Stripe webhook
+event exists.
 
 ## What is not claimed
 

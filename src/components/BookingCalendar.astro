@@ -29,10 +29,7 @@ const { id = 'estimate-calendar' } = Astro.props;
   <div class="booking-calendar__intro">
     <p class="booking-calendar__eyebrow">Preferred cleaning time</p>
     <h3 class="booking-calendar__heading" id={`${id}-heading`}>When should we clean?</h3>
-    <p class="booking-calendar__copy">
-      Choose your preferred date and time. Appointments are confirmed after our team reviews
-      your request — this selection is a preference, not a guaranteed slot.
-    </p>
+    <p class="booking-calendar__copy">Choose your preferred date and start time.</p>
   </div>
 
   <div class="booking-calendar__layout">
@@ -106,13 +103,10 @@ const { id = 'estimate-calendar' } = Astro.props;
           </label>
           <span class="booking-calendar__meridiem" data-time-meridiem>AM</span>
         </div>
-        <p class="hint booking-calendar__picker-note" data-time-picker-note>
-          Choose a preferred start. We recheck live availability before your booking is confirmed.
-        </p>
       </div>
 
       <p class="booking-calendar__time-note small" data-calendar-time-note>
-        Times are shown in Central Time.
+        Times are Central Time.
       </p>
       <p class="booking-calendar__status small" data-calendar-status role="status" aria-live="polite"></p>
     </div>

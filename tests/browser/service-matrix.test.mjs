@@ -128,6 +128,11 @@ async function addressAndHome(page, { service = 'standard', beds } = {}) {
   await page.click('#est-address-suggestions li');
   await page.waitForFunction(() => document.querySelector('#est-zip')?.value === '32502');
   await page.fill('#est-address-city', 'Pensacola');
+  await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+  await page.locator('[data-address-confirm]').click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+  );
   await page.click('[data-next]');
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -156,14 +161,16 @@ async function finishAndSubmit(page, captured, { deepAck = false } = {}) {
     await page.waitForSelector('input[name="initialDeepCleanAcknowledged"]', { state: 'visible' });
     await page.check('input[name="initialDeepCleanAcknowledged"]');
   }
-  await page.click('[data-next]'); // extras
-  await page.click('[data-next]'); // final summary
-  await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
+  await page.click('[data-next]'); // your details
   await page.fill('#est-name', 'Service matrix test (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
+  await page.click('[data-next]'); // extras & payment
+  await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
   if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
   await page.click('[data-submit]');
+  await page.waitForTimeout(150);
+  if (await page.locator('[data-photo-gate]').isVisible()) await page.click('[data-photo-pay-later]');
   await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'success', undefined, { timeout: 15000 });
   await delay(150);
   return captured.payload?.fields ?? {};

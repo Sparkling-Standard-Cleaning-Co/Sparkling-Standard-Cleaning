@@ -115,11 +115,26 @@ async function open(width, height, { geocode = 'exact', travel = 'verified' } = 
   return { context, page };
 }
 
+async function confirmMapIfShown(page) {
+  const map = page.locator('[data-address-map]');
+  if (!(await map.isVisible())) {
+    const resolve = page.locator('[data-address-resolve]');
+    if (await resolve.isVisible().catch(() => false)) await resolve.click();
+    await map.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
+  }
+  if (await map.isVisible()) {
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
+  }
+}
 async function reachFinal(page) {
   await page.fill('#est-date', BOOKING_DATE);
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', '32502');
+  await confirmMapIfShown(page);
   await page.click('[data-next]');
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -135,8 +150,11 @@ async function reachFinal(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
-  await page.click('[data-next]'); // extras
-  await page.click('[data-next]'); // final
+  await page.click('[data-next]'); // your details
+  await page.fill('#est-name', 'Pay Now test (please ignore)');
+  await page.fill('#est-phone', '8500000000');
+  await page.fill('#est-email', 'owner@sparkling-standard.com');
+  await page.click('[data-next]'); // extras & payment
   await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
 }
 for (const [label, width, height] of [
@@ -148,6 +166,7 @@ for (const [label, width, height] of [
     try {
       await reachFinal(page);
       assert.equal(await page.locator('[data-pay-now]').isVisible(), true, 'Pay Now is visible for the verified exact address');
+      assert.equal(await page.locator('[data-gift-code]').isVisible(), true, 'gift code is available with online payment');
       assert.equal(await page.locator('[data-verify-address]').count(), 0, 'no separate address verification control');
       const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
       assert.match(note, /Your estimate is ready/i);
@@ -165,6 +184,7 @@ test('an approximate address is reservation-only and never becomes payable', asy
   try {
     await reachFinal(page);
     assert.equal(await page.locator('[data-pay-now]').isVisible(), false, 'approximate addresses cannot pay online');
+    assert.equal(await page.locator('[data-gift-code]').isVisible(), false, 'gift code is hidden when payment is unavailable');
     assert.equal(await page.locator('[data-verify-address]').count(), 0, 'no verification loop exists');
     const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
     assert.match(note, /couldn't verify this address|secure payment link|confirm/i);
@@ -182,6 +202,7 @@ test('an exact address with unavailable travel stays reservation-only', async ()
   try {
     await reachFinal(page);
     assert.equal(await page.locator('[data-pay-now]').isVisible(), false, 'unverified travel cannot pay online');
+    assert.equal(await page.locator('[data-gift-code]').isVisible(), false, 'gift code is hidden when payment is unavailable');
     assert.equal(await page.locator('[data-verify-address]').count(), 0, 'no verification control');
     const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
     assert.match(note, /Your cleaning request is ready|couldn't verify|confirm/i);

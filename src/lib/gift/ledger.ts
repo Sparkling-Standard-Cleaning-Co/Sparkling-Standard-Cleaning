@@ -181,8 +181,18 @@ export async function commitGiftReservation(
     if (!reservation) return { ok: false, error: 'not_reserved' };
     if (reservation.status === 'committed') return { ok: true, record, already: true };
     if (reservation.status === 'released') return { ok: false, error: 'released' };
+    const otherReservedCents = (record.reservations ?? [])
+      .filter(
+        (entry) =>
+          entry.id !== reservationId &&
+          entry.status === 'reserved' &&
+          Date.parse(entry.expiresAt) > now.getTime(),
+      )
+      .reduce((sum, entry) => sum + entry.amountCents, 0);
     const redeemedCents = record.redeemedCents + reservation.amountCents;
-    if (redeemedCents > record.valueCents) return { ok: false, error: 'insufficient_balance' };
+    if (redeemedCents + otherReservedCents > record.valueCents) {
+      return { ok: false, error: 'insufficient_balance' };
+    }
     const updated: GiftCertificateRecord = {
       ...record,
       redeemedCents,

@@ -40,13 +40,27 @@ import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.t
 import { legalTerms } from '../../src/config/legal.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
 import { calculateServiceTax, type ServiceTaxResult } from '../../src/lib/tax/engine.ts';
-import type { ReceiptLine } from '../../src/lib/payments/receipt.ts';
+import type { ReceiptData, ReceiptLine } from '../../src/lib/payments/receipt.ts';
+import {
+  commitGiftReservation,
+  giftBucket,
+  lookupGiftCertificate,
+  releaseGiftReservation,
+  remainingCents,
+  reserveGiftCredit,
+} from '../../src/lib/gift/ledger.ts';
+import { isGiftActive } from '../../src/lib/gift/activation.ts';
+import { sendCustomerReceipt } from '../../src/lib/forms/customer-receipt.ts';
 
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
+  WEB3FORMS_ENDPOINT?: string;
   PUBLIC_SITE_URL?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
+  GIFT_LEDGER?: LedgerBucket;
 }
 
 const RETURN_PATHS = new Set([
@@ -91,6 +105,23 @@ interface CheckoutRecord {
     taxJurisdiction: string | null;
     totalCents: number;
   };
+  /** Gift credit applied to this checkout, if any. */
+  gift?: {
+    code: string;
+    reservationId: string;
+    appliedCents: number;
+    totalCents: number;
+    paidByGift: boolean;
+  };
+  /** Amount the card is charged after gift credit (0 for gift-covered orders). */
+  chargeAmountCents?: number;
+  /** Idempotency fingerprint used to return a gift-only order result. */
+  attempt?: string;
+  /** Whether the customer still owes required photos before confirmation. */
+  photosOutstanding?: boolean;
+  /** Result of automatic confirmation for a paid, complete booking. */
+  bookingStatus?: 'confirmed' | 'pending_owner_review';
+  bookingEventId?: string;
 }
 
 interface StripeSession {
@@ -176,6 +207,32 @@ function sanitizeFields(value: unknown): Record<string, string> {
     count += 1;
   }
   return clean;
+}
+
+async function notifyOwnerGiftOrder(
+  env: Env,
+  subject: string,
+  fields: Record<string, string>,
+): Promise<boolean> {
+  if (!env.WEB3FORMS_ACCESS_KEY) return false;
+  try {
+    const response = await fetch(env.WEB3FORMS_ENDPOINT ?? 'https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        access_key: env.WEB3FORMS_ACCESS_KEY,
+        subject,
+        from_name: 'Sparkling Standard Website',
+        botcheck: '',
+        ...fields,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const data = (await response.json().catch(() => ({}))) as { success?: boolean };
+    return response.ok && data.success === true;
+  } catch {
+    return false;
+  }
 }
 
 function siteOrigin(env: Env): string {
@@ -599,21 +656,41 @@ function successUrl(env: Env, sessionId: string): string {
   return `${siteOrigin(env)}/estimate/payment-success/?session_id=${encodeURIComponent(sessionId)}`;
 }
 
+async function releaseCheckoutGift(env: Env, record: CheckoutRecord): Promise<void> {
+  if (!record.gift || record.gift.paidByGift) return;
+  const ledger = giftBucket(env);
+  if (!ledger) return;
+  await releaseGiftReservation(ledger, record.gift.code, record.gift.reservationId).catch(
+    () => undefined,
+  );
+}
+
 async function existingCheckoutResponse(
   env: Env,
   bucket: LedgerBucket,
   key: string,
   record: CheckoutRecord,
 ): Promise<Response | null> {
+  if (record.gift?.paidByGift && record.status === 'completed' && record.attempt) {
+    return json({
+      ok: true,
+      giftOrder: true,
+      pricePaidByGift: record.amountCents / 100,
+      reference: record.reference,
+      url: `${siteOrigin(env)}/estimate/payment-success/?gift_order=${encodeURIComponent(record.attempt)}`,
+    });
+  }
   if (record.status === 'creating') {
     const age = Date.now() - Date.parse(record.createdAt);
     if (Number.isFinite(age) && age < CHECKOUT_CLAIM_STALE_MS) {
       return json({ ok: false, error: 'checkout_in_progress' }, 409);
     }
+    await releaseCheckoutGift(env, record);
     await deleteLedgerKey(bucket, key);
     return null;
   }
   if (record.status === 'failed') {
+    await releaseCheckoutGift(env, record);
     await deleteLedgerKey(bucket, key);
     return null;
   }
@@ -635,12 +712,123 @@ async function existingCheckoutResponse(
     return json({ ok: true, url: successUrl(env, record.sessionId) });
   }
   if (session.status === 'expired') {
+    await releaseCheckoutGift(env, record);
     await deleteLedgerKey(bucket, key);
     return null;
   }
   return json({ ok: false, error: 'stripe_unavailable' }, 503);
 }
 
+async function fulfillGiftOnlyOrder(
+  env: Env,
+  bucket: LedgerBucket,
+  key: string,
+  input: {
+    record: CheckoutRecord;
+    candidate: CandidateSuccess;
+    giftCode: string;
+    reservationId: string;
+    email: string;
+    attempt: string;
+  },
+): Promise<Response> {
+  const giftLedger = giftBucket(env);
+  if (!giftLedger) return json({ ok: false, error: 'gift_ledger_not_configured' }, 503);
+  const paidAt = new Date().toISOString();
+  const snapshot = input.record.receipt;
+  const completed: CheckoutRecord = {
+    ...input.record,
+    status: 'completed',
+    updatedAt: paidAt,
+    chargeAmountCents: 0,
+    attempt: input.attempt,
+    gift: {
+      code: input.giftCode,
+      reservationId: input.reservationId,
+      appliedCents: input.candidate.amountCents,
+      totalCents: input.candidate.amountCents,
+      paidByGift: true,
+    },
+  };
+  try {
+    await writeLedgerJson(bucket, key, completed);
+  } catch (error) {
+    console.error('[estimate-checkout] gift_order_write_failed', {
+      name: error instanceof Error ? error.name : 'unknown',
+    });
+    await releaseGiftReservation(giftLedger, input.giftCode, input.reservationId).catch(
+      () => undefined,
+    );
+    await deleteLedgerKey(bucket, key).catch(() => undefined);
+    return json({ ok: false, error: 'storage_unavailable' }, 503);
+  }
+  const committed = await commitGiftReservation(
+    giftLedger,
+    input.giftCode,
+    input.reservationId,
+    `Gift certificate applied to cleaning ${input.candidate.reference}`,
+  );
+  if (!committed.ok) {
+    console.error('[estimate-checkout] gift_commit_failed', { error: committed.error });
+    await releaseGiftReservation(giftLedger, input.giftCode, input.reservationId).catch(
+      () => undefined,
+    );
+    await deleteLedgerKey(bucket, key).catch(() => undefined);
+    return json({ ok: false, error: 'gift_commit_failed' }, 502);
+  }
+  const receipt: ReceiptData | null = snapshot
+    ? {
+        receiptNumber: `SSR-${input.candidate.reference}`,
+        reference: input.candidate.reference,
+        paidAt,
+        service: snapshot.service,
+        ...(snapshot.serviceLocation ? { serviceLocation: snapshot.serviceLocation } : {}),
+        ...(snapshot.customerName ? { customerName: snapshot.customerName } : {}),
+        customerEmail: input.email,
+        lines: snapshot.lines,
+        subtotalCents: snapshot.subtotalCents,
+        taxCents: snapshot.taxCents,
+        taxRatePercent: snapshot.taxRatePercent,
+        taxJurisdiction: snapshot.taxJurisdiction,
+        totalCents: snapshot.totalCents,
+        paidCents: snapshot.totalCents,
+        balanceCents: 0,
+        paymentStatus: 'paid',
+        notes:
+          'Paid in full with a Sparkling Standard gift certificate. This receipt is not a confirmed appointment; Sparkling Standard confirms the date and scope personally.',
+      }
+    : null;
+  let receiptStatus = 'not_available';
+  if (receipt) {
+    const outcome = await sendCustomerReceipt(receipt, env, `gift-order-${input.attempt}`);
+    receiptStatus = outcome.status;
+  }
+  const notified = await notifyOwnerGiftOrder(
+    env,
+    `PAID BY GIFT — ${input.candidate.reference}`,
+    {
+      'Payment status': 'PAID IN FULL BY GIFT CERTIFICATE',
+      'Gift code': input.giftCode,
+      'Amount covered by gift': `$${(input.candidate.amountCents / 100).toFixed(2)}`,
+      'Quote reference': input.candidate.reference,
+      Service: serviceLabel({ service_type: input.candidate.serviceType }),
+      Customer: snapshot?.customerName ?? 'name unavailable',
+      Email: input.email,
+      'Photos outstanding': input.record.photosOutstanding ? 'yes — confirm after photos' : 'no',
+      'Customer receipt': receiptStatus,
+      Note:
+        'The gift balance was committed. Confirm the requested date, scope and final details personally before scheduling.',
+    },
+  );
+  if (!notified) console.error('[estimate-checkout] gift_order_owner_notification_failed');
+  return json({
+    ok: true,
+    giftOrder: true,
+    pricePaidByGift: input.candidate.amountCents / 100,
+    reference: input.candidate.reference,
+    url: `${siteOrigin(env)}/estimate/payment-success/?gift_order=${encodeURIComponent(input.attempt)}`,
+  });
+}
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
   if (throttled(request)) return json({ ok: false, error: 'rate_limited' }, 429);
@@ -713,6 +901,37 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const emailProblem = customerEmailProblem(fields.email);
   if (emailProblem) return json({ ok: false, error: emailProblem }, 400);
   const email = normalizeCustomerEmail(fields.email);
+
+  const totalCents = candidate.amountCents;
+  const giftCode = (fields.gift_code ?? '').trim().toUpperCase();
+  let giftAppliedCents = 0;
+  let giftLedger: ReturnType<typeof giftBucket> = null;
+  if (giftCode) {
+    if (!/^SSGC-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(giftCode)) {
+      return json({ ok: false, error: 'gift_invalid_code' }, 400);
+    }
+    giftLedger = giftBucket(env);
+    if (!giftLedger) return json({ ok: false, error: 'gift_ledger_not_configured' }, 503);
+    const giftRecord = await lookupGiftCertificate(giftLedger, giftCode);
+    if (!giftRecord) return json({ ok: false, error: 'gift_not_found' }, 404);
+    if (giftRecord.status !== 'active' || !isGiftActive(giftRecord)) {
+      return json({ ok: false, error: 'gift_inactive' }, 409);
+    }
+    const available = remainingCents(giftRecord);
+    if (available <= 0) return json({ ok: false, error: 'gift_no_balance' }, 409);
+    const requestedRaw = Number(fields.gift_apply_amount);
+    const requested = Number.isFinite(requestedRaw) && requestedRaw > 0
+      ? Math.round(requestedRaw * 100)
+      : available;
+    giftAppliedCents = Math.min(totalCents, available, requested);
+    if (giftAppliedCents <= 0) return json({ ok: false, error: 'gift_no_balance' }, 409);
+  }
+  let chargeAmountCents = totalCents - giftAppliedCents;
+  if (chargeAmountCents > 0 && chargeAmountCents < 50) {
+    giftAppliedCents = totalCents - 50;
+    chargeAmountCents = 50;
+  }
+
   const attemptFingerprint = await paymentHash(
     [
       candidate.reference,
@@ -721,6 +940,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       candidate.serviceType,
       fields.quote_config_version ?? '',
       fields.preferred_date ?? '',
+      giftCode,
+      String(giftAppliedCents),
     ].join('|'),
   );
   const bucket = paymentLedger(env);
@@ -747,6 +968,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     cleaningAmountCents: candidate.cleaningAmountCents,
     ...(candidate.quotedTotalCents !== null ? { quotedTotalCents: candidate.quotedTotalCents } : {}),
     tax: candidate.tax,
+    photosOutstanding: fields.photos_outstanding === 'yes',
     receipt: { ...candidate.receipt, customerEmail: email },
   };
   const claimed = await createLedgerJson(bucket, key, claim).catch((error) => {
@@ -764,6 +986,57 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'checkout_in_progress' }, 409);
   }
 
+  let gift:
+    | { code: string; reservationId: string; appliedCents: number; totalCents: number; paidByGift: boolean }
+    | undefined;
+  if (giftCode && giftAppliedCents > 0 && giftLedger) {
+    const reserved = await reserveGiftCredit(
+      giftLedger,
+      giftCode,
+      giftAppliedCents,
+      candidate.reference,
+      { ttlMinutes: 120 },
+    );
+    if (!reserved.ok) {
+      await deleteLedgerKey(bucket, key).catch(() => undefined);
+      return json({ ok: false, error: `gift_${reserved.error}` }, 409);
+    }
+    gift = {
+      code: giftCode,
+      reservationId: reserved.reservation.id,
+      appliedCents: giftAppliedCents,
+      totalCents,
+      paidByGift: chargeAmountCents === 0,
+    };
+    try {
+      await writeLedgerJson(bucket, key, {
+        ...claim,
+        chargeAmountCents,
+        attempt: attemptFingerprint,
+        gift,
+      });
+    } catch (error) {
+      console.error('[estimate-checkout] gift_record_write_failed', {
+        name: error instanceof Error ? error.name : 'unknown',
+      });
+      await releaseGiftReservation(giftLedger, giftCode, reserved.reservation.id).catch(
+        () => undefined,
+      );
+      await deleteLedgerKey(bucket, key).catch(() => undefined);
+      return json({ ok: false, error: 'storage_unavailable' }, 503);
+    }
+    if (chargeAmountCents === 0) {
+      return fulfillGiftOnlyOrder(env, bucket, key, {
+        record: { ...claim, chargeAmountCents, attempt: attemptFingerprint, gift },
+        candidate,
+        giftCode,
+        reservationId: reserved.reservation.id,
+        email,
+        attempt: attemptFingerprint,
+      });
+    }
+  }
+
   const site = siteOrigin(env);
   const body = new URLSearchParams();
   body.set('mode', 'payment');
@@ -775,7 +1048,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('payment_method_types[0]', 'card');
   body.set('line_items[0][quantity]', '1');
   body.set('line_items[0][price_data][currency]', 'usd');
-  body.set('line_items[0][price_data][unit_amount]', String(candidate.amountCents));
+  body.set('line_items[0][price_data][unit_amount]', String(chargeAmountCents));
   body.set(
     'line_items[0][price_data][product_data][name]',
     `${estimatePaymentConfig.productLabel} — ${serviceLabel(fields)}`,
@@ -785,15 +1058,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('metadata[quote_reference]', candidate.reference);
   body.set('metadata[service_type]', candidate.serviceType);
   body.set('metadata[checkout_attempt]', attemptFingerprint);
+  body.set('metadata[total_amount_cents]', String(totalCents));
+  body.set('metadata[gift_applied_cents]', String(giftAppliedCents));
   body.set('metadata[cleaning_amount_cents]', String(candidate.cleaningAmountCents));
   body.set('metadata[tax_amount_cents]', String(cents(candidate.tax.taxAmount ?? 0)));
   body.set('metadata[tax_treatment]', candidate.tax.treatment);
   body.set('metadata[tax_rate_percent]', String(candidate.tax.ratePercent ?? ''));
   body.set('metadata[tax_jurisdiction]', candidate.tax.jurisdictionKey ?? '');
+  if (fields.booking_hold_id) body.set('metadata[booking_hold_id]', fields.booking_hold_id);
   body.set(
     'metadata[photos_outstanding]',
     fields.photos_outstanding === 'yes' ? 'yes' : 'no',
   );
+  if (gift) body.set('expires_at', String(Math.floor(Date.now() / 1000) + 31 * 60));
   body.set('customer_email', email);
 
   try {
@@ -818,12 +1095,20 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         code: data.error?.code ?? 'unknown',
         type: data.error?.type ?? 'unknown',
       });
+      if (gift && giftLedger) {
+        await releaseGiftReservation(giftLedger, gift.code, gift.reservationId).catch(
+          () => undefined,
+        );
+      }
       await deleteLedgerKey(bucket, key).catch(() => undefined);
       return json({ ok: false, error: 'stripe_unavailable' }, 502);
     }
     const record: CheckoutRecord = {
       ...claim,
       status: 'open',
+      chargeAmountCents,
+      attempt: attemptFingerprint,
+      ...(gift ? { gift } : {}),
       sessionId: data.id,
       sessionUrl: data.url,
       updatedAt: new Date().toISOString(),
@@ -835,6 +1120,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     });
     return json({ ok: true, url: data.url });
   } catch (error) {
+    if (gift && giftLedger) {
+      await releaseGiftReservation(giftLedger, gift.code, gift.reservationId).catch(
+        () => undefined,
+      );
+    }
     await deleteLedgerKey(bucket, key).catch(() => undefined);
     console.error('[estimate-checkout] stripe_transport_failed', {
       name: error instanceof Error ? error.name : 'unknown',
@@ -847,6 +1137,31 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
   const { request, env } = context;
   const url = new URL(request.url);
   const sessionId = url.searchParams.get('session_id')?.trim() ?? '';
+  const giftOrder = url.searchParams.get('gift_order')?.trim() ?? '';
+
+  if (giftOrder) {
+    if (!/^[a-f0-9]{64}$/i.test(giftOrder)) return json({ ok: false, error: 'invalid_request' }, 400);
+    const bucket = paymentLedger(env);
+    if (!bucket) return json({ ok: false, error: 'payment_not_ready' }, 503);
+    const stored = await readLedgerJson<CheckoutRecord>(
+      bucket,
+      ledgerKey('checkouts', giftOrder.toLowerCase()),
+    ).catch(() => null);
+    const record = stored?.value;
+    if (!record || record.status !== 'completed' || record.gift?.paidByGift !== true) {
+      return json({ ok: false, error: 'gift_order_not_found' }, 404);
+    }
+    return json({
+      ok: true,
+      paid: true,
+      giftOrder: true,
+      amount: 0,
+      giftApplied: (record.gift?.appliedCents ?? 0) / 100,
+      photosOutstanding: record.photosOutstanding === true,
+      reference: record.reference,
+      serviceType: record.serviceType,
+    });
+  }
 
   if (!sessionId) {
     const ready = await paymentReadiness(env);
@@ -865,9 +1180,18 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
   if (session.metadata?.checkout_kind !== 'estimate_payment') {
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
+  const bookingBucket = paymentLedger(env);
+  const bookingRecord =
+    bookingBucket && session.metadata?.checkout_attempt
+      ? await readLedgerJson<CheckoutRecord>(
+          bookingBucket,
+          ledgerKey('checkouts', session.metadata.checkout_attempt),
+        ).catch(() => null)
+      : null;
   return json({
     ok: true,
     paid: session.payment_status === 'paid',
+    bookingStatus: bookingRecord?.value.bookingStatus ?? null,
     status: session.status ?? 'unknown',
     paymentStatus: session.payment_status ?? 'unknown',
     amount: typeof session.amount_total === 'number' ? session.amount_total / 100 : null,

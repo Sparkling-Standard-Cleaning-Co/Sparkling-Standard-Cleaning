@@ -16,7 +16,7 @@
 
 import { verifyStripeSignature } from '../../src/lib/gift/stripe-signature.ts';
 import { buildGiftFulfillment, giftCertificateCodeFor } from '../../src/lib/gift/fulfillment.ts';
-import { giftBucket, issueGiftCertificate, remainingCents } from '../../src/lib/gift/ledger.ts';
+import { commitGiftReservation, giftBucket, issueGiftCertificate, releaseGiftReservation, remainingCents } from '../../src/lib/gift/ledger.ts';
 import { buildGiftCertificateEmail } from '../../src/lib/gift/delivery.ts';
 import { activationInstant, centralToday, isValidCalendarDate } from '../../src/lib/gift/activation.ts';
 import {
@@ -34,9 +34,11 @@ import {
   type PaymentStorageEnv,
 } from '../../src/lib/payments/ledger.ts';
 import { sendCustomerReceipt, describeReceiptOutcome } from '../../src/lib/forms/customer-receipt.ts';
+import { autoConfirmPaidBooking } from '../../src/lib/booking/auto-confirm.ts';
+import type { BookingEnv } from '../../src/lib/booking/service.ts';
 import type { ReceiptData, ReceiptLine } from '../../src/lib/payments/receipt.ts';
 
-interface Env extends PaymentStorageEnv {
+interface Env extends PaymentStorageEnv, BookingEnv {
   STRIPE_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
@@ -86,6 +88,17 @@ interface CheckoutLedgerRecord {
   sessionId?: string;
   sessionUrl?: string;
   receipt?: CheckoutReceiptSnapshot;
+  gift?: {
+    code: string;
+    reservationId: string;
+    appliedCents: number;
+    totalCents: number;
+    paidByGift: boolean;
+  };
+  chargeAmountCents?: number;
+  photosOutstanding?: boolean;
+  bookingStatus?: 'confirmed' | 'pending_owner_review';
+  bookingEventId?: string;
 }
 
 async function readCheckoutRecord(
@@ -134,6 +147,7 @@ async function updateCheckoutRecord(
   env: Env,
   attempt: string,
   session: NonNullable<StripeEvent['data']>['object'],
+  booking?: { status: CheckoutLedgerRecord['bookingStatus']; eventId?: string },
 ): Promise<void> {
   if (!/^[a-f0-9]{64}$/i.test(attempt)) return;
   const bucket = paymentLedger(env);
@@ -151,9 +165,18 @@ async function updateCheckoutRecord(
       updatedAt: now,
       reference: existing?.value.reference ?? session?.metadata?.quote_reference ?? '',
       amountCents:
-        amountCentsFrom(session?.amount_total) ?? existing?.value.amountCents ?? 0,
+        Number(session?.metadata?.total_amount_cents) ||
+        existing?.value.amountCents ||
+        amountCentsFrom(session?.amount_total) ||
+        0,
+      chargeAmountCents:
+        existing?.value.chargeAmountCents ??
+        amountCentsFrom(session?.amount_total) ??
+        0,
       serviceType:
         existing?.value.serviceType ?? session?.metadata?.service_type ?? 'cleaning',
+      ...(booking?.status ? { bookingStatus: booking.status } : {}),
+      ...(booking?.eventId ? { bookingEventId: booking.eventId } : {}),
       ...(session?.id ? { sessionId: session.id } : {}),
     };
     await writeLedgerJson(bucket, key, record);
@@ -238,8 +261,12 @@ async function deliverEstimateReceipt(
   const customerName =
     (session?.customer_details?.name ?? '').trim() || snapshot.customerName;
   const totalCents = snapshot.totalCents;
-  const paidCents = amountCents ?? record?.amountCents ?? totalCents;
+  const giftAppliedCents = record?.gift?.appliedCents ?? 0;
+  const paidCents =
+    (amountCents ?? record?.chargeAmountCents ?? record?.amountCents ?? totalCents) +
+    giftAppliedCents;
   const photosOutstanding = session?.metadata?.photos_outstanding === 'yes';
+  const bookingConfirmed = session?.metadata?.booking_status === 'confirmed';
   const data: ReceiptData = {
     receiptNumber: `SSR-${reference || record?.reference || eventId.slice(-8)}`,
     reference: reference || record?.reference || '',
@@ -258,12 +285,23 @@ async function deliverEstimateReceipt(
     balanceCents: Math.max(0, totalCents - paidCents),
     paymentStatus: paidCents >= totalCents ? 'paid' : 'partially_paid',
     ...(session?.id ? { stripeSessionId: session.id } : {}),
-    ...(photosOutstanding
+    ...(bookingConfirmed
       ? {
           notes:
-            'Payment received. Required photos are still outstanding, so booking confirmation is pending photo review and owner approval. This receipt is not a confirmed appointment.',
+            'Payment received and the requested appointment is confirmed. Sparkling Standard will send the final arrival details before the cleaning. This receipt is your paid confirmation.',
         }
-      : {}),
+      : giftAppliedCents > 0
+      ? {
+          notes: photosOutstanding
+            ? 'Payment received with gift-certificate credit. Required photos are still outstanding, so booking confirmation is pending photo review and owner approval. This receipt is not a confirmed appointment.'
+            : 'Payment received with gift-certificate credit. Sparkling Standard confirms the requested date, scope and final details personally before scheduling. This receipt is not a confirmed appointment.',
+        }
+      : photosOutstanding
+        ? {
+            notes:
+              'Payment received. Required photos are still outstanding, so booking confirmation is pending photo review and owner approval. This receipt is not a confirmed appointment.',
+          }
+        : {}),
   };
   const outcome = await sendCustomerReceipt(data, env, `receipt-${eventId}`);
   return { status: describeReceiptOutcome(outcome), sent: outcome.status === 'sent' };
@@ -283,6 +321,30 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     event = JSON.parse(payload) as StripeEvent;
   } catch {
     return json({ ok: false, error: 'invalid_request' }, 400);
+  }
+
+  if (event.type === 'checkout.session.expired') {
+    const expired = event.data?.object;
+    const attempt = expired?.metadata?.checkout_attempt ?? '';
+    const expiredKind = expired?.metadata?.checkout_kind;
+    if (expiredKind === 'estimate_payment' && /^[a-f0-9]{64}$/i.test(attempt)) {
+      const record = await readCheckoutRecord(env, attempt);
+      const bucket = paymentLedger(env);
+      const ledger = giftBucket(env);
+      if (record?.gift && !record.gift.paidByGift && ledger) {
+        await releaseGiftReservation(ledger, record.gift.code, record.gift.reservationId).catch(
+          () => undefined,
+        );
+      }
+      if (record && bucket && record.status !== 'completed' && record.status !== 'failed') {
+        await writeLedgerJson(bucket, ledgerKey('checkouts', attempt.toLowerCase()), {
+          ...record,
+          status: 'failed',
+          updatedAt: new Date().toISOString(),
+        }).catch(() => undefined);
+      }
+    }
+    return json({ ok: true, received: true, expired: true });
   }
 
   // Only a completed, actually-paid Checkout Session authorizes anything.
@@ -373,14 +435,72 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
 
   if (kind === 'estimate') {
+    const checkout = metadata.checkout_attempt
+      ? await readCheckoutRecord(env, metadata.checkout_attempt)
+      : null;
     if (session.id && metadata.checkout_attempt) {
-      await updateCheckoutRecord(env, metadata.checkout_attempt, session);
+      const giftAppliedCents = Number(metadata.gift_applied_cents) || 0;
+      if (giftAppliedCents > 0) {
+        if (!checkout?.gift) {
+          if (bucket && record) {
+            await failPaymentEvent(bucket, eventId, record, 'gift_reservation_missing');
+          }
+          return json({ ok: false, error: 'gift_reservation_missing' }, 500);
+        }
+        if (!checkout.gift.paidByGift) {
+          const ledger = giftBucket(env);
+          if (!ledger) {
+            if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'gift_ledger_not_configured');
+            return json({ ok: false, error: 'gift_ledger_not_configured' }, 503);
+          }
+          const committed = await commitGiftReservation(
+            ledger,
+            checkout.gift.code,
+            checkout.gift.reservationId,
+            `Gift credit used for cleaning ${reference || checkout.reference}`,
+          );
+          if (!committed.ok) {
+            console.error('[stripe-webhook] gift_commit_failed', { error: committed.error });
+            if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'gift_commit_failed');
+            return json({ ok: false, error: 'gift_commit_failed' }, 500);
+          }
+        }
+      }
+      let booking:
+        | { status: CheckoutLedgerRecord['bookingStatus']; eventId?: string; reason?: string }
+        | undefined;
+      const holdId = metadata.booking_hold_id ?? '';
+      if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
+        if (checkout?.photosOutstanding === true || metadata.photos_outstanding === 'yes') {
+          booking = { status: 'pending_owner_review', reason: 'photos_outstanding' };
+        } else {
+          const confirmed = await autoConfirmPaidBooking(env, holdId);
+          booking = confirmed.ok
+            ? { status: 'confirmed', eventId: confirmed.eventId }
+            : { status: 'pending_owner_review', reason: confirmed.reason };
+        }
+      }
+      await updateCheckoutRecord(env, metadata.checkout_attempt, session, booking);
+      if (booking?.status === 'confirmed') {
+        metadata.booking_status = 'confirmed';
+        metadata.booking_event_id = booking.eventId ?? '';
+      } else if (booking) {
+        metadata.booking_status = 'pending_owner_review';
+        metadata.booking_status_reason = booking.reason ?? 'manual_review';
+      }
     }
 
     const amount = amountCents === null ? 'unknown' : (amountCents / 100).toFixed(2);
     const fields: Record<string, string> = {
       'Payment status': 'PAID - verify in Stripe before scheduling',
-      'Amount paid': `$${amount} USD`,
+      'Amount paid': `$${amount} USD${checkout?.gift ? ' (card remainder after gift credit)' : ''}`,
+      ...(checkout?.gift
+        ? {
+            'Gift credit applied': `$${((checkout.gift.appliedCents ?? 0) / 100).toFixed(2)}`,
+            'Gift code': checkout.gift.code,
+            'Total including gift': `$${((checkout.amountCents ?? 0) / 100).toFixed(2)}`,
+          }
+        : {}),
       'Quote reference': reference || 'reference unavailable',
       Service: metadata.service_type ?? 'cleaning',
       Customer: customerName || 'name not supplied by Stripe',
@@ -388,9 +508,22 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       'Stripe event': eventId,
       'Stripe session': session.id ?? '',
       'Checkout attempt': metadata.checkout_attempt ?? '',
+      ...(metadata.booking_status
+        ? {
+            'Booking status':
+              metadata.booking_status === 'confirmed'
+                ? 'CONFIRMED automatically (verified slot, complete details, paid)'
+                : `Pending owner review (${metadata.booking_status_reason ?? 'manual review'})`,
+            ...(metadata.booking_event_id
+              ? { 'Calendar event id': metadata.booking_event_id }
+              : {}),
+          }
+        : {}),
       'Paid at': paidAt,
       Note:
-        'The cleaning request was delivered separately by the website lead relay. Confirm the requested date, scope and final details personally before scheduling.',
+        metadata.booking_status === 'confirmed'
+          ? 'The paid booking was confirmed automatically against the live calendar and resource schedule. Review the scope and arrival details before the visit.'
+          : 'The cleaning request was delivered separately by the website lead relay. Confirm the requested date, scope and final details personally before scheduling.',
     };
     const receipt = await deliverEstimateReceipt(
       env,

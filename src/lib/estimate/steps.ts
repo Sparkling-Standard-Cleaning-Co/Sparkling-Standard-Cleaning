@@ -37,13 +37,13 @@ export const ESTIMATE_STEPS: readonly EstimateStepDefinition[] = [
   },
   {
     id: 'extras',
-    title: 'Optional Extras',
-    blurb: 'Focused extras with the price shown beside each one before you choose.',
+    title: 'Your Details',
+    blurb: 'Your contact details so we can confirm the estimate and appointment.',
   },
   {
     id: 'estimate',
-    title: 'Your Estimate',
-    blurb: 'Your proposed price, the full scope and your reservation request.',
+    title: 'Extras & Payment',
+    blurb: 'Bundle and save, review your proposed total and choose how to continue.',
   },
 ] as const;
 

@@ -173,11 +173,14 @@ test('the residential wizard removes the audited lead and offers approved bundle
     assert.match(sidebar, /Your home\. Your estimate\. Your schedule\. Your choice\./);
 
     const bundles = page.locator('.bundle-offer');
-    assert.equal(await bundles.count(), 3);
+    assert.ok((await bundles.count()) >= 6, 'the expanded bundle menu renders');
     const text = normalize((await page.locator('.bundle-offers').textContent()) ?? '');
     assert.match(text, /Kitchen Refresh Bundle/);
     assert.match(text, /Deep Detail Bundle/);
     assert.match(text, /Recurring Care Bundle/);
+    assert.match(text, /Move-In Ready Bundle/);
+    assert.match(text, /Pet & Family Refresh Bundle/);
+    assert.match(text, /Whole-Home Detail Bundle/);
     assert.match(text, /Save 10% when selected together/);
   } finally {
     await context.close();
@@ -214,7 +217,12 @@ test('a confirmed facility location can continue without a ZIP code', async () =
     await page.locator('#est-address').fill('123 Main St');
     await page.locator('#est-address-city').fill('Pensacola');
     await page.locator('#est-address-state').selectOption('FL');
-    // The five-step journey resolves and accepts the typed address automatically.
+    await page.locator('[data-address-resolve]').click();
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
     await page.locator('[data-facility-next]').click();
     await page.locator('[data-facility-step-panel="2"]').waitFor({ state: 'visible' });
     assert.match(normalize((await page.locator('[data-facility-step-label]').innerText()) ?? ''), /Step 2 of 4/);
@@ -306,7 +314,12 @@ test('Pay Now appears only for an exact Tier A facility quote when Stripe is con
     await page.locator('#est-address-city').fill('Pensacola');
     await page.locator('#est-address-state').selectOption('FL');
     await page.locator('#est-zip').fill('32502');
-    // The five-step journey resolves and accepts the typed address automatically.
+    await page.locator('[data-address-resolve]').click();
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
     await page.locator('[data-facility-next]').click();
     await page.locator('[data-facility-step-panel="2"]').waitFor({ state: 'visible' });
     await page.selectOption('#fac-type', 'office');
@@ -397,7 +410,12 @@ test('an approximate facility address becomes a manual-review request instead of
     await page.locator('#est-address-city').fill('Molino');
     await page.locator('#est-address-state').selectOption('FL');
     await page.locator('#est-zip').fill('32577');
-    // The five-step journey resolves and accepts the typed address automatically.
+    await page.locator('[data-address-resolve]').click();
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
     await page.locator('[data-facility-next]').click();
     await page.locator('[data-facility-step-panel="2"]').waitFor({ state: 'visible' });
     await page.selectOption('#fac-type', 'office');

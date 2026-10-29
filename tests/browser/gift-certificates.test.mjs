@@ -45,83 +45,91 @@ async function open(width = 1280, height = 900) {
   return { context, page };
 }
 
-test('the gift page explains the offering and takes a request without charging', async () => {
+test('the gift page sells a certificate through secure checkout', async () => {
   const { context, page } = await open();
   try {
-    const requests = { lead: [], checkout: [] };
-    await page.route('**/api/lead', async (route) => {
-      requests.lead.push(route.request().postDataJSON());
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
-    });
+    let checkoutBody = null;
     await page.route('**/api/gift-checkout', async (route) => {
-      requests.checkout.push(route.request().postData());
-      await route.fulfill({ status: 403, contentType: 'application/json', body: '{"ok":false}' });
+      checkoutBody = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          url: BASE + '/gift-certificates/success/?session_id=cs_test_gift',
+        }),
+      });
+    });
+    await page.route('**/api/lead', async (route) => {
+      await route.fulfill({ status: 500, contentType: 'application/json', body: '{"ok":false}' });
     });
 
     await page.goto(BASE + '/gift-certificates/', { waitUntil: 'load' });
     assert.match((await page.locator('h1').textContent()) ?? '', /beautifully kept home/i);
     assert.match((await page.textContent('body')) ?? '', /value toward Sparkling Standard cleaning services/i);
     assert.match((await page.textContent('body')) ?? '', /SSGC-SAMP-LE42/, 'sample certificate code shown');
-    assert.equal(await page.locator('[data-gift-purchase]').count(), 0, 'purchase mode is off until approved');
-    assert.match((await page.textContent('body')) ?? '', /No payment is taken/i);
+    assert.equal(await page.locator('[data-gift-purchase]').count(), 1, 'purchase mode is live');
+    assert.equal(await page.locator('#gift-denomination').inputValue(), '50');
 
-    await delay(2800); // clear the shared form's time-on-form guard
+    await page.selectOption('#gift-denomination', '100');
     await page.fill('#gift-purchaser-name', 'Synthetic Purchaser');
     await page.fill('#gift-purchaser-email', 'purchaser@example.com');
     await page.fill('#gift-recipient-name', 'Synthetic Recipient');
     await page.fill('#gift-recipient-email', 'recipient@example.com');
-    await page.fill('#gift-value', '100');
+    await page.selectOption('#gift-delivery-method', 'recipient_email');
     await page.fill('#gift-message', 'Enjoy a beautifully kept home!');
     await page.check('#gift-terms');
     await page.click('button[type="submit"]');
-    await page.waitForSelector('[data-form-status][data-state="success"]', { timeout: 15000 });
+    await page.waitForURL(/gift-certificates\/success/);
 
-    assert.equal(requests.checkout.length, 0, 'no checkout attempt while sales are disabled');
-    assert.equal(requests.lead.length, 1, 'the request goes through the existing lead relay');
-    const fields = requests.lead[0].fields;
-    assert.equal(fields.name, 'Synthetic Purchaser');
-    assert.equal(fields.email, 'purchaser@example.com');
-    assert.equal(fields.recipient_name, 'Synthetic Recipient');
-    assert.equal(fields.recipient_email, 'recipient@example.com');
-    assert.equal(fields.gift_value, '100');
-    assert.equal(fields.gift_message, 'Enjoy a beautifully kept home!');
-    assert.equal(fields.extra_ref, undefined, 'the honeypot never travels');
-
-    const success = (await page.locator('[data-form-status]').textContent()) ?? '';
-    assert.match(success, /No payment has been taken/i);
+    assert.ok(checkoutBody, 'the checkout endpoint received the purchase');
+    assert.equal(checkoutBody.purchaserName, 'Synthetic Purchaser');
+    assert.equal(checkoutBody.purchaserEmail, 'purchaser@example.com');
+    assert.equal(checkoutBody.recipientName, 'Synthetic Recipient');
+    assert.equal(checkoutBody.recipientEmail, 'recipient@example.com');
+    assert.equal(checkoutBody.denominationUsd, 100);
+    assert.equal(checkoutBody.amountUsd, undefined);
+    assert.equal(checkoutBody.message, 'Enjoy a beautifully kept home!');
+    assert.equal(checkoutBody.termsAccepted, true);
   } finally {
     await context.close();
   }
 });
 
-test('a filled trap field blocks the gift request without sending', async () => {
+test('a custom gift amount and valid-from date are sent to checkout', async () => {
   const { context, page } = await open(390, 844);
   try {
-    const requests = [];
-    await page.route('**/api/lead', async (route) => {
-      requests.push(route.request().postData());
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+    let checkoutBody = null;
+    await page.route('**/api/gift-checkout', async (route) => {
+      checkoutBody = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          url: BASE + '/gift-certificates/success/?session_id=cs_test_custom',
+        }),
+      });
     });
     await page.goto(BASE + '/gift-certificates/', { waitUntil: 'load' });
-    await delay(2800);
+    await page.selectOption('#gift-denomination', 'custom');
+    assert.equal(await page.locator('#gift-custom-value').isVisible(), true);
+    await page.fill('#gift-custom-value', '75');
+    await page.fill('#gift-valid-from', '2027-01-15');
     await page.fill('#gift-purchaser-name', 'Synthetic Purchaser');
     await page.fill('#gift-purchaser-email', 'purchaser@example.com');
     await page.fill('#gift-recipient-name', 'Synthetic Recipient');
-    await page.fill('#gift-value', '100');
     await page.check('#gift-terms');
-    await page.evaluate(() => {
-      const trap = document.querySelector('input[name="extra_ref"]');
-      if (trap) trap.value = 'bot';
-    });
     await page.click('button[type="submit"]');
-    await page.waitForSelector('[data-form-status][data-state="error"]', { timeout: 15000 });
-    assert.equal(requests.length, 0, 'trapped requests are never sent');
-    assert.match((await page.locator('[data-form-status]').textContent()) ?? '', /could not be verified/i);
+    await page.waitForURL(/gift-certificates\/success/);
+    assert.ok(checkoutBody);
+    assert.equal(checkoutBody.denominationUsd, undefined);
+    assert.equal(checkoutBody.amountUsd, 75);
+    assert.equal(checkoutBody.validFromDate, '2027-01-15');
   } finally {
     await context.close();
   }
 });
-
 test('the redeem page echoes a valid code, verifies its balance and refuses nonsense', async () => {
   const { context, page } = await open(390, 844);
   try {

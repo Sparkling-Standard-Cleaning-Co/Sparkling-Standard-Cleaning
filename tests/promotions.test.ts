@@ -104,12 +104,15 @@ test('the shipped bundles apply only when every required extra is selected', () 
       }),
     );
     assert.equal(evaluation.discount?.id, bundle.id);
-    assert.equal(evaluation.discount?.amount, 10);
+    assert.equal(
+      evaluation.discount?.amount,
+      Math.min(100 * (bundle.value ?? 0), bundle.maxDiscountUsd ?? Infinity),
+    );
 
     const partial = evaluatePromotions(
       overrides({
         frequency,
-        eligibleAddonIds: bundle.requiredAddonIds.slice(0, -1),
+        eligibleAddonIds: [bundle.requiredAddonIds[0]!],
         addonSubtotal: 100,
         gross: 500,
         addonBundles: pricing.promotions.addonBundles,

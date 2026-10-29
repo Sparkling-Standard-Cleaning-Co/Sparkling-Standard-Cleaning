@@ -55,6 +55,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   const status = host.querySelector<HTMLElement>('[data-form-status]');
   const submitButton = host.querySelector<HTMLButtonElement>('button[type="submit"]');
   const payNowButton = host.querySelector<HTMLButtonElement>('[data-facility-pay-now]');
+  const giftField = host.querySelector<HTMLElement>('[data-facility-gift]');
+  const giftInput = host.querySelector<HTMLInputElement>('[data-facility-gift-code]');
   const verifyAddressButton = host.querySelector<HTMLButtonElement>('[data-facility-verify-address]');
   const paymentGuidance = host.querySelector<HTMLElement>('[data-facility-payment-guidance]');
   const payNowNote = host.querySelector<HTMLElement>('[data-facility-pay-note]');
@@ -170,6 +172,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         payNowButton.textContent = payNowLabel();
       }
     }
+    if (giftField) giftField.hidden = !payable;
     if (verifyAddressButton) verifyAddressButton.hidden = !canVerify;
     if (paymentGuidance) {
       paymentGuidance.hidden = !eligibleBase || payable;
@@ -497,7 +500,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   showStep(1, false);
   finder = initAddressFinder({
     form: host,
-    autoConfirm: true,
+    autoConfirm: false,
     onChange: (location) => {
       travel = null;
       travelKey = location ? `pin:${location.lat},${location.lng}` : '';
@@ -993,6 +996,31 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       );
       return;
     }
+    if (failure.error?.startsWith('gift_')) {
+      paymentRetryAvailable = true;
+      markRequestReceived();
+      setPayNowBusy(false);
+      syncFacilityPayment();
+      const giftMessages: Record<string, string> = {
+        gift_invalid_code: 'That gift certificate code does not look right. Use the format SSGC-XXXX-XXXX.',
+        gift_not_found: 'We could not find that gift certificate. Check the code and try again.',
+        gift_inactive: 'That gift certificate is not active yet. It can be used once its start date arrives.',
+        gift_not_active_yet: 'That gift certificate is not active yet. It can be used once its start date arrives.',
+        gift_no_balance: 'That gift certificate has no remaining balance.',
+        gift_insufficient_balance: 'That gift certificate does not have enough remaining balance.',
+        gift_conflict: 'That gift certificate is already being used by another checkout. Try again shortly.',
+        gift_ledger_not_configured: 'Gift certificate redemption is not available right now.',
+        gift_commit_failed: 'The gift certificate could not be applied. No charge has been made; please try again.',
+      };
+      setStatus(
+        'error',
+        (giftMessages[failure.error] ?? 'That gift certificate could not be applied.') +
+          ' No charge has been made.',
+      );
+      giftInput?.focus();
+      return;
+    }
+
     if (
       failure.error === 'quote_not_payable' ||
       failure.error === 'payment_not_ready' ||
@@ -1089,6 +1117,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         ? 'yes'
         : 'no',
       terms_version: legalTerms.termsVersion,
+      ...(giftInput?.value.trim()
+        ? { gift_code: giftInput.value.trim().toUpperCase() }
+        : {}),
       facility_type: field('facility_type') || (facilityEngine === 'church' ? 'church' : ''),
       cleanable_sqft: field('cleanable_sqft'),
       restroom_fixtures: field('restroom_fixtures'),

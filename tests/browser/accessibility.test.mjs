@@ -90,6 +90,13 @@ async function openEstimate(width = 1280, height = 900) {
   return { context, page };
 }
 
+async function confirmMap(page) {
+  await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+  await page.locator('[data-address-confirm]').click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+  );
+}
 test('every estimable form control has an accessible name', async () => {
   const { context, page } = await openEstimate();
   try {
@@ -140,11 +147,9 @@ test('the address field exposes combobox semantics and keyboard selection', asyn
     const active = await field.getAttribute('aria-activedescendant');
     assert.match(active ?? '', /^est-address-option-0$/, 'arrow keys move the active option');
     await page.keyboard.press('Enter');
-    await page.waitForFunction(
-      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
-    );
+    await confirmMap(page);
     assert.equal(await field.getAttribute('aria-expanded'), 'false', 'collapsed after selection');
-    assert.equal(await page.locator('[data-address-confirm]').count(), 0, 'no separate confirmation step');
+    assert.equal(await page.locator('[data-address-confirm]').count(), 1, 'map confirmation is available');
   } finally {
     await context.close();
   }
@@ -156,9 +161,7 @@ test('interactive controls have accessible names and no positive tabindex', asyn
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
-    await page.waitForFunction(
-      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
-    );
+    await confirmMap(page);
 
     const buttons = await page.evaluate(() =>
       [...document.querySelectorAll('button, a[href]')]
@@ -207,6 +210,8 @@ test('the five-step navigator exposes state and locks future steps accessibly', 
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32503');
+    await page.click('[data-address-resolve]');
+    await confirmMap(page);
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',

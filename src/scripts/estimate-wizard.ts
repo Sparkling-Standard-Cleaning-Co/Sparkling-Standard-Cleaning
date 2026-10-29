@@ -111,6 +111,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const photoSummary = form.querySelector<HTMLElement>('[data-photo-summary]');
   const verifyAddressButton = form.querySelector<HTMLButtonElement>('[data-verify-address]');
   const paymentNote = form.querySelector<HTMLElement>('[data-payment-note]');
+  const giftField = form.querySelector<HTMLElement>('[data-gift-field]');
   const paymentUnavailable = form.querySelector<HTMLElement>('[data-payment-unavailable]');
   const progressFill = form.querySelector<HTMLElement>('[data-progress-fill]');
   const progressBar = form.querySelector<HTMLElement>('[data-progress-bar]');
@@ -166,6 +167,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
   });
   let photosDeferred = false;
+  let pendingPhotoAction: 'reserve' | 'pay_now' = 'pay_now';
 
   function photoStorageAvailable(): boolean {
     const section = form.querySelector<HTMLElement>('[data-photo-section]');
@@ -184,11 +186,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
       return;
     }
     const count = photoController.photoCount();
-    photoSummary.hidden = false;
-    photoSummary.textContent =
-      count > 0
-        ? `${count} photo${count === 1 ? '' : 's'} attached.`
-        : 'Photos are required before your booking can be confirmed. You can upload them now or pay now and confirm later.';
+    photoSummary.hidden = count === 0;
+    photoSummary.textContent = count > 0 ? `${count} photo${count === 1 ? '' : 's'} attached.` : '';
     if (count > 0) hidePhotoGate();
   }
 
@@ -196,8 +195,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (photoGate) photoGate.hidden = true;
   }
 
-  function showPhotoGate(): void {
+  function showPhotoGate(action: 'reserve' | 'pay_now' = 'pay_now'): void {
     if (!photoGate) return;
+    pendingPhotoAction = action;
     photoGate.hidden = false;
     updatePhotoSummary();
     photoGate.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -771,6 +771,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     const eligible = paymentEnabled && !paymentBlocked && hasQuote && clientPaymentEligible();
     const canOfferVerification =
       hasQuote && paymentEnabled && !paymentBlocked && !addressConfirmed() && !addressReviewRequired;
+    if (giftField) giftField.hidden = !eligible;
     if (payNowButton) {
       payNowButton.hidden = !eligible;
       if (!eligible) {
@@ -1366,12 +1367,22 @@ function initEstimateWizard(form: HTMLFormElement): void {
     // was returned, so no ZIP entry is ever demanded for GPS.
     if (step === 1) {
       const submission = submissionAddress();
-      if (submission.method === 'gps' && !submission.location) {
-        const gpsButton = form.querySelector<HTMLElement>('[data-address-gps]');
-        const message = 'Please confirm your current location, or enter the address manually.';
-        if (gpsButton) {
-          setFieldError(gpsButton, message);
-          errors.push({ field: gpsButton, message });
+      if (!submission.location) {
+        const mapCard = form.querySelector<HTMLElement>('[data-address-map]');
+        const confirm = form.querySelector<HTMLElement>('[data-address-confirm]');
+        const message =
+          submission.method === 'gps'
+            ? 'Please confirm your current location on the map, or enter the address manually.'
+            : 'Please confirm the map location, or adjust the pin if it is not exact.';
+        if (mapCard && !mapCard.hidden && confirm) {
+          setFieldError(confirm, message);
+          errors.push({ field: confirm, message });
+        } else if (submission.method === 'gps') {
+          const gpsButton = form.querySelector<HTMLElement>('[data-address-gps]');
+          if (gpsButton) {
+            setFieldError(gpsButton, message);
+            errors.push({ field: gpsButton, message });
+          }
         }
       }
     }
@@ -1545,7 +1556,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   // ── Address finder wiring ─────────────────────────────────────────────────
   const addressFinder: AddressFinderHandle | null = initAddressFinder({
     form,
-    autoConfirm: true,
+    autoConfirm: false,
     onChange: (next) => {
       // Editing the address invalidates any previous route instantly, so a
       // stale ZIP/centroid route can never price a different destination.
@@ -1838,6 +1849,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     if (photosDeferred) fields.photos_deferred = 'yes';
     fields.photos_outstanding = photosOutstanding() ? 'yes' : 'no';
+    const giftCode =
+      form.querySelector<HTMLInputElement>('input[data-gift-code]')?.value.trim().toUpperCase() ?? '';
+    if (giftCode) fields.gift_code = giftCode;
     return { ...fields, ...attributionFields() };
   }
 
@@ -1927,6 +1941,32 @@ function initEstimateWizard(form: HTMLFormElement): void {
           `${prior}The secure total is now ${formatUsd(failure.amount)}. ` +
           `Click “Pay ${formatUsd(failure.amount)} Securely” to approve the recalculated total. No charge has been made.`;
       }
+      return;
+    }
+
+    if (failure.error?.startsWith('gift_')) {
+      paymentRetryAvailable = true;
+      markRequestReceived();
+      setPayNowBusy(false);
+      syncPaymentAvailability(true);
+      const giftMessages: Record<string, string> = {
+        gift_invalid_code: 'That gift certificate code does not look right. Use the format SSGC-XXXX-XXXX.',
+        gift_not_found: 'We could not find that gift certificate. Check the code and try again.',
+        gift_inactive: 'That gift certificate is not active yet. It can be used once its start date arrives.',
+        gift_not_active_yet: 'That gift certificate is not active yet. It can be used once its start date arrives.',
+        gift_no_balance: 'That gift certificate has no remaining balance.',
+        gift_insufficient_balance: 'That gift certificate does not have enough remaining balance.',
+        gift_conflict: 'That gift certificate is already being used by another checkout. Try again shortly.',
+        gift_ledger_not_configured: 'Gift certificate redemption is not available right now.',
+        gift_commit_failed: 'The gift certificate could not be applied. No charge has been made; please try again.',
+      };
+      if (status) {
+        status.dataset.state = 'error';
+        status.textContent =
+          (giftMessages[failure.error] ?? 'That gift certificate could not be applied.') +
+          ' No charge has been made.';
+      }
+      form.querySelector<HTMLInputElement>('input[data-gift-code]')?.focus();
       return;
     }
 
@@ -2076,6 +2116,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
       return;
     }
     if (!validateStep(currentStep)) return;
+    if (photosOutstanding() && !photosDeferred) {
+      showPhotoGate(paymentChoice);
+      return;
+    }
     if (photoController.isUploading()) {
       if (status) {
         status.dataset.state = 'info';
@@ -2288,7 +2332,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     photosDeferred = true;
     hidePhotoGate();
     updatePhotoSummary();
-    void handleSubmit(undefined, 'pay_now');
+    void handleSubmit(undefined, pendingPhotoAction);
   });
 
   form.addEventListener('input', (event) => {

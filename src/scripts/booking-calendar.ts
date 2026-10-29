@@ -271,12 +271,7 @@ export function initBookingCalendar(
     if (selectedLabel) {
       selectedLabel.textContent = `${shortDateLabel(selectedDate)} at ${label}`;
     }
-    setStatus(
-      slot
-        ? 'Preferred time selected. We will recheck it with your final details.'
-        : 'Preferred start saved. Our team confirms the exact available time.',
-      'success',
-    );
+    setStatus(slot ? 'Preferred time selected.' : 'Preferred start saved.', 'success');
     notify();
   }
 

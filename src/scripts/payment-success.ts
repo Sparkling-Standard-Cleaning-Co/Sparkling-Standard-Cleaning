@@ -18,14 +18,18 @@ function setReference(reference: string | undefined): void {
 async function load(): Promise<void> {
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get('session_id')?.trim() ?? '';
-  if (!sessionId) {
+  const giftOrder = params.get('gift_order')?.trim() ?? '';
+  if (!sessionId && !giftOrder) {
     setState(
-      'We could not see a Stripe checkout reference. If you completed payment, please contact us so we can verify it before scheduling.',
+      'We could not see a payment reference. If you completed payment, please contact us so we can verify it before scheduling.',
     );
     return;
   }
+  const query = sessionId
+    ? `session_id=${encodeURIComponent(sessionId)}`
+    : `gift_order=${encodeURIComponent(giftOrder)}`;
   try {
-    const response = await fetch(`/api/estimate-checkout?session_id=${encodeURIComponent(sessionId)}`, {
+    const response = await fetch(`/api/estimate-checkout?${query}`, {
       headers: { Accept: 'application/json' },
     });
     const data = (await response.json().catch(() => ({}))) as {
@@ -34,6 +38,9 @@ async function load(): Promise<void> {
       status?: string;
       paymentStatus?: string;
       photosOutstanding?: boolean;
+      giftOrder?: boolean;
+      giftApplied?: number;
+      bookingStatus?: string;
       reference?: string;
       error?: string;
     };
@@ -47,6 +54,22 @@ async function load(): Promise<void> {
     }
     setReference(data.reference);
     if (data.paid) {
+      if (data.bookingStatus === 'confirmed') {
+        setState(
+          'Your payment was received and your appointment is confirmed. Sparkling Standard will send the final details before the cleaning.',
+        );
+        return;
+      }
+      if (data.giftOrder) {
+        setState(
+          `Your gift certificate covered $${(data.giftApplied ?? 0).toFixed(2)} of this payment. ${
+            data.photosOutstanding
+              ? 'Booking confirmation is pending the required photos and owner review. Sparkling Standard will follow up for the photos and confirm the requested date, scope and final details personally.'
+              : 'Sparkling Standard will confirm the requested date, scope and final details with you personally before the cleaning is scheduled.'
+          }`,
+        );
+        return;
+      }
       setState(
         data.photosOutstanding
           ? 'Your payment was received. Booking confirmation is pending the required photos and owner review. Sparkling Standard will follow up for the photos and confirm the requested date, scope and final details personally.'

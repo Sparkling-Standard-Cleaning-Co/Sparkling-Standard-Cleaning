@@ -119,7 +119,7 @@ test('the STR page runs the turnover engine without a second service choice', as
     assert.equal(await page.locator('[data-service-fieldset]').isVisible(), false, 'no duplicate service picker');
     const headings = await page.locator('[data-step-title]').allTextContents();
     assert.equal(headings[0].trim(), 'When & Where');
-    assert.equal(headings[4].trim(), 'Your Turnover Estimate');
+    assert.equal(headings[4].trim(), 'Turnover Extras & Payment');
     // Turnover-specific facts are enabled; the residential supportive block is not.
     assert.equal(
       await page.locator('#est-rental-properties').evaluate((el) => el.closest('[data-str-only]').hidden),

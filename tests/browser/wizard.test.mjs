@@ -167,7 +167,10 @@ test('a new recurring residential request requires the Deep Cleaning acknowledgm
 });
 
 async function fillExtrasAndScheduling(page) {
-  await page.click('[data-next]'); // extras -> final summary
+  await page.fill('#est-name', 'Browser test (please ignore)');
+  await page.fill('#est-phone', '8500000000');
+  await page.fill('#est-email', 'owner@sparkling-standard.com');
+  await page.click('[data-next]'); // details -> extras & payment
 }
 
 // ── Navigation contract at every viewport ────────────────────────────────────
@@ -400,9 +403,6 @@ test('final submit disables while sending and reports honest failure', async () 
     await fillHome(page);
     await fillCondition(page);
     await fillExtrasAndScheduling(page);
-    await page.fill('#est-name', 'Browser test (please ignore)');
-    await page.fill('#est-phone', '8500000000');
-    await page.fill('#est-email', 'owner@sparkling-standard.com');
     if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
 
     await page.click('[data-submit]');
@@ -447,9 +447,6 @@ test('a filled trap field is rejected locally without losing the customer answer
     await fillHome(page);
     await fillCondition(page);
     await fillExtrasAndScheduling(page);
-    await page.fill('#est-name', 'Browser test (please ignore)');
-    await page.fill('#est-phone', '8500000000');
-    await page.fill('#est-email', 'owner@sparkling-standard.com');
     if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
 
     // Simulate a bot (or anything else) populating the hidden trap.
@@ -490,9 +487,6 @@ test('relay rejection causes produce distinct, recoverable copy and preserve ans
     await fillHome(page);
     await fillCondition(page);
     await fillExtrasAndScheduling(page);
-    await page.fill('#est-name', 'Browser test (please ignore)');
-    await page.fill('#est-phone', '8500000000');
-    await page.fill('#est-email', 'owner@sparkling-standard.com');
     if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
 
     await page.click('[data-submit]');

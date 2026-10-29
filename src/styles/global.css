@@ -2437,28 +2437,34 @@ div[id] {
 }
 
 .photo-gate {
-  margin: var(--space-4) 0;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
   padding: var(--space-4);
-  border: 1px solid var(--color-champagne-500);
-  border-left: 4px solid var(--color-champagne-500);
-  border-radius: var(--radius-md);
-  background: var(--color-cream-50);
+  background: rgba(48, 36, 41, 0.5);
 }
 
 .photo-gate[hidden] {
   display: none;
 }
 
-.photo-gate__title {
-  margin: 0 0 var(--space-1);
-  font-weight: var(--weight-bold);
-  color: var(--color-ink-900);
+.photo-gate__dialog {
+  width: min(100%, 30rem);
+  padding: var(--space-6);
+  border: 1px solid var(--color-champagne-500);
+  border-radius: var(--radius-lg);
+  background: var(--color-cream-50);
+  box-shadow: 0 24px 60px rgba(48, 36, 41, 0.24);
 }
 
-.photo-gate__copy {
-  margin: 0 0 var(--space-3);
-  color: var(--color-text-muted);
-  line-height: 1.6;
+.photo-gate__title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-900);
+  line-height: 1.4;
 }
 
 .photo-summary {
@@ -2936,13 +2942,20 @@ fieldset {
   white-space: normal;
 }
 
+.address-street-wrap {
+  position: relative;
+}
+
 .address-suggestions {
   list-style: none;
-  position: relative;
-  z-index: 2;
-  padding: var(--space-1);
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding: 0.25rem;
   margin: 0;
-  max-height: 15rem;
+  max-height: 13rem;
   overflow-y: auto;
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
@@ -2952,7 +2965,7 @@ fieldset {
 
 .address-suggestions li {
   margin: 0;
-  padding: var(--space-3);
+  padding: 0.55rem 0.65rem;
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   cursor: pointer;
@@ -3632,7 +3645,7 @@ fieldset.input--invalid {
 }
 
 .booking-calendar__copy {
-  margin: 0 0 var(--space-5);
+  margin: 0 0 var(--space-4);
   max-width: 44rem;
   color: var(--color-text-muted);
   line-height: 1.65;
@@ -3643,10 +3656,22 @@ fieldset.input--invalid {
   gap: var(--space-4);
 }
 
-@media (min-width: 54rem) {
-  .booking-calendar__layout {
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.85fr);
-    align-items: start;
+.booking-calendar__layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 40rem) {
+  .booking-calendar__period {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .booking-calendar__time-fields {
+    flex-wrap: nowrap;
+  }
+
+  .booking-calendar__time-field .select {
+    min-width: 4.6rem;
+    width: 4.6rem;
   }
 }
 

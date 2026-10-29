@@ -12,8 +12,8 @@
 //    where relevant, Alabama) requirements must be reviewed before publication.
 
 export const giftCertificateConfig = {
-  /** Public sales gate. Keep false until the owner has approved everything. */
-  enabled: false,
+  /** Public sales gate. Enabled by owner directive 2026-10-29. */
+  enabled: true,
 
   /** Purchased certificates never expire and carry no post-sale fee. */
   noExpiration: true,

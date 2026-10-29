@@ -71,22 +71,22 @@ export const PHOTO_ENGINE_COPY: Record<
 > = {
   residential: {
     title: 'Photos of Your Space',
-    hint: 'Include your bathroom, kitchen and main living area. Photos of appliances or areas needing extra attention are especially useful.',
+    hint: 'Photos are required for an accurate estimate and confirmed booking.',
     privacy: 'Photos are private, used only to prepare your cleaning estimate, and never posted publicly. Please only share photos of the space — no ID documents or personal paperwork.',
   },
   str: {
     title: 'Help Us Understand Your Turnover',
-    hint: 'Bedrooms, bathrooms, kitchen, laundry and any linen storage are helpful. Include the areas that take the most turnover work.',
+    hint: 'Photos are required for an accurate estimate and confirmed booking.',
     privacy: 'Photos are private, used only to prepare your turnover estimate, and never posted publicly. Please only share photos of the property — no guest information or personal paperwork.',
   },
   commercial: {
     title: 'Help Us Understand Your Facility',
-    hint: 'Facility entry, floors, restrooms and any special workload areas are helpful. Photos reduce scope questions before we confirm your estimate.',
+    hint: 'Photos are required for an accurate estimate and confirmed booking.',
     privacy: 'Photos are private, used only to prepare your facility estimate, and never posted publicly. Please only share photos of the space — no employee information, credentials, screens or personal paperwork.',
   },
   church: {
     title: 'Help Us Understand Your Church',
-    hint: 'Sanctuary, fellowship hall, classrooms, nursery, kitchen and offices are helpful. Include any space with a special event or access consideration.',
+    hint: 'Photos are required for an accurate estimate and confirmed booking.',
     privacy: 'Photos are private, used only to prepare your church estimate, and never posted publicly. Please only share photos of the facilities — no member information or personal paperwork.',
   },
 };

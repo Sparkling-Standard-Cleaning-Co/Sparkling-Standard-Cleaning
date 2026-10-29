@@ -248,24 +248,43 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     clearSuggestions();
   }
 
+  function visibleSuggestions(): GeocodeSuggestion[] {
+    const houseNumber = houseNumberFromStreet(streetField.value);
+    const withNumbers = suggestions.filter((suggestion) =>
+      labelHasHouseNumber(suggestion.label, houseNumber),
+    );
+    const seen = new Set<string>();
+    const rows: GeocodeSuggestion[] = [];
+    for (const suggestion of suggestions) {
+      const key = suggestion.label.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      const numbered = labelHasHouseNumber(suggestion.label, houseNumber);
+      if (
+        !numbered &&
+        withNumbers.some(
+          (other) => streetLineFromLabel(other.label) === streetLineFromLabel(suggestion.label),
+        )
+      ) {
+        continue;
+      }
+      seen.add(key);
+      rows.push(suggestion);
+      if (rows.length >= 5) break;
+    }
+    return rows;
+  }
+
   function renderSuggestions(): void {
     if (!suggestionsList) return;
-    const houseNumber = houseNumberFromStreet(streetField.value);
+    const rows = visibleSuggestions();
     suggestionsList.innerHTML = '';
-    suggestions.forEach((suggestion, index) => {
+    rows.forEach((suggestion, index) => {
       const item = document.createElement('li');
       item.id = `est-address-option-${index}`;
       item.setAttribute('role', 'option');
       item.setAttribute('aria-selected', String(index === activeIndex));
       item.dataset.index = String(index);
-      const exact = suggestion.kind === 'address' && labelHasHouseNumber(suggestion.label, houseNumber);
-      const label = document.createElement('span');
-      label.className = 'address-suggestions__label';
-      label.textContent = suggestion.label;
-      const badge = document.createElement('span');
-      badge.className = `address-suggestions__badge ${exact ? 'address-suggestions__badge--exact' : ''}`;
-      badge.textContent = exact ? 'Exact address' : 'Street match';
-      item.append(label, badge);
+      item.textContent = suggestion.label;
       item.addEventListener('pointerdown', (event) => {
         // Pointer-down covers touch and mouse; firing before the input blurs
         // means the tap reliably selects the suggestion on mobile.
@@ -274,8 +293,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       });
       suggestionsList.appendChild(item);
     });
-    suggestionsList.hidden = suggestions.length === 0;
-    streetField.setAttribute('aria-expanded', String(suggestions.length > 0));
+    suggestionsList.hidden = rows.length === 0;
+    streetField.setAttribute('aria-expanded', String(rows.length > 0));
     if (activeIndex >= 0) {
       streetField.setAttribute('aria-activedescendant', `est-address-option-${activeIndex}`);
     } else {
@@ -567,16 +586,16 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
             ...(gpsParts.state ? { state: gpsParts.state } : {}),
           };
         }
+        applyingResolved = true;
+        try {
+          if (gpsParts.street) fillField(streetField, gpsParts.street);
+          fillField(cityInput, gpsParts.city);
+          fillField(stateInput, gpsParts.state);
+          fillField(zipInput, gpsParts.zip);
+        } finally {
+          applyingResolved = false;
+        }
         if (autoConfirm) {
-          applyingResolved = true;
-          try {
-            if (gpsParts.street) fillField(streetField, gpsParts.street);
-            fillField(cityInput, gpsParts.city);
-            fillField(stateInput, gpsParts.state);
-            fillField(zipInput, gpsParts.zip);
-          } finally {
-            applyingResolved = false;
-          }
           commitGpsCandidate(false);
           return;
         }
@@ -772,7 +791,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   async function chooseSuggestion(index: number): Promise<void> {
-    const suggestion = suggestions[index];
+    const suggestion = visibleSuggestions()[index];
     if (!suggestion) return;
     clearSuggestions();
     ensureManualMode();
@@ -1202,10 +1221,12 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     if (suggestions.length === 0) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
+      const count = visibleSuggestions().length;
+      if (count === 0) return;
       activeIndex =
         event.key === 'ArrowDown'
-          ? (activeIndex + 1) % suggestions.length
-          : (activeIndex - 1 + suggestions.length) % suggestions.length;
+          ? (activeIndex + 1) % count
+          : (activeIndex - 1 + count) % count;
       renderSuggestions();
     } else if (event.key === 'Enter') {
       if (activeIndex >= 0) {

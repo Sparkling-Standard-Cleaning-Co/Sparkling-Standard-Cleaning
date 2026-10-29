@@ -52,8 +52,8 @@ test('each calculator family has five intentional step titles', () => {
     'When & Where',
     'Service & Home',
     'Condition & Frequency',
-    'Optional Extras',
-    'Your Estimate',
+    'Your Details',
+    'Extras & Payment',
   ]);
   assert.notEqual(ENGINE_STEPS.residential.titles[1], ENGINE_STEPS.str.titles[1]);
 });

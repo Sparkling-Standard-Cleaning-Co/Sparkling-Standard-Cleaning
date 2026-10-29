@@ -63,7 +63,7 @@ deployment, activation and actual provider verification.
 | Administrator login / session security | Implemented, tested, deployed | PBKDF2 100k versioned hashes, hardened cookie, CSRF, step-up, distributed IP/account limits. |
 | Backup-email recovery | Implemented, tested locally; **live recovery unverified** | Requires owner to verify the backup email and complete one recovery test. |
 | SMS recovery | Research complete; **not implemented** | No provider purchased or activated; see `SMS-RECOVERY-RESEARCH.md`. |
-| Gift redemption at cleaning checkout | **Not implemented** | Owner can record a redemption against a job; automatic checkout credit and remainder payment are missing. |
+| Gift purchase and redemption | Implemented, tested; **live purchase unverified** | Public purchase controls are enabled; verified webhook issuance, recipient delivery, valid-from activation and checkout redemption are covered by automated tests. Gift code reserves balance for up to 120 minutes; card charged only the remainder; gift-only orders complete without Stripe. Webhook commit/expiry release and receipts are covered by automated tests. |
 | Partial redemption / void / unused refund | Implemented, tested; live provider unverified | Ledger is ETag/CAS guarded; simultaneous-redemption test added. |
 | Dispute/chargeback reconciliation | **Not implemented** | Manual handling only. |
 | Liability dashboard | Implemented, tested, deployed | Inventory, search, totals, activation and redemption history. |
@@ -95,8 +95,10 @@ deployment, activation and actual provider verification.
 
 1. **Gift sales:** final gift-terms legal review, a live/test-mode Stripe purchase, valid-from
    redemption, refund and reconciliation exercise, and explicit activation authorization.
-2. **Checkout redemption:** gift-code application at cleaning checkout is not built.
-3. **Receipts:** itemized receipt delivery is implemented, but no live paid transaction has exercised Resend or Stripe receipt reconciliation.
+2. **Gift redemption:** implemented and covered by automated tests, but no live certificate or
+   test-mode checkout has exercised the reservation, card-remainder and receipt path.
+3. **Receipts:** itemized receipt delivery is implemented, but no live paid transaction has
+   exercised Resend or Stripe receipt reconciliation.
 4. **Backups:** no independent backup or successful restore.
 5. **Photo retention:** scheduled execution not yet activated or observed.
 6. **Email recovery:** implemented, but the live verified-email recovery path still needs an owner
@@ -119,8 +121,21 @@ deployment, activation and actual provider verification.
 
 ## Next safe engineering actions
 
-1. Build gift redemption at checkout with durable reservation/commit semantics.
-2. Exercise the itemized receipt path with an owner-authorized test-mode payment and reconcile it against Stripe.
-3. Implement independent backups and run a restore test.
-4. Complete customer/job history and the agreement signing workflow after legal review.
-5. Re-verify the Florida county surtaxes for 2027 before the rate table expires.
+1. Exercise gift redemption and the itemized receipt path with an owner-authorized test-mode
+   payment and reconcile both against Stripe.
+2. Implement independent backups and run a restore test.
+3. Complete customer/job history and the agreement signing workflow after legal review.
+4. Re-verify the Florida county surtaxes for 2027 before the rate table expires.
+
+## 2026-10-29 owner audit release
+
+- Public gift-certificate purchases are enabled with approved denominations, custom amounts,
+  recipient delivery and valid-from activation.
+- Community Support is one final-checkout checkbox; extras and six bundles with live prices/savings
+  are in the final checkout step.
+- Step 1 restores the interactive map, draggable pin and explicit location confirmation on desktop
+  and mobile.
+- Photos use the concise required-booking message and a two-choice popup; privacy moved to Terms.
+- Paid bookings with a live hold, no outstanding photos and a valid calendar slot confirm
+  automatically; other cases remain pending owner review.
+- No live gift purchase, live card charge or production calendar-event test has been performed.

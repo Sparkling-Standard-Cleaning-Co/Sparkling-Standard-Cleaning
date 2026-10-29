@@ -134,6 +134,12 @@ test('commercial uses the compact picker and allows any available start', async 
     await page.fill('#est-address-city', 'Pensacola');
     await page.selectOption('#est-address-state', 'FL');
     await page.fill('#est-zip', '32502');
+    await page.locator('[data-address-resolve]').click();
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
     await page.click('[data-facility-next]');
     await page.locator('[data-facility-step-panel="2"]').waitFor({ state: 'visible' });
     await page.selectOption('#fac-type', 'office');

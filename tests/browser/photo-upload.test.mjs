@@ -116,7 +116,10 @@ test('the shared photo section appears on all four engines with the right catego
       });
       const options = await page.locator('[data-photo-category] option').allTextContents();
       assert.deepEqual(options.map((label) => label.trim()), labels, pathname);
-      assert.match(await page.locator('[data-photo-section]').innerText(), /private/i);
+      assert.match(
+        await page.locator('[data-photo-section]').innerText(),
+        /Photos are required for an accurate estimate and confirmed booking/i,
+      );
     } finally {
       await context.close();
     }

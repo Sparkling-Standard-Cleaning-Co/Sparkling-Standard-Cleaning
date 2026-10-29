@@ -204,6 +204,23 @@ async function step1(page) {
   await page.fill('#est-date', BOOKING_DATE);
 }
 
+async function confirmMapIfShown(page) {
+  const map = page.locator('[data-address-map]');
+  if (!(await map.isVisible())) {
+    const resolve = page.locator('[data-address-resolve]');
+    if (await resolve.isVisible().catch(() => false)) {
+      await resolve.click();
+    }
+    await map.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
+  }
+  if (await map.isVisible()) {
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
+  }
+}
+
 async function addressStep(page, { manual = false } = {}) {
   if (!manual && !(await page.inputValue('#est-zip'))) {
     if (!(await page.inputValue('#est-address'))) {
@@ -228,6 +245,7 @@ async function addressStep(page, { manual = false } = {}) {
       await page.fill('#est-address-city', 'Pensacola');
     }
   }
+  await confirmMapIfShown(page);
   await page.click('[data-next]');
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -241,6 +259,7 @@ async function zipOnlyAddressStep(page, zip = '32503') {
   }
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', zip);
+  await confirmMapIfShown(page);
   await page.click('[data-next]');
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -267,22 +286,47 @@ async function conditionStep(page) {
   await page.click('[data-next]');
 }
 
-async function extrasStep(page, addons = []) {
-  for (const id of addons) {
-    // Click the styled label (the visible option), not the hidden input.
-    await page.click(`label.option:has(input[name="addons"][value="${id}"])`);
+async function submitForm(page) {
+  await page.click('[data-submit]');
+  await page.waitForTimeout(150);
+  if (await page.locator('[data-photo-gate]').isVisible()) {
+    await page.click('[data-photo-pay-later]');
+  }
+}
+async function contactFields(page) {
+  if (await page.locator('#est-name').isVisible()) {
+    await page.fill('#est-name', 'Browser journey (please ignore)');
+  }
+  if (await page.locator('#est-phone').isVisible()) {
+    await page.fill('#est-phone', '8500000000');
+  }
+  if (await page.locator('#est-email').isVisible()) {
+    await page.fill('#est-email', 'owner@sparkling-standard.com');
+  }
+  if (await page.locator('#est-terms').isVisible()) {
+    await page.check('#est-terms', { force: true });
   }
 }
 
 async function timingStep(page) {
-  await page.click('[data-next]');
+  await contactFields(page);
+  if (await page.locator('[data-next]').isVisible()) {
+    await page.click('[data-next]');
+  }
+  await page.waitForFunction(
+    () => document.querySelector('.wizard__step[data-step="5"]')?.getAttribute('data-active') === 'true',
+  );
 }
 
-async function contactFields(page) {
-  await page.fill('#est-name', 'Browser journey (please ignore)');
-  await page.fill('#est-phone', '8500000000');
-  await page.fill('#est-email', 'owner@sparkling-standard.com');
-  if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
+async function extrasStep(page, addons = []) {
+  const firstAddon = addons[0] ?? 'inside_oven';
+  if (!(await page.locator(`label.option:has(input[name="addons"][value="${firstAddon}"])`).isVisible())) {
+    await timingStep(page);
+  }
+  for (const id of addons) {
+    // Click the styled label (the visible option), not the hidden input.
+    await page.click(`label.option:has(input[name="addons"][value="${id}"])`);
+  }
 }
 
 // ── Address autocomplete + confirmation ──────────────────────────────────────
@@ -297,11 +341,13 @@ test('address autocomplete: debounced suggestions resolve and confirm a destinat
     assert.match(suggestion ?? '', /100 S Baylen St, Pensacola, FL 32502/);
 
     await page.click('#est-address-suggestions li');
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
     await page.waitForFunction(
       () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
     );
-    assert.equal(await page.locator('[data-address-map]').count(), 0, 'no map confirmation card exists');
-    assert.equal(await page.locator('[data-address-confirm]').count(), 0, 'no separate confirmation action');
+    assert.equal(await page.locator('[data-address-map]').count(), 1, 'map confirmation is restored');
+    assert.equal(await page.locator('[data-address-confirm]').count(), 1);
     assert.equal(
       await page.locator('[data-address-finder]').getAttribute('data-state'),
       'confirmed',
@@ -324,9 +370,7 @@ test('an exact provider suggestion fills the required ZIP and advances', async (
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
-    await page.waitForFunction(
-      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
-    );
+    await confirmMapIfShown(page);
     assert.equal(
       await page.inputValue('#est-zip'),
       '32502',
@@ -350,6 +394,7 @@ test('manual address entry works without selecting a suggestion', async () => {
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32502');
+    await confirmMapIfShown(page);
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -368,9 +413,7 @@ test('id-only suggestion gateways still resolve through the retrieve endpoint', 
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
-    await page.waitForFunction(
-      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
-    );
+    await confirmMapIfShown(page);
     assert.equal(await page.inputValue('#est-zip'), '32502');
   } finally {
     await context.close();
@@ -384,9 +427,7 @@ test('resolved coordinates — not a ZIP centroid — reach the routing lookup',
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
-    await page.waitForFunction(
-      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
-    );
+    await confirmMapIfShown(page);
     await page.waitForFunction(
       (requests) => requests.some((entry) => entry.lat === 30.4111 && entry.lng === -87.2164),
       travelRequests,
@@ -410,13 +451,13 @@ test('prices stay hidden until the final step, then the reveal shows the exact p
     await addressStep(page);
     await homeStep(page);
     await conditionStep(page);
-    await extrasStep(page, ['inside_oven']);
 
     // Calculation continues internally, but no dollar total is visible or
     // announced while the customer answers questions.
     assert.equal(await page.locator('[data-estimate-live]').isVisible(), false, 'no live price panel');
-    assert.equal(await page.locator('[data-addon-price]').count(), 0, 'no per-add-on dollar totals');
+    assert.equal(await page.locator('[data-addon-price]').first().isVisible(), false, 'no per-add-on dollar totals before the final step');
     assert.equal(await page.locator('[data-price-preview]').count(), 0, 'no price-so-far preview');
+    await extrasStep(page, ['inside_oven']);
 
     await timingStep(page);
     await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
@@ -505,7 +546,7 @@ test('reservation summary carries every answer and the call/text actions work', 
     assert.match(submitLabel ?? '', /Reserve This Cleaning/);
 
     await contactFields(page);
-    await page.click('[data-submit]');
+    await submitForm(page);
     await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'success');
     await delay(150);
 
@@ -584,7 +625,7 @@ test('client-side price manipulation does not change the submitted price', async
       if (summary) summary.textContent = '$1';
     });
 
-    await page.click('[data-submit]');
+    await submitForm(page);
     await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'success');
     await delay(150);
     assert.equal(captured.payload.fields.quoted_price, '270', 'the real calculated price is submitted');
@@ -619,7 +660,7 @@ test('a mismatch verdict is shown honestly and never claims the price was accept
   );
   try {
     await completeReservation(page);
-    await page.click('[data-submit]');
+    await submitForm(page);
     await page.waitForSelector('[data-form-status][data-state="warning"]', { timeout: 15000 });
     const text = (await page.locator('[data-form-status]').textContent()) ?? '';
     assert.match(text, /needs a personal review/i);
@@ -650,7 +691,7 @@ test('a preliminary verdict names the travel uncertainty', async () => {
   );
   try {
     await completeReservation(page);
-    await page.click('[data-submit]');
+    await submitForm(page);
     await page.waitForSelector('[data-form-status][data-state="warning"]', { timeout: 15000 });
     const text = (await page.locator('[data-form-status]').textContent()) ?? '';
     assert.match(text, /drive time still needs a final check/i);
@@ -671,9 +712,7 @@ test('the complete journey works on mobile without overflow', async () => {
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
     await page.click('#est-address-suggestions li');
-    await page.waitForFunction(
-      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
-    );
+    await confirmMapIfShown(page);
     assert.ok((await overflow()) <= 1, 'no overflow on the address step');
     await shot(page, '04-address-confirmed-mobile');
     await page.click('[data-next]');

@@ -6,8 +6,11 @@ import {
   createBookingHold,
   getBookingHold,
   holdIsActive,
+  holdKey,
   listActiveHolds,
 } from '../src/lib/booking/holds.ts';
+import { writeLedgerJson } from '../src/lib/payments/ledger.ts';
+import { autoConfirmPaidBooking } from '../src/lib/booking/auto-confirm.ts';
 
 const slot = {
   date: '2026-11-10',
@@ -115,4 +118,22 @@ test('a legacy hold with no resource assignment conservatively blocks every clea
   });
   assert.equal(second.ok, false);
   if (!second.ok) assert.equal(second.error, 'overlap');
+});
+
+test('a repeated paid confirmation returns the existing calendar event', async () => {
+  const bucket = new FakeLedger();
+  const created = await createBookingHold(bucket, slot);
+  assert.equal(created.ok, true);
+  if (!created.ok) return;
+  await writeLedgerJson(bucket, holdKey(created.hold.id), {
+    ...created.hold,
+    status: 'confirmed',
+    calendarEventId: 'evt-confirmed-1',
+  });
+  const confirmed = await autoConfirmPaidBooking(
+    { PAYMENT_LEDGER: bucket } as never,
+    created.hold.id,
+  );
+  assert.equal(confirmed.ok, true);
+  if (confirmed.ok) assert.equal(confirmed.eventId, 'evt-confirmed-1');
 });

@@ -140,11 +140,24 @@ async function openEstimate(page) {
   await page.fill('#est-date', BOOKING_DATE);
 }
 
+async function submitThroughPhotoGate(page) {
+  await page.click('[data-submit]');
+  await page.waitForTimeout(150);
+  if (await page.locator('[data-photo-gate]').isVisible()) {
+    await page.click('[data-photo-pay-later]');
+  }
+}
 async function fillAddressAndDetails(page) {
   await page.fill('#est-date', BOOKING_DATE);
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', '32502');
+  await page.click('[data-address-resolve]');
+  await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+  await page.locator('[data-address-confirm]').click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+  );
   await page.click('[data-next]'); // when & where -> service & home
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -160,12 +173,15 @@ async function fillAddressAndDetails(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
-  await page.click('[data-next]'); // condition -> extras
-  await page.click('[data-next]'); // extras -> your estimate
+  await page.click('[data-next]'); // condition -> your details
   await page.fill('#est-name', 'UX test (please ignore)');
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
-  if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
+  await page.click('[data-next]'); // details -> extras & payment
+  await page.waitForFunction(
+    () => document.querySelector('.wizard__step[data-step="5"]')?.getAttribute('data-active') === 'true',
+  );
+  await page.check('#est-terms', { force: true });
 }
 
 test('no Google script loads and no event fires before an analytics choice', async () => {
@@ -254,7 +270,7 @@ test('the estimator emits start, step and complete events, and a delivered reque
     const beforeSubmit = await customEvents(page);
     assert.ok(!beforeSubmit.includes('cleaning_request_submit'), 'no submit event before the request is sent');
 
-    await page.click('[data-submit]');
+    await submitThroughPhotoGate(page);
     await page.waitForFunction(() => (window.dataLayer ?? []).some((entry) => entry?.event === 'cleaning_request_submit'));
 
     const submitted = await eventPayload(page, 'cleaning_request_submit');
@@ -293,7 +309,7 @@ test('a failed submission never emits a conversion event', async () => {
   try {
     await openEstimate(page);
     await fillAddressAndDetails(page);
-    await page.click('[data-submit]');
+    await submitThroughPhotoGate(page);
     await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'error');
     await delay(200);
 

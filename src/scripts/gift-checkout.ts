@@ -10,6 +10,26 @@ export {};
 const form = document.querySelector<HTMLFormElement>('[data-gift-purchase]');
 if (form) {
   const status = form.querySelector<HTMLElement>('[data-form-status]');
+  const denomination = form.querySelector<HTMLSelectElement>('[data-gift-denomination]');
+  const customField = form.querySelector<HTMLElement>('[data-gift-custom-field]');
+  const customValue = form.querySelector<HTMLInputElement>('[data-gift-custom-value]');
+  const validFrom = form.querySelector<HTMLInputElement>('[data-gift-valid-from]');
+
+  const syncCustomValue = (): void => {
+    const custom = denomination?.value === 'custom';
+    if (customField) customField.hidden = !custom;
+    if (customValue) {
+      customValue.required = custom;
+      if (!custom) customValue.value = '';
+    }
+  };
+  denomination?.addEventListener('change', syncCustomValue);
+  if (validFrom) {
+    validFrom.min = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(
+      new Date(),
+    );
+  }
+  syncCustomValue();
   const setStatus = (state: 'info' | 'error' | 'success', message: string): void => {
     if (!status) return;
     status.dataset.state = state;
@@ -33,8 +53,13 @@ if (form) {
       message: String(data.get('gift_message') ?? ''),
       validFromDate: String(data.get('valid_from_date') ?? ''),
       deliveryMethod: String(data.get('delivery_method') ?? 'print'),
-      denominationUsd: data.get('denominationUsd') ? Number(data.get('denominationUsd')) : undefined,
-      amountUsd: data.get('gift_value') ? Number(data.get('gift_value')) : undefined,
+      denominationUsd:
+        data.get('denominationUsd') && data.get('denominationUsd') !== 'custom'
+          ? Number(data.get('denominationUsd'))
+          : undefined,
+      amountUsd: data.get('gift_custom_value')
+        ? Number(data.get('gift_custom_value'))
+        : undefined,
       termsAccepted: data.get('termsAccepted') === 'yes',
       termsVersion: legalTerms.termsVersion,
     };
