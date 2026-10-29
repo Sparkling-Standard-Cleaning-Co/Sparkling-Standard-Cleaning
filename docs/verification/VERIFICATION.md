@@ -2,8 +2,8 @@
 
 ## Verified - 2026-10-28 scheduling, auth hardening and retention release
 
-**Release:** `0219571` (owner-audit release). Cloudflare Pages deployment
-`c1652023-8ce0-4b25-b545-0e17b51aaee2`. GitHub run `40908189653`: `validate` and `browser` both
+**Release:** `83bd9c3` (code `0219571`, owner-audit release). Cloudflare Pages deployment
+`5f89797e-3453-41dd-b512-a159d2bca209`. GitHub run `40909369826`: `validate` and `browser` both
 succeeded; Cloudflare Pages check succeeded.
 
 - **Booking hold defect fixed:** the hold context key included the rotating quote reference. Crossing
