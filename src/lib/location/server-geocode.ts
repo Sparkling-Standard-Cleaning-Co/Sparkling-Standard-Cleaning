@@ -96,6 +96,29 @@ export function containsHouseNumber(label: string, requested: string | null): bo
 
 const FIVE_DIGIT_ZIP = /\b(\d{5})(?:-\d{4})?\b/;
 
+const STATE_NAMES: Record<'FL' | 'AL', string> = { FL: 'florida', AL: 'alabama' };
+
+function queryState(query: string): 'FL' | 'AL' | null {
+  const match = query.match(/\b(FL|Fla\.?|Florida|AL|Ala\.?|Alabama)\b/i)?.[1]?.toLowerCase();
+  if (!match) return null;
+  return match.startsWith('fl') ? 'FL' : 'AL';
+}
+
+function queryStreetToken(query: string): string {
+  const street = query.split(',')[0]?.replace(/^\d+[a-z]?(?:-\d+[a-z]?)?\s*/i, '') ?? '';
+  const generic = new Set([
+    'street', 'st', 'avenue', 'ave', 'road', 'rd', 'drive', 'dr', 'lane', 'ln',
+    'boulevard', 'blvd', 'court', 'ct', 'place', 'pl', 'highway', 'hwy',
+    'north', 'south', 'east', 'west', 'n', 's', 'e', 'w',
+  ]);
+  return street.toLowerCase().match(/[a-z]{3,}/g)?.find((token) => !generic.has(token)) ?? '';
+}
+
+function labelMatchesState(label: string, state: 'FL' | 'AL'): boolean {
+  const lower = label.toLowerCase();
+  return lower.includes(state.toLowerCase()) || lower.includes(STATE_NAMES[state]);
+}
+
 /** Maps a provider feature to the minimal address shape we return. */
 export function parsePhotonFeature(feature: PhotonFeature, source: 'mapmap'): GeocodedAddress | null {
   const coords = feature.geometry?.coordinates;
@@ -151,6 +174,8 @@ export async function censusResolve(query: string): Promise<GeocodedAddress | nu
     // can count as an exact property.
     precise: requested !== null && containsHouseNumber(label, requested),
   };
+  const wantedState = queryState(query);
+  if (wantedState && !labelMatchesState(label, wantedState)) return null;
   const zip = label.match(/,\s*(\d{5})(?:-\d{4})?\s*$/)?.[1];
   if (zip) result.zip = zip;
   // "4242 MAPLEWOOD LN, MOLINO, FL, 32577" → city + state when present.
@@ -174,12 +199,18 @@ export async function mapMapResolve(env: GeocodeEnv, query: string): Promise<Geo
   const { status, data } = await mapMapJson(env, `/geocode?q=${encodeURIComponent(query)}&limit=3&country=us`);
   if (status !== 200) return null;
   const requested = queryHouseNumber(query);
+  const wantedState = queryState(query);
+  const streetToken = queryStreetToken(query);
   const features = ((data as { features?: PhotonFeature[] })?.features ?? []);
   // Prefer an exact house-number feature; never accept a street/POI result for
-  // a house-number query, and never mark a no-number query "precise".
+  // a house-number query, and never mark a no-number query "precise". A
+  // provider result outside FL/AL or for a different street is rejected even
+  // when it happens to contain the same house number.
   for (const feature of features) {
     const address = parsePhotonFeature(feature, 'mapmap');
     if (!address) continue;
+    if (wantedState && !labelMatchesState(address.label, wantedState)) continue;
+    if (streetToken && !address.label.toLowerCase().includes(streetToken)) continue;
     if (requested === null) return { ...address, precise: false };
     if (containsHouseNumber(address.label, requested)) return { ...address, precise: true };
   }

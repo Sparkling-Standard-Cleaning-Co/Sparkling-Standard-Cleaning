@@ -308,6 +308,41 @@ test('geocode resolve: a Census match exposes the ZIP from its label', async () 
   assert.equal(data.result.zip, '32502');
 });
 
+test('geocode resolve: a same-house-number result on the wrong street/state is rejected', async () => {
+  const response = await withFetch(
+    async (url) => {
+      if (String(url).includes('geocoding.geo.census.gov')) {
+        return jsonResponse({ result: { addressMatches: [] } });
+      }
+      return jsonResponse({
+        features: [
+          {
+            properties: {
+              label: '100 S Juniper St, Philadelphia, Pennsylvania, 19107',
+              housenumber: '100',
+              street: 'S Juniper St',
+              city: 'Philadelphia',
+              state: 'Pennsylvania',
+              postcode: '19107',
+            },
+            geometry: { coordinates: [-75.16299, 39.95036] },
+          },
+        ],
+      });
+    },
+    () =>
+      geocodePost({
+        request: request({ action: 'resolve', query: '100 S Baylen St, Pensacola, FL 32502' }),
+        env: { MAPMAP_API_KEY: 'dummy-key' },
+      } as never),
+  );
+  const data = (await response.json()) as { result?: { label: string; city?: string; state?: string; approximate?: boolean } };
+  assert.equal(response.status, 200);
+  assert.ok(data.result, 'the ZIP fallback keeps the request alive');
+  assert.doesNotMatch(data.result.label, /Juniper|Philadelphia|Pennsylvania/);
+  assert.equal(data.result.approximate, true);
+  assert.equal(data.result.state, 'FL');
+});
 test('geocode resolve: an exact MapMap house-number match is preferred over Census', async () => {
   let censusCalls = 0;
   const response = await withFetch(
