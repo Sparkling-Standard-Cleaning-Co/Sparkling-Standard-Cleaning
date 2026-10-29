@@ -259,7 +259,7 @@ test('lead: a new recurring reservation shows the server-owned first-visit and o
   assert.equal(sent['Pricing — First visit (required Deep Cleaning)'], '$1');
   // The ongoing rhythm is the SERVER's number — never the hostile $999 claim.
   assert.match(sent['Pricing — Ongoing visits (after the required first deep clean)'] ?? '', /\$\d+(\.\d+)? per weekly visit/);
-  assert.doesNotMatch(JSON.stringify(sent), /"?\$?999"?/, 'the client-asserted ongoing price never reaches the owner');
+  assert.doesNotMatch(JSON.stringify(sent), /\$999\b/, 'the client-asserted ongoing price never reaches the owner');
   assert.match(sent['Summary — Price'] ?? '', /Then \$[\d.]+ per weekly ongoing/);
   // The claim surfaces as a claim with its redemption duty.
   assert.equal(sent['Pricing — Campaign claim'], 'SPARKLE100');

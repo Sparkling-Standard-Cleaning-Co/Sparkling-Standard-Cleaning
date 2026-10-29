@@ -3488,6 +3488,69 @@ fieldset.input--invalid {
   gap: var(--space-2);
 }
 
+.booking-picker__time-picker {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-cream-50);
+}
+
+.booking-picker__time-fields {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.booking-picker__time-field {
+  display: grid;
+  gap: 0.2rem;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.booking-picker__time-field .select {
+  min-width: 5.2rem;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-ink-900);
+}
+
+.booking-picker__time-separator {
+  padding-bottom: 0.55rem;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-900);
+}
+
+.booking-picker__meridiem {
+  padding-bottom: 0.65rem;
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: var(--color-rose-700);
+}
+
+.booking-picker__selected {
+  margin: 0;
+}
+
+@media (max-width: 30rem) {
+  .booking-picker__time-field {
+    flex: 1 1 6rem;
+  }
+
+  .booking-picker__time-field .select {
+    width: 100%;
+  }
+}
+
 .booking-picker__slot {
   min-height: 2.75rem;
   padding: 0.55rem 0.9rem;

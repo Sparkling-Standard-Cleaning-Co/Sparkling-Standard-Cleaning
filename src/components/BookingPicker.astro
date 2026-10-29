@@ -26,7 +26,24 @@ const { id, showDate = true } = Astro.props;
     }
     <button class="btn btn--secondary" type="button" data-booking-check>Check Available Times</button>
   </div>
-  <div class="booking-picker__slots" data-booking-slots role="list" aria-live="polite"></div>
+  <div class="booking-picker__time-picker" data-booking-picker-time hidden>
+    <div class="booking-picker__time-fields">
+      <label class="booking-picker__time-field">
+        <span>Hour</span>
+        <select class="select select--small" data-booking-hour aria-label="Appointment start hour"></select>
+      </label>
+      <span class="booking-picker__time-separator" aria-hidden="true">:</span>
+      <label class="booking-picker__time-field">
+        <span>Minute</span>
+        <select class="select select--small" data-booking-minute aria-label="Appointment start minute"></select>
+      </label>
+      <span class="booking-picker__meridiem" data-booking-meridiem>AM</span>
+    </div>
+    <p class="small text-muted booking-picker__selected" data-booking-selected></p>
+    <button class="btn btn--secondary" type="button" data-booking-hold-selected>
+      Hold This Start Time
+    </button>
+  </div>
   <p class="booking-picker__status small" data-booking-status role="status" aria-live="polite"></p>
   <p class="booking-picker__hold small" data-booking-hold hidden></p>
 </section>
