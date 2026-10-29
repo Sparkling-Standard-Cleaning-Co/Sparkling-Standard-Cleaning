@@ -2,9 +2,9 @@
 
 ## Verified - 2026-10-28 scheduling, auth hardening and retention release
 
-**Release:** `7bb91ff` (commits `74fbf05` booking-hold fix and `7bb91ff` security/retention).
-Cloudflare Pages deployment `5529baa6-591b-4501-b40f-8d23f6f273b9`. GitHub run `40783479501`:
-`validate` and `browser` both succeeded; Cloudflare Pages check succeeded.
+**Release:** `0219571` (owner-audit release). Cloudflare Pages deployment
+`c1652023-8ce0-4b25-b545-0e17b51aaee2`. GitHub run `40908189653`: `validate` and `browser` both
+succeeded; Cloudflare Pages check succeeded.
 
 - **Booking hold defect fixed:** the hold context key included the rotating quote reference. Crossing
   a minute boundary between slot selection and submission silently cleared the hold, so the request
