@@ -1519,7 +1519,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
       if (previousKey !== nextKey || routed === undefined) {
         void lookupTravel();
       }
-      if (!addressVerificationPending) addressReviewRequired = false;
+      if (!addressVerificationPending) {
+        addressReviewRequired = Boolean(
+          next && (next.precision === 'approximate' || next.precision === 'street'),
+        );
+      }
       const current = submissionAddress();
       bookingCalendar?.setContext({
         ...(next ? { lat: next.lat, lng: next.lng } : {}),
