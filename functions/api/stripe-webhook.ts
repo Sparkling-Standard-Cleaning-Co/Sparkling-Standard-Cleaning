@@ -33,6 +33,8 @@ import {
   writeLedgerJson,
   type PaymentStorageEnv,
 } from '../../src/lib/payments/ledger.ts';
+import { sendCustomerReceipt, describeReceiptOutcome } from '../../src/lib/forms/customer-receipt.ts';
+import type { ReceiptData, ReceiptLine } from '../../src/lib/payments/receipt.ts';
 
 interface Env extends PaymentStorageEnv {
   STRIPE_WEBHOOK_SECRET?: string;
@@ -59,6 +61,19 @@ interface StripeEvent {
   };
 }
 
+interface CheckoutReceiptSnapshot {
+  service: string;
+  serviceLocation: string;
+  customerName?: string;
+  customerEmail: string;
+  lines: ReceiptLine[];
+  subtotalCents: number;
+  taxCents: number;
+  taxRatePercent: number | null;
+  taxJurisdiction: string | null;
+  totalCents: number;
+}
+
 interface CheckoutLedgerRecord {
   version?: number;
   status?: string;
@@ -70,6 +85,25 @@ interface CheckoutLedgerRecord {
   serviceType?: string;
   sessionId?: string;
   sessionUrl?: string;
+  receipt?: CheckoutReceiptSnapshot;
+}
+
+async function readCheckoutRecord(
+  env: Env,
+  attempt: string,
+): Promise<CheckoutLedgerRecord | null> {
+  if (!/^[a-f0-9]{64}$/i.test(attempt)) return null;
+  const bucket = paymentLedger(env);
+  if (!bucket) return null;
+  try {
+    const stored = await readLedgerJson<CheckoutLedgerRecord>(
+      bucket,
+      ledgerKey('checkouts', attempt.toLowerCase()),
+    );
+    return stored?.value ?? null;
+  } catch {
+    return null;
+  }
 }
 
 const processedEvents = new Set<string>();
@@ -187,6 +221,54 @@ async function sendCustomerGiftEmail(
     return false;
   }
 }
+async function deliverEstimateReceipt(
+  env: Env,
+  eventId: string,
+  session: NonNullable<StripeEvent['data']>['object'],
+  amountCents: number | null,
+  paidAt: string,
+  reference: string,
+): Promise<{ status: string; sent: boolean }> {
+  const attempt = session?.metadata?.checkout_attempt ?? '';
+  const record = await readCheckoutRecord(env, attempt);
+  const snapshot = record?.receipt;
+  if (!snapshot) return { status: 'not_available', sent: false };
+  const customerEmail =
+    (session?.customer_details?.email ?? '').trim() || snapshot.customerEmail;
+  const customerName =
+    (session?.customer_details?.name ?? '').trim() || snapshot.customerName;
+  const totalCents = snapshot.totalCents;
+  const paidCents = amountCents ?? record?.amountCents ?? totalCents;
+  const photosOutstanding = session?.metadata?.photos_outstanding === 'yes';
+  const data: ReceiptData = {
+    receiptNumber: `SSR-${reference || record?.reference || eventId.slice(-8)}`,
+    reference: reference || record?.reference || '',
+    paidAt,
+    service: snapshot.service,
+    ...(snapshot.serviceLocation ? { serviceLocation: snapshot.serviceLocation } : {}),
+    ...(customerName ? { customerName } : {}),
+    ...(customerEmail ? { customerEmail } : {}),
+    lines: snapshot.lines,
+    subtotalCents: snapshot.subtotalCents,
+    taxCents: snapshot.taxCents,
+    taxRatePercent: snapshot.taxRatePercent,
+    taxJurisdiction: snapshot.taxJurisdiction,
+    totalCents,
+    paidCents,
+    balanceCents: Math.max(0, totalCents - paidCents),
+    paymentStatus: paidCents >= totalCents ? 'paid' : 'partially_paid',
+    ...(session?.id ? { stripeSessionId: session.id } : {}),
+    ...(photosOutstanding
+      ? {
+          notes:
+            'Payment received. Required photos are still outstanding, so booking confirmation is pending photo review and owner approval. This receipt is not a confirmed appointment.',
+        }
+      : {}),
+  };
+  const outcome = await sendCustomerReceipt(data, env, `receipt-${eventId}`);
+  return { status: describeReceiptOutcome(outcome), sent: outcome.status === 'sent' };
+}
+
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
   const secret = env.STRIPE_WEBHOOK_SECRET?.trim();
@@ -310,6 +392,18 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       Note:
         'The cleaning request was delivered separately by the website lead relay. Confirm the requested date, scope and final details personally before scheduling.',
     };
+    const receipt = await deliverEstimateReceipt(
+      env,
+      eventId,
+      session,
+      amountCents,
+      paidAt,
+      reference,
+    );
+    fields['Receipt email'] = receipt.status;
+    if (!receipt.sent && receipt.status.startsWith('failed')) {
+      console.error(receipt.status);
+    }
     const sent = await notifyOwner(
       env,
       `PAID estimate - $${amount} - ${reference || 'reference unavailable'}`,

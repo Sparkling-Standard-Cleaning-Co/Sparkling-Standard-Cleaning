@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { onRequestPost } from '../functions/api/stripe-webhook.ts';
-import { ledgerKey } from '../src/lib/payments/ledger.ts';
+import { ledgerKey, writeLedgerJson } from '../src/lib/payments/ledger.ts';
 import { FakeLedger } from './helpers/payment-fakes.ts';
 
 function toHex(buffer: ArrayBuffer): string {
@@ -235,4 +235,71 @@ test('a gift event is fulfilled separately from an estimate event', async () => 
   assert.match(notification?.subject ?? '', /PAID gift certificate/);
   assert.equal(notification?.['Stripe session id'], 'cs_gift_1');
   assert.equal(ledger.json<{ kind: string }>(ledgerKey('events', 'evt_gift_1'))?.kind, 'gift');
+});
+
+test('a paid estimate sends an itemized customer receipt from the stored checkout record', async () => {
+  const ledger = new FakeLedger();
+  const secret = 'whsec_receipt_test';
+  const attempt = 'b'.repeat(64);
+  const event = estimateEvent('evt_estimate_receipt');
+  event.data.object.metadata.checkout_attempt = attempt;
+  event.data.object.metadata.quote_reference = 'SS-20261029-ABC123';
+  event.data.object.amount_total = 15050;
+  await writeLedgerJson(ledger, ledgerKey('checkouts', attempt), {
+    version: 1,
+    status: 'open',
+    generation: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    reference: 'SS-20261029-ABC123',
+    amountCents: 15050,
+    serviceType: 'commercial_cleaning',
+    receipt: {
+      service: 'Commercial Cleaning',
+      serviceLocation: '100 S Baylen St, Pensacola, FL 32502',
+      customerName: 'Synthetic Customer',
+      customerEmail: 'customer@example.test',
+      lines: [
+        { label: 'Cleaning service — Commercial Cleaning', amountCents: 14000, kind: 'charge' },
+      ],
+      subtotalCents: 14000,
+      taxCents: 1050,
+      taxRatePercent: 7.5,
+      taxJurisdiction: 'Escambia County, FL',
+      totalCents: 15050,
+    },
+  });
+  let receiptBodies: Array<Record<string, unknown>> = [];
+  let notifications = 0;
+  const payload = JSON.stringify(event);
+  const request = await signedWebhook(payload, secret);
+
+  const response = await withFetch(
+    async (url, init) => {
+      const target = String(url);
+      if (target.includes('api.resend.com/emails')) {
+        receiptBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+        return jsonResponse({ id: 'email_1' });
+      }
+      notifications += 1;
+      return jsonResponse({ success: true });
+    },
+    () =>
+      onRequestPost({
+        request,
+        env: {
+          STRIPE_WEBHOOK_SECRET: secret,
+          WEB3FORMS_ACCESS_KEY: 'web3forms_test',
+          RESEND_API_KEY: 'resend_test',
+          PAYMENT_LEDGER: ledger,
+        },
+      } as never),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(notifications, 1);
+  assert.equal(receiptBodies.length, 1);
+  assert.match(String(receiptBodies[0]?.subject), /SS-20261029-ABC123/);
+  assert.match(String(receiptBodies[0]?.html), /Commercial Cleaning/);
+  assert.match(String(receiptBodies[0]?.html), /Escambia County/);
+  assert.match(String(receiptBodies[0]?.html), /\$150\.50/);
 });

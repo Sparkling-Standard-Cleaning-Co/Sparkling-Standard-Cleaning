@@ -747,6 +747,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     cleaningAmountCents: candidate.cleaningAmountCents,
     ...(candidate.quotedTotalCents !== null ? { quotedTotalCents: candidate.quotedTotalCents } : {}),
     tax: candidate.tax,
+    receipt: { ...candidate.receipt, customerEmail: email },
   };
   const claimed = await createLedgerJson(bucket, key, claim).catch((error) => {
     console.error('[estimate-checkout] ledger_claim_failed', {
