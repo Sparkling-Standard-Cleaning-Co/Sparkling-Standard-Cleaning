@@ -283,7 +283,7 @@ async function conditionStep(page) {
   // Expected prices are derived from the current pricing configuration in the
   // price assertions; no owner value is hard-coded here.
   await page.selectOption('#est-frequency', 'one_time');
-  await page.click('label.option:has(input[name="condition"][value="maintained"])');
+  await page.locator('[data-dirt-guide] summary').click(); await page.locator('[data-dirt-level="2"]').click();
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
   await page.click('[data-next]');

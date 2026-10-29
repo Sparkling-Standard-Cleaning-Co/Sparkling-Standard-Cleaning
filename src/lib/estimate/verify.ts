@@ -19,6 +19,7 @@ import { pricing } from '../../config/pricing.ts';
 import { travelConfig } from '../../config/estimators/travel.ts';
 import { zipReference } from '../../config/geography.ts';
 import { calculateEstimate, type EstimateContext } from './calculate.ts';
+import { parseDirtLevel } from './dirt-levels.ts';
 import { requiresInitialDeepClean } from './frequency.ts';
 import { selectInstantAmount } from './quote.ts';
 import { validateEstimateInput } from './validation.ts';
@@ -170,6 +171,12 @@ export function mapReservationFields(fields: Record<string, string>): EstimateIn
     halfBaths: numberFrom(fields, 'half_baths') ?? 0,
     beds: numberFrom(fields, 'beds'),
     frequency: fields.frequency as EstimateInputDraft['frequency'],
+    // The 1–10 guide is authoritative when supplied. An invalid submitted
+    // level becomes a rejected sentinel instead of falling back to a
+    // client-supplied condition.
+    dirtLevel: fields.dirt_level?.trim()
+      ? (parseDirtLevel(fields.dirt_level) ?? (0 as EstimateInputDraft['dirtLevel']))
+      : undefined,
     condition: fields.condition as EstimateInputDraft['condition'],
     lastClean: fields.last_cleaned as EstimateInputDraft['lastClean'],
     addonIds,

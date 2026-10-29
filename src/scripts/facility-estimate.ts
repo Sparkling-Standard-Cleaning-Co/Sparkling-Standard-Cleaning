@@ -229,6 +229,16 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       : null;
   }
 
+  function focusFirstError(name: string): void {
+    const element = namedElement(name);
+    if (!element) return;
+    element.focus({ preventScroll: true });
+    element.scrollIntoView({
+      block: 'center',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  }
+
   function clearFieldError(name: string): void {
     const element = namedElement(name);
     if (!element) return;
@@ -415,7 +425,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     }
     if (announce) {
       showErrorSummary(errors, stage);
-      if (errors.length > 0) namedElement(errors[0]!.name)?.focus();
+      if (errors.length > 0) focusFirstError(errors[0]!.name);
     }
     return errors;
   }
@@ -1067,7 +1077,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       maxVisitedStep = Math.max(maxVisitedStep, invalid.step);
       showStep(invalid.step, false);
       showErrorSummary(invalid.errors, 'send');
-      namedElement(invalid.errors[0]!.name)?.focus();
+      focusFirstError(invalid.errors[0]!.name);
       return;
     }
     if (photoController.isUploading()) {

@@ -158,7 +158,7 @@ test('a real available slot becomes an expiring hold and travels with the reques
     await page.fill('#est-half-baths', '0');
     await page.click('[data-next]');
     await page.selectOption('#est-frequency', 'one_time');
-    await page.click('label.option:has(input[name="condition"][value="maintained"])');
+    await page.locator('[data-dirt-guide] summary').click(); await page.locator('[data-dirt-level="2"]').click();
     await page.selectOption('#est-last-clean', 'within_month');
     await page.selectOption('#est-pets', 'none');
     await page.click('[data-next]'); // your details

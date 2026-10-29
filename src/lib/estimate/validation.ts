@@ -3,6 +3,7 @@
 
 import { normalizeZip } from '../../config/geography.ts';
 import { pricing } from '../../config/pricing.ts';
+import { conditionForDirtLevel, parseDirtLevel } from './dirt-levels.ts';
 import { serviceSupportsFrequency } from './service-matrix.ts';
 import type {
   Condition,
@@ -74,8 +75,19 @@ export function validateEstimateInput(
     issues.push('That cleaning service is a one-time service — no recurring rhythm applies.');
   }
 
-  const condition = asEnum<Condition>(raw.condition, CONDITIONS);
-  if (!condition) issues.push('Choose the home’s current condition.');
+  const dirtLevel =
+    raw.dirtLevel === undefined ? undefined : (parseDirtLevel(raw.dirtLevel) ?? undefined);
+  if (raw.dirtLevel !== undefined && !dirtLevel) {
+    issues.push('Choose a dirt level from 1 to 10.');
+  }
+
+  // The 10-level guide is the customer-facing source; the five condition
+  // tiers remain the pricing model. Legacy/internal callers that provide only
+  // a condition still validate against the existing vocabulary.
+  const condition = dirtLevel
+    ? conditionForDirtLevel(dirtLevel)
+    : asEnum<Condition>(raw.condition, CONDITIONS);
+  if (!condition) issues.push("Choose the home's current condition.");
 
   const lastClean =
     raw.lastClean === undefined ? undefined : asEnum<LastProfessionalClean>(raw.lastClean, LAST_CLEAN);
@@ -127,6 +139,7 @@ export function validateEstimateInput(
       halfBaths,
       frequency,
       condition,
+      ...(dirtLevel ? { dirtLevel } : {}),
       addonIds,
       zip: normalizedZip ?? '',
       normalizedZip: normalizedZip ?? '',

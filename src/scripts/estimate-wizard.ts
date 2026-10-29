@@ -28,6 +28,12 @@ import { buildInstantQuote, type InstantQuote } from '../lib/estimate/quote';
 import { taxPresentationForService } from '../lib/estimate/tax';
 import { formatUsd } from '../lib/format';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
+import {
+  conditionForDirtLevel,
+  dirtLevelDefinition,
+  dirtLevelLabel,
+  parseDirtLevel,
+} from '../lib/estimate/dirt-levels';
 import { SERVICE_LABELS, SERVICE_SHORT, FREQUENCY_LABELS, FREQUENCY_RHYTHMS } from '../lib/estimate/labels';
 import { serviceAsksFrequency, serviceSupportsFrequency } from '../lib/estimate/service-matrix';
 import { ENGINE_STEPS, parseResidentialServiceParam } from '../lib/estimate/engines';
@@ -160,6 +166,37 @@ function initEstimateWizard(form: HTMLFormElement): void {
     addressDetailsRevealed = true;
     if (scroll) smoothReveal(addressDetailsEl);
   }
+
+  const dirtGuide = form.querySelector<HTMLDetailsElement>('[data-dirt-guide] details');
+  const dirtSelected = form.querySelector<HTMLElement>('[data-dirt-selected]');
+  const dirtImpact = form.querySelector<HTMLElement>('[data-dirt-impact]');
+
+  function selectedDirtLevel() {
+    const checked = form.querySelector<HTMLInputElement>('input[name="dirtLevel"]:checked');
+    return parseDirtLevel(checked?.value);
+  }
+
+  function syncDirtGuide(): void {
+    const level = selectedDirtLevel();
+    const definition = dirtLevelDefinition(level);
+    if (dirtSelected) {
+      dirtSelected.textContent = definition
+        ? dirtLevelLabel(level)
+        : 'Choose a dirt level (1–10)';
+    }
+    if (!dirtImpact) return;
+    if (!definition) {
+      dirtImpact.hidden = true;
+      dirtImpact.textContent = '';
+      return;
+    }
+    dirtImpact.hidden = false;
+    dirtImpact.textContent =
+      definition.condition === 'severe'
+        ? 'Full restoration needs a personal scope review before we can confirm a price.'
+        : `${definition.impact} — we will allow the matching detail time in your estimate.`;
+  }
+
   const resetButton = document.querySelector<HTMLButtonElement>('[data-estimate-reset]');
   const reservationSummary = form.querySelector<HTMLElement>('[data-reservation-summary]');
   const estimateReveal = form.querySelector<HTMLElement>('[data-estimate-reveal]');
@@ -289,6 +326,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       (input) => input.value,
     );
     const submission = submissionAddress();
+    const dirtLevel = selectedDirtLevel();
     return {
       serviceType: radioValue('serviceType') as ServiceType | undefined,
       propertyType: textValue('propertyType') as EstimateInput['propertyType'],
@@ -298,7 +336,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
       halfBaths: numberValue('halfBaths') ?? 0,
       beds: numberValue('beds'),
       frequency: textValue('frequency') as EstimateInput['frequency'],
-      condition: radioValue('condition') as EstimateInput['condition'],
+      condition: (conditionForDirtLevel(dirtLevel) ??
+        radioValue('condition')) as EstimateInput['condition'],
+      ...(dirtLevel !== null ? { dirtLevel } : {}),
       lastClean: textValue('lastClean') as EstimateInput['lastClean'],
       addonIds,
       zip: submission.zip,
@@ -982,7 +1022,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
             : '',
         ].filter(Boolean);
         addSummaryRow(cleaningRows, 'Home', homeParts.join(' · '));
-        addSummaryRow(cleaningRows, 'Condition', input.condition ? input.condition.replaceAll('_', ' ') : '');
+        addSummaryRow(
+          cleaningRows,
+          'Dirt level',
+          dirtLevelLabel(input.dirtLevel) ||
+            (input.condition ? input.condition.replaceAll('_', ' ') : ''),
+        );
         addSummaryRow(cleaningRows, 'Last professional clean', input.lastClean ? input.lastClean.replaceAll('_', ' ') : '');
         addSummaryRow(cleaningRows, 'Pets', input.pets ? input.pets.replaceAll('_', ' ') : '');
         addSummaryRow(
@@ -1167,6 +1212,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const errorSummaryList = form.querySelector<HTMLElement>('[data-error-summary-list]');
 
   function keyOf(field: HTMLElement): string {
+    const group = field.getAttribute('data-group-error');
+    if (group && field instanceof HTMLFieldSetElement) return `group-${group}`;
     return field.id || field.getAttribute('name') || 'field';
   }
 
@@ -1203,6 +1250,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const describedBy = new Set((control.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean));
       describedBy.add(el.id);
       control.setAttribute('aria-describedby', [...describedBy].join(' '));
+    } else if (control instanceof HTMLFieldSetElement) {
+      control.setAttribute('aria-invalid', 'true');
+      control.setAttribute('aria-describedby', el.id);
     }
   }
 
@@ -1221,6 +1271,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
         .filter((id) => id && id !== el?.id);
       if (describedBy.length > 0) control.setAttribute('aria-describedby', describedBy.join(' '));
       else control.removeAttribute('aria-describedby');
+    } else if (control instanceof HTMLFieldSetElement) {
+      control.removeAttribute('aria-invalid');
+      control.removeAttribute('aria-describedby');
     }
   }
 
@@ -1325,11 +1378,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
     // A collapsed manual section must open before its field can be focused.
     const details = field.closest('details');
     if (details instanceof HTMLDetailsElement) details.open = true;
-    const target = controlFor(field);
-    if (target instanceof HTMLElement) {
-      target.scrollIntoView({ block: 'center' });
-      target.focus?.();
-    }
+    const scrollTarget = controlFor(field);
+    const focusTarget =
+      field instanceof HTMLInputElement && field.type === 'radio' ? field : scrollTarget;
+    focusTarget.focus?.({ preventScroll: true });
+    scrollTarget.scrollIntoView({
+      block: 'center',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
   }
 
   function validateStep(step: number): boolean {
@@ -1518,6 +1574,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
     // the turnover engine and never priced differently by category.
     const supportiveSection = form.querySelector<HTMLElement>('[data-supportive-section]');
     if (supportiveSection) supportiveSection.hidden = engine === 'str' || isStr;
+
+    syncDirtGuide();
   }
 
   // ── Travel lookup ─────────────────────────────────────────────────────────
@@ -1720,6 +1778,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
     bookingCalendar?.reset();
     if (addressCardEl) addressCardEl.hidden = true;
     if (addressDetailsEl) addressDetailsEl.hidden = true;
+    if (dirtGuide) dirtGuide.open = false;
+    syncDirtGuide();
     addressCardRevealed = false;
     addressDetailsRevealed = false;
     bookingFinalizedKey = '';
@@ -1797,6 +1857,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       supportive_notes: input.serviceType === 'str_turnover' ? '' : textValue('supportiveNotes') ?? '',
       frequency: input.frequency ?? '',
       condition: input.condition ?? '',
+      dirt_level: input.dirtLevel !== undefined ? String(input.dirtLevel) : '',
       last_cleaned: input.lastClean ?? '',
       pets: input.pets ?? '',
       addons: result.addons.map((addon) => addon.label).join(', '),
@@ -2436,6 +2497,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     syncConditionalFields();
     recalc();
+    if (target instanceof HTMLInputElement && target.name === 'dirtLevel' && dirtGuide) {
+      dirtGuide.open = false;
+    }
     if (target instanceof HTMLInputElement && target.name === 'zip') {
       void lookupTravel();
     }

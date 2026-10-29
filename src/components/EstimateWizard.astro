@@ -1,7 +1,6 @@
 ---
 import { pricing } from '../config/pricing';
 import {
-  CONDITION_OPTIONS,
   FREQUENCY_OPTIONS,
   LAST_CLEAN_OPTIONS,
   LINEN_PREFERENCE_OPTIONS,
@@ -14,6 +13,7 @@ import {
 import { schedulingConfig } from '../config/scheduling';
 import { business, contactPhone, isPending } from '../config/business';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
+import { DIRT_LEVELS } from '../lib/estimate/dirt-levels';
 import Icon from './Icon.astro';
 import TurnstileWidget from './TurnstileWidget.astro';
 import PhotoUploadSection from './PhotoUploadSection.astro';
@@ -374,22 +374,45 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         </div>
 
 
-        <fieldset class="field" data-group-error="condition" data-group-message="Please choose the home's current condition.">
-          <legend>What condition is the home in today?</legend>
-          <div class="option-grid">
-            {
-              CONDITION_OPTIONS.map((option) => (
-                <label class="option">
-                  <input type="radio" name="condition" value={option.value} required />
-                  <span class="option__control"></span>
-                  <span>
-                    <span class="option__label">{option.label}</span>
-                    <span class="option__desc">{option.description}</span>
-                  </span>
-                </label>
-              ))
-            }
-          </div>
+        <fieldset
+          class="field dirt-guide"
+          data-dirt-guide
+          data-group-error="dirtLevel"
+          data-group-message="Please choose the dirt level that best matches the home."
+        >
+          <legend>How dirty is the home today?</legend>
+          <p class="hint">
+            Pick the one description that fits best. This sets the detail time we allow for the
+            visit, so it directly affects the accuracy of your estimate.
+          </p>
+          <details class="dirt-guide__details">
+            <summary class="dirt-guide__summary">
+              <span class="dirt-guide__selected" data-dirt-selected>
+                Choose a dirt level (1–10)
+              </span>
+              <Icon name="chevron-down" size={18} class="dirt-guide__chevron" />
+            </summary>
+            <div class="dirt-guide__options">
+              {
+                DIRT_LEVELS.map((level) => (
+                  <label class="dirt-guide__option" data-dirt-level={level.level}>
+                    <input
+                      type="radio"
+                      name="dirtLevel"
+                      value={String(level.level)}
+                      required
+                    />
+                    <span class="dirt-guide__badge">{level.level}</span>
+                    <span class="dirt-guide__copy">
+                      <span class="dirt-guide__label">{level.label}</span>
+                      <span class="dirt-guide__description">{level.description}</span>
+                    </span>
+                  </label>
+                ))
+              }
+            </div>
+          </details>
+          <p class="hint dirt-guide__impact" data-dirt-impact aria-live="polite" hidden></p>
         </fieldset>
         <div class="field">
           <label for="est-last-clean">When was the home last professionally cleaned?</label>

@@ -12,9 +12,11 @@ interface Props {
   description: string;
   noindex?: boolean;
   schema?: object[];
+  /** False on estimator form pages, which use their own fixed action bar. */
+  showMobileActionBar?: boolean;
 }
 
-const { title, description, noindex = false, schema = [] } = Astro.props;
+const { title, description, noindex = false, schema = [], showMobileActionBar = true } = Astro.props;
 ---
 
 <!doctype html>
@@ -25,11 +27,11 @@ const { title, description, noindex = false, schema = [] } = Astro.props;
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <Header />
-    <main id="main" class="site-main">
+    <main id="main" class:list={['site-main', { 'site-main--estimator': !showMobileActionBar }]}>
       <slot />
     </main>
     <Footer />
-    <MobileActionBar />
+    {showMobileActionBar && <MobileActionBar />}
     <ConsentBanner />
     <PromoPopup />
     <script>

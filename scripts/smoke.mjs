@@ -3,7 +3,7 @@
 // This environment cannot run a real browser, so the smoke test asserts the
 // structural guarantees that matter (documented in docs/VERIFICATION.md):
 // required pages exist, every page has the layout shell, the estimate flow
-// has all six steps and the request/submit states, the hub is selection-only, and no obviously broken
+// has all five steps and the request/submit states, the hub is selection-only, and no obviously broken
 // interactive markup ships. Run: npm run smoke (after npm run build).
 
 import fs from 'node:fs';
@@ -49,11 +49,17 @@ for (const page of REQUIRED_PAGES) {
   }
   const html = fs.readFileSync(file, 'utf8');
 
+  const mobileChrome =
+    page === 'estimate/residential/index.html' || page === 'estimate/str/index.html'
+      ? 'class="wizard__nav"'
+      : page === 'estimate/commercial/index.html' || page === 'estimate/church/index.html'
+        ? 'class="facility-form__actions"'
+        : 'class="mobile-action-bar"';
   for (const [label, needle] of [
     ['header shell', 'class="site-header"'],
     ['footer shell', 'class="site-footer"'],
     ['follow-us section', 'data-social-follow'],
-    ['mobile action bar', 'class="mobile-action-bar"'],
+    ['mobile actions', mobileChrome],
     ['skip link', 'class="skip-link"'],
     ['main landmark', 'id="main"'],
   ]) {

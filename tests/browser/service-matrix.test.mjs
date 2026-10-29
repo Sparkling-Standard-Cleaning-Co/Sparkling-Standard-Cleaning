@@ -157,7 +157,7 @@ async function addressAndHome(page, { service = 'standard', beds } = {}) {
 }
 
 async function finishAndSubmit(page, captured, { deepAck = false } = {}) {
-  await page.click('label.option:has(input[name="condition"][value="maintained"])');
+  await page.locator('[data-dirt-guide] summary').click(); await page.locator('[data-dirt-level="2"]').click();
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
   if (deepAck) {

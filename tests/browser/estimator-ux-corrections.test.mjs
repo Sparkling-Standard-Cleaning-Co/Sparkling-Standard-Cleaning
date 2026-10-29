@@ -149,7 +149,7 @@ async function reachCondition(page) {
 async function reachFinal(page) {
   await reachCondition(page);
   await page.selectOption('#est-frequency', 'one_time');
-  await page.click('label.option:has(input[name="condition"][value="maintained"])');
+  await page.locator('[data-dirt-guide] summary').click(); await page.locator('[data-dirt-level="2"]').click();
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
   await page.click('[data-next]'); // your details
@@ -222,8 +222,54 @@ test('Step 1 reveals time, address and details progressively', async () => {
 test('the Continue button is sticky on mobile', async () => {
   const { context, page } = await open(390, 844);
   try {
-    const position = await page.locator('.wizard__nav').evaluate((el) => getComputedStyle(el).position);
-    assert.equal(position, 'fixed');
+    assert.equal(await page.locator('.mobile-action-bar').count(), 0, 'global quick actions are replaced');
+    const nav = page.locator('.wizard__nav');
+    assert.equal(await nav.evaluate((el) => getComputedStyle(el).position), 'fixed');
+    assert.equal(await nav.locator('[data-next]').isVisible(), true);
+    assert.equal((await nav.locator('[data-next]').innerText()).trim(), 'Continue');
+    assert.equal(await nav.locator('[data-back]').isVisible(), false, 'nothing to go back to on step 1');
+  } finally {
+    await context.close();
+  }
+});
+
+test('the dirt guide is a compact single-select with ten explained levels', async () => {
+  const { context, page } = await open();
+  try {
+    await reachCondition(page);
+    const guide = page.locator('[data-dirt-guide]');
+    const summary = guide.locator('summary');
+    assert.equal((await summary.innerText()).trim(), 'Choose a dirt level (1–10)');
+    await summary.click();
+    assert.equal(await guide.locator('.dirt-guide__option').count(), 10);
+    assert.equal(await guide.locator('[data-dirt-level="1"]').innerText(), '1\nDisney Princess Clean\nAlready sparkling. You mainly need light maintenance: dusting, surfaces, floors and bathrooms.');
+    await guide.locator('[data-dirt-level="5"]').click();
+    assert.equal(await guide.locator('input[name="dirtLevel"]:checked').count(), 1);
+    assert.match(await summary.innerText(), /Level 5 — Surface Clean but Needs Elbow Grease/);
+    assert.match(await guide.locator('[data-dirt-impact]').innerText(), /Extra detail time/);
+    assert.equal(await guide.locator('details').evaluate((el) => el.open), false, 'guide collapses after selection');
+  } finally {
+    await context.close();
+  }
+});
+
+test('Continue opens the dirt guide, scrolls to it and shows the red error', async () => {
+  const { context, page } = await open(390, 844);
+  try {
+    await reachCondition(page);
+    await page.click('[data-next]');
+    const guide = page.locator('[data-dirt-guide]');
+    assert.equal(await guide.locator('details').evaluate((el) => el.open), true, 'the invalid guide opens');
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.getAttribute('name')),
+      'dirtLevel',
+      'the first missing control receives focus',
+    );
+    assert.equal(await page.locator('[data-error-summary]').isVisible(), true);
+    assert.match(await guide.locator('.field-error').innerText(), /dirt level/i);
+    await page.waitForTimeout(700);
+    const box = await guide.locator('[data-dirt-level="1"]').boundingBox();
+    assert.ok(box && box.y >= 0 && box.y < 844, 'the invalid section is scrolled into view');
   } finally {
     await context.close();
   }
@@ -239,7 +285,7 @@ test('photos are in Condition & Frequency, and the last step has no photo upload
       '3',
     );
     await page.selectOption('#est-frequency', 'one_time');
-    await page.click('label.option:has(input[name="condition"][value="maintained"])');
+    await page.locator('[data-dirt-guide] summary').click(); await page.locator('[data-dirt-level="2"]').click();
     await page.selectOption('#est-last-clean', 'within_month');
     await page.selectOption('#est-pets', 'none');
     await page.click('[data-next]');

@@ -2661,6 +2661,124 @@ fieldset {
   margin-top: 0.15rem;
 }
 
+.dirt-guide__details {
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.dirt-guide__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 3.25rem;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  font-weight: var(--weight-bold);
+  color: var(--color-ink-800);
+}
+
+.dirt-guide__summary::-webkit-details-marker {
+  display: none;
+}
+
+.dirt-guide__summary:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: -3px;
+}
+
+.dirt-guide__chevron {
+  flex: none;
+  transition: transform 160ms ease;
+}
+
+.dirt-guide__details[open] .dirt-guide__chevron {
+  transform: rotate(180deg);
+}
+
+.dirt-guide__options {
+  display: grid;
+  max-height: 24rem;
+  overflow-y: auto;
+  border-top: 1px solid var(--color-border);
+  overscroll-behavior: contain;
+}
+
+.dirt-guide__option {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dirt-guide__option:last-child {
+  border-bottom: 0;
+}
+
+.dirt-guide__option:hover {
+  background: var(--color-rose-50);
+}
+
+.dirt-guide__option:has(input:checked) {
+  background: var(--color-rose-50);
+  box-shadow: inset 3px 0 0 var(--color-rose-600);
+}
+
+.dirt-guide__option:has(input:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: -3px;
+}
+
+.dirt-guide__option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dirt-guide__badge {
+  grid-column: 1;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--color-champagne-100);
+  color: var(--color-rose-800);
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+}
+
+.dirt-guide__copy {
+  grid-column: 2;
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.dirt-guide__label {
+  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+  color: var(--color-ink-800);
+}
+
+.dirt-guide__description {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.dirt-guide__impact {
+  margin-top: var(--space-2);
+  color: var(--color-rose-800);
+}
+
 .honeypot {
   position: absolute;
   left: -9999px;
@@ -2806,8 +2924,17 @@ fieldset {
     box-shadow: 0 -8px 24px rgba(48, 36, 41, 0.12);
   }
 
+  .wizard__nav .spacer {
+    display: none;
+  }
+
   .wizard__nav .btn {
     min-height: 2.75rem;
+  }
+
+  .wizard__nav [data-next],
+  .wizard__nav [data-submit] {
+    flex: 1 1 auto;
   }
 }
 
@@ -5429,6 +5556,10 @@ fieldset.input--invalid {
   padding-bottom: calc(var(--mobile-bar-height) + 1rem);
 }
 
+.site-main--estimator {
+  padding-bottom: 0;
+}
+
 @media (min-width: 60rem) {
   .site-main {
     padding-bottom: 0;
@@ -6434,6 +6565,41 @@ fieldset.input--invalid {
     margin-left: 0;
   }
 }
+
+@media (max-width: 47.99rem) {
+  .facility-form {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+
+  .facility-form__actions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin: 0;
+    padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    box-shadow: 0 -8px 24px rgba(48, 36, 41, 0.12);
+  }
+
+  .facility-form__actions [data-facility-back] {
+    flex: 0 0 auto;
+  }
+
+  .facility-form__actions [data-facility-next],
+  .facility-form__actions [data-facility-submit] {
+    flex: 1 1 auto;
+    width: auto;
+    margin-left: 0;
+  }
+}
+
 .facility-form__section {
   padding: var(--space-5);
   border: 1px solid var(--color-border);

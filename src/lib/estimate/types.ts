@@ -9,9 +9,10 @@ import type {
   PricingServiceType,
 } from '../../config/pricing.ts';
 import type { ServiceZone } from '../../config/geography.ts';
+import type { DirtLevel } from './dirt-levels.ts';
 
 export type ServiceType = PricingServiceType;
-export type { Condition, Frequency, LastProfessionalClean, ServiceZone };
+export type { Condition, DirtLevel, Frequency, LastProfessionalClean, ServiceZone };
 
 export type PropertyType = 'house' | 'apartment' | 'condo' | 'townhome' | 'other';
 export type PetSituation = 'none' | 'one' | 'multiple_shedding';
@@ -30,6 +31,11 @@ export interface EstimateInput {
   beds?: number;
   frequency: Frequency;
   condition: Condition;
+  /**
+   * Customer-facing 1–10 dirt guide. When present it is the authoritative
+   * source for `condition`; the condition tier is derived from it.
+   */
+  dirtLevel?: DirtLevel;
   lastClean?: LastProfessionalClean;
   addonIds: string[];
   zip: string;

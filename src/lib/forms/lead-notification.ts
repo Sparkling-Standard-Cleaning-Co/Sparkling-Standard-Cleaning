@@ -18,6 +18,8 @@
 //    "More details" so information can never be lost.
 //  - The customer's notes are passed through verbatim.
 
+import { dirtLevelLabel, parseDirtLevel } from '../estimate/dirt-levels.ts';
+
 const SERVICE_LABELS: Record<string, string> = {
   standard: 'Residential cleaning',
   deep: 'Deep cleaning',
@@ -682,6 +684,8 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
   ].filter(Boolean);
   add('Home — Rooms', rooms.join(' · '), 'bedrooms', 'full_baths', 'half_baths');
   add('Home — Beds to reset', text(fields, 'beds'), 'beds');
+  const dirtLevel = parseDirtLevel(text(fields, 'dirt_level'));
+  add('Home — Dirt level', dirtLevel ? dirtLevelLabel(dirtLevel) : '', 'dirt_level');
   const condition = text(fields, 'condition');
   add('Home — Condition', CONDITION_LABELS[condition] ?? (condition ? humanizeKey(condition) : ''), 'condition');
   const lastClean = text(fields, 'last_cleaned');

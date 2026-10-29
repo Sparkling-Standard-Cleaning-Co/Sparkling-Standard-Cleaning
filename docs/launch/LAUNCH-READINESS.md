@@ -151,3 +151,18 @@ deployment, activation and actual provider verification.
   SPARKLE100 now explicitly accepts weekly, biweekly and monthly recurring residential service.
 - Address suggestions remain a compact dropdown. Street-only provider rows are labeled and never
   place a state or street into the city field; city/ZIP are left blank unless verified.
+
+## 2026-10-29 dirt guide and estimator mobile navigation
+
+- Condition & Frequency now requires a compact, expandable 10-level dirt guide with a plain-English
+  description for every level. The guide maps into the existing five condition tiers, so the same
+  labor-hour model, minimum job, recurring first-visit policy and review gates remain authoritative.
+- Level 10 (Full Restoration) maps to the existing severe tier and receives a personal scope review
+  rather than an instant price. Levels 1-9 price through the approved condition multipliers.
+- The selected level is shown in the customer summary and the owner notification alongside the
+  derived condition. Initial-visit buildup is not carried into the ongoing recurring price.
+- Residential, STR, commercial and church estimate pages no longer render the sitewide
+  Call / Text / Estimate bar. Residential/STR show the wizard Back/Continue/Reserve actions;
+  commercial/church show their own Back/Continue/Request actions.
+- Continue on an incomplete step opens an invalid dirt guide, shows the red inline error and error
+  summary, focuses the first missing control and scrolls it into view.

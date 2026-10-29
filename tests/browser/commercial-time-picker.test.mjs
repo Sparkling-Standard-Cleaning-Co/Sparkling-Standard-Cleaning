@@ -37,8 +37,8 @@ after(async () => {
   server?.kill();
 });
 
-async function openCommercial() {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+async function openCommercial(width = 1280, height = 1000) {
+  const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   await page.addInitScript(() => {
     localStorage.setItem('pcc-consent-v1', JSON.stringify({ analytics: false, ads: false, v: 1 }));
@@ -166,6 +166,21 @@ test('commercial uses the compact picker and allows any available start', async 
     await picker.locator('[data-booking-hold-selected]').click();
     await page.waitForFunction(() => document.querySelector('[data-booking-hold]')?.hasAttribute('hidden') === false);
     assert.match((await picker.locator('[data-booking-hold]').textContent()) ?? '', /Temporary hold until/i);
+  } finally {
+    await context.close();
+  }
+});
+
+test('estimate pages use the facility navigator instead of Call / Text / Estimate', async () => {
+  const { context, page } = await openCommercial(390, 844);
+  try {
+    assert.equal(await page.locator('.mobile-action-bar').count(), 0);
+    const actions = page.locator('.facility-form__actions');
+    assert.equal(await actions.evaluate((el) => getComputedStyle(el).position), 'fixed');
+    assert.equal((await page.locator('[data-facility-next]').innerText()).trim(), 'Continue');
+    assert.equal(await page.locator('[data-facility-back]').isVisible(), false);
+    const box = await actions.boundingBox();
+    assert.equal(Math.round((box?.y ?? 0) + (box?.height ?? 0)), 844);
   } finally {
     await context.close();
   }

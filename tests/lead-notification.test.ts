@@ -17,6 +17,7 @@ const estimatorBase: Record<string, string> = {
   half_baths: '0',
   frequency: 'biweekly',
   condition: 'maintained',
+  dirt_level: '2',
   last_cleaned: 'within_month',
   pets: 'none',
   addon_ids: 'inside_oven',
@@ -95,6 +96,7 @@ test('a recurring reservation reads as an ordered business summary', () => {
   assert.equal(notification['Home — Property type'], 'House');
   assert.equal(notification['Home — Approximate size'], '1600 sq ft');
   assert.equal(notification['Home — Rooms'], '3 bed · 2 full bath');
+  assert.equal(notification['Home — Dirt level'], 'Level 2 — Tidy & Well-Kept');
   assert.equal(notification['Home — Condition'], 'Maintained');
   assert.equal(notification['Extras — Selected'], 'Inside oven');
   assert.equal(notification['Pricing — Customer-proposed price'], '$200');
