@@ -1198,6 +1198,18 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   watchDestinationField(stateInput);
   watchDestinationField(zipInput);
 
+  // A pointer press outside the street field or the suggestion list dismisses
+  // the dropdown before the click lands, so controls below it (for example
+  // Find My Address) remain reachable while suggestions are open.
+  document.addEventListener(
+    'pointerdown',
+    (event) => {
+      const target = event.target as Node | null;
+      if (!target || suggestionsList?.contains(target) || streetField.contains(target)) return;
+      cancelSuggestions();
+    },
+    true,
+  );
   streetField.addEventListener('input', () => {
     if (methodIsGps()) ensureManualMode();
     else if (manualCandidate || manualConfirmed) {
