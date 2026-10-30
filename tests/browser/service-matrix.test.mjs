@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { checkEstimateTerms } from './terms-ready.mjs';
 
 const PORT = 4417;
 const BASE = `http://localhost:${PORT}`;
@@ -170,7 +171,7 @@ async function finishAndSubmit(page, captured, { deepAck = false } = {}) {
   await page.fill('#est-email', 'owner@sparkling-standard.com');
   await page.click('[data-next]'); // extras & payment
   await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
-  if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
+  if (await page.locator('#est-terms').isVisible()) await checkEstimateTerms(page);
   await page.click('[data-submit]');
   await page.waitForTimeout(150);
   if (await page.locator('[data-photo-gate]').isVisible()) await page.click('[data-photo-pay-later]');

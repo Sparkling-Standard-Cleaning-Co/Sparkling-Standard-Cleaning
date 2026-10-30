@@ -14,6 +14,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { checkEstimateTerms } from './terms-ready.mjs';
 import { pricing, pricingValue } from '../../src/config/pricing.ts';
 import { calculateEstimate } from '../../src/lib/estimate/calculate.ts';
 import { selectInstantAmount } from '../../src/lib/estimate/quote.ts';

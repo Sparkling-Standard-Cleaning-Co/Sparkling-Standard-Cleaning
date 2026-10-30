@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { checkEstimateTerms } from './terms-ready.mjs';
 
 const PORT = 4405;
 const BASE = `http://localhost:${PORT}`;
@@ -191,7 +192,7 @@ async function completeRemainingSteps(page) {
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="5"]')?.getAttribute('data-active') === 'true',
   );
-  await page.check('#est-terms', { force: true });
+  await checkEstimateTerms(page);
 }
 
 // ── 3) GPS resolves an exact address ─────────────────────────────────────────

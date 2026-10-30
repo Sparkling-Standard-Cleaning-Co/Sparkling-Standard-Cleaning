@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { checkEstimateTerms } from './terms-ready.mjs';
 
 const PORT = 4399;
 const BASE = `http://localhost:${PORT}`;
@@ -406,7 +407,7 @@ test('final submit disables while sending and reports honest failure', async () 
     await fillHome(page);
     await fillCondition(page);
     await fillExtrasAndScheduling(page);
-    if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
+    if (await page.locator('#est-terms').isVisible()) await checkEstimateTerms(page);
 
     await page.click('[data-submit]');
     await delay(250);
@@ -450,7 +451,7 @@ test('a filled trap field is rejected locally without losing the customer answer
     await fillHome(page);
     await fillCondition(page);
     await fillExtrasAndScheduling(page);
-    if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
+    if (await page.locator('#est-terms').isVisible()) await checkEstimateTerms(page);
 
     // Simulate a bot (or anything else) populating the hidden trap.
     await page.evaluate(() => {
@@ -490,7 +491,7 @@ test('relay rejection causes produce distinct, recoverable copy and preserve ans
     await fillHome(page);
     await fillCondition(page);
     await fillExtrasAndScheduling(page);
-    if (await page.locator('#est-terms').isVisible()) await page.check('#est-terms', { force: true });
+    if (await page.locator('#est-terms').isVisible()) await checkEstimateTerms(page);
 
     await page.click('[data-submit]');
     await page.waitForFunction(() =>

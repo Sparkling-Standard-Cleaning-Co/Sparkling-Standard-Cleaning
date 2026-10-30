@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { checkEstimateTerms } from './terms-ready.mjs';
 
 const PORT = 4506;
 const BASE = `http://localhost:${PORT}`;
@@ -166,8 +167,7 @@ test('a real available slot becomes an expiring hold and travels with the reques
     await page.fill('#est-phone', '8500000000');
     await page.fill('#est-email', 'owner@sparkling-standard.com');
     await page.click('[data-next]'); // extras & payment
-    await page.locator('#est-terms').scrollIntoViewIfNeeded();
-    await page.check('#est-terms');
+    await checkEstimateTerms(page);
     await page.click('[data-submit]');
     await page.waitForTimeout(150);
     if (await page.locator('[data-photo-gate]').isVisible()) await page.click('[data-photo-pay-later]');
