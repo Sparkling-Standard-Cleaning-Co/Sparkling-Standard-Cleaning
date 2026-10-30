@@ -84,15 +84,22 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release:** **`c03394d`** is live (Cloudflare Pages deployment `7bcb95b4-cf86-46d2-91c6-b0605765c084`; GitHub run `40969672226`; `validate`, `browser` and Cloudflare checks passed). It adds the final green **Pay Now and Reserve This Cleaning** action, one smaller pay-later action, a single reconciled vertical total, the collapsed Cleaning Details accordion, Community Support immediately above simplified Terms/Privacy acceptance, a compact estimator consent banner, and a consistent paid-auto-confirmation policy. It hardens checkout state persistence, server-authoritative photos, quote-bound holds, gift refunds vs active reservations, gift checkout readiness/idempotency/terms, booking-admin token separation, day-lock ownership and security headers. A D1 schema foundation is committed but not provisioned. It retains the ten-level dirt guide, progressive Step 1, monthly recurring, map confirmation and gift/payment/booking work from `a6180a3`/`c79a1f6`/`7352cf2`/`a84ae3b`. No live card charge, live gift purchase or production calendar-event test was performed.
-- **Local unreleased work (not deployed):** commit `0966c33` corrects the final estimator page:
-  the add-ons accordion is **Bundle and Save With These Add-Ons**, the customer selections sit in a
-  separately collapsed **Your Cleaning Details** accordion, and the price breakdown is one
-  full-width row per financial item. Commit `7f0b477` adds the local-only D1/admin foundation:
-  `/admin/`, protected auth/customer/lead/request APIs, migrations `0002`–`0004`, and best-effort
-  lead persistence. See `docs/operations/ADMIN-DATA-FOUNDATION.md`. Neither commit is pushed;
-  production remains `c03394d` / docs `4bedeba`. MFA, invitations/recovery and the remaining
-  operational admin modules are still pending.
+- **Current release:** **`a042f83`** is live (Cloudflare Pages deployment
+  `94eacf06-b4fa-4f3a-8ffc-21fbed688485`; GitHub run `40987304333`; `validate`, `browser` and the
+  Cloudflare Pages check passed). It deploys the final-page corrections: **Bundle and Save With These
+  Add-Ons**, a separate collapsed **Your Cleaning Details** accordion, and one full-width financial
+  row per item. Production mobile and desktop pages were re-checked after deployment. It retains
+  `c03394d`'s checkout, photo, hold, gift, booking, security-header and paid-auto-confirmation work
+  plus the ten-level dirt guide, progressive Step 1 and monthly recurring flow. No live card charge,
+  live gift purchase or production calendar-event test was performed.
+- **Local unreleased work (not deployed):** the D1-backed operations admin is implemented locally on
+  `feat/admin-overhaul`: MFA, invitations, password resets, session revocation, customer/property
+  CRM, lead retry, scheduling/recurring plans, team/job checklists, invoices/manual payments/credits,
+  gift-ledger reporting, reports, settings and audit. Migrations `0005`–`0007` are local-only. See
+  `docs/operations/ADMIN-DATA-FOUNDATION.md`. Production remains `a042f83`; no D1 database is
+  provisioned and no admin functionality is deployed. Live charging, payment links, saved cards,
+  Stripe refund execution, production calendar synchronization for D1 confirmations and R2 backfill
+  remain pending/owner-gated.
 - **Prior Initiative 6.8:** live at `6e36c95` plus the HEIC test-stability fix `9fe8764` (Cloudflare Pages deployments `2a0d4f21-8eb8-49b0-b298-f086e3c7473b` and `4afab04f-9f97-47b5-bb2c-778aa7b6f745`; `validate`, `browser` and Cloudflare checks passed). It implements the three-page owner audit: prices stay hidden through every preliminary estimator step and are revealed at the final stage with a shared branded animation across all four engines; the owner-supplied **two-of-four** Competitive Pricing badge is installed; homepage service cards use one equal-height grid; KJV scripture is expanded through a shared component; and all transactional forms require an unchecked-by-default, server-verified terms acceptance with a private R2 record. The public Terms were expanded with Florida cancellation/gift research, condition/access, payment/refund, damage, safety, recurring, commercial/church, dispute and version rules. Gift certificates remain in **request mode** (sales disabled) because no owner-approved denominations/fulfillment activation were supplied; live calendar booking is **not connected**, so preferred dates remain requests and no fake availability is shown. No new cancellation/reassessment fee is active; owner and Florida counsel approval gates are documented in `docs/legal/TERMS-RESEARCH.md` and `docs/launch/OWNER-INPUT-REQUIRED.md`. No pricing mathematics changed.
 - **Prior Initiative 6.7:** live at `f111014`; checkout readiness now checks key, webhook secret/endpoint, notifier, ledger and mode; verified-only quotes, explicit price-change acceptance, SHA-256 checkout idempotency with R2 session reuse, durable webhook event claims, retryable notifications, safe cancellation/status pages and no duplicate lead on payment retry. Production `/api/estimate-checkout` is live mode with all readiness checks true. No live card charge or Stripe test-mode transaction was performed.
 - **Prior Initiative 6.6:** live at `0b907d4` (Cloudflare Pages deployment `26e3b9f8-7665-426f-8687-7f171588c865`); it completed the 13-page owner audit, approved homepage/Community Support/Deep Cleaning/Service Area copy, FL/AL state restriction, GPS loading, optional facility ZIP, centered facility intros, add-on bundles, and the original Pay Now/reservation path. Private legal records were organized in the master archive.
@@ -540,8 +547,8 @@ collections are intentionally empty — not errors.
   **Request to Reserve This Cleaning (Pay Later)** action; no duplicate pay button remains in the
   form. Extras and six bundles sit in a collapsed **Bundle and Save With These Add-Ons**
   accordion; the customer's selections, appointment and location sit below the price breakdown in
-  a separate collapsed **Your Cleaning Details** accordion. This correction is verified locally
-  but was not yet deployed at the time of writing. The final price is one vertical reconciled
+  a separate collapsed **Your Cleaning Details** accordion. Both corrections are live in 042f83;
+  the final price is one vertical reconciled
   breakdown with the true base/deep price, extras, rounding, discount, travel, tax and total, one
   financial item per full-width row; recurring first-visit and ongoing prices remain distinct.
   Estimate form pages do not render the sitewide Call/Text/Estimate bar; the wizard and facility

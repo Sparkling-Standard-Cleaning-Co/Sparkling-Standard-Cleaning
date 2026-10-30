@@ -2,8 +2,10 @@
 
 ## Verified - 2026-10-29 final-page accordion and price-row correction
 
-**Status:** verified locally; **not deployed**. Production remains `c03394d` until the owner
-authorizes a push.
+**Release:** `a042f83`. Cloudflare Pages deployment
+`94eacf06-b4fa-4f3a-8ffc-21fbed688485`. GitHub run `40987304333`: `validate`, `browser` and the
+Cloudflare Pages check succeeded. Production mobile and desktop final pages were re-checked after
+deployment.
 
 - **Add-ons accordion:** the six bundles and individual extras sit under the exact title
   **Bundle and Save With These Add-Ons**; its expandable behavior, prices and selections are
@@ -22,43 +24,46 @@ authorizes a push.
 
 | Check | Result |
 | --- | --- |
-| Unit suite | **679 tests: 678 passed, 1 pre-existing print-output skip, 0 failed** |
+| Unit suite | **674 tests: 673 passed, 1 pre-existing print-output skip, 0 failed** (release branch) |
 | Browser regression | **171 passed, 0 failed** (includes new accordion, single-column, 360/390/1440-width and recurring-price checks) |
 | Type check / build / validation | passed; 205 files, 0 diagnostics; validation and smoke passed |
 | Visual inspection | local mobile (390x844) and desktop (1440x1000) screenshots confirmed both accordions, one-row pricing and no horizontal overflow |
-| Deployment | not pushed; production unchanged |
+| Deployment | live at `a042f83`; production HTTP and rendered-page checks passed |
 
-## Verified locally - 2026-10-29 secure operations admin foundation
+## Verified locally - 2026-10-29 secure operations admin overhaul
 
-**Status:** local D1/admin implementation; **not deployed, not provisioned in production**. No
-customer data was copied into the local database.
+**Status:** local D1/admin implementation; **not deployed and not provisioned in production**. No
+real customer data was copied into the local database.
 
-- **D1 foundation:** `0001` (44 tables, integer-cent money), `0002` (rate limits, lead idempotency,
-  same-business branch/role seeds), `0003` (session hardening/MFA field) and `0004` (branch scope on
-  requests/gifts) applied cleanly to local D1.
-- **Admin security:** owner-only first-run enrollment, PBKDF2-SHA-256 passwords, D1 sessions with
-  hashed tokens/expiry/revocation, CSRF, durable login/setup rate limits, constant-time setup-code
-  comparison, server-derived actor and branch scope, and route-level permission enforcement.
-- **Admin application:** `/admin/` and five protected APIs cover KPI overview, customer search/detail,
-  leads and booking requests. The page is noindex, absent from the sitemap, `no-store`, and is not
-  linked publicly.
-- **Lead persistence:** `/api/lead` writes customers/contacts/properties/leads/estimates
-  idempotently when `DB` is bound; delivery remains authoritative and a D1 failure never blocks the
-  customer request.
-- **Visual:** 390 px and 1440 px screenshots verified; compact three-column mobile navigation,
-  visible sign-out, and table scrolling contained inside cards without page overflow.
-- **Backup:** local D1 export restored 47 tables, both branches and the owner account into a clean
-  SQLite database.
-- **Not implemented:** MFA enrollment, invitations/password recovery, session-revocation UI,
-  remaining operational modules, gift-admin session unification, production D1/binding/backfill.
+- **D1 foundation:** migrations `0001`–`0007` define the cleaning-company schema, security seeds,
+  branch scope, MFA/invitations/resets/settings, service catalog and cleaner field scope. All seven
+  apply cleanly to local D1.
+- **Authentication:** owner enrollment, PBKDF2-SHA-256 passwords, D1 sessions with hashed
+  tokens/expiry/revocation, CSRF, durable login/setup rate limits, TOTP MFA with one-time recovery
+  codes, invitations, owner-issued password resets, last-owner protection and audit history.
+- **Authorization:** server-derived actor, permissions and branch scope on every admin endpoint;
+  cleaner CRM access removed; private notes withheld from finance/cleaner roles.
+- **Admin application:** overview, calendar/requests, lead inbox with delivery-failure retry,
+  customer/property CRM, recurring plans, team/jobs/checklists, invoices/manual payments/refunds/
+  credits, gift-ledger reporting, reports, sessions, security settings and audit.
+- **Lead persistence:** reservations are mirrored into D1 and `/api/lead` fails closed before
+  notification when the database is configured but persistence fails. Failed notifications retain
+  attempts/error state and can be retried from the admin.
+- **Visual:** 390 px and 1440 px administrator and manager views verified; no page overflow,
+  role-aware navigation/actions and mobile table containment.
+- **Backup:** local D1 export restored **52 tables, 7 migrations and 2 synthetic administrators** with
+  no foreign-key violations.
+- **Not activated:** production D1/binding/backfill, live invoice payment links, saved cards,
+  off-session charging, Stripe refund execution, unified gift adjustments, production calendar sync
+  for D1 confirmations, operational settings screens and independent production backup drill.
 
 | Check | Result |
 | --- | --- |
-| Unit suite | **681 tests: 680 passed, 1 pre-existing print-output skip, 0 failed** |
+| Unit suite | **687 tests: 686 passed, 1 pre-existing print-output skip, 0 failed** |
 | Browser regression | **171 passed, 0 failed** |
-| Admin tests | **7 passed** (migrations, auth, CSRF, RBAC, branch scope, persistence, rate limits) |
+| Admin tests | **13 passed** (migrations, auth, MFA, invitations/reset, CSRF, RBAC, branch scope, CRM, lead retry, scheduling, checklists, billing/idempotency) |
 | Type check / build / validation | passed; admin boundary and `_headers` validation passed |
-| Production | unchanged; no D1 provisioned and no admin work deployed |
+| Production | unchanged at `a042f83`; no D1 provisioned and no admin work deployed |
 
 ## Verified - 2026-10-29 final checkout and payment-integrity release
 

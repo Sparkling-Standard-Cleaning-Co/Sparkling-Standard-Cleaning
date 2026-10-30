@@ -178,8 +178,7 @@ deployment, activation and actual provider verification.
 - Extras and all six bundles sit in a collapsed **Bundle and Save With These Add-Ons** accordion.
   The selected extras and subtotal appear in its summary and update immediately.
 - The customer's selections, appointment and location sit below the price breakdown in a separate,
-  collapsed **Your Cleaning Details** accordion. This local correction is verified but not yet
-  deployed; production remains `c03394d`.
+  collapsed **Your Cleaning Details** accordion. The correction is live in `a042f83`.
 - Community Support moved immediately above the simplified Terms/Privacy acceptance. The
   cancellation policy remains inside `/terms/`.
 - Paid, complete bookings confirm automatically only after the server verifies payment, the quote,
