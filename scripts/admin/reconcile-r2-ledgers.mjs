@@ -90,7 +90,7 @@ for (const file of readJsonFiles(bookingsDir)) {
     VALUES (${sqlValue(record.id)}, ${sqlValue(record.holdId)}, 'branch_pensacola',
       ${sqlValue(record.status === 'declined' ? 'declined' : record.status === 'confirmed' ? 'confirmed' : 'pending')},
       ${sqlValue(record.reference ?? '')}, ${sqlValue(date)}, ${sqlValue(start)}, ${sqlValue(end)},
-      ${Number(record.durationMinutes) || 120}, ${sqlValue(JSON.stringify({ source: 'r2_backfill', calendarEventId: record.calendarEventId ?? '' }))})
+      ${Number(record.durationMinutes) || 120}, ${sqlValue(JSON.stringify({ source: 'r2_backfill', locationText: record.locationText ?? '', destination: record.destination ?? null, resourceIds: record.resourceIds ?? [], crewSize: record.crewSize ?? null, calendarEventId: record.calendarEventId ?? '' }))})
     ON CONFLICT(hold_id) DO UPDATE SET
       status = excluded.status,
       quote_reference = excluded.quote_reference,
@@ -98,6 +98,7 @@ for (const file of readJsonFiles(bookingsDir)) {
       start_at = excluded.start_at,
       end_at = excluded.end_at,
       duration_minutes = excluded.duration_minutes,
+      payload_json = excluded.payload_json,
       updated_at = CURRENT_TIMESTAMP,
       branch_id = COALESCE(booking_requests.branch_id, excluded.branch_id);`);
   bookingCount += 1;

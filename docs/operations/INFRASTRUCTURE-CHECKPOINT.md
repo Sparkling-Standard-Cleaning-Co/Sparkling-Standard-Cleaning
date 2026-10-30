@@ -81,7 +81,9 @@ reviewable D1 SQL from exported R2 JSON without connecting to production R2.
 
 ## Outstanding work
 
-- Admin code is deployed; first-owner enrollment via the server setup code is the remaining account step.
+- Admin code is deployed at 9ca8068; the owner account owner@sparkling-standard.com is enrolled with
+  the owner role, and a one-time password-reset email was sent so the owner can choose the final
+  password. MFA enrollment remains owner-controlled in Settings.
 - Verify the production `DB` binding through `/api/admin/auth`.
 - Run Stripe test-mode verification without live money after a test-mode key is available locally.
 - Test real Google Calendar writes only against an isolated test calendar or after explicit owner
