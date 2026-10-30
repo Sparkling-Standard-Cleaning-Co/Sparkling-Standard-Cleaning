@@ -1,6 +1,57 @@
 # Verification status
 
-## Verified - 2026-10-30 five-condition estimator release candidate (local, not deployed)
+## Verified - 2026-10-30 owner access, five-condition estimator and recovery release
+
+**Release:** `5525cd5` on `main` (code commits `c11a85c`, `26605b5`, `2ade072`, `af0ad1f`;
+documentation `5525cd5`). Cloudflare Pages deployment
+`c3cb64b0-6260-423a-be2b-19cffde55fd3` (source `5525cd5`) is active. The previous production
+checkpoint was `d9c025a` / deployment `52d1f15a-c133-4099-95a8-732555fa5ed3`.
+
+**Scope:** self-service administrator password recovery, owner-directed password rules (8
+characters plus one special character), the five-condition estimator restoration, agreement review
+packaging, admin manual, and verification tooling. No customer price, billing rate, discount,
+travel value, facility tier, D1 schema, R2 ledger or Google Calendar configuration was changed.
+
+**Local verification (exact final code):**
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **698 tests: 697 passed, 1 pre-existing skip, 0 failed** |
+| Browser suite | **177 passed, 0 failed** |
+| Type check | `npm run check` 0 errors, 0 warnings, 0 hints |
+| Build + validation | `npm run verify` passed (links, SEO, marketing/QR, GTM artifacts, checklist leaks) |
+| Smoke | `npm run smoke` passed across 21 pages |
+| Pricing configuration | `config:validate` passed; automatic version unchanged |
+| Pricing impact report | `npm run pricing:impact` completed for all four engines |
+| Frozen 8,771-scenario comparison | 8,771 rows; 0 first-visit changes, 0 ongoing changes, 0 status changes, 0 hours changes |
+| Independent recomputation | 8,726 scenarios recomputed by the final engine; **0 mismatches** (45 routed-travel fixtures excluded) |
+| Config version | `2026-10-25.engine-calibration-supportive-tax.v1.186596024bedfeeb` (identical to the audit) |
+
+**Production verification (read-only):**
+
+| Check | Result |
+| --- | --- |
+| `/admin/` | HTTP 200; **Forgot Password?** present; password hints show 8 characters plus one special |
+| `/api/admin/auth` | `configured: true`, `setupRequired: false` |
+| `/api/admin/overview` without a session | **401 rejected** |
+| `/estimate/residential/`, `/estimate/str/` | HTTP 200; five `condition` inputs; no ten-level dirt guide |
+| `/estimate/commercial/`, `/estimate/church/` | HTTP 200; facility condition selector present |
+| Public Pay Now readiness | `enabled: true`, `mode: "live"`, every readiness check true |
+| Google Calendar | connected, readable, `America/Chicago`, `auto_confirm` |
+
+**Not verified / blocked:**
+
+- A real Stripe **test-mode** API run: no test-mode key is available locally. The harness is ready
+  (`npm run stripe:sandbox`) and refuses live keys. No administrative billing gate was enabled.
+- Google Calendar **write** lifecycle: the owner token is an encrypted Cloudflare secret and was not
+  available to the local terminal. Reads, holds and availability are verified; the live write test
+  remains an owner-run command (`node scripts/booking-live-test.mjs`).
+- No real-money charge or refund was performed at any point.
+
+See `docs/operations/STRIPE-SANDBOX-VERIFICATION.md`, `docs/operations/GOOGLE-CALENDAR-SETUP.md` and
+`docs/operations/ADMIN-USER-GUIDE.md`.
+
+## Verified - 2026-10-30 five-condition estimator release candidate (superseded by the release above)
 
 **Status:** local release candidate; no push or production deployment was performed.
 

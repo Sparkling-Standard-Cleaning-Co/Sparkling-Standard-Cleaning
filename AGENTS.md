@@ -84,18 +84,26 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release:** **`cbd4b96`** is live (Cloudflare Pages deployment
-  `b19620e8-2cc9-45fc-b046-f8aa3e8a1575`; GitHub run `41115145424`; `validate`, `browser` and the
-  Cloudflare Pages check passed). It deploys the D1-backed operations admin, remote migrations
-  `0001`–`0010`, owner enrollment, production `DB` binding, two reconciled legacy booking requests,
-  and the confirmed-address Pay Now correction from `48930a0`. The owner reset email was delivered
-  through Resend. Admin remains protected by the owner/manager/finance/cleaner permission model;
-  Stripe live administrative charging/refund gates remain disabled. Service agreements remain draft
-  and are not presented as binding; only the owner-directed payment authorization signature flow is
-  implemented.
-- **Concurrent estimator work:** a separate editor may have uncommitted five-condition estimator
-  changes in the working tree. They are not part of `cbd4b96` and must not be committed or deployed
-  without the owner's separate directive.
+- **Current release:** **`5525cd5`** is live (Cloudflare Pages deployment
+  `c3cb64b0-6260-423a-be2b-19cffde55fd3`; GitHub run `41128450805`; `validate`, `browser` and the
+  Cloudflare Pages check passed). It deploys the restored five-condition estimator, the
+  self-service administrator password-recovery flow, the owner-directed password rule (**at least 8
+  characters plus one special character**), the agreement review package and the admin manual. The
+  prior admin release `cbd4b96` (deployment `b19620e8-2cc9-45fc-b046-f8aa3e8a1575`) remains the
+  D1/administrator foundation: migrations `0001`–`0010`, owner enrollment, production `DB` binding,
+  two reconciled legacy booking requests and the confirmed-address Pay Now correction. Admin remains
+  protected by the owner/manager/finance/cleaner permission model; Stripe live administrative
+  charging/refund gates remain disabled. Customer agreement e-signature remains disabled; the
+  proposed wording is delivered to the owner master folder for review, and only the owner-directed
+  payment authorization signature flow is implemented.
+- **Canonical owner master:** `C:\Users\thoma\Downloads\Sparkling-Standard-Master\`. The active
+  repository checkout is `01_WEBSITE_REPOSITORY`; the original Documents copy is preserved as a
+  read-only pre-consolidation snapshot until the owner approves cleanup. Start at
+  `00_START_HERE\START_HERE.html`.
+- **Owner local recovery state:** the previously issued reset link was **expired** (two unused rows,
+  60-minute expiry, both created 2026-10-30 19:03 UTC); both were invalidated. The owner must set her
+  own password through the new Forgot Password flow. Production D1 has 10 migrations, 54 tables
+  (53 business), 0 foreign-key violations and 0 outstanding reset tokens.
 - **Prior Initiative 6.8:** live at `6e36c95` plus the HEIC test-stability fix `9fe8764` (Cloudflare Pages deployments `2a0d4f21-8eb8-49b0-b298-f086e3c7473b` and `4afab04f-9f97-47b5-bb2c-778aa7b6f745`; `validate`, `browser` and Cloudflare checks passed). It implements the three-page owner audit: prices stay hidden through every preliminary estimator step and are revealed at the final stage with a shared branded animation across all four engines; the owner-supplied **two-of-four** Competitive Pricing badge is installed; homepage service cards use one equal-height grid; KJV scripture is expanded through a shared component; and all transactional forms require an unchecked-by-default, server-verified terms acceptance with a private R2 record. The public Terms were expanded with Florida cancellation/gift research, condition/access, payment/refund, damage, safety, recurring, commercial/church, dispute and version rules. Gift certificates remain in **request mode** (sales disabled) because no owner-approved denominations/fulfillment activation were supplied; live calendar booking is **not connected**, so preferred dates remain requests and no fake availability is shown. No new cancellation/reassessment fee is active; owner and Florida counsel approval gates are documented in `docs/legal/TERMS-RESEARCH.md` and `docs/launch/OWNER-INPUT-REQUIRED.md`. No pricing mathematics changed.
 - **Prior Initiative 6.7:** live at `f111014`; checkout readiness now checks key, webhook secret/endpoint, notifier, ledger and mode; verified-only quotes, explicit price-change acceptance, SHA-256 checkout idempotency with R2 session reuse, durable webhook event claims, retryable notifications, safe cancellation/status pages and no duplicate lead on payment retry. Production `/api/estimate-checkout` is live mode with all readiness checks true. No live card charge or Stripe test-mode transaction was performed.
 - **Prior Initiative 6.6:** live at `0b907d4` (Cloudflare Pages deployment `26e3b9f8-7665-426f-8687-7f171588c865`); it completed the 13-page owner audit, approved homepage/Community Support/Deep Cleaning/Service Area copy, FL/AL state restriction, GPS loading, optional facility ZIP, centered facility intros, add-on bundles, and the original Pay Now/reservation path. Private legal records were organized in the master archive.

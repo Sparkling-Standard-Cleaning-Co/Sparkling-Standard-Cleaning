@@ -4,7 +4,20 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-29** (owner-facing estimator and payment-integrity release).
+Last reviewed: **2026-10-30** (owner access, five-condition estimator and recovery release).
+
+**2026-10-30 corrections — these supersede any conflicting row below:**
+
+- Production release is **`5525cd5`** (deployment `c3cb64b0-6260-423a-be2b-19cffde55fd3`).
+- Booking confirmation mode is **`auto_confirm`** with `autoConfirmAllowed: true`; only a complete
+  paid booking that passes every server check confirms automatically. The older "owner approval /
+  auto-confirm disabled" rows are historical.
+- The operations admin is deployed at `/admin/` with self-service **Forgot Password?**, 8-character
+  plus one-special-character password rules, optional TOTP MFA, and server-enforced roles.
+- Stripe administrative charging and refunds remain **disabled** behind server gates. A test-mode
+  sandbox run is still outstanding because no test-mode key is available locally.
+- Google Calendar reads, availability and holds are verified. The live **write** lifecycle still
+  needs one owner-run `scripts/booking-live-test.mjs` execution.
 
 **Release status:** production serves GitHub `main`. Gift certificates are **live for public
 purchase**, including custom amounts, recipient delivery and valid-from activation. A complete paid

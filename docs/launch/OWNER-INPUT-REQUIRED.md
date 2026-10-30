@@ -1,5 +1,26 @@
 # Owner input required
 
+> **2026-10-30 owner actions after the recovery release (`5525cd5`):**
+>
+> 1. **Set your own password.** Open <https://sparkling-standard.com/admin/>, choose **Forgot
+>    Password?**, enter `owner@sparkling-standard.com`, and use the emailed single-use link within
+>    30 minutes. Password rule: at least 8 characters including one special character. The previous
+>    link expired unused and has been invalidated. Nobody else sets this password for you.
+> 2. **Stripe sandbox (optional, to finish financial verification).** Create or rotate a Stripe
+>    **test-mode** secret key, then paste it into
+>    `C:\Users\thoma\Downloads\Sparkling-Standard-Master\01_WEBSITE_REPOSITORY\.env`
+>    on the line `STRIPE_SECRET_KEY=` and run `npm run stripe:sandbox`. The key is ignored by Git and
+>    never printed. No live key is accepted. Details: `docs/operations/STRIPE-SANDBOX-VERIFICATION.md`.
+> 3. **Calendar write verification (optional, one command).** In a terminal at
+>    `C:\Users\thoma\Downloads\Sparkling-Standard-Master\01_WEBSITE_REPOSITORY`, run
+>    `node scripts/booking-live-test.mjs`. Paste the `BOOKING_OWNER_TOKEN` at the hidden prompt
+>    (never in chat), type `YES`, and the script creates, verifies and cancels one synthetic calendar
+>    event. It cannot create a customer booking, notification or charge.
+> 4. **Agreement review.** Read the drafts in
+>    `C:\Users\thoma\Downloads\Sparkling-Standard-Master\05_AGREEMENTS_AND_LEGAL\REVIEW_REQUIRED\`
+>    and complete `10_OWNER_REVIEW_CHECKLIST`. Nothing is active until you approve it and counsel
+>    reviews it.
+
 > **2026-10-21 owner decision pass:** all 46 decisions are recorded in `Business HQ\00_START_HERE\MASTER_OWNER_DECISIONS.xlsx`. Remaining items below are evidence or professional review, not unanswered decisions. The workbook's `VERIFICATION_REGISTER` is the authoritative remaining-work list.
 
 **The site is live at `https://sparkling-standard.com`** and its pipeline is verified operational.
