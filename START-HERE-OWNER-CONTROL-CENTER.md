@@ -7,6 +7,8 @@ files** — production secrets belong only in Cloudflare.
 
 Full instructions: [Owner Operations Manual](docs/OWNER-OPERATIONS-MANUAL.md).
 
+Infrastructure already configured: [2026-10-30 Infrastructure Checkpoint](docs/operations/INFRASTRUCTURE-CHECKPOINT.md).
+
 Estimator details: [Estimator Control Center](docs/ESTIMATOR-CONTROL-CENTER.md).
 
 ---
