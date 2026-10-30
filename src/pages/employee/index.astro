@@ -1,0 +1,158 @@
+---
+import '../../styles/global.css';
+import '../../styles/employee.css';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#8a4a52" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SS Team" />
+    <link rel="manifest" href="/employee-manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <title>Sparkling Standard Team</title>
+  </head>
+  <body class="employee-body">
+    <main class="employee-shell">
+      <header class="employee-brand">
+        <img src="/brand/icon-192.png" alt="" width="40" height="40" />
+        <div>
+          <p class="employee-brand__name">Sparkling Standard</p>
+          <p class="employee-brand__sub">Team</p>
+        </div>
+      </header>
+
+      <div class="employee-gate" data-employee-gate>
+        <p class="employee-muted" data-employee-gate-status>Checking your secure session.</p>
+
+        <form class="employee-form employee-card" data-employee-login hidden>
+          <h1 style="font-family:var(--font-display);font-size:1.3rem;margin:0;color:#6d343c;">Sign in</h1>
+          <label>Email <input name="email" type="email" autocomplete="username" required /></label>
+          <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
+          <button class="btn btn--primary" type="submit">Sign In</button>
+          <p class="employee-muted"><button class="employee-link" type="button" data-employee-show-forgot>Forgot Password?</button></p>
+        </form>
+
+        <form class="employee-form employee-card" data-employee-forgot hidden>
+          <h1 style="font-family:var(--font-display);font-size:1.3rem;margin:0;color:#6d343c;">Reset your password</h1>
+          <p class="employee-muted">If the address belongs to an active employee account, we will email a single-use link that expires in 30 minutes.</p>
+          <label>Email <input name="email" type="email" autocomplete="username" required /></label>
+          <button class="btn btn--primary" type="submit">Send Reset Link</button>
+          <button class="btn btn--ghost" type="button" data-employee-back>Return to Sign In</button>
+          <p class="employee-status" data-employee-forgot-status role="status" aria-live="polite"></p>
+        </form>
+
+        <form class="employee-form employee-card" data-employee-reset hidden>
+          <h1 style="font-family:var(--font-display);font-size:1.3rem;margin:0;color:#6d343c;">Choose a new password</h1>
+          <p class="employee-muted">At least 8 characters, including one special character.</p>
+          <label>New password <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="200" required /></label>
+          <label>Confirm new password <input name="confirmPassword" type="password" autocomplete="new-password" required /></label>
+          <button class="btn btn--primary" type="submit">Update Password</button>
+          <p class="employee-status" data-employee-reset-status role="status" aria-live="polite"></p>
+        </form>
+
+        <form class="employee-form employee-card" data-employee-invite hidden>
+          <h1 style="font-family:var(--font-display);font-size:1.3rem;margin:0;color:#6d343c;">Accept your invitation</h1>
+          <p class="employee-muted">At least 8 characters, including one special character.</p>
+          <label>Your name <input name="name" type="text" autocomplete="name" required /></label>
+          <label>Create password <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="200" required /></label>
+          <label>Confirm password <input name="confirmPassword" type="password" autocomplete="new-password" required /></label>
+          <button class="btn btn--primary" type="submit">Accept Invitation</button>
+          <p class="employee-status" data-employee-invite-status role="status" aria-live="polite"></p>
+        </form>
+
+        <form class="employee-form employee-card" data-employee-mfa hidden>
+          <h1 style="font-family:var(--font-display);font-size:1.3rem;margin:0;color:#6d343c;">Two-step verification</h1>
+          <label>Authenticator code <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /></label>
+          <label>Recovery code <input name="recoveryCode" autocomplete="off" maxlength="40" /></label>
+          <button class="btn btn--primary" type="submit">Verify and Sign In</button>
+        </form>
+      </div>
+
+      <div class="employee-app" data-employee-app hidden>
+        <div class="employee-head">
+          <div>
+            <p class="employee-muted" style="margin:0;">Signed in as</p>
+            <h1 data-employee-name>Team member</h1>
+          </div>
+          <button class="btn btn--ghost btn--small" type="button" data-employee-logout>Sign out</button>
+        </div>
+
+        <section class="employee-card employee-clock" aria-labelledby="clock-title">
+          <h2 id="clock-title">Timeclock</h2>
+          <span class="employee-clock__state" data-employee-clock-state data-state="out">Clocked out</span>
+          <p class="employee-clock__time" data-employee-clock-time>—</p>
+          <p class="employee-muted" data-employee-clock-note>Clock in when you arrive at your assigned job.</p>
+
+          <div class="employee-fields" data-employee-clock-fields>
+            <label>Job (optional)
+              <select data-employee-job>
+                <option value="">No specific job</option>
+              </select>
+            </label>
+            <label>Pay rate
+              <select data-employee-rate>
+                <option value="regular">Regular cleaner</option>
+                <option value="lead">Lead cleaner</option>
+                <option value="solo" disabled>Solo assignment</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="employee-actions">
+            <button class="btn btn--success btn--full" type="button" data-employee-action="clock_in">Clock In</button>
+            <button class="btn btn--secondary" type="button" data-employee-action="start_break">Start Break</button>
+            <button class="btn btn--secondary" type="button" data-employee-action="end_break">End Break</button>
+            <button class="btn btn--secondary" type="button" data-employee-action="start_meal">Start Meal</button>
+            <button class="btn btn--secondary" type="button" data-employee-action="end_meal">End Meal</button>
+            <button class="btn btn--danger btn--full" type="button" data-employee-action="clock_out">Clock Out</button>
+          </div>
+          <p class="employee-status" data-employee-clock-status role="status" aria-live="polite"></p>
+          <p class="employee-notice" data-employee-location-note hidden></p>
+
+          <div class="employee-grid">
+            <div class="employee-stat"><p class="employee-stat__label">Today</p><p class="employee-stat__value" data-employee-today>0h 00m</p></div>
+            <div class="employee-stat"><p class="employee-stat__label">This week</p><p class="employee-stat__value" data-employee-week>0h 00m</p></div>
+            <div class="employee-stat"><p class="employee-stat__label">Overtime</p><p class="employee-stat__value" data-employee-overtime>0h 00m</p></div>
+            <div class="employee-stat"><p class="employee-stat__label">Estimated gross (preliminary)</p><p class="employee-stat__value" data-employee-gross>$0.00</p></div>
+          </div>
+        </section>
+
+        <section class="employee-card" aria-labelledby="jobs-title">
+          <h2 id="jobs-title">Your next three days</h2>
+          <p class="employee-muted">Only your assigned jobs for today, tomorrow and the day after are shown.</p>
+          <div data-employee-jobs></div>
+        </section>
+
+        <section class="employee-card" aria-labelledby="time-title">
+          <h2 id="time-title">This week's time</h2>
+          <p class="employee-muted">Preliminary until management reviews it. Meal periods are unpaid unless a manager corrects them.</p>
+          <div data-employee-time></div>
+          <details style="margin-top:.7rem;">
+            <summary>Request a timecard correction</summary>
+            <form class="employee-form" data-employee-correction>
+              <label>Entry (optional) <select name="intervalId" data-employee-interval-options><option value="">General correction</option></select></label>
+              <label>What should be corrected? <textarea name="message" rows="3" maxlength="1000" required></textarea></label>
+              <button class="btn btn--secondary" type="submit">Send Correction Request</button>
+              <p class="employee-status" data-employee-correction-status role="status" aria-live="polite"></p>
+            </form>
+          </details>
+        </section>
+
+        <p class="employee-footer">
+          <a href="/employee/install/">Install this app on your phone</a> ·
+          <a href="/privacy/">Privacy</a>
+          <br />Sparkling Standard · Standards That Make Your Space Sparkle.
+        </p>
+      </div>
+    </main>
+    <script>
+      import '../../scripts/employee';
+    </script>
+  </body>
+</html>

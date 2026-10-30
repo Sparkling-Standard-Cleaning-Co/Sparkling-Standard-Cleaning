@@ -1,0 +1,81 @@
+---
+import '../../styles/global.css';
+import '../../styles/employee.css';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#8a4a52" />
+    <title>Install the Sparkling Standard Team app</title>
+  </head>
+  <body class="employee-body">
+    <main class="employee-shell" style="max-width:32rem;">
+      <header class="employee-brand">
+        <img src="/brand/icon-192.png" alt="" width="40" height="40" />
+        <div>
+          <p class="employee-brand__name">Sparkling Standard</p>
+          <p class="employee-brand__sub">Team app</p>
+        </div>
+      </header>
+
+      <section class="employee-card">
+        <h1 style="font-family:var(--font-display);color:#6d343c;margin-top:0;">Add the team portal to your phone</h1>
+        <p class="employee-muted">
+          The team portal is a secure mobile website. Add it to your home screen so it opens like an app.
+          There is no App Store or Google Play download.
+        </p>
+        <p class="employee-muted">Portal address:</p>
+        <p style="font-weight:700;word-break:break-all;">https://sparkling-standard.com/employee/</p>
+        <button class="btn btn--secondary" type="button" data-copy-link>Copy the link</button>
+        <p class="employee-status" data-copy-status role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="employee-card">
+        <h2>iPhone or iPad (Safari)</h2>
+        <ol class="employee-muted" style="padding-left:1.2rem;">
+          <li>Open the portal link in Safari.</li>
+          <li>Tap the Share button (square with an arrow).</li>
+          <li>Scroll and tap <strong>Add to Home Screen</strong>.</li>
+          <li>Name it “SS Team” and tap <strong>Add</strong>.</li>
+        </ol>
+      </section>
+
+      <section class="employee-card">
+        <h2>Android (Chrome)</h2>
+        <ol class="employee-muted" style="padding-left:1.2rem;">
+          <li>Open the portal link in Chrome.</li>
+          <li>Tap the three-dot menu.</li>
+          <li>Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
+          <li>Confirm the install.</li>
+        </ol>
+      </section>
+
+      <section class="employee-card">
+        <h2>Signing in</h2>
+        <p class="employee-muted">
+          Use the email address the owner or manager invited. Forgot your password? Use
+          <strong>Forgot Password?</strong> on the sign-in screen. Location is requested only when you
+          tap a clock button, and never tracked in the background.
+        </p>
+        <a class="btn btn--primary" href="/employee/">Open the team portal</a>
+      </section>
+    </main>
+    <script>
+      const button = document.querySelector('[data-copy-link]');
+      const status = document.querySelector('[data-copy-status]');
+      button?.addEventListener('click', async () => {
+        const url = 'https://sparkling-standard.com/employee/';
+        try {
+          await navigator.clipboard.writeText(url);
+          if (status) status.textContent = 'Link copied.';
+        } catch {
+          if (status) status.textContent = 'Copy failed. Select the address above instead.';
+        }
+      });
+    </script>
+  </body>
+</html>

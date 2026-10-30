@@ -56,6 +56,10 @@ const NOINDEX_PAGES = new Set([
   '/gift-admin/',
   '/admin/index.html',
   '/admin/',
+  '/employee/index.html',
+  '/employee/',
+  '/employee/install/index.html',
+  '/employee/install/',
   '/gift-certificates/redeem/index.html',
   '/gift-certificates/redeem/',
   '/gift-certificates/success/index.html',
@@ -75,6 +79,11 @@ for (const file of htmlFiles) {
   const relative = path.relative(DIST, file).split(path.sep).join('/');
   const page = relative.endsWith('index.html') ? `/${relative.slice(0, -'index.html'.length)}` : `/${relative}`;
 
+  if (page.startsWith('/employee')) {
+    const robots = html.match(/<meta name="robots" content="([^"]*)"/)?.[1];
+    if (!robots || !isEffectivelyNoindex(robots)) problems.push(`${page}: employee portal must be noindex`);
+    continue;
+  }
   if (page.startsWith('/admin')) {
     const robots = html.match(/<meta name="robots" content="([^"]*)"/)?.[1];
     if (!robots || !isEffectivelyNoindex(robots)) problems.push(`${page}: admin must be noindex`);
