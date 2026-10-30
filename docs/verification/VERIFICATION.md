@@ -92,7 +92,7 @@ real customer data was copied into the local database.
 | Browser regression | **171 passed, 0 failed** |
 | Admin tests | **15 passed** (migrations, auth, encrypted MFA, invitations/reset, CSRF, RBAC, branch scope, CRM, lead retry, scheduling, checklists, billing/idempotency, Stripe link/webhook reconciliation) |
 | Type check / build / validation | passed; admin boundary and `_headers` validation passed |
-| Production | unchanged at `a042f83`; no D1 provisioned and no admin work deployed |
+| Production | unchanged at `48930a0`; no D1 provisioned and no admin work deployed |
 
 ## Verified - 2026-10-29 final checkout and payment-integrity release
 
