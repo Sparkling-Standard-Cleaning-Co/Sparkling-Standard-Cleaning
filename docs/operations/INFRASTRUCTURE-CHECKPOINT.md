@@ -13,7 +13,9 @@ existing secrets. No credential values belong in this file.
 - Cloudflare account: owner account `owner@sparkling-standard.com`
 - Existing GitHub-connected Pages deployment is authoritative. Preserve it; do not replace it with
   an unrelated Pages project or deployment mechanism.
-- Verified production release at this checkpoint: `48930a0`; deployment
+- Verified production admin release at this checkpoint: `cbd4b96`; deployment
+  `b19620e8-2cc9-45fc-b046-f8aa3e8a1575`.
+- The prior customer Pay Now fix remains included: release `48930a0`, deployment
   `c067b24b-968a-4fae-95c3-59925cef5fc2`.
 
 ## Cloudflare D1
@@ -37,9 +39,14 @@ existing secrets. No credential values belong in this file.
 
 Present in the Pages production environment; values are encrypted and were not read or copied:
 
-`BOOKING_OWNER_TOKEN`, `GIFT_ADMIN_SETUP_CODE`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CLIENT_ID`,
-`GOOGLE_REFRESH_TOKEN`, `MFA_ENCRYPTION_KEY`, `PHOTO_OWNER_TOKEN`, `RESEND_API_KEY`, `ROUTES_API_KEY`,
-`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `TRAVEL_ORIGIN`, `WEB3FORMS_ACCESS_KEY`.
+`ADMIN_SETUP_CODE`, `BOOKING_OWNER_TOKEN`, `GIFT_ADMIN_SETUP_CODE`, `GOOGLE_CLIENT_ID`,
+`GOOGLE_CALENDAR_ID`, `GOOGLE_REFRESH_TOKEN`, `MFA_ENCRYPTION_KEY`, `PHOTO_OWNER_TOKEN`,
+`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `ROUTES_API_KEY`, `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`, `TRAVEL_ORIGIN`, `WEB3FORMS_ACCESS_KEY`.
+
+`ADMIN_SETUP_CODE` becomes unusable once the owner exists. `GOOGLE_CLIENT_SECRET` is a working
+environment value even though it is not shown in the secret listing; production
+`/api/booking-status` reports it configured.
 
 `GOOGLE_CLIENT_SECRET` is not shown in the Pages secret listing but is present as a working
 environment value: the production booking-status endpoint reports
@@ -81,10 +88,13 @@ reviewable D1 SQL from exported R2 JSON without connecting to production R2.
 
 ## Outstanding work
 
-- Admin code is deployed at 9ca8068; the owner account owner@sparkling-standard.com is enrolled with
-  the owner role, and a one-time password-reset email was sent so the owner can choose the final
-  password. MFA enrollment remains owner-controlled in Settings.
-- Verify the production `DB` binding through `/api/admin/auth`.
+- Admin code is deployed; production `/api/admin/auth` reports `configured: true` and
+  `setupRequired: false`, confirming the `DB` binding. The owner account
+  `owner@sparkling-standard.com` is enrolled with the owner role. A one-time password-reset email
+  was sent through Resend (`emailSent: true`); the owner should use it to choose the final password.
+  MFA enrollment remains owner-controlled in Settings.
+- Remote D1 contains two backfilled pending booking requests with their original references and
+  locations. No customer, lead, gift or completed payment record existed in R2 to import.
 - Run Stripe test-mode verification without live money after a test-mode key is available locally.
 - Test real Google Calendar writes only against an isolated test calendar or after explicit owner
   approval; current verification is read-only.

@@ -1,5 +1,35 @@
 # Verification status
 
+## Verified - 2026-10-30 production operations admin release
+
+**Release:** `cbd4b96`. Cloudflare Pages deployment
+`b19620e8-2cc9-45fc-b046-f8aa3e8a1575`. GitHub run `41115145424`: `validate`, `browser` and the
+Cloudflare Pages check succeeded.
+
+- **D1:** remote `sparkling-standard-operations` (`82af5623-e4a0-48c5-b5da-b3aea5e84105`) received
+  migrations `0001`-`0010`; pre/post exports were taken and the post-migration export restored
+  independently with 53 tables, 10 migrations and no foreign-key violations.
+- **Admin deployment:** production `/admin/` is noindex and loaded; `/api/admin/auth` reports the
+  `DB` binding configured and no setup pending. Unauthenticated admin APIs return 401.
+- **Owner:** `owner@sparkling-standard.com` was enrolled with the owner role. A one-time
+  password-reset email was delivered through Resend; MFA enrollment remains owner-controlled.
+- **Requests:** two legacy pending R2 requests were reconciled into D1 with their original
+  references and locations; no customer/lead/gift/completed payment data existed to import.
+- **Production UI:** owner login, overview, calendar/requests, leads, customers, recurring, jobs,
+  finance, gifts, reports and settings were exercised at 1440 px and 390 px with no page errors or
+  horizontal overflow.
+- **Pay Now:** exact-address customer Pay Now remains visible after the `48930a0` correction; no
+  payment or live financial transaction was performed during verification.
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **689 tests: 688 passed, 1 pre-existing skip, 0 failed** |
+| Browser regression | **171 passed, 0 failed** |
+| Admin tests | **15 passed** |
+| Type check / build / validation | passed; admin boundary, headers, links and SEO passed |
+| Remote D1 | 10 migrations, 54 tables including Cloudflare internal metadata, 0 FK violations |
+| Production | admin and existing customer site verified |
+
 ## Verified - 2026-10-30 customer Pay Now address-preservation fix
 
 **Release:** `48930a0`. Cloudflare Pages deployment

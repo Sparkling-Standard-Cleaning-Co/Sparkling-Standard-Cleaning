@@ -84,26 +84,18 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release:** **`48930a0`** is live (Cloudflare Pages deployment
-  `c067b24b-968a-4fae-95c3-59925cef5fc2`; GitHub run `41088102492`; `validate`, `browser` and the
-  Cloudflare Pages check passed). It fixes the confirmed-address state reset on Step 1 Continue so the
-  green **Pay Now and Reserve This Cleaning** action remains available for exact-address estimates.
-  Production mobile and desktop exact-address flows were re-checked after deployment. It retains
-  `a042f83`'s estimator accordions and one-row pricing plus `c03394d`'s checkout, photo, hold, gift,
-  booking, security-header and paid-auto-confirmation work. No live card charge or production
-  calendar-event test was performed.
-- **Local unreleased work (not deployed):** the D1-backed operations admin is implemented on local
-  `main` through `4104536`: encrypted-at-rest MFA, invitations/resets with optional Resend delivery,
-  session revocation, customer/property CRM, lead retry, scheduling through the authoritative Google
-  Calendar/booking engine, recurring plans, team/job checklists, invoices/manual payments/credits,
-  gated Stripe invoice links/refund execution, signed payment authorizations, saved-card/off-session
-  code paths, unified gift redeem/void, reports, settings and audit. Migrations `0005`–`0010` are
-  local-only. See `docs/operations/ADMIN-DATA-FOUNDATION.md`. Production remains `48930a0`; no D1
-  database is provisioned and no admin functionality is deployed. Live charging, saved cards,
-  off-session charging, Stripe refund activation, production cutover of unified calendar
-  confirmations and R2 customer/payment backfill remain owner-gated.
-  Service agreements remain draft and are not presented as binding; only the owner-directed payment
-  authorization signature flow is implemented.
+- **Current release:** **`cbd4b96`** is live (Cloudflare Pages deployment
+  `b19620e8-2cc9-45fc-b046-f8aa3e8a1575`; GitHub run `41115145424`; `validate`, `browser` and the
+  Cloudflare Pages check passed). It deploys the D1-backed operations admin, remote migrations
+  `0001`–`0010`, owner enrollment, production `DB` binding, two reconciled legacy booking requests,
+  and the confirmed-address Pay Now correction from `48930a0`. The owner reset email was delivered
+  through Resend. Admin remains protected by the owner/manager/finance/cleaner permission model;
+  Stripe live administrative charging/refund gates remain disabled. Service agreements remain draft
+  and are not presented as binding; only the owner-directed payment authorization signature flow is
+  implemented.
+- **Concurrent estimator work:** a separate editor may have uncommitted five-condition estimator
+  changes in the working tree. They are not part of `cbd4b96` and must not be committed or deployed
+  without the owner's separate directive.
 - **Prior Initiative 6.8:** live at `6e36c95` plus the HEIC test-stability fix `9fe8764` (Cloudflare Pages deployments `2a0d4f21-8eb8-49b0-b298-f086e3c7473b` and `4afab04f-9f97-47b5-bb2c-778aa7b6f745`; `validate`, `browser` and Cloudflare checks passed). It implements the three-page owner audit: prices stay hidden through every preliminary estimator step and are revealed at the final stage with a shared branded animation across all four engines; the owner-supplied **two-of-four** Competitive Pricing badge is installed; homepage service cards use one equal-height grid; KJV scripture is expanded through a shared component; and all transactional forms require an unchecked-by-default, server-verified terms acceptance with a private R2 record. The public Terms were expanded with Florida cancellation/gift research, condition/access, payment/refund, damage, safety, recurring, commercial/church, dispute and version rules. Gift certificates remain in **request mode** (sales disabled) because no owner-approved denominations/fulfillment activation were supplied; live calendar booking is **not connected**, so preferred dates remain requests and no fake availability is shown. No new cancellation/reassessment fee is active; owner and Florida counsel approval gates are documented in `docs/legal/TERMS-RESEARCH.md` and `docs/launch/OWNER-INPUT-REQUIRED.md`. No pricing mathematics changed.
 - **Prior Initiative 6.7:** live at `f111014`; checkout readiness now checks key, webhook secret/endpoint, notifier, ledger and mode; verified-only quotes, explicit price-change acceptance, SHA-256 checkout idempotency with R2 session reuse, durable webhook event claims, retryable notifications, safe cancellation/status pages and no duplicate lead on payment retry. Production `/api/estimate-checkout` is live mode with all readiness checks true. No live card charge or Stripe test-mode transaction was performed.
 - **Prior Initiative 6.6:** live at `0b907d4` (Cloudflare Pages deployment `26e3b9f8-7665-426f-8687-7f171588c865`); it completed the 13-page owner audit, approved homepage/Community Support/Deep Cleaning/Service Area copy, FL/AL state restriction, GPS loading, optional facility ZIP, centered facility intros, add-on bundles, and the original Pay Now/reservation path. Private legal records were organized in the master archive.
