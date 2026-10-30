@@ -1,10 +1,19 @@
 # Google Calendar booking setup
 
-**Status:** **Connected and active (2026-10-28).** OAuth refresh exchange succeeds against the dedicated
-**Sparkling Standard - Bookings** calendar in `America/Chicago`; real event reads and live
-availability/holds have been verified. Booking remains `owner_approval`; auto-confirm is disabled.
-No Sunshine Climate Solutions calendar or credentials are used. The owner still needs to add real
-jobs with full addresses and run one owner-confirmation/event-creation test.
+**Status:** **Connected and active (verified 2026-10-30).** OAuth refresh exchange succeeds against
+the dedicated **Sparkling Standard - Bookings** calendar in `America/Chicago`; real event reads,
+availability and live holds have been verified in production. `src/config/booking.ts` and the
+production status endpoint agree on `confirmationMode: auto_confirm` with `autoConfirmAllowed: true`:
+a **complete paid booking** that passes payment, address, photo, time and resource checks may confirm
+automatically. Incomplete, unpaid or review-required requests remain pending for the owner. No
+Sunshine Climate Solutions calendar or credentials are used.
+
+**Write verification remains outstanding.** Creating, rescheduling and cancelling events is
+implemented and mock-tested, and production holds/reads are verified, but the live write lifecycle
+has not been executed because the production `BOOKING_OWNER_TOKEN` is an encrypted Cloudflare secret
+that cannot be read locally. Run `node scripts/booking-live-test.mjs` from a terminal (it prompts for
+the token without echoing it, requires a typed `YES`, and cleans up its synthetic event). Never test
+against a real customer appointment.
 
 **Pending requests:** a temporary hold lasts 20 minutes, but a submitted reservation remains a durable
 **pending owner-review request** after the hold expires. Pending requests are non-guaranteed and do
@@ -111,16 +120,20 @@ slot, creates a synthetic TEST hold, confirms it through `/api/booking-admin`, v
 event and blocked availability, cancels it, verifies availability restoration and attempts emergency
 cleanup on failure. Do not run it without owner authorization.
 
-## 8. Activation gate
+## 8. Current activation state
 
-`src/config/booking.ts` has `enabled:false` and `autoConfirmAllowed:false`. Keep both false until:
+`src/config/booking.ts` currently sets `enabled: true` and `autoConfirmAllowed: true`
+(`confirmationMode: 'auto_confirm'`). Keep configuration changes behind an explicit owner decision.
+Before changing any of the following, record the reason and re-run the full verification suite:
 
-1. The calendar is connected and the read-only probe passes.
-2. Existing jobs and crew capacity are reviewed.
-3. The owner approves the working window, buffers, notice period and confirmation mode.
-4. A controlled test proves holds, concurrency, rescheduling and cancellation.
-5. Pay Now is reconciled with the hold/booking state.
+1. Master switch, confirmation mode, working window, buffers, notice period or hold lifetime.
+2. The two active booking resources in `bookingResources`.
+3. Pay Now reconciliation with holds and auto-confirmation.
 
-Live booking must not be switched on with only an OAuth token. The availability engine is only
-half of the booking lifecycle; the durable hold/confirmation layer and customer UI activation still
-need to be verified.
+A complete paid booking confirms only when payment, address, required photos, requested time and
+resource availability all verify. A bare OAuth token is not enough to confirm a job, and an
+unverified request must never be presented as a confirmed appointment.
+
+The live write lifecycle still needs one controlled run (see the status note above and
+`scripts/booking-live-test.mjs`). Until that run is recorded, describe calendar **writes** as
+implemented and mock-tested, not production-verified.

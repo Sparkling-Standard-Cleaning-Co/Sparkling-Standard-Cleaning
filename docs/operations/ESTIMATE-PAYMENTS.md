@@ -252,3 +252,18 @@ owner notification as verified).
 
 These changes are local only. They have not been deployed, and no live charge or financial
 activation was performed.
+
+### Sandbox verification (2026-10-30)
+
+The administrative billing tooling is covered by mocked/unit tests, and a real test-mode verification
+script now exists: `npm run stripe:sandbox` (`scripts/stripe-sandbox-verify.mjs`). It refuses live
+keys, creates only synthetic test-mode objects, deletes its test customers and reconciles into an
+in-memory database built from the committed migrations.
+
+**Blocked, not passed:** no Stripe test-mode key is available in the local environment, so the real
+Stripe test API has not been contacted. Production Pay Now remains live and ready. Full instructions,
+safety rules and the exact credential path are in `docs/operations/STRIPE-SANDBOX-VERIFICATION.md`.
+No administrative charging gate was enabled.
+
+The Batch A hardening described above was released in `8edce3a`; the sentence calling it "local
+only" is historical and no longer describes production.

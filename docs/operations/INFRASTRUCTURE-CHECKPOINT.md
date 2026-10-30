@@ -88,19 +88,39 @@ recorded after activation.
 historical ledger was overwritten or deleted. Gift and booking reconciliation tooling can generate
 reviewable D1 SQL from exported R2 JSON without connecting to production R2.
 
+## Owner password recovery (2026-10-30)
+
+The owner's reset link failed with **Reset Invalid**. Production D1 was inspected read-only:
+
+- two reset rows existed for the owner account, both created 2026-10-30 19:03 UTC;
+- both had a 60-minute expiry (20:03 UTC) and neither had been used;
+- the inspection happened after that expiry, so the tokens were **expired**, not consumed and not
+  from another environment;
+- both rows were marked used and the outstanding count is now zero. The reset token shown in the
+  owner's screenshot is therefore invalid.
+
+The production console now has a self-service **Forgot Password?** flow: generic responses that do
+not reveal account existence, 30-minute single-use hashed tokens, per-IP and per-address rate
+limits, same-origin checks, session revocation after a successful reset, and a branded Resend email
+that links straight to the password-setting page. Password rules are owner-directed: **at least 8
+characters and one special character**, with no other complexity requirement. See
+`docs/operations/ADMIN-USER-GUIDE.md`.
+
 ## Outstanding work
 
 - Admin code is deployed; production `/api/admin/auth` reports `configured: true` and
   `setupRequired: false`, confirming the `DB` binding. The owner account
-  `owner@sparkling-standard.com` is enrolled with the owner role. A one-time password-reset email
-  was sent through Resend (`emailSent: true`); the owner should use it to choose the final password.
+  `owner@sparkling-standard.com` is enrolled with the owner role. The owner must personally set the
+  final password through the new Forgot Password flow; no developer-generated password exists.
   MFA enrollment remains owner-controlled in Settings.
 - Remote D1 contains two backfilled pending booking requests with their original references and
   locations. No customer, lead, gift or completed payment record existed in R2 to import.
-- Run Stripe test-mode verification without live money after a test-mode key is available locally.
-- Test real Google Calendar writes only against an isolated test calendar or after explicit owner
-  approval; current verification is read-only.
-- Record live Resend delivery to an owner-controlled address.
+- Run Stripe test-mode verification without live money after a rotated test-mode key is available
+  locally (`npm run stripe:sandbox`). No test key is present today.
+- Run the live Google Calendar write lifecycle with `node scripts/booking-live-test.mjs` from an
+  owner terminal (masked token prompt, typed confirmation, synthetic event, automatic cleanup).
+  Read/availability verification is complete; write verification is not.
+- Record live Resend delivery to an owner-controlled address (the reset flow will do this).
 - Backfill/reconcile R2 historical customer/lead/payment data only after export and review.
 - Enable live administrative Stripe gates only after test-mode authorization/consent validation.
 
