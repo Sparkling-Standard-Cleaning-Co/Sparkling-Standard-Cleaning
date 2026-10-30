@@ -36,9 +36,12 @@ import {
 import { sendCustomerReceipt, describeReceiptOutcome } from '../../src/lib/forms/customer-receipt.ts';
 import { autoConfirmPaidBooking } from '../../src/lib/booking/auto-confirm.ts';
 import type { BookingEnv } from '../../src/lib/booking/service.ts';
+import type { D1Database } from '../../src/lib/admin/d1.ts';
+import { applyInvoiceCheckoutPayment } from '../../src/lib/admin/stripe-reconcile.ts';
 import type { ReceiptData, ReceiptLine } from '../../src/lib/payments/receipt.ts';
 
 interface Env extends PaymentStorageEnv, BookingEnv {
+  DB?: D1Database;
   STRIPE_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
@@ -59,6 +62,9 @@ interface StripeEvent {
       currency?: string;
       customer_details?: { email?: string; name?: string };
       metadata?: Record<string, string>;
+      customer?: string;
+      payment_intent?: string;
+      mode?: string;
     };
   };
 }
@@ -330,6 +336,14 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const expired = event.data?.object;
     const attempt = expired?.metadata?.checkout_attempt ?? '';
     const expiredKind = expired?.metadata?.checkout_kind;
+    if (expiredKind === 'invoice_payment' && env.DB && expired?.metadata?.invoice_id) {
+      await env.DB
+        .prepare('UPDATE invoices SET payment_url = NULL, stripe_checkout_session_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stripe_checkout_session_id = ?')
+        .bind(expired.metadata.invoice_id, String(expired.id ?? ''))
+        .run()
+        .catch(() => undefined);
+      return json({ ok: true, received: true, expired: true });
+    }
     if (expiredKind === 'estimate_payment' && /^[a-f0-9]{64}$/i.test(attempt)) {
       const record = await readCheckoutRecord(env, attempt);
       const bucket = paymentLedger(env);
@@ -362,6 +376,21 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
 
   const metadata = session.metadata ?? {};
+  if (metadata.checkout_kind === 'invoice_payment') {
+    if (!env.DB) return json({ ok: false, error: 'database_not_configured' }, 503);
+    try {
+      const result = await applyInvoiceCheckoutPayment(env.DB, {
+        ...(session.id ? { id: session.id } : {}),
+        ...(session.payment_intent ? { payment_intent: session.payment_intent } : {}),
+        ...(session.customer ? { customer: session.customer } : {}),
+        ...(session.amount_total ? { amount_total: session.amount_total } : {}),
+        metadata,
+      });
+      return json({ ok: true, received: true, invoice: result });
+    } catch {
+      return json({ ok: false, error: 'invoice_payment_reconciliation_failed' }, 500);
+    }
+  }
   const amountCents = amountCentsFrom(session.amount_total);
   const giftValueUsd = (() => {
     const value = Number(metadata.gift_value_usd);

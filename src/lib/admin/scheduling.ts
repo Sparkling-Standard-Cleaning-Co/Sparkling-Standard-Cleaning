@@ -62,7 +62,9 @@ export async function listAppointments(
     .prepare(
       `SELECT a.*, c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
               (SELECT GROUP_CONCAT(tm.display_name, ', ') FROM appointment_resources ar
-               JOIN team_members tm ON tm.id = ar.team_member_id WHERE ar.appointment_id = a.id) AS crew
+               JOIN team_members tm ON tm.id = ar.team_member_id WHERE ar.appointment_id = a.id) AS crew,
+              (SELECT provider_event_id FROM calendar_links cl WHERE cl.appointment_id = a.id
+               ORDER BY cl.last_synced_at DESC LIMIT 1) AS calendar_event_id
        FROM appointments a
        LEFT JOIN customers c ON c.id = a.customer_id
        LEFT JOIN properties p ON p.id = a.property_id
@@ -94,6 +96,31 @@ async function assertNoOverlap(
   if (conflict) throw new AdminAuthError(409, 'schedule_conflict');
 }
 
+export async function assertRequestConfirmable(
+  db: D1Database,
+  actor: AdminActor,
+  requestId: string,
+): Promise<void> {
+  const row = await db
+    .prepare(
+      `SELECT r.status, r.customer_id, r.property_id, r.start_at, r.end_at, r.branch_id,
+              a.id AS existing_appointment
+       FROM booking_requests r
+       LEFT JOIN appointments a ON a.booking_request_id = r.id
+       WHERE r.id = ? ${scope(actor, 'r.branch_id').sql} LIMIT 1`,
+    )
+    .bind(requestId, ...scope(actor, 'r.branch_id').bind)
+    .first<Record<string, unknown>>();
+  if (!row) throw new AdminAuthError(404, 'request_not_found');
+  if (row.existing_appointment) throw new AdminAuthError(409, 'request_already_confirmed');
+  if (!row.customer_id || !row.property_id) throw new AdminAuthError(400, 'request_customer_incomplete');
+  await assertNoOverlap(
+    db,
+    (row.branch_id as string | null) ?? actor.branchId,
+    String(row.start_at ?? ''),
+    String(row.end_at ?? ''),
+  );
+}
 export async function confirmRequest(
   db: D1Database,
   actor: AdminActor,
@@ -455,4 +482,25 @@ export async function updateChecklistItem(
     .bind(done ? 'completed' : 'in_progress', done ? now() : null, row.checklist_id)
     .run();
   await audit(db, { actorUserId: actor.id, action: 'job.checklist_item_updated', entityType: 'job_checklist_item', entityId: itemId });
+}
+
+export async function attachCalendarEvent(
+  db: D1Database,
+  appointmentId: string,
+  eventId: string,
+): Promise<void> {
+  if (!eventId) throw new AdminAuthError(400, 'calendar_event_required');
+  await db
+    .prepare(
+      `INSERT INTO calendar_links
+       (id, appointment_id, provider, provider_event_id, sync_status, last_synced_at)
+       VALUES (?, ?, 'google', ?, 'synced', ?)
+       ON CONFLICT(provider, provider_event_id) DO UPDATE SET
+         appointment_id = excluded.appointment_id,
+         sync_status = 'synced',
+         last_synced_at = excluded.last_synced_at,
+         error_detail = ''`,
+    )
+    .bind(`cal_${crypto.randomUUID()}`, appointmentId, eventId, now())
+    .run();
 }

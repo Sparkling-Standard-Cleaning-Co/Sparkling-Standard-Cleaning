@@ -26,6 +26,7 @@ export default defineConfig({
         !page.includes('/estimate/payment-canceled') &&
         !page.includes('/leave-review') &&
         !page.includes('/gift-admin') &&
+        !page.includes('/invoice-payment') &&
         !page.includes('/admin') &&
         !page.includes('/gift-certificates/success') &&
         !page.includes('/gift-certificates/redeem'),

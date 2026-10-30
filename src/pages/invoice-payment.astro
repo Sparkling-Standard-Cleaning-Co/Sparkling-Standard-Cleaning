@@ -1,0 +1,50 @@
+﻿---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Icon from '../components/Icon.astro';
+---
+
+<BaseLayout
+  title="Invoice Payment Status"
+  description="Secure Sparkling Standard invoice payment status."
+  noindex
+>
+  <section class="section">
+    <div class="container container--narrow text-center">
+      <span class="card__icon" style="margin-inline: auto"><Icon name="shield" /></span>
+      <h1 class="mt-4" data-invoice-payment-title>Checking payment status</h1>
+      <p class="lead" style="margin-inline: auto" data-invoice-payment-message>
+        Please wait while we check the secure payment result.
+      </p>
+      <p class="small text-muted">
+        Stripe processes the payment. Sparkling Standard records the invoice only after the verified
+        payment notification arrives.
+      </p>
+      <div class="btn-row" style="justify-content: center">
+        <a class="btn btn--ghost" href="/">Back to Home</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get('status') ?? '';
+  const title = document.querySelector<HTMLElement>('[data-invoice-payment-title]');
+  const message = document.querySelector<HTMLElement>('[data-invoice-payment-message]');
+  if (status === 'success') {
+    if (title) title.textContent = 'Payment received.';
+    if (message) {
+      message.textContent =
+        'Stripe has accepted your payment. We are recording it against your invoice and will send the receipt after verification.';
+    }
+  } else if (status === 'cancelled') {
+    if (title) title.textContent = 'Checkout cancelled.';
+    if (message) {
+      message.textContent =
+        'No payment was taken. You can reopen the secure payment link from your invoice email or contact us for help.';
+    }
+  } else {
+    if (title) title.textContent = 'Invoice payment';
+    if (message) message.textContent = 'Open the secure payment link from your invoice email to continue.';
+  }
+</script>

@@ -56,7 +56,6 @@ const navPermission: Record<string, string> = {
   finance: 'finance.read',
   gift: 'finance.read',
   reports: 'finance.read',
-  settings: 'admin.manage',
 };
 
 function esc(value: unknown): string {
@@ -108,6 +107,19 @@ function friendly(error: unknown): string {
     email_not_configured: 'Email delivery is not configured.',
     schedule_conflict: 'That time overlaps an existing booking.',
     team_conflict: 'That team member already has an overlapping job.',
+    booking_admin_not_configured: 'The Google Calendar booking connection is not configured.',
+    calendar_confirm_failed: 'Google Calendar did not confirm the booking. No D1 appointment was created.',
+    reauth_failed: 'Your password could not be verified.',
+    stripe_billing_disabled: 'Stripe billing is not enabled for this deployment.',
+    stripe_refunds_disabled: 'Stripe refund execution is not enabled for this deployment.',
+    stripe_not_configured: 'Stripe is not configured.',
+    invoice_not_payable: 'This invoice is not payable in its current state.',
+    customer_email_required: 'The customer needs an email address for a payment link.',
+    reserved: 'This gift is reserved by an active booking.',
+    redeemed: 'This gift has already been redeemed.',
+    insufficient_balance: 'The redemption exceeds the available gift balance.',
+    not_active_yet: 'This gift is not active yet.',
+    d1_confirm_failed: 'Calendar confirmed, but the local appointment record failed. Retry safely.',
     contact_in_use: 'That email or phone belongs to another customer.',
   };
   return messages[code] ?? titleCase(code);
@@ -172,7 +184,7 @@ function showApp(nextActor: AdminActor): void {
   for (const element of document.querySelectorAll<HTMLElement>('[data-admin-invoice-create]')) {
     element.hidden = !can('finance.write');
   }
-  for (const element of document.querySelectorAll<HTMLElement>('[data-admin-invite-create]')) {
+  for (const element of document.querySelectorAll<HTMLElement>('[data-admin-invite-create], [data-admin-owner-section]')) {
     element.hidden = !can('admin.manage');
   }
   void loadView('overview');
@@ -457,6 +469,29 @@ async function openInvoice(invoiceId: string): Promise<void> {
   const lines = (data.lines as Array<Record<string, unknown>>) ?? [];
   const payments = (data.payments as Array<Record<string, unknown>>) ?? [];
   target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(invoice.number)}</h2><span class="admin-status">${esc(titleCase(invoice.status))}</span></div><dl class="admin-definition"><dt>Customer</dt><dd>${esc([invoice.first_name, invoice.last_name].filter(Boolean).join(' '))}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Paid</dt><dd>${esc(money(invoice.amount_paid_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(dateTime(invoice.due_date))}</dd></dl><h3>Lines</h3>${lines.map((line) => `<div class="admin-record">${esc(line.description)} · ${esc(money(line.total_cents))}</div>`).join('') || '<p class="admin-muted">No lines.</p>'}<h3>Payments</h3>${payments.map((payment) => `<div class="admin-record">${esc(titleCase(payment.provider))} · ${esc(money(payment.amount_cents))} · ${esc(payment.status)} · ${esc(dateTime(payment.created_at))}<details class="admin-detail-toggle"><summary>Record refund</summary><form class="admin-form" data-form="refund"><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><label>Refund amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="reason" /></label><button class="btn btn--secondary btn--small" type="submit">Record refund</button></form></details></div>`).join('') || '<p class="admin-muted">No payments.</p>'}${Number(invoice.balance_cents) > 0 ? `<form class="admin-form" data-form="payment"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Payment method <select name="provider"><option value="cash">Cash</option><option value="check">Check</option><option value="external">External</option></select></label><label>Amount <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Reference <input name="reference" /></label><button class="btn btn--primary btn--small" type="submit">Record payment</button></form>` : ''}<form class="admin-form" data-form="credit"><input type="hidden" name="customerId" value="${esc(invoice.customer_id)}" /><label>Customer credit amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="source" /></label><button class="btn btn--secondary btn--small" type="submit">Add credit</button></form></div>`;
+  const controls = document.querySelector<HTMLElement>('[data-admin-invoice-controls]');
+  if (controls) {
+    controls.innerHTML = '';
+    if (can('finance.write') && !invoice.payment_url && Number(invoice.balance_cents) > 0) {
+      controls.insertAdjacentHTML(
+        'beforeend',
+        `<button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-link" data-id="${esc(invoiceId)}">Create Stripe payment link</button>`,
+      );
+    }
+    if (invoice.payment_url) {
+      controls.insertAdjacentHTML(
+        'beforeend',
+        `<p><a class="btn btn--secondary btn--small" href="${esc(invoice.payment_url)}" target="_blank" rel="noopener noreferrer">Open Stripe payment link</a></p>`,
+      );
+    }
+    const stripePayments = payments.filter((payment) => payment.provider === 'stripe');
+    if (can('finance.write') && stripePayments.length > 0) {
+      controls.insertAdjacentHTML(
+        'beforeend',
+        `<details class="admin-detail-toggle"><summary>Execute Stripe refund</summary><form class="admin-form" data-form="stripe-refund"><label>Stripe payment <select name="paymentId">${stripePayments.map((payment) => `<option value="${esc(payment.id)}">${esc(money(payment.amount_cents))} · ${esc(dateTime(payment.created_at))}</option>`).join('')}</select></label><label>Refund amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Your password (step-up) <input name="password" type="password" required /></label><button class="btn btn--secondary btn--small" type="submit">Execute Stripe refund</button></form></details>`,
+      );
+    }
+  }
 }
 
 async function loadGifts(): Promise<void> {
@@ -468,10 +503,16 @@ async function loadGifts(): Promise<void> {
   target.innerHTML = `<div class="admin-grid">${[['Issued', summary.issuedCount ?? 0], ['Active', summary.activeCount ?? 0], ['Outstanding', money(summary.outstandingCents)], ['Redeemed', money(summary.redeemedCents)]].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('')}</div><div style="margin-top:1rem;" data-admin-gift-table></div>`;
   const table = target.querySelector<HTMLElement>('[data-admin-gift-table]');
   if (table) {
-    renderTable(table, ['Code', 'Recipient', 'Value', 'Remaining', 'Valid from', 'Status'], (data.records ?? []).map((record) => [esc(record.code), esc(record.recipientName), esc(money(record.valueCents)), esc(money(record.remainingCents)), esc(record.validFromDate), `<span class="admin-status">${esc(record.active ? 'active' : record.status)}</span>`]), 'No gift certificates are recorded.');
+    renderTable(table, ['Code', 'Recipient', 'Value', 'Remaining', 'Valid from', 'Status', 'Action'], (data.records ?? []).map((record) => [esc(record.code), esc(record.recipientName), esc(money(record.valueCents)), esc(money(record.remainingCents)), esc(record.validFromDate), `<span class="admin-status">${esc(record.active ? 'active' : record.status)}</span>`, `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-gift-code="${esc(record.code)}" data-gift-action="redeem">Redeem</button><button class="btn btn--ghost btn--small" type="button" data-gift-code="${esc(record.code)}" data-gift-action="void">Void</button></div>`]), 'No gift certificates are recorded.');
   }
+  target.insertAdjacentHTML('beforeend', '<div data-admin-gift-action style="margin-top:1rem;"></div>');
 }
 
+function renderGiftAction(code: string, action: string): void {
+  const target = document.querySelector<HTMLElement>('[data-admin-gift-action]');
+  if (!target) return;
+  target.innerHTML = `<div class="admin-card"><h3>${action === 'redeem' ? 'Redeem' : 'Void'} ${esc(code)}</h3><form class="admin-form" data-form="gift-action"><input type="hidden" name="code" value="${esc(code)}" /><input type="hidden" name="giftAction" value="${esc(action)}" />${action === 'redeem' ? '<label>Amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reference <input name="reference" /></label>' : ''}<label>Reason / note <input name="note" /></label><label>Your password (step-up) <input name="password" type="password" autocomplete="current-password" required /></label><button class="btn btn--primary btn--small" type="submit">Confirm ${action === 'redeem' ? 'redemption' : 'void'}</button></form></div>`;
+}
 async function loadReports(): Promise<void> {
   const [data, giftData] = await Promise.all([
     api<{ report?: Record<string, unknown> }>('/api/admin/reports'),
@@ -492,9 +533,13 @@ async function loadReports(): Promise<void> {
 
 async function loadSettings(): Promise<void> {
   const [admins, sessions, audit] = await Promise.all([
-    api<{ admins?: Array<Record<string, unknown>> }>('/api/admin/accounts?view=admins'),
+    can('admin.manage')
+      ? api<{ admins?: Array<Record<string, unknown>> }>('/api/admin/accounts?view=admins')
+      : Promise.resolve({ admins: [] }),
     api<{ sessions?: Array<Record<string, unknown>> }>('/api/admin/accounts?view=sessions'),
-    api<{ audit?: Array<Record<string, unknown>> }>('/api/admin/accounts?view=audit&limit=100'),
+    can('admin.manage')
+      ? api<{ audit?: Array<Record<string, unknown>> }>('/api/admin/accounts?view=audit&limit=100')
+      : Promise.resolve({ audit: [] }),
   ]);
   const mfaStatus = document.querySelector<HTMLElement>('[data-admin-mfa-status]');
   if (mfaStatus) {
@@ -695,6 +740,24 @@ document.addEventListener('submit', (event) => {
   if (kind === 'payment') void action('/api/admin/finance', { action: 'record_payment', invoiceId: value('invoiceId'), provider: value('provider'), amount: value('amount'), reference: value('reference'), idempotencyKey: value('idempotencyKey') });
   if (kind === 'refund') void action('/api/admin/finance', { action: 'record_refund', paymentId: value('paymentId'), amount: value('amount'), reason: value('reason') });
   if (kind === 'credit') void action('/api/admin/finance', { action: 'create_credit', customerId: value('customerId'), amount: value('amount'), source: value('source') });
+  if (kind === 'stripe-refund') {
+    void action('/api/admin/finance', {
+      action: 'stripe_refund',
+      paymentId: value('paymentId'),
+      amountCents: Math.round(Number(value('amount')) * 100),
+      password: value('password'),
+    });
+  }
+  if (kind === 'gift-action') {
+    void action('/api/admin/gifts', {
+      action: value('giftAction'),
+      code: value('code'),
+      amountCents: Math.round(Number(value('amount')) * 100),
+      note: value('note'),
+      reference: value('reference'),
+      password: value('password'),
+    }).then(() => loadGifts());
+  }
   if (kind === 'mfa-disable') {
     void api('/api/admin/accounts', { method: 'POST', body: JSON.stringify({ action: 'mfa_disable', password: value('password'), code: value('code') }) })
       .then(() => { if (actor) actor.mfaEnabled = false; return loadView('settings'); })
@@ -732,13 +795,13 @@ for (const form of [
     }
     if (form.matches('[data-admin-invite-create]')) {
       setAppError();
-      void api<{ token: string; expiresAt: string }>('/api/admin/accounts', {
+      void api<{ token: string; expiresAt: string; emailSent?: boolean }>('/api/admin/accounts', {
         method: 'POST',
         body: JSON.stringify({ action: 'invite', email: data.get('email'), role: data.get('role'), branchId: data.get('branchId') }),
       }).then((result) => {
         const link = `${window.location.origin}/admin/?invite=${encodeURIComponent(result.token)}`;
         const target = document.querySelector<HTMLElement>('[data-admin-invite-result]');
-        if (target) target.innerHTML = `<div class="admin-card"><p><strong>One-time invitation</strong> (expires ${esc(dateTime(result.expiresAt))})</p><p><a href="${esc(link)}">${esc(link)}</a></p><p class="admin-muted">Send this private link to the administrator. It works once.</p></div>`;
+        if (target) target.innerHTML = `<div class="admin-card"><p><strong>One-time invitation</strong> (expires ${esc(dateTime(result.expiresAt))})</p><p><a href="${esc(link)}">${esc(link)}</a></p><p class="admin-muted">${result.emailSent ? 'Invitation email sent.' : 'Email is not configured or failed; copy this private link. It works once.'}</p></div>`;
         form.reset();
       }).catch((error) => setAppError(friendly(error)));
     }
@@ -751,6 +814,11 @@ document.addEventListener('click', (event) => {
   if (newCustomer) { renderCustomerCreate(); return; }
   const revokeOthers = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-revoke-others]');
   if (revokeOthers) { void action('/api/admin/accounts', { action: 'revoke_others' }); return; }
+  const giftAction = (event.target as HTMLElement).closest<HTMLElement>('[data-gift-action]');
+  if (giftAction) {
+    renderGiftAction(giftAction.dataset.giftCode ?? '', giftAction.dataset.giftAction ?? 'redeem');
+    return;
+  }
   if (!target) return;
   const actionName = target.dataset.adminAction ?? '';
   const id = target.dataset.id ?? '';
@@ -778,6 +846,12 @@ document.addEventListener('click', (event) => {
   if (actionName === 'job-checklist') void openChecklist(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'checklist-create') void action('/api/admin/operations', { action: 'create_checklist', appointmentId: id }).then(() => openChecklist(id));
   if (actionName === 'invoice-open') void openInvoice(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'invoice-link') {
+    setAppError();
+    void api<{ url: string }>('/api/admin/finance', { method: 'POST', body: JSON.stringify({ action: 'payment_link', invoiceId: id }) })
+      .then(() => openInvoice(id))
+      .catch((error) => setAppError(friendly(error)));
+  }
   if (actionName === 'mfa-start') {
     setAppError();
     void api<{ secret: string; uri: string }>('/api/admin/accounts', { method: 'POST', body: JSON.stringify({ action: 'mfa_setup' }) })
@@ -788,11 +862,11 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'admin-reset') {
     setAppError();
-    void api<{ token: string; expiresAt: string; email: string }>('/api/admin/accounts', { method: 'POST', body: JSON.stringify({ action: 'issue_reset', userId: id }) })
+    void api<{ token: string; expiresAt: string; email: string; emailSent?: boolean }>('/api/admin/accounts', { method: 'POST', body: JSON.stringify({ action: 'issue_reset', userId: id }) })
       .then((result) => {
         const link = `${window.location.origin}/admin/?reset=${encodeURIComponent(result.token)}`;
         const target = document.querySelector<HTMLElement>('[data-admin-invite-result]');
-        if (target) target.innerHTML = `<div class="admin-card"><p><strong>One-time reset for ${esc(result.email)}</strong> (expires ${esc(dateTime(result.expiresAt))})</p><p><a href="${esc(link)}">${esc(link)}</a></p></div>`;
+        if (target) target.innerHTML = `<div class="admin-card"><p><strong>One-time reset for ${esc(result.email)}</strong> (expires ${esc(dateTime(result.expiresAt))})</p><p><a href="${esc(link)}">${esc(link)}</a></p><p class="admin-muted">${result.emailSent ? 'Reset email sent.' : 'Email is not configured or failed; copy this private link.'}</p></div>`;
       }).catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'admin-toggle') void action('/api/admin/accounts', { action: 'status', userId: id, status: target.dataset.status });

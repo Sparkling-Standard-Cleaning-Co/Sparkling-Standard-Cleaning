@@ -1,4 +1,5 @@
 import { hashToken, randomToken } from './auth.ts';
+import { decryptMfaSecret, encryptMfaSecret } from './secrets.ts';
 import type { D1Database } from './d1.ts';
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -152,7 +153,7 @@ export async function createMfaChallenge(
 export async function verifyMfaChallenge(
   db: D1Database,
   token: string,
-  input: { code?: string; recoveryCode?: string },
+  input: { code?: string; recoveryCode?: string; encryptionKey?: string },
 ): Promise<{ userId: string } | null> {
   if (!token) return null;
   const tokenHash = await hashToken(token);
@@ -178,8 +179,9 @@ export async function verifyMfaChallenge(
   }
   const code = input.code ?? '';
   const recovery = input.recoveryCode ?? '';
+  const secret = row.mfa_secret ? await decryptMfaSecret(row.mfa_secret, input.encryptionKey) : null;
   const valid =
-    (code && row.mfa_secret && (await verifyTotp(row.mfa_secret, code))) ||
+    (code && secret && (await verifyTotp(secret, code))) ||
     (recovery && (await consumeRecoveryCode(db, row.user_id, recovery)));
   if (!valid) {
     await db
@@ -196,11 +198,12 @@ export async function startMfaEnrollment(
   db: D1Database,
   userId: string,
   email: string,
+  encryptionKey: string,
 ): Promise<{ secret: string; uri: string }> {
   const secret = generateTotpSecret();
   await db
     .prepare("UPDATE admin_users SET mfa_secret = ?, mfa_enabled = 0, updated_at = ? WHERE id = ?")
-    .bind(secret, new Date().toISOString(), userId)
+    .bind(await encryptMfaSecret(secret, encryptionKey), new Date().toISOString(), userId)
     .run();
   return { secret, uri: totpUri(secret, email) };
 }
@@ -209,12 +212,14 @@ export async function enableMfa(
   db: D1Database,
   userId: string,
   code: string,
+  encryptionKey?: string,
 ): Promise<string[] | null> {
   const row = await db
     .prepare('SELECT mfa_secret FROM admin_users WHERE id = ? LIMIT 1')
     .bind(userId)
     .first<{ mfa_secret: string | null }>();
-  if (!row?.mfa_secret || !(await verifyTotp(row.mfa_secret, code))) return null;
+  const secret = row?.mfa_secret ? await decryptMfaSecret(row.mfa_secret, encryptionKey) : null;
+  if (!secret || !(await verifyTotp(secret, code))) return null;
   return createRecoveryCodes(db, userId);
 }
 

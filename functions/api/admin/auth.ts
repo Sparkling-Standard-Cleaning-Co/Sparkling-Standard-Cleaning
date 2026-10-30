@@ -19,6 +19,7 @@ import { acceptInvite, resetPassword } from '../../../src/lib/admin/accounts.ts'
 
 interface Env extends AdminDbEnv {
   ADMIN_SETUP_CODE?: string;
+  MFA_ENCRYPTION_KEY?: string;
 }
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
@@ -171,6 +172,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const verified = await verifyMfaChallenge(db, safeText(payload.challengeToken, 300), {
       code: safeText(payload.code, 20),
       recoveryCode: safeText(payload.recoveryCode, 40),
+      ...(context.env.MFA_ENCRYPTION_KEY ? { encryptionKey: context.env.MFA_ENCRYPTION_KEY } : {}),
     });
     if (!verified) {
       await auditFromRequest(db, context.request, null, 'admin.mfa_failed');

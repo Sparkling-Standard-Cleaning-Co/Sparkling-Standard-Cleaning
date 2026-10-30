@@ -1,8 +1,31 @@
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
 import { AdminAuthError, requireActor, requireCsrf, type AdminActor } from '../../../src/lib/admin/operations.ts';
-import { confirmRequest, updateRequestStatus } from '../../../src/lib/admin/scheduling.ts';
+import { assertRequestConfirmable, attachCalendarEvent, confirmRequest, updateRequestStatus } from '../../../src/lib/admin/scheduling.ts';
+import type { BookingEnv } from '../../../src/lib/booking/service.ts';
+import { onRequestPost as bookingAdminPost } from '../booking-admin.ts';
 
-interface Env extends AdminDbEnv {}
+interface Env extends AdminDbEnv, BookingEnv {
+  BOOKING_OWNER_TOKEN?: string;
+}
+
+async function bookingAction(
+  context: { request: Request; env: Env },
+  payload: Record<string, unknown>,
+): Promise<{ status: number; data: Record<string, unknown> }> {
+  const token = context.env.BOOKING_OWNER_TOKEN?.trim();
+  if (!token) return { status: 503, data: { ok: false, error: 'booking_admin_not_configured' } };
+  const request = new Request(context.request.url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  const response = await bookingAdminPost({ request, env: context.env as never });
+  const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  return { status: response.status, data };
+}
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 }
@@ -64,13 +87,49 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const action = String(body.action ?? '');
     const requestId = String(body.requestId ?? '');
     if (action === 'confirm') {
+      await assertRequestConfirmable(db, actor, requestId);
+      const calendar = await bookingAction(context, { id: requestId, action: 'confirm' });
+      if (!calendar.data.ok) {
+        return json(
+          { ok: false, error: calendar.data.error ?? 'calendar_confirm_failed', calendarStatus: calendar.status },
+          calendar.status === 200 ? 502 : calendar.status,
+        );
+      }
       const teamMemberIds = Array.isArray(body.teamMemberIds)
         ? body.teamMemberIds.map((value) => String(value)).filter(Boolean).slice(0, 12)
         : [];
-      return json({ ok: true, ...(await confirmRequest(db, actor, requestId, teamMemberIds)) });
+      try {
+        const result = await confirmRequest(db, actor, requestId, teamMemberIds);
+        const eventId = String(calendar.data.eventId ?? '');
+        if (eventId) await attachCalendarEvent(db, result.appointmentId, eventId);
+        return json({ ok: true, ...result, calendarEventId: eventId || null });
+      } catch (error) {
+        return json(
+          {
+            ok: false,
+            error: error instanceof AdminAuthError ? error.code : 'd1_confirm_failed',
+            calendarConfirmed: true,
+            calendarEventId: calendar.data.eventId ?? null,
+          },
+          error instanceof AdminAuthError ? error.status : 502,
+        );
+      }
     }
     if (action === 'status') {
-      await updateRequestStatus(db, actor, requestId, String(body.status ?? ''));
+      const status = String(body.status ?? '');
+      if (status === 'declined' || status === 'released') {
+        const calendar = await bookingAction(context, {
+          id: requestId,
+          action: status === 'declined' ? 'decline' : 'release',
+        });
+        if (!calendar.data.ok) {
+          return json(
+            { ok: false, error: calendar.data.error ?? 'calendar_release_failed', calendarStatus: calendar.status },
+            calendar.status === 200 ? 502 : calendar.status,
+          );
+        }
+      }
+      await updateRequestStatus(db, actor, requestId, status);
       return json({ ok: true });
     }
     return json({ ok: false, error: 'invalid_action' }, 400);

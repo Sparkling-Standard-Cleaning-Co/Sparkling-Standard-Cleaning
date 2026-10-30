@@ -1,5 +1,6 @@
-﻿import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
+import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
 import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { verifyPassword } from '../../../src/lib/admin/auth.ts';
 import {
   createCredit,
   createInvoice,
@@ -10,8 +11,9 @@ import {
   recordRefund,
   updateInvoiceStatus,
 } from '../../../src/lib/admin/billing.ts';
+import { createInvoicePaymentLink, refundStripePayment, type StripeBillingEnv } from '../../../src/lib/admin/stripe-billing.ts';
 
-interface Env extends AdminDbEnv {}
+interface Env extends AdminDbEnv, StripeBillingEnv {}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -67,6 +69,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'record_payment') return json({ ok: true, ...(await recordPayment(db, actor, body)) });
     if (action === 'record_refund') return json({ ok: true, ...(await recordRefund(db, actor, body)) });
     if (action === 'create_credit') return json({ ok: true, ...(await createCredit(db, actor, body)) });
+    if (action === 'payment_link') {
+      return json({ ok: true, ...(await createInvoicePaymentLink(db, actor, String(body.invoiceId ?? ''), context.env)) });
+    }
+    if (action === 'stripe_refund') {
+      const stored = await db.prepare('SELECT password_hash FROM admin_users WHERE id = ? LIMIT 1').bind(actor.id).first<{ password_hash: string }>();
+      if (!stored || !(await verifyPassword(String(body.password ?? ''), stored.password_hash))) {
+        return json({ ok: false, error: 'reauth_failed' }, 401);
+      }
+      return json({ ok: true, ...(await refundStripePayment(db, actor, String(body.paymentId ?? ''), Number(body.amountCents) || 0, context.env)) });
+    }
     return json({ ok: false, error: 'invalid_action' }, 400);
   } catch (error) {
     return json(

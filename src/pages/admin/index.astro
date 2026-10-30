@@ -180,6 +180,7 @@ import '../../styles/admin.css';
               <h2 class="admin-section-title">Invoices</h2>
               <div data-admin-invoices></div>
               <div data-admin-invoice-detail style="margin-top:1rem;"></div>
+              <div data-admin-invoice-controls style="margin-top:1rem;"></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Create an invoice</h2>
@@ -213,7 +214,7 @@ import '../../styles/admin.css';
               <div data-admin-mfa-setup style="margin-top:1rem;"></div>
               <button class="btn btn--ghost btn--small" type="button" data-admin-revoke-others>Sign out other sessions</button>
             </div>
-            <div class="admin-card" style="margin-top:1rem;">
+            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
               <h2 class="admin-section-title">Administrators</h2>
               <div data-admin-admins></div>
               <form class="admin-form" data-admin-invite-create style="max-width:none;margin-top:1rem;">
@@ -228,7 +229,7 @@ import '../../styles/admin.css';
               <h2 class="admin-section-title">Sessions</h2>
               <div data-admin-sessions></div>
             </div>
-            <div class="admin-card" style="margin-top:1rem;">
+            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
               <h2 class="admin-section-title">Audit history</h2>
               <div data-admin-audit></div>
             </div>

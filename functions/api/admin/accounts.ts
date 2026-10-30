@@ -15,8 +15,39 @@ import {
   updateAdminStatus,
 } from '../../../src/lib/admin/accounts.ts';
 import { disableMfa, enableMfa, startMfaEnrollment, verifyTotp } from '../../../src/lib/admin/mfa.ts';
+import { decryptMfaSecret, mfaKeyConfigured } from '../../../src/lib/admin/secrets.ts';
 
-interface Env extends AdminDbEnv {}
+
+async function sendAccountEmail(
+  env: Env,
+  to: string,
+  subject: string,
+  text: string,
+): Promise<boolean> {
+  const key = env.RESEND_API_KEY?.trim();
+  const from = env.RESEND_FROM_EMAIL?.trim();
+  if (!key || !from || !to) return false;
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to: [to], subject, text }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+interface Env extends AdminDbEnv {
+  MFA_ENCRYPTION_KEY?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
+  PUBLIC_SITE_URL?: string;
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -75,12 +106,15 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       if (action === 'mfa_setup') {
         if (actor.mfaEnabled) return json({ ok: false, error: 'mfa_already_enabled' }, 409);
-        const enrollment = await startMfaEnrollment(db, actor.id, actor.email);
+        if (!mfaKeyConfigured(context.env.MFA_ENCRYPTION_KEY)) {
+          return json({ ok: false, error: 'mfa_encryption_not_configured' }, 503);
+        }
+        const enrollment = await startMfaEnrollment(db, actor.id, actor.email, context.env.MFA_ENCRYPTION_KEY);
         await audit(db, { actorUserId: actor.id, action: 'admin.mfa_setup_started' });
         return json({ ok: true, ...enrollment });
       }
       if (action === 'mfa_enable') {
-        const codes = await enableMfa(db, actor.id, String(body.code ?? ''));
+        const codes = await enableMfa(db, actor.id, String(body.code ?? ''), context.env.MFA_ENCRYPTION_KEY);
         if (!codes) return json({ ok: false, error: 'mfa_code_invalid' }, 401);
         await audit(db, { actorUserId: actor.id, action: 'admin.mfa_enabled' });
         return json({ ok: true, recoveryCodes: codes });
@@ -92,7 +126,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         return json({ ok: false, error: 'password_invalid' }, 401);
       }
       if (!stored.mfa_secret) return json({ ok: false, error: 'mfa_not_enabled' }, 400);
-      if (!(await verifyTotp(stored.mfa_secret, code))) return json({ ok: false, error: 'mfa_code_invalid' }, 401);
+      const secret = await decryptMfaSecret(stored.mfa_secret, context.env.MFA_ENCRYPTION_KEY);
+      if (!secret || !(await verifyTotp(secret, code))) return json({ ok: false, error: 'mfa_code_invalid' }, 401);
       await disableMfa(db, actor.id);
       await audit(db, { actorUserId: actor.id, action: 'admin.mfa_disabled' });
       return json({ ok: true });
@@ -102,11 +137,27 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     requireCsrf(context.request, actor);
     if (action === 'invite') {
       const result = await inviteAdmin(db, actor, body);
-      return json({ ok: true, ...result });
+      const origin = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+      const link = `${origin}/admin/?invite=${encodeURIComponent(result.token)}`;
+      const emailSent = await sendAccountEmail(
+        context.env,
+        String(body.email ?? ''),
+        'Sparkling Standard administrator invitation',
+        `You have been invited to Sparkling Standard Operations.\n\nAccept the invitation (single use, expires soon):\n${link}\n\nIf you were not expecting this, ignore this email.`,
+      );
+      return json({ ok: true, ...result, emailSent });
     }
     if (action === 'issue_reset') {
       const result = await issuePasswordReset(db, actor, String(body.userId ?? ''));
-      return json({ ok: true, ...result });
+      const origin = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+      const link = `${origin}/admin/?reset=${encodeURIComponent(result.token)}`;
+      const emailSent = await sendAccountEmail(
+        context.env,
+        result.email,
+        'Sparkling Standard password reset',
+        `A password reset was requested for your Sparkling Standard Operations account.\n\nSet a new password (single use, expires soon):\n${link}\n\nIf you did not request this, contact the owner immediately.`,
+      );
+      return json({ ok: true, ...result, emailSent });
     }
     if (action === 'status') {
       await updateAdminStatus(db, actor, String(body.userId ?? ''), String(body.status ?? ''));

@@ -19,6 +19,8 @@ import { persistLeadSubmission } from '../src/lib/admin/lead-persistence.ts';
 import { onRequestGet as overviewGet } from '../functions/api/admin/overview.ts';
 import { onRequestPost as authPost } from '../functions/api/admin/auth.ts';
 
+const MFA_KEY = 'synthetic-mfa-encryption-key-32-bytes-minimum';
+
 class SqlStatement implements D1PreparedStatement {
   private values: unknown[] = [];
   private readonly db: DatabaseSync;
@@ -64,6 +66,7 @@ function migratedDb(): TestD1 {
     '0005_admin_accounts_and_operations.sql',
     '0006_service_catalog_and_lead_permissions.sql',
     '0007_cleaner_field_scope.sql',
+    '0008_invoice_payment_links.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -359,6 +362,8 @@ import {
   verifyMfaChallenge,
 } from '../src/lib/admin/mfa.ts';
 import { operationsReport } from '../src/lib/admin/reporting.ts';
+import { applyInvoiceCheckoutPayment } from '../src/lib/admin/stripe-reconcile.ts';
+import { createInvoicePaymentLink, refundStripePayment } from '../src/lib/admin/stripe-billing.ts';
 
 function base32Decode(value: string): Buffer {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -408,22 +413,24 @@ async function ownerActor(db: TestD1) {
 test('MFA enrollment, challenge verification and one-time recovery codes work', async () => {
   const db = migratedDb();
   const { owner, actor } = await ownerActor(db);
-  const enrollment = await startMfaEnrollment(db, owner.id, owner.email);
+  const enrollment = await startMfaEnrollment(db, owner.id, owner.email, MFA_KEY);
   assert.match(enrollment.uri, /^otpauth:\/\/totp\//);
-  const codes = await enableMfa(db, owner.id, totpCode(enrollment.secret));
+  const codes = await enableMfa(db, owner.id, totpCode(enrollment.secret), MFA_KEY);
   assert.equal(codes?.length, 8);
+  const stored = db.raw.prepare('SELECT mfa_secret FROM admin_users WHERE id = ?').get(owner.id) as { mfa_secret: string };
+  assert.match(stored.mfa_secret, /^v1\./);
   assert.equal((await authenticate(db, owner.email, 'SyntheticOwner!2026'))?.mfaEnabled, true);
 
   const challenge = await createMfaChallenge(db, owner.id);
   assert.deepEqual(
-    await verifyMfaChallenge(db, challenge.token, { code: totpCode(enrollment.secret) }),
+    await verifyMfaChallenge(db, challenge.token, { code: totpCode(enrollment.secret), encryptionKey: MFA_KEY }),
     { userId: owner.id },
   );
 
   const recoveryChallenge = await createMfaChallenge(db, owner.id);
-  assert.ok(await verifyMfaChallenge(db, recoveryChallenge.token, { recoveryCode: codes![0]! }));
+  assert.ok(await verifyMfaChallenge(db, recoveryChallenge.token, { recoveryCode: codes![0]!, encryptionKey: MFA_KEY }));
   const reused = await createMfaChallenge(db, owner.id);
-  assert.equal(await verifyMfaChallenge(db, reused.token, { recoveryCode: codes![0]! }), null);
+  assert.equal(await verifyMfaChallenge(db, reused.token, { recoveryCode: codes![0]!, encryptionKey: MFA_KEY }), null);
   assert.equal(actor.mfaEnabled, false, 'the existing session remains valid until revoked');
 });
 
@@ -616,9 +623,9 @@ test('the login route requires MFA and issues a session only after verification'
     name: 'MFA Route Owner',
     password: 'SyntheticOwner!2026',
   });
-  const enrollment = await startMfaEnrollment(db, owner.id, owner.email);
-  await enableMfa(db, owner.id, totpCode(enrollment.secret));
-  const env = { DB: db };
+  const enrollment = await startMfaEnrollment(db, owner.id, owner.email, MFA_KEY);
+  await enableMfa(db, owner.id, totpCode(enrollment.secret), MFA_KEY);
+  const env = { DB: db, MFA_ENCRYPTION_KEY: MFA_KEY };
   const login = await authPost({
     request: new Request('https://example.test/api/admin/auth', {
       method: 'POST',
@@ -643,4 +650,84 @@ test('the login route requires MFA and issues a session only after verification'
   } as never);
   assert.equal(verify.status, 200);
   assert.match(verify.headers.get('Set-Cookie') ?? '', /^ss_ops=/);
+});
+
+test('invoice payment links and Stripe reconciliation are gated and idempotent', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Stripe',
+    lastName: 'Customer',
+    email: 'stripe@example.test',
+    addressLine1: '600 S Baylen St',
+    city: 'Pensacola',
+    postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    lines: [{ kind: 'service', description: 'Recurring cleaning', quantity: 1, unitAmountCents: 12000, totalCents: 12000 }],
+  });
+  const originalFetch = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.includes('/customers')) return new Response(JSON.stringify({ id: 'cus_test_123' }), { status: 200 });
+    if (url.includes('/checkout/sessions')) {
+      return new Response(JSON.stringify({ id: 'cs_test_123', url: 'https://checkout.stripe.test/cs_test_123' }), { status: 200 });
+    }
+    if (url.includes('/refunds')) return new Response(JSON.stringify({ id: 're_test_123' }), { status: 200 });
+    return new Response('{}', { status: 500 });
+  };
+  try {
+    await assert.rejects(
+      () => createInvoicePaymentLink(db, actor, invoice.id, { STRIPE_SECRET_KEY: 'sk_test_synthetic' }),
+      /stripe_billing_disabled/,
+    );
+    const link = await createInvoicePaymentLink(db, actor, invoice.id, {
+      STRIPE_SECRET_KEY: 'sk_test_synthetic',
+      ADMIN_STRIPE_BILLING_ENABLED: 'true',
+      PUBLIC_SITE_URL: 'https://example.test',
+    });
+    assert.equal(link.sessionId, 'cs_test_123');
+    assert.match(link.url, /checkout\.stripe\.test/);
+    assert.ok(calls.some((url) => url.includes('/customers')));
+    const stored = db.raw.prepare('SELECT payment_url, stripe_checkout_session_id FROM invoices WHERE id = ?').get(invoice.id) as { payment_url: string; stripe_checkout_session_id: string };
+    assert.equal(stored.stripe_checkout_session_id, 'cs_test_123');
+
+    const first = await applyInvoiceCheckoutPayment(db, {
+      id: 'cs_test_123',
+      payment_intent: 'pi_test_123',
+      customer: 'cus_test_123',
+      amount_total: 12000,
+      metadata: { invoice_id: invoice.id, checkout_kind: 'invoice_payment' },
+    });
+    assert.equal(first.applied, true);
+    const duplicate = await applyInvoiceCheckoutPayment(db, {
+      id: 'cs_test_123',
+      amount_total: 12000,
+      metadata: { invoice_id: invoice.id },
+    });
+    assert.equal(duplicate.duplicate, true);
+    let detail = await getInvoice(db, actor, invoice.id);
+    assert.equal((detail?.invoice as Record<string, unknown>).status, 'paid');
+    assert.equal((detail?.invoice as Record<string, unknown>).balance_cents, 0);
+    const stripePayment = (detail?.payments as Array<Record<string, unknown>>)[0];
+    assert.equal(stripePayment?.provider, 'stripe');
+
+    await assert.rejects(
+      () => refundStripePayment(db, actor, String(stripePayment?.id), 2500, { STRIPE_SECRET_KEY: 'sk_test_synthetic' }),
+      /stripe_refunds_disabled/,
+    );
+    const refund = await refundStripePayment(db, actor, String(stripePayment?.id), 2500, {
+      STRIPE_SECRET_KEY: 'sk_test_synthetic',
+      ADMIN_STRIPE_REFUNDS_ENABLED: 'true',
+    });
+    assert.equal(refund.refundId, 're_test_123');
+    detail = await getInvoice(db, actor, invoice.id);
+    assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 9500);
+    assert.equal((detail?.invoice as Record<string, unknown>).balance_cents, 2500);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
