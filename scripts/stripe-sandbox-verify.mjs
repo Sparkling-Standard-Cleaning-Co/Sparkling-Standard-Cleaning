@@ -109,6 +109,14 @@ try {
   stripeCustomerIds.add(customerId);
   record('test customer created', Boolean(customerId));
 
+  const attached = await stripe('payment_methods/pm_card_visa/attach', {
+    body: form({ customer: customerId }),
+  });
+  await stripe(`customers/${customerId}`, {
+    body: form({ 'invoice_settings[default_payment_method]': attached.id }),
+  });
+  record('test card attached', Boolean(attached.id), `brand=${attached.card?.brand ?? '?'} last4=${attached.card?.last4 ?? '?'}`);
+
   // 2. Invoice creation, finalisation and payment ---------------------------
   await stripe('invoiceitems', {
     body: form({
@@ -121,8 +129,10 @@ try {
   const invoice = await stripe('invoices', {
     body: form({
       customer: customerId,
-      collection_method: 'charge_automatically',
+      collection_method: 'send_invoice',
+      days_until_due: 1,
       auto_advance: 'false',
+      pending_invoice_items_behavior: 'include',
       description: `Sandbox invoice ${stamp}`,
       'metadata[sandbox_verification]': stamp,
     }),
@@ -131,10 +141,25 @@ try {
   record('invoice finalized', finalized.status === 'open', `status=${finalized.status}`);
 
   // pm_card_visa is a documented Stripe TEST payment method token.
-  const paidInvoice = await stripe(`invoices/${invoice.id}/pay`, {
-    body: form({ payment_method: 'pm_card_visa' }),
-  });
-  const invoicePaymentIntent = String(paidInvoice.payment_intent ?? '');
+  const paidInvoice = finalized.status === 'paid'
+    ? finalized
+    : await stripe(`invoices/${invoice.id}/pay`, {
+        body: form({ payment_method: attached.id }),
+      });
+  let invoicePaymentIntent = String(paidInvoice.payment_intent ?? '');
+  if (!invoicePaymentIntent) {
+    // Newer Stripe API versions do not return payment_intent on the invoice
+    // object; locate the succeeded $1 card charge for this synthetic customer.
+    const intents = await stripe(`payment_intents?customer=${encodeURIComponent(customerId)}&limit=10`);
+    invoicePaymentIntent = String(
+      (intents.data ?? []).find(
+        (intent) =>
+          Number(intent.amount) === 100 &&
+          intent.status === 'succeeded' &&
+          !intent.metadata?.sandbox_verification,
+      )?.id ?? '',
+    );
+  }
   record(
     'invoice paid with the test card',
     paidInvoice.status === 'paid' && Number(paidInvoice.amount_paid) === 100,
@@ -293,6 +318,7 @@ try {
       customer: String(session.customer ?? customerId),
       payment_method: 'pm_card_visa',
       confirm: 'true',
+      'payment_method_types[0]': 'card',
       'metadata[invoice_id]': localInvoice.id,
       'metadata[sandbox_verification]': stamp,
     }),
