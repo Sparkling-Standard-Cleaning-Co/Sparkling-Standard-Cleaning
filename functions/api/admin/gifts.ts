@@ -1,9 +1,18 @@
 import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import { verifyPassword } from '../../../src/lib/admin/auth.ts';
 import type { AdminDbEnv } from '../../../src/lib/admin/d1.ts';
-import { giftBucket, lookupGiftCertificate, redeemGiftCertificate, remainingCents, voidGiftCertificate, type GiftCertificateRecord, type GiftStorageEnv } from '../../../src/lib/gift/ledger.ts';
+import {
+  giftBucket,
+  lookupGiftCertificate,
+  redeemGiftCertificate,
+  remainingCents,
+  voidGiftCertificate,
+  type GiftCertificateRecord,
+  type GiftStorageEnv,
+} from '../../../src/lib/gift/ledger.ts';
 import { isGiftActive, activationDateFor } from '../../../src/lib/gift/activation.ts';
 import { readLedgerJson } from '../../../src/lib/payments/ledger.ts';
+import { applyGiftPaymentToInvoice } from '../../../src/lib/admin/gift-reconcile.ts';
 
 interface Env extends GiftStorageEnv, AdminDbEnv {}
 
@@ -14,16 +23,25 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+function text(value: unknown, max = 300): string {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
 export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
   try {
     if (!context.env.DB) return json({ ok: false, error: 'database_not_configured' }, 503);
     await requireActor(context.env.DB, context.request, 'finance.read');
     const bucket = giftBucket(context.env);
     if (!bucket) return json({ ok: true, configured: false, records: [], summary: null });
+    const url = new URL(context.request.url);
+    const query = text(url.searchParams.get('q'), 120).toLowerCase();
+    const filter = text(url.searchParams.get('status'), 20);
     const listed = bucket.list ? await bucket.list({ prefix: 'gifts/certificates/' }) : { objects: [] };
     const records: Array<Record<string, unknown>> = [];
     let issued = 0;
     let active = 0;
+    let partial = 0;
+    let future = 0;
     let value = 0;
     let redeemed = 0;
     let outstanding = 0;
@@ -37,27 +55,59 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       value += Number(record.valueCents) || 0;
       redeemed += Number(record.redeemedCents) || 0;
       outstanding += remainingCents(record);
-      if (record.status === 'active' && isGiftActive(record)) active += 1;
+      const activeNow = record.status === 'active' && isGiftActive(record);
+      if (activeNow) active += 1;
+      if (record.status === 'active' && Number(record.redeemedCents) > 0 && Number(record.redeemedCents) < Number(record.valueCents)) partial += 1;
+      if (record.status === 'active' && !isGiftActive(record)) future += 1;
       if (record.status === 'refunded') refunded += 1;
       if (record.status === 'void') voided += 1;
+      const searchable = [
+        record.code,
+        record.purchaserName,
+        record.purchaserEmail,
+        record.recipientName,
+        record.recipientEmail ?? '',
+      ]
+        .join(' ')
+        .toLowerCase();
+      if (query && !searchable.includes(query)) continue;
+      const activationState = !isGiftActive(record) && record.status === 'active' ? 'scheduled' : record.status;
+      if (filter && activationState !== filter) continue;
       records.push({
         code: record.code,
         status: record.status,
-        active: isGiftActive(record),
+        activationState,
+        active: activeNow,
         valueCents: record.valueCents,
         redeemedCents: record.redeemedCents,
         remainingCents: remainingCents(record),
-        recipientName: record.recipientName,
         purchaserName: record.purchaserName,
+        purchaserEmail: record.purchaserEmail,
+        recipientName: record.recipientName,
+        recipientEmail: record.recipientEmail ?? '',
+        message: record.message ?? '',
         validFromDate: activationDateFor(record),
         issuedAt: record.issuedAt,
+        stripeSessionId: record.stripeSessionId,
+        history: record.history ?? [],
+        adjustments: record.adjustments ?? [],
       });
     }
     records.sort((a, b) => String(b.issuedAt).localeCompare(String(a.issuedAt)));
     return json({
       ok: true,
       configured: true,
-      summary: { issuedCount: issued, activeCount: active, valueCents: value, redeemedCents: redeemed, outstandingCents: outstanding, refundedCount: refunded, voidedCount: voided },
+      summary: {
+        issuedCount: issued,
+        activeCount: active,
+        partialCount: partial,
+        futureCount: future,
+        valueCents: value,
+        redeemedCents: redeemed,
+        outstandingCents: outstanding,
+        refundedCount: refunded,
+        voidedCount: voided,
+      },
       records: records.slice(0, 200),
     });
   } catch (error) {
@@ -94,30 +144,70 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'redeem') {
       const amountCents = Math.round(Number(body.amountCents) || 0);
       if (amountCents <= 0) return json({ ok: false, error: 'amount_invalid' }, 400);
-      const result = await redeemGiftCertificate(
-        bucket,
-        code,
-        amountCents,
-        String(body.note ?? ''),
-        String(body.reference ?? ''),
-      );
-      if (!result.ok) return json({ ok: false, error: result.error }, 409);
-      await audit(context.env.DB, {
-        actorUserId: actor.id,
-        action: 'gift.redeemed',
-        entityType: 'gift_certificate',
-        entityId: code,
-        detail: String(amountCents),
-      });
+      const invoiceId = text(body.invoiceId, 120);
+      const reference =
+        text(body.reference, 200) ||
+        (invoiceId ? `invoice:${invoiceId}:${code}:${amountCents}` : `admin:${crypto.randomUUID()}`);
+      const before = await lookupGiftCertificate(bucket, code);
+      if (!before) return json({ ok: false, error: 'not_found' }, 404);
+      const already = (before.history ?? []).find((entry) => entry.reference === reference);
+      let record = before;
+      if (!already) {
+        const result = await redeemGiftCertificate(
+          bucket,
+          code,
+          amountCents,
+          String(body.note ?? ''),
+          reference,
+        );
+        if (!result.ok) return json({ ok: false, error: result.error }, 409);
+        record = result.record;
+        await audit(context.env.DB, {
+          actorUserId: actor.id,
+          action: 'gift.redeemed',
+          entityType: 'gift_certificate',
+          entityId: code,
+          detail: String(amountCents),
+        });
+      }
+
+      let invoice: Record<string, unknown> | null = null;
+      if (invoiceId) {
+        try {
+          const applied = await applyGiftPaymentToInvoice(context.env.DB, actor, {
+            invoiceId,
+            amountCents: already ? already.amountCents : amountCents,
+            giftCode: code,
+            reference,
+          });
+          invoice = { ...applied };
+        } catch (error) {
+          return json(
+            {
+              ok: false,
+              error: error instanceof AdminAuthError ? error.code : 'invoice_gift_apply_failed',
+              giftRedeemed: !already,
+              reference,
+              giftRemainingCents: remainingCents(record),
+            },
+            error instanceof AdminAuthError ? error.status : 502,
+          );
+        }
+      }
+
       return json({
         ok: true,
-        redeemedCents: result.redeemedCents,
+        already: Boolean(already),
+        redeemedCents: record.redeemedCents,
         certificate: {
-          code: result.record.code,
-          status: result.record.status,
-          remainingCents: remainingCents(result.record),
-          valueCents: result.record.valueCents,
+          code: record.code,
+          status: record.status,
+          remainingCents: remainingCents(record),
+          valueCents: record.valueCents,
+          active: isGiftActive(record),
         },
+        invoice,
+        reference,
       });
     }
     const existing = await lookupGiftCertificate(bucket, code);

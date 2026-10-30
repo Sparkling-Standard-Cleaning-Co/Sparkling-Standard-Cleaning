@@ -265,7 +265,101 @@ and payment mix. These are operational summaries, not accounting statements.
 
 ---
 
-## 5. Google Calendar
+## 5. Booking request management
+
+Every row in **Calendar & Requests** has an **Open** action, including legacy and unlinked
+requests.
+
+### What the detail shows
+
+Reference, requested date/time, status, customer and contacts (when linked), service address,
+service type, estimate/price, condition and frequency, extras, notes and access instructions,
+calendar event ID, appointment reference, the raw imported payload, the audit trail, and every
+customer email logged for that request.
+
+Nothing is invented. An imported legacy request shows exactly what exists and labels the customer
+as **Not linked**.
+
+### Possible duplicates
+
+If another pending request has the same location and a nearby time, the detail shows a
+**Possible duplicate requests** warning. The system never merges, deletes or guesses which one is
+correct. A manager reviews and decides.
+
+### Linking a customer
+
+- **Link Customer** ? search the existing customer list and choose the correct property.
+- **Create and Link Customer** ? create a verified record with a name, contact details and address.
+  Duplicate email/phone contacts are rejected by the existing CRM rules.
+
+The original R2 references, quote references and request history are preserved.
+
+### Actions
+
+| Action | What happens |
+| --- | --- |
+| **Accept / Confirm Booking** | Revalidates availability, creates the Google Calendar event, then creates the D1 appointment. Only after both succeed is the branded confirmation email sent. |
+| **Propose This Time** | Revalidates the new slot, updates the request as a **proposal** (not confirmed) and emails the customer to agree. |
+| **Decline Request** | Releases the hold, marks the request declined with an optional reason, and can email the customer. |
+| **Reschedule Appointment** | Updates the existing calendar event and D1 appointment, then emails the customer. |
+| **Cancel Appointment** | Deletes the calendar event, marks the appointment cancelled, releases the request and can email the customer. |
+| **Resend last customer email** | Retries the logged email without changing the booking. |
+
+Email outcomes are recorded in the request detail. A failed email never changes the booking
+status, and a sent email never proves a booking.
+
+### Seven-day board
+
+The top of **Calendar & Requests** shows the next seven days with job counts, crew counts and the
+first/latest appointment. Later confirmed appointments remain in the appointments table below; the
+board does not invalidate them.
+
+## 6. Timekeeping and the employee portal
+
+The employee portal lives at <https://sparkling-standard.com/employee/>. The complete guide is
+`docs/operations/EMPLOYEE-PORTAL.md`.
+
+From **Admin ? Timekeeping**, the owner or manager can:
+
+- choose a Monday?Sunday workweek;
+- review compensated hours, rest breaks, meals, overtime and preliminary gross pay;
+- see open shifts and missing clock-outs (14 hours or more);
+- correct any interval with a mandatory reason (the previous values are preserved);
+- approve or decline employee correction requests;
+- inspect location verification for clock events (status, accuracy, map link);
+- export the week as CSV;
+- invite a cleaner and link the account to the team-member roster;
+- the owner can update dated pay rates ($18 regular, $22 lead, $25 solo).
+
+Rest breaks are paid. Fully relieved meals are unpaid unless a manager corrects them. The portal
+never deducts a lunch automatically and never stops paid time because a phone left a job site.
+
+## 7. Gift certificate management
+
+**Admin ? Gift Certificates** reads the existing R2 gift ledger; it does not create a second
+ledger.
+
+- Search by code, purchaser, recipient or email; filter by active, scheduled, fully redeemed,
+  refunded or voided.
+- **Details** shows purchaser and recipient contact, original value, redeemed and remaining value,
+  valid-from date, activation state, issue date, Stripe session reference, the message, and the
+  full redemption/refund/void history.
+- **Redeem** and **Void** use the existing secure register actions and require your password.
+
+### Applying a gift to an invoice
+
+1. Open the invoice.
+2. Choose **Apply Gift Certificate**.
+3. Enter the code and the amount to apply (defaults to the balance).
+4. Re-enter your password.
+5. The gift ledger is debited and the invoice balance is reduced exactly once.
+
+A $150 certificate applied to a $230 cleaning can take $90, leaving a $60 gift balance and $140
+due. The same redemption reference cannot credit the invoice twice on a retry. The invoice payment
+appears as an external payment with gift metadata; the gift ledger remains authoritative for the
+gift balance.
+
+## 8. Google Calendar
 
 The booking calendar is **Sparkling Standard - Bookings** in `America/Chicago`. The production
 status endpoint reports the connection as configured, connected and readable.
@@ -282,7 +376,7 @@ no appointment record is created when the calendar write fails.
 
 ---
 
-## 6. Stripe and money safety
+## 9. Stripe and money safety
 
 - Public **Pay Now** on the website is separate and remains operational in live mode.
 - The console's administrative charging features are gated and currently disabled.
@@ -294,7 +388,7 @@ no appointment record is created when the calendar write fails.
 
 ---
 
-## 7. Common messages and what to do
+## 10. Common messages and what to do
 
 | Message | Meaning | Action |
 | --- | --- | --- |
@@ -316,7 +410,7 @@ no appointment record is created when the calendar write fails.
 
 ---
 
-## 8. Security rules for everyone with access
+## 11. Security rules for everyone with access
 
 - Use a unique password. Never reuse a password from another service.
 - Turn on two-step verification, especially for owner, manager and finance accounts.
@@ -331,7 +425,7 @@ no appointment record is created when the calendar write fails.
 
 ---
 
-## 9. Recovery checklist
+## 12. Recovery checklist
 
 If you cannot sign in:
 

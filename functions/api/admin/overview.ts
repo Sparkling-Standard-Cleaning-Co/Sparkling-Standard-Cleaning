@@ -25,7 +25,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
   const db = adminDb(context.env);
   if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
   try {
-    const actor = await requireActor(db, context.request);
+    const actor = await requireActor(db, context.request, 'lead.read');
     const customerScope = scope(actor, 'primary_branch_id');
     const leadScope = scope(actor, 'branch_id');
     const requestScope = scope(actor, 'branch_id');

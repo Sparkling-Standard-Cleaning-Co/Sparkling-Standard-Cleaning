@@ -102,6 +102,7 @@ import '../../styles/admin.css';
             <button type="button" data-admin-nav="customers">Customers</button>
             <button type="button" data-admin-nav="recurring">Recurring Plans</button>
             <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
+            <button type="button" data-admin-nav="timekeeping">Timekeeping</button>
             <button type="button" data-admin-nav="finance">Invoices &amp; Payments</button>
             <button type="button" data-admin-nav="gift">Gift Certificates</button>
             <button type="button" data-admin-nav="reports">Reports</button>
@@ -133,9 +134,16 @@ import '../../styles/admin.css';
 
           <section class="admin-view" data-admin-view="calendar" hidden>
             <div class="admin-card">
-              <h2 class="admin-section-title">Pending reservation requests</h2>
+              <h2 class="admin-section-title">Next seven days</h2>
+              <p class="admin-muted">Operational board for scheduling and staffing. Later confirmed appointments remain intact below.</p>
+              <div data-admin-week-board></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Reservation requests</h2>
+              <p class="admin-muted">Every request can be opened, linked to a customer and actioned.</p>
               <div data-admin-requests></div>
             </div>
+            <div data-admin-request-detail style="margin-top:1rem;" hidden></div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Upcoming appointments</h2>
               <div data-admin-appointments></div>
@@ -201,6 +209,78 @@ import '../../styles/admin.css';
             </div>
           </section>
 
+          <section class="admin-view" data-admin-view="timekeeping" hidden>
+            <div class="admin-card">
+              <div class="admin-inline-form" style="align-items:end;">
+                <label>Week starting <input type="date" data-time-week /></label>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-action="time-load">Load Week</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="time-export">Export CSV</button>
+              </div>
+              <div class="admin-grid" data-admin-time-summary style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Employees</h2>
+              <p class="admin-muted">Preliminary hours. Correct a timecard below; every correction records the reason and the previous values.</p>
+              <div data-admin-time-employees></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Intervals and corrections</h2>
+              <div data-admin-time-intervals></div>
+              <details class="admin-detail-toggle" style="margin-top:1rem;"><summary>Correct a time interval</summary>
+                <form class="admin-form admin-form--grid" data-form="time-correct">
+                  <input type="hidden" name="intervalId" data-time-interval-id />
+                  <label>Start (Central) <input name="startedAt" type="datetime-local" required /></label>
+                  <label>End (Central) <input name="endedAt" type="datetime-local" required /></label>
+                  <label>Kind <select name="kind"><option value="work">Work</option><option value="break">Paid rest break</option><option value="meal">Meal</option></select></label>
+                  <label>Rate type <select name="rateType"><option value="regular">Regular</option><option value="lead">Lead</option><option value="solo">Solo assignment</option></select></label>
+                  <label><input type="checkbox" name="paid" value="yes" /> Paid interval</label>
+                  <label class="admin-field--wide">Reason (required) <input name="reason" maxlength="500" required /></label>
+                  <button class="btn btn--primary btn--small" type="submit">Save Correction</button>
+                </form>
+              </details>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Pending correction requests</h2>
+              <div data-admin-time-corrections></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Location verification</h2>
+              <p class="admin-muted">Recorded only when an employee taps a clock action. Never continuous tracking.</p>
+              <div data-admin-time-events></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Staff access</h2>
+              <div class="admin-grid">
+                <div>
+                  <h3>Invite a cleaner</h3>
+                  <form class="admin-form" data-form="time-invite">
+                    <label>Email <input name="email" type="email" required /></label>
+                    <button class="btn btn--secondary btn--small" type="submit">Send Employee Invitation</button>
+                  </form>
+                  <div data-time-invite-result style="margin-top:.6rem;"></div>
+                </div>
+                <div>
+                  <h3>Link an account to the roster</h3>
+                  <form class="admin-form" data-form="time-link">
+                    <label>Account email <input name="email" type="email" required /></label>
+                    <label>Team member <select name="teamMemberId" data-time-team-options required></select></label>
+                    <button class="btn btn--secondary btn--small" type="submit">Link Account</button>
+                  </form>
+                </div>
+              </div>
+              <div data-admin-owner-time-rates style="margin-top:1rem;">
+                <h3>Pay rates (owner only)</h3>
+                <form class="admin-form admin-form--grid" data-form="time-rate">
+                  <label>Team member <select name="teamMemberId" data-time-team-options required></select></label>
+                  <label>Rate <select name="rateType"><option value="regular">Regular ? $18/hr</option><option value="lead">Lead ? $22/hr</option><option value="solo">Solo assignment ? $25/hr</option></select></label>
+                  <label>Hourly (USD) <input name="hourly" type="number" min="0" step="0.01" required /></label>
+                  <label>Effective from <input name="effectiveFrom" type="date" required /></label>
+                  <button class="btn btn--secondary btn--small" type="submit">Update Rate</button>
+                </form>
+              </div>
+            </div>
+          </section>
+
           <section class="admin-view" data-admin-view="finance" hidden>
             <div class="admin-grid" data-admin-finance-summary></div>
             <div class="admin-card" style="margin-top:1rem;">
@@ -224,9 +304,15 @@ import '../../styles/admin.css';
           <section class="admin-view" data-admin-view="gift" hidden>
             <div class="admin-card">
               <h2 class="admin-section-title">Gift certificates</h2>
-              <div data-admin-gifts></div>
+              <form class="admin-inline-form" data-admin-gift-filter>
+                <label>Search <input name="q" type="search" placeholder="Code, purchaser, recipient or email" /></label>
+                <label>Status <select name="status"><option value="">All</option><option value="active">Active</option><option value="scheduled">Scheduled (future)</option><option value="fully_redeemed">Fully redeemed</option><option value="refunded">Refunded</option><option value="void">Voided</option></select></label>
+                <button class="btn btn--secondary btn--small" type="submit">Filter</button>
+              </form>
+              <div data-admin-gifts style="margin-top:1rem;"></div>
+              <div data-admin-gift-detail style="margin-top:1rem;"></div>
               <p style="margin-top:1rem;"><a class="btn btn--secondary" href="/gift-admin/">Open Gift Register for Adjustments</a></p>
-              <p class="admin-muted">The existing production register remains authoritative for redemption, refund and void actions.</p>
+              <p class="admin-muted">The existing production register remains authoritative for balances. Redemption against an invoice is available from the invoice view.</p>
             </div>
           </section>
 

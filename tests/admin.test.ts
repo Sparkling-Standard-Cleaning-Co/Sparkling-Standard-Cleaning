@@ -18,6 +18,7 @@ import { hashPassword } from '../src/lib/admin/auth.ts';
 import { persistLeadSubmission } from '../src/lib/admin/lead-persistence.ts';
 import { onRequestGet as overviewGet } from '../functions/api/admin/overview.ts';
 import { onRequestPost as authPost } from '../functions/api/admin/auth.ts';
+import { onRequestGet as adminRequestsGet, onRequestPost as adminRequestsPost } from '../functions/api/admin/requests.ts';
 
 const MFA_KEY = 'synthetic-mfa-encryption-key-32-bytes-minimum';
 
@@ -69,6 +70,8 @@ function migratedDb(): TestD1 {
     '0008_invoice_payment_links.sql',
     '0009_signed_documents_and_payment_authorizations.sql',
     '0010_signed_content_and_card_setup.sql',
+    '0011_booking_management_and_notifications.sql',
+    '0012_employee_timekeeping.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -344,6 +347,7 @@ import {
   addCustomerNote,
   addProperty,
   createCustomer,
+  getCustomer,
   listCustomers,
   listLeads,
   retryLeadNotification,
@@ -372,6 +376,7 @@ import {
   verifyMfaChallenge,
 } from '../src/lib/admin/mfa.ts';
 import { operationsReport } from '../src/lib/admin/reporting.ts';
+import { applyGiftPaymentToInvoice } from '../src/lib/admin/gift-reconcile.ts';
 import { applyInvoiceCheckoutPayment } from '../src/lib/admin/stripe-reconcile.ts';
 import { createInvoicePaymentLink, refundStripePayment, createSavedCardSetupSession, recordSavedCardSetup, chargeInvoiceWithAuthorization } from '../src/lib/admin/stripe-billing.ts';
 import { createPaymentAuthorization, getPaymentAuthorization, signPaymentAuthorization } from '../src/lib/admin/payment-authorization.ts';
@@ -1060,4 +1065,187 @@ test('the login route rejects a cross-origin state-changing request', async () =
     env: { DB: db },
   } as never);
   assert.equal(response.status, 403);
+});
+
+
+// ?? Booking request management (2026-10-30) ?????????????????????????????????
+
+test('legacy requests can be opened, flagged as possible duplicates and linked', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'requests@example.test',
+    name: 'Requests Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const actor = await readOpsActor(db, request(`ss_ops=${session.token}`));
+  assert.ok(actor);
+
+  const insert = db.raw.prepare(
+    `INSERT INTO booking_requests
+     (id, hold_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+     VALUES (?, ?, 'pending', ?, '2026-10-30', ?, ?, 438, ?)`,
+  );
+  const payload = JSON.stringify({
+    source: 'r2_backfill',
+    locationText: '6360 HAUPERT LANE ? MOLINO, FL 32577',
+    destination: { lat: 30.719, lng: -87.442 },
+  });
+  insert.run('BR-1', 'hold-1', 'SS-ONE', '2026-10-30T13:45:00.000Z', '2026-10-30T21:03:00.000Z', payload);
+  insert.run('BR-2', 'hold-2', 'SS-TWO', '2026-10-30T14:00:00.000Z', '2026-10-30T21:39:00.000Z', payload);
+
+  const headers = { Cookie: `ss_ops=${session.token}`, Accept: 'application/json' };
+  const detailResponse = await adminRequestsGet({
+    request: new Request('https://example.test/api/admin/requests?id=BR-1', { headers }),
+    env: { DB: db },
+  } as never);
+  assert.equal(detailResponse.status, 200);
+  const detail = (await detailResponse.json()) as Record<string, unknown>;
+  assert.equal((detail.request as Record<string, unknown>).customer_id, null);
+  assert.equal((detail.payload as Record<string, unknown>).locationText, '6360 HAUPERT LANE ? MOLINO, FL 32577');
+  assert.equal((detail.possibleDuplicates as unknown[]).length, 1, 'the second legacy request is flagged');
+  assert.equal(detail.email, '');
+
+  const customer = await createCustomer(db, actor!, {
+    firstName: 'Verified',
+    lastName: 'Customer',
+    email: 'verified@example.test',
+    addressLine1: '6360 Haupert Ln',
+    city: 'Molino',
+    state: 'FL',
+    postalCode: '32577',
+  });
+  const customerDetail = await getCustomer(db, actor!, String(customer.id));
+  const property = (customerDetail?.properties as Array<Record<string, unknown>>)[0];
+
+  const linkResponse = await adminRequestsPost({
+    request: new Request('https://example.test/api/admin/requests', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json', 'X-CSRF-Token': actor!.csrf },
+      body: JSON.stringify({ action: 'link_customer', requestId: 'BR-1', customerId: customer.id, propertyId: property.id }),
+    }),
+    env: { DB: db },
+  } as never);
+  assert.equal(linkResponse.status, 200);
+  const linked = db.raw.prepare('SELECT customer_id, property_id FROM booking_requests WHERE id = ?').get('BR-1') as {
+    customer_id: string;
+    property_id: string;
+  };
+  assert.equal(linked.customer_id, customer.id);
+  assert.equal(linked.property_id, property.id);
+  const auditRow = db.raw
+    .prepare("SELECT action FROM admin_audit WHERE entity_id = 'BR-1' ORDER BY created_at DESC LIMIT 1")
+    .get() as { action: string };
+  assert.equal(auditRow.action, 'request.customer_linked');
+});
+
+test('a request without a customer can create and link a verified customer', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'request-create@example.test',
+    name: 'Requests Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const actor = await readOpsActor(db, request(`ss_ops=${session.token}`));
+  assert.ok(actor);
+  db.raw
+    .prepare(
+      `INSERT INTO booking_requests
+       (id, hold_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+       VALUES ('BR-3', 'hold-3', 'pending', 'SS-THREE', '2026-10-30', '2026-10-30T14:00:00.000Z', '2026-10-30T16:00:00.000Z', 120, '{}')`,
+    )
+    .run();
+  const response = await adminRequestsPost({
+    request: new Request('https://example.test/api/admin/requests', {
+      method: 'POST',
+      headers: {
+        Cookie: `ss_ops=${session.token}`,
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': actor!.csrf,
+      },
+      body: JSON.stringify({
+        action: 'create_customer',
+        requestId: 'BR-3',
+        firstName: 'New',
+        lastName: 'Customer',
+        email: 'new-request-customer@example.test',
+        addressLine1: '100 S Baylen St',
+        city: 'Pensacola',
+        state: 'FL',
+        postalCode: '32502',
+      }),
+    }),
+    env: { DB: db },
+  } as never);
+  assert.equal(response.status, 200);
+  const linked = db.raw
+    .prepare('SELECT customer_id, property_id FROM booking_requests WHERE id = ?')
+    .get('BR-3') as { customer_id: string; property_id: string };
+  assert.ok(linked.customer_id);
+  assert.ok(linked.property_id);
+  const count = db.raw
+    .prepare("SELECT COUNT(*) AS count FROM customer_contacts WHERE normalized_value = 'new-request-customer@example.test'")
+    .get() as { count: number };
+  assert.equal(count.count, 1, 'no duplicate customer contact is created');
+});
+
+
+test('a gift redemption is applied to an invoice exactly once', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Gift',
+    lastName: 'Customer',
+    email: 'gift-invoice@example.test',
+    addressLine1: '200 S Baylen St',
+    city: 'Pensacola',
+    state: 'FL',
+    postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    lines: [{ kind: 'service', description: 'Deep cleaning', quantity: 1, unitAmountCents: 23000, totalCents: 23000 }],
+  });
+  const first = await applyGiftPaymentToInvoice(db, actor, {
+    invoiceId: invoice.id,
+    amountCents: 9000,
+    giftCode: 'SSGC-AAAA-BBBB',
+    reference: 'invoice:test:SSGC-AAAA-BBBB:9000',
+  });
+  assert.equal(first.duplicate, false);
+  assert.equal(first.balanceCents, 14000);
+  const detail = await getInvoice(db, actor, invoice.id);
+  assert.equal((detail?.invoice as Record<string, unknown>).balance_cents, 14000);
+  const payment = db.raw
+    .prepare("SELECT provider, amount_cents, status, metadata_json FROM payments WHERE invoice_id = ?")
+    .get(invoice.id) as { provider: string; amount_cents: number; status: string; metadata_json: string };
+  assert.equal(payment.provider, 'external');
+  assert.equal(payment.amount_cents, 9000);
+  assert.equal(payment.status, 'succeeded');
+  assert.match(payment.metadata_json, /gift_certificate/);
+  assert.match(payment.metadata_json, /SSGC-AAAA-BBBB/);
+
+  const duplicate = await applyGiftPaymentToInvoice(db, actor, {
+    invoiceId: invoice.id,
+    amountCents: 9000,
+    giftCode: 'SSGC-AAAA-BBBB',
+    reference: 'invoice:test:SSGC-AAAA-BBBB:9000',
+  });
+  assert.equal(duplicate.duplicate, true);
+  const count = db.raw.prepare('SELECT COUNT(*) AS count FROM payments WHERE invoice_id = ?').get(invoice.id) as {
+    count: number;
+  };
+  assert.equal(count.count, 1, 'a retry never credits the invoice twice');
+
+  await assert.rejects(
+    () =>
+      applyGiftPaymentToInvoice(db, actor, {
+        invoiceId: invoice.id,
+        amountCents: 99999,
+        giftCode: 'SSGC-AAAA-BBBB',
+        reference: 'invoice:test:over-balance',
+      }),
+    /payment_exceeds_balance/,
+  );
 });

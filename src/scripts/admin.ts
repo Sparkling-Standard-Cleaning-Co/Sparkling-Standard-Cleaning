@@ -53,6 +53,7 @@ const viewMeta: Record<string, [string, string]> = {
   customers: ['Customers', 'Customer profiles, properties and history.'],
   recurring: ['Recurring Plans', 'Recurring cleaning administration.'],
   jobs: ['Jobs & Team', 'Cleaning jobs, assignments and checklists.'],
+  timekeeping: ['Timekeeping', 'Employee hours, corrections and location verification.'],
   finance: ['Invoices & Payments', 'Invoicing, payments, credits and reconciliation.'],
   gift: ['Gift Certificates', 'Existing production gift register.'],
   reports: ['Reports', 'Operational and financial reporting.'],
@@ -65,6 +66,7 @@ const navPermission: Record<string, string> = {
   customers: 'customer.read',
   recurring: 'job.read',
   jobs: 'job.read',
+  timekeeping: 'job.write',
   finance: 'finance.read',
   gift: 'finance.read',
   reports: 'finance.read',
@@ -199,6 +201,11 @@ function can(permission: string): boolean {
 }
 
 function showApp(nextActor: AdminActor): void {
+  if (nextActor.role === 'cleaner') {
+    // Cleaners use the dedicated mobile employee portal, not the owner console.
+    window.location.replace('/employee/');
+    return;
+  }
   actor = nextActor;
   if (gate) gate.hidden = true;
   if (app) app.hidden = false;
@@ -321,6 +328,56 @@ async function loadOverview(): Promise<void> {
   }
 }
 
+function centralDateKey(value: unknown): string {
+  const date = new Date(String(value ?? ''));
+  if (!Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function requestLocation(request: Record<string, unknown>): string {
+  const joined = [request.line1, request.city].filter(Boolean).join(', ');
+  if (joined) return joined;
+  try {
+    const payload = JSON.parse(String(request.payload_json ?? '{}')) as Record<string, unknown>;
+    return String(payload.locationText ?? payload.location_text ?? 'Legacy request — address not linked');
+  } catch {
+    return 'Legacy request — address not linked';
+  }
+}
+
+function renderWeekBoard(appointments: Array<Record<string, unknown>>): void {
+  const target = document.querySelector<HTMLElement>('[data-admin-week-board]');
+  if (!target) return;
+  const byDay = new Map<string, Array<Record<string, unknown>>>();
+  for (const appointment of appointments) {
+    if (['cancelled', 'no_show'].includes(String(appointment.status))) continue;
+    const key = centralDateKey(appointment.start_at);
+    if (!key) continue;
+    const list = byDay.get(key) ?? [];
+    list.push(appointment);
+    byDay.set(key, list);
+  }
+  const days: string[] = [];
+  for (let offset = 0; offset < 7; offset += 1) {
+    const day = new Date(Date.now() + offset * 86_400_000);
+    days.push(centralDateKey(day));
+  }
+  target.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Day</th><th>Jobs</th><th>Crew</th><th>First appointment</th><th>Latest</th></tr></thead><tbody>${days
+    .map((day) => {
+      const jobs = (byDay.get(day) ?? []).sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
+      const crew = jobs.reduce((total, job) => total + (Number(job.crew_size) || 1), 0);
+      const first = jobs[0];
+      const last = jobs[jobs.length - 1];
+      return `<tr><td>${esc(dateTime(day))}</td><td>${jobs.length}</td><td>${crew}</td><td>${first ? `${esc(dateTime(first.start_at))} · ${esc(first.reference)}` : '—'}</td><td>${last ? esc(dateTime(last.start_at)) : '—'}</td></tr>`;
+    })
+    .join('')}</tbody></table></div>`;
+}
+
 async function loadCalendar(): Promise<void> {
   const data = await api<{ requests?: Array<Record<string, unknown>>; appointments?: Array<Record<string, unknown>> }>('/api/admin/requests');
   const requests = document.querySelector<HTMLElement>('[data-admin-requests]');
@@ -328,14 +385,13 @@ async function loadCalendar(): Promise<void> {
     renderTable(requests, ['Start', 'Reference', 'Customer', 'Property', 'Status', 'Action'], (data.requests ?? []).map((request) => [
       esc(dateTime(request.start_at)),
       esc(request.quote_reference),
-      esc([request.first_name, request.last_name].filter(Boolean).join(' ')),
-      esc([request.line1, request.city].filter(Boolean).join(', ') || (() => { try { return JSON.parse(String(request.payload_json ?? '{}')).locationText ?? 'Legacy R2 request (unlinked)'; } catch { return 'Legacy R2 request (unlinked)'; } })()),
+      esc([request.first_name, request.last_name].filter(Boolean).join(' ') || 'Unlinked request'),
+      esc(requestLocation(request)),
       `<span class="admin-status">${esc(request.status)}</span>`,
-      request.status === 'pending' && request.customer_id && can('booking.write')
-        ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="request-confirm" data-id="${esc(request.id)}">Confirm</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="request-decline" data-id="${esc(request.id)}">Decline</button></div>`
-        : '',
+      `<button class="btn btn--ghost btn--small" type="button" data-admin-action="request-open" data-id="${esc(request.id)}">Open</button>`,
     ]), 'No reservation requests are waiting.');
   }
+  renderWeekBoard(data.appointments ?? []);
   const appointments = document.querySelector<HTMLElement>('[data-admin-appointments]');
   if (appointments) {
     renderTable(appointments, ['Start', 'Reference', 'Customer', 'Property', 'Crew', 'Status'], (data.appointments ?? []).map((appointment) => [
@@ -346,6 +402,221 @@ async function loadCalendar(): Promise<void> {
       esc(appointment.crew_size),
       `<span class="admin-status">${esc(appointment.status)}</span>`,
     ]), 'No appointments are recorded yet.');
+  }
+}
+
+function payloadSummary(payload: Record<string, unknown>): string {
+  const keys = [
+    'serviceType',
+    'service_label',
+    'frequency',
+    'condition',
+    'addonIds',
+    'addons',
+    'squareFeet',
+    'bedrooms',
+    'fullBaths',
+    'halfBaths',
+    'beds',
+    'price',
+    'expectedPrice',
+    'total',
+    'notes',
+    'special_instructions',
+    'access_notes',
+    'quote_reference',
+  ];
+  const rows = keys
+    .filter((key) => payload[key] !== undefined && payload[key] !== null && String(payload[key]).trim() !== '')
+    .map((key) => `<dt>${esc(titleCase(key))}</dt><dd>${esc(Array.isArray(payload[key]) ? (payload[key] as unknown[]).join(', ') : payload[key])}</dd>`)
+    .join('');
+  return rows ? `<dl class="admin-definition">${rows}</dl>` : '';
+}
+
+async function loadRequestProperties(customerId: string, select: HTMLSelectElement): Promise<void> {
+  select.innerHTML = '<option value="">No specific property</option>';
+  if (!customerId) return;
+  try {
+    const data = await api<Record<string, unknown>>(`/api/admin/customers?id=${encodeURIComponent(customerId)}`);
+    for (const property of (data.properties as Array<Record<string, unknown>>) ?? []) {
+      select.insertAdjacentHTML(
+        'beforeend',
+        `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' — '))}</option>`,
+      );
+    }
+  } catch {
+    // The customer may have no properties; a request can still be linked.
+  }
+}
+
+async function openRequest(requestId: string): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-admin-request-detail]');
+  if (!target) return;
+  const data = await api<Record<string, unknown>>(`/api/admin/requests?id=${encodeURIComponent(requestId)}`);
+  const request = (data.request ?? {}) as Record<string, unknown>;
+  const payload = (data.payload ?? {}) as Record<string, unknown>;
+  const contacts = (data.contacts as Array<Record<string, unknown>>) ?? [];
+  const properties = (data.properties as Array<Record<string, unknown>>) ?? [];
+  const notifications = (data.notifications as Array<Record<string, unknown>>) ?? [];
+  const auditRows = (data.audit as Array<Record<string, unknown>>) ?? [];
+  const duplicates = (data.possibleDuplicates as Array<Record<string, unknown>>) ?? [];
+  const linked = Boolean(request.customer_id);
+  const status = String(request.status ?? '');
+  const pending = status === 'pending';
+  const confirmed = Boolean(request.appointment_id);
+  const customerName = [request.first_name, request.last_name].filter(Boolean).join(' ') || request.company_name || '';
+  const email = String(data.email ?? '');
+
+  let customerOptions = '';
+  try {
+    const customers = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?limit=200');
+    customerOptions = (customers.customers ?? [])
+      .map((customer) => {
+        const label = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || customer.id;
+        return `<option value="${esc(customer.id)}"${customer.id === request.customer_id ? ' selected' : ''}>${esc(label)}${customer.email ? ` — ${esc(customer.email)}` : ''}</option>`;
+      })
+      .join('');
+  } catch {
+    customerOptions = '';
+  }
+
+  const association = !linked
+    ? `<div class="admin-card" style="margin-top:1rem;">
+        <h3>Link this request to a customer</h3>
+        <p class="admin-muted">No identity is guessed from the address. Link an existing match or create a verified customer record.</p>
+        <form class="admin-form admin-form--grid" data-form="request-link">
+          <input type="hidden" name="requestId" value="${esc(requestId)}" />
+          <label>Existing customer <select name="customerId" data-request-customer required><option value="">Choose a customer</option>${customerOptions}</select></label>
+          <label>Property <select name="propertyId" data-request-property><option value="">No specific property</option>${properties.map((property) => `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' — '))}</option>`).join('')}</select></label>
+          <button class="btn btn--secondary btn--small" type="submit">Link Customer</button>
+        </form>
+        <details class="admin-detail-toggle" style="margin-top:1rem;"><summary>Create a new customer</summary>
+          <form class="admin-form admin-form--grid" data-form="request-create">
+            <input type="hidden" name="requestId" value="${esc(requestId)}" />
+            <label>First name <input name="firstName" required /></label>
+            <label>Last name <input name="lastName" /></label>
+            <label>Email <input name="email" type="email" /></label>
+            <label>Phone <input name="phone" /></label>
+            <label class="admin-field--wide">Service address <input name="addressLine1" value="${esc(String(payload.locationText ?? ''))}" required /></label>
+            <label>City <input name="city" value="${esc(String(payload.city ?? ''))}" /></label>
+            <label>State <input name="state" maxlength="2" value="FL" /></label>
+            <label>ZIP <input name="postalCode" maxlength="10" /></label>
+            <button class="btn btn--primary btn--small" type="submit">Create and Link Customer</button>
+          </form>
+        </details>
+      </div>`
+    : `<div class="admin-card" style="margin-top:1rem;">
+        <h3>Customer</h3>
+        <dl class="admin-definition">
+          <dt>Name</dt><dd>${esc(customerName || '—')}</dd>
+          <dt>Contacts</dt><dd>${contacts.map((contact) => `${esc(titleCase(contact.kind))}: ${esc(contact.value)}`).join('<br />') || '—'}</dd>
+          <dt>Property</dt><dd>${esc([request.property_label, request.line1, request.city, request.state, request.postal_code].filter(Boolean).join(', ') || '—')}</dd>
+        </dl>
+        <details class="admin-detail-toggle"><summary>Change linked customer</summary>
+          <form class="admin-form" data-form="request-link">
+            <input type="hidden" name="requestId" value="${esc(requestId)}" />
+            <label>Customer <select name="customerId" data-request-customer required><option value="">Choose a customer</option>${customerOptions}</select></label>
+            <label>Property <select name="propertyId" data-request-property><option value="">No specific property</option>${properties.map((property) => `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' — '))}</option>`).join('')}</select></label>
+            <button class="btn btn--secondary btn--small" type="submit">Update Link</button>
+          </form>
+        </details>
+      </div>`;
+
+  const actions = can('booking.write')
+    ? pending
+      ? `<div class="admin-card" style="margin-top:1rem;">
+          <h3>Actions</h3>
+          <p class="admin-muted">Confirmation checks the calendar and creates the appointment before any customer email is sent.</p>
+          <form class="admin-form" data-form="request-confirm">
+            <input type="hidden" name="requestId" value="${esc(requestId)}" />
+            <button class="btn btn--primary btn--small" type="submit">Accept / Confirm Booking</button>
+          </form>
+          <details class="admin-detail-toggle" style="margin-top:1rem;"><summary>Propose a new time</summary>
+            <form class="admin-form" data-form="request-propose">
+              <input type="hidden" name="requestId" value="${esc(requestId)}" />
+              <label>Start (Central) <input name="start" type="datetime-local" required /></label>
+              <label>End (Central) <input name="end" type="datetime-local" required /></label>
+              <button class="btn btn--secondary btn--small" type="submit">Propose This Time</button>
+            </form>
+          </details>
+          <details class="admin-detail-toggle" style="margin-top:1rem;"><summary>Decline request</summary>
+            <form class="admin-form" data-form="request-decline">
+              <input type="hidden" name="requestId" value="${esc(requestId)}" />
+              <label>Reason (optional) <input name="reason" maxlength="500" /></label>
+              <label><input type="checkbox" name="notify" value="yes"${email ? '' : ' disabled'} /> Email the customer${email ? '' : ' (no email on file)'}</label>
+              <button class="btn btn--danger btn--small" type="submit">Decline Request</button>
+            </form>
+          </details>
+        </div>`
+      : confirmed
+        ? `<div class="admin-card" style="margin-top:1rem;">
+            <h3>Confirmed appointment actions</h3>
+            <dl class="admin-definition"><dt>Appointment</dt><dd>${esc(request.appointment_reference || '—')} · ${esc(request.appointment_status || '')}</dd><dt>Calendar event</dt><dd>${esc(request.calendar_event_id || 'Not linked')}</dd></dl>
+            <details class="admin-detail-toggle"><summary>Reschedule</summary>
+              <form class="admin-form" data-form="request-reschedule">
+                <input type="hidden" name="requestId" value="${esc(requestId)}" />
+                <label>New start (Central) <input name="start" type="datetime-local" required /></label>
+                <label>New end (Central) <input name="end" type="datetime-local" required /></label>
+                <button class="btn btn--secondary btn--small" type="submit">Reschedule Appointment</button>
+              </form>
+            </details>
+            <details class="admin-detail-toggle" style="margin-top:1rem;"><summary>Cancel appointment</summary>
+              <form class="admin-form" data-form="request-cancel">
+                <input type="hidden" name="requestId" value="${esc(requestId)}" />
+                <label>Reason (optional) <input name="reason" maxlength="500" /></label>
+                <label><input type="checkbox" name="notify" value="yes"${email ? '' : ' disabled'} /> Email the customer${email ? '' : ' (no email on file)'}</label>
+                <button class="btn btn--danger btn--small" type="submit">Cancel Appointment</button>
+              </form>
+            </details>
+          </div>`
+        : ''
+    : '';
+
+  const notificationRows = notifications.length
+    ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>When</th><th>Type</th><th>Status</th><th>Detail</th></tr></thead><tbody>${notifications
+        .map((notification) => `<tr><td>${esc(dateTime(notification.created_at))}</td><td>${esc(titleCase(notification.kind))}</td><td>${esc(notification.status)}</td><td>${esc(notification.error_detail || '')}</td></tr>`)
+        .join('')}</tbody></table></div>`
+    : '<p class="admin-muted">No customer emails have been logged for this request.</p>';
+
+  target.hidden = false;
+  target.innerHTML = `<div class="admin-card">
+    <div class="admin-detail-head">
+      <h2 class="admin-section-title">${esc(request.quote_reference || requestId)}</h2>
+      <div class="admin-actions">
+        <span class="admin-status">${esc(titleCase(status))}</span>
+        <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-close">Close</button>
+      </div>
+    </div>
+    ${duplicates.length ? `<div class="admin-warning"><strong>Possible duplicate requests.</strong> ${duplicates.map((duplicate) => `${esc(duplicate.quote_reference)} (${esc(dateTime(duplicate.start_at))})`).join(', ')}. Nothing was merged or deleted. Review before confirming.</div>` : ''}
+    <dl class="admin-definition">
+      <dt>Requested</dt><dd>${esc(dateTime(request.start_at))} – ${esc(dateTime(request.end_at))}</dd>
+      <dt>Status</dt><dd>${esc(titleCase(status))}</dd>
+      <dt>Customer</dt><dd>${esc(customerName || 'Not linked')}</dd>
+      <dt>Contact</dt><dd>${esc(email || '—')}</dd>
+      <dt>Property</dt><dd>${esc([request.line1, request.city, request.state, request.postal_code].filter(Boolean).join(', ') || String(payload.locationText ?? '—'))}</dd>
+      <dt>Service</dt><dd>${esc(String(payload.service_label ?? payload.serviceType ?? payload.service ?? '—'))}</dd>
+      <dt>Estimate / price</dt><dd>${esc(String(payload.price ?? payload.expectedPrice ?? payload.total ?? '—'))}</dd>
+      <dt>Calendar event</dt><dd>${esc(request.calendar_event_id || '—')}</dd>
+      <dt>Appointment</dt><dd>${esc(request.appointment_reference || '—')}</dd>
+    </dl>
+    ${payloadSummary(payload)}
+    <details class="admin-detail-toggle"><summary>Raw request data</summary><pre style="white-space:pre-wrap">${esc(JSON.stringify(payload, null, 2))}</pre></details>
+    <details class="admin-detail-toggle"><summary>Request audit trail (${auditRows.length})</summary><pre style="white-space:pre-wrap">${esc(auditRows.map((entry) => `${entry.created_at} · ${entry.action} · ${entry.success ? 'ok' : 'failed'}`).join('\n'))}</pre></details>
+    <h3 style="margin-top:1rem;">Customer email history</h3>
+    ${notificationRows}
+    ${email ? `<form class="admin-inline-form" data-form="request-notify" style="margin-top:.75rem;"><input type="hidden" name="requestId" value="${esc(requestId)}" /><button class="btn btn--ghost btn--small" type="submit">Resend last customer email</button></form>` : ''}
+  </div>${association}${actions}`;
+}
+
+async function submitRequestAction(body: Record<string, unknown>): Promise<void> {
+  setAppError();
+  const requestId = String(body.requestId ?? '');
+  try {
+    await api('/api/admin/requests', { method: 'POST', body: JSON.stringify(body) });
+    await loadCalendar();
+    if (requestId) await openRequest(requestId);
+  } catch (error) {
+    setAppError(friendly(error));
   }
 }
 
@@ -561,6 +832,12 @@ async function openInvoice(invoiceId: string): Promise<void> {
       );
     }
     if (can('finance.write') && Number(invoice.balance_cents) > 0) {
+      controls.insertAdjacentHTML(
+        'beforeend',
+        `<details class="admin-detail-toggle"><summary>Apply Gift Certificate</summary><form class="admin-form" data-form="gift-invoice"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><label>Certificate code <input name="code" placeholder="SSGC-XXXX-XXXX" required /></label><label>Amount to apply (USD) <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Your password (step-up) <input name="password" type="password" autocomplete="current-password" required /></label><button class="btn btn--secondary btn--small" type="submit">Apply Gift to Invoice</button></form></details>`,
+      );
+    }
+    if (can('finance.write') && Number(invoice.balance_cents) > 0) {
       void api<{ authorizations?: Array<Record<string, unknown>> }>(
         `/api/admin/payment-authorizations?customerId=${encodeURIComponent(String(invoice.customer_id ?? ''))}`,
       )
@@ -577,25 +854,199 @@ async function openInvoice(invoiceId: string): Promise<void> {
   }
 }
 
-async function loadGifts(): Promise<void> {
-  const data = await api<{ configured?: boolean; summary?: Record<string, number>; records?: Array<Record<string, unknown>> }>('/api/admin/gifts');
+let timeIntervals: Array<Record<string, unknown>> = [];
+
+function centralInputValue(value: unknown): string {
+  const date = new Date(String(value ?? ''));
+  if (!Number.isFinite(date.getTime())) return '';
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+    })
+      .formatToParts(date)
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value]),
+  ) as Record<string, string>;
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour === '24' ? '00' : parts.hour}:${parts.minute}`;
+}
+
+async function loadTimekeeping(): Promise<void> {
+  const weekInput = document.querySelector<HTMLInputElement>('[data-time-week]');
+  const week = weekInput?.value ?? '';
+  try {
+    const data = await api<Record<string, unknown>>(`/api/admin/timekeeping${week ? `?weekStart=${encodeURIComponent(week)}` : ''}`);
+    if (weekInput) weekInput.value = String(data.weekStart ?? '');
+    const employees = (data.employees as Array<Record<string, unknown>>) ?? [];
+    const events = (data.events as Array<Record<string, unknown>>) ?? [];
+    const corrections = (data.corrections as Array<Record<string, unknown>>) ?? [];
+    timeIntervals = employees.flatMap((employee) =>
+      ((employee.intervals as Array<Record<string, unknown>>) ?? []).map((interval) => ({
+        ...interval,
+        employee_name: employee.display_name,
+      })),
+    );
+
+    const summary = document.querySelector<HTMLElement>('[data-admin-time-summary]');
+    if (summary) {
+      const totalWork = employees.reduce((total, employee) => total + Number((employee.totals as Record<string, unknown>)?.workMinutes ?? 0), 0);
+      const overtime = employees.reduce((total, employee) => total + Number((employee.totals as Record<string, unknown>)?.overtimeMinutes ?? 0), 0);
+      const openCount = employees.filter((employee) => employee.openInterval).length;
+      const missing = employees.filter((employee) => employee.missingClockOut).length;
+      summary.innerHTML = [
+        ['Week', `${esc(data.weekStart)} ? ${esc(data.weekEnd)}`],
+        ['Compensated hours', (totalWork / 60).toFixed(2)],
+        ['Overtime hours', (overtime / 60).toFixed(2)],
+        ['Open shifts', openCount],
+        ['Missing clock-outs', missing],
+      ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('');
+    }
+
+    const employeeTarget = document.querySelector<HTMLElement>('[data-admin-time-employees]');
+    if (employeeTarget) {
+      renderTable(employeeTarget, ['Employee', 'Work', 'Rest', 'Meal', 'Overtime', 'Est. gross', 'State'], employees.map((employee) => {
+        const totals = (employee.totals as Record<string, unknown>) ?? {};
+        const state = employee.missingClockOut ? 'Missing clock-out' : employee.openInterval ? 'On the clock' : '?';
+        return [
+          esc(employee.display_name),
+          esc(totals.workLabel),
+          esc(totals.breakLabel),
+          esc(totals.mealLabel),
+          esc(totals.overtimeLabel),
+          esc(totals.grossLabel),
+          esc(state),
+        ];
+      }), 'No team members are linked to the roster yet.');
+    }
+
+    const intervalTarget = document.querySelector<HTMLElement>('[data-admin-time-intervals]');
+    if (intervalTarget) {
+      renderTable(intervalTarget, ['Employee', 'Start', 'End', 'Kind', 'Rate', 'Paid', 'Status', 'Action'], timeIntervals.map((interval) => [
+        esc(interval.employee_name),
+        esc(dateTime(interval.started_at)),
+        esc(interval.ended_at ? dateTime(interval.ended_at) : 'open'),
+        esc(interval.kind),
+        esc(interval.rate_type),
+        Number(interval.paid) ? 'Yes' : 'No',
+        esc(interval.status),
+        `<button class="btn btn--ghost btn--small" type="button" data-admin-action="time-edit" data-id="${esc(interval.id)}">Edit</button>`,
+      ]), 'No intervals recorded for this week.');
+    }
+
+    const correctionTarget = document.querySelector<HTMLElement>('[data-admin-time-corrections]');
+    if (correctionTarget) {
+      renderTable(correctionTarget, ['Requested', 'Employee', 'Message', 'Action'], corrections.map((correction) => [
+        esc(dateTime(correction.created_at)),
+        esc(correction.display_name),
+        esc(correction.message),
+        `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="time-review" data-id="${esc(correction.id)}" data-approve="yes">Approve</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="time-review" data-id="${esc(correction.id)}" data-approve="no">Decline</button></div>`,
+      ]), 'No pending correction requests.');
+    }
+
+    const eventTarget = document.querySelector<HTMLElement>('[data-admin-time-events]');
+    if (eventTarget) {
+      renderTable(eventTarget, ['When', 'Employee', 'Action', 'Location', 'Accuracy', 'Map'], events.slice(0, 100).map((event) => [
+        esc(dateTime(event.occurred_at)),
+        esc(event.display_name),
+        esc(titleCase(event.action)),
+        esc(titleCase(event.location_status)),
+        event.accuracy_m ? `${Math.round(Number(event.accuracy_m))} m` : '?',
+        event.lat && event.lng ? `<a href="https://www.google.com/maps?q=${esc(event.lat)},${esc(event.lng)}" target="_blank" rel="noopener noreferrer">Open</a>` : '?',
+      ]), 'No clock events recorded this week.');
+    }
+
+    const options = employees
+      .map((employee) => `<option value="${esc(employee.id)}">${esc(employee.display_name)}</option>`)
+      .join('');
+    for (const select of document.querySelectorAll<HTMLSelectElement>('[data-time-team-options]')) {
+      const current = select.value;
+      select.innerHTML = `<option value="">Choose a team member</option>${options}`;
+      if (current) select.value = current;
+    }
+    const ownerRates = document.querySelector<HTMLElement>('[data-admin-owner-time-rates]');
+    if (ownerRates) ownerRates.hidden = actor?.role !== 'owner';
+    setAppError();
+  } catch (error) {
+    setAppError(friendly(error));
+  }
+}
+
+let giftRecords: Array<Record<string, unknown>> = [];
+
+async function loadGifts(query = '', status = ''): Promise<void> {
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  if (status) params.set('status', status);
+  const data = await api<{ configured?: boolean; summary?: Record<string, number>; records?: Array<Record<string, unknown>> }>(
+    `/api/admin/gifts${params.toString() ? `?${params.toString()}` : ''}`,
+  );
   const target = document.querySelector<HTMLElement>('[data-admin-gifts]');
   if (!target) return;
   if (!data.configured) return renderEmpty(target, 'Gift storage is not configured on this deployment.');
+  giftRecords = data.records ?? [];
   const summary = data.summary ?? {};
-  target.innerHTML = `<div class="admin-grid">${[['Issued', summary.issuedCount ?? 0], ['Active', summary.activeCount ?? 0], ['Outstanding', money(summary.outstandingCents)], ['Redeemed', money(summary.redeemedCents)]].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('')}</div><div style="margin-top:1rem;" data-admin-gift-table></div>`;
+  target.innerHTML = `<div class="admin-grid">${[
+    ['Issued', summary.issuedCount ?? 0],
+    ['Active now', summary.activeCount ?? 0],
+    ['Scheduled', summary.futureCount ?? 0],
+    ['Partially redeemed', summary.partialCount ?? 0],
+    ['Outstanding', money(summary.outstandingCents)],
+    ['Redeemed', money(summary.redeemedCents)],
+  ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('')}</div><div style="margin-top:1rem;" data-admin-gift-table></div><div data-admin-gift-action style="margin-top:1rem;"></div>`;
   const table = target.querySelector<HTMLElement>('[data-admin-gift-table]');
   if (table) {
-    renderTable(table, ['Code', 'Recipient', 'Value', 'Remaining', 'Valid from', 'Status', 'Action'], (data.records ?? []).map((record) => [esc(record.code), esc(record.recipientName), esc(money(record.valueCents)), esc(money(record.remainingCents)), esc(record.validFromDate), `<span class="admin-status">${esc(record.active ? 'active' : record.status)}</span>`, `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-gift-code="${esc(record.code)}" data-gift-action="redeem">Redeem</button><button class="btn btn--ghost btn--small" type="button" data-gift-code="${esc(record.code)}" data-gift-action="void">Void</button></div>`]), 'No gift certificates are recorded.');
+    renderTable(table, ['Code', 'Purchaser', 'Recipient', 'Value', 'Redeemed', 'Remaining', 'Valid from', 'State', 'Action'], (data.records ?? []).map((record) => [
+      esc(record.code),
+      esc(record.purchaserName),
+      esc(record.recipientName),
+      esc(money(record.valueCents)),
+      esc(money(record.redeemedCents)),
+      esc(money(record.remainingCents)),
+      esc(record.validFromDate),
+      `<span class="admin-status">${esc(titleCase(record.activationState))}</span>`,
+      `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-gift-code="${esc(record.code)}" data-gift-action="details">Details</button><button class="btn btn--ghost btn--small" type="button" data-gift-code="${esc(record.code)}" data-gift-action="redeem">Redeem</button><button class="btn btn--ghost btn--small" type="button" data-gift-code="${esc(record.code)}" data-gift-action="void">Void</button></div>`,
+    ]), 'No gift certificates match this filter.');
   }
-  target.insertAdjacentHTML('beforeend', '<div data-admin-gift-action style="margin-top:1rem;"></div>');
+}
+
+function renderGiftDetails(code: string): void {
+  const target = document.querySelector<HTMLElement>('[data-admin-gift-detail]');
+  const record = giftRecords.find((entry) => entry.code === code);
+  if (!target || !record) return;
+  const history = (record.history as Array<Record<string, unknown>>) ?? [];
+  const adjustments = (record.adjustments as Array<Record<string, unknown>>) ?? [];
+  target.hidden = false;
+  target.innerHTML = `<div class="admin-card">
+    <div class="admin-detail-head"><h3>${esc(record.code)}</h3><button class="btn btn--ghost btn--small" type="button" data-gift-action="details-close">Close</button></div>
+    <dl class="admin-definition">
+      <dt>State</dt><dd>${esc(titleCase(record.activationState))}</dd>
+      <dt>Purchaser</dt><dd>${esc(record.purchaserName)} ? ${esc(record.purchaserEmail)}</dd>
+      <dt>Recipient</dt><dd>${esc(record.recipientName)} ? ${esc(record.recipientEmail || 'No recipient email')}</dd>
+      <dt>Value</dt><dd>${esc(money(record.valueCents))} ? redeemed ${esc(money(record.redeemedCents))} ? remaining ${esc(money(record.remainingCents))}</dd>
+      <dt>Valid from</dt><dd>${esc(record.validFromDate)} (12:00 AM America/Chicago)</dd>
+      <dt>Issued</dt><dd>${esc(dateTime(record.issuedAt))}</dd>
+      <dt>Stripe session</dt><dd>${esc(record.stripeSessionId || '?')}</dd>
+      <dt>Message</dt><dd>${esc(record.message || '?')}</dd>
+    </dl>
+    <h4>Redemption history</h4>
+    ${history.length ? history.map((entry) => `<p class="admin-muted">${esc(dateTime(entry.at))} ? ${esc(money(entry.amountCents))} ? ${esc(entry.reference || 'no reference')} ? ${esc(entry.note || '')}</p>`).join('') : '<p class="admin-muted">Not redeemed yet.</p>'}
+    <h4>Refunds and voids</h4>
+    ${adjustments.length ? adjustments.map((entry) => `<p class="admin-muted">${esc(dateTime(entry.at))} ? ${esc(titleCase(entry.kind))} ? ${esc(money(entry.amountCents))} ? ${esc(entry.note || '')}</p>`).join('') : '<p class="admin-muted">None.</p>'}
+  </div>`;
+  target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function renderGiftAction(code: string, action: string): void {
   const target = document.querySelector<HTMLElement>('[data-admin-gift-action]');
   if (!target) return;
+  if (action === 'details') return renderGiftDetails(code);
+  if (action === 'details-close') {
+    const detail = document.querySelector<HTMLElement>('[data-admin-gift-detail]');
+    if (detail) { detail.hidden = true; detail.innerHTML = ''; }
+    return;
+  }
   target.innerHTML = `<div class="admin-card"><h3>${action === 'redeem' ? 'Redeem' : 'Void'} ${esc(code)}</h3><form class="admin-form" data-form="gift-action"><input type="hidden" name="code" value="${esc(code)}" /><input type="hidden" name="giftAction" value="${esc(action)}" />${action === 'redeem' ? '<label>Amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reference <input name="reference" /></label>' : ''}<label>Reason / note <input name="note" /></label><label>Your password (step-up) <input name="password" type="password" autocomplete="current-password" required /></label><button class="btn btn--primary btn--small" type="submit">Confirm ${action === 'redeem' ? 'redemption' : 'void'}</button></form></div>`;
 }
+
 async function loadReports(): Promise<void> {
   const [data, giftData] = await Promise.all([
     api<{ report?: Record<string, unknown> }>('/api/admin/reports'),
@@ -674,6 +1125,7 @@ async function loadView(view: string): Promise<void> {
     if (view === 'customers') await loadCustomers();
     if (view === 'recurring') await loadRecurring();
     if (view === 'jobs') await loadJobs();
+    if (view === 'timekeeping') await loadTimekeeping();
     if (view === 'finance') await loadFinance();
     if (view === 'gift') await loadGifts();
     if (view === 'reports') await loadReports();
@@ -894,6 +1346,12 @@ document.querySelector<HTMLButtonElement>('[data-admin-logout]')?.addEventListen
 
 for (const button of navButtons) button.addEventListener('click', () => void loadView(button.dataset.adminNav ?? 'overview'));
 
+document.querySelector<HTMLFormElement>('[data-admin-gift-filter]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget as HTMLFormElement);
+  void loadGifts(String(data.get('q') ?? ''), String(data.get('status') ?? ''));
+});
+
 document.querySelector<HTMLFormElement>('[data-admin-customer-search]')?.addEventListener('submit', (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget as HTMLFormElement);
@@ -909,6 +1367,11 @@ document.querySelector<HTMLFormElement>('[data-admin-lead-filter]')?.addEventLis
 document.addEventListener('change', (event) => {
   const target = event.target as HTMLInputElement | HTMLSelectElement;
   if (target.matches('[data-admin-customer-options]') && currentView === 'recurring') void loadPropertiesFor(target.value);
+  if (target.matches('[data-request-customer]')) {
+    const form = target.closest('form');
+    const property = form?.querySelector<HTMLSelectElement>('[data-request-property]');
+    if (property) void loadRequestProperties(target.value, property);
+  }
   if (target.matches('[data-checklist-item]')) {
     void api('/api/admin/operations', {
       method: 'POST',
@@ -994,6 +1457,88 @@ document.addEventListener('submit', (event) => {
       password: value('password'),
     }).then(() => loadGifts());
   }
+  const iso = (raw: string): string => {
+    const parsed = new Date(raw);
+    return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : '';
+  };
+  if (kind === 'request-link') void submitRequestAction({ action: 'link_customer', requestId: value('requestId'), customerId: value('customerId'), propertyId: value('propertyId') });
+  if (kind === 'request-create') void submitRequestAction({
+    action: 'create_customer', requestId: value('requestId'), firstName: value('firstName'), lastName: value('lastName'),
+    email: value('email'), phone: value('phone'), addressLine1: value('addressLine1'), city: value('city'),
+    state: value('state'), postalCode: value('postalCode'),
+  });
+  if (kind === 'request-confirm') void submitRequestAction({ action: 'confirm', requestId: value('requestId') });
+  if (kind === 'request-decline') void submitRequestAction({ action: 'decline', requestId: value('requestId'), reason: value('reason'), notify: checked('notify') });
+  if (kind === 'request-notify') void submitRequestAction({ action: 'notify', requestId: value('requestId') });
+  if (kind === 'request-propose' || kind === 'request-reschedule') {
+    const start = iso(value('start'));
+    const end = iso(value('end'));
+    if (!start || !end) {
+      setAppError('Choose a valid start and end time in Central Time.');
+    } else {
+      void submitRequestAction({
+        action: kind === 'request-propose' ? 'propose' : 'reschedule',
+        requestId: value('requestId'),
+        date: value('start').slice(0, 10),
+        start,
+        end,
+      });
+    }
+  }
+  if (kind === 'request-cancel') void submitRequestAction({ action: 'cancel', requestId: value('requestId'), reason: value('reason'), notify: checked('notify') });
+  if (kind === 'time-correct') {
+    const start = iso(value('startedAt'));
+    const end = iso(value('endedAt'));
+    if (!start || !end) {
+      setAppError('Choose a valid start and end time in Central Time.');
+    } else {
+      void action('/api/admin/timekeeping', {
+        action: 'correct_interval', intervalId: value('intervalId'), startedAt: start, endedAt: end,
+        kind: value('kind'), rateType: value('rateType'), paid: checked('paid'), reason: value('reason'),
+      });
+    }
+  }
+  if (kind === 'time-invite') {
+    setAppError();
+    void api<{ token?: string; expiresAt?: string; emailSent?: boolean }>('/api/admin/timekeeping', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'invite_employee', email: value('email') }),
+    }).then((result) => {
+      const target = document.querySelector<HTMLElement>('[data-time-invite-result]');
+      if (!target) return;
+      const link = result.token ? `${window.location.origin}/employee/?invite=${encodeURIComponent(result.token)}` : '';
+      target.innerHTML = result.emailSent
+        ? '<p class="admin-muted">Invitation email sent.</p>'
+        : `<p class="admin-muted">Email was not sent. Share this one-time link directly:</p><p><a href="${esc(link)}">${esc(link)}</a></p>`;
+      form.reset();
+    }).catch((error) => setAppError(friendly(error)));
+  }
+  if (kind === 'time-link') void action('/api/admin/timekeeping', { action: 'link_member', email: value('email'), teamMemberId: value('teamMemberId') });
+  if (kind === 'time-rate') {
+    const hourly = Number(value('hourly'));
+    if (!Number.isFinite(hourly) || hourly < 0) {
+      setAppError('Enter a valid hourly rate.');
+    } else {
+      void action('/api/admin/timekeeping', {
+        action: 'set_rate', teamMemberId: value('teamMemberId'), rateType: value('rateType'),
+        hourlyCents: Math.round(hourly * 100), effectiveFrom: value('effectiveFrom'),
+      });
+    }
+  }
+  if (kind === 'gift-invoice') {
+    setAppError();
+    void api('/api/admin/gifts', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'redeem',
+        invoiceId: value('invoiceId'),
+        code: value('code'),
+        amountCents: Math.round(Number(value('amount')) * 100),
+        password: value('password'),
+        note: `Applied to invoice ${value('invoiceId')}`,
+      }),
+    }).then(() => openInvoice(value('invoiceId'))).catch((error) => setAppError(friendly(error)));
+  }
   if (kind === 'mfa-disable') {
     void api('/api/admin/accounts', { method: 'POST', body: JSON.stringify({ action: 'mfa_disable', password: value('password'), code: value('code') }) })
       .then(() => { if (actor) actor.mfaEnabled = false; return loadView('settings'); })
@@ -1058,8 +1603,50 @@ document.addEventListener('click', (event) => {
   if (!target) return;
   const actionName = target.dataset.adminAction ?? '';
   const id = target.dataset.id ?? '';
-  if (actionName === 'request-confirm') void action('/api/admin/requests', { action: 'confirm', requestId: id });
-  if (actionName === 'request-decline') void action('/api/admin/requests', { action: 'status', requestId: id, status: 'declined' });
+  if (actionName === 'time-load') void loadTimekeeping();
+  if (actionName === 'time-export') {
+    const week = document.querySelector<HTMLInputElement>('[data-time-week]')?.value ?? '';
+    void fetch(`/api/admin/timekeeping?export=csv${week ? `&weekStart=${encodeURIComponent(week)}` : ''}`, {
+      credentials: 'same-origin',
+      headers: { Accept: 'text/csv' },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('export_failed');
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `sparkling-standard-timecards-${week || 'week'}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      })
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'time-edit') {
+    const interval = timeIntervals.find((entry) => entry.id === id);
+    const correctionForm = document.querySelector<HTMLFormElement>('[data-form="time-correct"]');
+    if (interval && correctionForm) {
+      const field = (name: string) => correctionForm.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${name}"]`);
+      const intervalId = field('intervalId') as HTMLInputElement | null;
+      if (intervalId) intervalId.value = id;
+      const start = field('startedAt') as HTMLInputElement | null;
+      const end = field('endedAt') as HTMLInputElement | null;
+      const kind = field('kind') as HTMLSelectElement | null;
+      const rate = field('rateType') as HTMLSelectElement | null;
+      const paid = correctionForm.querySelector<HTMLInputElement>('input[name="paid"]');
+      if (start) start.value = centralInputValue(interval.started_at);
+      if (end) end.value = centralInputValue(interval.ended_at);
+      if (kind) kind.value = String(interval.kind ?? 'work');
+      if (rate) rate.value = String(interval.rate_type ?? 'regular');
+      if (paid) paid.checked = Boolean(Number(interval.paid));
+      correctionForm.closest('details')?.setAttribute('open', '');
+      correctionForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+  if (actionName === 'time-review') {
+    void action('/api/admin/timekeeping', { action: 'review_correction', correctionId: id, approve: target.dataset.approve === 'yes' });
+  }
+  if (actionName === 'request-open') void openRequest(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'request-close') { const detail = document.querySelector<HTMLElement>('[data-admin-request-detail]'); if (detail) { detail.hidden = true; detail.innerHTML = ''; } }
   if (actionName === 'customer-open') void openCustomer(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'customer-create') renderCustomerCreate();
   if (actionName === 'lead-save') {

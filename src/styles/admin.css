@@ -31,6 +31,18 @@
 .admin-form input { border: 1px solid #d8c8b7; border-radius: .5rem; padding: .65rem .7rem; font: inherit; background: #fff; }
 .admin-error { color: #8f2738; font-size: .85rem; min-height: 1.2rem; }
 .admin-status-message { color: #4c6b4f; font-size: .85rem; min-height: 1.2rem; margin: 0; }
+.admin-warning {
+  margin: .7rem 0 0;
+  padding: .65rem .8rem;
+  border: 1px solid #dfb26f;
+  border-radius: .55rem;
+  background: #fff6e8;
+  color: #6b4a16;
+  font-size: .85rem;
+  line-height: 1.5;
+}
+.btn--danger { background: #8f2738; border-color: #8f2738; color: #fff; }
+.btn--danger:hover { background: #742030; border-color: #742030; }
 .admin-status-message:empty, .admin-error:empty { min-height: 0; }
 .admin-forgot { margin: .15rem 0 0; }
 .admin-link {
