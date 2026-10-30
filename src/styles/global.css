@@ -2963,7 +2963,7 @@ fieldset {
     grid-column: 1 / -1;
     width: 100%;
     margin-left: 0;
-    flex-direction: column-reverse;
+    flex-direction: column;
     align-items: stretch;
   }
 
@@ -2977,10 +2977,13 @@ fieldset {
 }
 .wizard__final-actions {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: flex-end;
-  gap: var(--space-3);
-  margin-left: auto;
+  gap: var(--space-2);
+  margin-left: 0;
+  width: 100%;
+  flex: 1 1 100%;
 }
 
 .wizard__final-actions .btn {
@@ -2988,7 +2991,8 @@ fieldset {
 }
 
 .wizard__final-actions .btn--large {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
+  width: 100%;
 }
 
 .estimate-result {
@@ -3480,18 +3484,17 @@ fieldset.input--invalid {
 
 .terms-acceptance {
   display: grid;
-  gap: var(--space-2);
-  margin: var(--space-5) 0;
-  padding: var(--space-4);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  gap: var(--space-1);
+  margin: var(--space-2) 0 var(--space-4);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .terms-acceptance__label {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: 0;
   font-size: var(--text-sm);
   line-height: 1.55;
@@ -3499,9 +3502,9 @@ fieldset.input--invalid {
 
 .terms-acceptance__input {
   flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
-  margin-top: 0.16rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
   accent-color: var(--color-rose-700);
 }
 
@@ -3512,7 +3515,7 @@ fieldset.input--invalid {
 
 .terms-acceptance__note {
   margin: 0;
-  padding-left: calc(1.25rem + var(--space-3));
+  padding-left: calc(1.1rem + var(--space-2));
   font-size: var(--text-xs);
   color: var(--color-text-muted);
 }

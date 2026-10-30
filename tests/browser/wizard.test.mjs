@@ -221,15 +221,18 @@ for (const [name, width, height] of [
       await fillExtrasAndScheduling(page);
       assert.equal(await activeStep(page), 5);
 
-      // Final step: Back + ONE primary action.
-      assert.equal(await isVisible(page, '[data-back]'), true, 'Back visible on final step');
+      // Final step: no Back; two stacked reservation choices.
+      assert.equal(await isVisible(page, '[data-back]'), false, 'Back removed on the final step');
       assert.equal(await isVisible(page, '[data-next]'), false, 'Continue hidden on final step');
-      assert.equal(await isVisible(page, '[data-submit]'), true, 'Submit visible on final step');
-      const visiblePrimary = await page.locator('.wizard__nav .btn--primary:visible').count();
-      assert.equal(visiblePrimary, 1, 'exactly one primary action on the final step');
+      assert.equal(await isVisible(page, '[data-submit]'), true, 'Pay Later visible on final step');
+      assert.equal(
+        (await page.locator('[data-submit]').innerText()).trim(),
+        'Request to Reserve This Cleaning (Pay Later)',
+      );
 
-      await page.click('[data-back]');
+      await page.click('[data-step-jump="4"]');
       assert.equal(await activeStep(page), 4);
+      assert.equal(await isVisible(page, '[data-back]'), true, 'Back still available on earlier steps');
       assert.equal(await isVisible(page, '[data-next]'), true, 'Continue visible after going back');
       assert.equal(await isVisible(page, '[data-submit]'), false, 'Submit hidden after going back');
     } finally {

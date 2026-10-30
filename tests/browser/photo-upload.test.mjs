@@ -118,7 +118,7 @@ test('the shared photo section appears on all four engines with the right catego
       assert.deepEqual(options.map((label) => label.trim()), labels, pathname);
       assert.match(
         await page.locator('[data-photo-section]').innerText(),
-        /Photos are required for an accurate estimate and confirmed booking/i,
+        /Photos help us verify the condition/i,
       );
     } finally {
       await context.close();

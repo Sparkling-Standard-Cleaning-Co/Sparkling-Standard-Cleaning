@@ -114,8 +114,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const payNowButton = form.querySelector<HTMLButtonElement>('[data-pay-now]');
   const photoGate = form.querySelector<HTMLElement>('[data-photo-gate]');
   const photoGateUpload = form.querySelector<HTMLButtonElement>('[data-photo-upload-now]');
-  const photoGatePayLater = form.querySelector<HTMLButtonElement>('[data-photo-pay-later]');
   const photoSummary = form.querySelector<HTMLElement>('[data-photo-summary]');
+  const photoUnavailableNotice = form.querySelector<HTMLElement>('[data-photo-unavailable]');
   const verifyAddressButton = form.querySelector<HTMLButtonElement>('[data-verify-address]');
   const paymentNote = form.querySelector<HTMLElement>('[data-payment-note]');
   const giftField = form.querySelector<HTMLElement>('[data-gift-field]');
@@ -234,12 +234,18 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const photoController = initPhotoUploads(form, {
     engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
   });
-  let photosDeferred = false;
-  let pendingPhotoAction: 'reserve' | 'pay_now' = 'pay_now';
 
   function photoStorageAvailable(): boolean {
     const section = form.querySelector<HTMLElement>('[data-photo-section]');
     return Boolean(section && !section.hasAttribute('hidden'));
+  }
+
+  const photoSectionEl = form.querySelector<HTMLElement>('[data-photo-section]');
+  if (photoSectionEl && typeof MutationObserver !== 'undefined') {
+    new MutationObserver(() => updatePhotoSummary()).observe(photoSectionEl, {
+      attributes: true,
+      attributeFilter: ['hidden'],
+    });
   }
 
   function photosOutstanding(): boolean {
@@ -247,6 +253,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   function updatePhotoSummary(): void {
+    if (photoUnavailableNotice) photoUnavailableNotice.hidden = photoStorageAvailable();
     if (!photoSummary) return;
     if (!photoStorageAvailable()) {
       photoSummary.hidden = true;
@@ -263,9 +270,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (photoGate) photoGate.hidden = true;
   }
 
-  function showPhotoGate(action: 'reserve' | 'pay_now' = 'pay_now'): void {
+  function showPhotoGate(): void {
     if (!photoGate) return;
-    pendingPhotoAction = action;
     photoGate.hidden = false;
     updatePhotoSummary();
     photoGate.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -282,7 +288,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   let routedKey: string | null = null;
   let latestResult: EstimateResult | null = null;
   let latestQuote: InstantQuote | null = null;
-  let revealKey = '';
+  let finalRevealPlayed = false;
   let lastTravelKey = '';
   let estimateStarted = false;
   let estimateCompleted = false;
@@ -900,8 +906,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (submitButton) {
       submitButton.classList.toggle('btn--primary', !eligible);
       submitButton.classList.toggle('btn--secondary', eligible);
-      submitButton.classList.toggle('btn--large', !eligible);
-      submitButton.classList.toggle('btn--small', eligible);
+      submitButton.classList.add('btn--large');
+      submitButton.classList.remove('btn--small');
     }
     if (verifyAddressButton) verifyAddressButton.hidden = !canOfferVerification;
     if (paymentUnavailable) {
@@ -932,18 +938,20 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
   function maybeRevealEstimate(): void {
     if (!reservationSummary) return;
-    const key =
-      currentStep === steps.length && latestQuote
-        ? `${latestQuote.reference}:${latestQuote.amount}`
-        : '';
-    if (!key) {
-      revealKey = '';
+    if (currentStep !== steps.length || !latestQuote) {
+      finalRevealPlayed = false;
       cancelEstimateReveal(estimateReveal, reservationSummary);
       return;
     }
-    if (revealKey === key) return;
-    revealKey = key;
     reservationSummary.hidden = false;
+    // The reveal plays once per visit to the final step. A consent checkbox or
+    // eligibility change must update the visible price in place — it must never
+    // restart the calculating animation or hide the finished quote again.
+    if (finalRevealPlayed) {
+      cancelEstimateReveal(estimateReveal, reservationSummary);
+      return;
+    }
+    finalRevealPlayed = true;
     void playEstimateReveal({ reveal: estimateReveal, target: reservationSummary });
   }
 
@@ -1181,13 +1189,15 @@ function initEstimateWizard(form: HTMLFormElement): void {
       else jump.removeAttribute('aria-current');
     }
 
-    if (backButton) backButton.hidden = currentStep === 1;
+    // The final reservation step deliberately has no Back control: the two
+    // reservation choices are the only actions in that area.
+    if (backButton) backButton.hidden = currentStep === 1 || currentStep === steps.length;
     if (nextButton) nextButton.hidden = currentStep === steps.length;
     if (finalActions) finalActions.hidden = currentStep !== steps.length;
     if (submitButton) {
       submitButton.hidden = currentStep !== steps.length;
       if (currentStep === steps.length) {
-        submitButton.textContent = latestQuote ? 'Reserve This Cleaning' : 'Send My Request';
+        submitButton.textContent = 'Request to Reserve This Cleaning (Pay Later)';
       }
     }
   }
@@ -1549,6 +1559,26 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
     }
 
+    if (step === 3 && photoStorageAvailable()) {
+      const photoSection = form.querySelector<HTMLElement>('[data-photo-section]');
+      const photoStatus = form.querySelector<HTMLElement>('[data-photo-status]');
+      const uploading = photoController.isUploading();
+      const missing = photoController.photoCount() === 0;
+      if (uploading || missing) {
+        const message = uploading
+          ? 'Please wait for the photo upload to finish before continuing.'
+          : 'Add at least one photo of the home before continuing. Photos help us verify the condition and keep your estimate accurate.';
+        if (photoStatus) {
+          photoStatus.textContent = message;
+          photoStatus.dataset.state = 'error';
+        }
+        if (photoSection) errors.push({ field: photoSection, message });
+      } else if (photoStatus?.dataset.state === 'error') {
+        photoStatus.textContent = '';
+        delete photoStatus.dataset.state;
+      }
+    }
+
     showErrorSummary(errors);
     if (errors.length > 0) {
       const first = errors[0];
@@ -1573,6 +1603,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         if (field instanceof HTMLInputElement && field.type === 'radio') continue;
         if (messageFor(field)) return false;
       }
+      if (index === 3 && photoStorageAvailable() && photoController.photoCount() === 0) return false;
       if (index === 1) {
         const submission = submissionAddress();
         if (submission.method === 'gps') {
@@ -1847,7 +1878,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
     addressDetailsRevealed = false;
     bookingFinalizedKey = '';
     bookingFinalizeNote = '';
-    photosDeferred = false;
     hidePhotoGate();
     clearAllErrors();
     attemptedSteps.clear();
@@ -1858,7 +1888,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     travelLookupSeq += 1;
     latestResult = null;
     latestQuote = null;
-    revealKey = '';
+    finalRevealPlayed = false;
     cancelEstimateReveal(estimateReveal, reservationSummary);
     pendingPaymentFields = null;
     acceptedPaymentAmount = null;
@@ -2021,7 +2051,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
       fields.photo_request_ref = photoController.requestRef;
       fields.photo_count = String(photoController.photoCount());
     }
-    if (photosDeferred) fields.photos_deferred = 'yes';
     fields.photos_outstanding = photosOutstanding() ? 'yes' : 'no';
     const giftCode =
       form.querySelector<HTMLInputElement>('input[data-gift-code]')?.value.trim().toUpperCase() ?? '';
@@ -2290,8 +2319,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
       return;
     }
     if (!validateStep(currentStep)) return;
-    if (photosOutstanding() && !photosDeferred) {
-      showPhotoGate(paymentChoice);
+    if (photosOutstanding()) {
+      showPhotoGate();
       return;
     }
     if (photoController.isUploading()) {
@@ -2503,12 +2532,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
     form.querySelector<HTMLInputElement>('[data-photo-input]')?.focus();
   });
 
-  photoGatePayLater?.addEventListener('click', () => {
-    photosDeferred = true;
-    hidePhotoGate();
-    updatePhotoSummary();
-    void handleSubmit(undefined, pendingPhotoAction);
-  });
+  function consentOnlyChange(target: EventTarget | null): boolean {
+    // Terms acceptance is a legal acknowledgment, not a pricing input. Do not
+    // recalculate the quote or replay the reveal when it is checked.
+    return target instanceof HTMLInputElement && target.name === 'termsAccepted';
+  }
 
   form.addEventListener('input', (event) => {
     if (!estimateStarted) {
@@ -2532,6 +2560,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         }
       }
     }
+    if (consentOnlyChange(target)) return;
     syncConditionalFields();
     syncRevealGroups(true);
     recalc();
@@ -2560,6 +2589,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         }
       }
     }
+    if (consentOnlyChange(target)) return;
     syncConditionalFields();
     syncRevealGroups(true);
     recalc();

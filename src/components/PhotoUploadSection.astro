@@ -1,7 +1,7 @@
 ---
 // Shared customer-photo section for all four estimate engines.
-// Residential photos are required before booking confirmation, but the
-// customer may continue without them and confirm later.
+// Residential/STR photos are required in Step 3 before the customer can
+// continue; other engines keep their own request-time behavior.
 // Hidden until /api/photo-upload confirms private R2 storage is available.
 import type { PhotoEngine } from '../lib/photos';
 import { PHOTO_CATEGORY_OPTIONS, PHOTO_ENGINE_COPY } from '../lib/photos';
@@ -21,7 +21,8 @@ const options = PHOTO_CATEGORY_OPTIONS[engine];
     {copy.title}
   </h3>
   <p class="photo-upload__hint" data-photo-hint>
-    Photos are required for an accurate estimate and confirmed booking.
+    Add at least one photo of the areas we will clean, and choose the area label before uploading.
+    Photos help us verify the home&rsquo;s condition and keep your estimate accurate.
   </p>
 
   <div class="photo-upload__grid" data-photo-grid></div>

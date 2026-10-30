@@ -101,7 +101,14 @@ async function open(width = 1440, height = 1000) {
           contentType: 'application/json',
           body: JSON.stringify({ ok: true, enabled: true, maxBytes: 8388608, maxCount: 6, maxTotalBytes: 33554432, turnstileRequired: false }),
         })
-      : route.fulfill({ status: 500, contentType: 'application/json', body: '{"ok":false}' }),
+      : route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            photos: [{ key: 'leads/2026/10/aaaaaaaaaaaaaaaaaaaaaaaa/bathroom-00000000000000000000000000000001.jpg', category: 'bathroom', bytes: 2048, name: 'condition.jpg' }],
+          }),
+        }),
   );
   await page.route('**/api/lead', async (route) => {
     leadPayloads.push(route.request().postDataJSON());
@@ -167,6 +174,7 @@ async function reachRecurringFinal(page) {
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
+  await uploadPhoto(page);
   await page.click('[data-next]');
   await page.fill('#est-name', 'UX correction test (please ignore)');
   await page.fill('#est-phone', '8500000000');
@@ -183,12 +191,22 @@ async function reachRecurringFinal(page) {
   });
 }
 
+async function uploadPhoto(page) {
+  await page.locator('[data-photo-input]').setInputFiles({
+    name: 'condition.jpg',
+    mimeType: 'image/jpeg',
+    buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, ...Array(2048).fill(0)]),
+  });
+  await page.waitForFunction(() => document.querySelectorAll('[data-photo-grid] img').length >= 1);
+}
+
 async function reachFinal(page) {
   await reachCondition(page);
   await page.selectOption('#est-frequency', 'one_time');
   await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
+  await uploadPhoto(page);
   await page.click('[data-next]'); // your details
   await page.fill('#est-name', 'UX correction test (please ignore)');
   await page.fill('#est-phone', '8500000000');
@@ -353,6 +371,7 @@ test('photos are in Condition & Frequency, and the last step has no photo upload
     );
     await page.selectOption('#est-last-clean', 'within_month');
     await page.selectOption('#est-pets', 'none');
+    await uploadPhoto(page);
     await page.click('[data-next]');
     await page.click('[data-next]');
     assert.equal(await page.locator('[data-step="5"] [data-photo-section]').count(), 0);
@@ -361,32 +380,33 @@ test('photos are in Condition & Frequency, and the last step has no photo upload
   }
 });
 
-test('Pay Now without photos offers Upload Now or Pay Now, Confirm Later', async () => {
+test('Pay Now cannot bypass a missing Step 3 photo', async () => {
   const { context, page, leadPayloads } = await open();
   try {
-    await reachFinal(page);
-    await page.click('[data-pay-now]');
-    const gate = page.locator('[data-photo-gate]');
-    assert.equal(await gate.isVisible(), true);
-    assert.match((await gate.innerText()).replace(/\s+/g, ' '), /Photos are required for an accurate estimate and confirmed booking/i);
-    assert.equal(leadPayloads.length, 0, 'no request is sent before the customer chooses');
-
-    await page.click('[data-photo-upload-now]');
+    await reachCondition(page);
+    await page.selectOption('#est-frequency', 'one_time');
+    await page.click('label.option:has(input[name="condition"][value="maintained"])');
+    await page.selectOption('#est-last-clean', 'within_month');
+    await page.selectOption('#est-pets', 'none');
+    await page.click('[data-next]');
+    await page.waitForTimeout(400);
     assert.equal(
       await page.evaluate(() => document.querySelector('.wizard__step[data-active="true"]')?.getAttribute('data-step')),
       '3',
+      'the customer cannot continue without a photo',
     );
-    assert.equal(await page.locator('[data-photo-section]').isVisible(), true);
+    assert.match(await page.locator('[data-photo-status]').innerText(), /at least one photo/i);
+    assert.equal(await page.locator('[data-pay-now]').isVisible(), false, 'Pay Now is not reachable');
+    assert.equal(await page.locator('[data-photo-pay-later]').count(), 0, 'the old bypass is gone');
+    assert.equal(leadPayloads.length, 0);
 
-    await page.click('[data-next]'); // extras
-    await page.click('[data-next]'); // final again
-    await page.click('[data-pay-now]');
-    await page.click('[data-photo-pay-later]');
-    await page.waitForFunction(() => /secure checkout could not start/i.test(document.querySelector('[data-form-status]')?.textContent ?? ''));
-    assert.equal(leadPayloads.length, 1);
-    const fields = leadPayloads[0].fields;
-    assert.equal(fields.photos_deferred, 'yes');
-    assert.equal(fields.photos_outstanding, 'yes');
+    await uploadPhoto(page);
+    await page.click('[data-next]');
+    assert.equal(
+      await page.evaluate(() => document.querySelector('.wizard__step[data-active="true"]')?.getAttribute('data-step')),
+      '4',
+      'a successful upload unlocks the next step',
+    );
   } finally {
     await context.close();
   }

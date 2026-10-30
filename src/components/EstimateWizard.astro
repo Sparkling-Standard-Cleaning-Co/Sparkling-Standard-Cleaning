@@ -418,6 +418,10 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </select>
         </div>
         <PhotoUploadSection engine="residential" />
+        <p class="small text-muted" data-photo-unavailable hidden>
+          Photo upload is temporarily unavailable. Continue your request and we will contact you
+          for photos before confirming the booking.{phone ? ` Call or text ${phone.display}.` : ''}
+        </p>
         </div>
       </section>
 
@@ -643,13 +647,13 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
               Photos are required for an accurate estimate and confirmed booking.
             </p>
             <div class="btn-row">
-              <button class="btn btn--secondary" type="button" data-photo-upload-now>
-                Upload Photos Now
-              </button>
-              <button class="btn btn--primary" type="button" data-photo-pay-later>
-                I&rsquo;ll Submit Them Later
+              <button class="btn btn--primary" type="button" data-photo-upload-now>
+                Add Photos in Step 3
               </button>
             </div>
+            <p class="small text-muted" style="margin:.75rem 0 0">
+              At least one successfully uploaded photo is required before the request can be sent.
+            </p>
           </div>
         </div>
         <p class="small photo-summary" data-photo-summary hidden></p>
@@ -686,11 +690,11 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       <span class="spacer"></span>
       <button class="btn btn--primary" type="button" data-next>Continue <Icon name="arrow-right" size={16} /></button>
       <div class="wizard__final-actions" data-final-actions hidden>
-        <button class="btn btn--secondary btn--small" type="submit" data-submit hidden data-cta="estimate-submit">
-          Request to Reserve This Cleaning (Pay Later)
-        </button>
         <button class="btn btn--success btn--large" type="button" data-pay-now hidden>
           Pay Now and Reserve This Cleaning
+        </button>
+        <button class="btn btn--secondary btn--large" type="submit" data-submit hidden data-cta="estimate-submit">
+          Request to Reserve This Cleaning (Pay Later)
         </button>
       </div>
     </div>

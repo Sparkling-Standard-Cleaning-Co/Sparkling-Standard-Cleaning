@@ -194,9 +194,81 @@ async function openEstimate(width, height, options = {}) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   const travelRequests = await mockProviders(page, options);
+  if (options.paymentEnabled) {
+    await page.route('**/api/estimate-checkout', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true, enabled: true }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false, error: 'not_in_this_test' }),
+      });
+    });
+  }
   await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
   return { context, page, travelRequests };
+}
+
+async function mockPhotoUpload(page, mode = 'success') {
+  await page.route('**/api/photo-upload', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          enabled: true,
+          maxBytes: 8 * 1024 * 1024,
+          maxCount: 6,
+          maxTotalBytes: 32 * 1024 * 1024,
+          turnstileRequired: false,
+        }),
+      });
+      return;
+    }
+    if (mode === 'fail') {
+      await route.fulfill({
+        status: 502,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false, error: 'storage_unavailable' }),
+      });
+      return;
+    }
+    const post = route.request().postData() ?? '';
+    const ref = /name="request_ref"\r?\n\r?\n([a-f0-9]+)/.exec(post)?.[1] ?? 'a'.repeat(24);
+    const category = /name="category"\r?\n\r?\n([a-z_]+)/.exec(post)?.[1] ?? 'bathroom';
+    const names = [...post.matchAll(/filename="([^"]+)"/g)].map((match) => match[1]);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        photos: names.map((name, index) => ({
+          key: `leads/2026/10/${ref}/${category}-${String(index + 1).padStart(32, '0')}.jpg`,
+          category,
+          bytes: 2048,
+          name,
+        })),
+      }),
+    });
+  });
+}
+
+async function openEstimateWithPhotos(width, height, mode = 'success') {
+  const context = await browser.newContext({ viewport: { width, height } });
+  const page = await context.newPage();
+  await mockProviders(page);
+  await mockPhotoUpload(page, mode);
+  await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
+  await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner{display:none!important}' });
+  return { context, page };
 }
 
 const isVisible = (page, selector) => page.locator(selector).isVisible();
@@ -293,9 +365,6 @@ async function conditionStep(page) {
 async function submitForm(page) {
   await page.click('[data-submit]');
   await page.waitForTimeout(150);
-  if (await page.locator('[data-photo-gate]').isVisible()) {
-    await page.click('[data-photo-pay-later]');
-  }
 }
 async function contactFields(page) {
   if (await page.locator('#est-name').isVisible()) {
@@ -921,6 +990,149 @@ test('the thank-you page shows the single-use request summary exactly once', asy
     // Single use: a reload no longer shows it.
     await page.reload({ waitUntil: 'load' });
     assert.equal(await page.locator('[data-request-summary]').isVisible(), false);
+  } finally {
+    await context.close();
+  }
+});
+
+// ── 2026-10-30 owner-directed final-step and photo enforcement ───────────────
+
+test('Step 3 requires a successfully uploaded photo before continuing', async () => {
+  const { context, page } = await openEstimateWithPhotos(1280, 900);
+  try {
+    await step1(page);
+    await addressStep(page);
+    await homeStep(page);
+    await page.selectOption('#est-frequency', 'one_time');
+    await page.click('label.option:has(input[name="condition"][value="maintained"])');
+    await page.selectOption('#est-last-clean', 'within_month');
+    await page.selectOption('#est-pets', 'none');
+    await page.click('[data-next]');
+    await page.waitForTimeout(500);
+    assert.equal(
+      await page.locator('.wizard__step[data-step="3"]').getAttribute('data-active'),
+      'true',
+      'the customer stays on Step 3 without a photo',
+    );
+    assert.match(await page.locator('[data-photo-status]').innerText(), /at least one photo/i);
+
+    await page.locator('[data-photo-input]').setInputFiles({
+      name: 'living-room.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, ...Array(2048).fill(0)]),
+    });
+    await page.waitForFunction(() => document.querySelectorAll('[data-photo-grid] img').length === 1);
+    await page.click('[data-next]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="4"]')?.getAttribute('data-active') === 'true',
+    );
+
+    await page.click('[data-back]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="3"]')?.getAttribute('data-active') === 'true',
+    );
+    assert.equal(await page.locator('[data-photo-grid] img').count(), 1, 'the upload survives navigation');
+  } finally {
+    await context.close();
+  }
+});
+
+test('the final reservation step has no Back and two stacked full-width actions', async () => {
+  for (const [width, height] of [
+    [1280, 900],
+    [390, 844],
+  ]) {
+    const { context, page } = await openEstimate(width, height, { paymentEnabled: true });
+    try {
+      await completeReservation(page);
+      await page.locator('[data-final-actions]').waitFor({ state: 'visible' });
+      assert.equal(await page.locator('[data-back]').isVisible(), false, `${width}px: no Back action`);
+      const payNow = page.locator('[data-pay-now]');
+      const payLater = page.locator('[data-submit]');
+      assert.equal(await payNow.isVisible(), true, `${width}px: Pay Now stays visible`);
+      assert.equal((await payNow.innerText()).trim(), 'Pay Now and Reserve This Cleaning');
+      assert.equal(
+        (await payLater.innerText()).trim(),
+        'Request to Reserve This Cleaning (Pay Later)',
+      );
+      await page.waitForFunction(
+        () => {
+          const first = document.querySelector('[data-pay-now]');
+          const second = document.querySelector('[data-submit]');
+          if (!first || !second || first.hidden || second.hidden) return false;
+          return first.getBoundingClientRect().top < second.getBoundingClientRect().top - 4;
+        },
+        null,
+        { timeout: 5000 },
+      );
+      const a = await payNow.boundingBox();
+      const b = await payLater.boundingBox();
+      assert.ok(a && b, `${width}px: both actions are rendered`);
+      assert.ok(Math.abs(a.x - b.x) < 2, `${width}px: actions share a left edge`);
+      assert.ok(Math.abs(a.width - b.width) < 2, `${width}px: actions share a width`);
+      const actions = await page.locator('[data-final-actions]').boundingBox();
+      assert.ok(actions && a.width >= actions.width - 2, `${width}px: actions fill the content area`);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      assert.ok(overflow <= 1, `${width}px: no horizontal overflow`);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+test('Terms acceptance neither changes the price nor replays the reveal', async () => {
+  const { context, page } = await openEstimate(1280, 900);
+  try {
+    await step1(page);
+    await addressStep(page);
+    await homeStep(page);
+    await conditionStep(page);
+    await page.fill('#est-name', 'Browser journey (please ignore)');
+    await page.fill('#est-phone', '8500000000');
+    await page.fill('#est-email', 'owner@sparkling-standard.com');
+    await page.click('[data-next]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="5"]')?.getAttribute('data-active') === 'true',
+    );
+    await page.waitForFunction(
+      () => {
+        const summary = document.querySelector('[data-reservation-summary]');
+        return summary && !summary.hasAttribute('hidden') && !summary.hasAttribute('data-revealing');
+      },
+      null,
+      { timeout: 9000 },
+    );
+    const price = page.locator('[data-reservation-price]');
+    const before = (await price.innerText()).trim();
+    await page.locator('#est-terms').evaluate((element) => {
+      if (!element.checked) element.click();
+    });
+    await page.waitForTimeout(400);
+    assert.equal((await price.innerText()).trim(), before, 'Terms cannot change the price');
+    assert.equal(
+      await page.locator('[data-reservation-summary]').getAttribute('data-revealing'),
+      null,
+      'Terms cannot restart the reveal',
+    );
+    assert.equal(await page.locator('[data-estimate-reveal]').isVisible(), false);
+
+    const supportive = page.locator('[data-supportive-eligible]');
+    if (await supportive.isVisible()) {
+      const supportiveBefore = (await price.innerText()).trim();
+      await supportive.evaluate((element) => {
+        if (!element.checked) element.click();
+      });
+      await page.waitForTimeout(400);
+      const supportiveAfter = (await price.innerText()).trim();
+      assert.notEqual(supportiveAfter, supportiveBefore, 'eligibility updates the price in place');
+      assert.equal(
+        await page.locator('[data-reservation-summary]').getAttribute('data-revealing'),
+        null,
+        'eligibility does not replay the full reveal',
+      );
+    }
   } finally {
     await context.close();
   }
