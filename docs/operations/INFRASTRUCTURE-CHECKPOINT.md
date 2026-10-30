@@ -13,8 +13,10 @@ existing secrets. No credential values belong in this file.
 - Cloudflare account: owner account `owner@sparkling-standard.com`
 - Existing GitHub-connected Pages deployment is authoritative. Preserve it; do not replace it with
   an unrelated Pages project or deployment mechanism.
-- Verified production admin release at this checkpoint: `cbd4b96`; deployment
+- Verified production admin code release at this checkpoint: `cbd4b96`; deployment
   `b19620e8-2cc9-45fc-b046-f8aa3e8a1575`.
+- Documentation checkpoint: `d6fa22e`; deployment
+  `e34023d5-d8ee-4769-b556-941038e0b3d3`.
 - The prior customer Pay Now fix remains included: release `48930a0`, deployment
   `c067b24b-968a-4fae-95c3-59925cef5fc2`.
 
