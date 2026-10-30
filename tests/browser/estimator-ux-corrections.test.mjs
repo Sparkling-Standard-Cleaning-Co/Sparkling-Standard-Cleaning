@@ -203,7 +203,9 @@ async function reachFinal(page) {
       document.querySelectorAll('[data-price-breakdown] li').length >= 3
     );
   });
-  await page.check('#est-terms', { force: true });
+  const termsInput = page.locator('#est-terms');
+    await termsInput.evaluate((element) => { if (!element.checked) element.click(); });
+    await page.waitForFunction(() => document.querySelector('#est-terms')?.checked === true);
 }
 
 test('Community Support is one small checkbox linked to the terms', async () => {

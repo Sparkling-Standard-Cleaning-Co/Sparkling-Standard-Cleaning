@@ -187,7 +187,9 @@ async function fillAddressAndDetails(page) {
     const summary = document.querySelector('[data-reservation-summary]');
     return stepFive && summary && summary.getAttribute('data-revealing') !== 'true';
   });
-  await page.check('#est-terms', { force: true });
+  const termsInput = page.locator('#est-terms');
+    await termsInput.evaluate((element) => { if (!element.checked) element.click(); });
+    await page.waitForFunction(() => document.querySelector('#est-terms')?.checked === true);
 }
 
 test('no Google script loads and no event fires before an analytics choice', async () => {

@@ -5,5 +5,6 @@
   });
   const terms = page.locator('#est-terms');
   await terms.scrollIntoViewIfNeeded();
-  await terms.check({ force: true });
+  await terms.evaluate((element) => { if (!element.checked) element.click(); });
+  await page.waitForFunction(() => document.querySelector('#est-terms')?.checked === true);
 }

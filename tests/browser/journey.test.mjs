@@ -308,7 +308,9 @@ async function contactFields(page) {
     await page.fill('#est-email', 'owner@sparkling-standard.com');
   }
   if (await page.locator('#est-terms').isVisible()) {
-    await page.check('#est-terms', { force: true });
+    const termsInput = page.locator('#est-terms');
+    await termsInput.evaluate((element) => { if (!element.checked) element.click(); });
+    await page.waitForFunction(() => document.querySelector('#est-terms')?.checked === true);
   }
 }
 
