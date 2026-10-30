@@ -1,13 +1,28 @@
 # Launch readiness — evidence-backed status
 
-**Last updated:** 2026-10-28. **Last production release:** `7bb91ff` (Cloudflare Pages deployment
-`5529baa6-591b-4501-b40f-8d23f6f273b9`; GitHub run `40783479501` passed `validate` and `browser`,
-and the Cloudflare check passed). **Local unreleased work:** five-step residential/STR estimator,
-premium appointment calendar, automatic address resolution, strict FL/AL suggestions, two-resource
-scheduler and service-location tax engine. Local verification: 647 unit tests (646 pass, 1 skip),
-154 browser tests pass, `npm run check` 0 errors, `npm run verify` and `npm run smoke` pass.
+**Last updated:** 2026-10-30. **Last production release:** `cbd4b96` (Cloudflare Pages deployment
+`b19620e8-2cc9-45fc-b046-f8aa3e8a1575`; GitHub run `41115145424` passed `validate` and `browser`,
+and the Cloudflare check passed). **Local unreleased work:** five-condition estimator restoration,
+specialty/bundle display corrections and input-limit alignment. Local verification: 690 unit tests
+(689 pass, 1 skip), 172 browser tests pass, `npm run check` 0 errors, `npm run verify` and
+`npm run smoke` pass.
 This is the working checklist required by the launch directive. It distinguishes implementation from
 deployment, activation and actual provider verification.
+
+## 2026-10-30 five-condition release candidate
+
+- **Implemented and tested locally, not deployed:** the ten-level customer selector is replaced by
+  the original five-condition dropdown; Severe keeps the personal-review gate. Historical dirt-level
+  records remain readable through the legacy parser.
+- **Corrected:** specialty extras preserve the calculable base total without becoming payable;
+  bundle cards report the discount actually applied; Recurring Care explains its ongoing-only
+  application; STR beds and facility fixture limits match the calculation.
+- **Unchanged:** every customer price, rate, multiplier, promotion, travel rule and facility tier.
+  The rerun of all 8,771 scenarios produced 0 price changes.
+- **Verification:** 690 unit tests (689 pass, 1 skip), 172 browser tests pass, `npm run check`
+  0 errors, `npm run verify` and `npm run smoke` pass.
+- **Awaiting owner approval:** any future price, promotion, travel-surcharge or staffing change
+  described in the optimization package.
 
 ## Status vocabulary
 

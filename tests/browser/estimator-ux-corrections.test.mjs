@@ -164,7 +164,7 @@ async function reachRecurringFinal(page) {
   await page.selectOption('#est-frequency', 'biweekly');
   await page.waitForSelector('input[name="initialDeepCleanAcknowledged"]', { state: 'visible' });
   await page.check('input[name="initialDeepCleanAcknowledged"]');
-  await page.locator('[data-dirt-guide] summary').click(); await page.locator('[data-dirt-level="2"]').click();
+  await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
   await page.click('[data-next]');
@@ -186,7 +186,7 @@ async function reachRecurringFinal(page) {
 async function reachFinal(page) {
   await reachCondition(page);
   await page.selectOption('#est-frequency', 'one_time');
-  await page.locator('[data-dirt-guide] summary').click(); await page.locator('[data-dirt-level="2"]').click();
+  await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
   await page.click('[data-next]'); // your details
@@ -278,44 +278,60 @@ test('the Continue button is sticky on mobile', async () => {
   }
 });
 
-test('the dirt guide is a compact single-select with ten explained levels', async () => {
+test('Your Cleaning Details shows the selected condition and no dirt level', async () => {
   const { context, page } = await open();
   try {
-    await reachCondition(page);
-    await page.selectOption('#est-frequency', 'one_time');
-    const guide = page.locator('[data-dirt-guide]');
-    const summary = guide.locator('summary');
-    assert.equal((await summary.innerText()).trim(), 'Choose a dirt level (1–10)');
-    await summary.click();
-    assert.equal(await guide.locator('.dirt-guide__option').count(), 10);
-    assert.equal(await guide.locator('[data-dirt-level="1"]').innerText(), '1\nDisney Princess Clean\nAlready sparkling. You mainly need light maintenance: dusting, surfaces, floors and bathrooms.');
-    await guide.locator('[data-dirt-level="5"]').click();
-    assert.equal(await guide.locator('input[name="dirtLevel"]:checked').count(), 1);
-    assert.match(await summary.innerText(), /Level 5 — Surface Clean but Needs Elbow Grease/);
-    assert.match(await guide.locator('[data-dirt-impact]').innerText(), /Extra detail time/);
-    assert.equal(await guide.locator('details').evaluate((el) => el.open), false, 'guide collapses after selection');
+    await reachFinal(page);
+    const summary = page.locator('[data-reservation-scope]');
+    const text = (await summary.textContent()) ?? '';
+    assert.match(text, /Condition/);
+    assert.match(text, /Maintained/);
+    assert.doesNotMatch(text, /Dirt level/i);
   } finally {
     await context.close();
   }
 });
 
-test('Continue opens the dirt guide, scrolls to it and shows the red error', async () => {
+test('the condition selector is the original five explained choices', async () => {
+  const { context, page } = await open();
+  try {
+    await reachCondition(page);
+    await page.selectOption('#est-frequency', 'one_time');
+    const group = page.locator('fieldset[data-group-error="condition"]');
+    assert.equal(await group.isVisible(), true);
+    assert.equal(await page.locator('[data-dirt-guide]').count(), 0, 'the ten-level guide is gone');
+    assert.equal(await group.locator('input[name="condition"]').count(), 5);
+    assert.deepEqual(
+      await group.locator('input[name="condition"]').evaluateAll((nodes) => nodes.map((node) => node.value)),
+      ['maintained', 'average', 'needs_attention', 'heavy', 'severe'],
+    );
+    await group.locator('label.option:has(input[value="average"])').click();
+    assert.equal(await group.locator('input[name="condition"]:checked').count(), 1);
+    assert.match(await group.innerText(), /Average/);
+    assert.match(await group.innerText(), /Normal lived-in buildup/);
+    assert.match(await group.innerText(), /Severe/);
+    assert.match(await group.innerText(), /Needs an in-person review/);
+  } finally {
+    await context.close();
+  }
+});
+
+test('Continue without a condition shows the red error and focuses the first choice', async () => {
   const { context, page } = await open(390, 844);
   try {
     await reachCondition(page);
     await page.selectOption('#est-frequency', 'one_time');
     await page.click('[data-next]');
-    const guide = page.locator('[data-dirt-guide]');
-    assert.equal(await guide.locator('details').evaluate((el) => el.open), true, 'the invalid guide opens');
+    const group = page.locator('fieldset[data-group-error="condition"]');
     assert.equal(
       await page.evaluate(() => document.activeElement?.getAttribute('name')),
-      'dirtLevel',
+      'condition',
       'the first missing control receives focus',
     );
     assert.equal(await page.locator('[data-error-summary]').isVisible(), true);
-    assert.match(await guide.locator('.field-error').innerText(), /dirt level/i);
+    assert.match(await group.locator('.field-error').innerText(), /condition/i);
     await page.waitForTimeout(700);
-    const box = await guide.locator('[data-dirt-level="1"]').boundingBox();
+    const box = await group.locator('input[value="maintained"]').boundingBox();
     assert.ok(box && box.y >= 0 && box.y < 844, 'the invalid section is scrolled into view');
   } finally {
     await context.close();
@@ -326,8 +342,7 @@ test('photos are in Condition & Frequency, and the last step has no photo upload
   try {
     await reachCondition(page);
     await page.selectOption('#est-frequency', 'one_time');
-    await page.locator('[data-dirt-guide] summary').click();
-    await page.locator('[data-dirt-level="2"]').click();
+    await page.click('label.option:has(input[name="condition"][value="maintained"])');
     const section = page.locator('[data-photo-section]');
     assert.equal(await section.isVisible(), true);
     assert.equal(

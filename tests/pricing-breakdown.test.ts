@@ -199,10 +199,13 @@ test('tiny jobs never show an effective discount and still reconcile', () => {
   assert.equal(tiny.ongoing.pricing.discount, null, 'no eligible add-on incentive applies');
 });
 
-test('custom-quote specialty work still blocks instant pricing under the unified model', () => {
+test('custom-quote specialty work blocks instant pricing but preserves the calculable base total', () => {
   const result = calculateEstimate(input({ addonIds: ['carpet_cleaning'] }), context());
   assert.equal(result.status, 'custom_confirmation_required');
   assert.equal(selectInstantAmount(result), null);
+  assert.ok(result.pricing.subtotal > 0, 'the base clean remains calculable for display');
+  assert.equal(result.pricing.basePrice > 0, true);
+  assert.equal(result.pricing.addonPrices.find((line) => line.id === 'carpet_cleaning')?.charge, null);
 });
 
 test('residential extras receive the approved 15% reduction exactly once', () => {

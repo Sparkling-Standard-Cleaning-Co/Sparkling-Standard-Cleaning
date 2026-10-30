@@ -29,12 +29,12 @@ import { taxPresentationForService } from '../lib/estimate/tax';
 import { formatUsd } from '../lib/format';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
 import {
-  conditionForDirtLevel,
-  dirtLevelDefinition,
-  dirtLevelLabel,
-  parseDirtLevel,
-} from '../lib/estimate/dirt-levels';
-import { SERVICE_LABELS, SERVICE_SHORT, FREQUENCY_LABELS, FREQUENCY_RHYTHMS } from '../lib/estimate/labels';
+  CONDITION_LABELS,
+  SERVICE_LABELS,
+  SERVICE_SHORT,
+  FREQUENCY_LABELS,
+  FREQUENCY_RHYTHMS,
+} from '../lib/estimate/labels';
 import { serviceAsksFrequency, serviceSupportsFrequency } from '../lib/estimate/service-matrix';
 import { ENGINE_STEPS, parseResidentialServiceParam } from '../lib/estimate/engines';
 import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInfo, ServiceType } from '../lib/estimate/types';
@@ -196,36 +196,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return revealed;
   }
 
-  const dirtGuide = form.querySelector<HTMLDetailsElement>('[data-dirt-guide] details');
-  const dirtSelected = form.querySelector<HTMLElement>('[data-dirt-selected]');
-  const dirtImpact = form.querySelector<HTMLElement>('[data-dirt-impact]');
-
-  function selectedDirtLevel() {
-    const checked = form.querySelector<HTMLInputElement>('input[name="dirtLevel"]:checked');
-    return parseDirtLevel(checked?.value);
-  }
-
-  function syncDirtGuide(): void {
-    const level = selectedDirtLevel();
-    const definition = dirtLevelDefinition(level);
-    if (dirtSelected) {
-      dirtSelected.textContent = definition
-        ? dirtLevelLabel(level)
-        : 'Choose a dirt level (1–10)';
-    }
-    if (!dirtImpact) return;
-    if (!definition) {
-      dirtImpact.hidden = true;
-      dirtImpact.textContent = '';
-      return;
-    }
-    dirtImpact.hidden = false;
-    dirtImpact.textContent =
-      definition.condition === 'severe'
-        ? 'Full restoration needs a personal scope review before we can confirm a price.'
-        : `${definition.impact} — we will allow the matching detail time in your estimate.`;
-  }
-
   const resetButton = document.querySelector<HTMLButtonElement>('[data-estimate-reset]');
   const reservationSummary = form.querySelector<HTMLElement>('[data-reservation-summary]');
   const estimateReveal = form.querySelector<HTMLElement>('[data-estimate-reveal]');
@@ -358,7 +328,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
       (input) => input.value,
     );
     const submission = submissionAddress();
-    const dirtLevel = selectedDirtLevel();
     return {
       serviceType: radioValue('serviceType') as ServiceType | undefined,
       propertyType: textValue('propertyType') as EstimateInput['propertyType'],
@@ -368,9 +337,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       halfBaths: numberValue('halfBaths') ?? 0,
       beds: numberValue('beds'),
       frequency: textValue('frequency') as EstimateInput['frequency'],
-      condition: (conditionForDirtLevel(dirtLevel) ??
-        radioValue('condition')) as EstimateInput['condition'],
-      ...(dirtLevel !== null ? { dirtLevel } : {}),
+      condition: radioValue('condition') as EstimateInput['condition'],
       lastClean: textValue('lastClean') as EstimateInput['lastClean'],
       addonIds,
       zip: submission.zip,
@@ -504,7 +471,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
     // Before the final step the calculator runs silently: no changing dollar
     // totals, no sidebar price and no accessible price announcement. On the
     // final step the reservation summary takes over for estimable jobs; for
-    // custom-confirmation jobs the status panel explains why no number exists.
+    // custom-confirmation jobs the status panel explains the pending scope and
+    // shows a calculated base total only when a specialty extra is the cause.
     const summaryTakesOver =
       currentStep === steps.length && result.status === 'estimated' && latestQuote !== null;
     livePanel.hidden = currentStep !== steps.length || summaryTakesOver;
@@ -563,8 +531,18 @@ function initEstimateWizard(form: HTMLFormElement): void {
         });
       }
     } else {
-      if (liveLabel) liveLabel.textContent = 'Estimate status';
-      livePrice.textContent = 'Confirmation Required';
+      const partialPrice =
+        result.pricing.subtotal > 0 && result.addons.some((addon) => addon.customQuote)
+          ? result.pricing.subtotal
+          : null;
+      if (liveLabel) {
+        liveLabel.textContent = partialPrice !== null
+          ? 'Base estimate — custom extras pending'
+          : 'Estimate status';
+      }
+      livePrice.textContent = partialPrice !== null
+        ? `${formatUsd(partialPrice, { forceCents: true })}+`
+        : 'Confirmation Required';
       if (liveRange) {
         liveRange.hidden = true;
         liveRange.textContent = '';
@@ -577,7 +555,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
         liveReference.hidden = true;
         liveReference.textContent = '';
       }
-      liveNote.textContent = result.message ?? 'We will confirm this one personally.';
+      liveNote.textContent = partialPrice !== null
+        ? `${result.message ?? 'We will confirm this one personally.'} The calculated base and priced extras are ${formatUsd(partialPrice, { forceCents: true })}; custom-quoted extras are not included. This is not a payable total.`
+        : result.message ?? 'We will confirm this one personally.';
     }
 
     if (liveTravel) liveTravel.textContent = travelCopy(result);
@@ -721,12 +701,17 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const bundlePrice = Math.max(0, selectedNormal - applied.amount);
         priceNode.textContent = `Bundle price ${formatUsd(bundlePrice, { forceCents: true })} for your selected extras (${formatUsd(selectedNormal, { forceCents: true })} individually — save ${formatUsd(applied.amount, { forceCents: true })}).`;
       } else if (allSelected && result.pricing.discount) {
-        priceNode.textContent = 'A larger discount is applied instead.';
+        priceNode.textContent =
+          `A larger discount is applied instead: ${result.pricing.discount.label} ` +
+          `(${formatUsd(result.pricing.discount.amount, { forceCents: true })}). ` +
+          'This named bundle is not added separately.';
       } else if (allSelected) {
         priceNode.textContent =
           result.pricing.minimumApplied
             ? 'Included in the minimum visit price.'
-            : `Selected — bundle price ${formatUsd(Math.max(0, normal - nominalSavings), { forceCents: true })} (save ${formatUsd(nominalSavings, { forceCents: true })}).`;
+            : recurring && result.ongoing
+              ? 'Available on ongoing visits. The first visit is priced as a Deep Cleaning, so this bundle is not applied to it.'
+              : 'Selected. No additional bundle discount is applied to this quote.';
       } else if (normal > 0 && nominalSavings > 0) {
         priceNode.textContent = `${formatUsd(normal, { forceCents: true })} individually — ${formatUsd(Math.max(0, normal - nominalSavings), { forceCents: true })} as a bundle. Save ${formatUsd(nominalSavings, { forceCents: true })}.`;
       } else if (kind === 'percent' && Number.isFinite(value) && value > 0) {
@@ -740,7 +725,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
   /** Builds the reconciled price lines used by both the preview and summary. */
   function priceLines(result: EstimateResult): Array<{ label: string; value: string; strong?: boolean }> {
     const p = result.pricing;
-    if (result.status !== 'estimated' || p.subtotal <= 0) return [];
+    if (result.status === 'invalid' || p.subtotal <= 0) return [];
+    const partial =
+      result.status === 'custom_confirmation_required' &&
+      result.addons.some((addon) => addon.customQuote);
+    if (result.status !== 'estimated' && !partial) return [];
     const tax = taxPresentationForService(radioValue('serviceType'));
     const lines: Array<{ label: string; value: string; strong?: boolean }> = [];
     const firstVisit = Boolean(result.ongoing);
@@ -787,7 +776,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
             : '—',
     });
     lines.push({
-      label: firstVisit ? 'FIRST VISIT TOTAL' : 'ESTIMATED TOTAL',
+      label: partial
+        ? 'BASE TOTAL — CUSTOM EXTRAS PENDING'
+        : firstVisit
+          ? 'FIRST VISIT TOTAL'
+          : 'ESTIMATED TOTAL',
       value: formatUsd(p.subtotal, { forceCents: true }),
       strong: true,
     });
@@ -809,13 +802,19 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   function renderPricePreview(result: EstimateResult): void {
     if (!pricePreview || !pricePreviewLines || !pricePreviewNote) return;
-    if (result.status === 'invalid' || result.status === 'custom_confirmation_required') {
-      pricePreview.hidden = result.status === 'invalid';
+    if (result.status === 'invalid') {
+      pricePreview.hidden = true;
       pricePreviewLines.innerHTML = '';
-      pricePreviewNote.textContent =
-        result.status === 'custom_confirmation_required'
-          ? result.message ?? 'This one is confirmed personally with you.'
-          : '';
+      pricePreviewNote.textContent = '';
+      return;
+    }
+    if (result.status === 'custom_confirmation_required') {
+      const lines = priceLines(result);
+      pricePreview.hidden = lines.length === 0;
+      fillLines(pricePreviewLines, lines);
+      pricePreviewNote.textContent = lines.length > 0
+        ? `${result.message ?? 'This one is confirmed personally with you.'} The figures above are the calculated base and priced extras only; custom-quoted extras are not included. This is not a payable total.`
+        : result.message ?? 'This one is confirmed personally with you.';
       return;
     }
     const lines = priceLines(result);
@@ -1087,9 +1086,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
         addSummaryRow(cleaningRows, 'Home', homeParts.join(' · '));
         addSummaryRow(
           cleaningRows,
-          'Dirt level',
-          dirtLevelLabel(input.dirtLevel) ||
-            (input.condition ? input.condition.replaceAll('_', ' ') : ''),
+          'Condition',
+          input.condition ? CONDITION_LABELS[input.condition] : '',
         );
         addSummaryRow(cleaningRows, 'Last professional clean', input.lastClean ? input.lastClean.replaceAll('_', ' ') : '');
         addSummaryRow(cleaningRows, 'Pets', input.pets ? input.pets.replaceAll('_', ' ') : '');
@@ -1642,8 +1640,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
     // the turnover engine and never priced differently by category.
     const supportiveSection = form.querySelector<HTMLElement>('[data-supportive-section]');
     if (supportiveSection) supportiveSection.hidden = engine === 'str' || isStr;
-
-    syncDirtGuide();
   }
 
   // ── Travel lookup ─────────────────────────────────────────────────────────
@@ -1846,8 +1842,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
     bookingCalendar?.reset();
     if (addressCardEl) addressCardEl.hidden = true;
     if (addressDetailsEl) addressDetailsEl.hidden = true;
-    if (dirtGuide) dirtGuide.open = false;
-    syncDirtGuide();
     syncRevealGroups(false);
     addressCardRevealed = false;
     addressDetailsRevealed = false;
@@ -1926,7 +1920,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       supportive_notes: input.serviceType === 'str_turnover' ? '' : textValue('supportiveNotes') ?? '',
       frequency: input.frequency ?? '',
       condition: input.condition ?? '',
-      dirt_level: input.dirtLevel !== undefined ? String(input.dirtLevel) : '',
+      dirt_level: '',
       last_cleaned: input.lastClean ?? '',
       pets: input.pets ?? '',
       addons: result.addons.map((addon) => addon.label).join(', '),
@@ -2569,10 +2563,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     syncConditionalFields();
     syncRevealGroups(true);
     recalc();
-    if (target instanceof HTMLInputElement && target.name === 'dirtLevel' && dirtGuide) {
-      dirtGuide.open = false;
-    }
-    if (target instanceof HTMLInputElement && target.name === 'zip') {
+      if (target instanceof HTMLInputElement && target.name === 'zip') {
       void lookupTravel();
     }
   });

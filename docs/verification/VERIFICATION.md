@@ -1,5 +1,40 @@
 # Verification status
 
+## Verified - 2026-10-30 five-condition estimator release candidate (local, not deployed)
+
+**Status:** local release candidate; no push or production deployment was performed.
+
+**Scope:** restored the original five-condition dropdown, corrected estimator display
+and input-limit defects, and added the staffing/financial analysis package. No
+customer price, rate, multiplier, promotion, travel or facility tier was changed.
+
+- **Five conditions:** Residential and STR now show the original **Maintained,
+  Average, Needs Attention, Heavy Buildup, Severe** choices; Severe keeps the
+  personal-review gate. The ten-level dirt guide is no longer rendered. Historical
+  dirt-level records remain readable through the legacy parser.
+- **Specialty extras:** selecting a custom-quoted extra keeps the calculated base
+  and priced extras visible but never presents the incomplete total as payable and
+  never enables Pay Now.
+- **Bundle display:** the customer now sees the discount actually applied; the
+  Recurring Care bundle says it applies to ongoing visits when the first visit is
+  the required Deep Cleaning.
+- **Input limits:** STR beds align at 30 and commercial restroom fixtures align at
+  40; classrooms use their own limit.
+- **Quote stability:** all 8,771 original scenarios were rerun; every before/after
+  first-visit and ongoing price is identical (0 changes).
+- **Pay Now:** exact-address customer Pay Now remains available; no payment or
+  live financial transaction was performed during verification.
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **690 tests: 689 passed, 1 pre-existing skip, 0 failed** |
+| Browser regression | **172 passed, 0 failed** |
+| Type check / build / validation | `npm run check` 0 errors/warnings/hints; `npm run verify` passed |
+| Smoke | `npm run smoke` passed across 21 pages |
+| Pricing validation | `config:validate` passed; automatic version unchanged |
+| Before/after quote matrix | 8,771 matched scenario IDs; 0 price changes |
+| Mobile/desktop | five-condition selector, final summary and Pay Now/Reserve flows exercised at desktop and phone widths |
+
 ## Verified - 2026-10-30 production operations admin release
 
 **Release:** `cbd4b96`. Cloudflare Pages deployment

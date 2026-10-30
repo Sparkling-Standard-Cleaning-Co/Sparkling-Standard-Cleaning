@@ -224,7 +224,7 @@ export const CHURCH_PARTNERSHIP_OPTIONS = [
 
 export const FACILITY_INPUT_LIMITS = {
   sanctuarySeats: { min: 0, max: 5000, step: 1 },
-  restroomFixtures: { min: 0, max: 60, step: 1 },
+  restroomFixtures: { min: 0, max: 40, step: 1 },
   classrooms: { min: 0, max: 60, step: 1 },
   workstations: { min: 0, max: 500, step: 1 },
 } as const satisfies Record<string, NumericLimit>;

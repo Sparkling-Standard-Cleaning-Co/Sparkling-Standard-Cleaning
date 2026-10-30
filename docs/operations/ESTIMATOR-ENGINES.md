@@ -28,7 +28,7 @@
 > confined to step 4. The underlying pricing mathematics, bundles, discounts, minimums, travel and
 > configuration versioning are unchanged.
 
-**Current five-step journey (updated 2026-10-29):** **When & Where → Service &
+**Current five-step journey (updated 2026-10-30):** **When & Where → Service &
 Home → Condition & Frequency → Your Details → Extras & Payment**. Step 1
 progressively reveals the appointment calendar, period/time picker, address
 card, city/state/ZIP details and the interactive MapLibre/OpenFreeMap pin
@@ -41,15 +41,15 @@ preferred date/time is provisional until the real job duration is known; the
 final step revalidates the slot against the two-resource scheduler, converts it
 to a temporary hold, and offers real alternatives when needed.
 
-**Dirt-level guide (2026-10-29):** Condition & Frequency requires one of ten
-customer-facing levels, from **Level 1 — Disney Princess Clean** to **Level 10 —
-Full Restoration Clean**. The guide is not a second pricing model: Levels 1–2
-map to maintained, 3–4 to average, 5–6 to needs attention, 7–9 to heavy, and 10
-to the existing severe personal-review gate. The derived five-tier condition
-drives the existing labor multipliers, so the first recurring visit carries the
-real initial condition while the ongoing visit uses maintained condition.
-`src/lib/estimate/dirt-levels.ts` is the single mapping source used by the
-wizard, validation, server verification and owner notification.
+**Five-condition selector (restored 2026-10-30):** Condition & Frequency uses the
+original customer-facing dropdown: **Maintained**, **Average**, **Needs
+Attention**, **Heavy Buildup** and **Severe**. These map directly to the
+existing multipliers (1.00, 1.10, 1.25, 1.45 and 2.00). Severe keeps the
+personal-review gate. The first recurring visit carries the real initial
+condition; the ongoing visit uses maintained condition. The retired ten-level
+dirt guide remains only as a backward-compatible parser for historical quotes
+and server records in `src/lib/estimate/dirt-levels.ts`; it is not rendered to
+customers, and new submissions send the five-condition value directly.
 
 **Owner corrections (2026-10-29):** photos are collected in **Condition &
 Frequency** and are required before booking confirmation. The customer may

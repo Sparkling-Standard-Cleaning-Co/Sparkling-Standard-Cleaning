@@ -1,4 +1,6 @@
-// Focused 10-level dirt-guide tests (owner directive 2026-10-29).
+// Legacy 10-level dirt-guide compatibility tests (the customer UI was restored
+// to the original five conditions on 2026-10-30; historical values must keep
+// parsing and pricing exactly as they did).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -82,6 +84,18 @@ test('submitted levels parse strictly and invalid values fail closed', () => {
   assert.equal(conditionForDirtLevel(5), 'needs_attention');
   assert.equal(conditionForDirtLevel(null), null);
   assert.equal(dirtLevelLabel(9), 'Level 9 — Move-In/Out Level Dirty');
+});
+
+test('the restored five-condition input validates without a dirt level', () => {
+  const validated = validateEstimateInput({
+    ...input(),
+    condition: 'needs_attention',
+  });
+  assert.equal(validated.ok, true);
+  if (validated.ok) {
+    assert.equal(validated.input.condition, 'needs_attention');
+    assert.equal(validated.input.dirtLevel, undefined);
+  }
 });
 
 test('the dirt level wins over a conflicting condition and invalid levels are rejected', () => {

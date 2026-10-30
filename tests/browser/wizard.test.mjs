@@ -131,7 +131,7 @@ async function fillCondition(page) {
   await page.selectOption('#est-frequency', 'biweekly');
   const deepAck = page.locator('input[name="initialDeepCleanAcknowledged"]');
   if (await deepAck.isVisible()) await deepAck.check();
-  await page.locator('[data-dirt-guide] summary').click(); await page.locator('[data-dirt-level="2"]').click();
+  await page.click('label.option:has(input[name="condition"][value="maintained"])');
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
   await page.click('[data-next]');
@@ -150,7 +150,7 @@ test('a new recurring residential request requires the Deep Cleaning acknowledgm
     assert.equal(await ack.isVisible(), true, 'acknowledgment is visible');
     assert.notEqual(await ack.getAttribute('required'), null, 'acknowledgment is required');
 
-    await page.locator('[data-dirt-guide] summary').click(); await page.locator('[data-dirt-level="2"]').click();
+    await page.click('label.option:has(input[name="condition"][value="maintained"])');
     await page.selectOption('#est-last-clean', 'within_month');
     await page.selectOption('#est-pets', 'none');
     await page.click('[data-next]');

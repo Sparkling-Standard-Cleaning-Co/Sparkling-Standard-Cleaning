@@ -534,8 +534,11 @@ collections are intentionally empty — not errors.
   parsed defensively, street-only provider rows are labeled and never become a city, and a ZIP
   fallback preserves an eligible request when exact geocoding fails. Suggestions are strictly
   FL/AL only server-side (`functions/api/geocode.ts`, `suggestion-ranking.ts`). Condition &
-  Frequency requires the ten-level dirt guide (`src/lib/estimate/dirt-levels.ts`), which maps
-  into the existing five condition tiers; Level 10 keeps the personal-review gate. Photos are
+  Frequency uses the restored original five-condition dropdown: Maintained, Average, Needs
+  Attention, Heavy Buildup and Severe. Severe keeps the personal-review gate. The legacy
+  ten-level dirt guide remains only as a backward-compatible parser for historical records
+  (`src/lib/estimate/dirt-levels.ts`); it is not rendered to customers, and new submissions
+  send the five-condition value directly. Photos are
   collected in Condition & Frequency; they are required before booking confirmation, but the
   customer may pay now and confirm later. The Community Support discount is one small eligibility
   checkbox linked to the Terms, immediately above the simplified Terms/Privacy acceptance. The

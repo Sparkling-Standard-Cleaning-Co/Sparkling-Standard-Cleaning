@@ -108,7 +108,7 @@ export function validateEstimateInput(
   const bedrooms = clampNumber(raw.bedrooms, 0, 12) ?? 0;
   const fullBaths = clampNumber(raw.fullBaths, 0, 12) ?? 0;
   const halfBaths = clampNumber(raw.halfBaths, 0, 12) ?? 0;
-  const beds = raw.beds === undefined ? undefined : (clampNumber(raw.beds, 0, 25) ?? undefined);
+  const beds = raw.beds === undefined ? undefined : (clampNumber(raw.beds, 0, 30) ?? undefined);
 
   if (serviceType === 'str_turnover' && (beds === undefined || beds <= 0)) {
     issues.push('Tell us how many beds the rental has.');
