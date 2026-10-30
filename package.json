@@ -54,7 +54,8 @@
     "calibration:report": "node scripts/facility-calibration-report.ts",
     "config:validate": "node --experimental-strip-types scripts/validate-estimator-config.mjs",
     "prebuild": "npm run config:validate",
-    "pricing:impact": "node --experimental-strip-types scripts/pricing-impact.mjs"
+    "pricing:impact": "node --experimental-strip-types scripts/pricing-impact.mjs",
+    "stripe:sandbox": "node scripts/stripe-sandbox-verify.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.4.0",

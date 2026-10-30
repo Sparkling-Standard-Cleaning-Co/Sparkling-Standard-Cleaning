@@ -137,6 +137,46 @@ try {
     (s) => s.start === slot.start && s.end === slot.end,
   );
   output.write(`Conflicting availability: ${stillOffered ? 'FAIL (still offered)' : 'PASS (slot removed)'}\n`);
+  output.write(`Assigned resources: ${(inspect.body.resourceNames ?? []).join(', ') || 'not reported'}\n`);
+
+  const confirmAgain = await request('/api/booking-admin', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: holdId, action: 'confirm' }),
+  });
+  const duplicateOk =
+    confirmAgain.body.ok === true &&
+    confirmAgain.body.duplicate === true &&
+    confirmAgain.body.eventId === confirm.body.eventId;
+  output.write(`Idempotent re-confirm: ${duplicateOk ? 'PASS (same event, no duplicate)' : 'FAIL'}\n`);
+
+  let finalSlot = slot;
+  const alternative = (afterConfirm.body.slots ?? []).find((candidate) => candidate.start !== slot.start);
+  if (alternative) {
+    const moved = await request('/api/booking-admin', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: holdId,
+        action: 'reschedule',
+        date,
+        start: alternative.start,
+        end: alternative.end,
+      }),
+    });
+    const reInspect = await request(`/api/booking-admin?id=${encodeURIComponent(holdId)}`, {
+      headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const movedOk =
+      moved.response.ok === true &&
+      moved.body.ok === true &&
+      reInspect.body.calendarEventId === confirm.body.eventId &&
+      reInspect.body.calendarEvent?.start === alternative.start;
+    if (movedOk) finalSlot = { ...slot, start: alternative.start, end: alternative.end };
+    output.write(`Reschedule (event updated, same id): ${movedOk ? 'PASS' : 'FAIL'}\n`);
+  } else {
+    output.write('Reschedule: SKIPPED (no second available slot on that day)\n');
+  }
 
   const cancel = await request('/api/booking-admin', {
     method: 'POST',
@@ -152,10 +192,11 @@ try {
     `/api/availability?date=${encodeURIComponent(date)}&durationMinutes=${DURATION}&lat=${LAT}&lng=${LNG}`,
   );
   const restored = (afterCancel.body.slots ?? []).some(
-    (s) => s.start === slot.start && s.end === slot.end,
+    (s) => s.start === finalSlot.start && s.end === finalSlot.end,
   );
   output.write(`Availability restored: ${restored ? 'PASS' : 'FAIL (check after Google propagation)'}\n`);
   output.write(`Cleanup: PASS (test event canceled; reference ${reference})\n`);
+  output.write('D1 appointment: not created by this hold-based test (only paid auto-confirm bookings write D1).\n');
 } catch (error) {
   output.write(`LIVE TEST FAILED: ${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;
