@@ -113,6 +113,7 @@ test('a custom gift amount and valid-from date are sent to checkout', async () =
     });
     await page.goto(BASE + '/gift-certificates/', { waitUntil: 'load' });
     await page.selectOption('#gift-denomination', 'custom');
+    await page.locator('#gift-custom-value').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#gift-custom-value').isVisible(), true);
     await page.fill('#gift-custom-value', '75');
     await page.fill('#gift-valid-from', '2027-01-15');

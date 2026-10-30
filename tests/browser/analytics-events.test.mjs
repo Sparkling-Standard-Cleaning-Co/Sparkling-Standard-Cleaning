@@ -181,9 +181,12 @@ async function fillAddressAndDetails(page) {
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
   await page.click('[data-next]'); // details -> extras & payment
-  await page.waitForFunction(
-    () => document.querySelector('.wizard__step[data-step="5"]')?.getAttribute('data-active') === 'true',
-  );
+  await page.waitForFunction(() => {
+    const stepFive =
+      document.querySelector('.wizard__step[data-step="5"]')?.getAttribute('data-active') === 'true';
+    const summary = document.querySelector('[data-reservation-summary]');
+    return stepFive && summary && summary.getAttribute('data-revealing') !== 'true';
+  });
   await page.check('#est-terms', { force: true });
 }
 

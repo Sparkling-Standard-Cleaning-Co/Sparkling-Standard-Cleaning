@@ -159,7 +159,15 @@ async function reachRecurringFinal(page) {
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
   await page.click('[data-next]');
-  await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
+  await page.waitForFunction(() => {
+    const summary = document.querySelector('[data-reservation-summary]');
+    return (
+      summary &&
+      !summary.hasAttribute('hidden') &&
+      summary.getAttribute('data-revealing') !== 'true' &&
+      document.querySelectorAll('[data-price-breakdown] li').length >= 3
+    );
+  });
 }
 
 async function reachFinal(page) {
@@ -173,7 +181,15 @@ async function reachFinal(page) {
   await page.fill('#est-phone', '8500000000');
   await page.fill('#est-email', 'owner@sparkling-standard.com');
   await page.click('[data-next]'); // extras & payment
-  await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
+  await page.waitForFunction(() => {
+    const summary = document.querySelector('[data-reservation-summary]');
+    return (
+      summary &&
+      !summary.hasAttribute('hidden') &&
+      summary.getAttribute('data-revealing') !== 'true' &&
+      document.querySelectorAll('[data-price-breakdown] li').length >= 3
+    );
+  });
   await page.check('#est-terms', { force: true });
 }
 
@@ -400,11 +416,11 @@ test('the add-ons and cleaning-details accordions are independent and correctly 
     const addons = page.locator('[data-extras-accordion]');
     const details = page.locator('[data-cleaning-details]');
     assert.equal(
-      (await addons.locator('summary .extras-accordion__heading').innerText()).trim(),
+      (await addons.locator('summary .extras-accordion__heading').textContent()).trim(),
       'Bundle and Save With These Add-Ons',
     );
     assert.equal(
-      (await details.locator('summary .extras-accordion__heading').innerText()).trim(),
+      (await details.locator('summary .extras-accordion__heading').textContent()).trim(),
       'Your Cleaning Details',
     );
     assert.equal(await addons.evaluate((el) => el.open), false, 'add-ons start collapsed');
@@ -412,7 +428,7 @@ test('the add-ons and cleaning-details accordions are independent and correctly 
 
     await details.locator('summary').click();
     assert.equal(await details.evaluate((el) => el.open), true);
-    const summary = (await page.locator('[data-reservation-scope]').innerText()).replace(/\s+/g, ' ');
+    const summary = (await page.locator('[data-reservation-scope]').textContent()).replace(/\s+/g, ' ');
     for (const expected of [
       'Cleaning type',
       'Frequency',
@@ -481,7 +497,7 @@ test('recurring first-visit pricing keeps the true price and totals on separate 
   const { context, page } = await open(390, 844);
   try {
     await reachRecurringFinal(page);
-    const breakdown = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+    const breakdown = (await page.locator('[data-price-breakdown]').textContent()).replace(/\s+/g, ' ');
     assert.match(breakdown, /True Deep Cleaning Price/);
     assert.match(breakdown, /FIRST VISIT TOTAL/);
     assert.match((await page.locator('[data-reservation-ongoing]').innerText()).trim(), /\$[\d,.]+ .*Biweekly Thereafter/);
@@ -509,7 +525,7 @@ test('the final step has one green pay action, one pay-later action and a stacke
     assert.equal(await page.locator('[data-pay-now]').evaluate((el) => el.classList.contains('btn--success')), true);
     assert.match((await page.locator('[data-pay-now]').innerText()).trim(), /Pay Now and Reserve This Cleaning/);
     assert.match((await page.locator('[data-submit]').innerText()).trim(), /Request to Reserve This Cleaning \(Pay Later\)/);
-    const breakdown = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+    const breakdown = (await page.locator('[data-price-breakdown]').textContent()).replace(/\s+/g, ' ');
     assert.match(breakdown, /Sales tax \$0\.00/);
     assert.match(breakdown, /ESTIMATED TOTAL \$/);
     assert.equal(await page.locator('[data-extras-accordion]').evaluate((el) => el.open), false, 'extras start collapsed');
