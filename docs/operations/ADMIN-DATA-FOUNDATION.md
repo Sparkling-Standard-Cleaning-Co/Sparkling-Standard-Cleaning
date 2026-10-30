@@ -30,8 +30,9 @@ cross-company infrastructure is explicitly out of scope.
 - Owner-only first-run enrollment with a server-side setup code and constant-time comparison.
 - PBKDF2-SHA-256 passwords, D1 sessions with hashed tokens, expiry, revocation, CSRF and durable
   IP/identity rate limits.
-- TOTP MFA enrollment, challenge-based login, one-time recovery codes and MFA audit records. Secrets
-  are server-side only and never returned after enrollment.
+- TOTP MFA enrollment, challenge-based login, one-time recovery codes and MFA audit records. MFA
+  secrets are AES-GCM encrypted with MFA_ENCRYPTION_KEY and are never returned after enrollment.
+  Setup fails closed when the key is missing.
 - Owner-issued, single-use administrator invitation links; invite acceptance creates the canonical
   `manager`, `finance` or `cleaner` role with optional branch scope.
 - Owner-issued, single-use password-reset links that revoke all existing sessions when completed.
@@ -54,7 +55,9 @@ cross-company infrastructure is explicitly out of scope.
 
 ### Scheduling and operations
 
-- Reservation confirmation/decline and appointment status visibility.
+- Reservation confirmation/decline is routed through the existing authoritative /api/booking-admin  Google Calendar/resource engine. D1 writes happen only after calendar confirmation, the event ID is
+  linked in calendar_links, and failures surface without creating a D1 appointment. Legacy
+  booking-admin remains authoritative until reconciliation and owner cutover.
 - D1 scheduling conflict checks and team-member overlap prevention.
 - Recurring-plan creation/status/pricing with next-visit dates.
 - Team-member records, job assignment and crew-size reconciliation.
@@ -65,9 +68,13 @@ cross-company infrastructure is explicitly out of scope.
 - Invoice creation with integer-cent lines, totals, balances and status.
 - Manual cash/check/external payment recording with durable idempotency keys.
 - Manual refund records and customer credits/credit applications data.
+- Gated Stripe invoice Checkout payment links and Stripe refund execution. Both require explicit server
+  environment gates and finance permission; Stripe refunds also require password step-up.
+- Verified Stripe webhook reconciliation records an invoice payment exactly once, updates invoice
+  balances/status and clears the stale payment link.
 - Branch-scoped financial summary, balances and reporting.
-- **Not enabled:** new live card charging, invoice payment links, saved-card enrollment, off-session
-  charging or Stripe refund execution. Those require explicit owner authorization and live testing.
+- **Not enabled:** saved-card enrollment, off-session charging or live card transactions. Those require
+  approved customer-consent wording, owner authorization and live-mode testing.
 
 ### Gifts, reports and settings
 
@@ -91,13 +98,33 @@ cross-company infrastructure is explicitly out of scope.
 - Existing R2 ledgers, Stripe, Google Calendar, booking, gift and customer confirmation systems remain
   in place and are not deleted or rewritten.
 
+## Environment and secret names
+
+Required for the full local admin runtime:
+
+- `DB` — Cloudflare D1 binding.
+- `ADMIN_SETUP_CODE` — one-time first-owner enrollment.
+- `MFA_ENCRYPTION_KEY` — at least 32 characters; encrypts TOTP secrets at rest.
+
+Required for connected integrations:
+
+- `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `PUBLIC_SITE_URL` — invitation/reset email.
+- `BOOKING_OWNER_TOKEN` plus `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`,
+  `GOOGLE_CALENDAR_ID` — authoritative calendar confirmation.
+- `PAYMENT_LEDGER` or `PHOTOS_BUCKET` — existing booking/gift R2 storage.
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `ADMIN_STRIPE_BILLING_ENABLED`,
+  `ADMIN_STRIPE_REFUNDS_ENABLED` — invoice payment links and Stripe refunds. Both flags must remain
+  unset/false until the owner authorizes test/live activation.
+- `PUBLIC_SITE_URL` — Stripe return URLs and owner-facing links.
+
+Never commit these values. Production values belong in Cloudflare secrets.
 ## Local development
 
 ```powershell
 npx wrangler d1 migrations apply sparkling-standard-local --local --config wrangler.local.toml
 npm run build
 Copy-Item wrangler.local.toml wrangler.toml
-npx wrangler pages dev dist --port 8790 --binding ADMIN_SETUP_CODE=<local-setup-code>
+npx wrangler pages dev dist --port 8790 --binding ADMIN_SETUP_CODE=<local-setup-code> --binding MFA_ENCRYPTION_KEY=<32-plus-character-local-key>
 Remove-Item wrangler.toml
 ```
 
@@ -107,25 +134,26 @@ customer data.
 
 ## Verified locally
 
-- **13 focused admin tests** cover migrations, schema/FK integrity, enrollment, login, sessions,
+- **14 focused admin tests** cover migrations, schema/FK integrity, enrollment, login, sessions,
   expiry, CSRF, MFA challenge/recovery, invitations, password reset, RBAC, branch isolation, customer
   CRUD, properties, notes, lead persistence, delivery retry, scheduling conflicts, crew assignment,
-  checklists, invoice/payment/refund/credit reconciliation and payment idempotency.
-- Full unit suite: **687 tests, 686 passed, 1 pre-existing print-output skip, 0 failed**.
+  checklists, invoice/payment/refund/credit reconciliation, payment idempotency, encrypted MFA,
+  Stripe invoice links and webhook-style payment reconciliation.
+- Full unit suite: **688 tests, 687 passed, 1 pre-existing print-output skip, 0 failed**.
 - Browser regression: **171 passed, 0 failed**.
 - `npm run check`: 0 diagnostics. Build, validation and smoke pass.
 - Desktop and 390 px mobile admin screenshots verified; no page overflow and role-aware controls.
-- Local D1 export restored **52 tables, 7 migrations and 2 synthetic administrators** into a clean
+- Local D1 export restored **52 tables, 8 migrations and 2 synthetic administrators** into a clean
   SQLite database with no foreign-key violations.
 
 ## Not implemented / not activated
 
-- TOTP encrypted-at-rest key management; secrets live in the private D1 database.
-- Email delivery of invitation/reset links; the owner copies the one-time private link.
-- Unified gift adjustments; the existing authorized gift register remains separate.
+- Saved-card enrollment, off-session charging and customer card consent wording.
+- Unified Stripe gift refunds and gift resend; the existing authorized register remains separate.
+- Email delivery logs/retry queue; Resend delivery failures return the one-time link for copy.
 - Historical R2-to-D1 customer/lead/payment backfill and financial reconciliation of Stripe/R2
   checkouts. Gift and booking-request exports can already be converted with the safe SQL generator.
-- Live invoice payment links, saved-card enrollment, off-session charging and Stripe refunds.
+- Live activation of invoice payment links/refunds (code exists behind disabled server gates).
 - Production D1 provisioning, `DB` binding, staging migration, customer backfill and cutover.
 - Production Google Calendar synchronization for newly unified D1 confirmations; the existing
   `/api/booking-admin` flow remains authoritative.
@@ -140,6 +168,6 @@ customer data.
    cutover.
 3. Integrate D1 confirmations with the existing Google Calendar/resource engine before treating D1
    appointments as operationally authoritative.
-4. Add owner-authorized Stripe invoice/payment-link and saved-card workflows with full consent and
-   idempotency tests; do not enable live charging without approval.
+4. Activate the gated Stripe invoice-link/refund code only after owner test-mode approval; add
+   saved-card consent wording and off-session workflows separately.
 5. Run independent production exports and a verified restore drill.

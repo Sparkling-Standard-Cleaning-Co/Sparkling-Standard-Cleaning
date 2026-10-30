@@ -39,19 +39,21 @@ real customer data was copied into the local database.
   branch scope, MFA/invitations/resets/settings, service catalog and cleaner field scope. All seven
   apply cleanly to local D1.
 - **Authentication:** owner enrollment, PBKDF2-SHA-256 passwords, D1 sessions with hashed
-  tokens/expiry/revocation, CSRF, durable login/setup rate limits, TOTP MFA with one-time recovery
-  codes, invitations, owner-issued password resets, last-owner protection and audit history.
+  tokens/expiry/revocation, CSRF, durable login/setup rate limits, AES-GCM-encrypted TOTP secrets
+  with one-time recovery codes, invitations/resets (optional Resend email), last-owner protection and
+  audit history.
 - **Authorization:** server-derived actor, permissions and branch scope on every admin endpoint;
   cleaner CRM access removed; private notes withheld from finance/cleaner roles.
-- **Admin application:** overview, calendar/requests, lead inbox with delivery-failure retry,
-  customer/property CRM, recurring plans, team/jobs/checklists, invoices/manual payments/refunds/
-  credits, gift-ledger reporting, reports, sessions, security settings and audit.
+- **Admin application:** overview, calendar/requests routed through the existing Google Calendar/
+  resource engine, lead inbox with delivery-failure retry, customer/property CRM, recurring plans,
+  team/jobs/checklists, invoices/manual payments/refunds/credits, gated Stripe invoice links and
+  refunds, unified gift redeem/void, reports, sessions, security settings and audit.
 - **Lead persistence:** reservations are mirrored into D1 and `/api/lead` fails closed before
   notification when the database is configured but persistence fails. Failed notifications retain
   attempts/error state and can be retried from the admin.
 - **Visual:** 390 px and 1440 px administrator and manager views verified; no page overflow,
   role-aware navigation/actions and mobile table containment.
-- **Backup:** local D1 export restored **52 tables, 7 migrations and 2 synthetic administrators** with
+- **Backup:** local D1 export restored **52 tables, 8 migrations and 2 synthetic administrators** with
   no foreign-key violations.
 - **Not activated:** production D1/binding/backfill, live invoice payment links, saved cards,
   off-session charging, Stripe refund execution, unified gift adjustments, production calendar sync
@@ -59,9 +61,9 @@ real customer data was copied into the local database.
 
 | Check | Result |
 | --- | --- |
-| Unit suite | **687 tests: 686 passed, 1 pre-existing print-output skip, 0 failed** |
+| Unit suite | **688 tests: 687 passed, 1 pre-existing print-output skip, 0 failed** |
 | Browser regression | **171 passed, 0 failed** |
-| Admin tests | **13 passed** (migrations, auth, MFA, invitations/reset, CSRF, RBAC, branch scope, CRM, lead retry, scheduling, checklists, billing/idempotency) |
+| Admin tests | **14 passed** (migrations, auth, encrypted MFA, invitations/reset, CSRF, RBAC, branch scope, CRM, lead retry, scheduling, checklists, billing/idempotency, Stripe link/webhook reconciliation) |
 | Type check / build / validation | passed; admin boundary and `_headers` validation passed |
 | Production | unchanged at `a042f83`; no D1 provisioned and no admin work deployed |
 
