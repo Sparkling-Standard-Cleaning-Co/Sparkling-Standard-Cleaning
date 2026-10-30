@@ -112,3 +112,25 @@ When a customer redeems a gift certificate:
 - Do not commit ledger exports, customer rows or addresses to the repository.
 - Keep records only as long as needed for service, tax and dispute purposes; the owner decides the
   retention period with their accountant.
+
+## 8. Request management inside the console (2026-10-30)
+
+**Admin → Calendar & Requests** now opens every request, including legacy R2 backfills that have no
+customer.
+
+- **Customer association:** link an existing customer/property or create a verified customer. An
+  address never determines identity, and duplicate email/phone contacts are rejected by the CRM.
+- **Possible duplicates:** same-location/nearby-time pending requests are flagged for review. They
+  are never merged or deleted automatically.
+- **Accept / Confirm:** revalidates availability, writes the Google event, then the D1 appointment;
+  only after both succeed does the branded confirmation email send.
+- **Propose a new time:** the server revalidates the slot, records a proposal (not a confirmation)
+  and emails the customer to agree.
+- **Decline:** releases the hold, records the reason and optionally emails the customer.
+- **Reschedule / cancel a confirmed appointment:** updates or deletes the existing calendar event,
+  updates D1 and optionally emails the customer.
+- **Email history:** every attempt, its status and any retry are recorded per request. Email success
+  never substitutes for calendar or D1 success.
+
+A seven-day board at the top of the view shows upcoming job and crew counts. Later confirmed
+appointments remain intact in the appointments table.

@@ -214,3 +214,43 @@ performed.
   general accounting replacement, and partial refunds/chargeback adjustments are not exposed.
 - The final gift terms/legal review and a live test purchase are still required before
   `enabled: true`.
+
+The last sentence is historical: the owner enabled public sales on 2026-10-29. Legal review and a
+live purchase remain outstanding; no live purchase has been run.
+
+## 9. Administrative management (2026-10-30)
+
+**Admin → Gift Certificates** now reads the same R2 ledger and exposes:
+
+- search by code, purchaser, recipient or email and a status filter
+  (active, scheduled future activation, fully redeemed, refunded, voided);
+- a detail view with purchaser and recipient contacts, original/redeemed/remaining value,
+  valid-from date and activation state, issue date, Stripe session reference, message,
+  redemption history and refund/void adjustments;
+- the existing password-protected redeem and void actions.
+
+### Invoice-linked redemption
+
+Open an invoice with a balance and choose **Apply Gift Certificate**. The server:
+
+1. verifies the certificate is active at the current Central Time;
+2. debits the remaining gift value once, keyed by a redemption reference;
+3. records an invoice payment with provider `external` and gift metadata;
+4. updates the invoice paid/balance/status and audit log.
+
+A retry with the same reference cannot credit the invoice twice. The gift ledger remains the
+authoritative balance; the invoice payment is the matching accounting record. Partial redemption
+is supported (a $150 certificate can apply $90 to a $230 invoice, leaving $60 on the gift and $140
+due).
+
+### Verification
+
+- The repository's Stripe **sandbox** harness now passes 23/23 real test-mode checks: customer,
+  attached test card, invoice finalisation/payment/refund, SetupIntent, saved-card retrieval,
+  off-session charge/refund, administrative checkout link, reconciliation idempotency, webhook
+  signature acceptance/tamper rejection, missing-authorization rejection and cleanup.
+- Gift issuance, activation, partial redemption, refund and void logic are covered by the existing
+  unit suite with a synthetic ledger.
+- A completed real gift Checkout (hosted card entry) and a real Stripe-delivered gift webhook have
+  **not** been run. That requires a controlled test-mode purchase and webhook forwarding; do not
+  report the gift purchase as live-verified until it is recorded here.

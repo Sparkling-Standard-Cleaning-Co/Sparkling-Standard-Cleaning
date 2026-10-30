@@ -157,3 +157,26 @@ Invoke-RestMethod https://sparkling-standard.com/api/admin/auth
 
 Do not ask the owner to create another D1 database, add the `DB` binding again, create another Google
 calendar, recreate Stripe, Resend or Cloudflare accounts, or re-upload already-present secrets.
+
+## 2026-10-30 operations expansion
+
+- **Remote D1 migrations 0011 and 0012 applied** after a verified pre-migration export to a private
+  temporary location. They add booking notification/decline/proposal fields and the employee
+  timekeeping tables (team pay rates, rate history, time events, intervals, correction requests and
+  correction history). Both are additive. Production now has **12 migrations**; no foreign-key
+  violations were introduced.
+- **Stripe sandbox verification passed 23/23 against the real test API** using the rotated test-mode
+  key in the ignored local `.env`: test customer, attached test card, invoice finalisation/payment,
+  invoice refund, SetupIntent/saved card, off-session charge and refund, the repository's own
+  checkout-link/reconciliation/refund helpers, duplicate-delivery idempotency, webhook signature
+  acceptance and tamper rejection, missing-authorization rejection and cleanup. No live money moved.
+- **Booking request management** now opens every request, links or creates a verified customer,
+  flags possible duplicates, and supports confirm/propose/decline/reschedule/cancel with branded
+  customer emails and per-request delivery history.
+- **Admin gift management** exposes ledger details, search/filter and invoice-linked partial
+  redemption. The R2 ledger remains authoritative; the invoice payment uses provider `external`
+  with gift metadata and a retry-safe reference.
+- **Employee portal** at `/employee/` uses the existing account/session/role system, links to the
+  existing team-member roster, and enforces the three-day job window and one-open-interval rule on
+  the server. A completed real gift Checkout, a live gift webhook and a live Google Calendar write
+  remain unverified; see the relevant operation documents.
