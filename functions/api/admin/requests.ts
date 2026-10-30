@@ -44,7 +44,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const leadScope = scoped(actor, 'l.branch_id');
     const [requests, appointments, reservationLeads] = await Promise.all([
       db.prepare(
-        `SELECT r.id, r.status, r.quote_reference, r.requested_date, r.start_at, r.end_at,
+        `SELECT r.id, r.customer_id, r.status, r.quote_reference, r.requested_date, r.start_at, r.end_at,
                 r.duration_minutes, r.payload_json, r.created_at, c.first_name, c.last_name,
                 p.line1, p.city, p.state, p.postal_code
          FROM booking_requests r
