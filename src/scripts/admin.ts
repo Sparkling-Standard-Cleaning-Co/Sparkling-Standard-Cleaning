@@ -112,6 +112,12 @@ function friendly(error: unknown): string {
     reauth_failed: 'Your password could not be verified.',
     stripe_billing_disabled: 'Stripe billing is not enabled for this deployment.',
     stripe_refunds_disabled: 'Stripe refund execution is not enabled for this deployment.',
+    saved_cards_disabled: 'Saved-card setup is not enabled for this deployment.',
+    off_session_disabled: 'After-service charging is not enabled for this deployment.',
+    authorization_amount_exceeded: 'The invoice exceeds the signed maximum authorization.',
+    valid_authorization_not_found: 'No active signed authorization covers this invoice.',
+    authorization_not_for_after_service: 'This authorization is not approved for after-service charging.',
+    authorization_property_mismatch: 'The signed authorization is for a different property.',
     stripe_not_configured: 'Stripe is not configured.',
     invoice_not_payable: 'This invoice is not payable in its current state.',
     customer_email_required: 'The customer needs an email address for a payment link.',
@@ -366,6 +372,7 @@ async function openCustomer(customerId: string): Promise<void> {
   const estimates = (data.estimates as Array<Record<string, unknown>>) ?? [];
   const appointments = (data.appointments as Array<Record<string, unknown>>) ?? [];
   const invoices = (data.invoices as Array<Record<string, unknown>>) ?? [];
+  const paymentAuthorizations = (data.paymentAuthorizations as Array<Record<string, unknown>>) ?? [];
   const email = contacts.find((contact) => contact.kind === 'email')?.value ?? customer.email ?? '';
   const phone = contacts.find((contact) => contact.kind === 'phone')?.value ?? customer.phone ?? '';
   detail.hidden = false;
@@ -382,6 +389,16 @@ async function openCustomer(customerId: string): Promise<void> {
   </div>`;
   if (!can('customer.write')) {
     for (const form of detail.querySelectorAll<HTMLElement>('[data-form]')) form.hidden = true;
+  }
+  if (can('finance.write')) {
+    detail.insertAdjacentHTML(
+      'beforeend',
+      `<div class="admin-card" style="margin-top:1rem;"><h3>Saved-card payment authorization</h3><p class="admin-muted">Create a one-time signing link. The customer signs before any card is saved; a saved card never authorizes a charge by itself.</p><form class="admin-form" data-form="payment-auth"><input type="hidden" name="customerId" value="${esc(customerId)}" /><label>Service <input name="serviceCode" value="residential-cleaning" required /></label><label>Property <select name="propertyId"><option value="">No specific property</option>${properties.map((property) => `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' — '))}</option>`).join('')}</select></label><label>Expected amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Maximum authorized (USD) <input name="maxAmount" type="number" min="0.01" step="0.01" required /></label><button class="btn btn--secondary btn--small" type="submit">Create signing link</button></form><div data-payment-auth-result></div></div>`,
+    );
+  }
+  if (paymentAuthorizations.length > 0) {
+    const rows = paymentAuthorizations.map((authorization) => `<div class="admin-record"><strong>${esc(titleCase(authorization.status))}</strong> · ${esc(money(authorization.max_amount_cents))} max · signed ${esc(dateTime(authorization.signed_at))}<p class="admin-muted">SHA-256 ${esc(authorization.sha256)}</p><details class="admin-detail-toggle"><summary>View signed authorization</summary><pre style="white-space:pre-wrap">${esc(authorization.signed_content_text)}</pre></details></div>`).join('');
+    detail.insertAdjacentHTML('beforeend', `<div class="admin-card" style="margin-top:1rem;"><h3>Signed payment authorizations</h3>${rows}</div>`);
   }
 }
 
@@ -490,6 +507,20 @@ async function openInvoice(invoiceId: string): Promise<void> {
         'beforeend',
         `<details class="admin-detail-toggle"><summary>Execute Stripe refund</summary><form class="admin-form" data-form="stripe-refund"><label>Stripe payment <select name="paymentId">${stripePayments.map((payment) => `<option value="${esc(payment.id)}">${esc(money(payment.amount_cents))} · ${esc(dateTime(payment.created_at))}</option>`).join('')}</select></label><label>Refund amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Your password (step-up) <input name="password" type="password" required /></label><button class="btn btn--secondary btn--small" type="submit">Execute Stripe refund</button></form></details>`,
       );
+    }
+    if (can('finance.write') && Number(invoice.balance_cents) > 0) {
+      void api<{ authorizations?: Array<Record<string, unknown>> }>(
+        `/api/admin/payment-authorizations?customerId=${encodeURIComponent(String(invoice.customer_id ?? ''))}`,
+      )
+        .then((result) => {
+          const active = (result.authorizations ?? []).filter((authorization) => authorization.status === 'active');
+          if (active.length === 0) return;
+          controls.insertAdjacentHTML(
+            'beforeend',
+            `<details class="admin-detail-toggle"><summary>Charge saved card after service</summary><form class="admin-form" data-form="offsession"><label>Signed authorization <select name="authorizationId">${active.map((authorization) => `<option value="${esc(authorization.id)}">${esc(money(authorization.max_amount_cents))} max · signed ${esc(dateTime(authorization.signed_at))}</option>`).join('')}</select></label><label>Your password (step-up) <input name="password" type="password" required /></label><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><button class="btn btn--secondary btn--small" type="submit">Charge authorized card</button></form></details>`,
+          );
+        })
+        .catch(() => undefined);
     }
   }
 }
@@ -740,6 +771,24 @@ document.addEventListener('submit', (event) => {
   if (kind === 'payment') void action('/api/admin/finance', { action: 'record_payment', invoiceId: value('invoiceId'), provider: value('provider'), amount: value('amount'), reference: value('reference'), idempotencyKey: value('idempotencyKey') });
   if (kind === 'refund') void action('/api/admin/finance', { action: 'record_refund', paymentId: value('paymentId'), amount: value('amount'), reason: value('reason') });
   if (kind === 'credit') void action('/api/admin/finance', { action: 'create_credit', customerId: value('customerId'), amount: value('amount'), source: value('source') });
+  if (kind === 'offsession') {
+    setAppError();
+    void api<Record<string, unknown>>('/api/admin/payment-authorizations', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'charge_invoice',
+        invoiceId: value('invoiceId'),
+        authorizationId: value('authorizationId'),
+        password: value('password'),
+      }),
+    }).then((result) => {
+      if (result.clientSecret) {
+        setAppError('The card requires customer authentication before the charge can complete.');
+        return;
+      }
+      return openInvoice(value('invoiceId'));
+    }).catch((error) => setAppError(friendly(error)));
+  }
   if (kind === 'stripe-refund') {
     void action('/api/admin/finance', {
       action: 'stripe_refund',
@@ -747,6 +796,24 @@ document.addEventListener('submit', (event) => {
       amountCents: Math.round(Number(value('amount')) * 100),
       password: value('password'),
     });
+  }
+  if (kind === 'payment-auth') {
+    setAppError();
+    void api<{ link: string; expiresAt: string }>('/api/admin/payment-authorizations', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'create',
+        customerId: value('customerId'),
+        propertyId: value('propertyId'),
+        serviceCode: value('serviceCode'),
+        amountCents: Math.round(Number(value('amount')) * 100),
+        maxAmountCents: Math.round(Number(value('maxAmount')) * 100),
+        chargeAfterService: true,
+      }),
+    }).then((result) => {
+      const target = document.querySelector<HTMLElement>('[data-payment-auth-result]');
+      if (target) target.innerHTML = `<p><a href="${esc(result.link)}" target="_blank" rel="noopener noreferrer">${esc(result.link)}</a></p><p class="admin-muted">Single-use signing link. Expires ${esc(dateTime(result.expiresAt))}.</p>`;
+    }).catch((error) => setAppError(friendly(error)));
   }
   if (kind === 'gift-action') {
     void action('/api/admin/gifts', {

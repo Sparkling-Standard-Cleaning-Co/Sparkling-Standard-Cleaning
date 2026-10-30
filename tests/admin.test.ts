@@ -67,6 +67,8 @@ function migratedDb(): TestD1 {
     '0006_service_catalog_and_lead_permissions.sql',
     '0007_cleaner_field_scope.sql',
     '0008_invoice_payment_links.sql',
+    '0009_signed_documents_and_payment_authorizations.sql',
+    '0010_signed_content_and_card_setup.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -363,7 +365,8 @@ import {
 } from '../src/lib/admin/mfa.ts';
 import { operationsReport } from '../src/lib/admin/reporting.ts';
 import { applyInvoiceCheckoutPayment } from '../src/lib/admin/stripe-reconcile.ts';
-import { createInvoicePaymentLink, refundStripePayment } from '../src/lib/admin/stripe-billing.ts';
+import { createInvoicePaymentLink, refundStripePayment, createSavedCardSetupSession, recordSavedCardSetup, chargeInvoiceWithAuthorization } from '../src/lib/admin/stripe-billing.ts';
+import { createPaymentAuthorization, getPaymentAuthorization, signPaymentAuthorization } from '../src/lib/admin/payment-authorization.ts';
 
 function base32Decode(value: string): Buffer {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -727,6 +730,93 @@ test('invoice payment links and Stripe reconciliation are gated and idempotent',
     detail = await getInvoice(db, actor, invoice.id);
     assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 9500);
     assert.equal((detail?.invoice as Record<string, unknown>).balance_cents, 2500);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('signed payment authorization gates saved-card setup and off-session charging', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Signed',
+    lastName: 'Customer',
+    email: 'signed@example.test',
+    addressLine1: '700 S Baylen St',
+    city: 'Pensacola',
+    postalCode: '32502',
+  });
+  const authorization = await createPaymentAuthorization(db, actor, {
+    customerId: customer.id,
+    serviceCode: 'residential-cleaning',
+    amountCents: 10000,
+    maxAmountCents: 12000,
+    chargeAfterService: true,
+  });
+  const view = await getPaymentAuthorization(db, authorization.token);
+  assert.ok(view);
+  assert.match(view.content, /PAYMENT METHOD AUTHORIZATION/);
+  assert.match(view.content, /up to \$120\.00/);
+  await signPaymentAuthorization(db, authorization.token, {
+    signerName: 'Signed Customer',
+    consent: true,
+  }, new Request('https://example.test/payment-authorization', {
+    headers: { 'CF-Connecting-IP': '203.0.113.9', 'User-Agent': 'Synthetic Test' },
+  }));
+  assert.equal(await getPaymentAuthorization(db, authorization.token), null);
+  const signed = db.raw.prepare('SELECT status, signer_name, signed_content_sha256, signature_json FROM agreements').get() as {
+    status: string;
+    signer_name: string;
+    signed_content_sha256: string;
+    signature_json: string;
+  };
+  assert.equal(signed.status, 'signed');
+  assert.equal(signed.signer_name, 'Signed Customer');
+  assert.match(signed.signature_json, /typed/);
+  assert.match(signed.signed_content_sha256, /^[a-f0-9]{64}$/);
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.includes('/customers')) return new Response(JSON.stringify({ id: 'cus_signed_123' }), { status: 200 });
+    if (url.includes('/checkout/sessions')) return new Response(JSON.stringify({ id: 'cs_setup_123', url: 'https://checkout.stripe.test/setup/123' }), { status: 200 });
+    if (url.includes('/setup_intents/')) return new Response(JSON.stringify({ payment_method: 'pm_test_123' }), { status: 200 });
+    if (url.includes('/payment_methods/')) return new Response(JSON.stringify({ card: { brand: 'visa', last4: '4242', exp_month: 12, exp_year: 2030 } }), { status: 200 });
+    if (url.includes('/payment_intents')) return new Response(JSON.stringify({ id: 'pi_offsession_123', status: 'succeeded' }), { status: 200 });
+    return new Response('{}', { status: 500 });
+  };
+  try {
+    const setup = await createSavedCardSetupSession(db, actor, authorization.id, {
+      STRIPE_SECRET_KEY: 'sk_test_synthetic',
+      ADMIN_STRIPE_SAVED_CARDS_ENABLED: 'true',
+      PUBLIC_SITE_URL: 'https://example.test',
+    });
+    assert.match(setup.url, /checkout\.stripe\.test/);
+    const saved = await recordSavedCardSetup(db, {
+      id: 'cs_setup_123',
+      customer: 'cus_signed_123',
+      setup_intent: 'seti_123',
+      metadata: { authorization_id: authorization.id, customer_id: customer.id, checkout_kind: 'saved_card_setup' },
+    }, { STRIPE_SECRET_KEY: 'sk_test_synthetic' });
+    assert.equal(saved.saved, true);
+    const active = db.raw.prepare('SELECT status, saved_payment_method_id FROM payment_authorizations WHERE id = ?').get(authorization.id) as { status: string; saved_payment_method_id: string };
+    assert.equal(active.status, 'active');
+    assert.ok(active.saved_payment_method_id);
+
+    const invoice = await createInvoice(db, actor, {
+      customerId: customer.id,
+      lines: [{ kind: 'service', description: 'After-service charge', quantity: 1, unitAmountCents: 9000, totalCents: 9000 }],
+    });
+    const charged = await chargeInvoiceWithAuthorization(db, actor, invoice.id, authorization.id, {
+      STRIPE_SECRET_KEY: 'sk_test_synthetic',
+      ADMIN_STRIPE_OFF_SESSION_ENABLED: 'true',
+    });
+    assert.equal(charged.status, 'succeeded');
+    const detail = await getInvoice(db, actor, invoice.id);
+    assert.equal((detail?.invoice as Record<string, unknown>).status, 'paid');
+    assert.equal((detail?.invoice as Record<string, unknown>).balance_cents, 0);
+    const used = db.raw.prepare('SELECT status FROM payment_authorizations WHERE id = ?').get(authorization.id) as { status: string };
+    assert.equal(used.status, 'used');
   } finally {
     globalThis.fetch = originalFetch;
   }

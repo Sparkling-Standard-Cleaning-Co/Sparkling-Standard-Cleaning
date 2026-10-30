@@ -1,0 +1,107 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Payment Method Authorization"
+  description="Review and sign a Sparkling Standard payment method authorization."
+  noindex
+>
+  <section class="section">
+    <div class="container container--narrow">
+      <h1>Payment method authorization</h1>
+      <p class="lead" data-auth-status>Loading the authorization…</p>
+      <div class="card" data-auth-panel hidden>
+        <pre class="agreement-text" data-auth-content style="white-space:pre-wrap"></pre>
+        <form class="stack" data-auth-form style="margin-top:var(--space-5)">
+          <label class="field">
+            <span>Type your full legal name as your electronic signature</span>
+            <input class="input" name="signerName" autocomplete="name" required />
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="consent" required />
+            <span>
+              I reviewed this authorization, consent to electronic records and signatures, and
+              agree that typing my name is my signature. I understand that saving a card does not
+              authorize a charge by itself and that a new signature is required if the amount,
+              service or property materially changes.
+            </span>
+          </label>
+          <button class="btn btn--primary" type="submit">Sign and Continue to Secure Card Setup</button>
+        </form>
+        <p class="small text-muted" data-auth-error role="alert"></p>
+      </div>
+      <div class="card" data-auth-complete hidden>
+        <h2>Authorization signed</h2>
+        <p data-auth-complete-message></p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  const token = new URLSearchParams(window.location.search).get('token') ?? '';
+  const status = document.querySelector<HTMLElement>('[data-auth-status]');
+  const panel = document.querySelector<HTMLElement>('[data-auth-panel]');
+  const content = document.querySelector<HTMLElement>('[data-auth-content]');
+  const form = document.querySelector<HTMLFormElement>('[data-auth-form]');
+  const error = document.querySelector<HTMLElement>('[data-auth-error]');
+  const complete = document.querySelector<HTMLElement>('[data-auth-complete]');
+  const completeMessage = document.querySelector<HTMLElement>('[data-auth-complete-message]');
+
+  async function load() {
+    if (!token) {
+      if (status) status.textContent = 'This authorization link is incomplete.';
+      return;
+    }
+    try {
+      const response = await fetch(`/api/payment-authorization?token=${encodeURIComponent(token)}`);
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'authorization_unavailable');
+      if (status) status.textContent = data.authorization.signedAt ? 'This authorization is signed. A read-only copy is shown below.' : 'Review the authorization below before signing.';
+      if (content) content.textContent = data.authorization.content;
+      if (panel) panel.hidden = false;
+      if (data.authorization.signedAt) {
+        if (form) form.hidden = true;
+        if (complete) complete.hidden = false;
+        if (completeMessage) completeMessage.textContent = `Signed ${new Date(data.authorization.signedAt).toLocaleString()}.`;
+      }
+    } catch {
+      if (status) status.textContent = 'This authorization link is unavailable or expired.';
+    }
+  }
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (error) error.textContent = '';
+    const data = new FormData(form);
+    try {
+      const response = await fetch('/api/payment-authorization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sign',
+          token,
+          signerName: data.get('signerName'),
+          consent: data.get('consent') === 'on',
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || 'signature_failed');
+      if (result.setupUrl) {
+        window.location.assign(result.setupUrl);
+        return;
+      }
+      if (panel) panel.hidden = true;
+      if (complete) complete.hidden = false;
+      if (completeMessage) {
+        completeMessage.textContent =
+          'Your signed authorization is recorded. Card setup is not available on this deployment yet; Sparkling Standard will contact you when it is ready.';
+      }
+    } catch (caught) {
+      if (error) error.textContent = caught instanceof Error ? caught.message.replaceAll('_', ' ') : 'Unable to sign.';
+    }
+  });
+
+  void load();
+</script>

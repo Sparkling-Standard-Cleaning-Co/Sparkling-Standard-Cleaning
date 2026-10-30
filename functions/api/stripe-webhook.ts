@@ -38,10 +38,12 @@ import { autoConfirmPaidBooking } from '../../src/lib/booking/auto-confirm.ts';
 import type { BookingEnv } from '../../src/lib/booking/service.ts';
 import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { applyInvoiceCheckoutPayment } from '../../src/lib/admin/stripe-reconcile.ts';
+import { recordSavedCardSetup } from '../../src/lib/admin/stripe-billing.ts';
 import type { ReceiptData, ReceiptLine } from '../../src/lib/payments/receipt.ts';
 
 interface Env extends PaymentStorageEnv, BookingEnv {
   DB?: D1Database;
+  STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
@@ -65,6 +67,7 @@ interface StripeEvent {
       customer?: string;
       payment_intent?: string;
       mode?: string;
+      setup_intent?: string;
     };
   };
 }
@@ -362,6 +365,27 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
     }
     return json({ ok: true, received: true, expired: true });
+  }
+
+  const checkoutObject = event.data?.object;
+  if (
+    event.type === 'checkout.session.completed' &&
+    checkoutObject?.metadata?.checkout_kind === 'saved_card_setup'
+  ) {
+    if (!env.DB || !env.STRIPE_SECRET_KEY) {
+      return json({ ok: false, error: 'saved_card_setup_not_configured' }, 503);
+    }
+    try {
+      const saved = await recordSavedCardSetup(env.DB, {
+        ...(checkoutObject.id ? { id: checkoutObject.id } : {}),
+        ...(checkoutObject.customer ? { customer: checkoutObject.customer } : {}),
+        ...(checkoutObject.setup_intent ? { setup_intent: checkoutObject.setup_intent } : {}),
+        ...(checkoutObject.metadata ? { metadata: checkoutObject.metadata } : {}),
+      }, env);
+      return json({ ok: true, received: true, savedCard: saved.saved });
+    } catch {
+      return json({ ok: false, error: 'saved_card_setup_failed' }, 500);
+    }
   }
 
   // Only a completed, actually-paid Checkout Session authorizes anything.

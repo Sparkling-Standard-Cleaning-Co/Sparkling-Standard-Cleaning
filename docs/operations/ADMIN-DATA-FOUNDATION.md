@@ -40,6 +40,20 @@ cross-company infrastructure is explicitly out of scope.
   permission-aware navigation.
 - Server-side permissions remain authoritative. Hiding a UI control is never treated as security.
 
+### Customer documents and signatures
+
+- The existing service-agreement catalog remains draft/legal-review-required and is **not** presented
+  as approved contract text.
+- A technical e-signature and tamper-evident record system is implemented for the owner-directed
+  payment-method authorization: customer, service, property, expected/maximum amount, after-service
+  timing, applicable Terms version, electronic-signature consent, typed signature, UTC timestamp,
+  signer evidence and SHA-256 content hash.
+- Authorizations are single-use signing links with expiry. Admin users can create the link from the
+  customer record and review the signed text, hash and status.
+- Payment authorization records are required before saved-card setup and off-session charging. A
+  saved card alone never authorizes a charge; amount/property/service scope is enforced server-side.
+- Service agreements remain awaiting owner-approved final wording and legal review. No draft
+  agreement was published or converted into a signed contract.
 ### Customers and leads
 
 - Customer search, filters, profiles, multiple properties, notes, contact updates, estimate history,
@@ -134,21 +148,23 @@ customer data.
 
 ## Verified locally
 
-- **14 focused admin tests** cover migrations, schema/FK integrity, enrollment, login, sessions,
+- **15 focused admin tests** cover migrations, schema/FK integrity, enrollment, login, sessions,
   expiry, CSRF, MFA challenge/recovery, invitations, password reset, RBAC, branch isolation, customer
   CRUD, properties, notes, lead persistence, delivery retry, scheduling conflicts, crew assignment,
   checklists, invoice/payment/refund/credit reconciliation, payment idempotency, encrypted MFA,
-  Stripe invoice links and webhook-style payment reconciliation.
-- Full unit suite: **688 tests, 687 passed, 1 pre-existing print-output skip, 0 failed**.
+  Stripe invoice links, webhook-style reconciliation, signed payment authorization, saved-card setup
+  and off-session charging.
+- Full unit suite: **689 tests, 688 passed, 1 pre-existing print-output skip, 0 failed**.
 - Browser regression: **171 passed, 0 failed**.
 - `npm run check`: 0 diagnostics. Build, validation and smoke pass.
 - Desktop and 390 px mobile admin screenshots verified; no page overflow and role-aware controls.
-- Local D1 export restored **52 tables, 8 migrations and 2 synthetic administrators** into a clean
-  SQLite database with no foreign-key violations.
+- Local D1 export restored **53 tables, 10 migrations, 2 synthetic administrators and the signed
+  test authorization** into a clean SQLite database with no foreign-key violations.
 
 ## Not implemented / not activated
 
-- Saved-card enrollment, off-session charging and customer card consent wording.
+- Live activation of saved-card setup or off-session charging; both code paths are gated and have not
+  been exercised against Stripe test mode.
 - Unified Stripe gift refunds and gift resend; the existing authorized register remains separate.
 - Email delivery logs/retry queue; Resend delivery failures return the one-time link for copy.
 - Historical R2-to-D1 customer/lead/payment backfill and financial reconciliation of Stripe/R2

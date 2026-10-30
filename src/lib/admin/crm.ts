@@ -91,7 +91,7 @@ export async function getCustomer(
     .first();
   if (!customer) return null;
   const canSeeNotes = actor.role === 'owner' || actor.role === 'manager';
-  const [contacts, properties, notes, leads, estimates, appointments, recurring, invoices] = await Promise.all([
+  const [contacts, properties, notes, leads, estimates, appointments, recurring, invoices, paymentAuthorizations] = await Promise.all([
     db.prepare('SELECT * FROM customer_contacts WHERE customer_id = ? ORDER BY is_primary DESC, created_at').bind(customerId).all(),
     db.prepare('SELECT * FROM properties WHERE customer_id = ? ORDER BY is_primary DESC, created_at').bind(customerId).all(),
     canSeeNotes
@@ -102,6 +102,12 @@ export async function getCustomer(
     db.prepare('SELECT id, reference, status, start_at, end_at FROM appointments WHERE customer_id = ? ORDER BY start_at DESC LIMIT 50').bind(customerId).all(),
     db.prepare('SELECT id, frequency, status, ongoing_price_cents, next_visit_date FROM recurring_plans WHERE customer_id = ? ORDER BY created_at DESC').bind(customerId).all(),
     db.prepare('SELECT id, number, status, total_cents, balance_cents, due_date FROM invoices WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50').bind(customerId).all(),
+    db.prepare(
+      `SELECT pa.id, pa.service_code, pa.amount_cents, pa.max_amount_cents, pa.charge_after_service,
+              pa.status, pa.signed_at, pa.used_at, a.signed_content_text, a.sha256, a.signature_json
+       FROM payment_authorizations pa JOIN agreements a ON a.id = pa.agreement_id
+       WHERE pa.customer_id = ? ORDER BY pa.created_at DESC LIMIT 25`,
+    ).bind(customerId).all(),
   ]);
   return {
     customer,
@@ -113,6 +119,7 @@ export async function getCustomer(
     appointments: appointments.results ?? [],
     recurringPlans: recurring.results ?? [],
     invoices: invoices.results ?? [],
+    paymentAuthorizations: paymentAuthorizations.results ?? [],
   };
 }
 

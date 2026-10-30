@@ -27,6 +27,7 @@ export default defineConfig({
         !page.includes('/leave-review') &&
         !page.includes('/gift-admin') &&
         !page.includes('/invoice-payment') &&
+        !page.includes('/payment-authorization') &&
         !page.includes('/admin') &&
         !page.includes('/gift-certificates/success') &&
         !page.includes('/gift-certificates/redeem'),
