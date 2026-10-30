@@ -279,7 +279,7 @@ async function loadCalendar(): Promise<void> {
       esc([request.first_name, request.last_name].filter(Boolean).join(' ')),
       esc([request.line1, request.city].filter(Boolean).join(', ') || (() => { try { return JSON.parse(String(request.payload_json ?? '{}')).locationText ?? 'Legacy R2 request (unlinked)'; } catch { return 'Legacy R2 request (unlinked)'; } })()),
       `<span class="admin-status">${esc(request.status)}</span>`,
-      request.status === 'pending' && can('booking.write')
+      request.status === 'pending' && request.customer_id && can('booking.write')
         ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="request-confirm" data-id="${esc(request.id)}">Confirm</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="request-decline" data-id="${esc(request.id)}">Decline</button></div>`
         : '',
     ]), 'No reservation requests are waiting.');
