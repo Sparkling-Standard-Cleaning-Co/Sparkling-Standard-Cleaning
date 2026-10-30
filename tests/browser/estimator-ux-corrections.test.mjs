@@ -146,6 +146,22 @@ async function reachCondition(page) {
   await page.click('[data-next]');
 }
 
+async function reachRecurringFinal(page) {
+  await reachCondition(page);
+  await page.selectOption('#est-frequency', 'biweekly');
+  await page.waitForSelector('input[name="initialDeepCleanAcknowledged"]', { state: 'visible' });
+  await page.check('input[name="initialDeepCleanAcknowledged"]');
+  await page.locator('[data-dirt-guide] summary').click(); await page.locator('[data-dirt-level="2"]').click();
+  await page.selectOption('#est-last-clean', 'within_month');
+  await page.selectOption('#est-pets', 'none');
+  await page.click('[data-next]');
+  await page.fill('#est-name', 'UX correction test (please ignore)');
+  await page.fill('#est-phone', '8500000000');
+  await page.fill('#est-email', 'owner@sparkling-standard.com');
+  await page.click('[data-next]');
+  await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
+}
+
 async function reachFinal(page) {
   await reachCondition(page);
   await page.selectOption('#est-frequency', 'one_time');
@@ -372,6 +388,111 @@ test('final checkout shows calculated add-on prices and bundle savings', async (
     );
     const bundleText = (await page.locator('.bundle-offers').innerText()).replace(/\s+/g, ' ');
     assert.match(bundleText, /\$\d+.*save|save.*\$\d+/i, 'bundle price and savings are shown');
+  } finally {
+    await context.close();
+  }
+});
+
+test('the add-ons and cleaning-details accordions are independent and correctly titled', async () => {
+  const { context, page } = await open();
+  try {
+    await reachFinal(page);
+    const addons = page.locator('[data-extras-accordion]');
+    const details = page.locator('[data-cleaning-details]');
+    assert.equal(
+      (await addons.locator('summary .extras-accordion__heading').innerText()).trim(),
+      'Bundle and Save With These Add-Ons',
+    );
+    assert.equal(
+      (await details.locator('summary .extras-accordion__heading').innerText()).trim(),
+      'Your Cleaning Details',
+    );
+    assert.equal(await addons.evaluate((el) => el.open), false, 'add-ons start collapsed');
+    assert.equal(await details.evaluate((el) => el.open), false, 'cleaning details start collapsed');
+
+    await details.locator('summary').click();
+    assert.equal(await details.evaluate((el) => el.open), true);
+    const summary = (await page.locator('[data-reservation-scope]').innerText()).replace(/\s+/g, ' ');
+    for (const expected of [
+      'Cleaning type',
+      'Frequency',
+      'Extras',
+      'Preferred date',
+      'Preferred start',
+      'Status',
+      'Service address',
+      'Travel',
+    ]) {
+      assert.ok(summary.includes(expected), `cleaning details includes ${expected}`);
+    }
+
+    await addons.locator('summary').click();
+    assert.equal(await addons.evaluate((el) => el.open), true);
+    assert.equal(await details.evaluate((el) => el.open), true, 'opening add-ons leaves details open');
+    await addons.locator('summary').click();
+    assert.equal(await addons.evaluate((el) => el.open), false);
+    assert.equal(await details.evaluate((el) => el.open), true, 'closing add-ons leaves details open');
+
+    await details.locator('summary').click();
+    assert.equal(await details.evaluate((el) => el.open), false);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the final price breakdown is one full-width row per financial item', async () => {
+  for (const [width, height] of [
+    [1440, 1000],
+    [390, 844],
+    [360, 780],
+  ]) {
+    const { context, page } = await open(width, height);
+    try {
+      await reachFinal(page);
+      const rows = page.locator('[data-price-breakdown] li');
+      assert.ok((await rows.count()) >= 3);
+      const columns = await page
+        .locator('[data-price-breakdown]')
+        .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length);
+      assert.equal(columns, 1, `one pricing column at ${width}px`);
+      const tops = await rows.evaluateAll((items) =>
+        items.map((item) => Math.round(item.getBoundingClientRect().top)),
+      );
+      assert.equal(new Set(tops).size, tops.length, `every price item owns its row at ${width}px`);
+      const widths = await rows.evaluateAll((items) =>
+        items.map((item) => item.getBoundingClientRect().width),
+      );
+      assert.ok(widths.every((rowWidth) => rowWidth > 200), `price rows use the available width at ${width}px`);
+      const alignments = await rows.evaluateAll((items) =>
+        items.map((item) => getComputedStyle(item.lastElementChild).textAlign),
+      );
+      assert.ok(alignments.every((alignment) => alignment === 'right'));
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      );
+      assert.equal(overflow, false, `no horizontal overflow at ${width}px`);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+test('recurring first-visit pricing keeps the true price and totals on separate rows', async () => {
+  const { context, page } = await open(390, 844);
+  try {
+    await reachRecurringFinal(page);
+    const breakdown = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+    assert.match(breakdown, /True Deep Cleaning Price/);
+    assert.match(breakdown, /FIRST VISIT TOTAL/);
+    assert.match((await page.locator('[data-reservation-ongoing]').innerText()).trim(), /\$[\d,.]+ .*Biweekly Thereafter/);
+    const tops = await page.locator('[data-price-breakdown] li').evaluateAll((items) =>
+      items.map((item) => Math.round(item.getBoundingClientRect().top)),
+    );
+    assert.equal(new Set(tops).size, tops.length, 'no two pricing items share a row');
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+    assert.equal(overflow, false);
   } finally {
     await context.close();
   }

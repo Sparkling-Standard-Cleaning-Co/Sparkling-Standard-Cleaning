@@ -757,7 +757,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
       if (p.roundingAdjustment !== 0) {
         lines.push({
-          label: 'Rounded to the nearest $5',
+          label: 'Rounded Down to Nearest $5',
           value: `${p.roundingAdjustment < 0 ? '\u2212' : '+'}${formatUsd(Math.abs(p.roundingAdjustment), { forceCents: true })}`,
         });
       }
@@ -1058,7 +1058,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const cleaningRows = summaryGroup('Cleaning details', reservationScope);
         addSummaryRow(
           cleaningRows,
-          'Cleaning',
+          'Cleaning type',
           input.serviceType ? SERVICE_LABELS[input.serviceType as ServiceType] : '',
         );
         addSummaryRow(

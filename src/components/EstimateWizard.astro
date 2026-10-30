@@ -487,7 +487,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
 
           <details class="extras-accordion" data-extras-accordion>
             <summary class="extras-accordion__summary">
-              <span class="extras-accordion__heading">Your Cleaning Details</span>
+              <span class="extras-accordion__heading">Bundle and Save With These Add-Ons</span>
               <span class="extras-accordion__hint"
                 >Add extras, choose a bundle, or customize your cleaning.</span
               >
@@ -599,7 +599,16 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <p class="reservation-summary__meta" data-reservation-validity hidden></p>
 
           <ul class="summary-list price-breakdown" data-price-breakdown></ul>
-          <div class="summary-groups" data-reservation-scope></div>
+          <details class="extras-accordion cleaning-details-accordion" data-cleaning-details>
+            <summary class="extras-accordion__summary">
+              <span class="extras-accordion__heading">Your Cleaning Details</span>
+              <span class="extras-accordion__hint"
+                >Your selections, appointment and service location.</span
+              >
+              <Icon name="chevron-down" size={18} class="extras-accordion__chevron" />
+            </summary>
+            <div class="summary-groups" data-reservation-scope></div>
+          </details>
           <p class="reservation-summary__qualification" data-reservation-qualification></p>
 
 

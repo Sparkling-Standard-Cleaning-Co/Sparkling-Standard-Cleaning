@@ -530,9 +530,12 @@ collections are intentionally empty — not errors.
   checkbox linked to the Terms, immediately above the simplified Terms/Privacy acceptance. The
   final step has one green **Pay Now and Reserve This Cleaning** action and one smaller
   **Request to Reserve This Cleaning (Pay Later)** action; no duplicate pay button remains in the
-  form. Extras and six bundles sit in a collapsed **Your Cleaning Details** accordion. The final
-  price is one vertical reconciled breakdown with the true base/deep price, extras, rounding,
-  discount, travel, tax and total; recurring first-visit and ongoing prices remain distinct.
+  form. Extras and six bundles sit in a collapsed **Bundle and Save With These Add-Ons**
+  accordion; the customer's selections, appointment and location sit below the price breakdown in
+  a separate collapsed **Your Cleaning Details** accordion. This correction is verified locally
+  but was not yet deployed at the time of writing. The final price is one vertical reconciled
+  breakdown with the true base/deep price, extras, rounding, discount, travel, tax and total, one
+  financial item per full-width row; recurring first-visit and ongoing prices remain distinct.
   Estimate form pages do not render the sitewide Call/Text/Estimate bar; the wizard and facility
   forms expose their own fixed Back/Continue/final action bar, and the estimator consent banner is
   compact. A complete paid booking confirms automatically only when the server verifies payment,

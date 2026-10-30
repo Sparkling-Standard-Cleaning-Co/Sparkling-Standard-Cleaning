@@ -175,8 +175,11 @@ deployment, activation and actual provider verification.
 - The final total is a single vertical reconciliation: true deep-clean/base price, extras, rounding,
   the single applied discount, travel, sales tax and the final total. Recurring first-visit and
   ongoing prices remain separate.
-- Extras and all six bundles sit in a collapsed **Your Cleaning Details** accordion. The selected
-  extras and subtotal appear in its summary and update immediately.
+- Extras and all six bundles sit in a collapsed **Bundle and Save With These Add-Ons** accordion.
+  The selected extras and subtotal appear in its summary and update immediately.
+- The customer's selections, appointment and location sit below the price breakdown in a separate,
+  collapsed **Your Cleaning Details** accordion. This local correction is verified but not yet
+  deployed; production remains `c03394d`.
 - Community Support moved immediately above the simplified Terms/Privacy acceptance. The
   cancellation policy remains inside `/terms/`.
 - Paid, complete bookings confirm automatically only after the server verifies payment, the quote,

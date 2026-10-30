@@ -1,5 +1,33 @@
 # Verification status
 
+## Verified - 2026-10-29 final-page accordion and price-row correction
+
+**Status:** verified locally; **not deployed**. Production remains `c03394d` until the owner
+authorizes a push.
+
+- **Add-ons accordion:** the six bundles and individual extras sit under the exact title
+  **Bundle and Save With These Add-Ons**; its expandable behavior, prices and selections are
+  unchanged.
+- **Customer summary:** the selections that previously rendered as the "Cleaning Details" block
+  below the price breakdown now live in a separate **Your Cleaning Details** accordion. It is
+  collapsed by default, expands and collapses independently, and retains cleaning type, frequency,
+  first visit, ongoing price, home details, dirt level, last clean, pets, extras, appointment,
+  status, service address and travel.
+- **Price breakdown:** removed the inherited two-column grid. Every financial item now occupies
+  one full-width row with the label left and amount right: true deep-cleaning/base price, extras,
+  **Rounded Down to Nearest $5**, discount, calibration, travel, sales tax and the first-visit
+  total. Recurring first-visit and ongoing prices remain distinct.
+- **Boundaries:** presentation only; no pricing mathematics, discount rules, tax, Stripe, booking,
+  D1 or five-step behavior changed.
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **679 tests: 678 passed, 1 pre-existing print-output skip, 0 failed** |
+| Browser regression | **171 passed, 0 failed** (includes new accordion, single-column, 360/390/1440-width and recurring-price checks) |
+| Type check / build / validation | passed; 205 files, 0 diagnostics; validation and smoke passed |
+| Visual inspection | local mobile (390x844) and desktop (1440x1000) screenshots confirmed both accordions, one-row pricing and no horizontal overflow |
+| Deployment | not pushed; production unchanged |
+
 ## Verified - 2026-10-29 final checkout and payment-integrity release
 
 **Release:** `c03394d`. Cloudflare Pages deployment
