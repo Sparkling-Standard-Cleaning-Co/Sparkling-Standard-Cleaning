@@ -5,6 +5,18 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), payment=(), geolocation=(self)
   Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https: wss:; frame-src https://challenges.cloudflare.com https://checkout.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+
+# Private operations pages must never be cached or indexed.
+/admin/*
+  Cache-Control: no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+
+/api/admin/*
+  Cache-Control: no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow
+
 # Financial and redemption pages must never be cached by a browser or proxy.
 /gift-admin/*
   Cache-Control: no-store, max-age=0

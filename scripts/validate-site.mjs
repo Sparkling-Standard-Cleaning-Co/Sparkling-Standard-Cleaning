@@ -22,6 +22,48 @@ function run(label, script, scriptArgs = []) {
   execFileSync(process.execPath, [script, ...scriptArgs], { stdio: 'inherit' });
 }
 
+process.stdout.write('\n== admin build boundary ==\n');
+const adminFile = path.join('dist', 'admin', 'index.html');
+if (!fs.existsSync(adminFile)) {
+  console.error('ADMIN BUILD MISSING: dist/admin/index.html');
+  process.exit(1);
+}
+const adminHtml = fs.readFileSync(adminFile, 'utf8');
+if (!/<meta name="robots" content="[^"]*noindex/i.test(adminHtml)) {
+  console.error('ADMIN BOUNDARY: /admin/ must carry noindex');
+  process.exit(1);
+}
+if (!adminHtml.includes('data-admin-app')) {
+  console.error('ADMIN BOUNDARY: /admin/ application shell missing');
+  process.exit(1);
+}
+const sitemapFiles = fs.readdirSync(path.join('dist')).filter((file) => /^sitemap-\d+\.xml$/.test(file));
+for (const file of sitemapFiles) {
+  if (fs.readFileSync(path.join('dist', file), 'utf8').includes('/admin/')) {
+    console.error(`ADMIN BOUNDARY: ${file} lists /admin/`);
+    process.exit(1);
+  }
+}
+console.log('admin page built, noindex, outside the sitemap');
+
+const headersFile = path.join('dist', '_headers');
+if (!fs.existsSync(headersFile)) {
+  console.error('HEADERS MISSING: dist/_headers');
+  process.exit(1);
+}
+const headers = fs.readFileSync(headersFile, 'utf8');
+if (/\\n/.test(headers)) {
+  console.error('HEADERS INVALID: literal \\n sequences found');
+  process.exit(1);
+}
+for (const section of ['/admin/*', '/api/admin/*']) {
+  if (!headers.includes(section)) {
+    console.error(`HEADERS MISSING: ${section}`);
+    process.exit(1);
+  }
+}
+console.log('admin cache/indexing headers are structurally valid');
+
 run('internal links', 'scripts/links.mjs');
 run('SEO', 'scripts/verify-seo.mjs');
 run('homepage audit copy', 'scripts/check-homepage-audit.mjs');

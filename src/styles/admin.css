@@ -1,0 +1,79 @@
+/* Sparkling Standard internal operations shell. */
+.admin-body {
+  min-height: 100vh;
+  background: #f6f0e8;
+  color: var(--color-ink-900);
+}
+.admin-shell { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: 100vh; }
+.admin-sidebar { background: #2d2425; color: #f8f2e9; padding: 1.25rem 1rem; }
+.admin-brand { display: flex; align-items: center; gap: .65rem; color: #f8f2e9; text-decoration: none; margin-bottom: 1.5rem; }
+.admin-brand__mark { width: 2.2rem; height: 2.2rem; border: 1px solid #c7a55b; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); }
+.admin-brand__name { font-family: var(--font-display); font-size: 1rem; line-height: 1.05; }
+.admin-brand__sub { font-size: .65rem; letter-spacing: .14em; text-transform: uppercase; color: #d7b978; }
+.admin-nav { display: grid; gap: .2rem; }
+.admin-nav button { background: transparent; color: #f8f2e9; border: 0; text-align: left; padding: .6rem .7rem; border-radius: .5rem; cursor: pointer; font: inherit; }
+.admin-nav button:hover, .admin-nav button[aria-current="page"] { background: rgba(255,255,255,.1); }
+.admin-sidebar__meta { margin-top: 1.5rem; font-size: .75rem; color: #d8c9c0; line-height: 1.5; }
+.admin-main { padding: 1.5rem; min-width: 0; }
+.admin-topbar { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-bottom: 1.2rem; }
+.admin-title { font-family: var(--font-display); font-size: 1.8rem; margin: 0; }
+.admin-sub { color: var(--color-text-muted); font-size: .9rem; margin: .2rem 0 0; }
+.admin-card { background: #fffdfa; border: 1px solid #e5d8c8; border-radius: .9rem; padding: 1rem; box-shadow: 0 8px 22px rgba(48,36,41,.05); }
+.admin-grid { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }
+.admin-kpi__label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--color-text-muted); }
+.admin-kpi__value { font-family: var(--font-display); font-size: 1.8rem; margin: .25rem 0 0; }
+.admin-table-scroll { overflow-x: auto; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.admin-table th, .admin-table td { text-align: left; padding: .55rem .4rem; border-bottom: 1px solid #eadfd3; vertical-align: top; }
+.admin-table th { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-muted); }
+.admin-form { display: grid; gap: .75rem; max-width: 28rem; }
+.admin-form label { display: grid; gap: .3rem; font-size: .8rem; font-weight: 600; }
+.admin-form input { border: 1px solid #d8c8b7; border-radius: .5rem; padding: .65rem .7rem; font: inherit; background: #fff; }
+.admin-error { color: #8f2738; font-size: .85rem; min-height: 1.2rem; }
+.admin-muted { color: var(--color-text-muted); font-size: .82rem; }
+.admin-empty { padding: 1rem; color: var(--color-text-muted); font-size: .88rem; }
+.admin-status { display: inline-flex; padding: .15rem .45rem; border-radius: 999px; background: #f3e8d8; font-size: .7rem; font-weight: 700; }
+.admin-detail { display: grid; gap: 1rem; }
+.admin-detail section { border-top: 1px solid #eadfd3; padding-top: .8rem; }
+.admin-detail h3 { margin: 0 0 .4rem; font-size: .95rem; }
+.admin-detail dl { display: grid; grid-template-columns: minmax(7rem, .6fr) 1.4fr; gap: .25rem .75rem; font-size: .84rem; }
+.admin-detail dt { color: var(--color-text-muted); } .admin-detail dd { margin: 0; }
+.admin-view[hidden], .admin-gate[hidden], .admin-app[hidden] { display: none !important; }
+@media (max-width: 48rem) {
+  .admin-shell { grid-template-columns: 1fr; }
+  .admin-sidebar {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .35rem .75rem;
+    padding: .75rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .admin-brand { flex: 1 1 auto; margin: 0; min-width: 0; }
+  .admin-sidebar__meta { order: 2; margin: 0; }
+  .admin-sidebar__meta p { display: none; }
+  .admin-nav {
+    order: 3;
+    flex: 1 0 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .2rem;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+  .admin-nav button {
+    white-space: normal;
+    text-align: left;
+    font-size: .8rem;
+    line-height: 1.25;
+    padding: .5rem .6rem;
+  }
+  .admin-main { padding: 1rem .75rem 4rem; }
+  .admin-title { font-size: 1.45rem; }
+  .admin-table { min-width: 44rem; }
+}
+
+.admin-sidebar__meta .btn { color: #f8f2e9; border-color: rgba(248,242,233,.45); }

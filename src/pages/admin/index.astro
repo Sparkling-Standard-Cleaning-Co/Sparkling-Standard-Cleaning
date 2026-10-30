@@ -1,0 +1,125 @@
+﻿---
+import '../../styles/global.css';
+import '../../styles/admin.css';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Sparkling Standard Operations</title>
+  </head>
+  <body class="admin-body">
+    <main class="admin-main" id="main">
+      <div class="admin-gate" data-admin-gate>
+        <div class="admin-card" style="max-width: 32rem; margin: 8vh auto 0;">
+          <p class="admin-brand__sub">Sparkling Standard</p>
+          <h1 class="admin-title">Operations</h1>
+          <p class="admin-sub">Private cleaning-company administration.</p>
+          <p class="admin-muted" data-admin-gate-status>Checking secure session…</p>
+
+          <form class="admin-form" data-admin-setup hidden>
+            <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Create the owner account</h2>
+            <p class="admin-muted">Use the setup code configured in the server environment.</p>
+            <label>Setup code <input name="setupCode" type="password" autocomplete="one-time-code" required /></label>
+            <label>Owner name <input name="name" type="text" autocomplete="name" required /></label>
+            <label>Owner email <input name="email" type="email" autocomplete="email" required /></label>
+            <label>Password <input name="password" type="password" autocomplete="new-password" required minlength="12" /></label>
+            <button class="btn btn--primary" type="submit">Create Secure Owner Account</button>
+          </form>
+
+          <form class="admin-form" data-admin-login hidden>
+            <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Sign in</h2>
+            <label>Email <input name="email" type="email" autocomplete="username" required /></label>
+            <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
+            <button class="btn btn--primary" type="submit">Sign In</button>
+          </form>
+          <p class="admin-error" data-admin-error role="alert"></p>
+        </div>
+      </div>
+
+      <div class="admin-shell" data-admin-app hidden>
+        <aside class="admin-sidebar">
+          <a class="admin-brand" href="/admin/">
+            <span class="admin-brand__mark">S</span>
+            <span><span class="admin-brand__name">Sparkling<br />Standard</span><br /><span class="admin-brand__sub">Operations</span></span>
+          </a>
+          <nav class="admin-nav" aria-label="Admin sections">
+            <button type="button" data-admin-nav="overview">Overview</button>
+            <button type="button" data-admin-nav="calendar">Calendar &amp; Requests</button>
+            <button type="button" data-admin-nav="customers">Customers</button>
+            <button type="button" data-admin-nav="recurring">Recurring Plans</button>
+            <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
+            <button type="button" data-admin-nav="finance">Invoices &amp; Payments</button>
+            <button type="button" data-admin-nav="gift">Gift Certificates</button>
+            <button type="button" data-admin-nav="reports">Reports</button>
+            <button type="button" data-admin-nav="settings">Settings &amp; Audit</button>
+          </nav>
+          <div class="admin-sidebar__meta">
+            <p data-admin-user></p>
+            <button class="btn btn--ghost btn--small" type="button" data-admin-logout>Sign out</button>
+          </div>
+        </aside>
+
+        <div style="min-width:0;padding:1.5rem;">
+          <header class="admin-topbar">
+            <div>
+              <h1 class="admin-title" data-admin-view-title>Overview</h1>
+              <p class="admin-sub" data-admin-view-sub>Live cleaning-company operations.</p>
+            </div>
+            <span class="admin-status" data-admin-role></span>
+          </header>
+
+          <section class="admin-view" data-admin-view="overview">
+            <div class="admin-grid" data-admin-kpis></div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 style="font-size:1rem;margin:.1rem 0 .7rem;">Recent inquiries</h2>
+              <div data-admin-recent></div>
+            </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="calendar" hidden>
+            <div class="admin-card">
+              <h2 style="font-size:1rem;margin:.1rem 0 .7rem;">Pending reservation requests</h2>
+              <div data-admin-requests></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 style="font-size:1rem;margin:.1rem 0 .7rem;">Upcoming appointments</h2>
+              <div data-admin-appointments></div>
+            </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="customers" hidden>
+            <div class="admin-card">
+              <form class="admin-form" data-admin-customer-search style="max-width:none;">
+                <label>Search customers <input name="q" type="search" placeholder="Name, email or phone" /></label>
+                <button class="btn btn--secondary" type="submit">Search</button>
+              </form>
+              <div data-admin-customers style="margin-top:1rem;"></div>
+              <div class="admin-detail" data-admin-customer-detail hidden></div>
+            </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="gift" hidden>
+            <div class="admin-card">
+              <h2 style="font-size:1.1rem;margin:.1rem 0 .5rem;">Gift certificates</h2>
+              <p class="admin-muted">The existing production gift register remains available.</p>
+              <p style="margin-top:1rem;"><a class="btn btn--primary" href="/gift-admin/">Open Gift Register</a></p>
+            </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="recurring" hidden><div class="admin-card admin-empty">Recurring-plan administration is not connected yet.</div></section>
+          <section class="admin-view" data-admin-view="jobs" hidden><div class="admin-card admin-empty">Job and team administration is not connected yet.</div></section>
+          <section class="admin-view" data-admin-view="finance" hidden><div class="admin-card admin-empty">Invoice and payment administration is not connected yet.</div></section>
+          <section class="admin-view" data-admin-view="reports" hidden><div class="admin-card admin-empty">Operational reports are not connected yet.</div></section>
+          <section class="admin-view" data-admin-view="settings" hidden><div class="admin-card admin-empty">Settings and audit viewer are not connected yet.</div></section>
+        </div>
+      </div>
+    </main>
+    <script>
+      import '../../scripts/admin';
+    </script>
+  </body>
+</html>

@@ -56,6 +56,8 @@ import { createPendingBookingRequest } from '../../src/lib/booking/requests.ts';
 import type { BookingHold } from '../../src/lib/booking/holds.ts';
 import { paymentLedger, type LedgerBucket } from '../../src/lib/payments/ledger.ts';
 import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.ts';
+import type { D1Database } from '../../src/lib/admin/d1.ts';
+import { persistLeadSubmission, updateLeadDelivery } from '../../src/lib/admin/lead-persistence.ts';
 
 interface R2ObjectLike {
   arrayBuffer?(): Promise<ArrayBuffer>;
@@ -84,6 +86,7 @@ interface Env extends QuoteVerificationEnv {
   PHOTO_OWNER_TOKEN?: string;
   PHOTO_LINK_TTL_DAYS?: string;
   OWNER_NOTIFICATION_EMAIL?: string;
+  DB?: D1Database;
 }
 
 // The estimator sends structured scope + quote + attribution fields; the cap
@@ -702,6 +705,12 @@ export async function onRequestPost(context: {
     }
   }
 
+  const persistedLead = await persistLeadSubmission(env.DB ?? null, clean).catch((error) => {
+    console.error('[lead] admin_persist_failed', {
+      name: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  });
   const notification = buildLeadNotification(clean);
   const attachmentRequestId = (clean.quote_reference || (photoRequestRef ? `PHOTO-${photoRequestRef}` : 'request')).trim();
   if (verifiedPhotos.length > 0 && env.PHOTO_OWNER_TOKEN) {
@@ -834,6 +843,7 @@ export async function onRequestPost(context: {
       });
       const data = (await response.json().catch(() => ({}))) as { success?: boolean };
       if (!response.ok || data.success !== true) {
+        await updateLeadDelivery(env.DB ?? null, persistedLead?.leadId ?? null, 'failed');
         return json({ ok: false, error: 'provider_failed' }, 502);
       }
       ownerDelivered = true;
@@ -842,7 +852,10 @@ export async function onRequestPost(context: {
     }
   }
 
-  if (!ownerDelivered) return json({ ok: false, error: 'provider_failed' }, 502);
+  if (!ownerDelivered) {
+    await updateLeadDelivery(env.DB ?? null, persistedLead?.leadId ?? null, 'failed');
+    return json({ ok: false, error: 'provider_failed' }, 502);
+  }
 
   // The owner notification was accepted (not necessarily inbox-delivered).
   // The customer confirmation is a best-effort second path; its failure never

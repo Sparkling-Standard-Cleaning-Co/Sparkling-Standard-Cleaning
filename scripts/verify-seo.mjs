@@ -54,6 +54,8 @@ const NOINDEX_PAGES = new Set([
   '/leave-review/',
   '/gift-admin/index.html',
   '/gift-admin/',
+  '/admin/index.html',
+  '/admin/',
   '/gift-certificates/redeem/index.html',
   '/gift-certificates/redeem/',
   '/gift-certificates/success/index.html',
@@ -68,6 +70,12 @@ for (const file of htmlFiles) {
   const html = fs.readFileSync(file, 'utf8');
   const relative = path.relative(DIST, file).split(path.sep).join('/');
   const page = relative.endsWith('index.html') ? `/${relative.slice(0, -'index.html'.length)}` : `/${relative}`;
+
+  if (page.startsWith('/admin')) {
+    const robots = html.match(/<meta name="robots" content="([^"]*)"/)?.[1];
+    if (!robots || !isEffectivelyNoindex(robots)) problems.push(`${page}: admin must be noindex`);
+    continue;
+  }
 
   const title = html.match(/<title>([^<]*)<\/title>/)?.[1];
   const description = html.match(/<meta name="description" content="([^"]*)"/)?.[1];
@@ -127,7 +135,7 @@ if (!fs.existsSync(sitemapIndex)) {
 } else {
   for (const file of walk(DIST).filter((f) => /^sitemap-\d+\.xml$/.test(path.basename(f)))) {
     const xml = fs.readFileSync(file, 'utf8');
-    for (const marker of ['/404', '/thank-you/', '/estimate/payment-success/', '/estimate/payment-canceled/']) {
+    for (const marker of ['/404', '/thank-you/', '/estimate/payment-success/', '/estimate/payment-canceled/', '/admin/']) {
       if (xml.includes(marker)) problems.push(`${path.basename(file)} contains ${marker} (should be excluded)`);
     }
     for (const match of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) {
