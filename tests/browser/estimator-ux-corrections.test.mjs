@@ -146,6 +146,19 @@ async function reachCondition(page) {
   await page.click('[data-next]');
 }
 
+async function priceRowText(page) {
+  return page.locator('[data-price-breakdown] li').evaluateAll((items) =>
+    items
+      .map((item) =>
+        [...item.children]
+          .map((child) => child.textContent?.trim() ?? '')
+          .filter(Boolean)
+          .join(' '),
+      )
+      .join(' | '),
+  );
+}
+
 async function reachRecurringFinal(page) {
   await reachCondition(page);
   await page.selectOption('#est-frequency', 'biweekly');
@@ -497,7 +510,7 @@ test('recurring first-visit pricing keeps the true price and totals on separate 
   const { context, page } = await open(390, 844);
   try {
     await reachRecurringFinal(page);
-    const breakdown = (await page.locator('[data-price-breakdown]').textContent()).replace(/\s+/g, ' ');
+    const breakdown = await priceRowText(page);
     assert.match(breakdown, /True Deep Cleaning Price/);
     assert.match(breakdown, /FIRST VISIT TOTAL/);
     assert.match((await page.locator('[data-reservation-ongoing]').innerText()).trim(), /\$[\d,.]+ .*Biweekly Thereafter/);
@@ -525,7 +538,7 @@ test('the final step has one green pay action, one pay-later action and a stacke
     assert.equal(await page.locator('[data-pay-now]').evaluate((el) => el.classList.contains('btn--success')), true);
     assert.match((await page.locator('[data-pay-now]').innerText()).trim(), /Pay Now and Reserve This Cleaning/);
     assert.match((await page.locator('[data-submit]').innerText()).trim(), /Request to Reserve This Cleaning \(Pay Later\)/);
-    const breakdown = (await page.locator('[data-price-breakdown]').textContent()).replace(/\s+/g, ' ');
+    const breakdown = await priceRowText(page);
     assert.match(breakdown, /Sales tax \$0\.00/);
     assert.match(breakdown, /ESTIMATED TOTAL \$/);
     assert.equal(await page.locator('[data-extras-accordion]').evaluate((el) => el.open), false, 'extras start collapsed');
