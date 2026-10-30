@@ -28,6 +28,38 @@ authorizes a push.
 | Visual inspection | local mobile (390x844) and desktop (1440x1000) screenshots confirmed both accordions, one-row pricing and no horizontal overflow |
 | Deployment | not pushed; production unchanged |
 
+## Verified locally - 2026-10-29 secure operations admin foundation
+
+**Status:** local D1/admin implementation; **not deployed, not provisioned in production**. No
+customer data was copied into the local database.
+
+- **D1 foundation:** `0001` (44 tables, integer-cent money), `0002` (rate limits, lead idempotency,
+  same-business branch/role seeds), `0003` (session hardening/MFA field) and `0004` (branch scope on
+  requests/gifts) applied cleanly to local D1.
+- **Admin security:** owner-only first-run enrollment, PBKDF2-SHA-256 passwords, D1 sessions with
+  hashed tokens/expiry/revocation, CSRF, durable login/setup rate limits, constant-time setup-code
+  comparison, server-derived actor and branch scope, and route-level permission enforcement.
+- **Admin application:** `/admin/` and five protected APIs cover KPI overview, customer search/detail,
+  leads and booking requests. The page is noindex, absent from the sitemap, `no-store`, and is not
+  linked publicly.
+- **Lead persistence:** `/api/lead` writes customers/contacts/properties/leads/estimates
+  idempotently when `DB` is bound; delivery remains authoritative and a D1 failure never blocks the
+  customer request.
+- **Visual:** 390 px and 1440 px screenshots verified; compact three-column mobile navigation,
+  visible sign-out, and table scrolling contained inside cards without page overflow.
+- **Backup:** local D1 export restored 47 tables, both branches and the owner account into a clean
+  SQLite database.
+- **Not implemented:** MFA enrollment, invitations/password recovery, session-revocation UI,
+  remaining operational modules, gift-admin session unification, production D1/binding/backfill.
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **681 tests: 680 passed, 1 pre-existing print-output skip, 0 failed** |
+| Browser regression | **171 passed, 0 failed** |
+| Admin tests | **7 passed** (migrations, auth, CSRF, RBAC, branch scope, persistence, rate limits) |
+| Type check / build / validation | passed; admin boundary and `_headers` validation passed |
+| Production | unchanged; no D1 provisioned and no admin work deployed |
+
 ## Verified - 2026-10-29 final checkout and payment-integrity release
 
 **Release:** `c03394d`. Cloudflare Pages deployment
