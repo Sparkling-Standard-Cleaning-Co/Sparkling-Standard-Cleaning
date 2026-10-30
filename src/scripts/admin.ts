@@ -1,4 +1,9 @@
-export {};
+import {
+  passwordConfirmationMessage,
+  passwordConfirmationProblem,
+  passwordPolicyMessage,
+  passwordProblem,
+} from '../lib/password-policy.ts';
 
 interface AdminActor {
   id: string;
@@ -10,15 +15,20 @@ interface AdminActor {
   mfaEnabled: boolean;
 }
 
-type GateMode = 'setup' | 'login' | 'mfa' | 'invite' | 'reset';
+type GateMode = 'setup' | 'login' | 'forgot' | 'mfa' | 'invite' | 'reset';
 
 const gate = document.querySelector<HTMLElement>('[data-admin-gate]');
 const app = document.querySelector<HTMLElement>('[data-admin-app]');
 const setupForm = document.querySelector<HTMLFormElement>('[data-admin-setup]');
 const loginForm = document.querySelector<HTMLFormElement>('[data-admin-login]');
+const forgotForm = document.querySelector<HTMLFormElement>('[data-admin-forgot-form]');
+const forgotStatus = document.querySelector<HTMLElement>('[data-admin-forgot-status]');
+const resetStatus = document.querySelector<HTMLElement>('[data-admin-reset-status]');
+const successEl = document.querySelector<HTMLElement>('[data-admin-success]');
 const mfaForm = document.querySelector<HTMLFormElement>('[data-admin-mfa]');
 const inviteForm = document.querySelector<HTMLFormElement>('[data-admin-invite]');
 const resetForm = document.querySelector<HTMLFormElement>('[data-admin-reset]');
+const passwordChangeForm = document.querySelector<HTMLFormElement>('[data-admin-password-change]');
 const gateStatus = document.querySelector<HTMLElement>('[data-admin-gate-status]');
 const errorEl = document.querySelector<HTMLElement>('[data-admin-error]');
 const appError = document.querySelector<HTMLElement>('[data-admin-app-error]');
@@ -33,6 +43,8 @@ let csrf = '';
 let actor: AdminActor | null = null;
 let mfaChallenge = '';
 let currentView = 'overview';
+let inviteToken = '';
+let resetToken = '';
 
 const viewMeta: Record<string, [string, string]> = {
   overview: ['Overview', 'Live cleaning-company operations.'],
@@ -90,6 +102,14 @@ function setError(message = ''): void {
   if (errorEl) errorEl.textContent = message;
 }
 
+function setSuccess(message = ''): void {
+  if (successEl) successEl.textContent = message;
+}
+
+function setStatusMessage(node: HTMLElement | null, message = ''): void {
+  if (node) node.textContent = message;
+}
+
 function setAppError(message = ''): void {
   if (appError) appError.textContent = message;
 }
@@ -101,10 +121,17 @@ function friendly(error: unknown): string {
     unauthorized: 'Your session expired. Sign in again.',
     forbidden: 'You do not have permission for that action.',
     csrf_failed: 'Your security token expired. Refresh and try again.',
-    rate_limited: 'Too many attempts. Wait a few minutes.',
+    rate_limited: 'Too many attempts. Wait a few minutes and try again.',
     credentials_invalid: 'Email or password is incorrect.',
     mfa_invalid: 'That authenticator or recovery code is invalid.',
+    reset_invalid: 'This reset link is invalid, expired or already used. Request a new one.',
+    origin_rejected: 'The request came from an unexpected origin. Reload and try again.',
     email_not_configured: 'Email delivery is not configured.',
+    password_required: passwordPolicyMessage('password_required'),
+    password_too_short: passwordPolicyMessage('password_too_short'),
+    password_too_long: passwordPolicyMessage('password_too_long'),
+    password_needs_special: passwordPolicyMessage('password_needs_special'),
+    password_mismatch: passwordConfirmationMessage('password_mismatch'),
     schedule_conflict: 'That time overlaps an existing booking.',
     team_conflict: 'That team member already has an overlapping job.',
     booking_admin_not_configured: 'The Google Calendar booking connection is not configured.',
@@ -148,6 +175,7 @@ function showGate(mode: GateMode): void {
   for (const [form, visible] of [
     [setupForm, mode === 'setup'],
     [loginForm, mode === 'login'],
+    [forgotForm, mode === 'forgot'],
     [mfaForm, mode === 'mfa'],
     [inviteForm, mode === 'invite'],
     [resetForm, mode === 'reset'],
@@ -158,6 +186,7 @@ function showGate(mode: GateMode): void {
     gateStatus.textContent = {
       setup: 'First-run owner enrollment.',
       login: 'Sign in to continue.',
+      forgot: 'Request a single-use password reset link.',
       mfa: 'Enter your second factor to continue.',
       invite: 'Create your administrator account.',
       reset: 'Choose a new password.',
@@ -205,10 +234,33 @@ function applySession(data: { actor?: AdminActor; csrf?: string }): boolean {
 
 async function loadAuth(): Promise<void> {
   const params = new URLSearchParams(window.location.search);
-  const inviteToken = params.get('invite') ?? '';
-  const resetToken = params.get('reset') ?? '';
+  inviteToken = params.get('invite') ?? '';
+  resetToken = params.get('reset') ?? '';
+  if (inviteToken || resetToken) {
+    // Remove the one-time secret from the address bar and session history.
+    window.history.replaceState({}, '', '/admin/');
+  }
   if (inviteToken) return showGate('invite');
-  if (resetToken) return showGate('reset');
+  if (resetToken) {
+    showGate('reset');
+    try {
+      const data = await api<{ valid?: boolean }>('/api/admin/auth', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'reset_check', token: resetToken }),
+      });
+      if (!data.valid) {
+        resetToken = '';
+        setError('This reset link is invalid, expired or already used. Request a new one below.');
+        showGate('forgot');
+        setStatusMessage(forgotStatus, 'Enter your account email to receive a fresh single-use link.');
+        return;
+      }
+      if (gateStatus) gateStatus.textContent = 'Choose a new password. This link works once and expires soon.';
+    } catch {
+      if (gateStatus) gateStatus.textContent = 'Choose a new password.';
+    }
+    return;
+  }
   try {
     const data = await api<{ setupRequired?: boolean; authenticated?: boolean; actor?: AdminActor; csrf?: string }>(
       '/api/admin/auth',
@@ -690,17 +742,72 @@ document.querySelector<HTMLButtonElement>('[data-admin-mfa-cancel]')?.addEventLi
   showGate('login');
 });
 
+function passwordConfirmationIssue(form: HTMLFormElement, passwordField: string): string {
+  const data = new FormData(form);
+  const password = String(data.get(passwordField) ?? '');
+  const confirmation = String(data.get('confirmPassword') ?? '');
+  const problem = passwordConfirmationProblem(password, confirmation);
+  return problem ? passwordConfirmationMessage(problem) : '';
+}
+
+document.querySelector<HTMLButtonElement>('[data-admin-forgot]')?.addEventListener('click', () => {
+  setError();
+  setSuccess();
+  setStatusMessage(forgotStatus);
+  const emailInput = forgotForm?.querySelector<HTMLInputElement>('input[name="email"]');
+  if (emailInput && !emailInput.value) {
+    const loginEmail = loginForm?.querySelector<HTMLInputElement>('input[name="email"]');
+    if (loginEmail?.value) emailInput.value = loginEmail.value;
+  }
+  showGate('forgot');
+  emailInput?.focus();
+});
+
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-admin-back-to-login]')) {
+  button.addEventListener('click', () => {
+    setError();
+    setSuccess();
+    showGate('login');
+  });
+}
+
+forgotForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  setError();
+  const data = new FormData(forgotForm);
+  const submit = forgotForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+  setStatusMessage(forgotStatus, 'Sending…');
+  if (submit) submit.disabled = true;
+  try {
+    const result = await api<{ message?: string }>('/api/admin/auth', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'request_reset', email: data.get('email') }),
+    });
+    const message =
+      result.message ??
+      'If that email belongs to an active administrator account, a single-use reset link is on its way.';
+    setStatusMessage(forgotStatus, `${message} The link expires in 30 minutes.`);
+    forgotForm.reset();
+  } catch (error) {
+    setStatusMessage(forgotStatus, '');
+    setError(friendly(error));
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+});
+
 inviteForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
   setError();
+  const issue = passwordConfirmationIssue(inviteForm, 'password');
+  if (issue) return setError(issue);
   const data = new FormData(inviteForm);
-  const token = new URLSearchParams(window.location.search).get('invite') ?? '';
   try {
     const result = await api<{ actor?: AdminActor; csrf?: string }>('/api/admin/auth', {
       method: 'POST',
-      body: JSON.stringify({ action: 'accept_invite', token, name: data.get('name'), password: data.get('password') }),
+      body: JSON.stringify({ action: 'accept_invite', token: inviteToken, name: data.get('name'), password: data.get('password') }),
     });
-    window.history.replaceState({}, '', '/admin/');
+    inviteToken = '';
     applySession(result);
   } catch (error) { setError(friendly(error)); }
 });
@@ -708,19 +815,81 @@ inviteForm?.addEventListener('submit', async (event) => {
 resetForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
   setError();
+  setStatusMessage(resetStatus);
+  const issue = passwordConfirmationIssue(resetForm, 'password');
+  if (issue) return setError(issue);
+  if (!resetToken) {
+    return setError('This reset link is invalid or has expired. Request a new one below.');
+  }
   const data = new FormData(resetForm);
-  const token = new URLSearchParams(window.location.search).get('reset') ?? '';
   try {
-    await api('/api/admin/auth', { method: 'POST', body: JSON.stringify({ action: 'reset_password', token, password: data.get('password') }) });
-    window.history.replaceState({}, '', '/admin/');
+    await api('/api/admin/auth', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reset_password', token: resetToken, password: data.get('password') }),
+    });
+    resetToken = '';
+    resetForm.reset();
     showGate('login');
-    setError('Password updated. Sign in with the new password.');
-  } catch (error) { setError(friendly(error)); }
+    setSuccess('Password updated. Sign in with your new password.');
+  } catch (error) {
+    setError(friendly(error));
+    if (error instanceof Error && error.message === 'reset_invalid') {
+      resetToken = '';
+      setStatusMessage(
+        resetStatus,
+        'This link no longer works. Use Forgot Password? to request a fresh single-use link.',
+      );
+    }
+  }
 });
+
+passwordChangeForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  setAppError();
+  const status = document.querySelector<HTMLElement>('[data-admin-password-change-status]');
+  setStatusMessage(status);
+  const issue = passwordConfirmationIssue(passwordChangeForm, 'newPassword');
+  if (issue) return setStatusMessage(status, issue);
+  const data = new FormData(passwordChangeForm);
+  try {
+    await api('/api/admin/accounts', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'change_password',
+        currentPassword: data.get('currentPassword'),
+        newPassword: data.get('newPassword'),
+      }),
+    });
+    passwordChangeForm.reset();
+    setStatusMessage(status, 'Password updated. Your other sessions were signed out.');
+  } catch (error) {
+    setStatusMessage(status, friendly(error));
+  }
+});
+
+for (const input of document.querySelectorAll<HTMLInputElement>('[data-admin-password-new]')) {
+  input.addEventListener('input', () => {
+    const problem = passwordProblem(input.value);
+    input.setCustomValidity(problem && input.value.length > 0 ? passwordPolicyMessage(problem) : '');
+  });
+  input.addEventListener('blur', () => {
+    const problem = passwordProblem(input.value);
+    input.setCustomValidity(problem ? passwordPolicyMessage(problem) : '');
+  });
+}
+
+for (const input of document.querySelectorAll<HTMLInputElement>('[data-admin-password-confirm]')) {
+  input.addEventListener('input', () => {
+    const form = input.form;
+    const passwordField = form?.querySelector<HTMLInputElement>('input[name="password"], input[name="newPassword"]');
+    const mismatch = Boolean(passwordField?.value) && input.value !== passwordField?.value;
+    input.setCustomValidity(mismatch ? passwordConfirmationMessage('password_mismatch') : '');
+  });
+}
 
 document.querySelector<HTMLButtonElement>('[data-admin-logout]')?.addEventListener('click', async () => {
   try { await api('/api/admin/auth', { method: 'POST', body: JSON.stringify({ action: 'logout' }) }); }
-  finally { csrf = ''; actor = null; showGate('login'); }
+  finally { csrf = ''; actor = null; setSuccess(); showGate('login'); }
 });
 
 for (const button of navButtons) button.addEventListener('click', () => void loadView(button.dataset.adminNav ?? 'overview'));

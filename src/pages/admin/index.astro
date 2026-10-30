@@ -26,15 +26,31 @@ import '../../styles/admin.css';
             <label>Setup code <input name="setupCode" type="password" autocomplete="one-time-code" required /></label>
             <label>Owner name <input name="name" type="text" autocomplete="name" required /></label>
             <label>Owner email <input name="email" type="email" autocomplete="email" required /></label>
-            <label>Password <input name="password" type="password" autocomplete="new-password" required minlength="12" /></label>
+            <label>Password
+              <input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="200" data-admin-password-new aria-describedby="admin-setup-password-hint" />
+            </label>
+            <p class="admin-muted" id="admin-setup-password-hint">At least 8 characters, including one special character (for example ! @ # $ %).</p>
             <button class="btn btn--primary" type="submit">Create Secure Owner Account</button>
           </form>
 
-          <form class="admin-form" data-admin-login hidden>
+          <form class="admin-form" data-admin-login>
             <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Sign in</h2>
             <label>Email <input name="email" type="email" autocomplete="username" required /></label>
             <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
             <button class="btn btn--primary" type="submit">Sign In</button>
+            <p class="admin-muted admin-forgot"><button class="admin-link" type="button" data-admin-forgot>Forgot Password?</button></p>
+          </form>
+
+          <form class="admin-form" data-admin-forgot-form hidden>
+            <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Reset your password</h2>
+            <p class="admin-muted">
+              Enter the email address for your administrator account. If it matches an active
+              account, we will email a single-use link that lets you choose a new password.
+            </p>
+            <label>Email <input name="email" type="email" autocomplete="username" required /></label>
+            <button class="btn btn--primary" type="submit">Send Reset Link</button>
+            <button class="btn btn--ghost btn--small" type="button" data-admin-back-to-login>Return to Sign In</button>
+            <p class="admin-status-message" data-admin-forgot-status role="status" aria-live="polite"></p>
           </form>
 
           <form class="admin-form" data-admin-mfa hidden>
@@ -49,16 +65,27 @@ import '../../styles/admin.css';
           <form class="admin-form" data-admin-invite hidden>
             <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Accept administrator invitation</h2>
             <label>Your name <input name="name" type="text" autocomplete="name" required /></label>
-            <label>Create password <input name="password" type="password" autocomplete="new-password" required minlength="12" /></label>
+            <label>Create password
+              <input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="200" data-admin-password-new aria-describedby="admin-invite-password-hint" />
+            </label>
+            <label>Confirm password <input name="confirmPassword" type="password" autocomplete="new-password" required data-admin-password-confirm /></label>
+            <p class="admin-muted" id="admin-invite-password-hint">At least 8 characters, including one special character (for example ! @ # $ %).</p>
             <button class="btn btn--primary" type="submit">Accept Invitation</button>
           </form>
 
           <form class="admin-form" data-admin-reset hidden>
             <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Set a new password</h2>
-            <label>New password <input name="password" type="password" autocomplete="new-password" required minlength="12" /></label>
+            <label>New password
+              <input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="200" data-admin-password-new aria-describedby="admin-reset-password-hint" />
+            </label>
+            <label>Confirm new password <input name="confirmPassword" type="password" autocomplete="new-password" required data-admin-password-confirm /></label>
+            <p class="admin-muted" id="admin-reset-password-hint">At least 8 characters, including one special character (for example ! @ # $ %).</p>
             <button class="btn btn--primary" type="submit">Update Password</button>
+            <button class="btn btn--ghost btn--small" type="button" data-admin-back-to-login>Return to Sign In</button>
+            <p class="admin-status-message" data-admin-reset-status role="status" aria-live="polite"></p>
           </form>
           <p class="admin-error" data-admin-error role="alert"></p>
+          <p class="admin-status-message" data-admin-success role="status" aria-live="polite"></p>
         </div>
       </div>
 
@@ -213,6 +240,17 @@ import '../../styles/admin.css';
               <div data-admin-mfa-status></div>
               <div data-admin-mfa-setup style="margin-top:1rem;"></div>
               <button class="btn btn--ghost btn--small" type="button" data-admin-revoke-others>Sign out other sessions</button>
+              <form class="admin-form" data-admin-password-change style="margin-top:1.25rem;">
+                <h3 style="font-size:.95rem;margin:0;">Change password</h3>
+                <label>Current password <input name="currentPassword" type="password" autocomplete="current-password" required /></label>
+                <label>New password
+                  <input name="newPassword" type="password" autocomplete="new-password" required minlength="8" maxlength="200" data-admin-password-new aria-describedby="admin-change-password-hint" />
+                </label>
+                <label>Confirm new password <input name="confirmPassword" type="password" autocomplete="new-password" required data-admin-password-confirm /></label>
+                <p class="admin-muted" id="admin-change-password-hint">At least 8 characters, including one special character (for example ! @ # $ %).</p>
+                <button class="btn btn--secondary btn--small" type="submit">Update password</button>
+                <p class="admin-status-message" data-admin-password-change-status role="status" aria-live="polite"></p>
+              </form>
             </div>
             <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
               <h2 class="admin-section-title">Administrators</h2>

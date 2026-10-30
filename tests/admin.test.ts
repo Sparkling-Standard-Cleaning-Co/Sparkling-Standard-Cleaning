@@ -352,11 +352,19 @@ import {
 } from '../src/lib/admin/crm.ts';
 import {
   acceptInvite,
+  changePassword,
   inviteAdmin,
   issuePasswordReset,
+  passwordResetStatus,
+  requestPasswordReset,
   resetPassword,
   updateAdminStatus,
 } from '../src/lib/admin/accounts.ts';
+import {
+  passwordConfirmationProblem,
+  passwordPolicyMessage,
+  passwordProblem,
+} from '../src/lib/password-policy.ts';
 import {
   createMfaChallenge,
   enableMfa,
@@ -820,4 +828,236 @@ test('signed payment authorization gates saved-card setup and off-session chargi
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+// ── Owner password policy and self-service recovery (2026-10-30) ─────────────
+
+function authRequest(body: unknown, ip = '198.51.100.10', origin?: string): Request {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'CF-Connecting-IP': ip,
+  };
+  if (origin) headers.Origin = origin;
+  return new Request('https://sparkling-standard.com/api/admin/auth', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
+test('the owner password policy is exactly eight characters plus one special character', () => {
+  for (const allowed of ['Passw0rd!', 'abcdefg!', 'a b c d e f !', 'a long passphrase with spaces and ?']) {
+    assert.equal(passwordProblem(allowed), null, allowed);
+  }
+  assert.equal(passwordProblem(''), 'password_required');
+  assert.equal(passwordProblem('Short!1'), 'password_too_short');
+  assert.equal(passwordProblem('abcdefgh'), 'password_needs_special');
+  assert.equal(passwordProblem('abc defgh'), 'password_needs_special');
+  assert.equal(passwordProblem('abcdefghi'), 'password_needs_special');
+  assert.equal(passwordProblem(`${'a'.repeat(200)}!`), 'password_too_long');
+  assert.equal(passwordProblem(`${'a'.repeat(199)}!`), null);
+  assert.equal(passwordPolicyMessage('password_too_short'), 'Use at least 8 characters.');
+  assert.equal(passwordPolicyMessage('password_needs_special'), 'Include at least one special character, such as ! @ # $ %.');
+  assert.equal(passwordConfirmationProblem('Passw0rd!', 'Passw0rd?'), 'password_mismatch');
+});
+
+test('owner enrollment accepts the simplified policy and rejects weaker passwords', async () => {
+  const db = migratedDb();
+  await assert.rejects(
+    () => enrollOwner(db, { email: 'short@example.test', name: 'Short', password: 'Ab!1' }),
+    /password_too_short/,
+  );
+  await assert.rejects(
+    () => enrollOwner(db, { email: 'nospecial@example.test', name: 'Plain', password: 'abcdefgh' }),
+    /password_needs_special/,
+  );
+  await enrollOwner(db, { email: 'eight@example.test', name: 'Eight', password: 'abcdefg!' });
+  assert.ok(await authenticate(db, 'eight@example.test', 'abcdefg!'));
+});
+
+test('self-service reset issues a hashed single-use link and signs every session out', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'recovery@example.test',
+    name: 'Recovery Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  db.raw.prepare("UPDATE admin_users SET mfa_enabled = 1, mfa_secret = 'v1.synthetic' WHERE id = ?").run(owner.id);
+  const session = await createOpsSession(db, owner.id, request());
+  assert.ok(await readOpsActor(db, request(`ss_ops=${session.token}`)));
+
+  const reset = await requestPasswordReset(db, owner.email);
+  assert.ok(reset?.token);
+  const stored = db.raw.prepare('SELECT token_hash FROM admin_password_resets').get() as { token_hash: string };
+  assert.notEqual(stored.token_hash, reset!.token, 'only the hash is stored');
+  assert.match(stored.token_hash, /^[0-9a-f]{64}$/);
+  assert.equal((await passwordResetStatus(db, reset!.token)).valid, true);
+
+  await assert.rejects(
+    () => resetPassword(db, { token: reset!.token, password: 'weakpass' }),
+    /password_needs_special/,
+  );
+  assert.equal((await passwordResetStatus(db, reset!.token)).valid, true, 'a rejected password does not consume the link');
+
+  const result = await resetPassword(db, { token: reset!.token, password: 'NewOwner!2026' });
+  assert.equal(result.email, owner.email);
+  assert.ok(await authenticate(db, owner.email, 'NewOwner!2026'));
+  assert.equal(await readOpsActor(db, request(`ss_ops=${session.token}`)), null, 'existing sessions are revoked');
+  assert.equal((await passwordResetStatus(db, reset!.token)).valid, false);
+  await assert.rejects(
+    () => resetPassword(db, { token: reset!.token, password: 'Another!2026' }),
+    /reset_invalid/,
+  );
+  const mfa = db.raw.prepare('SELECT mfa_enabled, mfa_secret FROM admin_users WHERE id = ?').get(owner.id) as {
+    mfa_enabled: number;
+    mfa_secret: string;
+  };
+  assert.equal(mfa.mfa_enabled, 1, 'MFA is preserved');
+  assert.equal(mfa.mfa_secret, 'v1.synthetic');
+});
+
+test('a new reset link invalidates the previous one and unknown emails reveal nothing', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'rotate@example.test',
+    name: 'Rotate Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const first = await requestPasswordReset(db, owner.email);
+  const second = await requestPasswordReset(db, owner.email);
+  assert.equal((await passwordResetStatus(db, first!.token)).valid, false);
+  assert.equal((await passwordResetStatus(db, second!.token)).valid, true);
+  assert.equal(await requestPasswordReset(db, 'nobody@example.test'), null);
+  const active = db.raw.prepare('SELECT COUNT(*) AS count FROM admin_password_resets WHERE used_at IS NULL').get() as { count: number };
+  assert.equal(active.count, 1);
+});
+
+test('expired reset links fail closed', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'expired@example.test',
+    name: 'Expired Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const reset = await requestPasswordReset(db, owner.email);
+  db.raw
+    .prepare('UPDATE admin_password_resets SET expires_at = ? WHERE user_id = ?')
+    .run(new Date(Date.now() - 60_000).toISOString(), owner.id);
+  assert.equal((await passwordResetStatus(db, reset!.token)).valid, false);
+  await assert.rejects(
+    () => resetPassword(db, { token: reset!.token, password: 'Expired!2026' }),
+    /reset_invalid/,
+  );
+});
+
+test('an authenticated password change requires the current password and keeps the current session', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'change@example.test',
+    name: 'Change Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const actor = await readOpsActor(db, request(`ss_ops=${session.token}`));
+  assert.ok(actor);
+  await assert.rejects(
+    () => changePassword(db, actor!, { currentPassword: 'wrong-password', newPassword: 'Changed!2026' }),
+    /reauth_failed/,
+  );
+  await assert.rejects(
+    () => changePassword(db, actor!, { currentPassword: 'SyntheticOwner!2026', newPassword: 'short' }),
+    /password_too_short/,
+  );
+  await changePassword(db, actor!, { currentPassword: 'SyntheticOwner!2026', newPassword: 'Changed!2026' });
+  assert.ok(await authenticate(db, owner.email, 'Changed!2026'));
+  assert.equal(await authenticate(db, owner.email, 'SyntheticOwner!2026'), null);
+  assert.ok(await readOpsActor(db, request(`ss_ops=${session.token}`)), 'the active session stays valid');
+});
+
+test('the forgot-password endpoint emails a working link without revealing account state', async (t) => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'forgot@example.test',
+    name: 'Forgot Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const originalFetch = globalThis.fetch;
+  const sent: Array<Record<string, unknown>> = [];
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async (input, init) => {
+    assert.match(String(input), /api\.resend\.com\/emails/);
+    sent.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+    return new Response(JSON.stringify({ id: 'email_test' }), { status: 200 });
+  };
+  const env = {
+    DB: db,
+    RESEND_API_KEY: 're_test_synthetic',
+    RESEND_FROM_EMAIL: 'notifications@example.test',
+    PUBLIC_SITE_URL: 'https://sparkling-standard.com',
+  };
+
+  const response = await authPost({
+    request: authRequest({ action: 'request_reset', email: owner.email }, '198.51.100.60'),
+    env,
+  } as never);
+  assert.equal(response.status, 200);
+  const payload = (await response.json()) as Record<string, unknown>;
+  assert.equal(typeof payload.message, 'string');
+  assert.equal('token' in payload, false, 'the API never returns a token');
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0]!.to instanceof Array ? (sent[0]!.to as string[])[0] : '', owner.email);
+  const text = String(sent[0]!.text ?? '');
+  const match = text.match(/https:\/\/sparkling-standard\.com\/admin\/\?reset=([A-Za-z0-9_-]+)/);
+  assert.ok(match, 'the email links to the password-setting interface');
+  const token = decodeURIComponent(match![1]!);
+
+  const unknown = await authPost({
+    request: authRequest({ action: 'request_reset', email: 'nobody@example.test' }, '198.51.100.61'),
+    env,
+  } as never);
+  assert.equal(unknown.status, 200);
+  assert.deepEqual(await unknown.json(), payload, 'unknown accounts receive the identical response');
+  assert.equal(sent.length, 1, 'no email is sent for an unknown account');
+
+  const check = await authPost({
+    request: authRequest({ action: 'reset_check', token }, '198.51.100.62'),
+    env,
+  } as never);
+  assert.deepEqual(await check.json(), { ok: true, valid: true, expiresAt: (await passwordResetStatus(db, token)).expiresAt });
+
+  const set = await authPost({
+    request: authRequest({ action: 'reset_password', token, password: 'FreshOwner!1' }, '198.51.100.63'),
+    env,
+  } as never);
+  assert.equal(set.status, 200);
+  assert.ok(await authenticate(db, owner.email, 'FreshOwner!1'));
+
+  const reuse = await authPost({
+    request: authRequest({ action: 'reset_password', token, password: 'Another!1' }, '198.51.100.64'),
+    env,
+  } as never);
+  assert.equal(reuse.status, 400);
+  assert.equal(((await reuse.json()) as { error: string }).error, 'reset_invalid');
+
+  const crossOrigin = await authPost({
+    request: authRequest({ action: 'request_reset', email: owner.email }, '198.51.100.65', 'https://evil.example'),
+    env,
+  } as never);
+  assert.equal(crossOrigin.status, 403);
+});
+
+test('the login route rejects a cross-origin state-changing request', async () => {
+  const db = migratedDb();
+  await enrollOwner(db, {
+    email: 'origin@example.test',
+    name: 'Origin Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const response = await authPost({
+    request: authRequest({ action: 'login', email: 'origin@example.test', password: 'SyntheticOwner!2026' }, '198.51.100.70', 'https://evil.example'),
+    env: { DB: db },
+  } as never);
+  assert.equal(response.status, 403);
 });

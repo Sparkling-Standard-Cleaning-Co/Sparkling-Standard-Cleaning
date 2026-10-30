@@ -7,6 +7,7 @@
 //          update-recovery. Financial permissions live in /api/gift-admin.
 
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
+import { passwordPolicyMessage } from '../../src/lib/password-policy.ts';
 import {
   adminBucket,
   audit,
@@ -184,7 +185,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     const password = typeof payload.password === 'string' ? payload.password : '';
     const passwordIssue = passwordProblem(password);
-    if (passwordIssue) return json({ ok: false, error: 'weak_password', message: passwordIssue }, 400);
+    if (passwordIssue) return json({ ok: false, error: 'weak_password', message: passwordPolicyMessage(passwordIssue) }, 400);
     const recoveryEmail = normalizeCustomerEmail(payload.recoveryEmail);
     const emailIssue = recoveryEmail ? customerEmailProblem(recoveryEmail) : null;
     if (emailIssue) return json({ ok: false, error: 'recovery_email_invalid' }, 400);
@@ -303,7 +304,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const token = text(payload.token, 300);
     const password = typeof payload.password === 'string' ? payload.password : '';
     const passwordIssue = passwordProblem(password);
-    if (passwordIssue) return json({ ok: false, error: 'weak_password', message: passwordIssue }, 400);
+    if (passwordIssue) return json({ ok: false, error: 'weak_password', message: passwordPolicyMessage(passwordIssue) }, 400);
     const passwordHash = await safeHashPassword(password);
     if (!passwordHash) return json({ ok: false, error: 'auth_crypto_unavailable' }, 503);
     const challenge = await consumeChallenge(bucket, token, 'reset_password');

@@ -30,6 +30,22 @@
 .admin-form label { display: grid; gap: .3rem; font-size: .8rem; font-weight: 600; }
 .admin-form input { border: 1px solid #d8c8b7; border-radius: .5rem; padding: .65rem .7rem; font: inherit; background: #fff; }
 .admin-error { color: #8f2738; font-size: .85rem; min-height: 1.2rem; }
+.admin-status-message { color: #4c6b4f; font-size: .85rem; min-height: 1.2rem; margin: 0; }
+.admin-status-message:empty, .admin-error:empty { min-height: 0; }
+.admin-forgot { margin: .15rem 0 0; }
+.admin-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #8a4a52;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: .18em;
+  cursor: pointer;
+}
+.admin-link:hover { color: #6d343c; }
+.admin-link:focus-visible { outline: 2px solid #8a4a52; outline-offset: 3px; border-radius: .2rem; }
 .admin-muted { color: var(--color-text-muted); font-size: .82rem; }
 .admin-empty { padding: 1rem; color: var(--color-text-muted); font-size: .88rem; }
 .admin-status { display: inline-flex; padding: .15rem .45rem; border-radius: 999px; background: #f3e8d8; font-size: .7rem; font-weight: 700; }

@@ -18,6 +18,14 @@ function siteUrl(env: AdminEmailEnv): string {
   return (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
 function shell(title: string, body: string): string {
   return `<!doctype html><html><body style="margin:0;background:#f8f1ec;color:#2c2421;font-family:Georgia,serif">
   <div style="max-width:560px;margin:0 auto;padding:32px 20px">
@@ -66,6 +74,56 @@ export function buildPasswordChangedEmail(env: AdminEmailEnv): AdminEmail {
        <p><a href="${url}" style="color:#9a5b61">Open the gift administrator register</a></p>`,
     ),
     text: `The Sparkling Standard gift administrator password was changed. Existing sessions were signed out.\n\n${url}`,
+  };
+}
+
+/**
+ * Operations-console recovery email. The link opens the password-setting
+ * interface directly; the token is single use and expires in 30 minutes.
+ */
+export function buildOpsPasswordResetEmail(env: AdminEmailEnv, token: string, name?: string): AdminEmail {
+  const url = `${siteUrl(env)}/admin/?reset=${encodeURIComponent(token)}`;
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hello,';
+  const plainGreeting = name ? `Hi ${name},` : 'Hello,';
+  return {
+    subject: 'Reset your Sparkling Standard administrator password',
+    html: shell(
+      'Reset your administrator password',
+      `<p style="font-size:16px;line-height:1.6">${greeting}</p>
+       <p style="font-size:16px;line-height:1.6">A password reset was requested for your Sparkling Standard Operations account.</p>
+       <p><a href="${url}" style="display:inline-block;background:#9a5b61;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px">Choose a new password</a></p>
+       <p style="font-size:14px;line-height:1.6">This link expires in 30 minutes and can be used once. Your two-step verification settings are not changed.</p>`,
+    ),
+    text: `Reset your Sparkling Standard administrator password\n\n${plainGreeting}\n\nChoose a new password (single use, expires in 30 minutes):\n${url}\n\nYour two-step verification settings are not changed.`,
+  };
+}
+
+export function buildOpsPasswordChangedEmail(env: AdminEmailEnv, name?: string): AdminEmail {
+  const url = `${siteUrl(env)}/admin/`;
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hello,';
+  return {
+    subject: 'Your Sparkling Standard administrator password was changed',
+    html: shell(
+      'Administrator password changed',
+      `<p style="font-size:16px;line-height:1.6">${greeting}</p>
+       <p style="font-size:16px;line-height:1.6">The password for your Sparkling Standard Operations account was changed. All existing sessions were signed out.</p>
+       <p><a href="${url}" style="color:#9a5b61">Sign in to Operations</a></p>`,
+    ),
+    text: `Your Sparkling Standard administrator password was changed.\n\nAll existing sessions were signed out.\n\n${url}`,
+  };
+}
+
+export function buildOpsInvitationEmail(env: AdminEmailEnv, token: string, role: string): AdminEmail {
+  const url = `${siteUrl(env)}/admin/?invite=${encodeURIComponent(token)}`;
+  return {
+    subject: 'Sparkling Standard administrator invitation',
+    html: shell(
+      'You have been invited to Operations',
+      `<p style="font-size:16px;line-height:1.6">You have been invited to the Sparkling Standard Operations console as <strong>${escapeHtml(role)}</strong>.</p>
+       <p><a href="${url}" style="display:inline-block;background:#9a5b61;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px">Accept the invitation</a></p>
+       <p style="font-size:14px;line-height:1.6">This link expires in 72 hours and can be used once. Choose a password of at least 8 characters including one special character.</p>`,
+    ),
+    text: `You have been invited to the Sparkling Standard Operations console as ${role}.\n\nAccept the invitation (single use, expires in 72 hours):\n${url}\n\nChoose a password of at least 8 characters including one special character.`,
   };
 }
 

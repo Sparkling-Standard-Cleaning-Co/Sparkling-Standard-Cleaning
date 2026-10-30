@@ -1,6 +1,9 @@
-import { hashPassword, hashToken, passwordProblem, randomToken } from './auth.ts';
+import { hashPassword, hashToken, passwordProblem, randomToken, verifyPassword } from './auth.ts';
 import { AdminAuthError, audit, cookie, OPS_COOKIE, type AdminActor } from './operations.ts';
 import type { D1Database } from './d1.ts';
+
+/** Owner-approved recovery window for a single-use reset link. */
+export const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
 
 function now(): string {
   return new Date().toISOString();
@@ -134,7 +137,7 @@ export async function issuePasswordReset(
     .first<{ id: string; email: string }>();
   if (!user) throw new AdminAuthError(404, 'admin_not_found');
   const token = randomToken(32);
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS).toISOString();
   await db
     .prepare(
       `INSERT INTO admin_password_resets
@@ -152,34 +155,132 @@ export async function issuePasswordReset(
   return { token, expiresAt, email: user.email };
 }
 
+/**
+ * Self-service recovery. Returns the delivery details to the trusted server
+ * caller only; the anonymous API response never reveals whether an account
+ * exists and never contains a token.
+ */
+export async function requestPasswordReset(
+  db: D1Database,
+  emailInput: string,
+): Promise<{ id: string; token: string; email: string; name: string; expiresAt: string } | null> {
+  const email = text(emailInput, 200).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return null;
+  const user = await db
+    .prepare("SELECT id, email, display_name FROM admin_users WHERE email = ? AND status = 'active' LIMIT 1")
+    .bind(email)
+    .first<{ id: string; email: string; display_name: string }>();
+  if (!user) return null;
+  await invalidatePendingResets(db, user.id);
+  const token = randomToken(32);
+  const id = `reset_${crypto.randomUUID()}`;
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS).toISOString();
+  await db
+    .prepare(
+      `INSERT INTO admin_password_resets
+       (id, user_id, token_hash, expires_at, created_by_admin_user_id)
+       VALUES (?, ?, ?, ?, NULL)`,
+    )
+    .bind(id, user.id, await hashToken(token), expiresAt)
+    .run();
+  await audit(db, {
+    actorUserId: user.id,
+    action: 'admin.password_reset_requested',
+    entityType: 'admin_user',
+    entityId: user.id,
+    detail: 'self-service',
+  });
+  return { id, token, email: user.email, name: user.display_name, expiresAt };
+}
+
+/** Read-only status check used by the reset page. Never returns a token. */
+export async function passwordResetStatus(
+  db: D1Database,
+  token: string,
+): Promise<{ valid: boolean; expiresAt: string | null }> {
+  const trimmed = text(token, 300);
+  if (!trimmed) return { valid: false, expiresAt: null };
+  const row = await db
+    .prepare('SELECT expires_at, used_at FROM admin_password_resets WHERE token_hash = ? LIMIT 1')
+    .bind(await hashToken(trimmed))
+    .first<{ expires_at: string; used_at: string | null }>();
+  if (!row || row.used_at || Date.parse(row.expires_at) <= Date.now()) {
+    return { valid: false, expiresAt: null };
+  }
+  return { valid: true, expiresAt: row.expires_at };
+}
+
+/** Any outstanding link for the same account stops working when a new one is issued. */
+export async function invalidatePendingResets(db: D1Database, userId: string): Promise<void> {
+  await db
+    .prepare('UPDATE admin_password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL')
+    .bind(now(), userId)
+    .run();
+}
+
 export async function resetPassword(
   db: D1Database,
   input: { token: string; password: string },
-): Promise<void> {
-  const problem = passwordProblem(text(input.password, 200));
-  if (problem) throw new AdminAuthError(400, problem);
+): Promise<{ userId: string; email: string }> {
   const token = text(input.token, 300);
-  const row = await db
-    .prepare(
-      `SELECT id, user_id, expires_at, used_at FROM admin_password_resets
-       WHERE token_hash = ? LIMIT 1`,
-    )
-    .bind(await hashToken(token))
-    .first<{ id: string; user_id: string; expires_at: string; used_at: string | null }>();
+  const row = token
+    ? await db
+        .prepare(
+          `SELECT r.id, r.user_id, r.expires_at, r.used_at, u.email
+           FROM admin_password_resets r JOIN admin_users u ON u.id = r.user_id
+           WHERE r.token_hash = ? LIMIT 1`,
+        )
+        .bind(await hashToken(token))
+        .first<{ id: string; user_id: string; expires_at: string; used_at: string | null; email: string }>()
+    : null;
   if (!row || row.used_at || Date.parse(row.expires_at) <= Date.now()) {
     throw new AdminAuthError(400, 'reset_invalid');
   }
+  const password = text(input.password, 200);
+  const problem = passwordProblem(password);
+  if (problem) throw new AdminAuthError(400, problem);
   await db
     .prepare('UPDATE admin_users SET password_hash = ?, updated_at = ? WHERE id = ?')
-    .bind(await hashPassword(text(input.password, 200)), now(), row.user_id)
+    .bind(await hashPassword(password), now(), row.user_id)
     .run();
   await db.prepare('UPDATE admin_password_resets SET used_at = ? WHERE id = ?').bind(now(), row.id).run();
+  await invalidatePendingResets(db, row.user_id);
   await db.prepare('DELETE FROM admin_sessions WHERE user_id = ?').bind(row.user_id).run();
   await audit(db, {
     actorUserId: row.user_id,
     action: 'admin.password_reset_completed',
     entityType: 'admin_user',
     entityId: row.user_id,
+  });
+  return { userId: row.user_id, email: row.email };
+}
+
+/** Authenticated password change. The current session stays valid; the rest are revoked by the caller. */
+export async function changePassword(
+  db: D1Database,
+  actor: AdminActor,
+  input: { currentPassword: string; newPassword: string },
+): Promise<void> {
+  const stored = await db
+    .prepare('SELECT password_hash FROM admin_users WHERE id = ? AND status = ? LIMIT 1')
+    .bind(actor.id, 'active')
+    .first<{ password_hash: string }>();
+  if (!stored) throw new AdminAuthError(401, 'unauthorized');
+  if (!(await verifyPassword(text(input.currentPassword, 200), stored.password_hash))) {
+    throw new AdminAuthError(401, 'reauth_failed');
+  }
+  const password = text(input.newPassword, 200);
+  const problem = passwordProblem(password);
+  if (problem) throw new AdminAuthError(400, problem);
+  await db
+    .prepare('UPDATE admin_users SET password_hash = ?, updated_at = ? WHERE id = ?')
+    .bind(await hashPassword(password), now(), actor.id)
+    .run();
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'admin.password_changed',
+    entityType: 'admin_user',
+    entityId: actor.id,
   });
 }
 

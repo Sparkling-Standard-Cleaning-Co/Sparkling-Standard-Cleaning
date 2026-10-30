@@ -101,13 +101,7 @@ export function constantTimeEqual(left: string, right: string): boolean {
   return mismatch === 0;
 }
 
-export function passwordProblem(password: string): string | null {
-  if (password.length < 12) return 'Use at least 12 characters.';
-  if (password.length > 200) return 'Use no more than 200 characters.';
-  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((pattern) => pattern.test(password)).length;
-  if (classes < 3) return 'Include at least three of: lowercase, uppercase, number and symbol.';
-  return null;
-}
+export { passwordProblem, type PasswordProblem } from '../password-policy.ts';
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));

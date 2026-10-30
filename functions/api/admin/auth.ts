@@ -15,11 +15,41 @@ import {
 } from '../../../src/lib/admin/operations.ts';
 import { constantTimeEqual, hashToken } from '../../../src/lib/admin/auth.ts';
 import { createMfaChallenge, verifyMfaChallenge } from '../../../src/lib/admin/mfa.ts';
-import { acceptInvite, resetPassword } from '../../../src/lib/admin/accounts.ts';
+import {
+  acceptInvite,
+  passwordResetStatus,
+  requestPasswordReset,
+  resetPassword,
+} from '../../../src/lib/admin/accounts.ts';
+import {
+  buildOpsPasswordChangedEmail,
+  buildOpsPasswordResetEmail,
+  sendAdminEmail,
+} from '../../../src/lib/admin/email.ts';
 
 interface Env extends AdminDbEnv {
   ADMIN_SETUP_CODE?: string;
   MFA_ENCRYPTION_KEY?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
+  PUBLIC_SITE_URL?: string;
+}
+
+const GENERIC_RESET_MESSAGE =
+  'If that email belongs to an active administrator account, a single-use reset link is on its way. Check the inbox and spam folder.';
+
+function sameOrigin(request: Request): boolean {
+  const origin = request.headers.get('Origin');
+  if (!origin) return true;
+  try {
+    return new URL(origin).host === new URL(request.url).host;
+  } catch {
+    return false;
+  }
+}
+
+function emailAddress(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
 }
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
@@ -107,6 +137,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: (error as AdminAuthError).code }, 503);
   }
 
+  if (!sameOrigin(context.request)) return json({ ok: false, error: 'origin_rejected' }, 403);
+
   let payload: Record<string, unknown>;
   try {
     payload = (await context.request.json()) as Record<string, unknown>;
@@ -147,15 +179,68 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
   }
 
+  if (action === 'request_reset') {
+    if (!(await rateLimit(db, `ops:forgot:${ipKey}`, 6, 15, 15))) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
+    const email = safeText(payload.email, 200).toLowerCase();
+    const generic = json({ ok: true, message: GENERIC_RESET_MESSAGE });
+    if (!emailAddress(email)) return generic;
+    // Per-address throttling stays generic so it never confirms an account.
+    if (!(await rateLimit(db, `ops:forgot:email:${await hashToken(email)}`, 3, 60, 60))) {
+      return generic;
+    }
+    const reset = await requestPasswordReset(db, email);
+    if (!reset) return generic;
+    const site = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+    const delivered = await sendAdminEmail(
+      {
+        ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
+        ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+        PUBLIC_SITE_URL: site,
+      },
+      reset.email,
+      buildOpsPasswordResetEmail({ PUBLIC_SITE_URL: site }, reset.token, reset.name),
+      `ops-reset-${reset.id}`,
+    );
+    await auditFromRequest(
+      db,
+      context.request,
+      null,
+      delivered ? 'admin.password_reset_email_sent' : 'admin.password_reset_email_failed',
+    );
+    return generic;
+  }
+
+  if (action === 'reset_check') {
+    if (!(await rateLimit(db, `ops:resetcheck:${ipKey}`, 40, 15, 15))) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
+    const status = await passwordResetStatus(db, safeText(payload.token, 300));
+    return json({ ok: true, valid: status.valid, expiresAt: status.expiresAt });
+  }
+
   if (action === 'reset_password') {
     if (!(await rateLimit(db, `ops:reset:${ipKey}`, 10, 15, 15))) {
       return json({ ok: false, error: 'rate_limited' }, 429);
     }
     try {
-      await resetPassword(db, {
+      const result = await resetPassword(db, {
         token: safeText(payload.token, 300),
         password: safeText(payload.password, 200),
       });
+      const site = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+      await sendAdminEmail(
+        {
+          ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
+          ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+          PUBLIC_SITE_URL: site,
+        },
+        result.email,
+        buildOpsPasswordChangedEmail({ PUBLIC_SITE_URL: site }),
+        `ops-password-changed-${result.userId}-${Date.now()}`,
+      );
+      await auditFromRequest(db, context.request, null, 'admin.password_reset_completed');
       return json({ ok: true });
     } catch (error) {
       return json(

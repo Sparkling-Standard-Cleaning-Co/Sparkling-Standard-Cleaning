@@ -46,8 +46,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           </div>
           <div class="field">
             <label for="gift-setup-password">New administrator password</label>
-            <input class="input" id="gift-setup-password" type="password" autocomplete="new-password" minlength="12" data-gift-setup-password required />
-            <span class="hint">At least 12 characters with three of: lowercase, uppercase, number and symbol.</span>
+            <input class="input" id="gift-setup-password" type="password" autocomplete="new-password" minlength="8" maxlength="200" data-gift-setup-password required />
+            <span class="hint">At least 8 characters, including one special character (for example ! @ # $ %).</span>
           </div>
           <div class="field">
             <label for="gift-setup-confirm">Confirm password</label>
@@ -89,7 +89,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <form class="form-card stack auth-card" data-gift-reset-form>
           <div class="field">
             <label for="gift-reset-password">New administrator password</label>
-            <input class="input" id="gift-reset-password" type="password" autocomplete="new-password" minlength="12" data-gift-reset-password required />
+            <input class="input" id="gift-reset-password" type="password" autocomplete="new-password" minlength="8" maxlength="200" data-gift-reset-password required />
           </div>
           <div class="field">
             <label for="gift-reset-confirm">Confirm password</label>

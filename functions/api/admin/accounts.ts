@@ -2,6 +2,7 @@ import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
 import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import { verifyPassword } from '../../../src/lib/admin/auth.ts';
 import {
+  changePassword,
   getSettings,
   inviteAdmin,
   issuePasswordReset,
@@ -16,32 +17,13 @@ import {
 } from '../../../src/lib/admin/accounts.ts';
 import { disableMfa, enableMfa, startMfaEnrollment, verifyTotp } from '../../../src/lib/admin/mfa.ts';
 import { decryptMfaSecret, mfaKeyConfigured } from '../../../src/lib/admin/secrets.ts';
+import {
+  buildOpsInvitationEmail,
+  buildOpsPasswordChangedEmail,
+  buildOpsPasswordResetEmail,
+  sendAdminEmail,
+} from '../../../src/lib/admin/email.ts';
 
-
-async function sendAccountEmail(
-  env: Env,
-  to: string,
-  subject: string,
-  text: string,
-): Promise<boolean> {
-  const key = env.RESEND_API_KEY?.trim();
-  const from = env.RESEND_FROM_EMAIL?.trim();
-  if (!key || !from || !to) return false;
-  try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ from, to: [to], subject, text }),
-      signal: AbortSignal.timeout(10_000),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
 interface Env extends AdminDbEnv {
   MFA_ENCRYPTION_KEY?: string;
   RESEND_API_KEY?: string;
@@ -97,11 +79,36 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   try {
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = String(body.action ?? '');
-    if (action === 'mfa_setup' || action === 'mfa_enable' || action === 'mfa_disable' || action === 'revoke_others') {
+    if (
+      action === 'mfa_setup' ||
+      action === 'mfa_enable' ||
+      action === 'mfa_disable' ||
+      action === 'revoke_others' ||
+      action === 'change_password'
+    ) {
       const actor = await requireActor(db, context.request);
       requireCsrf(context.request, actor);
       if (action === 'revoke_others') {
         await revokeOtherSessions(db, context.request, actor);
+        return json({ ok: true });
+      }
+      if (action === 'change_password') {
+        await changePassword(db, actor, {
+          currentPassword: String(body.currentPassword ?? ''),
+          newPassword: String(body.newPassword ?? ''),
+        });
+        await revokeOtherSessions(db, context.request, actor);
+        const site = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+        await sendAdminEmail(
+          {
+            ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
+            ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+            PUBLIC_SITE_URL: site,
+          },
+          actor.email,
+          buildOpsPasswordChangedEmail({ PUBLIC_SITE_URL: site }, actor.name),
+          `ops-password-changed-${actor.id}-${Date.now()}`,
+        );
         return json({ ok: true });
       }
       if (action === 'mfa_setup') {
@@ -138,24 +145,30 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'invite') {
       const result = await inviteAdmin(db, actor, body);
       const origin = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
-      const link = `${origin}/admin/?invite=${encodeURIComponent(result.token)}`;
-      const emailSent = await sendAccountEmail(
-        context.env,
+      const emailSent = await sendAdminEmail(
+        {
+          ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
+          ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+          PUBLIC_SITE_URL: origin,
+        },
         String(body.email ?? ''),
-        'Sparkling Standard administrator invitation',
-        `You have been invited to Sparkling Standard Operations.\n\nAccept the invitation (single use, expires soon):\n${link}\n\nIf you were not expecting this, ignore this email.`,
+        buildOpsInvitationEmail({ PUBLIC_SITE_URL: origin }, result.token, String(body.role ?? 'administrator')),
+        `ops-invite-${result.token.slice(0, 16)}`,
       );
       return json({ ok: true, ...result, emailSent });
     }
     if (action === 'issue_reset') {
       const result = await issuePasswordReset(db, actor, String(body.userId ?? ''));
       const origin = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
-      const link = `${origin}/admin/?reset=${encodeURIComponent(result.token)}`;
-      const emailSent = await sendAccountEmail(
-        context.env,
+      const emailSent = await sendAdminEmail(
+        {
+          ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
+          ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+          PUBLIC_SITE_URL: origin,
+        },
         result.email,
-        'Sparkling Standard password reset',
-        `A password reset was requested for your Sparkling Standard Operations account.\n\nSet a new password (single use, expires soon):\n${link}\n\nIf you did not request this, contact the owner immediately.`,
+        buildOpsPasswordResetEmail({ PUBLIC_SITE_URL: origin }, result.token),
+        `ops-reset-${result.token.slice(0, 16)}`,
       );
       return json({ ok: true, ...result, emailSent });
     }
