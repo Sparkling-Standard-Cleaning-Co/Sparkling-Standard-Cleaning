@@ -168,6 +168,11 @@ for (const [label, width, height] of [
     const { context, page } = await open(width, height);
     try {
       await reachFinal(page);
+      assert.equal(
+        await page.locator('[data-address-finder]').getAttribute('data-state'),
+        'confirmed',
+        'advancing from Step 1 preserves the confirmed address',
+      );
       assert.equal(await page.locator('[data-pay-now]').isVisible(), true, 'Pay Now is visible for the verified exact address');
       assert.equal(await page.locator('[data-gift-code]').isVisible(), true, 'gift code is available with online payment');
       assert.equal(await page.locator('[data-verify-address]').count(), 0, 'no separate address verification control');

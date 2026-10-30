@@ -1308,9 +1308,12 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     focusManual: () => openManualSection(),
     verifyAddress: async () => {
       if (methodIsGps()) return gpsConfirmed ? 'resolved' : 'incomplete';
+      // Advancing from Step 1 must never invalidate an already-confirmed pin.
+      // The previous ordering reset the finder to "typing" and hid the
+      // confirmation card on every Continue click.
+      if (manualConfirmed) return 'resolved';
       ensureManualMode();
       if (manualDetails) manualDetails.open = true;
-      if (manualConfirmed) return 'resolved';
       if (streetField.value.trim().length < 5) {
         if (!autoConfirm) {
           setStatus('Enter your street address first, then verify it on the map.', 'error');
