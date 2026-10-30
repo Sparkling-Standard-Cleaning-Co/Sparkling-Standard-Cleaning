@@ -138,6 +138,8 @@ test('the phone portal shows only the assigned three-day job and the timeclock',
     assert.match(await page.locator('[data-employee-jobs]').innerText(), /Gate code 1234/);
     assert.match(await page.locator('[data-employee-jobs]').innerText(), /Clean bathrooms/);
     assert.equal(await page.locator('.admin-shell').count(), 0, 'the owner console is not present');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(overflow <= 1, `no horizontal overflow at 390px (got ${overflow})`);
     assert.equal(await page.getByRole('button', { name: 'Clock In' }).isEnabled(), true);
     assert.equal(await page.getByRole('button', { name: 'Start Break' }).isDisabled(), true);
   } finally {

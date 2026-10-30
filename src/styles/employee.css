@@ -7,7 +7,7 @@
   font-family: var(--font-body);
   padding-bottom: calc(2rem + env(safe-area-inset-bottom));
 }
-.employee-shell { max-width: 34rem; margin: 0 auto; padding: 1rem 1rem 2rem; }
+.employee-shell { max-width: 34rem; margin: 0 auto; padding: 1rem 1rem 2rem; overflow-x: clip; }
 .employee-brand {
   display: flex;
   align-items: center;
@@ -24,6 +24,7 @@
 .employee-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin: 1rem 0 .6rem; }
 .employee-head h1 { font-family: var(--font-display); font-size: 1.4rem; margin: 0; color: #4a2e33; }
 .employee-card {
+  min-width: 0;
   background: #fffdfa;
   border: 1px solid #e5d8c8;
   border-radius: 1rem;
@@ -68,8 +69,11 @@
 .employee-checklist { margin: .45rem 0 0; padding-left: 1.1rem; font-size: .82rem; }
 .employee-checklist li { margin: .15rem 0; }
 .employee-fields { display: grid; gap: .65rem; margin-top: .7rem; }
-.employee-fields label { display: grid; gap: .25rem; font-size: .8rem; font-weight: 600; color: #4a2e33; }
+.employee-fields label { display: grid; gap: .25rem; min-width: 0; font-size: .8rem; font-weight: 600; color: #4a2e33; }
 .employee-fields select, .employee-fields input, .employee-fields textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid #d8c8b7;
   border-radius: .55rem;
   padding: .6rem .65rem;
