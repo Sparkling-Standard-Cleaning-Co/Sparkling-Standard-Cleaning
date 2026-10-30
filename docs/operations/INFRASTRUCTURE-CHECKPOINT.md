@@ -1,4 +1,4 @@
-﻿# Sparkling Standard infrastructure checkpoint - 2026-10-30
+# Sparkling Standard infrastructure checkpoint - 2026-10-30
 
 This is the authoritative record of infrastructure the owner already created and configured.
 It exists so future engineering sessions do not ask the owner to recreate services or re-add
@@ -81,8 +81,7 @@ reviewable D1 SQL from exported R2 JSON without connecting to production R2.
 
 ## Outstanding work
 
-- Deploy the local admin commits after the owner-authorized push.
-- Enroll/verify the owner account after the admin deployment.
+- Admin code is deployed; first-owner enrollment via the server setup code is the remaining account step.
 - Verify the production `DB` binding through `/api/admin/auth`.
 - Run Stripe test-mode verification without live money after a test-mode key is available locally.
 - Test real Google Calendar writes only against an isolated test calendar or after explicit owner
