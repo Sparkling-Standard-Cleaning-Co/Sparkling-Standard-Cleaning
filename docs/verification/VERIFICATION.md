@@ -1,5 +1,31 @@
 # Verification status
 
+## Verified - 2026-10-30 customer Pay Now address-preservation fix
+
+**Release:** `48930a0`. Cloudflare Pages deployment
+`c067b24b-968a-4fae-95c3-59925cef5fc2`. GitHub run `41088102492`: `validate`, `browser` and
+the Cloudflare Pages check succeeded.
+
+- **Cause:** `addressFinder.verifyAddress()` called `ensureManualMode()` before checking
+  `manualConfirmed`. Every Step 1 Continue therefore reset the confirmed finder to `typing` and
+  hid the confirmation card even though the address had been confirmed.
+- **Fix:** an already-confirmed manual destination now returns `resolved` immediately, preserving
+  the confirmed state, card and Pay Now eligibility through every step.
+- **Production verification:** a live exact-address estimate at 390 px retained
+  `data-state="confirmed"` after Continue and displayed the green
+  **Pay Now and Reserve This Cleaning** action with the smaller Pay Later action.
+- **Boundaries:** no pricing, discount, booking, Stripe or address-policy change. Approximate and
+  street-level addresses remain reservation-only as before.
+- **Focused regression:** desktop and mobile exact-address journeys now assert the confirmed state
+  and visible Pay Now action; approximate-address and unverified-travel cases remain blocked.
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **674 tests: 673 passed, 1 pre-existing print-output skip, 0 failed** |
+| Focused browser test | **4 passed** (desktop/mobile exact, approximate, unavailable travel) |
+| Full release validation | type check, build, validation and smoke passed |
+| Production | live at `48930a0`; exact-address Pay Now verified |
+
 ## Verified - 2026-10-29 final-page accordion and price-row correction
 
 **Release:** `a042f83`. Cloudflare Pages deployment

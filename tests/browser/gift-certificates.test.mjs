@@ -290,6 +290,7 @@ test('the owner gift register requires a session password and exposes data only 
     await page.goto(BASE + '/gift-admin/', { waitUntil: 'load' });
     assert.match((await page.locator('meta[name="robots"]').getAttribute('content')) ?? '', /noindex/);
     assert.equal(await page.locator('#gift-admin-token').count(), 0, 'the legacy token field is gone');
+    await page.locator('[data-gift-auth-login]').waitFor({ state: 'visible' });
     assert.equal(await page.locator('[data-gift-auth-login]').isVisible(), true);
     assert.doesNotMatch((await page.textContent('body')) ?? '', /SSGC-ABCD-2345/);
 
