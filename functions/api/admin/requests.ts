@@ -1,5 +1,6 @@
-﻿import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
-import { AdminAuthError, requireActor, type AdminActor } from '../../../src/lib/admin/operations.ts';
+import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
+import { AdminAuthError, requireActor, requireCsrf, type AdminActor } from '../../../src/lib/admin/operations.ts';
+import { confirmRequest, updateRequestStatus } from '../../../src/lib/admin/scheduling.ts';
 
 interface Env extends AdminDbEnv {}
 function json(body: unknown, status = 200): Response {
@@ -50,5 +51,33 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const code = error instanceof AdminAuthError ? error.code : 'requests_failed';
     const status = error instanceof AdminAuthError ? error.status : 500;
     return json({ ok: false, error: code }, status);
+  }
+}
+
+export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
+  const db = adminDb(context.env);
+  if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
+  try {
+    const actor = await requireActor(db, context.request, 'booking.write');
+    requireCsrf(context.request, actor);
+    const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
+    const action = String(body.action ?? '');
+    const requestId = String(body.requestId ?? '');
+    if (action === 'confirm') {
+      const teamMemberIds = Array.isArray(body.teamMemberIds)
+        ? body.teamMemberIds.map((value) => String(value)).filter(Boolean).slice(0, 12)
+        : [];
+      return json({ ok: true, ...(await confirmRequest(db, actor, requestId, teamMemberIds)) });
+    }
+    if (action === 'status') {
+      await updateRequestStatus(db, actor, requestId, String(body.status ?? ''));
+      return json({ ok: true });
+    }
+    return json({ ok: false, error: 'invalid_action' }, 400);
+  } catch (error) {
+    return json(
+      { ok: false, error: error instanceof AdminAuthError ? error.code : 'request_update_failed' },
+      error instanceof AdminAuthError ? error.status : 500,
+    );
   }
 }

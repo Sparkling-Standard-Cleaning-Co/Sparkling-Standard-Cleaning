@@ -22,6 +22,7 @@ export interface AdminActor {
   branchId: string | null;
   csrf: string;
   permissions: string[];
+  mfaEnabled: boolean;
 }
 
 export class AdminAuthError extends Error {
@@ -92,12 +93,12 @@ export async function authenticate(
   db: D1Database,
   emailInput: string,
   password: string,
-): Promise<{ id: string; email: string; name: string; role: string; branchId: string | null } | null> {
+): Promise<{ id: string; email: string; name: string; role: string; branchId: string | null; mfaEnabled: boolean } | null> {
   const email = emailInput.trim().toLowerCase();
   const user = await db
     .prepare(
       `SELECT u.id, u.email, u.display_name, u.password_hash, u.status, u.role_id, u.branch_id,
-              r.name AS role_name
+              u.mfa_enabled, r.name AS role_name
        FROM admin_users u JOIN admin_roles r ON r.id = u.role_id
        WHERE u.email = ? LIMIT 1`,
     )
@@ -110,6 +111,7 @@ export async function authenticate(
       status: string;
       role_id: string;
       branch_id: string | null;
+      mfa_enabled: number;
       role_name: string;
     }>();
   if (!user || user.status !== 'active') return null;
@@ -121,6 +123,7 @@ export async function authenticate(
     name: user.display_name,
     role: user.role_id,
     branchId: user.branch_id ?? null,
+    mfaEnabled: Number(user.mfa_enabled) === 1,
   };
 }
 
@@ -161,7 +164,7 @@ export async function readOpsActor(db: D1Database, request: Request): Promise<Ad
   const row = await db
     .prepare(
       `SELECT s.id AS session_id, s.csrf_token, s.expires_at, s.revoked_at,
-              u.id, u.email, u.display_name, u.status, u.role_id, u.branch_id
+              u.id, u.email, u.display_name, u.status, u.role_id, u.branch_id, u.mfa_enabled
        FROM admin_sessions s JOIN admin_users u ON u.id = s.user_id
        WHERE s.token_hash = ? LIMIT 1`,
     )
@@ -177,6 +180,7 @@ export async function readOpsActor(db: D1Database, request: Request): Promise<Ad
       status: string;
       role_id: string;
       branch_id: string | null;
+      mfa_enabled: number;
     }>();
   if (!row || row.revoked_at || row.status !== 'active') return null;
   if (Date.parse(row.expires_at) <= Date.now()) {
@@ -196,6 +200,7 @@ export async function readOpsActor(db: D1Database, request: Request): Promise<Ad
     branchId: row.branch_id ?? null,
     csrf: row.csrf_token,
     permissions,
+    mfaEnabled: Number(row.mfa_enabled) === 1,
   };
 }
 

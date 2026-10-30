@@ -1,4 +1,4 @@
-﻿import type { D1Database } from './d1.ts';
+import type { D1Database } from './d1.ts';
 import { hashToken } from './auth.ts';
 
 function splitName(name: string): { first: string; last: string } {
@@ -142,6 +142,60 @@ export async function persistLeadSubmission(
     }
   }
 
+  const holdId = (fields.booking_hold_id ?? '').trim();
+  const requestedDate = (fields.preferred_date ?? '').trim();
+  if (requestType === 'reservation_request' && holdId && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
+    const rawTime = (fields.preferred_time ?? '').trim();
+    const timeMatch = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec(rawTime);
+    let hour = 9;
+    let minute = 0;
+    if (timeMatch) {
+      hour = Number(timeMatch[1]);
+      minute = Number(timeMatch[2]);
+      const meridiem = (timeMatch[3] ?? '').toUpperCase();
+      if (meridiem === 'PM' && hour < 12) hour += 12;
+      if (meridiem === 'AM' && hour === 12) hour = 0;
+    }
+    const startAt = `${requestedDate}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+    const endAt = new Date(Date.parse(`${startAt}Z`) + 120 * 60_000).toISOString().slice(0, 19);
+    const requestId = (fields.booking_request_id ?? '').trim() || `request_${holdId}`;
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO booking_requests
+         (id, hold_id, branch_id, customer_id, property_id, status, quote_reference, requested_date,
+          start_at, end_at, duration_minutes, payload_json)
+         VALUES (?, ?, 'branch_pensacola', ?, ?, 'pending', ?, ?, ?, ?, 120, ?)`,
+      )
+      .bind(
+        requestId,
+        holdId,
+        customerId,
+        propertyId,
+        fields.quote_reference ?? '',
+        requestedDate,
+        startAt,
+        endAt,
+        JSON.stringify(fields),
+      )
+      .run();
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO booking_holds
+         (id, request_id, status, quote_reference, start_at, end_at, expires_at, payload_json)
+         VALUES (?, ?, 'held', ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        holdId,
+        requestId,
+        fields.quote_reference ?? '',
+        startAt,
+        endAt,
+        fields.booking_hold_expires_at ?? new Date(Date.parse(startAt) + 30 * 60_000).toISOString(),
+        JSON.stringify(fields),
+      )
+      .run();
+  }
+
   const leadId = `lead_${crypto.randomUUID()}`;
   const outstanding =
     fields.photos_outstanding === 'yes'
@@ -201,10 +255,18 @@ export async function updateLeadDelivery(
   db: D1Database | null,
   leadId: string | null,
   deliveryStatus: 'pending' | 'sent' | 'failed',
+  errorCode = '',
 ): Promise<void> {
   if (!db || !leadId) return;
-  await db.prepare('UPDATE leads SET delivery_status = ?, updated_at = ? WHERE id = ?')
-    .bind(deliveryStatus, new Date().toISOString(), leadId)
+  await db
+    .prepare(
+      `UPDATE leads SET delivery_status = ?,
+         delivery_attempts = delivery_attempts + CASE WHEN ? IN ('sent','failed') THEN 1 ELSE 0 END,
+         last_delivery_error = CASE WHEN ? = 'failed' THEN ? ELSE '' END,
+         updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(deliveryStatus, deliveryStatus, deliveryStatus, errorCode, new Date().toISOString(), leadId)
     .run()
     .catch(() => undefined);
 }

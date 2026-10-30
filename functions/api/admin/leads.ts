@@ -1,55 +1,79 @@
-﻿import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
-import { AdminAuthError, requireActor, type AdminActor } from '../../../src/lib/admin/operations.ts';
+import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
+import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { listLeads, retryLeadNotification, updateLead } from '../../../src/lib/admin/crm.ts';
 
-interface Env extends AdminDbEnv {}
+interface Env extends AdminDbEnv {
+  WEB3FORMS_ACCESS_KEY?: string;
+  WEB3FORMS_ENDPOINT?: string;
+}
+
 function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
 }
-function scoped(actor: AdminActor): { sql: string; bind: unknown[] } {
-  if (actor.role === 'owner') return { sql: '', bind: [] };
-  if (!actor.branchId) return { sql: ' AND 1 = 0', bind: [] };
-  return { sql: ' AND l.branch_id = ?', bind: [actor.branchId] };
-}
+
 function payload(value: unknown): Record<string, unknown> {
   if (typeof value !== 'string' || !value) return {};
-  try { return JSON.parse(value) as Record<string, unknown>; } catch { return {}; }
+  try {
+    return JSON.parse(value) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
+
 export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
   const db = adminDb(context.env);
   if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
   try {
     const actor = await requireActor(db, context.request, 'lead.read');
     const url = new URL(context.request.url);
-    const id = (url.searchParams.get('id') ?? '').trim();
-    if (id) {
-      const lead = await db.prepare(
-        `SELECT l.*, c.first_name, c.last_name,
-                (SELECT value FROM customer_contacts WHERE customer_id = c.id AND kind = 'email' LIMIT 1) AS email,
-                (SELECT value FROM customer_contacts WHERE customer_id = c.id AND kind = 'phone' LIMIT 1) AS phone
-         FROM leads l LEFT JOIN customers c ON c.id = l.customer_id
-         WHERE l.id = ? LIMIT 1`,
-      ).bind(id).first<Record<string, unknown>>();
-      if (!lead) return json({ ok: false, error: 'lead_not_found' }, 404);
-      const scope = scoped(actor);
-      if (scope.sql && lead.branch_id !== actor.branchId) return json({ ok: false, error: 'forbidden' }, 403);
-      return json({ ok: true, lead: { ...lead, payload: payload(lead.payload_json) } });
-    }
-    const status = (url.searchParams.get('status') ?? '').trim();
-    const scope = scoped(actor);
-    const rows = await db.prepare(
-      `SELECT l.id, l.request_type, l.status, l.source, l.quote_reference, l.delivery_status,
-              l.outstanding_requirement, l.branch_id, l.created_at,
-              c.id AS customer_id, c.first_name, c.last_name,
-              (SELECT value FROM customer_contacts WHERE customer_id = c.id AND kind = 'email' LIMIT 1) AS email,
-              (SELECT value FROM customer_contacts WHERE customer_id = c.id AND kind = 'phone' LIMIT 1) AS phone
-       FROM leads l LEFT JOIN customers c ON c.id = l.customer_id
-       WHERE (? = '' OR l.status = ?) ${scope.sql}
-       ORDER BY l.created_at DESC LIMIT 100`,
-    ).bind(status, status, ...scope.bind).all();
-    return json({ ok: true, leads: rows.results ?? [] });
+    const leads = await listLeads(db, actor, {
+      status: url.searchParams.get('status') ?? '',
+      q: url.searchParams.get('q') ?? '',
+      limit: Number(url.searchParams.get('limit') ?? 100),
+    });
+    return json({
+      ok: true,
+      leads: leads.map((lead) => ({ ...lead, payload: payload(lead.payload_json) })),
+    });
   } catch (error) {
-    const code = error instanceof AdminAuthError ? error.code : 'leads_failed';
-    const status = error instanceof AdminAuthError ? error.status : 500;
-    return json({ ok: false, error: code }, status);
+    return json(
+      { ok: false, error: error instanceof AdminAuthError ? error.code : 'leads_failed' },
+      error instanceof AdminAuthError ? error.status : 500,
+    );
+  }
+}
+
+export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
+  const db = adminDb(context.env);
+  if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
+  try {
+    const actor = await requireActor(db, context.request, 'lead.write');
+    requireCsrf(context.request, actor);
+    const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
+    const action = String(body.action ?? '');
+    const leadId = String(body.leadId ?? '');
+    if (action === 'update') {
+      await updateLead(db, actor, leadId, {
+        status: String(body.status ?? ''),
+        note: String(body.note ?? ''),
+      });
+      return json({ ok: true });
+    }
+    if (action === 'retry_notification') {
+      const result = await retryLeadNotification(db, actor, leadId, {
+        ...(context.env.WEB3FORMS_ACCESS_KEY ? { WEB3FORMS_ACCESS_KEY: context.env.WEB3FORMS_ACCESS_KEY } : {}),
+        ...(context.env.WEB3FORMS_ENDPOINT ? { WEB3FORMS_ENDPOINT: context.env.WEB3FORMS_ENDPOINT } : {}),
+      });
+      return json({ ok: true, ...result });
+    }
+    return json({ ok: false, error: 'invalid_action' }, 400);
+  } catch (error) {
+    return json(
+      { ok: false, error: error instanceof AdminAuthError ? error.code : 'lead_update_failed' },
+      error instanceof AdminAuthError ? error.status : 500,
+    );
   }
 }

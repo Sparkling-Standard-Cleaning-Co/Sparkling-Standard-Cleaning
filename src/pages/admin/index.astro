@@ -18,7 +18,7 @@ import '../../styles/admin.css';
           <p class="admin-brand__sub">Sparkling Standard</p>
           <h1 class="admin-title">Operations</h1>
           <p class="admin-sub">Private cleaning-company administration.</p>
-          <p class="admin-muted" data-admin-gate-status>Checking secure session…</p>
+          <p class="admin-muted" data-admin-gate-status>Checking secure session.</p>
 
           <form class="admin-form" data-admin-setup hidden>
             <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Create the owner account</h2>
@@ -36,6 +36,28 @@ import '../../styles/admin.css';
             <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
             <button class="btn btn--primary" type="submit">Sign In</button>
           </form>
+
+          <form class="admin-form" data-admin-mfa hidden>
+            <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Two-step verification</h2>
+            <p class="admin-muted">Enter the current authenticator code. A recovery code also works.</p>
+            <label>Authenticator code <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /></label>
+            <label>Recovery code <input name="recoveryCode" autocomplete="off" maxlength="40" /></label>
+            <button class="btn btn--primary" type="submit">Verify and Sign In</button>
+            <button class="btn btn--ghost btn--small" type="button" data-admin-mfa-cancel>Back to sign in</button>
+          </form>
+
+          <form class="admin-form" data-admin-invite hidden>
+            <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Accept administrator invitation</h2>
+            <label>Your name <input name="name" type="text" autocomplete="name" required /></label>
+            <label>Create password <input name="password" type="password" autocomplete="new-password" required minlength="12" /></label>
+            <button class="btn btn--primary" type="submit">Accept Invitation</button>
+          </form>
+
+          <form class="admin-form" data-admin-reset hidden>
+            <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Set a new password</h2>
+            <label>New password <input name="password" type="password" autocomplete="new-password" required minlength="12" /></label>
+            <button class="btn btn--primary" type="submit">Update Password</button>
+          </form>
           <p class="admin-error" data-admin-error role="alert"></p>
         </div>
       </div>
@@ -49,6 +71,7 @@ import '../../styles/admin.css';
           <nav class="admin-nav" aria-label="Admin sections">
             <button type="button" data-admin-nav="overview">Overview</button>
             <button type="button" data-admin-nav="calendar">Calendar &amp; Requests</button>
+            <button type="button" data-admin-nav="leads">Leads &amp; Inquiries</button>
             <button type="button" data-admin-nav="customers">Customers</button>
             <button type="button" data-admin-nav="recurring">Recurring Plans</button>
             <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
@@ -63,7 +86,7 @@ import '../../styles/admin.css';
           </div>
         </aside>
 
-        <div style="min-width:0;padding:1.5rem;">
+        <div class="admin-workspace">
           <header class="admin-topbar">
             <div>
               <h1 class="admin-title" data-admin-view-title>Overview</h1>
@@ -71,50 +94,145 @@ import '../../styles/admin.css';
             </div>
             <span class="admin-status" data-admin-role></span>
           </header>
+          <p class="admin-error" data-admin-app-error role="alert"></p>
 
           <section class="admin-view" data-admin-view="overview">
             <div class="admin-grid" data-admin-kpis></div>
             <div class="admin-card" style="margin-top:1rem;">
-              <h2 style="font-size:1rem;margin:.1rem 0 .7rem;">Recent inquiries</h2>
+              <h2 class="admin-section-title">Recent inquiries</h2>
               <div data-admin-recent></div>
             </div>
           </section>
 
           <section class="admin-view" data-admin-view="calendar" hidden>
             <div class="admin-card">
-              <h2 style="font-size:1rem;margin:.1rem 0 .7rem;">Pending reservation requests</h2>
+              <h2 class="admin-section-title">Pending reservation requests</h2>
               <div data-admin-requests></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
-              <h2 style="font-size:1rem;margin:.1rem 0 .7rem;">Upcoming appointments</h2>
+              <h2 class="admin-section-title">Upcoming appointments</h2>
               <div data-admin-appointments></div>
+            </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="leads" hidden>
+            <div class="admin-card">
+              <form class="admin-inline-form" data-admin-lead-filter>
+                <label>Status <select name="status"><option value="">All</option><option value="new">New</option><option value="contacted">Contacted</option><option value="quoted">Quoted</option><option value="converted">Converted</option><option value="lost">Lost</option><option value="archived">Archived</option></select></label>
+                <label>Search <input name="q" type="search" placeholder="Name, reference, address" /></label>
+                <button class="btn btn--secondary btn--small" type="submit">Filter</button>
+              </form>
+              <div data-admin-leads style="margin-top:1rem;"></div>
             </div>
           </section>
 
           <section class="admin-view" data-admin-view="customers" hidden>
             <div class="admin-card">
-              <form class="admin-form" data-admin-customer-search style="max-width:none;">
-                <label>Search customers <input name="q" type="search" placeholder="Name, email or phone" /></label>
-                <button class="btn btn--secondary" type="submit">Search</button>
+              <h2 class="admin-section-title">Customers</h2>
+              <form class="admin-inline-form" data-admin-customer-search>
+                <label>Search <input name="q" type="search" placeholder="Name, email or phone" /></label>
+                <button class="btn btn--secondary btn--small" type="submit">Search</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-customer-new>New customer</button>
               </form>
               <div data-admin-customers style="margin-top:1rem;"></div>
               <div class="admin-detail" data-admin-customer-detail hidden></div>
             </div>
           </section>
 
-          <section class="admin-view" data-admin-view="gift" hidden>
+          <section class="admin-view" data-admin-view="recurring" hidden>
             <div class="admin-card">
-              <h2 style="font-size:1.1rem;margin:.1rem 0 .5rem;">Gift certificates</h2>
-              <p class="admin-muted">The existing production gift register remains available.</p>
-              <p style="margin-top:1rem;"><a class="btn btn--primary" href="/gift-admin/">Open Gift Register</a></p>
+              <h2 class="admin-section-title">Recurring cleaning plans</h2>
+              <div data-admin-recurring></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Create a recurring plan</h2>
+              <form class="admin-form" data-admin-recurring-create>
+                <label>Customer <select name="customerId" data-admin-customer-options required></select></label>
+                <label>Property <select name="propertyId" data-admin-property-options required></select></label>
+                <label>Frequency <select name="frequency"><option value="biweekly">Every two weeks</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+                <label>First visit date <input name="startDate" type="date" required /></label>
+                <label>Ongoing price per visit (USD) <input name="ongoingPrice" type="number" min="0" step="0.01" required /></label>
+                <button class="btn btn--primary" type="submit">Create Plan</button>
+              </form>
             </div>
           </section>
 
-          <section class="admin-view" data-admin-view="recurring" hidden><div class="admin-card admin-empty">Recurring-plan administration is not connected yet.</div></section>
-          <section class="admin-view" data-admin-view="jobs" hidden><div class="admin-card admin-empty">Job and team administration is not connected yet.</div></section>
-          <section class="admin-view" data-admin-view="finance" hidden><div class="admin-card admin-empty">Invoice and payment administration is not connected yet.</div></section>
-          <section class="admin-view" data-admin-view="reports" hidden><div class="admin-card admin-empty">Operational reports are not connected yet.</div></section>
-          <section class="admin-view" data-admin-view="settings" hidden><div class="admin-card admin-empty">Settings and audit viewer are not connected yet.</div></section>
+          <section class="admin-view" data-admin-view="jobs" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Jobs</h2>
+              <div data-admin-jobs></div>
+              <div data-admin-checklist style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Team</h2>
+              <div data-admin-team></div>
+              <form class="admin-inline-form" data-admin-team-create style="margin-top:1rem;">
+                <label>Name <input name="displayName" required /></label>
+                <label>Email <input name="email" type="email" /></label>
+                <button class="btn btn--secondary btn--small" type="submit">Add team member</button>
+              </form>
+            </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="finance" hidden>
+            <div class="admin-grid" data-admin-finance-summary></div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Invoices</h2>
+              <div data-admin-invoices></div>
+              <div data-admin-invoice-detail style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Create an invoice</h2>
+              <form class="admin-form" data-admin-invoice-create>
+                <label>Customer <select name="customerId" data-admin-customer-options required></select></label>
+                <label>Description <input name="description" required /></label>
+                <label>Amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label>
+                <label>Due date <input name="dueDate" type="date" required /></label>
+                <button class="btn btn--primary" type="submit">Create Invoice</button>
+              </form>
+            </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="gift" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Gift certificates</h2>
+              <div data-admin-gifts></div>
+              <p style="margin-top:1rem;"><a class="btn btn--secondary" href="/gift-admin/">Open Gift Register for Adjustments</a></p>
+              <p class="admin-muted">The existing production register remains authoritative for redemption, refund and void actions.</p>
+            </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="reports" hidden>
+            <div data-admin-reports></div>
+          </section>
+
+          <section class="admin-view" data-admin-view="settings" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Your security</h2>
+              <div data-admin-mfa-status></div>
+              <div data-admin-mfa-setup style="margin-top:1rem;"></div>
+              <button class="btn btn--ghost btn--small" type="button" data-admin-revoke-others>Sign out other sessions</button>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Administrators</h2>
+              <div data-admin-admins></div>
+              <form class="admin-form" data-admin-invite-create style="max-width:none;margin-top:1rem;">
+                <label>Email <input name="email" type="email" required /></label>
+                <label>Role <select name="role"><option value="manager">Manager</option><option value="finance">Finance</option><option value="cleaner">Cleaner</option></select></label>
+                <label>Branch <select name="branchId"><option value="">All branches</option><option value="branch_pensacola">Pensacola</option></select></label>
+                <button class="btn btn--primary btn--small" type="submit">Create invitation</button>
+              </form>
+              <div data-admin-invite-result style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Sessions</h2>
+              <div data-admin-sessions></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Audit history</h2>
+              <div data-admin-audit></div>
+            </div>
+          </section>
         </div>
       </div>
     </main>

@@ -705,12 +705,17 @@ export async function onRequestPost(context: {
     }
   }
 
-  const persistedLead = await persistLeadSubmission(env.DB ?? null, clean).catch((error) => {
-    console.error('[lead] admin_persist_failed', {
-      name: error instanceof Error ? error.name : 'unknown',
-    });
-    return null;
-  });
+  let persistedLead: Awaited<ReturnType<typeof persistLeadSubmission>> = null;
+  if (env.DB) {
+    try {
+      persistedLead = await persistLeadSubmission(env.DB, clean);
+    } catch (error) {
+      console.error('[lead] admin_persist_failed', {
+        name: error instanceof Error ? error.name : 'unknown',
+      });
+      return json({ ok: false, error: 'request_storage_failed' }, 503);
+    }
+  }
   const notification = buildLeadNotification(clean);
   const attachmentRequestId = (clean.quote_reference || (photoRequestRef ? `PHOTO-${photoRequestRef}` : 'request')).trim();
   if (verifiedPhotos.length > 0 && env.PHOTO_OWNER_TOKEN) {
@@ -843,7 +848,7 @@ export async function onRequestPost(context: {
       });
       const data = (await response.json().catch(() => ({}))) as { success?: boolean };
       if (!response.ok || data.success !== true) {
-        await updateLeadDelivery(env.DB ?? null, persistedLead?.leadId ?? null, 'failed');
+        await updateLeadDelivery(env.DB ?? null, persistedLead?.leadId ?? null, 'failed', 'provider_failed');
         return json({ ok: false, error: 'provider_failed' }, 502);
       }
       ownerDelivered = true;
@@ -853,9 +858,10 @@ export async function onRequestPost(context: {
   }
 
   if (!ownerDelivered) {
-    await updateLeadDelivery(env.DB ?? null, persistedLead?.leadId ?? null, 'failed');
+    await updateLeadDelivery(env.DB ?? null, persistedLead?.leadId ?? null, 'failed', 'provider_failed');
     return json({ ok: false, error: 'provider_failed' }, 502);
   }
+  await updateLeadDelivery(env.DB ?? null, persistedLead?.leadId ?? null, 'sent');
 
   // The owner notification was accepted (not necessarily inbox-delivered).
   // The customer confirmation is a best-effort second path; its failure never
