@@ -35,8 +35,13 @@ cross-company infrastructure is explicitly out of scope.
 ```powershell
 npx wrangler d1 migrations apply sparkling-standard-local --local --config wrangler.local.toml
 npm run build
+Copy-Item wrangler.local.toml wrangler.toml
 npx wrangler pages dev dist --port 8790 --binding ADMIN_SETUP_CODE=<local-setup-code>
+Remove-Item wrangler.toml
 ```
+
+`wrangler pages dev` reads only `wrangler.toml`; the temporary copy is local-only and must be
+removed afterward. The D1 CLI commands accept `--config wrangler.local.toml` directly.
 
 `wrangler.local.toml` deliberately uses the placeholder UUID
 `00000000-0000-0000-0000-000000000000`; keep it. Local state lives under the git-ignored
