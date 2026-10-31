@@ -523,7 +523,7 @@ export function initBookingCalendar(
       button.type = 'button';
       button.className = 'booking-calendar__day';
       button.dataset.date = dateKey;
-      button.innerHTML = '<span class="booking-calendar__day-number">' + day + '</span><span class="booking-calendar__day-windows" aria-hidden="true"><span class="booking-calendar__window ' + windowClass(availability.morning) + '">' + availability.morning + '</span><span class="booking-calendar__window ' + windowClass(availability.afternoon) + '">' + availability.afternoon + '</span></span>';
+      button.innerHTML = '<span class="booking-calendar__day-number">' + day + '</span><span class="booking-calendar__day-windows" aria-hidden="true"><span class="booking-calendar__window ' + windowClass(availability.morning) + '"></span><span class="booking-calendar__window ' + windowClass(availability.afternoon) + '"></span></span>';
       button.title = availability.title;
       button.setAttribute(
         'aria-label',

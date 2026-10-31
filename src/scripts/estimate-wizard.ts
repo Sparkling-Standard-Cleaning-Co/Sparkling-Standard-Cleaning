@@ -140,6 +140,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const liveFlags = form.querySelector<HTMLElement>('[data-estimate-flags]');
   const status = form.querySelector<HTMLElement>('[data-form-status]');
   const addressCardEl = form.querySelector<HTMLElement>('[data-address-card]');
+  const calendarGateEl = form.querySelector<HTMLElement>('[data-calendar-gate]');
+  let calendarRootEl: HTMLElement | null = null;
   const addressDetailsEl = form.querySelector<HTMLElement>('[data-address-details]');
   const streetInputEl = form.querySelector<HTMLInputElement>('#est-address');
   let addressCardRevealed = false;
@@ -157,6 +159,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   function smoothReveal(element: HTMLElement): void {
     requestAnimationFrame(() => scrollToTopOf(element));
+  }
+
+  function revealCalendarAvailability(): void {
+    if (calendarGateEl) calendarGateEl.hidden = true;
+    calendarRootEl?.classList.remove('is-awaiting-address');
+    if (calendarRootEl) scrollToTopOf(calendarRootEl);
   }
 
   function revealAddressCard(): void {
@@ -1797,6 +1805,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       });
     },
     onConfirm: () => {
+      revealCalendarAvailability();
       if (!addressVerificationPending) return;
       const exact = addressConfirmed();
       addressVerificationPending = false;
@@ -1817,8 +1826,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
   // ── Fresh start (no drafts are ever stored) ───────────────────────────────
   const calendarRoot = form.querySelector<HTMLElement>('[data-booking-calendar]');
   if (calendarRoot) {
+    calendarRootEl = calendarRoot;
+    calendarRoot.classList.add('is-awaiting-address');
     const calendar = initBookingCalendar(calendarRoot, () => {
-      if (bookingCalendar?.selection()?.timeLabel) revealAddressCard();
       bookingFinalizedKey = '';
       bookingFinalizeNote = '';
       updateAppointmentSummary();
@@ -1887,8 +1897,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
     form.reset();
     addressFinder?.reset();
     bookingCalendar?.reset();
-    if (addressCardEl) addressCardEl.hidden = true;
+    if (addressCardEl) addressCardEl.hidden = false;
     if (addressDetailsEl) addressDetailsEl.hidden = true;
+    if (calendarGateEl) calendarGateEl.hidden = false;
+    calendarRootEl?.classList.add('is-awaiting-address');
     syncRevealGroups(false);
     addressCardRevealed = false;
     addressDetailsRevealed = false;
