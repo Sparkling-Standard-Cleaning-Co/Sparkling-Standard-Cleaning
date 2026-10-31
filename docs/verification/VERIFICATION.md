@@ -1,5 +1,62 @@
 # Verification status
 
+## Verified - 2026-10-30 operations, estimator UX and employee portal release
+
+**Release:** `d36b478` on `main` (commits `674d5e4`, `56438ff`, `fa65708`, `19acb2b`, `11fbddb`,
+`d36b478`). Cloudflare Pages deployment `7276be87-29eb-43f2-91be-add286f62c05` (source `d36b478`);
+GitHub run `41147314266`. The previous checkpoint was `325e58c` / deployment
+`39007f11-3db2-4ea6-aec1-0cf47d760b1b`.
+
+**Scope:** final estimator action layout, unified consent styling, Step 3 photo enforcement,
+in-place pricing updates instead of reveal replays, complete booking request management with
+customer association and branded emails, gift-certificate administration with invoice-linked
+redemption, the employee timekeeping portal and manager tools, and a real Stripe sandbox run.
+No approved customer price, billing rate, discount, travel value or facility tier was changed.
+
+**Database:** additive migrations `0011_booking_management_and_notifications.sql` and
+`0012_employee_timekeeping.sql` were applied to production after a verified pre-migration export.
+Production reports **12 migrations**, **60 tables** (including Cloudflare internal metadata) and
+**0 foreign-key violations**.
+
+**Tests (exact final code):**
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **711 tests: 710 passed, 1 pre-existing skip, 0 failed** |
+| Browser suite | **188 passed, 0 failed** |
+| Type check | `npm run check` 0 errors/warnings/hints |
+| Build and validation | `npm run verify` passed (links, SEO, marketing/QR, GTM artifacts, checklist leaks) |
+| Smoke | `npm run smoke` passed across 21 pages |
+| Stripe sandbox | **23/23 real test-mode checks passed** (`npm run stripe:sandbox`) |
+
+**Stripe sandbox (real test API, no live money):** test customer, attached `pm_card_visa`, invoice
+finalisation and payment, invoice refund, saved-card SetupIntent and retrieval, off-session charge
+and refund, administrative Checkout link, D1 reconciliation with duplicate rejection, administrative
+refund, cash recording, webhook signature acceptance/tamper/wrong-secret rejection,
+missing-authorization rejection, disabled off-session gate and synthetic customer cleanup.
+
+**Production checks (read-only):**
+
+| Check | Result |
+| --- | --- |
+| `/employee/` and `/employee/install/` | HTTP 200, manifest present, **noindex** |
+| `/api/employee/me`, `/api/admin/timekeeping`, `/api/admin/requests`, `/api/admin/gifts` without a session | **401 rejected** |
+| `/admin/` | HTTP 200; Forgot Password and password rules present |
+| `/estimate/residential/` | HTTP 200; five conditions, no ten-hour dirt guide |
+| Public Pay Now | `enabled: true`, `mode: "live"`, all readiness checks true |
+| Google Calendar | connected, readable, `America/Chicago` |
+
+**Not verified / gated:**
+
+- Google Calendar **write** lifecycle: the owner token remains an encrypted Cloudflare secret and
+  no owner session was supplied. Reads and availability are verified; run
+  `node scripts/booking-live-test.mjs` from an owner terminal for the synthetic write test.
+- A completed real **gift Checkout** and a real Stripe-delivered gift webhook. Gift issuance,
+  activation, redemption, refund and void remain covered by the unit suite only.
+- Employee portal activation for real staff: complete one supervised clock-in/out and approve the
+  first timecard before relying on payroll totals.
+- No real-money charge or refund was performed.
+
 ## Verified - 2026-10-30 owner access, five-condition estimator and recovery release
 
 **Release:** `5525cd5` on `main` (code commits `c11a85c`, `26605b5`, `2ade072`, `af0ad1f`;

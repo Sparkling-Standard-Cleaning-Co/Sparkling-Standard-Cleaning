@@ -8,7 +8,16 @@ Last reviewed: **2026-10-30** (owner access, five-condition estimator and recove
 
 **2026-10-30 corrections — these supersede any conflicting row below:**
 
-- Production release is **`5525cd5`** (deployment `c3cb64b0-6260-423a-be2b-19cffde55fd3`).
+- Production release is **`d36b478`** (deployment `7276be87-29eb-43f2-91be-add286f62c05`).
+- The **employee portal** is live at `/employee/` (noindex) with clock/break/meal actions, GPS
+  verification, a server-enforced three-day assigned-job window and manager timekeeping tools.
+- **Booking request management** supports opening legacy requests, customer association, duplicate
+  warnings, confirm/propose/decline/reschedule/cancel and branded customer emails.
+- **Gift administration** shows the full ledger detail and supports invoice-linked partial
+  redemption. The R2 ledger remains authoritative.
+- **Stripe sandbox:** 23/23 real test-mode checks passed. No live money moved. A completed real gift
+  Checkout/webhook remains unverified.
+- The **Google Calendar write** lifecycle remains unverified (owner token not available locally).
 - Booking confirmation mode is **`auto_confirm`** with `autoConfirmAllowed: true`; only a complete
   paid booking that passes every server check confirms automatically. The older "owner approval /
   auto-confirm disabled" rows are historical.
