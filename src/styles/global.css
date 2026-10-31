@@ -7169,3 +7169,6 @@ fieldset.input--invalid {
 }
 .booking-calendar__period-status[data-state="full"] { color: var(--color-text-muted); }
 .booking-calendar__period-status[data-state="unknown"] { color: var(--color-text-muted); font-weight: var(--weight-semibold); }
+@media (max-width: 700px) {
+  .booking-calendar { margin-bottom: 5.5rem; }
+}
