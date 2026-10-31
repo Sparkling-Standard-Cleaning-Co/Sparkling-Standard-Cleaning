@@ -243,6 +243,8 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const lifecycle: Record<string, string> = {
       actionable:
         " AND r.archived_at IS NULL AND r.closed_at IS NULL AND (r.status = 'pending' OR (r.status = 'confirmed' AND (a.status IS NULL OR a.status IN ('pending','confirmed','in_progress'))))",
+      paid_pending:
+        " AND r.archived_at IS NULL AND r.closed_at IS NULL AND r.payment_status IN ('paid_awaiting_confirmation','paid_awaiting_photos') AND r.status = 'pending'",
       pending: " AND r.status = 'pending' AND r.closed_at IS NULL AND r.archived_at IS NULL",
       confirmed:
         " AND r.status = 'confirmed' AND r.closed_at IS NULL AND r.archived_at IS NULL AND a.status IN ('pending','confirmed','in_progress')",
@@ -265,6 +267,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         `SELECT r.id, r.customer_id, r.status, r.quote_reference, r.requested_date, r.start_at, r.end_at,
                 r.duration_minutes, r.payload_json, r.created_at, r.closed_at, r.closed_reason,
                 r.archived_at, r.duplicate_of_request_id, r.previous_status,
+                r.payment_status, r.payment_reference, r.payment_amount_cents, r.paid_at,
                 c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
                 a.id AS appointment_id, a.status AS appointment_status,
                 (SELECT provider_event_id FROM calendar_links cl WHERE cl.appointment_id = a.id
@@ -274,7 +277,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
          LEFT JOIN properties p ON p.id = r.property_id
          LEFT JOIN appointments a ON a.booking_request_id = r.id
          WHERE 1 = 1 ${requestScope.sql} ${lifecycleSql} ${searchSql}
-         ORDER BY r.start_at ASC, r.created_at DESC LIMIT 200`,
+         ORDER BY CASE r.payment_status WHEN 'paid_awaiting_confirmation' THEN 0 WHEN 'paid_awaiting_photos' THEN 1 ELSE 2 END, r.start_at ASC, r.created_at DESC LIMIT 200`,
       ).bind(...requestScope.bind, ...searchBind).all(),
       db.prepare(
         `SELECT a.id, a.status, a.start_at, a.end_at, a.reference, a.crew_size, a.source,

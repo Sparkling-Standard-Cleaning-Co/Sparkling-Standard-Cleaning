@@ -73,6 +73,7 @@ function migratedDb(): TestD1 {
     '0011_booking_management_and_notifications.sql',
     '0012_employee_timekeeping.sql',
     '0013_request_lifecycle.sql',
+    '0014_request_payment_status.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -348,10 +349,12 @@ import {
   addCustomerNote,
   addProperty,
   createCustomer,
+  deleteCustomer,
   getCustomer,
   listCustomers,
   listLeads,
   retryLeadNotification,
+  setCustomerStatus,
   updateCustomer,
   updateLead,
 } from '../src/lib/admin/crm.ts';
@@ -1298,4 +1301,71 @@ test('closed and archived requests stay searchable and can be reopened', async (
   const reopenedRow = db.raw.prepare('SELECT status, archived_at FROM booking_requests WHERE id = ?').get('BR-LIFE') as { status: string; archived_at: string | null };
   assert.equal(reopenedRow.status, 'pending');
   assert.equal(reopenedRow.archived_at, null);
+});
+
+test('customers archive, restore and permanently delete when no history blocks it', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'delete-owner@example.test',
+    name: 'Delete Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const actor = await readOpsActor(db, request(`ss_ops=${session.token}`));
+  assert.ok(actor);
+
+  const clean = await createCustomer(db, actor!, {
+    firstName: 'Synthetic',
+    lastName: 'Delete',
+    email: 'delete-clean@example.test',
+    phone: '8505550100',
+    addressLine1: '1 Test Lane',
+    city: 'Pensacola',
+    state: 'FL',
+    postalCode: '32503',
+  });
+  await setCustomerStatus(db, actor!, String(clean.id), 'archived');
+  assert.equal((db.raw.prepare('SELECT status FROM customers WHERE id = ?').get(clean.id) as { status: string }).status, 'archived');
+  await setCustomerStatus(db, actor!, String(clean.id), 'active');
+  await assert.rejects(
+    () => deleteCustomer(db, actor!, String(clean.id), 'no'),
+    (error: Error & { code?: string }) => error.code === 'delete_confirmation_required',
+  );
+  const outcome = await deleteCustomer(db, actor!, String(clean.id), 'DELETE');
+  assert.equal(outcome.mode, 'deleted');
+  assert.equal(db.raw.prepare('SELECT id FROM customers WHERE id = ?').get(clean.id), undefined);
+  assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM customer_contacts WHERE customer_id = ?').get(clean.id) as { n: number }).n, 0);
+  assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM properties WHERE customer_id = ?').get(clean.id) as { n: number }).n, 0);
+  assert.equal((await deleteCustomer(db, actor!, String(clean.id), 'DELETE')).mode, 'deleted');
+
+  const historicalCustomer = await createCustomer(db, actor!, {
+    firstName: 'Historical', lastName: 'Customer', email: 'delete-history@example.test',
+  });
+  db.raw.prepare(
+    `INSERT INTO booking_requests
+     (id, hold_id, customer_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+     VALUES ('BR-HISTORY', 'hold-history', ?, 'released', 'SS-HISTORY', '2026-01-02', '2026-01-02T14:00:00.000Z', '2026-01-02T16:00:00.000Z', 120, '{}')`,
+  ).run(historicalCustomer.id);
+  const anonymized = await deleteCustomer(db, actor!, String(historicalCustomer.id), 'DELETE');
+  assert.equal(anonymized.mode, 'anonymized');
+  const retained = db.raw.prepare('SELECT first_name, status FROM customers WHERE id = ?').get(historicalCustomer.id) as { first_name: string; status: string };
+  assert.equal(retained.first_name, 'Deleted');
+  assert.equal(retained.status, 'archived');
+  assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM booking_requests WHERE id = ?').get('BR-HISTORY') as { n: number }).n, 1);
+
+  const protectedCustomer = await createCustomer(db, actor!, {
+    firstName: 'Protected',
+    lastName: 'Customer',
+    email: 'delete-protected@example.test',
+  });
+  db.raw.prepare(
+    `INSERT INTO booking_requests
+     (id, hold_id, customer_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+     VALUES ('BR-DELETE', 'hold-delete', ?, 'pending', 'SS-PROTECT', '2026-12-01', '2026-12-01T14:00:00.000Z', '2026-12-01T16:00:00.000Z', 120, '{}')`,
+  ).run(protectedCustomer.id);
+  await assert.rejects(
+    () => deleteCustomer(db, actor!, String(protectedCustomer.id), 'DELETE'),
+    (error: Error & { code?: string }) => error.code === 'pending_booking_request',
+  );
+  assert.ok(db.raw.prepare('SELECT id FROM customers WHERE id = ?').get(protectedCustomer.id));
 });

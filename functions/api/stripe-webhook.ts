@@ -541,6 +541,28 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             : { status: 'pending_owner_review', reason: confirmed.reason };
         }
       }
+      if (env.DB && /^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
+        const paymentStatus =
+          booking?.status === 'confirmed'
+            ? 'paid_confirmed'
+            : checkout?.photosOutstanding === true || metadata.photos_outstanding === 'yes'
+              ? 'paid_awaiting_photos'
+              : 'paid_awaiting_confirmation';
+        await env.DB
+          .prepare(
+            `UPDATE booking_requests SET payment_status = ?, payment_reference = ?,
+               payment_amount_cents = ?, paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP),
+               updated_at = CURRENT_TIMESTAMP WHERE hold_id = ?`,
+          )
+          .bind(
+            paymentStatus,
+            String(session.payment_intent ?? session.id ?? '').slice(0, 200),
+            Number(session.amount_total) || 0,
+            holdId,
+          )
+          .run()
+          .catch(() => undefined);
+      }
       await updateCheckoutRecord(env, metadata.checkout_attempt, session, booking);
       if (booking?.status === 'confirmed') {
         metadata.booking_status = 'confirmed';

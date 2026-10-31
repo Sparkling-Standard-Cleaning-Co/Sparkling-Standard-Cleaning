@@ -4,8 +4,10 @@ import {
   addCustomerNote,
   addProperty,
   createCustomer,
+  deleteCustomer,
   getCustomer,
   listCustomers,
+  setCustomerStatus,
   updateCustomer,
   updateProperty,
 } from '../../../src/lib/admin/crm.ts';
@@ -65,6 +67,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'update_property') {
       await updateProperty(db, actor, String(body.propertyId ?? ''), body);
       return json({ ok: true });
+    }
+    if (action === 'archive' || action === 'restore') {
+      await setCustomerStatus(db, actor, customerId, action === 'archive' ? 'archived' : 'active');
+      return json({ ok: true, status: action === 'archive' ? 'archived' : 'active' });
+    }
+    if (action === 'delete') {
+      return json({ ok: true, ...(await deleteCustomer(db, actor, customerId, String(body.confirmation ?? ''))) });
     }
     if (action === 'add_note') {
       await addCustomerNote(db, actor, customerId, String(body.body ?? ''), String(body.visibility ?? 'internal'));

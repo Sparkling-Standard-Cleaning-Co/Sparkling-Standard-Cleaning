@@ -400,3 +400,89 @@ export async function retryLeadNotification(
     return { delivered: false };
   }
 }
+
+export async function setCustomerStatus(
+  db: D1Database,
+  actor: AdminActor,
+  customerId: string,
+  status: 'active' | 'archived',
+): Promise<void> {
+  const current = await getCustomer(db, actor, customerId);
+  if (!current) throw new AdminAuthError(404, 'customer_not_found');
+  await db
+    .prepare('UPDATE customers SET status = ?, archived_at = ?, updated_at = ? WHERE id = ?')
+    .bind(status, status === 'archived' ? now() : null, now(), customerId)
+    .run();
+  await audit(db, {
+    actorUserId: actor.id,
+    action: status === 'archived' ? 'customer.archived' : 'customer.restored',
+    entityType: 'customer',
+    entityId: customerId,
+  });
+}
+
+async function count(db: D1Database, sql: string, customerId: string): Promise<number> {
+  const row = await db.prepare(sql).bind(customerId).first<{ n: number }>();
+  return Number(row?.n ?? 0);
+}
+
+export async function deleteCustomer(
+  db: D1Database,
+  actor: AdminActor,
+  customerId: string,
+  confirmation: string,
+): Promise<{ mode: 'deleted' | 'anonymized' }> {
+  if (actor.role !== 'owner') throw new AdminAuthError(403, 'owner_required');
+  if (confirmation !== 'DELETE') throw new AdminAuthError(400, 'delete_confirmation_required');
+  const current = await getCustomer(db, actor, customerId);
+  if (!current) return { mode: 'deleted' };
+  const stamp = now();
+  const blockers = await Promise.all([
+    count(db, "SELECT COUNT(*) AS n FROM appointments WHERE customer_id = ? AND status IN ('pending','confirmed','in_progress')", customerId),
+    count(db, "SELECT COUNT(*) AS n FROM booking_requests WHERE customer_id = ? AND status IN ('pending','confirmed') AND archived_at IS NULL AND closed_at IS NULL", customerId),
+    count(db, "SELECT COUNT(*) AS n FROM recurring_plans WHERE customer_id = ? AND status IN ('active','paused')", customerId),
+    count(db, "SELECT COUNT(*) AS n FROM invoices WHERE customer_id = ? AND balance_cents > 0 AND status NOT IN ('paid','void')", customerId),
+    count(db, "SELECT COUNT(*) AS n FROM payments WHERE customer_id = ? AND status = 'pending'", customerId),
+    count(db, "SELECT COUNT(*) AS n FROM refunds r JOIN payments p ON p.id = r.payment_id WHERE p.customer_id = ? AND r.status = 'pending'", customerId),
+    count(db, "SELECT COUNT(*) AS n FROM gift_certificates WHERE ? IN (purchaser_customer_id, recipient_customer_id) AND status = 'active' AND balance_cents > 0", customerId),
+  ]);
+  const blockerNames = ['active_booking', 'pending_booking_request', 'active_recurring_plan', 'outstanding_invoice', 'pending_payment', 'pending_refund', 'active_gift_liability'];
+  const blocking = blockerNames.filter((_, index) => (blockers[index] ?? 0) > 0);
+  if (blocking.length > 0) throw new AdminAuthError(409, blocking[0]!);
+  const history = await Promise.all([
+    count(db, 'SELECT COUNT(*) AS n FROM appointments WHERE customer_id = ?', customerId),
+    count(db, 'SELECT COUNT(*) AS n FROM booking_requests WHERE customer_id = ?', customerId),
+    count(db, 'SELECT COUNT(*) AS n FROM invoices WHERE customer_id = ?', customerId),
+    count(db, 'SELECT COUNT(*) AS n FROM payments WHERE customer_id = ?', customerId),
+    count(db, 'SELECT COUNT(*) AS n FROM agreements WHERE customer_id = ?', customerId),
+    count(db, 'SELECT COUNT(*) AS n FROM estimates WHERE customer_id = ?', customerId),
+    count(db, 'SELECT COUNT(*) AS n FROM leads WHERE customer_id = ?', customerId),
+    count(db, 'SELECT COUNT(*) AS n FROM recurring_plans WHERE customer_id = ?', customerId),
+    count(db, 'SELECT COUNT(*) AS n FROM gift_certificates WHERE ? IN (purchaser_customer_id, recipient_customer_id)', customerId),
+  ]);
+  await db.prepare('DELETE FROM customer_contacts WHERE customer_id = ?').bind(customerId).run();
+  await db.prepare('DELETE FROM customer_notes WHERE customer_id = ?').bind(customerId).run();
+  await db.prepare('DELETE FROM customer_consents WHERE customer_id = ?').bind(customerId).run();
+  const hasHistory = history.some((value) => value > 0);
+  if (hasHistory) {
+    await db
+      .prepare("UPDATE customers SET first_name = 'Deleted', last_name = 'Customer', company_name = '', status = 'archived', notes_summary = '', do_not_contact = 1, marketing_consent = 0, archived_at = COALESCE(archived_at, ?), updated_at = ? WHERE id = ?")
+      .bind(stamp, stamp, customerId)
+      .run();
+    await db
+      .prepare("UPDATE properties SET label = 'Archived property', line1 = 'Address removed for privacy', line2 = '', city = '', state = 'FL', postal_code = '', latitude = NULL, longitude = NULL, access_notes = '', parking_notes = '', status = 'archived', updated_at = ? WHERE customer_id = ?")
+      .bind(stamp, customerId)
+      .run();
+  } else {
+    await db.prepare('DELETE FROM properties WHERE customer_id = ?').bind(customerId).run();
+    await db.prepare('DELETE FROM customers WHERE id = ?').bind(customerId).run();
+  }
+  await audit(db, {
+    actorUserId: actor.id,
+    action: hasHistory ? 'customer.anonymized' : 'customer.deleted',
+    entityType: 'customer',
+    entityId: customerId,
+    detail: hasHistory ? 'historical records retained and identifiers removed' : 'no retained history',
+  });
+  return { mode: hasHistory ? 'anonymized' : 'deleted' };
+}

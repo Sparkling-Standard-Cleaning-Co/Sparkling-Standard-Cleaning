@@ -392,17 +392,32 @@ function requestStage(request: Record<string, unknown>): string {
   return titleCase(String(request.status ?? ''));
 }
 
+function requestPayment(request: Record<string, unknown>): string {
+  const status = String(request.payment_status ?? 'unpaid');
+  const amount = Number(request.payment_amount_cents);
+  const label =
+    status === 'paid_confirmed' ? 'Paid ? confirmed'
+      : status === 'paid_awaiting_photos' ? 'Paid ? awaiting photos'
+        : status === 'paid_awaiting_confirmation' ? 'Paid ? awaiting confirmation'
+          : status === 'payment_failed' ? 'Payment incomplete / failed'
+            : status === 'refunded' || status === 'disputed' ? titleCase(status)
+              : 'Unpaid ? awaiting approval';
+  const reference = String(request.payment_reference ?? '').trim();
+  return `${label}${Number.isFinite(amount) && amount > 0 ? ` ? ${money(amount)}` : ''}${reference ? ` (${reference})` : ''}`;
+}
+
 async function loadCalendar(view = 'actionable', query = ''): Promise<void> {
   const data = await api<{ requests?: Array<Record<string, unknown>>; appointments?: Array<Record<string, unknown>> }>(
     `/api/admin/requests?view=${encodeURIComponent(view)}&q=${encodeURIComponent(query)}`,
   );
   const requests = document.querySelector<HTMLElement>('[data-admin-requests]');
   if (requests) {
-    renderTable(requests, ['Start', 'Reference', 'Customer', 'Property', 'Status', 'Action'], (data.requests ?? []).map((request) => [
+    renderTable(requests, ['Start', 'Reference', 'Customer', 'Property', 'Payment', 'Status', 'Action'], (data.requests ?? []).map((request) => [
       esc(dateTime(request.start_at)),
       esc(request.quote_reference),
       esc([request.first_name, request.last_name].filter(Boolean).join(' ') || 'Unlinked request'),
       esc(requestLocation(request)),
+      esc(requestPayment(request)),
       `<span class="admin-status">${esc(requestStage(request))}</span>`,
       `<button class="btn btn--ghost btn--small" type="button" data-admin-action="request-open" data-id="${esc(request.id)}">Open</button>`,
     ]), query ? 'No requests match this search.' : 'No requests match this view.');
@@ -567,7 +582,8 @@ async function openRequest(requestId: string): Promise<void> {
       : confirmed
         ? `<div class="admin-card" style="margin-top:1rem;">
             <h3>Confirmed appointment actions</h3>
-            <dl class="admin-definition"><dt>Appointment</dt><dd>${esc(request.appointment_reference || '—')} · ${esc(request.appointment_status || '')}</dd><dt>Calendar event</dt><dd>${esc(request.calendar_event_id || 'Not linked')}</dd></dl>
+            <dl class="admin-definition"><dt>Appointment</dt><dd>${esc(request.appointment_reference || '—')} · ${esc(request.appointment_status || '')}</dd><dt>Payment</dt><dd>${esc(requestPayment(request))}</dd>
+      <dt>Calendar event</dt><dd>${esc(request.calendar_event_id || 'Not linked')}</dd></dl>
             <details class="admin-detail-toggle"><summary>Reschedule</summary>
               <form class="admin-form" data-form="request-reschedule">
                 <input type="hidden" name="requestId" value="${esc(requestId)}" />
@@ -745,7 +761,7 @@ async function openCustomer(customerId: string): Promise<void> {
   const phone = contacts.find((contact) => contact.kind === 'phone')?.value ?? customer.phone ?? '';
   detail.hidden = false;
   detail.innerHTML = `<div class="admin-card">
-    <div class="admin-detail-head"><h2 class="admin-section-title">${esc([customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || 'Customer')}</h2><button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-create">Close</button></div>
+    <div class="admin-detail-head"><h2 class="admin-section-title">${esc([customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || 'Customer')}</h2><div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-edit">Edit Customer</button><form class="admin-inline-form" data-form="customer-archive"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="targetStatus" value="${customer.status === 'archived' ? 'active' : 'archived'}" /><button class="btn btn--ghost btn--small" type="submit">${customer.status === 'archived' ? 'Restore Archived Customer' : 'Archive Customer'}</button></form>${actor?.role === 'owner' ? `<form class="admin-inline-form" data-form="customer-delete"><input type="hidden" name="customerId" value="${esc(customerId)}" /><button class="btn btn--danger btn--small" type="submit">Delete Customer</button></form>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-create">Close</button></div></div>
     <dl class="admin-definition"><dt>Status</dt><dd>${esc(customer.status)}</dd><dt>Branch</dt><dd>${esc(customer.branch_name)}</dd><dt>Source</dt><dd>${esc(customer.source)}</dd><dt>Contacts</dt><dd>${contacts.map((contact) => `${esc(titleCase(contact.kind))}: ${esc(contact.value)}`).join('<br />') || '—'}</dd></dl>
     <h3>Properties</h3>
     ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}</strong><p>${esc([property.line1, property.city, property.state, property.postal_code].filter(Boolean).join(', '))}</p>${property.access_notes ? `<p class="admin-muted">Access: ${esc(property.access_notes)}</p>` : ''}</div>`).join('') || '<p class="admin-muted">No properties.</p>'}
@@ -753,7 +769,7 @@ async function openCustomer(customerId: string): Promise<void> {
     <h3>History</h3><div class="admin-history">${leads.length ? `<p><strong>Requests:</strong> ${leads.map((lead) => `${esc(lead.request_type)} (${esc(lead.status)})`).join(', ')}</p>` : ''}${estimates.length ? `<p><strong>Estimates:</strong> ${estimates.map((estimate) => `${esc(estimate.quote_reference)} (${money(estimate.total_cents)})`).join(', ')}</p>` : ''}${appointments.length ? `<p><strong>Appointments:</strong> ${appointments.map((appointment) => `${esc(appointment.reference)} (${esc(appointment.status)})`).join(', ')}</p>` : ''}${invoices.length ? `<p><strong>Invoices:</strong> ${invoices.map((invoice) => `${esc(invoice.number)} (${money(invoice.balance_cents)} balance)`).join(', ')}</p>` : ''}</div>
     <h3>Notes</h3>${notes.map((note) => `<div class="admin-record"><p>${esc(note.body)}</p><p class="admin-muted">${esc(dateTime(note.created_at))}</p></div>`).join('') || '<p class="admin-muted">No notes.</p>'}
     <form class="admin-form" data-form="note-add" style="max-width:none;"><input type="hidden" name="customerId" value="${esc(customerId)}" /><label>Add note <textarea name="body" rows="3" required></textarea></label><button class="btn btn--secondary btn--small" type="submit">Add note</button></form>
-    <details class="admin-detail-toggle"><summary>Edit customer</summary>${customerForm({ ...customer, email, phone })}</details>
+    <details class="admin-detail-toggle" data-customer-edit><summary>Edit customer</summary>${customerForm({ ...customer, email, phone })}</details>
   </div>`;
   if (!can('customer.write')) {
     for (const form of detail.querySelectorAll<HTMLElement>('[data-form]')) form.hidden = true;
@@ -1449,6 +1465,30 @@ document.addEventListener('submit', (event) => {
       city: value('city'), state: value('state'), postalCode: value('postalCode'),
     });
   }
+  if (kind === 'customer-archive') {
+    const customerId = value('customerId');
+    const targetStatus = value('targetStatus') === 'active' ? 'active' : 'archived';
+    void api('/api/admin/customers', {
+      method: 'POST',
+      body: JSON.stringify({ action: targetStatus === 'active' ? 'restore' : 'archive', customerId }),
+    }).then(() => openCustomer(customerId)).catch((error) => setAppError(friendly(error)));
+  }
+  if (kind === 'customer-delete') {
+    const customerId = value('customerId');
+    const confirmation = window.prompt('Type DELETE to permanently delete this customer. Records with financial or booking history will be anonymized instead.');
+    if (confirmation === 'DELETE') {
+      void api<Record<string, unknown>>('/api/admin/customers', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'delete', customerId, confirmation: 'DELETE' }),
+      }).then((result) => {
+        const mode = String(result.mode ?? 'deleted');
+        const detail = document.querySelector<HTMLElement>('[data-admin-customer-detail]');
+        if (detail) { detail.hidden = true; detail.innerHTML = ''; }
+        window.alert(mode === 'anonymized' ? 'Customer identifiers removed. Retained financial and audit history was anonymized.' : 'Customer permanently deleted.');
+        return loadCustomers();
+      }).catch((error) => setAppError(friendly(error)));
+    }
+  }
   if (kind === 'property-add') void action('/api/admin/customers', { action: 'add_property', customerId: value('customerId'), label: value('label'), line1: value('line1'), city: value('city'), state: value('state'), postalCode: value('postalCode'), accessNotes: value('accessNotes') });
   if (kind === 'note-add') void action('/api/admin/customers', { action: 'add_note', customerId: value('customerId'), body: value('body') });
   if (kind === 'payment') void action('/api/admin/finance', { action: 'record_payment', invoiceId: value('invoiceId'), provider: value('provider'), amount: value('amount'), reference: value('reference'), idempotencyKey: value('idempotencyKey') });
@@ -1701,6 +1741,7 @@ document.addEventListener('click', (event) => {
     void action('/api/admin/timekeeping', { action: 'review_correction', correctionId: id, approve: target.dataset.approve === 'yes' });
   }
   if (actionName === 'request-open') void openRequest(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'customer-edit') { document.querySelector<HTMLDetailsElement>('[data-customer-edit]')?.setAttribute('open', ''); }
   if (actionName === 'request-close') { const detail = document.querySelector<HTMLElement>('[data-admin-request-detail]'); if (detail) { detail.hidden = true; detail.innerHTML = ''; } }
   if (actionName === 'customer-open') void openCustomer(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'customer-create') renderCustomerCreate();
