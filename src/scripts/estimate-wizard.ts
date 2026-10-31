@@ -145,13 +145,18 @@ function initEstimateWizard(form: HTMLFormElement): void {
   let addressCardRevealed = false;
   let addressDetailsRevealed = false;
 
-  function smoothReveal(element: HTMLElement): void {
-    requestAnimationFrame(() => {
-      element.scrollIntoView({
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-        block: 'center',
-      });
+  function scrollToTopOf(element: HTMLElement): void {
+    const header = document.querySelector<HTMLElement>('.site-header, header');
+    const offset = (header?.getBoundingClientRect().height ?? 72) + 16;
+    const top = Math.max(0, element.getBoundingClientRect().top + window.scrollY - offset);
+    window.scrollTo({
+      top,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
     });
+  }
+
+  function smoothReveal(element: HTMLElement): void {
+    requestAnimationFrame(() => scrollToTopOf(element));
   }
 
   function revealAddressCard(): void {
@@ -191,9 +196,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
       group.hidden = !visible;
       if (visible && wasHidden) {
         revealed += 1;
-        if (scroll) smoothReveal(group);
+        if (scroll && !suppressRevealScroll) smoothReveal(group);
       }
     }
+    suppressRevealScroll = false;
     return revealed;
   }
 
@@ -236,6 +242,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
   });
   let deepNoticeShown = false;
+  let suppressRevealScroll = false;
   let photosDeferred = false;
   let pendingPhotoAction: 'reserve' | 'pay_now' = 'pay_now';
   let pendingPhotoStage: 'step3' | 'final' = 'final';
@@ -1657,14 +1664,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     if (deepRequired && !deepNoticeShown) {
       deepNoticeShown = true;
+      suppressRevealScroll = true;
       requestAnimationFrame(() => {
         const notice = form.querySelector<HTMLElement>('[data-recurring-deep]');
-        if (notice) {
-          window.scrollTo({
-            top: notice.getBoundingClientRect().top + window.scrollY - 96,
-            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-          });
-        }
+        if (notice) scrollToTopOf(notice);
       });
     } else if (!deepRequired) {
       deepNoticeShown = false;

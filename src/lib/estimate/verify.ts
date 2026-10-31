@@ -263,20 +263,20 @@ export async function resolveServerDestination(
   const state = (fields.address_state ?? '').trim();
   const zip = (fields.zip ?? '').trim();
 
+  // A customer-confirmed property pin is the destination they chose. Prefer
+  // it over a street-level geocode so the route and recomputed price match
+  // the pin; the quote remains preliminary and the address is verified later.
+  if (isConfirmedPropertyPin(fields)) {
+    const pin = parseSubmittedPin(fields);
+    if (pin) return { lat: pin.lat, lng: pin.lng, source: 'customer_pin' };
+  }
+
   if (street.length >= 5) {
     const line1 = unit ? `${street} ${unit}` : street;
     const region = [city, state].filter(Boolean).join(', ');
     const queryParts = [line1, region, zip].filter(Boolean);
     const resolved = await resolveAddress(env, queryParts.join(', ')).catch(() => null);
     if (resolved) return { lat: resolved.lat, lng: resolved.lng, source: 'address_geocode' };
-  }
-
-  // A customer-confirmed property pin (manual numbered address whose exact
-  // geocode failed) is the next-best real destination. It is routed and
-  // quoted, but never presented as a geocoded exact-address match.
-  if (isConfirmedPropertyPin(fields)) {
-    const pin = parseSubmittedPin(fields);
-    if (pin) return { lat: pin.lat, lng: pin.lng, source: 'customer_pin' };
   }
 
   // GPS-confirmed pin wins over the ZIP centroid: it is the actual confirmed

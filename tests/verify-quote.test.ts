@@ -674,3 +674,26 @@ test('a customer-confirmed property pin is routed without claiming a geocoded ad
   assert.equal(verification.status, 'preliminary');
   assert.doesNotMatch(verification.note, /verified street address/i);
 });
+
+
+test('a confirmed property pin wins over a street-level geocode for routing', async () => {
+  const confirmedFields = fields({
+    address_method: 'manual',
+    address_confirmed: 'yes',
+    service_address: '12345 Rural Lane',
+    address_city: 'Pensacola',
+    address_state: 'FL',
+    zip: '32502',
+    pin_latitude: '30.719000',
+    pin_longitude: '-87.442800',
+    pin_precision: 'pin',
+    pin_adjusted: 'yes',
+    quoted_price: String(browserPrice()),
+  });
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(confirmedFields, routedEnv, Date.UTC(2026, 9, 1, 12, 0, 0)),
+  );
+  assert.equal(verification.travel.destinationSource, 'customer_pin');
+  assert.equal(verification.pinCheck, 'ok');
+  assert.equal(verification.destinationPrecise, false);
+});

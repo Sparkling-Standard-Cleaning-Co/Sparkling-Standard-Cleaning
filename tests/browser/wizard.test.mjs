@@ -148,6 +148,17 @@ test('a new recurring residential request requires the Deep Cleaning acknowledgm
 
     const notice = page.locator('[data-recurring-deep]');
     assert.equal(await notice.isVisible(), true, 'policy notice appears for recurring frequency');
+    await page.waitForTimeout(900);
+    const placement = await page.evaluate(() => {
+      const box = document.querySelector('[data-recurring-deep]');
+      const header = document.querySelector('header');
+      return {
+        top: box ? box.getBoundingClientRect().top : -1,
+        header: header ? header.getBoundingClientRect().height : 0,
+      };
+    });
+    assert.ok(placement.top >= placement.header - 2, 'Deep Cleaning heading is below the sticky header');
+    assert.ok(placement.top <= placement.header + 140, 'Deep Cleaning box is scrolled to its top, not the middle');
     const ack = page.locator('input[name="initialDeepCleanAcknowledged"]');
     assert.equal(await ack.isVisible(), true, 'acknowledgment is visible');
     assert.notEqual(await ack.getAttribute('required'), null, 'acknowledgment is required');
