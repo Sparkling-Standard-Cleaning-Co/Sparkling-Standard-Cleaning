@@ -661,7 +661,8 @@ async function verifyResidentialPayment(
     (verification.travel.destinationSource === 'address_geocode' ||
       (confirmedPropertyPin && verification.travel.destinationSource === 'customer_pin')) &&
     verification.travel.durationMinutes !== null &&
-    verification.travel.durationMinutes > 0 &&
+    (verification.travel.durationMinutes > 0 ||
+      (verification.travel.durationMinutes === 0 && verification.travel.oneWayMiles === 0)) &&
     verification.pinCheck === 'ok' &&
     verification.configMatch === 'match';
   if (!structurallyVerified) return { ok: false, reason: 'quote_not_verified' };
