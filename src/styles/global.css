@@ -7151,3 +7151,10 @@ fieldset.input--invalid {
   .booking-calendar__day-windows { width: 78%; gap: 3px; }
   .booking-calendar__window { height: 6px; min-height: 6px; }
 }
+@media (max-width: 480px) {
+  .booking-calendar__weekdays { font-size: .5rem; gap: .18rem; letter-spacing: 0; }
+  .booking-calendar__weekdays span { min-width: 0; text-align: center; }
+  .booking-calendar__month-label { font-size: var(--text-base); }
+  .booking-calendar__month-head { margin-bottom: var(--space-2); }
+  .booking-calendar__day { min-height: 3rem; }
+}
