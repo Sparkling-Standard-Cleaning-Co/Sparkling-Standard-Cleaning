@@ -84,12 +84,15 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release:** **`d36b478`** is live (Cloudflare Pages deployment
-  `7276be87-29eb-43f2-91be-add286f62c05`; GitHub run `41147314266`; `validate`, `browser` and the
+- **Current release:** **`69d5702`** is live (Cloudflare Pages deployment
+  `00f1be41-0664-4b0c-a414-be01e2b71954`; GitHub run `41159074048`; `validate`, `browser` and the
   Cloudflare Pages check passed). It deploys:
   - the final estimator action area (no Back on the last step, Pay Now then Pay Later stacked
     full-width), unified compact consent checkbox rows, in-place price updates without replaying the
-    reveal, and **at least one successfully uploaded Step 3 photo** before continuing;
+    reveal, and an optional Step 3 photo choice (Add Photos Now / I'll Add Them Later);
+  - **SPARKLE15** (15% off the eligible first recurring visit, capped at $100; legacy SPARKLE100
+    claims honored) and a server-recognized **customer-confirmed property pin** for Pay Now after a
+    failed exact geocode, with the address still verified personally;
   - complete booking request management: open any request, link/create a verified customer, flag
     possible duplicates, confirm/propose/decline/reschedule/cancel, branded customer emails with
     per-request delivery history and a seven-day board;
@@ -553,12 +556,11 @@ collections are intentionally empty — not errors.
   ten-level dirt guide remains only as a backward-compatible parser for historical records
   (`src/lib/estimate/dirt-levels.ts`); it is not rendered to customers, and new submissions
   send the five-condition value directly. Photos are
-  collected in Condition & Frequency; they are required before booking confirmation, but the
-  customer may pay now and confirm later. The Community Support discount is one small eligibility
+  collected in Condition & Frequency; they are optional, with Add Photos Now / I'll Add Them Later
+  and a pending-photo status when deferred. The Community Support discount is one small eligibility
   checkbox linked to the Terms, immediately above the simplified Terms/Privacy acceptance. The
-  final step has one green **Pay Now and Reserve This Cleaning** action and one smaller
-  **Request to Reserve This Cleaning (Pay Later)** action; no duplicate pay button remains in the
-  form. Extras and six bundles sit in a collapsed **Bundle and Save With These Add-Ons**
+  final step has no Back control and two full-width stacked actions: green **Pay Now and Reserve This
+  Cleaning** above **Request to Reserve This Cleaning (Pay Later)**; no duplicate pay button remains. Extras and six bundles sit in a collapsed **Bundle and Save With These Add-Ons**
   accordion; the customer's selections, appointment and location sit below the price breakdown in
   a separate collapsed **Your Cleaning Details** accordion. Both corrections are live in 042f83;
   the final price is one vertical reconciled
@@ -593,7 +595,7 @@ collections are intentionally empty — not errors.
   price the customer submits and the server verifies), with the ongoing per-visit rhythm shown
   alongside (`EstimateResult.ongoing`, wizard live panel/summary, `first_visit_total` /
   `ongoing_price_per_visit` / `ongoing_frequency` submission fields, server-owned in the lead
-  relay). The SPARKLE100 campaign discounts ONLY the first visit and only when the customer's
+  relay). The SPARKLE15 campaign discounts ONLY the first visit and only when the customer's
   arrangement is weekly, biweekly or monthly (`campaignArrangement` in
   `src/lib/estimate/promotions.ts`); the ongoing rhythm is never discounted.
 - **Homepage refinement (2026-10-23):** the homepage hero carries a four-slide representative

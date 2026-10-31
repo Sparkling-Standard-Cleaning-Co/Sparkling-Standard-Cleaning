@@ -51,11 +51,23 @@ dirt guide remains only as a backward-compatible parser for historical quotes
 and server records in `src/lib/estimate/dirt-levels.ts`; it is not rendered to
 customers, and new submissions send the five-condition value directly.
 
-**Owner corrections (2026-10-29):** photos are collected in **Condition &
-Frequency** and are required before booking confirmation. The customer may
-continue without them; Pay Now then offers **Upload Photos Now** or **Pay Now,
-Confirm Later**. Payment with photos outstanding is recorded honestly and the
-payment-status page does not claim the booking is confirmed. The former large
+**Address/payment (2026-10-30):** when a provider returns only a street, the
+typed house number is preserved. The engine still attempts an exact geocode;
+if that fails, the customer can position and confirm the property pin. A
+customer-confirmed pin (`precision: 'pin'`) is routed live and may use Pay Now,
+but the quote stays preliminary and the exact street address is verified
+personally - it is never presented as a geocoded exact match. A genuine failure
+shows **Verify Address to Pay Online** instead of hiding payment silently.
+
+**Owner corrections (2026-10-30):** photos are collected in **Condition &
+Frequency** and are optional. Continuing without photos opens a compact
+**Photos of Your Space** choice: **Add Photos Now** or **I'll Add Them Later**.
+Later is remembered, so the customer is not interrupted again; Pay Now then
+records a pending-photo status and never claims the booking is confirmed.
+The final step has no Back control and stacks full-width Pay Now above Pay
+Later. The add-on accordion now sits below **Your Cleaning Details**; the
+large green preliminary-price box was replaced by a concise muted disclosure.
+The former large
 Community Support panel is now one small eligibility checkbox linked to
 `/terms/#community-support`; the discount calculation is unchanged. The
 residential time list is the compact First/Afternoon hour-and-minute picker.

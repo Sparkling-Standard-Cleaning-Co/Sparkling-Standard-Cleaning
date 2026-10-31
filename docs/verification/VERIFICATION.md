@@ -1,5 +1,34 @@
 # Verification status
 
+## Verified - 2026-10-31 owner approval, address payment and estimator UX fixes
+
+**Release:** `69d5702` on `main`; Cloudflare Pages deployment
+`00f1be41-0664-4b0c-a414-be01e2b71954`; GitHub run `41159074048` (validate and browser passed).
+
+- **SPARKLE15:** 15% off the eligible first recurring visit, capped at $100; excludes travel, tax
+  and extras; no stacking; minimum-job protection. Legacy SPARKLE100 claims keep their original
+  $100 fixed terms. Client, server verification, checkout and receipt use the same engine.
+- **Confirmed property pin:** a numbered manual address whose exact geocode fails may be positioned
+  and confirmed by the customer. The server independently checks the complete fields, coverage,
+  coordinates, live route and recomputed total; the quote stays preliminary and never claims a
+  geocoded exact match. Pay Now is available; a genuine failure shows **Verify Address to Pay
+  Online**.
+- **Photos:** Step 3 is optional. The compact modal offers Add Photos Now or I'll Add Them Later;
+  deferral is remembered and Pay Now records a pending-photo status.
+- **Mobile:** final step has no Back; Pay Now stacks above full-width Pay Later at 320?430px.
+- **Content:** recurring selection scrolls to the top of the Deep Cleaning notice; the large green
+  preliminary box is now a concise muted disclosure; the add-on accordion sits below Your Cleaning
+  Details.
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **714 tests: 713 passed, 1 pre-existing skip, 0 failed** |
+| Browser suite | **189 passed, 0 failed** |
+| Type check | `npm run check` 0 errors/warnings/hints |
+| Build and validation | `npm run verify` passed |
+| Smoke | `npm run smoke` passed across 21 pages |
+| Production | home popup shows the 15% offer; Terms show SPARKLE15; estimator still five conditions |
+
 ## Verified - 2026-10-30 operations, estimator UX and employee portal release
 
 **Release:** `d36b478` on `main` (commits `674d5e4`, `56438ff`, `fa65708`, `19acb2b`, `11fbddb`,
