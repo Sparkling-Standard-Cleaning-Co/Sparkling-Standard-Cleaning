@@ -69,6 +69,7 @@ const { id = 'estimate-calendar' } = Astro.props;
         <span class="booking-calendar__legend-key"><span class="booking-calendar__window is-open"></span> Available</span>
         <span class="booking-calendar__legend-key"><span class="booking-calendar__window is-full"></span> Unavailable</span>
       </div>
+      <button class="btn btn--ghost btn--small" type="button" data-calendar-retry hidden>Retry availability</button>
       <p class="booking-calendar__hint small" data-calendar-date-note>
         Past dates are unavailable. Requests can be made up to {bookingConfig.maxAdvanceDays} days
         ahead.

@@ -149,6 +149,7 @@ export function initBookingCalendar(
   const meridiemEl = root.querySelector<HTMLElement>('[data-time-meridiem]');
   const selectedLabel = root.querySelector<HTMLElement>('[data-calendar-selected-label]');
   const statusEl = root.querySelector<HTMLElement>('[data-calendar-status]');
+  const retryButton = root.querySelector<HTMLButtonElement>('[data-calendar-retry]');
   const timeNote = root.querySelector<HTMLElement>('[data-calendar-time-note]');
   const dateInput = root.querySelector<HTMLInputElement>('[data-calendar-date-input]');
   const timeInput = root.querySelector<HTMLInputElement>('[data-calendar-time-input]');
@@ -215,7 +216,13 @@ export function initBookingCalendar(
 
   function setPeriod(period: Period): void {
     selectedPeriod = period;
-    for (const button of periodButtons) {
+    retryButton?.addEventListener('click', () => {
+    if (retryButton) retryButton.hidden = true;
+    void loadMonthAvailability(true);
+    if (selectedDate) void refreshTimes();
+  });
+
+  for (const button of periodButtons) {
       const pressed = button.dataset.period === period;
       button.setAttribute('aria-pressed', String(pressed));
       button.classList.toggle('is-selected', pressed);
@@ -480,12 +487,14 @@ export function initBookingCalendar(
       monthCache.set(key, { at: Date.now(), days });
       monthDays = new Map(days.map((day) => [day.date, day]));
       monthState = 'ready';
+      if (retryButton) retryButton.hidden = true;
       renderCalendar();
     } catch {
       if (seq !== monthSeq) return;
       monthState = 'error';
       monthDays.clear();
       renderCalendar();
+      if (retryButton) retryButton.hidden = false;
     }
   }
 
