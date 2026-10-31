@@ -317,6 +317,15 @@ export function initBookingCalendar(
       const available = periodMinutes(period).some(timeIsEnabled);
       button.disabled = liveAvailability && !available;
       button.classList.toggle('is-unavailable', liveAvailability && !available);
+      const status = button.querySelector<HTMLElement>('[data-period-status]');
+      if (status) {
+        status.textContent = !liveAvailability
+          ? 'Check availability'
+          : available
+            ? 'Available'
+            : 'Fully booked';
+        status.dataset.state = !liveAvailability ? 'unknown' : available ? 'open' : 'full';
+      }
     }
     if (selectedPeriod && liveAvailability) {
       const stillAvailable = periodMinutes(selectedPeriod).some(timeIsEnabled);
