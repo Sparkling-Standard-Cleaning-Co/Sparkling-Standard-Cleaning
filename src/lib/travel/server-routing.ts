@@ -87,8 +87,8 @@ export async function resolveRoute(
       };
       const route = data.routes?.[0];
       const meters = route?.distance;
-      const seconds = typeof route?.duration === 'number' && route.duration > 0 ? route.duration : null;
-      if (response.ok && typeof meters === 'number' && meters > 0) {
+      const seconds = typeof route?.duration === 'number' && route.duration >= 0 ? route.duration : null;
+      if (response.ok && typeof meters === 'number' && meters >= 0) {
         return {
           oneWayMiles: meters / 1609.344,
           durationMinutes: seconds !== null ? seconds / 60 : null,
