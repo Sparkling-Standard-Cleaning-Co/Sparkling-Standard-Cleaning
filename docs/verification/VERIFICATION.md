@@ -1,5 +1,12 @@
 # Verification status
 
+## Owner-verified - 2026-10-31 Google Calendar writes
+
+The owner confirmed that production Google Calendar appointment creation and
+cancellation/deletion work correctly through the admin panel. These calendar
+write paths are **OWNER-VERIFIED**; no additional synthetic production
+appointments were created for retesting.
+
 ## Verified - 2026-10-31 owner approval, address payment and estimator UX fixes
 
 **Release:** `69d5702` on `main`; Cloudflare Pages deployment
