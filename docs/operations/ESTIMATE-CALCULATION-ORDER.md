@@ -10,8 +10,10 @@ recalculation, the owner notification and the customer receipt.
    optional-extra charges receive the owner-approved 15% reduction exactly once; STR, commercial
    and church extras do not.
 2. **Base service** - max(minimumJob, labor value + reduced extras) is calculated.
-3. **Base presentation rounding** — the service base is rounded DOWN to the owner-approved $5 step
-   (`pricing.rounding.toNearest`). This is the displayed base before any discount.
+3. **No early presentation rounding** — the original service base stays unrounded while the
+   promotion engine evaluates eligibility, caps and the single-discount policy. Percentage discounts
+   apply to the correct pre-discount eligible subtotal; travel, tax and excluded extras are not
+   silently discounted.
 4. **One discount only** — the promotion engine and the Community Support eligibility discount are
    evaluated together. The **largest effective discount wins**; ties favor Community Support, then
    the claimed campaign, then other programs. No stacking. The owner-approved add-on bundles
@@ -24,10 +26,10 @@ recalculation, the owner notification and the customer receipt.
    is unchanged; it never multiplies travel or tax. The four engines have
    independent factors and never share or stack a global multiplier.
 6. **Travel** — the separately calculated travel adjustment is added. It is never discounted.
-7. **Final amount** — rounded to cents. There is no upward round-up and no reapplied minimum after
-   an explicit discount or engine calibration factor; the benefit is preserved exactly.
-8. **Tax** — presented separately as a disclosure (see `TAX-TREATMENT.md`). No tax amount is
-   invented.
+7. **Final pre-tax rounding** - after discounts, calibration and travel are applied, the final
+   pre-tax customer total is rounded DOWN exactly once to the owner-approved  step. Travel keeps
+   its calculated value and the negative rounding adjustment reconciles the difference. No line item
+   is rounded repeatedly and no minimum is silently reapplied after a valid discount.
 9. **Recurring** - a new recurring arrangement prices its required first Deep Cleaning under this
    order; the ongoing per-visit rhythm is computed by the same engine and shown separately. The
    ongoing rhythm uses maintained/within-month condition assumptions so the initial buildup
