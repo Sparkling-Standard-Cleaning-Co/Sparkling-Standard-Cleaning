@@ -15,11 +15,13 @@ import type { EstimateInput } from '../src/lib/estimate/types.ts';
 import type { CampaignPromotionConfig } from '../src/config/estimators/pricing-values.ts';
 
 const campaignConfig: CampaignPromotionConfig = {
-  code: 'SPARKLE100',
+  code: 'SPARKLE15',
   enabled: true,
-  kind: 'fixed',
-  value: 100,
-  label: 'SPARKLE100 — $100 off your first clean',
+  kind: 'percent',
+  value: 15,
+  capUsd: 100,
+  label: 'SPARKLE15 — 15% off your first clean (up to $100)',
+  legacy: [{ code: 'SPARKLE100', value: 100, label: 'SPARKLE100 — $100 off your first clean' }],
   services: ['standard', 'deep'],
   frequencies: ['weekly', 'biweekly', 'monthly'],
   expiresOn: null,
@@ -364,8 +366,9 @@ test('the shipped campaign is structurally complete, claim-only and non-stackabl
   const campaign = pricing.promotions.campaign.value;
   assert.ok(campaign.code.length > 0);
   assert.equal(typeof campaign.enabled, 'boolean');
-  assert.equal(campaign.kind, 'fixed');
+  assert.ok(campaign.kind === 'fixed' || campaign.kind === 'percent');
   assert.ok(campaign.value !== null && campaign.value > 0);
+  if (campaign.kind === 'percent') assert.ok(campaign.capUsd !== null && campaign.capUsd > 0);
   assert.ok(campaign.services.length > 0);
   assert.ok(campaign.frequencies.length > 0);
   assert.equal(campaign.stackable, false);
@@ -662,4 +665,27 @@ test('every prepared program has a unique id and declared non-stackability', () 
     assert.equal(bundle.stackable, false);
   }
   assert.equal(ownerPricing.promotions.foundingTen.capacity.slots, 10);
+});
+
+
+test('SPARKLE15 is 15% off the eligible first clean, capped at $100', () => {
+  const applied = evaluatePromotions(
+    overrides({ campaign: campaignConfig, frequency: 'weekly', gross: 400, claimedCampaignCode: 'SPARKLE15' }),
+  );
+  assert.equal(applied.discount?.id, 'SPARKLE15');
+  assert.equal(applied.discount?.percent, 15);
+  assert.equal(applied.discount?.amount, 60, '$400 x 15% = $60');
+
+  const capped = evaluatePromotions(
+    overrides({ campaign: campaignConfig, frequency: 'biweekly', gross: 1000, claimedCampaignCode: 'SPARKLE15' }),
+  );
+  assert.equal(capped.discount?.amount, 100, 'the cap limits the discount to $100');
+});
+
+test('previously issued SPARKLE100 claims keep their original fixed $100 terms', () => {
+  const legacy = evaluatePromotions(
+    overrides({ campaign: campaignConfig, frequency: 'monthly', gross: 400, claimedCampaignCode: 'SPARKLE100' }),
+  );
+  assert.equal(legacy.discount?.id, 'SPARKLE100');
+  assert.equal(legacy.discount?.amount, 100);
 });

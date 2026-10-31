@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  isConfirmedPropertyPin,
   isGpsPinDestination,
   isPricedReservation,
   mapReservationFields,
@@ -635,4 +636,41 @@ test('a live route without a driving duration can never be fully verified', asyn
   assert.equal(verification.travel.durationMinutes, null);
   assert.equal(verification.status, 'preliminary');
   assert.match(verification.note, /no driving duration/i);
+});
+
+
+test('a customer-confirmed property pin is routed without claiming a geocoded address', async () => {
+  const confirmedFields = fields({
+    address_method: 'manual',
+    address_confirmed: 'yes',
+    service_address: '12345 Rural Lane',
+    address_city: 'Molino',
+    address_state: 'FL',
+    zip: '32577',
+    pin_latitude: '30.719000',
+    pin_longitude: '-87.442800',
+    pin_precision: 'pin',
+    pin_adjusted: 'yes',
+    quoted_price: String(browserPrice()),
+  });
+  assert.equal(isConfirmedPropertyPin(confirmedFields), true);
+  assert.equal(isConfirmedPropertyPin({ ...confirmedFields, pin_precision: 'street' }), false);
+
+  const stub = async (url: string | URL): Promise<Response> => {
+    const href = String(url);
+    if (href.includes('/route/v1/')) {
+      return jsonResponse({ code: 'Ok', routes: [{ distance: 24140.2, duration: 1800.5 }] });
+    }
+    // Exact geocoding fails for this rural address; the confirmed pin must win.
+    return jsonResponse({ error: 'not_found' }, 404);
+  };
+  const verification = await withFetch(stub, () =>
+    verifyReservationQuote(confirmedFields, routedEnv, Date.UTC(2026, 9, 1, 12, 0, 0)),
+  );
+  assert.equal(verification.travel.destinationSource, 'customer_pin');
+  assert.equal(verification.travel.verified, true);
+  assert.equal(verification.pinCheck, 'ok');
+  assert.equal(verification.destinationPrecise, false);
+  assert.equal(verification.status, 'preliminary');
+  assert.doesNotMatch(verification.note, /verified street address/i);
 });

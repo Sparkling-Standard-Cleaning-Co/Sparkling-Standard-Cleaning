@@ -371,7 +371,12 @@ function campaignCandidate(input: PromotionInput): PromotionCandidate | null {
   const config = input.campaign;
   if (!config || !config.enabled || !notExpired(config.expiresOn, input.todayIso)) return null;
   const claimed = (input.claimedCampaignCode ?? '').trim().toUpperCase();
-  if (!claimed || claimed !== config.code.trim().toUpperCase()) return null;
+  if (!claimed) return null;
+  const legacy = (config.legacy ?? []).find((entry) => entry.code.trim().toUpperCase() === claimed) ?? null;
+  if (!legacy && claimed !== config.code.trim().toUpperCase()) return null;
+  const terms = legacy
+    ? { kind: 'fixed' as const, value: legacy.value, capUsd: null as number | null, label: legacy.label }
+    : { kind: config.kind, value: config.value, capUsd: config.capUsd ?? null, label: config.label };
   // The required first visit of a new recurring arrangement is computed as a
   // Deep Cleaning one-time visit; campaign eligibility still follows the
   // customer's actual arrangement, never the internal computation shape.
@@ -381,19 +386,21 @@ function campaignCandidate(input: PromotionInput): PromotionCandidate | null {
   if (!config.services.includes(eligibilityServiceType)) return null;
   if (!config.frequencies.includes(eligibilityFrequency)) return null;
   const amount = effectiveAmount({
-    kind: config.kind,
-    value: config.value,
+    kind: terms.kind,
+    // Campaign percentages are stored in human form (15) and converted to the
+    // engine's fractional percent form (0.15) here.
+    value: terms.kind === 'percent' ? (Number(terms.value) || 0) / 100 : terms.value,
     base: input.gross,
-    cap: null,
+    cap: terms.capUsd,
     gross: input.gross,
     minimumJob: input.minimumJob,
   });
   if (amount <= 0) return null;
   return {
-    id: config.code,
+    id: claimed,
     source: 'campaign',
-    label: config.label,
-    percent: 0,
+    label: terms.label,
+    percent: terms.kind === 'percent' ? Number(terms.value) || 0 : 0,
     amount,
   };
 }

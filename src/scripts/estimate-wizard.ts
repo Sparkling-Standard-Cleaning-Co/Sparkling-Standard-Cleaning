@@ -114,6 +114,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const payNowButton = form.querySelector<HTMLButtonElement>('[data-pay-now]');
   const photoGate = form.querySelector<HTMLElement>('[data-photo-gate]');
   const photoGateUpload = form.querySelector<HTMLButtonElement>('[data-photo-upload-now]');
+  const photoGatePayLater = form.querySelector<HTMLButtonElement>('[data-photo-pay-later]');
   const photoSummary = form.querySelector<HTMLElement>('[data-photo-summary]');
   const photoUnavailableNotice = form.querySelector<HTMLElement>('[data-photo-unavailable]');
   const verifyAddressButton = form.querySelector<HTMLButtonElement>('[data-verify-address]');
@@ -234,6 +235,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const photoController = initPhotoUploads(form, {
     engine: () => (radioValue('serviceType') === 'str_turnover' ? 'str' : 'residential'),
   });
+  let deepNoticeShown = false;
+  let photosDeferred = false;
+  let pendingPhotoAction: 'reserve' | 'pay_now' = 'pay_now';
+  let pendingPhotoStage: 'step3' | 'final' = 'final';
 
   function photoStorageAvailable(): boolean {
     const section = form.querySelector<HTMLElement>('[data-photo-section]');
@@ -270,8 +275,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (photoGate) photoGate.hidden = true;
   }
 
-  function showPhotoGate(): void {
+  function showPhotoGate(stage: 'step3' | 'final' = 'final', action: 'reserve' | 'pay_now' = 'reserve'): void {
     if (!photoGate) return;
+    pendingPhotoStage = stage;
+    pendingPhotoAction = action;
     photoGate.hidden = false;
     updatePhotoSummary();
     photoGate.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -450,6 +457,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
       submission.street.trim().length >= 5 &&
       submission.location.precision !== 'street' &&
       submission.location.precision !== 'approximate';
+    if (submission.location?.precision === 'pin') {
+      return 'Travel is calculated to the property pin you confirmed. We will verify the exact street address before booking.';
+    }
     if (travel.mode === 'routed' && travel.verified && streetConfirmed) {
       const miles =
         travel.oneWayMiles !== null ? ` (about ${Math.round(travel.oneWayMiles)} miles one way)` : '';
@@ -759,7 +769,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     if (p.discount) {
       lines.push({
-        label: p.discount.source === 'campaign' ? 'SPARKLE100 Discount' : p.discount.label,
+        label: p.discount.source === 'campaign' ? 'SPARKLE15 Discount' : p.discount.label,
         value: `\u2212${formatUsd(Math.abs(p.discount.amount), { forceCents: true })}`,
       });
     }
@@ -867,7 +877,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
     const submission = submissionAddress();
     if (submission.street.trim().length < 5) return false;
     const precision = submission.location?.precision;
-    return submission.location !== null && precision !== 'street' && precision !== 'approximate';
+    return (
+      submission.location !== null &&
+      precision !== 'street' &&
+      precision !== 'approximate' &&
+      /\d/.test(submission.street)
+    );
   }
 
   function clientPaymentEligible(): boolean {
@@ -892,7 +907,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   function syncPaymentAvailability(hasQuote: boolean): void {
     const eligible = paymentEnabled && !paymentBlocked && hasQuote && clientPaymentEligible();
     const canOfferVerification =
-      hasQuote && paymentEnabled && !paymentBlocked && !addressConfirmed() && !addressReviewRequired;
+      hasQuote && paymentEnabled && !paymentBlocked && !addressConfirmed();
     if (giftField) giftField.hidden = !eligible;
     if (payNowButton) {
       payNowButton.hidden = !eligible;
@@ -1559,26 +1574,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
     }
 
-    if (step === 3 && photoStorageAvailable()) {
-      const photoSection = form.querySelector<HTMLElement>('[data-photo-section]');
-      const photoStatus = form.querySelector<HTMLElement>('[data-photo-status]');
-      const uploading = photoController.isUploading();
-      const missing = photoController.photoCount() === 0;
-      if (uploading || missing) {
-        const message = uploading
-          ? 'Please wait for the photo upload to finish before continuing.'
-          : 'Add at least one photo of the home before continuing. Photos help us verify the condition and keep your estimate accurate.';
-        if (photoStatus) {
-          photoStatus.textContent = message;
-          photoStatus.dataset.state = 'error';
-        }
-        if (photoSection) errors.push({ field: photoSection, message });
-      } else if (photoStatus?.dataset.state === 'error') {
-        photoStatus.textContent = '';
-        delete photoStatus.dataset.state;
-      }
-    }
-
     showErrorSummary(errors);
     if (errors.length > 0) {
       const first = errors[0];
@@ -1603,7 +1598,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
         if (field instanceof HTMLInputElement && field.type === 'radio') continue;
         if (messageFor(field)) return false;
       }
-      if (index === 3 && photoStorageAvailable() && photoController.photoCount() === 0) return false;
       if (index === 1) {
         const submission = submissionAddress();
         if (submission.method === 'gps') {
@@ -1660,6 +1654,20 @@ function initEstimateWizard(form: HTMLFormElement): void {
     const deepRequired = requiresInitialDeepClean();
     for (const wrapper of form.querySelectorAll<HTMLElement>('[data-recurring-deep]')) {
       wrapper.hidden = !deepRequired;
+    }
+    if (deepRequired && !deepNoticeShown) {
+      deepNoticeShown = true;
+      requestAnimationFrame(() => {
+        const notice = form.querySelector<HTMLElement>('[data-recurring-deep]');
+        if (notice) {
+          window.scrollTo({
+            top: notice.getBoundingClientRect().top + window.scrollY - 96,
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+          });
+        }
+      });
+    } else if (!deepRequired) {
+      deepNoticeShown = false;
     }
     const acknowledged = form.querySelector<HTMLInputElement>('input[name="initialDeepCleanAcknowledged"]');
     if (acknowledged) {
@@ -1878,6 +1886,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     addressDetailsRevealed = false;
     bookingFinalizedKey = '';
     bookingFinalizeNote = '';
+    photosDeferred = false;
     hidePhotoGate();
     clearAllErrors();
     attemptedSteps.clear();
@@ -2319,8 +2328,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
       return;
     }
     if (!validateStep(currentStep)) return;
-    if (photosOutstanding()) {
-      showPhotoGate();
+    if (photosOutstanding() && !photosDeferred) {
+      showPhotoGate('final', paymentChoice);
       return;
     }
     if (photoController.isUploading()) {
@@ -2470,6 +2479,18 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     if (syncRevealGroups(true) > 0) return;
     if (!validateStep(currentStep)) return;
+    if (currentStep === 3 && photosOutstanding() && !photosDeferred) {
+      if (photoController.isUploading()) {
+        const photoStatus = form.querySelector<HTMLElement>('[data-photo-status]');
+        if (photoStatus) {
+          photoStatus.textContent = 'Please wait for the photo upload to finish before continuing.';
+          photoStatus.dataset.state = 'info';
+        }
+        return;
+      }
+      showPhotoGate('step3');
+      return;
+    }
     const serviceType = currentServiceType();
     track('estimate_step', {
       step: currentStep,
@@ -2515,13 +2536,35 @@ function initEstimateWizard(form: HTMLFormElement): void {
     });
   }
 
+  verifyAddressButton?.addEventListener('click', () => {
+    showStep(1);
+    requestAnimationFrame(() => {
+      const finder = form.querySelector<HTMLElement>('[data-address-finder]');
+      if (finder) {
+        window.scrollTo({
+          top: finder.getBoundingClientRect().top + window.scrollY - 96,
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        });
+      }
+      form.querySelector<HTMLButtonElement>('[data-address-resolve]')?.focus();
+    });
+  });
+
   payNowButton?.addEventListener('click', () => {
-    if (photosOutstanding()) {
-      showPhotoGate();
+    if (photosOutstanding() && !photosDeferred) {
+      showPhotoGate('final', 'pay_now');
       return;
     }
     hidePhotoGate();
     void handleSubmit(undefined, 'pay_now');
+  });
+
+  photoGatePayLater?.addEventListener('click', () => {
+    photosDeferred = true;
+    hidePhotoGate();
+    updatePhotoSummary();
+    if (pendingPhotoStage === 'step3') void advanceStep();
+    else void handleSubmit(undefined, pendingPhotoAction);
   });
 
   photoGateUpload?.addEventListener('click', () => {

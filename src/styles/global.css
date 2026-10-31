@@ -2473,6 +2473,13 @@ div[id] {
   box-shadow: 0 24px 60px rgba(48, 36, 41, 0.24);
 }
 
+.photo-gate__copy {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
 .photo-gate__title {
   margin: 0 0 var(--space-4);
   font-size: var(--text-lg);
@@ -2977,6 +2984,7 @@ fieldset {
 }
 .wizard__final-actions {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-end;
@@ -2988,6 +2996,11 @@ fieldset {
 
 .wizard__final-actions .btn {
   min-height: 2.75rem;
+  min-width: 0;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .wizard__final-actions .btn--large {
@@ -3518,6 +3531,16 @@ fieldset.input--invalid {
   padding-left: calc(1.1rem + var(--space-2));
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+.reservation-summary__qualification--compact {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
 }
 
 .estimate-reveal-stage,

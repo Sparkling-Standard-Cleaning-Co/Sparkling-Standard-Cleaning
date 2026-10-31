@@ -167,11 +167,18 @@ export interface CampaignPromotionConfig {
   code: string;
   /** Keep false to retract the campaign everywhere in one change. */
   enabled: boolean;
-  kind: 'fixed';
-  /** USD off the first qualifying cleaning. Null = unset (fails closed). */
+  kind: 'fixed' | 'percent';
+  /** Percentage off or USD off the first qualifying cleaning. Null = unset. */
   value: number | null;
+  /** Maximum USD discount for a percentage campaign; null = no cap. */
+  capUsd: number | null;
   /** Label recorded with the quote/lead and shown in the breakdown. */
   label: string;
+  /**
+   * Previously issued commitments that must still be honored without being
+   * advertised. A legacy claim keeps its original fixed terms.
+   */
+  legacy?: Array<{ code: string; value: number; label: string }>;
   /** Service types the discounted first clean may be (standard or deep). */
   services: PricingServiceType[];
   /** Qualifying recurring frequencies (weekly, biweekly or monthly). */
@@ -705,23 +712,32 @@ export const ownerPricing: OwnerPricingConfig = {
     // change to the amount, copy or eligibility also requires updating the
     // printed flyer and the popup at the same time so the terms stay honest.
     campaign: {
-      code: 'SPARKLE100',
+      code: 'SPARKLE15',
       enabled: true,
-      kind: 'fixed',
-      value: 100,
-      label: 'SPARKLE100 — $100 off your first clean',
+      kind: 'percent',
+      value: 15,
+      capUsd: 100,
+      label: 'SPARKLE15 — 15% off your first clean (up to $100)',
+      legacy: [
+        {
+          code: 'SPARKLE100',
+          value: 100,
+          label: 'SPARKLE100 — $100 off your first clean',
+        },
+      ],
       services: ['standard', 'deep'],
       frequencies: ['weekly', 'biweekly', 'monthly'],
       expiresOn: null,
       stackable: false,
       popup: {
         eyebrow: 'A SPARKLING WELCOME OFFER',
-        headline: 'Make Your First Clean $100 Sweeter.',
-        offer: 'Get $100 OFF your first clean when you sign up for recurring residential cleaning.',
-        ctaLabel: 'Claim My $100 Offer',
+        headline: 'Your First Cleaning Just Got Sweeter!',
+        offer:
+          'Get 15% OFF your first cleaning when you sign up for recurring service - up to $100 in savings!',
+        ctaLabel: 'Claim My 15% Discount',
         secondaryLabel: 'Maybe Later',
         termsLine:
-          'New recurring residential customers. Weekly, biweekly or monthly service. One per household. Applied to your first qualifying cleaning — no cash value, not retroactive, and it cannot combine with another promotion.',
+          'New recurring residential customers. Weekly, biweekly or monthly service. One per household. 15% off the eligible first-visit cleaning subtotal, capped at $100; excludes travel, tax and optional extras. No cash value, not retroactive, and it cannot combine with another promotion.',
         activeSeconds: 3,
         dismissedCooldownDays: 30,
       },

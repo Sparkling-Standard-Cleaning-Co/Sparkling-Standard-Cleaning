@@ -30,7 +30,7 @@ export interface ConfirmedLocation {
    *  - 'gps'        — a device location pin.
    * The exact house number is never fabricated for a non-exact match.
    */
-  precision?: 'exact' | 'street' | 'approximate' | 'gps';
+  precision?: 'exact' | 'street' | 'approximate' | 'gps' | 'pin';
   /** True when the customer corrected the pin after resolution. */
   adjusted?: boolean;
   confirmedAt: string;

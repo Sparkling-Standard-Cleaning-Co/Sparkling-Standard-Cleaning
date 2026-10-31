@@ -374,7 +374,7 @@ export const pricing = {
     addonBundles: ownerPricing.promotions.addonBundles,
     foundingTen: ownerPricing.promotions.foundingTen,
     /**
-     * SPARKLE100 welcome campaign — the one owner-approved, ENABLED program
+     * SPARKLE15 welcome campaign — the one owner-approved, ENABLED program
      * (2026-10-21 directive). Claim-based: it applies only when the customer
      * claims the code (popup CTA or a /estimate/?promo= link); the engine
      * never grants it silently. Redemption eligibility (new customer, one
@@ -384,9 +384,9 @@ export const pricing = {
      */
     campaign: approved(
       ownerPricing.promotions.campaign,
-      'Owner-approved $100-off first-clean welcome campaign for new weekly, biweekly or monthly recurring residential customers (2026-10-21). Claim-only; redemption confirmed by the owner; never stacks with another promotion.',
+      'Owner-approved 15%-off (capped at $100) first-clean welcome campaign for new weekly, biweekly or monthly recurring residential customers (2026-10-30). Claim-only; redemption confirmed by the owner; never stacks with another promotion. Legacy SPARKLE100 claims are honored with their original $100 fixed terms.',
     ),
-    note: 'Prepared, unpublished promotion programs ship disabled with no terms until owner approval. The SPARKLE100 campaign is the single approved exception.',
+    note: 'Prepared, unpublished promotion programs ship disabled with no terms until owner approval. The SPARKLE15 campaign is the single approved exception.',
   },
 
   // ── Instant-estimate boundaries (directive §27) ────────────────────────────

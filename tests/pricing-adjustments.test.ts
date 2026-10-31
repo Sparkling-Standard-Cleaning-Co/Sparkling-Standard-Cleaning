@@ -192,11 +192,11 @@ test('Community Support never applies to STR and never stacks with SPARKLE100', 
 
   const claimed = calculateEstimate(
     input({ frequency: 'weekly', supportiveEligible: true }),
-    context({ promotions: { claimedCampaignCode: 'SPARKLE100' } }),
+    context({ promotions: { claimedCampaignCode: 'SPARKLE15' } }),
   );
   if (pricing.promotions.campaign.value.enabled) {
     assert.equal(claimed.pricing.discount?.source, 'campaign', 'the larger single discount wins');
-    assert.equal(claimed.pricing.discount?.amount, pricing.promotions.campaign.value.value);
+    assert.equal(claimed.pricing.discount?.id, 'SPARKLE15');
   }
 });
 

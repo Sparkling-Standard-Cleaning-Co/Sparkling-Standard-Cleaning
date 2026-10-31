@@ -470,6 +470,31 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         </div>
         <div class="booking-alternatives" data-booking-alternatives hidden></div>
 
+        <div class="estimate-reveal-stage">
+          <EstimateReveal />
+          <div class="reservation-summary" data-reservation-summary hidden>
+          <p class="reservation-summary__eyebrow" data-reservation-eyebrow>Your proposed cleaning price</p>
+          <p class="reservation-summary__price">
+            <span data-reservation-price>—</span>
+            <span class="reservation-summary__price-suffix" data-reservation-price-suffix></span>
+          </p>
+          <p class="reservation-summary__ongoing" data-reservation-ongoing hidden></p>
+          <p class="reservation-summary__meta" data-reservation-reference hidden></p>
+          <p class="reservation-summary__meta" data-reservation-validity hidden></p>
+
+          <ul class="summary-list price-breakdown" data-price-breakdown></ul>
+          <details class="extras-accordion cleaning-details-accordion" data-cleaning-details>
+            <summary class="extras-accordion__summary">
+              <span class="extras-accordion__heading">Your Cleaning Details</span>
+              <span class="extras-accordion__hint"
+                >Your selections, appointment and service location.</span
+              >
+              <Icon name="chevron-down" size={18} class="extras-accordion__chevron" />
+            </summary>
+            <div class="summary-groups" data-reservation-scope></div>
+          </details>
+
+
           <details class="extras-accordion" data-extras-accordion>
             <summary class="extras-accordion__summary">
               <span class="extras-accordion__heading">Bundle and Save With These Add-Ons</span>
@@ -571,34 +596,11 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             </div>
           </details>
 
-        <div class="estimate-reveal-stage">
-          <EstimateReveal />
-          <div class="reservation-summary" data-reservation-summary hidden>
-          <p class="reservation-summary__eyebrow" data-reservation-eyebrow>Your proposed cleaning price</p>
-          <p class="reservation-summary__price">
-            <span data-reservation-price>—</span>
-            <span class="reservation-summary__price-suffix" data-reservation-price-suffix></span>
-          </p>
-          <p class="reservation-summary__ongoing" data-reservation-ongoing hidden></p>
-          <p class="reservation-summary__meta" data-reservation-reference hidden></p>
-          <p class="reservation-summary__meta" data-reservation-validity hidden></p>
-
-          <ul class="summary-list price-breakdown" data-price-breakdown></ul>
-          <details class="extras-accordion cleaning-details-accordion" data-cleaning-details>
-            <summary class="extras-accordion__summary">
-              <span class="extras-accordion__heading">Your Cleaning Details</span>
-              <span class="extras-accordion__hint"
-                >Your selections, appointment and service location.</span
-              >
-              <Icon name="chevron-down" size={18} class="extras-accordion__chevron" />
-            </summary>
-            <div class="summary-groups" data-reservation-scope></div>
-          </details>
-          <p class="reservation-summary__qualification" data-reservation-qualification></p>
-
+          <p class="reservation-summary__qualification reservation-summary__qualification--compact" data-reservation-qualification></p>
 
           <div class="reservation-actions">
             <p class="reservation-actions__note" data-payment-note></p>
+            <button class="btn btn--secondary btn--small" type="button" data-verify-address hidden>Verify Address to Pay Online</button>
             <div class="field gift-code-field" data-gift-field hidden>
               <label for="est-gift-code">Gift certificate code <span class="text-muted">(optional)</span></label>
               <input
@@ -634,28 +636,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         </div>
         </div>
 
-        <div
-          class="photo-gate"
-          data-photo-gate
-          hidden
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="photo-gate-title"
-        >
-          <div class="photo-gate__dialog">
-            <p class="photo-gate__title" id="photo-gate-title">
-              Photos are required for an accurate estimate and confirmed booking.
-            </p>
-            <div class="btn-row">
-              <button class="btn btn--primary" type="button" data-photo-upload-now>
-                Add Photos in Step 3
-              </button>
-            </div>
-            <p class="small text-muted" style="margin:.75rem 0 0">
-              At least one successfully uploaded photo is required before the request can be sent.
-            </p>
-          </div>
-        </div>
+
         <p class="small photo-summary" data-photo-summary hidden></p>
         <label class="supportive-check" data-supportive-section hidden>
           <input type="checkbox" name="supportiveEligible" value="yes" data-supportive-eligible />
@@ -682,6 +663,31 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         </div>
       </section>
     </div>
+
+        <div
+          class="photo-gate"
+          data-photo-gate
+          hidden
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="photo-gate-title"
+        >
+          <div class="photo-gate__dialog">
+            <p class="photo-gate__title" id="photo-gate-title">Photos of Your Space</p>
+            <p class="photo-gate__copy">
+              Photos help us verify your cleaning estimate. Would you like to upload them now or
+              provide them later?
+            </p>
+            <div class="btn-row">
+              <button class="btn btn--secondary" type="button" data-photo-upload-now>
+                Add Photos Now
+              </button>
+              <button class="btn btn--primary" type="button" data-photo-pay-later>
+                I&rsquo;ll Add Them Later
+              </button>
+            </div>
+          </div>
+        </div>
 
     <div class="wizard__nav">
       <button class="btn btn--ghost" type="button" data-back hidden>

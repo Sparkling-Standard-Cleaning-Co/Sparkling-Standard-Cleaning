@@ -175,7 +175,7 @@ for (const [label, width, height] of [
       );
       assert.equal(await page.locator('[data-pay-now]').isVisible(), true, 'Pay Now is visible for the verified exact address');
       assert.equal(await page.locator('[data-gift-code]').isVisible(), true, 'gift code is available with online payment');
-      assert.equal(await page.locator('[data-verify-address]').count(), 0, 'no separate address verification control');
+      assert.equal(await page.locator('[data-verify-address]').isVisible(), false, 'no separate address verification control');
       const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
       assert.match(note, /Pay now to reserve this cleaning/i);
       assert.match(
@@ -193,9 +193,10 @@ test('an approximate address is reservation-only and never becomes payable', asy
     await reachFinal(page);
     assert.equal(await page.locator('[data-pay-now]').isVisible(), false, 'approximate addresses cannot pay online');
     assert.equal(await page.locator('[data-gift-code]').isVisible(), false, 'gift code is hidden when payment is unavailable');
-    assert.equal(await page.locator('[data-verify-address]').count(), 0, 'no verification loop exists');
+    assert.equal(await page.locator('[data-verify-address]').isVisible(), true, 'the customer is offered a clear address verification action');
+    assert.match(await page.locator('[data-verify-address]').innerText(), /Verify Address to Pay Online/i);
     const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
-    assert.match(note, /couldn't verify this address|secure payment link|confirm/i);
+    assert.match(note, /couldn't verify this address|secure payment link|verify the service address|confirm/i);
     assert.match(
       (await page.locator('[data-submit]').innerText()).replace(/\s+/g, ' '),
       /Reserve This Cleaning/,
@@ -211,7 +212,7 @@ test('an exact address with unavailable travel stays reservation-only', async ()
     await reachFinal(page);
     assert.equal(await page.locator('[data-pay-now]').isVisible(), false, 'unverified travel cannot pay online');
     assert.equal(await page.locator('[data-gift-code]').isVisible(), false, 'gift code is hidden when payment is unavailable');
-    assert.equal(await page.locator('[data-verify-address]').count(), 0, 'no verification control');
+    assert.equal(await page.locator('[data-verify-address]').isVisible(), false, 'no verification control');
     const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
     assert.match(note, /Your cleaning request is ready|couldn't verify|confirm/i);
     assert.match(

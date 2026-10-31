@@ -380,7 +380,7 @@ test('photos are in Condition & Frequency, and the last step has no photo upload
   }
 });
 
-test('Pay Now cannot bypass a missing Step 3 photo', async () => {
+test('Continue without photos opens the compact photo choice and Later advances', async () => {
   const { context, page, leadPayloads } = await open();
   try {
     await reachCondition(page);
@@ -389,23 +389,16 @@ test('Pay Now cannot bypass a missing Step 3 photo', async () => {
     await page.selectOption('#est-last-clean', 'within_month');
     await page.selectOption('#est-pets', 'none');
     await page.click('[data-next]');
-    await page.waitForTimeout(400);
-    assert.equal(
-      await page.evaluate(() => document.querySelector('.wizard__step[data-active="true"]')?.getAttribute('data-step')),
-      '3',
-      'the customer cannot continue without a photo',
-    );
-    assert.match(await page.locator('[data-photo-status]').innerText(), /at least one photo/i);
-    assert.equal(await page.locator('[data-pay-now]').isVisible(), false, 'Pay Now is not reachable');
-    assert.equal(await page.locator('[data-photo-pay-later]').count(), 0, 'the old bypass is gone');
+    const gate = page.locator('[data-photo-gate]');
+    await gate.waitFor({ state: 'visible' });
+    assert.match((await gate.innerText()).replace(/\s+/g, ' '), /Photos of Your Space/);
+    assert.equal(await page.locator('[data-photo-pay-later]').isVisible(), true);
     assert.equal(leadPayloads.length, 0);
-
-    await uploadPhoto(page);
-    await page.click('[data-next]');
+    await page.click('[data-photo-pay-later]');
     assert.equal(
       await page.evaluate(() => document.querySelector('.wizard__step[data-active="true"]')?.getAttribute('data-step')),
       '4',
-      'a successful upload unlocks the next step',
+      'Later continues normally',
     );
   } finally {
     await context.close();

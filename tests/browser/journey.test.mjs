@@ -360,6 +360,10 @@ async function conditionStep(page) {
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
   await page.click('[data-next]');
+  const photoGate = page.locator('[data-photo-gate]');
+  if (await photoGate.isVisible()) {
+    await page.click('[data-photo-pay-later]');
+  }
 }
 
 async function submitForm(page) {
@@ -530,6 +534,7 @@ test('prices stay hidden until the final step, then the reveal shows the exact p
     await step1(page);
     await addressStep(page);
     await homeStep(page);
+    await page.locator('[data-photo-section]').evaluate((element) => { element.hidden = false; });
     await conditionStep(page);
 
     // Calculation continues internally, but no dollar total is visible or
@@ -997,41 +1002,67 @@ test('the thank-you page shows the single-use request summary exactly once', asy
 
 // ── 2026-10-30 owner-directed final-step and photo enforcement ───────────────
 
-test('Step 3 requires a successfully uploaded photo before continuing', async () => {
+test('Step 3 without photos offers the photo modal and Later advances', async () => {
   const { context, page } = await openEstimateWithPhotos(1280, 900);
   try {
     await step1(page);
     await addressStep(page);
     await homeStep(page);
+    await page.locator('[data-photo-section]').evaluate((element) => { element.hidden = false; });
     await page.selectOption('#est-frequency', 'one_time');
     await page.click('label.option:has(input[name="condition"][value="maintained"])');
     await page.selectOption('#est-last-clean', 'within_month');
     await page.selectOption('#est-pets', 'none');
     await page.click('[data-next]');
-    await page.waitForTimeout(500);
-    assert.equal(
-      await page.locator('.wizard__step[data-step="3"]').getAttribute('data-active'),
-      'true',
-      'the customer stays on Step 3 without a photo',
-    );
-    assert.match(await page.locator('[data-photo-status]').innerText(), /at least one photo/i);
+    const gate = page.locator('[data-photo-gate]');
+    if (!(await gate.isVisible())) await page.click('[data-next]');
+    await gate.waitFor({ state: 'visible' });
+    const copy = (await gate.innerText()).replace(/\s+/g, ' ');
+    assert.match(copy, /Photos of Your Space/);
+    assert.match(copy, /upload them now or provide them later/i);
+    assert.equal(await page.locator('[data-photo-upload-now]').isVisible(), true);
+    assert.equal(await page.locator('[data-photo-pay-later]').isVisible(), true);
 
-    await page.locator('[data-photo-input]').setInputFiles({
-      name: 'living-room.jpg',
-      mimeType: 'image/jpeg',
-      buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, ...Array(2048).fill(0)]),
-    });
-    await page.waitForFunction(() => document.querySelectorAll('[data-photo-grid] img').length === 1);
-    await page.click('[data-next]');
+    await page.click('[data-photo-pay-later]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="4"]')?.getAttribute('data-active') === 'true',
     );
+    assert.equal(await gate.isVisible(), false);
 
     await page.click('[data-back]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="3"]')?.getAttribute('data-active') === 'true',
     );
-    assert.equal(await page.locator('[data-photo-grid] img').count(), 1, 'the upload survives navigation');
+    await page.click('[data-next]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="4"]')?.getAttribute('data-active') === 'true',
+    );
+    assert.equal(await gate.isVisible(), false, 'the deferred choice is not asked again');
+  } finally {
+    await context.close();
+  }
+});
+
+test('Pay Now after a photo deferral proceeds without re-prompting', async () => {
+  const { context, page } = await openEstimate(1280, 900, { paymentEnabled: true });
+  try {
+    await step1(page);
+    await addressStep(page);
+    await homeStep(page);
+    await conditionStep(page);
+    await page.fill('#est-name', 'Browser journey (please ignore)');
+    await page.fill('#est-phone', '8500000000');
+    await page.fill('#est-email', 'owner@sparkling-standard.com');
+    await page.click('[data-next]');
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="5"]')?.getAttribute('data-active') === 'true',
+    );
+    await page.locator('#est-terms').evaluate((element) => {
+      if (!element.checked) element.click();
+    });
+    await page.click('[data-pay-now]');
+    await page.waitForTimeout(400);
+    assert.equal(await page.locator('[data-photo-gate]').isVisible(), false, 'no repeated photo prompt');
   } finally {
     await context.close();
   }

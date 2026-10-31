@@ -68,11 +68,11 @@ export type MarketingLink = {
   /** Exact owner action (CSV "Where Owner Must Paste It"). */
   whereToPaste: string;
   /**
-   * Optional promotion code appended to the destination (e.g. `SPARKLE100`)
+   * Optional promotion code appended to the destination (e.g. `SPARKLE15`; printed QR links may still carry the honored legacy `SPARKLE100` code)
    * so the estimate flow opens with the owner-approved campaign pre-claimed.
    * Only the literal promotion code is permitted; never a free-form query.
    */
-  promo?: 'SPARKLE100';
+  promo?: 'SPARKLE15' | 'SPARKLE100';
   /**
    * Prepared but NOT active: the owner has not confirmed this specific
    * placement. A live profile can still have a pending link. Pending links

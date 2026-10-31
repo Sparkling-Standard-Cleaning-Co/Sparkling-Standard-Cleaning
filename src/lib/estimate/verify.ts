@@ -199,6 +199,23 @@ export function isGpsPinDestination(fields: Record<string, string>): boolean {
   );
 }
 
+/**
+ * A numbered manual address whose exact geocode failed, where the customer
+ * then explicitly positioned and confirmed the property pin. This is a real
+ * confirmed destination for routing, but it is NOT a geocoded exact-address
+ * match and the property still needs verification before/at the visit.
+ */
+export function isConfirmedPropertyPin(fields: Record<string, string>): boolean {
+  return (
+    fields.address_method === 'manual' &&
+    fields.address_confirmed === 'yes' &&
+    fields.pin_precision === 'pin' &&
+    /\d/.test(fields.service_address ?? '') &&
+    (fields.service_address ?? '').trim().length >= 5 &&
+    parseSubmittedPin(fields) !== null
+  );
+}
+
 function buildEstimateContext(routed: RoutedTravelInfo | undefined, fields: Record<string, string>): EstimateContext {
   return {
     travel: {
@@ -252,6 +269,14 @@ export async function resolveServerDestination(
     const queryParts = [line1, region, zip].filter(Boolean);
     const resolved = await resolveAddress(env, queryParts.join(', ')).catch(() => null);
     if (resolved) return { lat: resolved.lat, lng: resolved.lng, source: 'address_geocode' };
+  }
+
+  // A customer-confirmed property pin (manual numbered address whose exact
+  // geocode failed) is the next-best real destination. It is routed and
+  // quoted, but never presented as a geocoded exact-address match.
+  if (isConfirmedPropertyPin(fields)) {
+    const pin = parseSubmittedPin(fields);
+    if (pin) return { lat: pin.lat, lng: pin.lng, source: 'customer_pin' };
   }
 
   // GPS-confirmed pin wins over the ZIP centroid: it is the actual confirmed
@@ -386,7 +411,11 @@ export async function verifyReservationQuote(
     pinDistanceMeters = Math.round(haversineMeters(submittedPin, destination));
   }
   const pinReportedAdjusted = fields.pin_adjusted === 'yes';
-  if (pinReportedAdjusted) {
+  if (isConfirmedPropertyPin(fields)) {
+    // The server routed to this exact confirmed pin, so the pin is correct for
+    // the quote even though the postal address itself was not geocoded.
+    pinCheck = 'ok';
+  } else if (pinReportedAdjusted) {
     pinCheck = 'adjusted';
   } else if (pinDistanceMeters !== null && pinDistanceMeters > PIN_DIVERGENCE_METERS) {
     pinCheck = 'divergent';

@@ -106,7 +106,6 @@ test('every estimable form control has an accessible name', async () => {
         .filter(
           (element) =>
             element.type !== 'hidden' &&
-            !element.closest('[hidden]') &&
             // Elements removed from the accessibility tree (the hidden anti-spam
             // trap) do not need an accessible name.
             !element.closest('[aria-hidden="true"]'),

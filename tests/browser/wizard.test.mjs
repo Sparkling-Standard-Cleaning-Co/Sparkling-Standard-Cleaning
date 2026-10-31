@@ -135,6 +135,8 @@ async function fillCondition(page) {
   await page.selectOption('#est-last-clean', 'within_month');
   await page.selectOption('#est-pets', 'none');
   await page.click('[data-next]');
+  const photoGate = page.locator('[data-photo-gate]');
+  if (await photoGate.isVisible()) await page.click('[data-photo-pay-later]');
 }
 
 test('a new recurring residential request requires the Deep Cleaning acknowledgment', async () => {

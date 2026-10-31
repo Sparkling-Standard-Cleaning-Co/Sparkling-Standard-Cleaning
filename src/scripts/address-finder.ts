@@ -1089,7 +1089,13 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
         ? { state: candidate.state ?? stateInput?.value ?? '' }
         : {}),
       source: candidate.source,
-      precision: candidate.approximate ? 'approximate' : candidate.streetLevel ? 'street' : 'exact',
+      precision: candidate.adjusted
+        ? 'pin'
+        : candidate.approximate
+          ? 'approximate'
+          : candidate.streetLevel
+            ? 'street'
+            : 'exact',
       ...(candidate.adjusted ? { adjusted: true } : {}),
       confirmedAt: new Date().toISOString(),
     };
