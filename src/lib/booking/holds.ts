@@ -62,7 +62,7 @@ async function withDayLock<T>(
   const key = lockKey(date);
   let acquired = false;
   let activeToken = '';
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
     const token = crypto.randomUUID();
     const created = await createLedgerJson(bucket, key, {
       token,
@@ -76,6 +76,17 @@ async function withDayLock<T>(
     const existing = await readLedgerJson<{ expiresAt?: string }>(bucket, key).catch(() => null);
     const expiresAt = existing?.value.expiresAt ? Date.parse(existing.value.expiresAt) : 0;
     if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
+      // A lock whose lease expired must never strand every later customer.
+      // Delete it and race for a fresh conditional create on the next pass;
+      // fall back to the conditional replace when delete is unavailable.
+      try {
+        if (bucket.delete) {
+          await bucket.delete(key);
+          continue;
+        }
+      } catch {
+        // Fall through to the conditional takeover.
+      }
       if (existing?.etag) {
         try {
           const nextToken = crypto.randomUUID();
@@ -100,17 +111,37 @@ async function withDayLock<T>(
     }
     await sleep(120);
   }
+  if (!acquired) {
+    // Last-resort recovery: the lease is provably expired, so replacing it
+    // unconditionally is safer than stranding checkout forever.
+    const stale = await readLedgerJson<{ expiresAt?: string }>(bucket, key).catch(() => null);
+    const expiresAt = stale?.value.expiresAt ? Date.parse(stale.value.expiresAt) : 0;
+    if (!stale || !Number.isFinite(expiresAt) || expiresAt < Date.now()) {
+      const token = crypto.randomUUID();
+      try {
+        await bucket.put(key, JSON.stringify({ token, expiresAt: new Date(Date.now() + 8_000).toISOString() }));
+        activeToken = token;
+        acquired = true;
+      } catch {
+        // Another isolate may still own it; report busy honestly.
+      }
+    }
+  }
   if (!acquired) return { ok: false, error: 'busy' };
   try {
     return { ok: true, value: await run() };
   } finally {
     const current = await readLedgerJson<{ token?: string }>(bucket, key).catch(() => null);
-    if (current?.etag && current.value.token === activeToken) {
-      await bucket.put(
-        key,
-        JSON.stringify({ token: activeToken, expiresAt: new Date(0).toISOString() }),
-        { onlyIf: new Headers({ 'If-Match': current.etag }) },
-      ).catch(() => undefined);
+    if (current?.value.token === activeToken) {
+      if (bucket.delete) {
+        await bucket.delete(key).catch(() => undefined);
+      } else if (current.etag) {
+        await bucket.put(
+          key,
+          JSON.stringify({ token: activeToken, expiresAt: new Date(0).toISOString() }),
+          { onlyIf: new Headers({ 'If-Match': current.etag }) },
+        ).catch(() => undefined);
+      }
     }
   }
 }

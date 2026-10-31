@@ -549,6 +549,7 @@ export function initBookingCalendar(
         });
         const response = await fetch(`/api/availability?${params}`, {
           headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(10_000),
         });
         const data = (await response.json().catch(() => ({}))) as {
           ok?: boolean;
@@ -583,6 +584,7 @@ export function initBookingCalendar(
         const hold = await fetch('/api/booking-hold', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          signal: AbortSignal.timeout(15_000),
           body: JSON.stringify({
             date: selectedDate,
             start: exact.start,
