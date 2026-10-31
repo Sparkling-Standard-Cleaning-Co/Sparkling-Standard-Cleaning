@@ -238,17 +238,44 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const requestScope = scoped(actor, 'r.branch_id');
     const appointmentScope = scoped(actor, 'a.branch_id');
     const leadScope = scoped(actor, 'l.branch_id');
+    const view = text(url.searchParams.get('view') ?? 'actionable', 20) || 'actionable';
+    const query = text(url.searchParams.get('q'), 100);
+    const lifecycle: Record<string, string> = {
+      actionable:
+        " AND r.archived_at IS NULL AND r.closed_at IS NULL AND (r.status = 'pending' OR (r.status = 'confirmed' AND (a.status IS NULL OR a.status IN ('pending','confirmed','in_progress'))))",
+      pending: " AND r.status = 'pending' AND r.closed_at IS NULL AND r.archived_at IS NULL",
+      confirmed:
+        " AND r.status = 'confirmed' AND r.closed_at IS NULL AND r.archived_at IS NULL AND a.status IN ('pending','confirmed','in_progress')",
+      completed: " AND (a.status = 'completed' OR r.status = 'completed')",
+      closed: ' AND r.closed_at IS NOT NULL AND r.archived_at IS NULL',
+      declined:
+        " AND r.closed_at IS NULL AND r.archived_at IS NULL AND (r.status IN ('declined','released','expired') OR a.status IN ('cancelled','no_show'))",
+      archived: ' AND r.archived_at IS NOT NULL',
+      all: '',
+      history: '',
+    };
+    const lifecycleSql = lifecycle[view] ?? lifecycle.actionable;
+    const searchSql = query
+      ? ` AND (r.quote_reference LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?
+          OR p.line1 LIKE ? OR p.city LIKE ? OR p.postal_code LIKE ? OR r.payload_json LIKE ?)`
+      : '';
+    const searchBind = query ? Array.from({ length: 7 }, () => `%${query}%`) : [];
     const [requests, appointments, reservationLeads] = await Promise.all([
       db.prepare(
         `SELECT r.id, r.customer_id, r.status, r.quote_reference, r.requested_date, r.start_at, r.end_at,
-                r.duration_minutes, r.payload_json, r.created_at, c.first_name, c.last_name,
-                p.line1, p.city, p.state, p.postal_code
+                r.duration_minutes, r.payload_json, r.created_at, r.closed_at, r.closed_reason,
+                r.archived_at, r.duplicate_of_request_id, r.previous_status,
+                c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
+                a.id AS appointment_id, a.status AS appointment_status,
+                (SELECT provider_event_id FROM calendar_links cl WHERE cl.appointment_id = a.id
+                 ORDER BY cl.last_synced_at DESC LIMIT 1) AS calendar_event_id
          FROM booking_requests r
          LEFT JOIN customers c ON c.id = r.customer_id
          LEFT JOIN properties p ON p.id = r.property_id
-         WHERE 1 = 1 ${requestScope.sql}
-         ORDER BY r.created_at DESC LIMIT 100`,
-      ).bind(...requestScope.bind).all(),
+         LEFT JOIN appointments a ON a.booking_request_id = r.id
+         WHERE 1 = 1 ${requestScope.sql} ${lifecycleSql} ${searchSql}
+         ORDER BY r.start_at ASC, r.created_at DESC LIMIT 200`,
+      ).bind(...requestScope.bind, ...searchBind).all(),
       db.prepare(
         `SELECT a.id, a.status, a.start_at, a.end_at, a.reference, a.crew_size, a.source,
                 c.first_name, c.last_name, p.line1, p.city
@@ -353,6 +380,69 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!requestId) return json({ ok: false, error: 'request_required' }, 400);
     const row = await requestRow(db, actor, requestId);
     if (!row) return json({ ok: false, error: 'request_not_found' }, 404);
+
+    if (action === 'close' || action === 'duplicate' || action === 'archive' || action === 'reopen') {
+      const status = String(row.status ?? '');
+      const appointmentStatus = String(row.appointment_status ?? '');
+      const appointmentActive = ['pending', 'confirmed', 'in_progress'].includes(appointmentStatus);
+      if (action === 'reopen') {
+        if (!row.closed_at && !row.archived_at) return json({ ok: false, error: 'request_not_closed' }, 409);
+        if (appointmentStatus === 'completed' || appointmentStatus === 'cancelled' || appointmentStatus === 'no_show') {
+          return json({ ok: false, error: 'new_request_required' }, 409);
+        }
+        const target = appointmentActive ? 'confirmed' : 'pending';
+        await db
+          .prepare("UPDATE booking_requests SET status = ?, closed_at = NULL, archived_at = NULL, closed_reason = '', duplicate_of_request_id = NULL, previous_status = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+          .bind(target, requestId)
+          .run();
+        await audit(db, { actorUserId: actor.id, action: 'request.reopened', entityType: 'booking_request', entityId: requestId, detail: target });
+        return json({ ok: true, status: target });
+      }
+      if (action === 'archive') {
+        if (row.archived_at) return json({ ok: true, alreadyArchived: true });
+        if (status === 'pending' || status === 'confirmed' || appointmentActive) {
+          return json({ ok: false, error: 'active_request_must_close_or_cancel' }, 409);
+        }
+        await db
+          .prepare('UPDATE booking_requests SET archived_at = CURRENT_TIMESTAMP, previous_status = status, archived_by_admin_user_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .bind(actor.id, requestId)
+          .run();
+        await audit(db, { actorUserId: actor.id, action: 'request.archived', entityType: 'booking_request', entityId: requestId, detail: status });
+        return json({ ok: true, archived: true });
+      }
+      if (row.closed_at) return json({ ok: true, alreadyClosed: true });
+      if (status !== 'pending' || row.appointment_id) {
+        return json({ ok: false, error: 'only_unconfirmed_pending_requests_can_close' }, 409);
+      }
+      let duplicateOf: string | null = null;
+      if (action === 'duplicate') {
+        const requested = text(body.duplicateOf, 120);
+        if (!requested) return json({ ok: false, error: 'duplicate_request_required' }, 400);
+        const match = await db
+          .prepare('SELECT id FROM booking_requests WHERE (id = ? OR quote_reference = ?) AND id <> ? LIMIT 1')
+          .bind(requested, requested, requestId)
+          .first<{ id: string }>();
+        if (!match) return json({ ok: false, error: 'duplicate_request_not_found' }, 404);
+        duplicateOf = match.id;
+      }
+      const released = await bookingAction(context, { id: requestId, action: 'release' });
+      if (!released.data.ok) {
+        return json({ ok: false, error: released.data.error ?? 'hold_release_failed', calendarStatus: released.status }, released.status === 200 ? 502 : released.status);
+      }
+      const reason = text(body.reason, 500) || (duplicateOf ? 'Duplicate request' : 'Closed by staff');
+      await db
+        .prepare("UPDATE booking_requests SET status = 'released', closed_at = CURRENT_TIMESTAMP, closed_reason = ?, duplicate_of_request_id = ?, previous_status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(reason, duplicateOf, requestId)
+        .run();
+      await audit(db, {
+        actorUserId: actor.id,
+        action: duplicateOf ? 'request.closed_duplicate' : 'request.closed',
+        entityType: 'booking_request',
+        entityId: requestId,
+        detail: duplicateOf ? reason + ' -> ' + duplicateOf : reason,
+      });
+      return json({ ok: true, closed: true, duplicateOf });
+    }
 
     if (action === 'link_customer') {
       const customerId = text(body.customerId, 100);

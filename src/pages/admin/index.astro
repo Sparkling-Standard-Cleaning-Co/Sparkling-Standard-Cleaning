@@ -140,7 +140,21 @@ import '../../styles/admin.css';
             </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Reservation requests</h2>
-              <p class="admin-muted">Every request can be opened, linked to a customer and actioned.</p>
+              <p class="admin-muted">Actionable requests appear by default. Search includes closed, archived and historical records.</p>
+              <form class="admin-inline-form" data-admin-request-filter>
+                <select name="view" aria-label="Request view">
+                  <option value="actionable">Actionable</option>
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="completed">Completed</option>
+                  <option value="declined">Declined / cancelled</option>
+                  <option value="closed">Closed</option>
+                  <option value="archived">Archived</option>
+                  <option value="all">All / historical</option>
+                </select>
+                <input name="q" type="search" placeholder="Search reference, customer, address" aria-label="Search requests" />
+                <button class="btn btn--secondary btn--small" type="submit">Search</button>
+              </form>
               <div data-admin-requests></div>
             </div>
             <div data-admin-request-detail style="margin-top:1rem;" hidden></div>

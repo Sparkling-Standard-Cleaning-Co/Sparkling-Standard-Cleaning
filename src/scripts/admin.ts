@@ -378,8 +378,24 @@ function renderWeekBoard(appointments: Array<Record<string, unknown>>): void {
     .join('')}</tbody></table></div>`;
 }
 
-async function loadCalendar(): Promise<void> {
-  const data = await api<{ requests?: Array<Record<string, unknown>>; appointments?: Array<Record<string, unknown>> }>('/api/admin/requests');
+function requestStage(request: Record<string, unknown>): string {
+  if (request.archived_at) return 'Archived';
+  if (request.duplicate_of_request_id) return 'Closed as duplicate';
+  if (request.closed_at) return 'Closed';
+  const appointment = String(request.appointment_status ?? '');
+  if (appointment === 'in_progress') return 'In progress';
+  if (appointment === 'completed') return 'Completed';
+  if (appointment === 'cancelled' || appointment === 'no_show') return 'Declined / cancelled';
+  if (['declined', 'released', 'expired'].includes(String(request.status))) return 'Declined / cancelled';
+  if (String(request.status) === 'confirmed') return 'Confirmed appointment';
+  if (String(request.status) === 'pending') return 'Pending request';
+  return titleCase(String(request.status ?? ''));
+}
+
+async function loadCalendar(view = 'actionable', query = ''): Promise<void> {
+  const data = await api<{ requests?: Array<Record<string, unknown>>; appointments?: Array<Record<string, unknown>> }>(
+    `/api/admin/requests?view=${encodeURIComponent(view)}&q=${encodeURIComponent(query)}`,
+  );
   const requests = document.querySelector<HTMLElement>('[data-admin-requests]');
   if (requests) {
     renderTable(requests, ['Start', 'Reference', 'Customer', 'Property', 'Status', 'Action'], (data.requests ?? []).map((request) => [
@@ -387,9 +403,9 @@ async function loadCalendar(): Promise<void> {
       esc(request.quote_reference),
       esc([request.first_name, request.last_name].filter(Boolean).join(' ') || 'Unlinked request'),
       esc(requestLocation(request)),
-      `<span class="admin-status">${esc(request.status)}</span>`,
+      `<span class="admin-status">${esc(requestStage(request))}</span>`,
       `<button class="btn btn--ghost btn--small" type="button" data-admin-action="request-open" data-id="${esc(request.id)}">Open</button>`,
-    ]), 'No reservation requests are waiting.');
+    ]), query ? 'No requests match this search.' : 'No requests match this view.');
   }
   renderWeekBoard(data.appointments ?? []);
   const appointments = document.querySelector<HTMLElement>('[data-admin-appointments]');
@@ -572,6 +588,35 @@ async function openRequest(requestId: string): Promise<void> {
         : ''
     : '';
 
+  const lifecycleActions = !can('booking.write')
+    ? ''
+    : pending
+      ? `<div class="admin-card" style="margin-top:1rem;">
+          <h3>Close this request</h3>
+          <p class="admin-muted">Closing releases any temporary hold. Records and customer history are preserved.</p>
+          <form class="admin-form" data-form="request-close">
+            <input type="hidden" name="requestId" value="${esc(requestId)}" />
+            <label>Reason (optional) <input name="reason" maxlength="500" /></label>
+            <button class="btn btn--danger btn--small" type="submit">Close Request</button>
+          </form>
+          <details class="admin-detail-toggle" style="margin-top:1rem;"><summary>Close as duplicate</summary>
+            <form class="admin-form" data-form="request-duplicate">
+              <input type="hidden" name="requestId" value="${esc(requestId)}" />
+              <label>Original reference or request ID <input name="duplicateOf" required maxlength="120" /></label>
+              ${duplicates.length ? `<p class="admin-muted">Possible originals: ${duplicates.map((item) => esc(item.quote_reference)).join(', ')}</p>` : ''}
+              <button class="btn btn--danger btn--small" type="submit">Close as Duplicate</button>
+            </form>
+          </details>
+        </div>`
+      : '';
+  const archiveAction = !can('booking.write') || request.archived_at
+    ? ''
+    : status === 'pending' || status === 'confirmed' || ['pending', 'confirmed', 'in_progress'].includes(String(request.appointment_status ?? ''))
+      ? ''
+      : `<form class="admin-inline-form" data-form="request-archive" style="margin-top:.75rem;"><input type="hidden" name="requestId" value="${esc(requestId)}" /><button class="btn btn--ghost btn--small" type="submit">Archive Request</button></form>`;
+  const reopenAction = !can('booking.write') || (!request.closed_at && !request.archived_at)
+    ? ''
+    : `<form class="admin-inline-form" data-form="request-reopen" style="margin-top:.75rem;"><input type="hidden" name="requestId" value="${esc(requestId)}" /><button class="btn btn--secondary btn--small" type="submit">Reopen Request</button></form>`;
   const notificationRows = notifications.length
     ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>When</th><th>Type</th><th>Status</th><th>Detail</th></tr></thead><tbody>${notifications
         .map((notification) => `<tr><td>${esc(dateTime(notification.created_at))}</td><td>${esc(titleCase(notification.kind))}</td><td>${esc(notification.status)}</td><td>${esc(notification.error_detail || '')}</td></tr>`)
@@ -605,7 +650,7 @@ async function openRequest(requestId: string): Promise<void> {
     <h3 style="margin-top:1rem;">Customer email history</h3>
     ${notificationRows}
     ${email ? `<form class="admin-inline-form" data-form="request-notify" style="margin-top:.75rem;"><input type="hidden" name="requestId" value="${esc(requestId)}" /><button class="btn btn--ghost btn--small" type="submit">Resend last customer email</button></form>` : ''}
-  </div>${association}${actions}`;
+  </div>${association}${actions}${lifecycleActions}${archiveAction}${reopenAction}`;
 }
 
 async function submitRequestAction(body: Record<string, unknown>): Promise<void> {
@@ -1358,6 +1403,12 @@ document.querySelector<HTMLFormElement>('[data-admin-customer-search]')?.addEven
   void loadCustomers(String(data.get('q') ?? ''));
 });
 
+document.querySelector<HTMLFormElement>('[data-admin-request-filter]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget as HTMLFormElement);
+  void loadCalendar(String(data.get('view') ?? 'actionable'), String(data.get('q') ?? ''));
+});
+
 document.querySelector<HTMLFormElement>('[data-admin-lead-filter]')?.addEventListener('submit', (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget as HTMLFormElement);
@@ -1467,6 +1518,10 @@ document.addEventListener('submit', (event) => {
     email: value('email'), phone: value('phone'), addressLine1: value('addressLine1'), city: value('city'),
     state: value('state'), postalCode: value('postalCode'),
   });
+  if (kind === 'request-close') { if (window.confirm('Close this pending request and release its hold?')) void submitRequestAction({ action: 'close', requestId: value('requestId'), reason: value('reason') }); }
+  if (kind === 'request-duplicate') { if (window.confirm('Close this request as a duplicate? The original is not changed.')) void submitRequestAction({ action: 'duplicate', requestId: value('requestId'), duplicateOf: value('duplicateOf') }); }
+  if (kind === 'request-archive') { if (window.confirm('Archive this request? Its calendar and appointment history are not changed.')) void submitRequestAction({ action: 'archive', requestId: value('requestId') }); }
+  if (kind === 'request-reopen') { if (window.confirm('Reopen this request?')) void submitRequestAction({ action: 'reopen', requestId: value('requestId') }); }
   if (kind === 'request-confirm') void submitRequestAction({ action: 'confirm', requestId: value('requestId') });
   if (kind === 'request-decline') void submitRequestAction({ action: 'decline', requestId: value('requestId'), reason: value('reason'), notify: checked('notify') });
   if (kind === 'request-notify') void submitRequestAction({ action: 'notify', requestId: value('requestId') });

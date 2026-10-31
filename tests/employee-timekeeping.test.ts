@@ -241,7 +241,7 @@ test('the employee board shows only assigned jobs in the next three days', async
   const at = (offsetHours: number) => new Date(now + offsetHours * 3_600_000).toISOString();
   const ids = ['JOB-1', 'JOB-2', 'JOB-3', 'JOB-4'];
   ids.forEach((id, index) => {
-    insertAppointment.run(id, customer.id, property.id, at([2, 26, 50, 120][index]!), at([4, 28, 52, 122][index]!), id);
+    insertAppointment.run(id, customer.id, property.id, at([2, 26, 40, 120][index]!), at([4, 28, 42, 122][index]!), id);
     db.raw
       .prepare('INSERT INTO appointment_resources (appointment_id, team_member_id) VALUES (?, ?)')
       .run(id, index === 3 ? other.teamMemberId : employee.teamMemberId);

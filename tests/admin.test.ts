@@ -72,6 +72,7 @@ function migratedDb(): TestD1 {
     '0010_signed_content_and_card_setup.sql',
     '0011_booking_management_and_notifications.sql',
     '0012_employee_timekeeping.sql',
+    '0013_request_lifecycle.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -1248,4 +1249,53 @@ test('a gift redemption is applied to an invoice exactly once', async () => {
       }),
     /payment_exceeds_balance/,
   );
+});
+
+test('closed and archived requests stay searchable and can be reopened', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'lifecycle@example.test',
+    name: 'Lifecycle Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const actor = await readOpsActor(db, request(`ss_ops=${session.token}`));
+  assert.ok(actor);
+  db.raw.prepare(
+    `INSERT INTO booking_requests
+     (id, hold_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+     VALUES ('BR-LIFE', 'hold-life', 'released', 'SS-LIFE', '2026-11-02', '2026-11-02T14:00:00.000Z', '2026-11-02T16:00:00.000Z', 120, '{"locationText":"100 Bluebird Dr, Pensacola, FL 32503"}') `,
+  ).run();
+  const headers = {
+    Cookie: `ss_ops=${session.token}`,
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': actor!.csrf,
+  };
+  const archived = await adminRequestsPost({
+    request: new Request('https://example.test/api/admin/requests', {
+      method: 'POST', headers, body: JSON.stringify({ action: 'archive', requestId: 'BR-LIFE' }),
+    }),
+    env: { DB: db },
+  } as never);
+  assert.equal(archived.status, 200);
+  const archivedRow = db.raw.prepare('SELECT archived_at, previous_status FROM booking_requests WHERE id = ?').get('BR-LIFE') as { archived_at: string; previous_status: string };
+  assert.ok(archivedRow.archived_at);
+  assert.equal(archivedRow.previous_status, 'released');
+  const search = await adminRequestsGet({
+    request: new Request('https://example.test/api/admin/requests?view=archived&q=Bluebird', { headers: { Cookie: `ss_ops=${session.token}` } }),
+    env: { DB: db },
+  } as never);
+  assert.equal(search.status, 200);
+  const listed = (await search.json()) as { requests: Array<Record<string, unknown>> };
+  assert.equal(listed.requests.some((entry) => entry.id === 'BR-LIFE'), true);
+  const reopened = await adminRequestsPost({
+    request: new Request('https://example.test/api/admin/requests', {
+      method: 'POST', headers, body: JSON.stringify({ action: 'reopen', requestId: 'BR-LIFE' }),
+    }),
+    env: { DB: db },
+  } as never);
+  assert.equal(reopened.status, 200);
+  const reopenedRow = db.raw.prepare('SELECT status, archived_at FROM booking_requests WHERE id = ?').get('BR-LIFE') as { status: string; archived_at: string | null };
+  assert.equal(reopenedRow.status, 'pending');
+  assert.equal(reopenedRow.archived_at, null);
 });
