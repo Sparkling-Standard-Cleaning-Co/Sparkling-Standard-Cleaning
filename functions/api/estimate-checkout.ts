@@ -19,6 +19,7 @@
 import { estimatePaymentConfig } from '../../src/config/payments.ts';
 import {
   QUOTE_MATCH_TOLERANCE,
+  isConfirmedPropertyPin,
   resolveServerDestination,
   verifyReservationQuote,
   type QuoteVerification,
@@ -651,12 +652,14 @@ async function verifyResidentialPayment(
     return { ok: false, reason: 'initial_deep_clean_required' };
   }
 
-  // A verified payment requires a real route to a precise, confirmed address.
-  // A preliminary quote (ZIP centroid, approximate pin, moved/unknown pin, or
-  // missing route duration) remains reservation-only.
+  // A verified payment requires a real route to a confirmed destination. An
+  // exact geocoder address or an explicitly customer-confirmed property pin
+  // both qualify; a preliminary ZIP centroid or unadjusted street pin does not.
+  const confirmedPropertyPin = isConfirmedPropertyPin(fields);
   const structurallyVerified =
     verification.travel.verified &&
-    verification.travel.destinationSource === 'address_geocode' &&
+    (verification.travel.destinationSource === 'address_geocode' ||
+      (confirmedPropertyPin && verification.travel.destinationSource === 'customer_pin')) &&
     verification.travel.durationMinutes !== null &&
     verification.travel.durationMinutes > 0 &&
     verification.pinCheck === 'ok' &&

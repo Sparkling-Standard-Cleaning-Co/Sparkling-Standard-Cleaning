@@ -914,7 +914,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
   function syncPaymentAvailability(hasQuote: boolean): void {
     const eligible = paymentEnabled && !paymentBlocked && hasQuote && clientPaymentEligible();
     const canOfferVerification =
-      hasQuote && paymentEnabled && !paymentBlocked && !addressConfirmed();
+      hasQuote && paymentEnabled && !paymentBlocked &&
+      (!addressConfirmed() || latestQuote?.travelVerified !== true);
     if (giftField) giftField.hidden = !eligible;
     if (payNowButton) {
       payNowButton.hidden = !eligible;
@@ -938,6 +939,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (!paymentNote) return;
     if (!hasQuote) {
       paymentNote.textContent = '';
+      return;
+    }
+    if (paymentEnabled && !paymentBlocked && addressConfirmed() && latestQuote?.travelVerified !== true) {
+      paymentNote.textContent =
+        'We could not verify the driving route to this address. Verify the address pin, or request to reserve and pay later.';
       return;
     }
     if (eligible) {

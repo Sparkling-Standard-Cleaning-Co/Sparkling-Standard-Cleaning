@@ -226,6 +226,10 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <div class="address-map" data-address-map hidden>
             <div class="address-map__canvas" data-address-map-canvas></div>
             <p class="hint">Confirm this is the right destination, or drag the pin to correct it.</p>
+            <label class="hint" data-pin-property-confirm-wrap hidden style="display:flex;gap:.5rem;align-items:flex-start;margin:.35rem 0;">
+              <input type="checkbox" data-pin-property-confirm />
+              <span>I confirm this pin is at my property.</span>
+            </label>
             <p class="hint address-map__fallback" data-address-map-fallback hidden>
               Map preview is unavailable right now - the confirmed coordinates still work. You can
               continue.

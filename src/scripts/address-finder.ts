@@ -159,6 +159,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   const mapCanvas = root.querySelector<HTMLElement>('[data-address-map-canvas]');
   const mapFallback = root.querySelector<HTMLElement>('[data-address-map-fallback]');
   const confirmButton = root.querySelector<HTMLButtonElement>('[data-address-confirm]');
+  const pinConfirmWrap = root.querySelector<HTMLElement>('[data-pin-property-confirm-wrap]');
+  const pinConfirm = root.querySelector<HTMLInputElement>('[data-pin-property-confirm]');
   const changeButton = root.querySelector<HTMLButtonElement>('[data-address-change]');
   const confirmedCard = root.querySelector<HTMLElement>('[data-address-confirmed]');
   const confirmedLabel = root.querySelector<HTMLElement>('[data-address-confirmed-label]');
@@ -398,6 +400,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       ...(!resolved.state && region.state ? { state: region.state } : {}),
     };
     clearSuggestions();
+    if (pinConfirm) pinConfirm.checked = false;
+    if (pinConfirmWrap) pinConfirmWrap.hidden = !(resolved.streetLevel || resolved.approximate);
     // The provider label carries the ZIP even when the resolve response does
     // not: exact suggestions with embedded coordinates skip the resolver, and
     // the ZIP is a required field. Editing it later would invalidate the
@@ -1068,6 +1072,12 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     }
 
     if (!manualCandidate) return;
+    if (
+      (manualCandidate.streetLevel || manualCandidate.approximate) &&
+      pinConfirm?.checked
+    ) {
+      manualCandidate = { ...manualCandidate, adjusted: true };
+    }
     commitManualCandidate(true);
   }
 

@@ -757,3 +757,32 @@ test('an unknown gift code is rejected before any Stripe session or reservation'
   assert.equal(((await response.json()) as { error?: string }).error, 'gift_not_found');
   assert.equal(provider.postCount(), 0);
 });
+
+
+test('checkout accepts a confirmed property pin for structural payment eligibility', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub();
+  const { fields } = validResidentialInput('standard');
+  const pinFields = {
+    ...fields,
+    service_address: '12345 Rural Lane',
+    address_city: 'Pensacola',
+    address_state: 'FL',
+    zip: '32502',
+    pin_latitude: '30.719000',
+    pin_longitude: '-87.442800',
+    pin_precision: 'pin',
+    pin_adjusted: 'yes',
+  };
+  const response = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ fields: pinFields, returnPath: '/estimate/residential/' }),
+      env,
+    } as never),
+  );
+  const data = (await response.json()) as { ok?: boolean; reason?: string };
+  assert.equal(response.status, 200);
+  assert.equal(data.ok, true, 'the confirmed property pin passes structural checkout verification');
+  assert.equal(provider.postCount(), 1, 'a server-priced checkout session is created');
+});
