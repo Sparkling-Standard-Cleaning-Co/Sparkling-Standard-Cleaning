@@ -144,7 +144,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
   let calendarRootEl: HTMLElement | null = null;
   const addressDetailsEl = form.querySelector<HTMLElement>('[data-address-details]');
   const streetInputEl = form.querySelector<HTMLInputElement>('#est-address');
-  let addressCardRevealed = false;
   let addressDetailsRevealed = false;
 
   function scrollToTopOf(element: HTMLElement): void {
@@ -165,13 +164,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (calendarGateEl) calendarGateEl.hidden = true;
     calendarRootEl?.classList.remove('is-awaiting-address');
     if (calendarRootEl) scrollToTopOf(calendarRootEl);
-  }
-
-  function revealAddressCard(): void {
-    if (!addressCardEl || addressCardRevealed) return;
-    addressCardEl.hidden = false;
-    addressCardRevealed = true;
-    smoothReveal(addressCardEl);
   }
 
   function revealAddressDetails(scroll: boolean): void {
@@ -1902,7 +1894,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (calendarGateEl) calendarGateEl.hidden = false;
     calendarRootEl?.classList.add('is-awaiting-address');
     syncRevealGroups(false);
-    addressCardRevealed = false;
     addressDetailsRevealed = false;
     bookingFinalizedKey = '';
     bookingFinalizeNote = '';

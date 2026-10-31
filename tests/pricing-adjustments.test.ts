@@ -56,7 +56,11 @@ function input(overrides: Partial<EstimateInput> = {}): EstimateInput {
 const round2 = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
 
 function baseRounded(result: ReturnType<typeof calculateEstimate>): number {
-  return round2(result.pricing.basePrice + result.pricing.extrasSubtotal + result.pricing.roundingAdjustment);
+  return round2(result.pricing.basePrice + result.pricing.extrasSubtotal);
+}
+
+function floor5(value: number): number {
+  return Math.floor((value + 1e-9) / 5) * 5;
 }
 
 test('four independent owner calibration factors are configured and validated', () => {
@@ -110,7 +114,7 @@ test('residential totals scale exactly at 0.85, 0.90, 1.00, 1.10 and 1.25', () =
     const result = calculateEstimate(input(), context({ globalFactorOverride: factor }));
     assert.equal(result.status, 'estimated');
     assert.equal(result.pricing.globalFactor, factor);
-    assert.equal(result.pricing.subtotal, round2(base * factor + travel));
+    assert.equal(result.pricing.subtotal, floor5(base * factor + travel));
     assert.equal(selectInstantAmount(result), result.pricing.subtotal);
     assert.equal(
       round2(
@@ -143,7 +147,7 @@ test('STR totals scale exactly at 0.85, 0.90, 1.00, 1.10 and 1.25', () => {
     const result = calculateEstimate(strInput, context({ globalFactorOverride: factor }));
     assert.equal(result.status, 'estimated');
     assert.equal(result.pricing.globalFactor, factor);
-    assert.equal(result.pricing.subtotal, round2(base * factor + travel));
+    assert.equal(result.pricing.subtotal, floor5(base * factor + travel));
     assert.equal(selectInstantAmount(result), result.pricing.subtotal);
   }
 });
@@ -164,7 +168,7 @@ test('Community Support eligibility applies the configured percentage and never 
   assert.equal(eligible.pricing.discount?.amount, round2(baseRounded(base) * percent));
   assert.equal(
     eligible.pricing.subtotal,
-    round2(baseRounded(base) * (1 - percent) + base.pricing.travelAdjustment),
+    floor5(baseRounded(base) * (1 - percent) + base.pricing.travelAdjustment),
   );
 });
 
@@ -175,12 +179,12 @@ test('a Community Support discount is not erased by the minimum job', () => {
     context(),
   );
   const percent = pricing.supportiveHomeDiscount.percent.value / 100;
-  const base = tiny.pricing.basePrice + tiny.pricing.extrasSubtotal + tiny.pricing.roundingAdjustment;
+  const base = tiny.pricing.basePrice + tiny.pricing.extrasSubtotal;
   assert.equal(tiny.status, 'estimated');
   assert.ok(base >= pricing.minimumJob.value);
   assert.equal(tiny.pricing.discount?.amount, round2(base * percent));
-  assert.equal(tiny.pricing.subtotal, round2(base * (1 - percent)));
-  assert.equal(selectInstantAmount(tiny), round2(base * (1 - percent)), 'the benefit is not re-floored');
+  assert.equal(tiny.pricing.subtotal, floor5(base * (1 - percent)));
+  assert.equal(selectInstantAmount(tiny), floor5(base * (1 - percent)), 'the discount is applied before the single final floor');
 });
 
 test('Community Support never applies to STR and never stacks with SPARKLE100', () => {

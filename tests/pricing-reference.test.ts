@@ -104,23 +104,23 @@ test('fixed reference: 4.70 labor-hours at $50 with a $100 minimum is $235', () 
   }
 });
 
-test('fixed reference: a 1.10 calibration factor turns $235 into $258.50', () => {
+test('fixed reference: a 1.10 calibration factor ends at $255 after the final $5 floor', () => {
   const restore = installFixture();
   try {
     const result = calculateEstimate(input, { ...context, globalFactorOverride: 1.1 });
-    assert.equal(result.pricing.subtotal, 258.5);
+    assert.equal(result.pricing.subtotal, 255);
     assert.equal(result.pricing.globalAdjustment, 23.5);
-    assert.equal(selectInstantAmount(result), 258.5);
+    assert.equal(selectInstantAmount(result), 255);
   } finally {
     restore();
   }
 });
 
-test('fixed reference: a 0.85 calibration factor turns $235 into $199.75', () => {
+test('fixed reference: a 0.85 calibration factor ends at $195 after the final $5 floor', () => {
   const restore = installFixture();
   try {
     const result = calculateEstimate(input, { ...context, globalFactorOverride: 0.85 });
-    assert.equal(result.pricing.subtotal, 199.75);
+    assert.equal(result.pricing.subtotal, 195);
     assert.equal(result.pricing.globalAdjustment, -35.25);
   } finally {
     restore();

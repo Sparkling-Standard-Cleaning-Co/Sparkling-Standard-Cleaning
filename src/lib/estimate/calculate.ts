@@ -373,10 +373,8 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
   const rawPrice = round2(baseRaw + addonRaw);
   const gross = Math.max(minimumJob, rawPrice);
   const minimumApplied = gross > rawPrice;
-  // 1. Base service price after the minimum, rounded to the owner-approved
-  //     presentation step BEFORE any discount or global adjustment. This
-  //    keeps a  campaign exactly  off the displayed base price.
-  const baseRounded = floorToStep(gross, step);
+  // 1. Protect the minimum on the original service value. Discounts and
+  //    calibration adjustments are calculated before the final $5 floor.
 
   const incentive = context.addonIncentive ?? {
     enabled: pricing.addonIncentive.enabled.value,
@@ -392,7 +390,7 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
     eligibleAddonIds: selectedExtras.map((extra) => extra.id),
     addonChargesById: Object.fromEntries(selectedExtras.map((extra) => [extra.id, extra.charge])),
     addonSubtotal: addonRaw,
-    gross: baseRounded,
+    gross,
     minimumJob,
     todayIso: context.promotions?.todayIso ?? new Date().toISOString().slice(0, 10),
     customerKind: context.promotions?.customerKind ?? 'unknown',
@@ -418,22 +416,24 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
     supportiveEligible: input.supportiveEligible === true,
   });
   const discount = evaluation.discount;
-  // 2. One discount (never stacked) applies to the rounded base.
-  const discountedBase = discount ? round2(baseRounded - discount.amount) : baseRounded;
+  // 2. One discount (never stacked) applies to the original service value.
+  const discountedBase = discount ? round2(gross - discount.amount) : gross;
   // 3. The selected engine calibration factor applies to the discounted service subtotal.
   const calibrationEngine = input.serviceType === 'str_turnover' ? 'str' : 'residential';
   const globalFactor = resolveEstimatorCalibration(calibrationEngine, context.globalFactorOverride);
   const calibrationLabel = calibrationEngine === 'str' ? 'STR' : 'Residential';
   const adjustedBase = round2(discountedBase * globalFactor);
   const globalAdjustment = round2(adjustedBase - discountedBase);
-  // 4. Travel is a separately stated pass-through; tax is never included here.
-  const expectedPrice = round2(adjustedBase + travel.adjustment);
+  // 4. Travel stays unchanged. The ONLY presentation rounding happens after
+  //    discounts, calibration and travel: the final pre-tax total floors down
+  //    to the owner-approved $5 step.
+  const unroundedTotal = round2(adjustedBase + travel.adjustment);
+  const expectedPrice = Math.max(0, floorToStep(unroundedTotal, step));
+  const roundingAdjustment = round2(expectedPrice - unroundedTotal);
   const hasAdjustment = discount !== null || globalFactor !== 1;
-  // 5. The base was rounded before discounts. The breakdown presents the
-  //    unrounded base + extras + the presentation adjustment separately so
-  //    the customer can reconcile every line exactly.
-  const roundingAdjustment = minimumApplied ? 0 : round2(baseRounded - baseRaw - addonRaw);
-  const basePrice = minimumApplied ? baseRounded : round2(baseRaw);
+  // 5. The breakdown reconciles exactly: original service + extras -
+  //    discount + calibration + travel + final rounding = subtotal.
+  const basePrice = minimumApplied ? round2(gross - addonRaw) : round2(baseRaw);
 
   const pricingBreakdown: PricingBreakdown = {
     ratePerLaborHour: rate,
@@ -477,8 +477,7 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
           },
         ]
       : []),
-    { step: 'price:base_rounding', detail: `Base service rounded down to the nearest $${step}`, value: round2(baseRounded - gross) },
-    { step: 'price:rounding', detail: 'Discounts and the engine calibration factor are preserved to the cent; no upward rounding or reapplied minimum', value: roundingAdjustment },
+    { step: 'price:rounding', detail: `Final discounted pre-tax total rounded DOWN once to the nearest ${step}`, value: roundingAdjustment },
     { step: 'price:expected', detail: 'Offered price before travel/tax presentation', value: expectedPrice },
   );
 
