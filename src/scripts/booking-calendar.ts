@@ -58,6 +58,19 @@ interface Slot {
   endLabel: string;
 }
 
+interface MonthDay {
+  date: string;
+  enabled: boolean;
+  morningAvailable: boolean;
+  afternoonAvailable: boolean;
+  morningSlots: number;
+  afternoonSlots: number;
+  available: boolean;
+  known: boolean;
+  slotCount: number;
+  reason?: string;
+}
+
 type Period = 'first' | 'afternoon';
 
 const PERIODS: Record<Period, { label: string; startMinutes: number; endMinutes: number }> = {
@@ -157,6 +170,11 @@ export function initBookingCalendar(
   let availableSlots: Slot[] = [];
   let liveAvailability = false;
   let timesSeq = 0;
+  let monthDays = new Map<string, MonthDay>();
+  let monthState: 'idle' | 'loading' | 'ready' | 'error' = 'idle';
+  let monthSeq = 0;
+  let monthKey = '';
+  const monthCache = new Map<string, { at: number; days: MonthDay[] }>();
 
   function setStatus(message: string, kind: 'info' | 'error' | 'success' = 'info'): void {
     if (!statusEl) return;
@@ -393,6 +411,95 @@ export function initBookingCalendar(
     }
   }
 
+  function monthRange(): { from: string; to: string } | null {
+    const first = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(viewYear, viewMonth + 1, 0, 12)).getUTCDate();
+    const last = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    const from = first < today ? today : first;
+    const to = last > latest ? latest : last;
+    return from <= to ? { from, to } : null;
+  }
+
+  async function loadMonthAvailability(force = false): Promise<void> {
+    const range = monthRange();
+    const point = coordinates();
+    if (!range || !point) {
+      monthState = 'idle';
+      monthDays.clear();
+      renderCalendar();
+      return;
+    }
+    const key = `${range.from}|${range.to}|${point.lat.toFixed(5)}|${point.lng.toFixed(5)}`;
+    if (!force && key === monthKey && monthState !== 'idle') return;
+    monthKey = key;
+    const cached = monthCache.get(key);
+    if (!force && cached && Date.now() - cached.at < 5 * 60_000) {
+      monthDays = new Map(cached.days.map((day) => [day.date, day]));
+      monthState = 'ready';
+      renderCalendar();
+      return;
+    }
+    const seq = ++monthSeq;
+    monthState = 'loading';
+    monthDays.clear();
+    renderCalendar();
+    try {
+      const params = new URLSearchParams({
+        from: range.from,
+        to: range.to,
+        durationMinutes: String(PROVISIONAL_DURATION),
+        lat: String(point.lat),
+        lng: String(point.lng),
+      });
+      const response = await fetch(`/api/availability-month?${params}`, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (seq !== monthSeq) return;
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        enabled?: boolean;
+        days?: MonthDay[];
+      };
+      if (!response.ok || data.ok !== true || data.enabled !== true || !Array.isArray(data.days)) {
+        monthState = 'error';
+        monthDays.clear();
+        renderCalendar();
+        return;
+      }
+      const days = data.days.filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day.date));
+      monthCache.set(key, { at: Date.now(), days });
+      monthDays = new Map(days.map((day) => [day.date, day]));
+      monthState = 'ready';
+      renderCalendar();
+    } catch {
+      if (seq !== monthSeq) return;
+      monthState = 'error';
+      monthDays.clear();
+      renderCalendar();
+    }
+  }
+
+  function dayAvailability(dateKey: string): { morning: string; afternoon: string; title: string; unavailable: boolean } {
+    if (monthState === 'loading') {
+      return { morning: 'AM ...', afternoon: 'PM ...', title: 'Checking live availability', unavailable: false };
+    }
+    if (monthState === 'error') {
+      return { morning: 'AM ?', afternoon: 'PM ?', title: 'Live availability could not be loaded. Select the date to check again.', unavailable: false };
+    }
+    const day = monthDays.get(dateKey);
+    if (!day) {
+      return { morning: 'AM ?', afternoon: 'PM ?', title: 'Live availability has not been loaded for this date.', unavailable: false };
+    }
+    if (!day.known) {
+      return { morning: 'AM ?', afternoon: 'PM ?', title: 'Live availability could not be confirmed for this date.', unavailable: false };
+    }
+    const morning = day.morningAvailable ? 'AM +' : 'AM x';
+    const afternoon = day.afternoonAvailable ? 'PM +' : 'PM x';
+    const title = `${shortDateLabel(dateKey)}. Morning: ${day.morningAvailable ? `${day.morningSlots} start times available${day.morningSlots <= 2 ? ' (limited)' : ''}` : 'fully booked'}; Afternoon: ${day.afternoonAvailable ? `${day.afternoonSlots} start times available${day.afternoonSlots <= 2 ? ' (limited)' : ''}` : 'fully booked'}`;
+    return { morning, afternoon, title, unavailable: !day.morningAvailable && !day.afternoonAvailable };
+  }
+
   function renderCalendar(): void {
     monthLabelEl.textContent = monthLabel(viewYear, viewMonth);
     const first = new Date(Date.UTC(viewYear, viewMonth, 1, 12));
@@ -408,16 +515,27 @@ export function initBookingCalendar(
     for (let day = 1; day <= daysInMonth; day += 1) {
       const dateKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const button = document.createElement('button');
+      const availability = dayAvailability(dateKey);
+      const windowClass = (value: string) =>
+        value.includes('+') ? 'is-open'
+          : value.includes('x') ? 'is-full'
+            : 'is-unknown';
       button.type = 'button';
       button.className = 'booking-calendar__day';
       button.dataset.date = dateKey;
-      button.textContent = String(day);
+      button.innerHTML = '<span class="booking-calendar__day-number">' + day + '</span><span class="booking-calendar__day-windows" aria-hidden="true"><span class="booking-calendar__window ' + windowClass(availability.morning) + '">' + availability.morning + '</span><span class="booking-calendar__window ' + windowClass(availability.afternoon) + '">' + availability.afternoon + '</span></span>';
+      button.title = availability.title;
+      button.setAttribute(
+        'aria-label',
+        shortDateLabel(dateKey) + '. Morning ' + availability.morning.replace('AM ', '').replace('+', 'available').replace('x', 'fully booked') + '. Afternoon ' + availability.afternoon.replace('PM ', '').replace('+', 'available').replace('x', 'fully booked') + '.',
+      );
       button.setAttribute('role', 'gridcell');
       button.setAttribute('aria-selected', String(dateKey === selectedDate));
-      const disabled = dateKey < today || dateKey > latest;
+      const disabled = dateKey < today || dateKey > latest || availability.unavailable;
       if (disabled) {
         button.disabled = true;
         button.classList.add('is-disabled');
+        if (availability.unavailable) button.classList.add('is-fully-booked');
         button.setAttribute('aria-disabled', 'true');
       }
       if (dateKey === selectedDate) button.classList.add('is-selected');
@@ -448,6 +566,7 @@ export function initBookingCalendar(
       viewYear -= 1;
     }
     renderCalendar();
+    void loadMonthAvailability(true);
   });
   nextButton?.addEventListener('click', () => {
     viewMonth += 1;
@@ -456,6 +575,7 @@ export function initBookingCalendar(
       viewYear += 1;
     }
     renderCalendar();
+    void loadMonthAvailability(true);
   });
 
   for (const button of periodButtons) {
@@ -493,6 +613,7 @@ export function initBookingCalendar(
 
   renderCalendar();
   clearTimes();
+  void loadMonthAvailability();
 
   return {
     setContext(next) {
@@ -502,6 +623,7 @@ export function initBookingCalendar(
         (next.zip ?? '') !== (context.zip ?? '');
       context = next;
       if (changed && selectedDate) void refreshTimes();
+      if (changed) void loadMonthAvailability(true);
     },
     selection() {
       return selectedTime;

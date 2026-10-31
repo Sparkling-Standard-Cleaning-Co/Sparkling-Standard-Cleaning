@@ -193,6 +193,41 @@ export async function calendarJobsForDate(
   }
 }
 
+
+export async function calendarJobsForRange(
+  env: GoogleCalendarEnv,
+  fromDate: string,
+  toDate: string,
+  timeZone: string,
+): Promise<{ ok: boolean; jobs: CalendarJob[]; reason?: 'auth_failed' | 'calendar_unavailable' }> {
+  const token = await accessToken(env);
+  if (!token) return { ok: false, jobs: [], reason: 'auth_failed' };
+  const start = zonedTimeToUtc(fromDate, '00:00', timeZone);
+  const endDay = new Date(Date.parse(`${toDate}T12:00:00Z`) + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const end = zonedTimeToUtc(endDay, '00:00', timeZone);
+  const params = new URLSearchParams({
+    timeMin: start.toISOString(),
+    timeMax: end.toISOString(),
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '2500',
+  });
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${calendarPath(env)}/events?${params}`,
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(12_000) },
+    );
+    if (!response.ok) return { ok: false, jobs: [], reason: 'calendar_unavailable' };
+    const data = (await response.json().catch(() => ({}))) as { items?: GoogleCalendarEvent[] };
+    const jobs = (data.items ?? [])
+      .map((event) => eventJob(event, timeZone))
+      .filter((job): job is CalendarJob => job !== null);
+    return { ok: true, jobs };
+  } catch {
+    return { ok: false, jobs: [], reason: 'calendar_unavailable' };
+  }
+}
+
 export interface NewCalendarJob {
   summary: string;
   description: string;

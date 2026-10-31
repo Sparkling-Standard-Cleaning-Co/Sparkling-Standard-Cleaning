@@ -63,6 +63,11 @@ const { id = 'estimate-calendar' } = Astro.props;
         role="grid"
         aria-label="Available cleaning dates"
       ></div>
+      <p class="booking-calendar__legend small" aria-label="Calendar availability legend">
+        <span><span class="booking-calendar__window is-open">AM +</span> Morning open</span>
+        <span><span class="booking-calendar__window is-full">PM x</span> Window booked</span>
+        <span><span class="booking-calendar__window is-unknown">?</span> Not loaded</span>
+      </p>
       <p class="booking-calendar__hint small" data-calendar-date-note>
         Past dates are unavailable. Requests can be made up to {bookingConfig.maxAdvanceDays} days
         ahead.
