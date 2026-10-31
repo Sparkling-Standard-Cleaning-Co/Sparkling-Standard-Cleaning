@@ -1750,7 +1750,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = (await response.json()) as RoutedTravelInfo;
-      if (typeof data.oneWayMiles === 'number' && data.oneWayMiles > 0) {
+      if (typeof data.oneWayMiles === 'number' && data.oneWayMiles >= 0 && data.verified === true) {
         applyIfCurrent(data);
         try {
           window.sessionStorage.setItem(travelCacheKey(key), JSON.stringify(data));
