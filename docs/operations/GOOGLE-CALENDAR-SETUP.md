@@ -8,12 +8,12 @@ a **complete paid booking** that passes payment, address, photo, time and resour
 automatically. Incomplete, unpaid or review-required requests remain pending for the owner. No
 Sunshine Climate Solutions calendar or credentials are used.
 
-**Write verification remains outstanding.** Creating, rescheduling and cancelling events is
-implemented and mock-tested, and production holds/reads are verified, but the live write lifecycle
-has not been executed because the production `BOOKING_OWNER_TOKEN` is an encrypted Cloudflare secret
-that cannot be read locally. Run `node scripts/booking-live-test.mjs` from a terminal (it prompts for
-the token without echoing it, requires a typed `YES`, and cleans up its synthetic event). Never test
-against a real customer appointment.
+**Write verification completed 2026-11-01.** A controlled production lifecycle created, confirmed,
+read, rescheduled and cancelled a synthetic event; the same event ID was retained, the conflicting
+slot was blocked, duplicate confirmation was idempotent, and availability was restored. The test did
+not create a D1 appointment or a real customer booking. Run `node scripts/booking-live-test.mjs`
+from a terminal for future controlled checks (it prompts for the token without echoing it, requires
+a typed `YES`, and cleans up its synthetic event). Never test against a real customer appointment.
 
 **Pending requests:** a temporary hold lasts 20 minutes, but a submitted reservation remains a durable
 **pending owner-review request** after the hold expires. Pending requests are non-guaranteed and do
@@ -134,6 +134,6 @@ A complete paid booking confirms only when payment, address, required photos, re
 resource availability all verify. A bare OAuth token is not enough to confirm a job, and an
 unverified request must never be presented as a confirmed appointment.
 
-The live write lifecycle still needs one controlled run (see the status note above and
-`scripts/booking-live-test.mjs`). Until that run is recorded, describe calendar **writes** as
-implemented and mock-tested, not production-verified.
+The live write lifecycle was verified with one controlled production run on 2026-11-01 (see the
+status note above and `scripts/booking-live-test.mjs`). Future changes to writes should repeat that
+controlled run.

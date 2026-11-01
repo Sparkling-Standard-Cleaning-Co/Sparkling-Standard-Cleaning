@@ -30,6 +30,12 @@ const addDays = (date, n) => {
 };
 const START_DATE = arg('date', addDays(today, 1));
 
+const sameInstant = (a, b) =>
+  typeof a === 'string' &&
+  typeof b === 'string' &&
+  Number.isFinite(Date.parse(a)) &&
+  Date.parse(a) === Date.parse(b);
+
 function readHidden(question) {
   return new Promise((resolve, reject) => {
     if (!input.isTTY) {
@@ -171,7 +177,8 @@ try {
       moved.response.ok === true &&
       moved.body.ok === true &&
       reInspect.body.calendarEventId === confirm.body.eventId &&
-      reInspect.body.calendarEvent?.start === alternative.start;
+      sameInstant(reInspect.body.calendarEvent?.start, alternative.start) &&
+      sameInstant(reInspect.body.calendarEvent?.end, alternative.end);
     if (movedOk) finalSlot = { ...slot, start: alternative.start, end: alternative.end };
     output.write(`Reschedule (event updated, same id): ${movedOk ? 'PASS' : 'FAIL'}\n`);
   } else {

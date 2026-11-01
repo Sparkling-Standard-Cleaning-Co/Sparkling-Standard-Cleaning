@@ -1,5 +1,64 @@
 # Verification status
 
+## Verified - 2026-11-01 booking, recurring, document and employee release
+
+**Release:** `7eab309` on `production-safe`; Cloudflare Pages deployment
+`71be4e9f-f1aa-432c-9681-fd5f8cb4e077` (source `7eab309`) is active. The previous production
+checkpoint was `aeeaa922-a931-45e2-8b1f-eb2f4d05ba94` (source `0983ca0`).
+
+**Scope:** dynamic booking resources and qualifications, recurring scheduling with the daily
+replenishment Worker, document management and e-signature, employee invitation/auto-link and the
+document gates before payment/confirmation. Migrations `0017`-`0020` were applied after a verified
+production D1 export. The private documents R2 bucket is bound to both environments.
+
+**Credential recovery (values never recorded here):**
+
+- Google OAuth was reauthorized through the existing Desktop client; Calendar read and a synthetic
+  create/delete write cycle passed against `Sparkling Standard - Bookings`.
+- The private dispatch origin was verified against the live production route (0.0-mile self-route).
+- The rotated Stripe key authenticated and the existing live webhook endpoint was enabled.
+- The live webhook signing secret verified a byte-exact synthetic `ping` event with HTTP 200
+  `ignored`; no payment or booking record was created.
+- Resend authenticated and the `sparkling-standard.com` sending domain is verified.
+- The private documents R2 bucket passed a synthetic put/get/delete round trip.
+- Cloudflare production and preview secret inventories were restored with targeted updates; the
+  old deployment was never overwritten.
+
+**Local verification (exact final code):**
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **759 tests: 758 passed, 1 pre-existing skip, 0 failed** |
+| Browser suite | **189 passed, 0 failed** on the final run (one map-animation flake passed in isolation and on rerun) |
+| Type check | `npm run check` 0 errors, 0 warnings, 1 hint |
+| Build + validation | `npm run verify` passed (links, SEO, marketing/QR, GTM artifacts, checklist leaks) |
+| Pricing configuration | `config:validate` passed; automatic version unchanged |
+| D1 | **20 migrations applied, 65 tables**, 0 document templates/bundles/signatures, 0 recurring plans, 0 payment events, 0 gift certificates; Hayli is the only team member |
+
+**Production verification:**
+
+| Check | Result |
+| --- | --- |
+| `/api/booking-status` | Calendar connected, `America/Chicago`, `auto_confirm`, `eventReadOk:true` |
+| `/api/availability` | `enabled:true`, 37 slots for 2026-11-03 |
+| `/api/travel` | self-route 0.0 mi and Pensacola 15.1 mi, Google route verified |
+| `/api/estimate-checkout` | `enabled:true`, live mode, all readiness checks true |
+| `/api/photo-upload` | `enabled:true` |
+| Core pages | `/`, `/estimate/`, `/estimate/residential/`, `/admin/`, `/employee/`, `/document-sign/`, robots and sitemap return 200 |
+| Webhook | byte-exact synthetic `ping` returned 200 `ignored` |
+| R2 | documents bucket synthetic round trip passed |
+| Live booking lifecycle | availability, hold, confirmation, event read, conflict block, idempotent re-confirm, cancellation and availability restoration passed |
+| Reschedule | event moved to the requested instant and retained the same event ID; the owner script now compares instants rather than offset-formatted strings |
+| Recurring Worker | deployed with `0 9 * * *`; public workers.dev route disabled (404); token accepted by the Pages endpoint with a zero-plan run |
+
+**Not verified / blocked:**
+
+- No real-money Stripe charge, refund or gift purchase was performed.
+- Document templates, bundles and signatures are empty pending owner upload and approval; no draft
+  legal agreement was activated.
+- Employee portal activation still requires a supervised first clock-in/out and timecard approval.
+- The live booking test did not create a D1 appointment or send a customer email.
+
 ## Owner-verified - 2026-10-31 Google Calendar writes
 
 The owner confirmed that production Google Calendar appointment creation and
