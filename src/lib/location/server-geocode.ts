@@ -339,12 +339,12 @@ export async function googleAutocomplete(
       includedRegionCodes: ['us'],
       languageCode: 'en',
       regionCode: 'us',
-      locationBias: { circle: { center: { latitude: 30.4213, longitude: -87.2169 }, radius: 80000 } },
+      locationBias: { circle: { center: { latitude: 30.4213, longitude: -87.2169 }, radius: 50000 } },
       ...(sessionToken ? { sessionToken } : {}),
     }),
     signal: AbortSignal.timeout(7000),
   });
-  if (!response.ok) return [];
+  if (!response.ok) throw new Error(`places_http_${response.status}`);
   const data = (await response.json().catch(() => ({}))) as {
     suggestions?: Array<{
       placePrediction?: {

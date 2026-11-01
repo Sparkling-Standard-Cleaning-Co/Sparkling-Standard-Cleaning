@@ -87,7 +87,7 @@ interface ResolvedCandidate {
   zip?: string;
   city?: string;
   state?: string;
-  source: 'mapmap' | 'census' | 'manual' | 'gps';
+  source: 'mapmap' | 'google' | 'census' | 'manual' | 'gps';
   adjusted: boolean;
   /**
    * True when the provider only knows the street (not the house number). The
@@ -385,7 +385,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       label,
       lat,
       lng,
-      source: resolved.source === 'mapmap' ? 'mapmap' : 'census',
+      source: resolved.source === 'mapmap' ? 'mapmap' : resolved.source === 'google' ? 'google' : 'census',
       adjusted: false,
       ...(resolved.zip ? { zip: resolved.zip } : {}),
       ...(resolved.city ? { city: resolved.city } : {}),

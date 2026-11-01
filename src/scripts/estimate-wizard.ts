@@ -2480,8 +2480,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   // ── Wiring ────────────────────────────────────────────────────────────────
   async function advanceStep(): Promise<void> {
-    if (currentStep === 1 && addressFinder) {
-      await addressFinder.verifyAddress();
+    if (currentStep === 1) {
       const submission = submissionAddress();
       bookingCalendar?.setContext({
         ...(submission.location
