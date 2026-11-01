@@ -435,7 +435,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
           : 'Address saved. We will calculate travel to this exact location.',
       'info',
     );
-    if (autoConfirm) {
+    if (autoConfirm && !resolved.streetLevel && !resolved.approximate) {
       commitManualCandidate(false);
       return;
     }
