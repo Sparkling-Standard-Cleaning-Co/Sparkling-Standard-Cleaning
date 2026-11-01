@@ -1,9 +1,27 @@
 # Recurring replenishment Worker
 
-Daily Cloudflare Worker that keeps the rolling 60-day recurring horizon
-populated. It reuses the production recurring engine, the existing D1 database
-and the existing Google Calendar credentials. It does not create a second
-calendar, identity system or database.
+Daily Cloudflare Worker trigger that keeps the rolling 60-day recurring
+horizon populated.
+
+## Architecture
+
+The recurring engine runs inside the existing Pages Functions environment via
+the protected endpoint:
+
+`POST /api/internal/recurring-replenish`
+
+That endpoint uses the existing D1 database, Google Calendar credentials and
+MapMap/Google routing configuration already configured for the production
+Pages project. The Worker does **not** receive copies of those credentials.
+
+The Worker holds only:
+
+- `RECURRING_WORKER_ENABLED=true`
+- `RECURRING_REPLENISH_URL=https://sparkling-standard.com/api/internal/recurring-replenish`
+- `RECURRING_WORKER_TOKEN` — a single-purpose bearer secret also configured on
+  the Pages project.
+
+This avoids duplicating Google/OAuth secrets into a second runtime.
 
 ## What it does
 
@@ -13,22 +31,21 @@ calendar, identity system or database.
 - Never duplicates an existing confirmed appointment or calendar event.
 - Records conflicts and errors for owner review.
 - Respects paused, cancelled and completed plans.
-- Does nothing unless `RECURRING_SCHEDULING_ENABLED=true`.
+- Does nothing unless `RECURRING_WORKER_ENABLED=true` on both the Worker and the
+  Pages endpoint.
 
 Cron runs in UTC. `0 9 * * *` is 3:00/4:00 AM America/Chicago depending on DST.
 
-## Deployment (owner action)
+## Deployment
 
-1. Copy `wrangler.toml.example` to `wrangler.toml`.
-2. Fill the **existing** production D1 `database_id` from the Cloudflare
-   dashboard. Do not create a new database.
-3. Add the same secrets already used by the Pages project:
-   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`,
-   `GOOGLE_CALENDAR_ID`, `TRAVEL_ORIGIN`, the MapMap keys, and
-   `RECURRING_SCHEDULING_ENABLED`.
-4. Run `npx wrangler deploy --config wrangler.toml`.
-5. Verify the Cron Trigger exists in the Cloudflare dashboard and that a run
-   row appears in `recurring_worker_runs`.
+The Worker has already been deployed to the existing Cloudflare account as
+`sparkling-standard-recurring` with the `0 9 * * *` trigger. To redeploy:
 
-The worker cannot be deployed from the repository alone because the production
-database id and secrets are intentionally not committed.
+1. Use a Wrangler configuration with the existing production D1 id.
+2. Set `RECURRING_WORKER_TOKEN` with `wrangler secret bulk` or
+   `wrangler secret put`.
+3. Run `npx wrangler deploy --config <config>`.
+4. Verify the trigger in the Cloudflare dashboard and a completed row in
+   `recurring_worker_runs`.
+
+Do not commit the production database id or the bearer token.
