@@ -412,7 +412,12 @@ export async function getSigningRequestByToken(
     .bind(await hashToken(token), now())
     .first<SigningRequestRow>();
   if (!request) return null;
-  const requirements = JSON.parse(request.requirement_snapshot_json || '[]') as RequirementSnapshot[];
+  const parsedSnapshot = JSON.parse(request.requirement_snapshot_json || '[]') as unknown;
+  const requirements = Array.isArray(parsedSnapshot)
+    ? (parsedSnapshot as RequirementSnapshot[]).filter(
+        (item) => item && typeof item === 'object' && typeof item.templateId === 'string',
+      )
+    : [];
   const signatures = await db
     .prepare('SELECT * FROM document_signatures WHERE signing_request_id = ?')
     .bind(request.id)
