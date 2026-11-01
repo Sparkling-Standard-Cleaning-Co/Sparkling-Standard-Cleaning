@@ -30,7 +30,7 @@ export const bookingResources: ReadonlyArray<BookingResource> = [
   {
     id: 'family-cleaner',
     name: 'Family Cleaner',
-    active: true,
+    active: false,
   },
 ] as const;
 

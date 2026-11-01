@@ -365,7 +365,7 @@ test('an expired hold with a durable pending request can still be owner-confirme
   }
 });
 
-test('the owner can reassign a confirmed booking to another cleaner', async () => {
+test('the owner can reassign a confirmed booking to the bookable cleaner', async () => {
   const config = bookingConfig as { enabled: boolean };
   const original = config.enabled;
   config.enabled = true;
@@ -409,7 +409,7 @@ test('the owner can reassign a confirmed booking to another cleaner', async () =
           body: JSON.stringify({
             id: created.hold.id,
             action: 'reassign',
-            resourceIds: ['family-cleaner'],
+            resourceIds: ['hayli'],
           }),
         });
         const response = await bookingAdminPost({
@@ -418,16 +418,16 @@ test('the owner can reassign a confirmed booking to another cleaner', async () =
         } as never);
         assert.equal(response.status, 200);
         const data = (await response.json()) as { slot?: { resourceIds?: string[] } };
-        assert.deepEqual(data.slot?.resourceIds, ['family-cleaner']);
+        assert.deepEqual(data.slot?.resourceIds, ['hayli']);
       },
     );
     assert.equal(
       (patchBody.extendedProperties as { private?: { sparkling_resources?: string } }).private
         ?.sparkling_resources,
-      'family-cleaner',
+      'hayli',
     );
     const stored = await getBookingHold(bucket, created.hold.id);
-    assert.deepEqual(stored?.resourceIds, ['family-cleaner']);
+    assert.deepEqual(stored?.resourceIds, ['hayli']);
     assert.equal(stored?.calendarEventId, 'evt-reassign');
   } finally {
     config.enabled = original;

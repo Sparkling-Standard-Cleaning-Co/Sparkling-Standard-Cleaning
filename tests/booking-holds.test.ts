@@ -66,7 +66,7 @@ test('adjacent holds do not overlap', async () => {
   assert.equal((await listActiveHolds(bucket, slot.date)).length, 2);
 });
 
-test('simultaneous holds are allowed on different cleaners', async () => {
+test('a deactivated placeholder resource cannot create a second concurrent hold', async () => {
   const bucket = new FakeLedger();
   assert.equal((await createBookingHold(bucket, slot)).ok, true);
   const second = await createBookingHold(bucket, {
@@ -76,25 +76,19 @@ test('simultaneous holds are allowed on different cleaners', async () => {
     reference: 'SS-20261027-DEF456',
     resourceIds: ['family-cleaner'],
   });
-  assert.equal(second.ok, true);
-  assert.equal((await listActiveHolds(bucket, slot.date)).length, 2);
+  assert.equal(second.ok, false);
+  assert.equal((await listActiveHolds(bucket, slot.date)).length, 1);
 });
 
-test('a joint hold blocks both resources', async () => {
+test('a joint hold fails when only one bookable resource remains', async () => {
   const bucket = new FakeLedger();
   const joint = await createBookingHold(bucket, {
     ...slot,
     resourceIds: ['hayli', 'family-cleaner'],
     crewSize: 2,
   });
-  assert.equal(joint.ok, true);
-  const single = await createBookingHold(bucket, {
-    ...slot,
-    reference: 'SS-20261027-JOINT2',
-    resourceIds: ['family-cleaner'],
-  });
-  assert.equal(single.ok, false);
-  if (!single.ok) assert.equal(single.error, 'overlap');
+  assert.equal(joint.ok, false);
+  assert.equal((await listActiveHolds(bucket, slot.date)).length, 0);
 });
 
 test('a legacy hold with no resource assignment conservatively blocks every cleaner', async () => {
