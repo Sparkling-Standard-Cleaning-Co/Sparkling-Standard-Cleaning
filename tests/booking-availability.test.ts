@@ -69,6 +69,21 @@ test('a free day offers only slots that fit the workday, travel and notice perio
   assert.ok(new Date(last.end) <= zonedTimeToUtc('2026-11-10', '18:00', tz));
 });
 
+test('the first appointment may start at 7:00 AM with zero travel', async () => {
+  const result = await calculateAvailability(
+    request({
+      workdayStart: '07:00',
+      slotMinutes: 15,
+      resources: resources.map((resource) => ({ ...resource, workdayStart: '07:00' })),
+      travelMinutes: async () => 0,
+    }),
+    label,
+  );
+  assert.equal(result.available, true);
+  assert.equal(label(new Date(result.slots[0]!.start)), '7:00 AM');
+  assert.ok(result.slots.some((slot) => label(new Date(slot.start)) === '7:15 AM'));
+});
+
 test('a nearby previous job consumes travel time before the new job', async () => {
   const result = await calculateAvailability(
     request({

@@ -31,10 +31,13 @@ export async function onRequestGet(context: { request: Request; env: BookingEnv 
     return json({ ok: false, error: 'range_too_large' }, 400);
   }
   const durationRaw = Number(url.searchParams.get('durationMinutes'));
-  const lat = Number(url.searchParams.get('lat'));
-  const lng = Number(url.searchParams.get('lng'));
+  const latRaw = url.searchParams.get('lat');
+  const lngRaw = url.searchParams.get('lng');
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
+  const hasPoint = latRaw !== null && lngRaw !== null && Number.isFinite(lat) && Number.isFinite(lng);
   if (!Number.isFinite(durationRaw)) return json({ ok: false, error: 'invalid_request' }, 400);
-  const result = Number.isFinite(lat) && Number.isFinite(lng)
+  const result = hasPoint
     ? await availabilityForRange(env, { from, to, durationMinutes: durationRaw, destination: { lat, lng } })
     : await scheduleAvailabilityForRange(env, { from, to, durationMinutes: durationRaw });
   if (!result.ok) return json({ ok: true, enabled: false, reason: result.reason, days: [] });
