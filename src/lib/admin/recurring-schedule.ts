@@ -1,6 +1,6 @@
 import { bookingConfig } from '../../config/booking.ts';
 import { availabilityForDate, type BookingEnv } from '../booking/service.ts';
-import { createCalendarEvent, deleteCalendarEvent, findCalendarEventByReference } from '../booking/google-calendar.ts';
+import { createCalendarEvent, deleteCalendarEvent, findCalendarEventByReference, getCalendarEvent } from '../booking/google-calendar.ts';
 import { addDays, zonedTimeToUtc } from '../booking/time.ts';
 import type { AdminActor } from './operations.ts';
 import { AdminAuthError, audit } from './operations.ts';
@@ -168,8 +168,12 @@ export async function syncRecurringPlan(
       'SELECT id, status, appointment_id, calendar_event_id FROM recurring_occurrences WHERE plan_id = ? AND occurrence_date = ? LIMIT 1',
     ).bind(planId, date).first<{ id: string; status: string; appointment_id: string | null; calendar_event_id: string | null }>();
     if (existing && existing.status === 'scheduled' && existing.appointment_id && existing.calendar_event_id) {
-      result.skipped += 1;
-      continue;
+      const appointment = await db.prepare('SELECT status FROM appointments WHERE id = ? LIMIT 1').bind(existing.appointment_id).first<{ status: string }>();
+      const event = await getCalendarEvent(env, existing.calendar_event_id).catch(() => null);
+      if (appointment && ['pending', 'confirmed'].includes(appointment.status) && event && event.status !== 'cancelled') {
+        result.skipped += 1;
+        continue;
+      }
     }
     const duration = date === plan.start_date.slice(0, 10) ? durationFirst : durationOngoing;
     const start = zonedTimeToUtc(date, plan.start_time, bookingConfig.timeZone);
@@ -192,6 +196,7 @@ export async function syncRecurringPlan(
     const end = new Date(exact.end);
     const occurrenceReference = reference(planId, date);
     let eventId = existing?.calendar_event_id ?? await findCalendarEventByReference(env, occurrenceReference);
+    let createdByThisAttempt = false;
     if (!eventId) {
       const created = await createCalendarEvent(env, {
         summary: `Sparkling Standard Recurring Cleaning - ${[plan.first_name, plan.last_name].filter(Boolean).join(' ') || planId}`,
@@ -212,6 +217,7 @@ export async function syncRecurringPlan(
         continue;
       }
       eventId = created.eventId;
+      createdByThisAttempt = true;
     }
     const appointmentId = existing?.appointment_id ?? `appt_${crypto.randomUUID()}`;
     try {
@@ -240,7 +246,7 @@ export async function syncRecurringPlan(
       }
       result.created += 1;
     } catch {
-      await deleteCalendarEvent(env, eventId);
+      if (createdByThisAttempt && eventId) await deleteCalendarEvent(env, eventId);
       result.errors.push(`${date}:d1_write_failed`);
     }
   }
