@@ -41,13 +41,17 @@ export function centralDateKey(date: Date): string {
 async function claimRun(db: D1Database, runKey: string): Promise<{ ok: boolean; id?: string; reason?: string }> {
   const id = `run_${crypto.randomUUID()}`;
   const startedAt = new Date().toISOString();
-  await db
+  const inserted = await db
     .prepare(
       `INSERT OR IGNORE INTO recurring_worker_runs (id, run_key, status, started_at)
        VALUES (?, ?, 'running', ?)`,
     )
     .bind(id, runKey, startedAt)
     .run();
+  // A fresh insert belongs to this request. Only inspect the existing row when
+  // the insert was ignored; otherwise we would mistake our own run for a
+  // concurrent one.
+  if (Number(inserted.meta?.changes ?? 0) > 0) return { ok: true, id };
   const row = await db
     .prepare('SELECT id, status, started_at FROM recurring_worker_runs WHERE run_key = ? LIMIT 1')
     .bind(runKey)
