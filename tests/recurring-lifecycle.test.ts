@@ -34,7 +34,7 @@ class TestD1 implements D1Database {
 function migratedDb(): TestD1 {
   const db = new TestD1();
   db.raw.exec('PRAGMA foreign_keys = ON');
-  const files = fs.readdirSync('migrations').filter((file) => /^00(0[1-9]|1[0-6])_.*\.sql$/.test(file)).sort();
+  const files = fs.readdirSync('migrations').filter((file) => /^00(0[1-9]|1[0-9])_.*\.sql$/.test(file)).sort();
   for (const file of files) db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   return db;
 }
@@ -49,7 +49,7 @@ function addDays(date: string, days: number): string {
   return new Date(Date.parse(date + 'T12:00:00Z') + days * 86_400_000).toISOString().slice(0, 10);
 }
 
-async function fixture() {
+async function fixture(startOffset = 55) {
   const db = migratedDb();
   const owner = await enrollOwner(db, { email: `lifecycle-${crypto.randomUUID()}@example.test`, name: 'Lifecycle Owner', password: 'SyntheticOwner!2026' });
   const session = await createOpsSession(db, owner.id, request());
@@ -62,10 +62,15 @@ async function fixture() {
   const propertyId = `prop_${crypto.randomUUID()}`;
   db.raw.prepare("INSERT INTO customers (id, primary_branch_id, first_name, last_name, status) VALUES (?, ?, 'Synthetic', 'Recurring', 'active')").run(customerId, branchId);
   db.raw.prepare("INSERT INTO properties (id, customer_id, branch_id, label, line1, city, state, postal_code, latitude, longitude, status) VALUES (?, ?, ?, 'Home', '100 S Baylen St', 'Pensacola', 'FL', '32502', 30.4111, -87.2164, 'active')").run(propertyId, customerId, branchId);
-  return { db, actor: actor!, customerId, propertyId, startDate: addDays(todayCentral(), 55) };
+  return { db, actor: actor!, customerId, propertyId, startDate: addDays(todayCentral(), startOffset) };
 }
 
-function makeCalendar(resourceIds: string[], startTime = '07:00', conflictDates = new Set<string>()) {
+function makeCalendar(
+  resourceIds: string[],
+  startTime = '07:00',
+  conflictDates = new Set<string>(),
+  failUpdateOnce = new Set<string>(),
+) {
   const events = new Map<string, { id: string; reference: string; start: string; end: string; resourceIds: string[]; status: string }>();
   let creates = 0;
   let sequence = 0;
@@ -88,6 +93,22 @@ function makeCalendar(resourceIds: string[], startTime = '07:00', conflictDates 
       return null;
     }) as never,
     getEvent: (async (_env: unknown, id: string) => events.get(id) ?? null) as never,
+    inspectEvent: (async (_env: unknown, id: string) => {
+      const event = events.get(id);
+      return event ? { state: 'found', event } : { state: 'missing' };
+    }) as never,
+    updateEvent: (async (_env: unknown, id: string, patch: { start?: string; end?: string; resourceIds?: string[] }) => {
+      const event = events.get(id);
+      if (!event) return { ok: false, reason: 'calendar_unavailable' };
+      if (failUpdateOnce.has(event.reference)) {
+        failUpdateOnce.delete(event.reference);
+        return { ok: false, reason: 'calendar_unavailable' };
+      }
+      if (patch.start) event.start = patch.start;
+      if (patch.end) event.end = patch.end;
+      if (patch.resourceIds) event.resourceIds = [...patch.resourceIds];
+      return { ok: true };
+    }) as never,
     createEvent: (async (_env: unknown, job: { reference: string; start: string; end: string; resourceIds: string[] }) => {
       creates += 1;
       sequence += 1;
@@ -204,3 +225,68 @@ test('valid reschedule updates plan, Google event and D1 appointment together', 
   assert.equal((f.db.raw.prepare('SELECT start_time FROM recurring_plans WHERE id = ?').get(plan.id) as { start_time: string }).start_time, '08:00');
 });
 
+
+test('a later-occurrence conflict preserves every original confirmed booking', async () => {
+  const f = await fixture(7);
+  const plan = await createRecurring(f.db, f.actor, {
+    customerId: f.customerId, propertyId: f.propertyId, frequency: 'weekly', startDate: f.startDate,
+    window: 'morning', startTime: '07:00', durationMinutes: 120, crewSize: 1, ongoingPrice: 150,
+  });
+  const env = { GOOGLE_CLIENT_ID: 'x', GOOGLE_CLIENT_SECRET: 'x', GOOGLE_REFRESH_TOKEN: 'x', GOOGLE_CALENDAR_ID: 'x' } as never;
+  const initial = makeCalendar(['family-cleaner']);
+  const created = await syncRecurringPlan(env, f.db, f.actor, plan.id, { deps: initial.deps });
+  assert.equal(created.ok, true);
+  assert.ok(created.created > 1);
+  const originalEvents = [...initial.events.values()].map((event) => ({ ...event }));
+  const originalAppointments = f.db.raw
+    .prepare('SELECT id, start_at, end_at, status FROM appointments WHERE recurring_plan_id = ? ORDER BY start_at')
+    .all(plan.id) as Array<Record<string, unknown>>;
+  const laterDate = addDays(f.startDate, 21);
+  const conflicting = makeCalendar(['family-cleaner'], '08:00', new Set([laterDate]));
+  const prepared = await prepareRecurringScheduleChange(
+    env, f.db, f.actor, plan.id,
+    { frequency: 'weekly', startDate: f.startDate, window: 'morning', startTime: '08:00', durationMinutes: 120, crewSize: 1 },
+    conflicting.deps,
+  );
+  assert.equal(prepared.ok, false);
+  assert.ok(prepared.conflicts.some((conflict) => conflict.date === laterDate));
+  assert.deepEqual([...initial.events.values()].map((event) => ({ ...event })), originalEvents);
+  assert.deepEqual(
+    f.db.raw.prepare('SELECT id, start_at, end_at, status FROM appointments WHERE recurring_plan_id = ? ORDER BY start_at').all(plan.id),
+    originalAppointments,
+  );
+  assert.equal((f.db.raw.prepare('SELECT start_time FROM recurring_plans WHERE id = ?').get(plan.id) as { start_time: string }).start_time, '07:00');
+});
+
+test('a partial external failure rolls back to the original schedule without erasing bookings', async () => {
+  const f = await fixture(7);
+  const plan = await createRecurring(f.db, f.actor, {
+    customerId: f.customerId, propertyId: f.propertyId, frequency: 'weekly', startDate: f.startDate,
+    window: 'morning', startTime: '07:00', durationMinutes: 120, crewSize: 1, ongoingPrice: 150,
+  });
+  const env = { GOOGLE_CLIENT_ID: 'x', GOOGLE_CLIENT_SECRET: 'x', GOOGLE_REFRESH_TOKEN: 'x', GOOGLE_CALENDAR_ID: 'x' } as never;
+  const failureDate = addDays(f.startDate, 21);
+  const initial = makeCalendar(['family-cleaner'], '07:00', new Set(), new Set([`RECURRING-${plan.id}-${failureDate}`]));
+  const created = await syncRecurringPlan(env, f.db, f.actor, plan.id, { deps: initial.deps });
+  assert.equal(created.ok, true);
+  const replacement = makeCalendar(['family-cleaner'], '08:00');
+  const applied = await applyRecurringScheduleChange(
+    env, f.db, f.actor, plan.id,
+    { frequency: 'weekly', startDate: f.startDate, window: 'morning', startTime: '08:00', durationMinutes: 120, crewSize: 1 },
+    { ...initial.deps, availability: replacement.deps.availability },
+  );
+  assert.equal(applied.ok, false);
+  assert.equal(applied.rolledBack, true);
+  assert.equal((f.db.raw.prepare('SELECT start_time FROM recurring_plans WHERE id = ?').get(plan.id) as { start_time: string }).start_time, '07:00');
+  const expectedStart = zonedTimeToUtc(f.startDate, '07:00', 'America/Chicago').toISOString();
+  const events = [...initial.events.values()];
+  assert.ok(events.length > 1);
+  assert.ok(events.every((event) => event.start === expectedStart || event.start > expectedStart));
+  const appointments = f.db.raw
+    .prepare('SELECT start_at, status FROM appointments WHERE recurring_plan_id = ?')
+    .all(plan.id) as Array<{ start_at: string; status: string }>;
+  assert.ok(appointments.length > 1);
+  assert.ok(appointments.every((appointment) => appointment.status === 'confirmed'));
+  const planRow = f.db.raw.prepare('SELECT sync_status FROM recurring_plans WHERE id = ?').get(plan.id) as { sync_status: string };
+  assert.notEqual(planRow.sync_status, 'sync_failed');
+});

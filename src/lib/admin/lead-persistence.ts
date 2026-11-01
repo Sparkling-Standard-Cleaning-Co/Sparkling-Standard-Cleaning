@@ -1,5 +1,7 @@
 import type { D1Database } from './d1.ts';
 import { hashToken } from './auth.ts';
+import { zonedTimeToUtc } from '../booking/time.ts';
+import { bookingConfig } from '../../config/booking.ts';
 
 function splitName(name: string): { first: string; last: string } {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -145,6 +147,8 @@ export async function persistLeadSubmission(
   const holdId = (fields.booking_hold_id ?? '').trim();
   const requestedDate = (fields.preferred_date ?? '').trim();
   if (requestType === 'reservation_request' && holdId && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
+    // The durable hold is the authoritative selected slot. Never replace it
+    // with a loosely typed preferred time in the operational record.
     const rawTime = (fields.preferred_time ?? '').trim();
     const timeMatch = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec(rawTime);
     let hour = 9;
@@ -156,15 +160,31 @@ export async function persistLeadSubmission(
       if (meridiem === 'PM' && hour < 12) hour += 12;
       if (meridiem === 'AM' && hour === 12) hour = 0;
     }
-    const startAt = `${requestedDate}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
-    const endAt = new Date(Date.parse(`${startAt}Z`) + 120 * 60_000).toISOString().slice(0, 19);
+    const fallbackStart = zonedTimeToUtc(
+      requestedDate,
+      `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+      bookingConfig.timeZone,
+    ).toISOString();
+    const slotStart = (fields.booking_slot_start ?? '').trim();
+    const slotEnd = (fields.booking_slot_end ?? '').trim();
+    const startAt =
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}.*Z$/.test(slotStart) && Number.isFinite(Date.parse(slotStart))
+        ? new Date(slotStart).toISOString()
+        : fallbackStart;
+    const endAt =
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}.*Z$/.test(slotEnd) &&
+      Number.isFinite(Date.parse(slotEnd)) &&
+      Date.parse(slotEnd) > Date.parse(startAt)
+        ? new Date(slotEnd).toISOString()
+        : new Date(Date.parse(startAt) + 120 * 60_000).toISOString();
+    const durationMinutes = Math.max(30, Math.round((Date.parse(endAt) - Date.parse(startAt)) / 60_000));
     const requestId = (fields.booking_request_id ?? '').trim() || `request_${holdId}`;
     await db
       .prepare(
         `INSERT OR IGNORE INTO booking_requests
          (id, hold_id, branch_id, customer_id, property_id, status, quote_reference, requested_date,
           start_at, end_at, duration_minutes, payload_json)
-         VALUES (?, ?, 'branch_pensacola', ?, ?, 'pending', ?, ?, ?, ?, 120, ?)`,
+         VALUES (?, ?, 'branch_pensacola', ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         requestId,
@@ -172,9 +192,10 @@ export async function persistLeadSubmission(
         customerId,
         propertyId,
         fields.quote_reference ?? '',
-        requestedDate,
+        startAt.slice(0, 10),
         startAt,
         endAt,
+        durationMinutes,
         JSON.stringify(fields),
       )
       .run();

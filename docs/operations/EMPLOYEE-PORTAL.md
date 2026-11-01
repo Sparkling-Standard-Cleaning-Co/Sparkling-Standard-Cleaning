@@ -1,4 +1,4 @@
-# Employee portal and timekeeping
+﻿# Employee portal and timekeeping
 
 **Portal:** <https://sparkling-standard.com/employee/>
 **Install help:** <https://sparkling-standard.com/employee/install/>
@@ -12,20 +12,38 @@ row in the existing team-member roster.
 
 ## 1. Accounts and invitations
 
-1. The owner or manager opens **Admin → Timekeeping → Staff access**.
-2. Enter the cleaner's email under **Invite a cleaner** and send the invitation.
-3. The cleaner opens the one-time link (72 hours, single use), creates a name and password,
-   and is signed in to `/employee/`.
-4. After the account exists, the manager links it to the roster: enter the account email and
-   choose the matching team member under **Link an account to the roster**.
-5. Rates default to the owner-approved values:
+1. The owner or manager opens **Admin -> Timekeeping -> Staff access**.
+2. Enter the employee's name, email and qualification (helper, lead or solo-qualified)
+   under **Invite a cleaner** and send the invitation.
+3. The system creates or updates the staff roster profile and records the qualification.
+   The invitation is linked to that profile automatically.
+4. The employee opens the one-time link (72 hours, single use), creates a name and password,
+   and is signed in to `/employee/`. The account is linked to the roster on acceptance;
+   no separate manual linking step is required.
+5. Any active employee-onboarding document bundle is sent separately. A submitted document
+   that requires owner verification stays pending until the owner verifies it.
+6. Rates default to the owner-approved values:
    - Regular cleaner: **$18.00/hour**
    - Lead cleaner: **$22.00/hour**
    - Solo assignment: **$25.00/hour**
-6. Only the owner can change a rate (**Pay rates**). Each change is dated and audited.
+7. Only the owner can change a rate (**Pay rates**). Each change is dated and audited.
 
 Managers cannot create owner accounts. A cleaner account can never open the owner console:
 `/admin/` redirects cleaners to `/employee/`, and the owner APIs reject cleaner sessions.
+
+## 1a. Job visibility (owner direction)
+
+The employee job board shows **today and tomorrow only** in America/Chicago.
+
+- A lead- or solo-qualified employee assigned with the `lead` or `solo` role on a specific
+  job receives the date/time, address, service, customer-approved access/parking notes,
+  cleaning instructions, assigned crew and checklist.
+- A helper receives only the job date, start/end, address, job identifier and timekeeping
+  controls. The server omits customer names, house notes, access instructions, service type
+  and checklists from the helper response; hiding them in the browser is not the control.
+- Qualification is a roster property (`team_members.is_solo`, `is_lead`), not
+  `admin_users.role_id`. A helper cannot gain detail visibility by changing client state.
+- Timeclock GPS capture remains action-scoped; there is no continuous tracking.
 
 ## 2. Signing in
 
@@ -41,9 +59,9 @@ Managers cannot create owner accounts. A cleaner account can never open the owne
 Open `/employee/install/` for illustrated steps. The portal is a home-screen web app, not a
 native App Store or Google Play application.
 
-**iPhone/iPad (Safari):** Share → Add to Home Screen → name it “SS Team” → Add.
+**iPhone/iPad (Safari):** Share â†’ Add to Home Screen â†’ name it â€œSS Teamâ€ â†’ Add.
 
-**Android (Chrome):** three-dot menu → Install app (or Add to Home screen) → confirm.
+**Android (Chrome):** three-dot menu â†’ Install app (or Add to Home screen) â†’ confirm.
 
 The manifest uses the approved Sparkling Standard icon and opens in standalone display mode.
 
@@ -103,14 +121,14 @@ or unavailable, the event records the exact status (`denied`, `unavailable` or `
 and **the time is still recorded**. No coordinates are invented.
 
 Managers and the owner can review the verification status and a map link in
-**Admin → Timekeeping → Location verification**. Employees cannot see another employee's
+**Admin â†’ Timekeeping â†’ Location verification**. Employees cannot see another employee's
 location. Coordinates are never shown publicly and are not sent to analytics.
 
 ## 7. Manager timekeeping tools
 
-**Admin → Timekeeping** provides:
+**Admin â†’ Timekeeping** provides:
 
-- a week selector and the Monday–Sunday workweek;
+- a week selector and the Mondayâ€“Sunday workweek;
 - compensated, break, meal and overtime totals per employee;
 - open shifts and **missing clock-out** flags (an open shift of 14 hours or more);
 - every interval with an **Edit** action;
@@ -137,7 +155,7 @@ the correction record.
 
 | Message | Meaning | Action |
 | --- | --- | --- |
-| Your account is not linked to a team-member profile yet | The admin account exists but the roster link is missing | Ask the owner/manager to link it under Timekeeping → Staff access |
+| Your account is not linked to a team-member profile yet | The admin account exists but the roster link is missing | Ask the owner/manager to link it under Timekeeping â†’ Staff access |
 | Your employee profile is inactive | The team-member record is disabled | Ask management |
 | You are already clocked in | An open interval exists | Clock out or end the current break/meal |
 | That action does not match your current clock state | Wrong action for the state | Use the action shown for the current state |

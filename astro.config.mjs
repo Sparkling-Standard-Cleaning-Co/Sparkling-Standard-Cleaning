@@ -30,6 +30,7 @@ export default defineConfig({
         !page.includes('/payment-authorization') &&
         !page.includes('/admin') &&
         !page.includes('/employee') &&
+        !page.includes('/document-sign') &&
         !page.includes('/gift-certificates/success') &&
         !page.includes('/gift-certificates/redeem'),
     }),

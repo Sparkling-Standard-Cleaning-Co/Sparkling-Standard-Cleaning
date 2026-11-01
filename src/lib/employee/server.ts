@@ -16,13 +16,16 @@ export interface EmployeeProfile {
   status: string;
   defaultRateType: RateType;
   rates: Record<RateType, number>;
+  isSolo: boolean;
+  isLead: boolean;
 }
 
 export async function employeeProfile(db: D1Database, userId: string): Promise<EmployeeProfile | null> {
   const row = await db
     .prepare(
       `SELECT tm.id, tm.display_name, tm.email, tm.branch_id, tm.status,
-              tm.default_rate_type, tm.pay_rate_regular_cents, tm.pay_rate_lead_cents, tm.pay_rate_solo_cents
+              tm.default_rate_type, tm.pay_rate_regular_cents, tm.pay_rate_lead_cents, tm.pay_rate_solo_cents,
+              tm.is_solo, tm.is_lead
        FROM team_members tm JOIN admin_users u ON u.id = tm.admin_user_id
        WHERE u.id = ? LIMIT 1`,
     )
@@ -42,6 +45,8 @@ export async function employeeProfile(db: D1Database, userId: string): Promise<E
       lead: positive(row.pay_rate_lead_cents) ?? DEFAULT_RATES_CENTS.lead,
       solo: positive(row.pay_rate_solo_cents) ?? DEFAULT_RATES_CENTS.solo,
     },
+    isSolo: Number(row.is_solo) === 1,
+    isLead: Number(row.is_lead) === 1,
   };
 }
 

@@ -53,6 +53,7 @@ const viewMeta: Record<string, [string, string]> = {
   customers: ['Customers', 'Customer profiles, properties and history.'],
   recurring: ['Recurring Plans', 'Recurring cleaning administration.'],
   jobs: ['Jobs & Team', 'Cleaning jobs, assignments and checklists.'],
+  documents: ['Documents & Agreements', 'Owner-controlled templates, bundles and electronic signatures.'],
   timekeeping: ['Timekeeping', 'Employee hours, corrections and location verification.'],
   finance: ['Invoices & Payments', 'Invoicing, payments, credits and reconciliation.'],
   gift: ['Gift Certificates', 'Existing production gift register.'],
@@ -66,6 +67,7 @@ const navPermission: Record<string, string> = {
   customers: 'customer.read',
   recurring: 'job.read',
   jobs: 'job.read',
+  documents: 'job.read',
   timekeeping: 'job.write',
   finance: 'finance.read',
   gift: 'finance.read',
@@ -491,6 +493,11 @@ async function openRequest(requestId: string): Promise<void> {
   const notifications = (data.notifications as Array<Record<string, unknown>>) ?? [];
   const auditRows = (data.audit as Array<Record<string, unknown>>) ?? [];
   const duplicates = (data.possibleDuplicates as Array<Record<string, unknown>>) ?? [];
+  const documentRequests = request.quote_reference
+    ? await api<{ requests?: Array<Record<string, unknown>> }>(
+        `/api/admin/documents?view=requests&bookingReference=${encodeURIComponent(String(request.quote_reference))}`,
+      ).then((result) => result.requests ?? []).catch(() => [])
+    : [];
   const linked = Boolean(request.customer_id);
   const status = String(request.status ?? '');
   const pending = status === 'pending';
@@ -663,6 +670,8 @@ async function openRequest(requestId: string): Promise<void> {
     ${payloadSummary(payload)}
     <details class="admin-detail-toggle"><summary>Raw request data</summary><pre style="white-space:pre-wrap">${esc(JSON.stringify(payload, null, 2))}</pre></details>
     <details class="admin-detail-toggle"><summary>Request audit trail (${auditRows.length})</summary><pre style="white-space:pre-wrap">${esc(auditRows.map((entry) => `${entry.created_at} · ${entry.action} · ${entry.success ? 'ok' : 'failed'}`).join('\n'))}</pre></details>
+    <h3 style="margin-top:1rem;">Documents &amp; agreements</h3>
+    ${documentRequests.length ? documentRequests.map((entry) => `<div class="admin-record"><p><strong>${esc(entry.bundle_code)}</strong> — ${esc(titleCase(entry.status))}</p><p class="admin-muted">Signed ${esc(entry.signed_count)} · Awaiting verification ${esc(entry.awaiting_verification)}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded for this booking.</p>'}
     <h3 style="margin-top:1rem;">Customer email history</h3>
     ${notificationRows}
     ${email ? `<form class="admin-inline-form" data-form="request-notify" style="margin-top:.75rem;"><input type="hidden" name="requestId" value="${esc(requestId)}" /><button class="btn btn--ghost btn--small" type="submit">Resend last customer email</button></form>` : ''}
@@ -757,6 +766,9 @@ async function openCustomer(customerId: string): Promise<void> {
   const appointments = (data.appointments as Array<Record<string, unknown>>) ?? [];
   const invoices = (data.invoices as Array<Record<string, unknown>>) ?? [];
   const paymentAuthorizations = (data.paymentAuthorizations as Array<Record<string, unknown>>) ?? [];
+  const documentRequests = await api<{ requests?: Array<Record<string, unknown>> }>(
+    `/api/admin/documents?view=requests&customerId=${encodeURIComponent(customerId)}`,
+  ).then((result) => result.requests ?? []).catch(() => []);
   const email = contacts.find((contact) => contact.kind === 'email')?.value ?? customer.email ?? '';
   const phone = contacts.find((contact) => contact.kind === 'phone')?.value ?? customer.phone ?? '';
   detail.hidden = false;
@@ -767,6 +779,7 @@ async function openCustomer(customerId: string): Promise<void> {
     ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}</strong><p>${esc([property.line1, property.city, property.state, property.postal_code].filter(Boolean).join(', '))}</p>${property.access_notes ? `<p class="admin-muted">Access: ${esc(property.access_notes)}</p>` : ''}</div>`).join('') || '<p class="admin-muted">No properties.</p>'}
     <details class="admin-detail-toggle"><summary>Add a property</summary><form class="admin-form" data-form="property-add"><input type="hidden" name="customerId" value="${esc(customerId)}" /><label>Label <input name="label" value="Service property" /></label><label>Address <input name="line1" required /></label><label>City <input name="city" /></label><label>State <input name="state" value="FL" maxlength="2" /></label><label>ZIP <input name="postalCode" maxlength="10" /></label><label>Access notes <textarea name="accessNotes" rows="2"></textarea></label><button class="btn btn--secondary btn--small" type="submit">Add property</button></form></details>
     <h3>History</h3><div class="admin-history">${leads.length ? `<p><strong>Requests:</strong> ${leads.map((lead) => `${esc(lead.request_type)} (${esc(lead.status)})`).join(', ')}</p>` : ''}${estimates.length ? `<p><strong>Estimates:</strong> ${estimates.map((estimate) => `${esc(estimate.quote_reference)} (${money(estimate.total_cents)})`).join(', ')}</p>` : ''}${appointments.length ? `<p><strong>Appointments:</strong> ${appointments.map((appointment) => `${esc(appointment.reference)} (${esc(appointment.status)})`).join(', ')}</p>` : ''}${invoices.length ? `<p><strong>Invoices:</strong> ${invoices.map((invoice) => `${esc(invoice.number)} (${money(invoice.balance_cents)} balance)`).join(', ')}</p>` : ''}</div>
+    <h3>Documents &amp; agreements</h3>${documentRequests.length ? documentRequests.map((request) => `<div class="admin-record"><p><strong>${esc(request.bundle_code)}</strong> — ${esc(titleCase(request.status))}</p><p class="admin-muted">Signed ${esc(request.signed_count)} · Awaiting verification ${esc(request.awaiting_verification)} · ${esc(dateTime(request.created_at))}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded.</p>'}
     <h3>Notes</h3>${notes.map((note) => `<div class="admin-record"><p>${esc(note.body)}</p><p class="admin-muted">${esc(dateTime(note.created_at))}</p></div>`).join('') || '<p class="admin-muted">No notes.</p>'}
     <form class="admin-form" data-form="note-add" style="max-width:none;"><input type="hidden" name="customerId" value="${esc(customerId)}" /><label>Add note <textarea name="body" rows="3" required></textarea></label><button class="btn btn--secondary btn--small" type="submit">Add note</button></form>
     <details class="admin-detail-toggle" data-customer-edit><summary>Edit customer</summary>${customerForm({ ...customer, email, phone })}</details>
@@ -790,7 +803,7 @@ async function loadRecurring(): Promise<void> {
   const data = await api<{ recurring?: Array<Record<string, unknown>> }>('/api/admin/operations?view=recurring');
   const target = document.querySelector<HTMLElement>('[data-admin-recurring]');
   if (target) {
-    renderTable(target, ['Customer', 'Property', 'Frequency', 'Window', 'Start', 'Duration', 'Price', 'Next visit', 'Status', 'Action'], (data.recurring ?? []).map((plan) => [
+    renderTable(target, ['Customer', 'Property', 'Frequency', 'Window', 'Start', 'Duration', 'Price', 'Next visit', 'Sync', 'Status', 'Action'], (data.recurring ?? []).map((plan) => [
       esc([plan.first_name, plan.last_name].filter(Boolean).join(' ')),
       esc([plan.line1, plan.city].filter(Boolean).join(', ')),
       esc(titleCase(plan.frequency)),
@@ -799,6 +812,7 @@ async function loadRecurring(): Promise<void> {
       can('job.write') ? `<input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" />` : esc(plan.duration_minutes ? `${plan.duration_minutes} min` : '?'),
       esc(money(plan.ongoing_price_cents)),
       esc(dateTime(plan.next_visit_date)),
+      `<span class="admin-status">${esc(titleCase(plan.sync_status ?? 'pending'))}</span>`,
       can('job.write') ? `<select class="admin-select" data-recurring-status="${esc(plan.id)}">${['active', 'paused', 'cancelled', 'completed'].map((status) => `<option value="${status}"${status === plan.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select>` : `<span class="admin-status">${esc(titleCase(plan.status))}</span>`,
       can('job.write') ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-save" data-id="${esc(plan.id)}">Save</button>` : '',
     ]), 'No recurring plans are recorded yet.');
@@ -822,11 +836,31 @@ async function loadJobs(): Promise<void> {
   const team = data.team ?? [];
   const target = document.querySelector<HTMLElement>('[data-admin-jobs]');
   if (target) {
-    target.innerHTML = (data.jobs ?? []).map((job) => `<div class="admin-record admin-job"><div><strong>${esc(dateTime(job.start_at))}</strong> · ${esc(job.reference)} · ${esc([job.first_name, job.last_name].filter(Boolean).join(' '))}<p class="admin-muted">${esc([job.line1, job.city].filter(Boolean).join(', '))}${job.crew ? ` · ${esc(job.crew)}` : ''}</p></div><div class="admin-actions">${can('job.write') ? `<select class="admin-select" data-job-status="${esc(job.id)}">${['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'].map((status) => `<option value="${status}"${status === job.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-save" data-id="${esc(job.id)}">Save</button><select class="admin-select" data-job-team="${esc(job.id)}"><option value="">Assign cleaner</option>${team.map((member) => `<option value="${esc(member.id)}">${esc(member.display_name)}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-assign" data-id="${esc(job.id)}">Assign</button>` : `<span class="admin-status">${esc(titleCase(job.status))}</span>`}<button class="btn btn--secondary btn--small" type="button" data-admin-action="job-checklist" data-id="${esc(job.id)}">Checklist</button></div></div>`).join('') || '<div class="admin-empty">No jobs are recorded yet.</div>';
+    target.innerHTML = (data.jobs ?? []).map((job) => {
+      const crewIds = String(job.crew_ids ?? '').split(',').filter(Boolean);
+      const crewNames = String(job.crew ?? '').split(',').map((name) => name.trim()).filter(Boolean);
+      const crewDetail = crewIds.map((memberId, index) => {
+        const name = team.find((member) => member.id === memberId)?.display_name ?? crewNames[index] ?? memberId;
+        return `<span class="admin-muted">${esc(name)}</span>${can('job.write') ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="job-unassign" data-id="${esc(job.id)}" data-member="${esc(memberId)}">Remove</button>` : ''}`;
+      }).join(' ');
+      return `<div class="admin-record admin-job"><div><strong>${esc(dateTime(job.start_at))}</strong> — ${esc(job.reference)} — ${esc([job.first_name, job.last_name].filter(Boolean).join(' '))}<p class="admin-muted">${esc([job.line1, job.city].filter(Boolean).join(', '))}${crewDetail ? ` — ${crewDetail}` : ''}</p></div><div class="admin-actions">${can('job.write') ? `<select class="admin-select" data-job-status="${esc(job.id)}">${['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'].map((status) => `<option value="${status}"${status === job.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-save" data-id="${esc(job.id)}">Save</button><select class="admin-select" data-job-team="${esc(job.id)}"><option value="">Assign cleaner</option>${team.map((member) => `<option value="${esc(member.id)}">${esc(member.display_name)}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-assign" data-id="${esc(job.id)}">Add</button>` : `<span class="admin-status">${esc(titleCase(job.status))}</span>`}<button class="btn btn--secondary btn--small" type="button" data-admin-action="job-checklist" data-id="${esc(job.id)}">Checklist</button></div></div>`;
+    }).join('') || '<div class="admin-empty">No jobs are recorded yet.</div>';
   }
   const teamTarget = document.querySelector<HTMLElement>('[data-admin-team]');
   if (teamTarget) {
-    renderTable(teamTarget, ['Name', 'Email', 'Status', 'Bookable'], team.map((member) => [esc(member.display_name), esc(member.email), `<span class="admin-status">${esc(member.status)}</span>`, Number(member.is_bookable) ? 'Yes' : 'No']), 'No team members are recorded yet.');
+    renderTable(teamTarget, ['Name', 'Email', 'Qualification', 'Bookable', 'Status', 'Actions'], team.map((member) => {
+      const solo = Number(member.is_solo) === 1;
+      const lead = Number(member.is_lead) === 1;
+      const qualification = solo ? 'Solo-qualified' : lead ? 'Lead' : 'Helper';
+      return [
+        esc(member.display_name),
+        esc(member.email),
+        can('job.write') ? `<select class="admin-select" data-team-qualification="${esc(member.id)}"><option value="helper"${!solo && !lead ? ' selected' : ''}>Helper</option><option value="lead"${lead && !solo ? ' selected' : ''}>Lead</option><option value="solo"${solo ? ' selected' : ''}>Solo-qualified</option></select>` : esc(qualification),
+        can('job.write') ? `<input type="checkbox" data-team-bookable="${esc(member.id)}"${Number(member.is_bookable) ? ' checked' : ''} />` : Number(member.is_bookable) ? 'Yes' : 'No',
+        `<span class="admin-status">${esc(member.status)}</span>`,
+        can('job.write') ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="team-save" data-id="${esc(member.id)}">Save</button>` : '',
+      ];
+    }), 'No team members are recorded yet.');
   }
 }
 
@@ -1167,6 +1201,93 @@ async function loadSettings(): Promise<void> {
   }
 }
 
+async function loadDocuments(): Promise<void> {
+  const [templateData, bundleData, requestData] = await Promise.all([
+    api<{ templates?: Array<Record<string, unknown>> }>('/api/admin/documents?view=templates'),
+    api<{ bundles?: Array<Record<string, unknown>> }>('/api/admin/documents?view=bundles'),
+    api<{ requests?: Array<Record<string, unknown>> }>('/api/admin/documents?view=requests'),
+  ]);
+  const templates = templateData.templates ?? [];
+  const bundles = bundleData.bundles ?? [];
+  const requests = requestData.requests ?? [];
+  const templateTarget = document.querySelector<HTMLElement>('[data-admin-documents-templates]');
+  if (templateTarget) {
+    renderTable(templateTarget, ['Title', 'Category', 'Version', 'Status', 'Actions'], templates.map((template) => [
+      esc(template.title),
+      esc(template.category),
+      esc(template.version),
+      `<span class="admin-status">${esc(titleCase(template.status))}</span>`,
+      `<div class="admin-actions">${template.status === 'draft' && actor?.role === 'owner' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-approve" data-id="${esc(template.id)}">Approve</button>` : ''}${template.status !== 'retired' && actor?.role === 'owner' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-retire" data-id="${esc(template.id)}">Retire</button>` : ''}</div>`,
+    ]), 'No document templates are configured yet.');
+  }
+  const bundleTarget = document.querySelector<HTMLElement>('[data-admin-documents-bundles]');
+  if (bundleTarget) {
+    renderTable(bundleTarget, ['Code', 'Name', 'Subject', 'Documents', 'Status', 'Actions'], bundles.map((bundle) => [
+      esc(bundle.code),
+      esc(bundle.name),
+      esc(titleCase(bundle.subject_type)),
+      esc(bundle.document_count),
+      `<span class="admin-status">${esc(titleCase(bundle.status))}</span>`,
+      `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-bundle-open" data-id="${esc(bundle.id)}">View documents</button>`,
+    ]), 'No document bundles are configured yet.');
+  }
+  const requestTarget = document.querySelector<HTMLElement>('[data-admin-documents-requests]');
+  if (requestTarget) {
+    renderTable(requestTarget, ['Subject', 'Bundle', 'Status', 'Signed', 'Awaiting verification', 'Created', 'Actions'], requests.map((request) => [
+      esc([request.first_name, request.last_name].filter(Boolean).join(' ') || request.display_name || request.subject_type),
+      esc(request.bundle_code),
+      `<span class="admin-status">${esc(titleCase(request.status))}</span>`,
+      esc(request.signed_count),
+      esc(request.awaiting_verification),
+      esc(dateTime(request.created_at)),
+      `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-open" data-id="${esc(request.id)}">Open</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-resend" data-id="${esc(request.id)}">Resend</button></div>`,
+    ]), 'No signing requests have been created yet.');
+  }
+  for (const select of document.querySelectorAll<HTMLSelectElement>('[data-document-template-options]')) {
+    select.innerHTML = `<option value="">Choose a template</option>${templates.filter((template) => template.status === 'approved').map((template) => `<option value="${esc(template.id)}">${esc(template.title)} (v${esc(template.version)})</option>`).join('')}`;
+  }
+  for (const select of document.querySelectorAll<HTMLSelectElement>('[data-document-bundle-options]')) {
+    select.innerHTML = `<option value="">Choose a bundle</option>${bundles.map((bundle) => `<option value="${esc(bundle.id)}">${esc(bundle.name)}</option>`).join('')}`;
+  }
+}
+
+async function loadDocumentBundleItems(bundleId: string): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-document-bundle-items]');
+  if (!target) return;
+  if (!bundleId) {
+    target.innerHTML = '<p class="admin-muted">Choose a bundle to view its documents.</p>';
+    return;
+  }
+  const data = await api<{ items?: Array<Record<string, unknown>> }>(`/api/admin/documents?view=items&bundleId=${encodeURIComponent(bundleId)}`);
+  renderTable(target, ['Order', 'Document', 'Version', 'Stage', 'Condition', 'Required', 'Actions'], (data.items ?? []).map((item) => [
+    esc(item.sort_order),
+    esc(item.title),
+    esc(item.version),
+    esc(titleCase(item.enforcement_stage)),
+    esc([item.condition_key, item.condition_value].filter(Boolean).join(': ') || '—'),
+    Number(item.required) ? 'Yes' : 'No',
+    `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-item-remove" data-id="${esc(item.template_id)}" data-bundle="${esc(bundleId)}">Remove</button>`,
+  ]), 'This bundle has no documents yet.');
+}
+
+async function openDocumentRequest(id: string): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-document-request-detail]');
+  if (!target) return;
+  const data = await api<{ request?: Record<string, unknown> | null }>(`/api/admin/documents?view=request&id=${encodeURIComponent(id)}`);
+  const detail = data.request;
+  if (!detail) {
+    target.innerHTML = '<p class="admin-muted">That signing request could not be loaded.</p>';
+    target.hidden = false;
+    return;
+  }
+  const request = detail.request as Record<string, unknown>;
+  const signatures = (detail.signatures as Array<Record<string, unknown>>) ?? [];
+  target.hidden = false;
+  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">Signing request ${esc(request.bundle_code)}</h2><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-close">Close</button></div>
+    <dl class="admin-definition"><dt>Status</dt><dd>${esc(titleCase(request.status))}</dd><dt>Subject</dt><dd>${esc(request.subject_type)}</dd><dt>Booking reference</dt><dd>${esc(request.booking_reference || '—')}</dd></dl>
+    ${signatures.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Document</th><th>Version</th><th>Signer</th><th>Status</th><th>Signed</th><th>Actions</th></tr></thead><tbody>${signatures.map((signature) => `<tr><td>${esc(signature.title)}</td><td>${esc(signature.template_version)}</td><td>${esc(signature.signer_name)}</td><td><span class="admin-status">${esc(titleCase(signature.status))}</span></td><td>${esc(dateTime(signature.signed_at))}</td><td><div class="admin-actions"><a class="btn btn--ghost btn--small" href="/api/admin/documents?view=download&signatureId=${encodeURIComponent(String(signature.id))}">Download</a>${signature.status === 'awaiting_verification' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-verify" data-id="${esc(signature.id)}">Verify</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-reject" data-id="${esc(signature.id)}">Reject</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No signatures yet.</p>'}</div>`;
+}
+
 async function loadView(view: string): Promise<void> {
   const permission = navPermission[view];
   if (permission && !can(permission)) {
@@ -1189,6 +1310,7 @@ async function loadView(view: string): Promise<void> {
     if (view === 'customers') await loadCustomers();
     if (view === 'recurring') await loadRecurring();
     if (view === 'jobs') await loadJobs();
+    if (view === 'documents') await loadDocuments();
     if (view === 'timekeeping') await loadTimekeeping();
     if (view === 'finance') await loadFinance();
     if (view === 'gift') await loadGifts();
@@ -1598,16 +1720,28 @@ document.addEventListener('submit', (event) => {
   }
   if (kind === 'time-invite') {
     setAppError();
-    void api<{ token?: string; expiresAt?: string; emailSent?: boolean }>('/api/admin/timekeeping', {
+    void api<{
+      token?: string;
+      expiresAt?: string;
+      emailSent?: boolean;
+      onboardingRequired?: boolean;
+      onboardingUrl?: string;
+    }>('/api/admin/timekeeping', {
       method: 'POST',
-      body: JSON.stringify({ action: 'invite_employee', email: value('email') }),
+      body: JSON.stringify({
+        action: 'invite_employee',
+        email: value('email'),
+        displayName: value('displayName'),
+        qualification: value('qualification'),
+        isBookable: checked('isBookable'),
+      }),
     }).then((result) => {
       const target = document.querySelector<HTMLElement>('[data-time-invite-result]');
       if (!target) return;
       const link = result.token ? `${window.location.origin}/employee/?invite=${encodeURIComponent(result.token)}` : '';
-      target.innerHTML = result.emailSent
+      target.innerHTML = `${result.emailSent
         ? '<p class="admin-muted">Invitation email sent.</p>'
-        : `<p class="admin-muted">Email was not sent. Share this one-time link directly:</p><p><a href="${esc(link)}">${esc(link)}</a></p>`;
+        : `<p class="admin-muted">Email was not sent. Share this one-time link directly:</p><p><a href="${esc(link)}">${esc(link)}</a></p>`}${result.onboardingRequired ? `<p class="admin-muted">Onboarding paperwork is required before work assignments.${result.onboardingUrl ? ` <a href="${esc(result.onboardingUrl)}">Open the signing link</a>.` : ''}</p>` : ''}`;
       form.reset();
     }).catch((error) => setAppError(friendly(error)));
   }
@@ -1687,6 +1821,124 @@ for (const form of [
   });
 }
 
+function documentResult(message: string, kind: 'ok' | 'error' = 'ok'): void {
+  const target = document.querySelector<HTMLElement>('[data-document-template-result]');
+  if (!target) return;
+  target.innerHTML = `<p class="admin-${kind === 'error' ? 'error' : 'muted'}">${esc(message)}</p>`;
+}
+
+document.querySelector<HTMLFormElement>('[data-document-template-text]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget as HTMLFormElement);
+  void api('/api/admin/documents', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'create_template',
+      title: data.get('title'),
+      category: data.get('category'),
+      version: data.get('version'),
+      signerParty: data.get('signerParty'),
+      contentText: data.get('contentText'),
+      requiresVerification: data.get('requiresVerification') === 'yes',
+    }),
+  }).then(() => {
+    documentResult('Draft template saved. Approve it before it can be required.');
+    return loadDocuments();
+  }).catch((error) => documentResult(friendly(error), 'error'));
+});
+
+document.querySelector<HTMLFormElement>('[data-document-template-upload]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const formData = new FormData(form);
+  formData.set('action', 'upload_template');
+  const headers = new Headers({ Accept: 'application/json' });
+  if (csrf) headers.set('X-CSRF-Token', csrf);
+  void fetch('/api/admin/documents', { method: 'POST', headers, body: formData, credentials: 'same-origin' })
+    .then(async (response) => {
+      const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!response.ok || !result.ok) throw new Error(result.error ?? `HTTP ${response.status}`);
+      documentResult('PDF template uploaded as a draft. Approve it before use.');
+      form.reset();
+      return loadDocuments();
+    })
+    .catch((error) => documentResult(friendly(error), 'error'));
+});
+
+document.querySelector<HTMLFormElement>('[data-document-bundle-create]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget as HTMLFormElement);
+  void api('/api/admin/documents', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'create_bundle',
+      code: data.get('code'),
+      name: data.get('name'),
+      subjectType: data.get('subjectType'),
+      serviceCategory: data.get('serviceCategory'),
+    }),
+  }).then(() => {
+    documentResult('Bundle created.');
+    return loadDocuments();
+  }).catch((error) => documentResult(friendly(error), 'error'));
+});
+
+document.querySelector<HTMLFormElement>('[data-document-bundle-item]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget as HTMLFormElement);
+  void api('/api/admin/documents', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'add_item',
+      bundleId: data.get('bundleId'),
+      templateId: data.get('templateId'),
+      enforcementStage: data.get('enforcementStage'),
+      conditionKey: data.get('conditionKey'),
+      conditionValue: data.get('conditionValue'),
+      perBooking: data.get('perBooking') === 'yes',
+      required: true,
+    }),
+  }).then(() => {
+    documentResult('Bundle requirement saved.');
+    return loadDocuments().then(() => loadDocumentBundleItems(String(data.get('bundleId') ?? '')));
+  }).catch((error) => documentResult(friendly(error), 'error'));
+});
+
+document.querySelector<HTMLFormElement>('[data-document-send]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget as HTMLFormElement);
+  const target = document.querySelector<HTMLElement>('[data-document-send-result]');
+  void api<{ required?: boolean; signingUrl?: string; emailSent?: boolean; message?: string }>('/api/admin/documents', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'send_request',
+      subjectType: data.get('subjectType'),
+      customerId: data.get('customerId'),
+      teamMemberId: data.get('teamMemberId'),
+      serviceCode: data.get('serviceCode'),
+      frequency: data.get('frequency'),
+      bookingReference: data.get('bookingReference'),
+      email: data.get('email'),
+    }),
+  }).then((result) => {
+    if (target) {
+      target.innerHTML = result.required
+        ? `<div class="admin-card"><p><strong>Signing link created.</strong> ${result.emailSent ? 'The email was sent.' : 'Email was not sent; share this private link.'}</p><p><a href="${esc(result.signingUrl)}">${esc(result.signingUrl)}</a></p></div>`
+        : `<p class="admin-muted">${esc(result.message ?? 'No active required documents for this context.')}</p>`;
+    }
+    return loadDocuments();
+  }).catch((error) => {
+    if (target) target.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
+  });
+});
+
+document.addEventListener('change', (event) => {
+  const target = event.target as HTMLSelectElement;
+  if (target.matches('[data-document-bundle-options]')) {
+    void loadDocumentBundleItems(target.value).catch((error) => setAppError(friendly(error)));
+  }
+});
+
 document.addEventListener('click', (event) => {
   const target = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-action]');
   const newCustomer = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-customer-new]');
@@ -1760,6 +2012,17 @@ document.addEventListener('click', (event) => {
     const window = document.querySelector<HTMLSelectElement>(`[data-recurring-window="${CSS.escape(id)}"]`);
     void action('/api/admin/operations', { action: 'update_recurring', planId: id, status: select?.value ?? '', window: window?.value ?? '', startTime: start?.value ?? '', durationMinutes: duration?.value ?? '' });
   }
+  if (actionName === 'team-save') {
+    const qualification = document.querySelector<HTMLSelectElement>(`[data-team-qualification="${CSS.escape(id)}"]`);
+    const bookable = document.querySelector<HTMLInputElement>(`[data-team-bookable="${CSS.escape(id)}"]`);
+    void action('/api/admin/operations', {
+      action: 'update_team',
+      memberId: id,
+      isSolo: qualification?.value === 'solo',
+      isLead: qualification?.value === 'lead',
+      isBookable: bookable?.checked ?? true,
+    });
+  }
   if (actionName === 'job-save') {
     const select = document.querySelector<HTMLSelectElement>(`[data-job-status="${CSS.escape(id)}"]`);
     void action('/api/admin/operations', { action: 'job_status', appointmentId: id, status: select?.value ?? '' });
@@ -1767,6 +2030,44 @@ document.addEventListener('click', (event) => {
   if (actionName === 'job-assign') {
     const select = document.querySelector<HTMLSelectElement>(`[data-job-team="${CSS.escape(id)}"]`);
     if (select?.value) void action('/api/admin/operations', { action: 'assign_team', appointmentId: id, teamMemberIds: [select.value] });
+  }
+  if (actionName === 'document-approve') void action('/api/admin/documents', { action: 'approve_template', templateId: id });
+  if (actionName === 'document-retire') void action('/api/admin/documents', { action: 'retire_template', templateId: id });
+  if (actionName === 'document-bundle-open') void loadDocumentBundleItems(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'document-item-remove') {
+    void action('/api/admin/documents', {
+      action: 'remove_item',
+      bundleId: target.dataset.bundle ?? '',
+      templateId: id,
+    });
+  }
+  if (actionName === 'document-request-open') void openDocumentRequest(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'document-request-close') {
+    const detail = document.querySelector<HTMLElement>('[data-document-request-detail]');
+    if (detail) { detail.hidden = true; detail.innerHTML = ''; }
+  }
+  if (actionName === 'document-request-resend') {
+    setAppError();
+    void api<{ signingUrl?: string; emailSent?: boolean }>('/api/admin/documents', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'resend_request', requestId: id }),
+    }).then((result) => {
+      const detail = document.querySelector<HTMLElement>('[data-document-send-result]');
+      if (detail) detail.innerHTML = `<p class="admin-muted">${result.emailSent ? 'Signing email resent.' : 'Email was not sent; share this private link.'} <a href="${esc(result.signingUrl)}">${esc(result.signingUrl)}</a></p>`;
+    }).catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'document-signature-verify') {
+    void action('/api/admin/documents', { action: 'verify_signature', signatureId: id });
+  }
+  if (actionName === 'document-signature-reject') {
+    void action('/api/admin/documents', { action: 'reject_signature', signatureId: id, reason: 'Rejected by owner' });
+  }
+  if (actionName === 'job-unassign') {
+    void action('/api/admin/operations', {
+      action: 'remove_team',
+      appointmentId: id,
+      teamMemberId: target.dataset.member ?? '',
+    });
   }
   if (actionName === 'job-checklist') void openChecklist(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'checklist-create') void action('/api/admin/operations', { action: 'create_checklist', appointmentId: id }).then(() => openChecklist(id));

@@ -247,6 +247,7 @@ async function loadMe(): Promise<void> {
     renderJobOptions(state);
     renderJobs();
     await loadTime();
+    await loadEmployeeDocuments();
   } catch (error) {
     if (String((error as Error).message) === 'employee_profile_missing' || String((error as Error).message) === 'employee_profile_inactive') {
       if (gate) gate.hidden = false;
@@ -282,7 +283,7 @@ function renderJobs(): void {
   const target = document.querySelector<HTMLElement>('[data-employee-jobs]');
   if (!target) return;
   if (currentJobs.length === 0) {
-    target.innerHTML = '<p class="employee-muted">No assigned jobs in the next three days.</p>';
+    target.innerHTML = '<p class="employee-muted">No assigned jobs today or tomorrow.</p>';
     return;
   }
   target.innerHTML = currentJobs
@@ -299,6 +300,37 @@ function renderJobs(): void {
       </div>`;
     })
     .join('');
+}
+
+async function loadEmployeeDocuments(): Promise<void> {
+  const card = document.querySelector<HTMLElement>('[data-employee-documents-card]');
+  if (!card) return;
+  try {
+    const data = await api<{
+      required?: boolean;
+      satisfied?: boolean;
+      signingUrl?: string;
+      missing?: Array<{ title?: string }>;
+    }>('/api/employee/documents');
+    const link = card.querySelector<HTMLAnchorElement>('[data-employee-documents-link]');
+    const status = card.querySelector<HTMLElement>('[data-employee-documents]');
+    if (!data.required || data.satisfied) {
+      card.hidden = true;
+      return;
+    }
+    card.hidden = false;
+    if (status) {
+      status.textContent = data.missing?.length
+        ? `Required: ${data.missing.map((item) => item.title).filter(Boolean).join(', ')}`
+        : 'Required onboarding documents are waiting for your signature.';
+    }
+    if (link) {
+      link.hidden = !data.signingUrl;
+      if (data.signingUrl) link.href = data.signingUrl;
+    }
+  } catch {
+    card.hidden = true;
+  }
 }
 
 async function loadTime(): Promise<void> {

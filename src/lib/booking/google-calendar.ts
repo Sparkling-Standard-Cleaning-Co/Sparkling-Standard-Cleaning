@@ -382,6 +382,13 @@ export async function findCalendarEventByReference(
     return null;
   }
 }
+export type CalendarEventState =
+  | { state: 'found'; event: CalendarEventDetails }
+  | { state: 'cancelled'; event: CalendarEventDetails }
+  | { state: 'missing' }
+  | { state: 'auth_failed' }
+  | { state: 'unavailable' };
+
 export interface CalendarEventDetails {
   id: string;
   summary?: string;
@@ -390,6 +397,54 @@ export interface CalendarEventDetails {
   end?: string;
   status?: string;
   resourceIds?: string[];
+}
+
+export async function inspectCalendarEvent(
+  env: GoogleCalendarEnv,
+  eventId: string,
+): Promise<CalendarEventState> {
+  const token = await accessToken(env);
+  if (!token) return { state: 'auth_failed' };
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${calendarPath(env)}/events/${encodeURIComponent(eventId)}`,
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
+    );
+    if (response.status === 404 || response.status === 410) return { state: 'missing' };
+    if (response.status === 401 || response.status === 403) return { state: 'auth_failed' };
+    if (!response.ok) return { state: 'unavailable' };
+    const data = (await response.json().catch(() => ({}))) as {
+      id?: string;
+      summary?: string;
+      location?: string;
+      status?: string;
+      start?: { dateTime?: string; date?: string };
+      end?: { dateTime?: string; date?: string };
+      extendedProperties?: { private?: Record<string, string> };
+    };
+    if (!data.id) return { state: 'missing' };
+    const rawResources = data.extendedProperties?.private?.sparkling_resources ?? '';
+    const resources = [
+      ...new Set(
+        rawResources
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean),
+      ),
+    ];
+    const event: CalendarEventDetails = {
+      id: data.id,
+      ...(data.summary ? { summary: data.summary } : {}),
+      ...(data.location ? { location: data.location } : {}),
+      ...(data.status ? { status: data.status } : {}),
+      ...(data.start?.dateTime ? { start: data.start.dateTime } : {}),
+      ...(data.end?.dateTime ? { end: data.end.dateTime } : {}),
+      ...(resources.length > 0 ? { resourceIds: resources } : {}),
+    };
+    return data.status === 'cancelled' ? { state: 'cancelled', event } : { state: 'found', event };
+  } catch {
+    return { state: 'unavailable' };
+  }
 }
 
 export async function getCalendarEvent(

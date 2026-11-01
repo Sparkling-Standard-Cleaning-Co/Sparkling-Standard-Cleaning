@@ -2090,6 +2090,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     amount?: number;
     quotedAmount?: number;
     reference?: string;
+    signingUrl?: string;
   }
 
   async function startSecurePayment(
@@ -2116,10 +2117,15 @@ function initEstimateWizard(form: HTMLFormElement): void {
         amount?: number;
         quotedAmount?: number;
         reference?: string;
+        signingUrl?: string;
       };
       if (response.ok && data.ok && data.url) {
         window.location.assign(data.url);
         return { ok: true, url: data.url };
+      }
+      if (data.error === 'documents_required' && data.signingUrl) {
+        window.location.assign(data.signingUrl);
+        return { ok: false, error: data.error };
       }
       if (data.error) {
         console.warn('[secure-checkout]', data.error, data.reason ?? '');

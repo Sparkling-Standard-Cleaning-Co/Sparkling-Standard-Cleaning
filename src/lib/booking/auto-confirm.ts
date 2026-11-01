@@ -8,20 +8,30 @@ import {
 } from './requests.ts';
 import { createCalendarEvent, findCalendarEventByReference } from './google-calendar.ts';
 import { writeLedgerJson } from '../payments/ledger.ts';
+import { commitConfirmedBooking, type CommitmentInput } from './commitment.ts';
 
 export type AutoConfirmResult =
-  | { ok: true; eventId: string; hold: BookingHold }
+  | {
+      ok: true;
+      eventId: string;
+      hold: BookingHold;
+      appointmentId?: string;
+      planId?: string;
+      recurringStatus?: string;
+    }
   | { ok: false; reason: string };
 
 /**
  * Confirms a paid, fully eligible booking without owner intervention.
- * The hold is revalidated against the current calendar and resource windows
- * first; any manual-review, hold or calendar problem leaves the request pending.
+ * When D1 is available the shared commitment service creates the operational
+ * appointment and any eligible recurring plan as well as the calendar event.
+ * The legacy R2-only path remains for environments without D1.
  */
 export async function autoConfirmPaidBooking(
   env: BookingEnv,
   holdId: string,
   expectedReference = '',
+  details: Partial<CommitmentInput> = {},
 ): Promise<AutoConfirmResult> {
   if (!bookingConfig.autoConfirmAllowed || bookingConfig.confirmationMode !== 'auto_confirm') {
     return { ok: false, reason: 'auto_confirm_disabled' };
@@ -37,11 +47,40 @@ export async function autoConfirmPaidBooking(
   if (expectedReference && hold?.reference !== expectedReference) {
     return { ok: false, reason: 'hold_reference_mismatch' };
   }
-  if (hold?.status === 'confirmed' && hold.calendarEventId) {
+  if (hold?.status === 'confirmed' && hold.calendarEventId && !env.DB) {
     return { ok: true, eventId: hold.calendarEventId, hold };
   }
-  if (!hold || hold.status !== 'held') return { ok: false, reason: 'hold_not_active' };
-  if (Date.parse(hold.expiresAt) <= Date.now()) return { ok: false, reason: 'hold_expired' };
+  if (!hold || !['held', 'confirmed'].includes(hold.status)) {
+    return { ok: false, reason: 'hold_not_active' };
+  }
+  if (hold.status === 'held' && Date.parse(hold.expiresAt) <= Date.now()) {
+    return { ok: false, reason: 'hold_expired' };
+  }
+
+  if (env.DB) {
+    const committed = await commitConfirmedBooking(env, env.DB, {
+      reference: expectedReference || hold.reference,
+      holdId: hold.id,
+      ...details,
+    });
+    if (!committed.ok) return { ok: false, reason: committed.reason ?? 'commitment_failed' };
+    const confirmedEventId = committed.eventId ?? hold.calendarEventId;
+    const confirmedHold: BookingHold = {
+      ...hold,
+      status: 'confirmed',
+      ...(confirmedEventId ? { calendarEventId: confirmedEventId } : {}),
+      ...(hold.resourceIds ? { resourceIds: hold.resourceIds } : {}),
+      ...(hold.crewSize ? { crewSize: hold.crewSize } : {}),
+    };
+    return {
+      ok: true,
+      eventId: confirmedEventId ?? '',
+      hold: confirmedHold,
+      ...(committed.appointmentId ? { appointmentId: committed.appointmentId } : {}),
+      ...(committed.planId ? { planId: committed.planId } : {}),
+      ...(committed.recurringStatus ? { recurringStatus: committed.recurringStatus } : {}),
+    };
+  }
 
   const availability = await availabilityForDate(env, {
     date: hold.date,

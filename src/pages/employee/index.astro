@@ -124,9 +124,16 @@ import '../../styles/employee.css';
         </section>
 
         <section class="employee-card" aria-labelledby="jobs-title">
-          <h2 id="jobs-title">Your next three days</h2>
-          <p class="employee-muted">Only your assigned jobs for today, tomorrow and the day after are shown.</p>
+          <h2 id="jobs-title">Today and tomorrow</h2>
+          <p class="employee-muted">Only your assigned jobs for today and tomorrow are shown.</p>
           <div data-employee-jobs></div>
+        </section>
+
+        <section class="employee-card" data-employee-documents-card hidden aria-labelledby="documents-title">
+          <h2 id="documents-title">Onboarding documents</h2>
+          <p class="employee-muted">Complete the required documents before you can be assigned work.</p>
+          <p class="employee-status" data-employee-documents role="status" aria-live="polite"></p>
+          <a class="btn btn--primary btn--full" data-employee-documents-link hidden>Review and sign documents</a>
         </section>
 
         <section class="employee-card" aria-labelledby="time-title">

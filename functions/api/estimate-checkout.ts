@@ -1,4 +1,4 @@
-// POST /api/estimate-checkout — starts a Stripe-hosted Checkout Session for
+﻿// POST /api/estimate-checkout â€” starts a Stripe-hosted Checkout Session for
 // an exact, server-verified residential/STR quote or an exact Tier A facility
 // quote.
 //
@@ -58,8 +58,14 @@ import {
   sanitizePhotoRequestRef,
 } from '../../src/lib/photos.ts';
 import { bookingStore, getBookingHold, holdIsActive } from '../../src/lib/booking/holds.ts';
+import {
+  createSigningRequest,
+  evaluateDocumentGate,
+  rotateSigningRequestToken,
+} from '../../src/lib/documents/service.ts';
 
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
+  DB?: import('../../src/lib/admin/d1.ts').D1Database;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
@@ -250,6 +256,57 @@ async function authoritativeHoldId(
   }
   return { ok: true, holdId };
 }
+async function documentGateForCheckout(
+  env: Env,
+  fields: Record<string, string>,
+  returnPath = '',
+): Promise<{ satisfied: boolean; signingUrl?: string }> {
+  if (!env.DB) return { satisfied: true };
+  const reference = (fields.quote_reference ?? '').trim();
+  const holdId = (fields.booking_hold_id ?? '').trim();
+  const requestRow = await env.DB
+    .prepare(
+      'SELECT id, customer_id, property_id, quote_reference FROM booking_requests WHERE quote_reference = ? OR hold_id = ? ORDER BY created_at DESC LIMIT 1',
+    )
+    .bind(reference, holdId)
+    .first<{ id: string; customer_id: string | null; property_id: string | null; quote_reference: string }>()
+    .catch(() => null);
+  const context = {
+    subjectType: 'customer' as const,
+    ...(requestRow?.customer_id ? { customerId: requestRow.customer_id } : {}),
+    ...(requestRow?.property_id ? { propertyId: requestRow.property_id } : {}),
+    serviceCode: fields.service_type ?? fields.engine_type ?? 'residential-cleaning',
+    frequency: fields.frequency ?? fields.ongoing_frequency ?? '',
+    bookingReference: requestRow?.quote_reference ?? reference,
+    ...(requestRow?.id ? { bookingRequestId: requestRow.id } : {}),
+    ...(fields.email ? { email: fields.email } : {}),
+    accessAuthorization: fields.access_authorization === 'yes',
+    customerProducts: fields.customer_products === 'yes',
+  };
+  const gate = await evaluateDocumentGate(env.DB, context, 'before_payment');
+  if (gate.satisfied) return { satisfied: true };
+  const pending = await env.DB
+    .prepare(
+      `SELECT id FROM signing_requests
+       WHERE status IN ('pending','partially_signed') AND subject_type = 'customer'
+         AND (customer_id = ? OR (customer_id IS NULL AND booking_reference = ?))
+       ORDER BY created_at DESC LIMIT 1`,
+    )
+    .bind(context.customerId ?? '', context.bookingReference ?? '')
+    .first<{ id: string }>();
+  if (pending) {
+    const rotated = await rotateSigningRequestToken(env.DB, null, pending.id);
+    return { satisfied: false, signingUrl: `/document-sign/?token=${encodeURIComponent(rotated.token)}${returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''}` };
+  }
+  const created = await createSigningRequest(env.DB, context);
+  return {
+    satisfied: false,
+    ...(created.token
+      ? { signingUrl: `/document-sign/?token=${encodeURIComponent(created.token)}${returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''}` }
+      : {}),
+  };
+}
+
 function sanitizeFields(value: unknown): Record<string, string> {
   if (typeof value !== 'object' || value === null) return {};
   const clean: Record<string, string> = {};
@@ -346,11 +403,11 @@ function residentialReceiptLines(
 ): ReceiptLine[] {
   const breakdown = verification.breakdown;
   if (!breakdown) {
-    return [{ label: `Cleaning service — ${service}`, amountCents: totalCents, kind: 'charge' }];
+    return [{ label: `Cleaning service â€” ${service}`, amountCents: totalCents, kind: 'charge' }];
   }
   const lines: ReceiptLine[] = [
     {
-      label: `Cleaning service — ${service}`,
+      label: `Cleaning service â€” ${service}`,
       amountCents: cents(breakdown.basePrice) + cents(breakdown.roundingAdjustment),
       kind: 'charge',
     },
@@ -391,7 +448,7 @@ function facilityReceiptLines(
   const discount = cents(verification.discountAmount ?? 0);
   const lines: ReceiptLine[] = [
     {
-      label: `Cleaning service — ${service}`,
+      label: `Cleaning service â€” ${service}`,
       amountCents: cleaningAfterDiscount + discount,
       kind: 'charge',
     },
@@ -864,7 +921,7 @@ async function fulfillGiftOnlyOrder(
   }
   const notified = await notifyOwnerGiftOrder(
     env,
-    `PAID BY GIFT — ${input.candidate.reference}`,
+    `PAID BY GIFT â€” ${input.candidate.reference}`,
     {
       'Payment status': 'PAID IN FULL BY GIFT CERTIFICATE',
       'Gift code': input.giftCode,
@@ -873,7 +930,7 @@ async function fulfillGiftOnlyOrder(
       Service: serviceLabel({ service_type: input.candidate.serviceType }),
       Customer: snapshot?.customerName ?? 'name unavailable',
       Email: input.email,
-      'Photos outstanding': input.record.photosOutstanding ? 'yes — confirm after photos' : 'no',
+      'Photos outstanding': input.record.photosOutstanding ? 'yes â€” confirm after photos' : 'no',
       'Customer receipt': receiptStatus,
       Note:
         'The gift balance was committed. Confirm the requested date, scope and final details personally before scheduling.',
@@ -920,6 +977,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (!hold.ok) return json({ ok: false, error: hold.error }, 400);
   if (hold.holdId) fields.booking_hold_id = hold.holdId;
   else delete fields.booking_hold_id;
+
+  const documentGate = await documentGateForCheckout(env, fields, returnPath);
+  if (!documentGate.satisfied) {
+    return json(
+      {
+        ok: false,
+        error: 'documents_required',
+        reason: 'Complete the required signed documents before payment.',
+        ...(documentGate.signingUrl ? { signingUrl: documentGate.signingUrl } : {}),
+      },
+      409,
+    );
+  }
 
   const ready = await paymentReadiness(env);
   if (!ready.enabled) {
@@ -1117,7 +1187,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('line_items[0][price_data][unit_amount]', String(chargeAmountCents));
   body.set(
     'line_items[0][price_data][product_data][name]',
-    `${estimatePaymentConfig.productLabel} — ${serviceLabel(fields)}`,
+    `${estimatePaymentConfig.productLabel} â€” ${serviceLabel(fields)}`,
   );
   body.set('line_items[0][price_data][product_data][description]', estimatePaymentConfig.checkoutNote);
   body.set('metadata[checkout_kind]', 'estimate_payment');

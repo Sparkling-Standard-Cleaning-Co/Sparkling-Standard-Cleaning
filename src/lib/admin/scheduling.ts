@@ -1,6 +1,8 @@
 import type { AdminActor } from './operations.ts';
 import { AdminAuthError, audit } from './operations.ts';
 import type { D1Database } from './d1.ts';
+import { bookingConfig } from '../../config/booking.ts';
+import { employeeOnboardingStatus, evaluateDocumentGate } from '../documents/service.ts';
 
 function now(): string {
   return new Date().toISOString();
@@ -63,6 +65,8 @@ export async function listAppointments(
       `SELECT a.*, c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
               (SELECT GROUP_CONCAT(tm.display_name, ', ') FROM appointment_resources ar
                JOIN team_members tm ON tm.id = ar.team_member_id WHERE ar.appointment_id = a.id) AS crew,
+              (SELECT GROUP_CONCAT(ar.team_member_id) FROM appointment_resources ar
+               WHERE ar.appointment_id = a.id) AS crew_ids,
               (SELECT provider_event_id FROM calendar_links cl WHERE cl.appointment_id = a.id
                ORDER BY cl.last_synced_at DESC LIMIT 1) AS calendar_event_id
        FROM appointments a
@@ -76,24 +80,88 @@ export async function listAppointments(
   return result.results ?? [];
 }
 
+/**
+ * Finds a qualified, available crew for the requested interval. Capacity is
+ * per employee, not per branch: two independent anchors may work at the same
+ * time, while a helper never creates an independent slot.
+ */
+export async function selectAvailableCrew(
+  db: D1Database,
+  branchId: string | null,
+  startAt: string,
+  endAt: string,
+  crewSize: number,
+  excludeAppointmentId = '',
+): Promise<string[]> {
+  const members = await db
+    .prepare(
+      `SELECT tm.id, tm.is_solo, tm.is_lead
+       FROM team_members tm
+       WHERE tm.status = 'active' AND tm.is_bookable = 1 AND tm.booking_resource_id <> ''
+         AND (tm.is_solo = 1 OR tm.is_lead = 1)
+         AND (? IS NULL OR tm.branch_id IS NULL OR tm.branch_id = ?)
+         AND NOT EXISTS (
+           SELECT 1 FROM appointment_resources ar
+           JOIN appointments a ON a.id = ar.appointment_id
+           WHERE ar.team_member_id = tm.id
+             AND a.id <> ? AND a.status IN ('pending','confirmed','in_progress')
+             AND a.start_at < ? AND a.end_at > ?
+         )
+       ORDER BY tm.is_solo DESC, tm.is_lead DESC, tm.display_name`,
+    )
+    .bind(branchId, branchId, excludeAppointmentId, endAt, startAt)
+    .all<{ id: string; is_solo: number; is_lead: number }>();
+  const available = members.results ?? [];
+  const wanted = Math.max(1, Math.min(bookingConfig.maxCrewSize, Math.round(crewSize)));
+  if (available.length < wanted) throw new AdminAuthError(409, 'schedule_conflict');
+  return available.slice(0, wanted).map((member) => member.id);
+}
+
 async function assertNoOverlap(
   db: D1Database,
   branchId: string | null,
   startAt: string,
   endAt: string,
   excludeAppointmentId = '',
-): Promise<void> {
-  const conflict = await db
-    .prepare(
-      `SELECT id FROM appointments
-       WHERE status IN ('pending','confirmed','in_progress')
-         AND id <> ? AND start_at < ? AND end_at > ?
-         AND (? IS NULL OR branch_id = ?)
-       LIMIT 1`,
-    )
-    .bind(excludeAppointmentId, endAt, startAt, branchId, branchId)
-    .first<{ id: string }>();
-  if (conflict) throw new AdminAuthError(409, 'schedule_conflict');
+  crewSize = 1,
+  teamMemberIds: string[] = [],
+): Promise<string[]> {
+  if (teamMemberIds.length > 0) {
+    const unique = [...new Set(teamMemberIds)];
+    if (unique.length !== teamMemberIds.length) throw new AdminAuthError(400, 'team_duplicate');
+    for (const memberId of unique) {
+      const member = await db
+        .prepare(
+          `SELECT id, is_solo, is_lead FROM team_members
+           WHERE id = ? AND status = 'active' AND is_bookable = 1`,
+        )
+        .bind(memberId)
+        .first<{ id: string; is_solo: number; is_lead: number }>();
+      if (!member) throw new AdminAuthError(400, 'team_member_invalid');
+      const conflict = await db
+        .prepare(
+          `SELECT ar.appointment_id FROM appointment_resources ar
+           JOIN appointments a ON a.id = ar.appointment_id
+           WHERE ar.team_member_id = ? AND a.id <> ?
+             AND a.status IN ('pending','confirmed','in_progress')
+             AND a.start_at < ? AND a.end_at > ? LIMIT 1`,
+        )
+        .bind(memberId, excludeAppointmentId, endAt, startAt)
+        .first();
+      if (conflict) throw new AdminAuthError(409, 'team_conflict');
+    }
+    const anchors = await db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM team_members
+         WHERE id IN (${unique.map(() => '?').join(',')})
+           AND (is_solo = 1 OR is_lead = 1)`,
+      )
+      .bind(...unique)
+      .first<{ count: number }>();
+    if (Number(anchors?.count ?? 0) < 1) throw new AdminAuthError(409, 'crew_requires_lead');
+    return unique;
+  }
+  return selectAvailableCrew(db, branchId, startAt, endAt, crewSize, excludeAppointmentId);
 }
 
 export async function assertRequestConfirmable(
@@ -104,7 +172,7 @@ export async function assertRequestConfirmable(
   const row = await db
     .prepare(
       `SELECT r.status, r.customer_id, r.property_id, r.start_at, r.end_at, r.branch_id,
-              a.id AS existing_appointment
+              r.payload_json, r.quote_reference, a.id AS existing_appointment
        FROM booking_requests r
        LEFT JOIN appointments a ON a.booking_request_id = r.id
        WHERE r.id = ? ${scope(actor, 'r.branch_id').sql} LIMIT 1`,
@@ -114,12 +182,42 @@ export async function assertRequestConfirmable(
   if (!row) throw new AdminAuthError(404, 'request_not_found');
   if (row.existing_appointment) throw new AdminAuthError(409, 'request_already_confirmed');
   if (!row.customer_id || !row.property_id) throw new AdminAuthError(400, 'request_customer_incomplete');
+  const payload = parsePayload(row.payload_json);
+  const gate = await evaluateDocumentGate(
+    db,
+    {
+      subjectType: 'customer',
+      customerId: String(row.customer_id),
+      propertyId: String(row.property_id),
+      serviceCode: payload.service_type || payload.service_code || 'residential-cleaning',
+      frequency: payload.frequency || payload.ongoing_frequency || '',
+      bookingReference: String(row.quote_reference ?? ''),
+      bookingRequestId: requestId,
+      accessAuthorization: payload.access_authorization === 'yes',
+      customerProducts: payload.customer_products === 'yes',
+    },
+    'before_confirmation',
+  );
+  if (!gate.satisfied) throw new AdminAuthError(409, 'documents_required');
   await assertNoOverlap(
     db,
     (row.branch_id as string | null) ?? actor.branchId,
     String(row.start_at ?? ''),
     String(row.end_at ?? ''),
+    '',
+    1,
   );
+}
+
+function parsePayload(value: unknown): Record<string, string> {
+  try {
+    const parsed = JSON.parse(String(value ?? '{}')) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, entry]) => typeof entry === 'string'),
+    ) as Record<string, string>;
+  } catch {
+    return {};
+  }
 }
 export async function confirmRequest(
   db: D1Database,
@@ -138,12 +236,38 @@ export async function confirmRequest(
   if (!row) throw new AdminAuthError(404, 'request_not_found');
   if (row.existing_appointment) throw new AdminAuthError(409, 'request_already_confirmed');
   if (!row.customer_id || !row.property_id) throw new AdminAuthError(400, 'request_customer_incomplete');
+  const payload = parsePayload(row.payload_json);
+  const gate = await evaluateDocumentGate(
+    db,
+    {
+      subjectType: 'customer',
+      customerId: String(row.customer_id),
+      propertyId: String(row.property_id),
+      serviceCode: payload.service_type || payload.service_code || 'residential-cleaning',
+      frequency: payload.frequency || payload.ongoing_frequency || '',
+      bookingReference: String(row.quote_reference ?? ''),
+      bookingRequestId: requestId,
+      accessAuthorization: payload.access_authorization === 'yes',
+      customerProducts: payload.customer_products === 'yes',
+    },
+    'before_confirmation',
+  );
+  if (!gate.satisfied) throw new AdminAuthError(409, 'documents_required');
   const startAt = String(row.start_at ?? '');
   const endAt = String(row.end_at ?? '');
   const branchId = (row.branch_id as string | null) ?? actor.branchId;
-  await assertNoOverlap(db, branchId, startAt, endAt);
+  const requestedCrew = Math.max(1, teamMemberIds.length);
+  const assigned = await assertNoOverlap(
+    db,
+    branchId,
+    startAt,
+    endAt,
+    '',
+    requestedCrew,
+    teamMemberIds,
+  );
   const appointmentId = uuid('appt');
-  const reference = `APT-${Date.now().toString(36).toUpperCase()}`;
+  const reference = `APT-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
   await db
     .prepare(
       `INSERT INTO appointments
@@ -160,7 +284,7 @@ export async function confirmRequest(
       startAt,
       endAt,
       Number(row.duration_minutes) || 120,
-      Math.max(1, teamMemberIds.length),
+      assigned.length,
       reference,
     )
     .run();
@@ -172,7 +296,7 @@ export async function confirmRequest(
     .prepare("UPDATE booking_holds SET status = 'confirmed' WHERE request_id = ?")
     .bind(requestId)
     .run();
-  if (teamMemberIds.length > 0) await assignTeam(db, actor, appointmentId, teamMemberIds);
+  await assignTeam(db, actor, appointmentId, assigned);
   await audit(db, { actorUserId: actor.id, action: 'booking.confirmed', entityType: 'appointment', entityId: appointmentId });
   return { appointmentId, reference };
 }
@@ -324,23 +448,90 @@ export async function listTeam(
   return result.results ?? [];
 }
 
+function booleanInput(value: unknown, fallback = false): boolean {
+  if (typeof value === 'boolean') return value;
+  if (value === 'true' || value === '1' || value === 1) return true;
+  if (value === 'false' || value === '0' || value === 0) return false;
+  return fallback;
+}
+
+function workdaysInput(value: unknown): string {
+  const raw = Array.isArray(value) ? value.join(',') : String(value ?? '');
+  const days = raw
+    .split(',')
+    .map((entry) => Number(entry.trim()))
+    .filter((entry) => Number.isInteger(entry) && entry >= 0 && entry <= 6);
+  return days.length > 0 ? [...new Set(days)].sort().join(',') : '0,1,2,3,4,5,6';
+}
+
+function clockInput(value: unknown, fallback: string): string {
+  const raw = text(value, 5);
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(raw) ? raw : fallback;
+}
+
+function resourceIdInput(value: unknown, fallback: string): string {
+  const raw = text(value, 80);
+  return /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(raw) ? raw : fallback;
+}
+
 export async function createTeamMember(
   db: D1Database,
   actor: AdminActor,
   input: Record<string, unknown>,
-): Promise<{ id: string }> {
+): Promise<{ id: string; bookingResourceId: string }> {
   const name = text(input.displayName, 120);
   if (!name) throw new AdminAuthError(400, 'team_name_required');
   const id = uuid('team');
+  const bookingResourceId = resourceIdInput(input.bookingResourceId, id);
+  const isSolo = booleanInput(input.isSolo);
+  const isLead = booleanInput(input.isLead);
   await db
     .prepare(
-      `INSERT INTO team_members (id, branch_id, display_name, email, phone, status, is_bookable)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO team_members
+       (id, branch_id, display_name, email, phone, status, is_bookable, booking_resource_id,
+        is_solo, is_lead, workdays, workday_start, workday_end, default_rate_type,
+        pay_rate_regular_cents, pay_rate_lead_cents, pay_rate_solo_cents)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1800, 2200, 2500)`,
     )
-    .bind(id, branchFor(actor, input.branchId), name, text(input.email, 200), text(input.phone, 30), input.status === 'inactive' ? 'inactive' : 'active', input.isBookable === false ? 0 : 1)
+    .bind(
+      id,
+      branchFor(actor, input.branchId),
+      name,
+      text(input.email, 200).toLowerCase(),
+      text(input.phone, 30),
+      input.status === 'inactive' ? 'inactive' : 'active',
+      input.isBookable === false ? 0 : 1,
+      bookingResourceId,
+      isSolo ? 1 : 0,
+      isLead ? 1 : 0,
+      workdaysInput(input.workdays),
+      clockInput(input.workdayStart, '07:00'),
+      clockInput(input.workdayEnd, '18:00'),
+      ['regular', 'lead', 'solo'].includes(text(input.defaultRateType, 20)) ? text(input.defaultRateType, 20) : 'regular',
+    )
     .run();
   await audit(db, { actorUserId: actor.id, action: 'team.created', entityType: 'team_member', entityId: id });
-  return { id };
+  return { id, bookingResourceId };
+}
+
+export async function findOrCreateTeamMember(
+  db: D1Database,
+  actor: AdminActor,
+  input: Record<string, unknown>,
+): Promise<{ id: string; created: boolean }> {
+  const email = text(input.email, 200).toLowerCase();
+  if (email) {
+    const existing = await db
+      .prepare(`SELECT id FROM team_members WHERE lower(email) = ? ${scope(actor, 'branch_id').sql} ORDER BY created_at LIMIT 1`)
+      .bind(email, ...scope(actor, 'branch_id').bind)
+      .first<{ id: string }>();
+    if (existing) {
+      await updateTeamMember(db, actor, existing.id, { ...input, email });
+      return { id: existing.id, created: false };
+    }
+  }
+  const created = await createTeamMember(db, actor, input);
+  return { id: created.id, created: true };
 }
 
 export async function updateTeamMember(
@@ -354,29 +545,59 @@ export async function updateTeamMember(
     .bind(memberId, ...scope(actor, 'branch_id').bind)
     .first<Record<string, unknown>>();
   if (!current) throw new AdminAuthError(404, 'team_not_found');
+  const isSolo = input.isSolo === undefined ? Number(current.is_solo) === 1 : booleanInput(input.isSolo);
+  const isLead = input.isLead === undefined ? Number(current.is_lead) === 1 : booleanInput(input.isLead);
+  const bookingResourceId = resourceIdInput(input.bookingResourceId, String(current.booking_resource_id ?? memberId));
   await db
-    .prepare(`UPDATE team_members SET display_name = ?, email = ?, phone = ?, status = ?, is_bookable = ?, updated_at = ? WHERE id = ?`)
-    .bind(text(input.displayName, 120) || current.display_name, text(input.email, 200), text(input.phone, 30), input.status === 'inactive' ? 'inactive' : 'active', input.isBookable === false ? 0 : 1, now(), memberId)
+    .prepare(
+      `UPDATE team_members
+       SET display_name = ?, email = ?, phone = ?, status = ?, is_bookable = ?,
+           booking_resource_id = ?, is_solo = ?, is_lead = ?, workdays = ?,
+           workday_start = ?, workday_end = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(
+      text(input.displayName, 120) || current.display_name,
+      text(input.email, 200).toLowerCase() || current.email,
+      text(input.phone, 30) || current.phone,
+      input.status === 'inactive' ? 'inactive' : input.status === 'active' ? 'active' : current.status,
+      input.isBookable === undefined ? current.is_bookable : input.isBookable === false ? 0 : 1,
+      bookingResourceId,
+      isSolo ? 1 : 0,
+      isLead ? 1 : 0,
+      input.workdays === undefined ? current.workdays : workdaysInput(input.workdays),
+      clockInput(input.workdayStart, String(current.workday_start ?? '07:00')),
+      clockInput(input.workdayEnd, String(current.workday_end ?? '18:00')),
+      now(),
+      memberId,
+    )
     .run();
   await audit(db, { actorUserId: actor.id, action: 'team.updated', entityType: 'team_member', entityId: memberId });
 }
 
-export async function assignTeam(
+export async function setAppointmentTeam(
   db: D1Database,
   actor: AdminActor,
   appointmentId: string,
   memberIds: string[],
-): Promise<void> {
+): Promise<{ memberIds: string[] }> {
   const appointment = await db
     .prepare(`SELECT * FROM appointments WHERE id = ? ${scope(actor, 'branch_id').sql} LIMIT 1`)
     .bind(appointmentId, ...scope(actor, 'branch_id').bind)
     .first<Record<string, unknown>>();
   if (!appointment) throw new AdminAuthError(404, 'appointment_not_found');
-  for (const memberId of [...new Set(memberIds)]) {
+  const unique = [...new Set(memberIds.filter(Boolean))];
+  if (unique.length > bookingConfig.maxCrewSize) throw new AdminAuthError(400, 'crew_too_large');
+
+  const members: Array<{ id: string; is_solo: number; is_lead: number }> = [];
+  for (const memberId of unique) {
     const member = await db
-      .prepare(`SELECT * FROM team_members WHERE id = ? AND status = 'active' AND is_bookable = 1 ${scope(actor, 'branch_id').sql} LIMIT 1`)
+      .prepare(
+        `SELECT id, is_solo, is_lead FROM team_members
+         WHERE id = ? AND status = 'active' AND is_bookable = 1 ${scope(actor, 'branch_id').sql} LIMIT 1`,
+      )
       .bind(memberId, ...scope(actor, 'branch_id').bind)
-      .first<Record<string, unknown>>();
+      .first<{ id: string; is_solo: number; is_lead: number }>();
     if (!member) throw new AdminAuthError(400, 'team_member_invalid');
     const conflict = await db
       .prepare(
@@ -388,16 +609,68 @@ export async function assignTeam(
       .bind(memberId, appointmentId, appointment.end_at, appointment.start_at)
       .first();
     if (conflict) throw new AdminAuthError(409, 'team_conflict');
+    const onboarding = await employeeOnboardingStatus(
+      db,
+      member.id,
+      Number(member.is_solo) === 1 ? 'solo' : Number(member.is_lead) === 1 ? 'lead' : 'helper',
+    );
+    if (!onboarding.satisfied) throw new AdminAuthError(409, 'employee_documents_incomplete');
+    members.push(member);
+  }
+  if (members.length > 0 && !members.some((member) => Number(member.is_solo) === 1 || Number(member.is_lead) === 1)) {
+    throw new AdminAuthError(409, 'crew_requires_lead');
+  }
+
+  await db.prepare('DELETE FROM appointment_resources WHERE appointment_id = ?').bind(appointmentId).run();
+  for (const member of members) {
+    const role = Number(member.is_solo) === 1 ? 'solo' : Number(member.is_lead) === 1 ? 'lead' : 'cleaner';
     await db
-      .prepare('INSERT OR IGNORE INTO appointment_resources (appointment_id, team_member_id, role) VALUES (?, ?, ?)')
-      .bind(appointmentId, memberId, 'cleaner')
+      .prepare('INSERT INTO appointment_resources (appointment_id, team_member_id, role) VALUES (?, ?, ?)')
+      .bind(appointmentId, member.id, role)
       .run();
   }
   await db
-    .prepare('UPDATE appointments SET crew_size = (SELECT COUNT(*) FROM appointment_resources WHERE appointment_id = ?), updated_at = ? WHERE id = ?')
-    .bind(appointmentId, now(), appointmentId)
+    .prepare('UPDATE appointments SET crew_size = ?, updated_at = ? WHERE id = ?')
+    .bind(Math.max(1, members.length), now(), appointmentId)
     .run();
-  await audit(db, { actorUserId: actor.id, action: 'job.team_assigned', entityType: 'appointment', entityId: appointmentId });
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'job.team_assigned',
+    entityType: 'appointment',
+    entityId: appointmentId,
+    detail: members.map((member) => member.id).join(','),
+  });
+  return { memberIds: members.map((member) => member.id) };
+}
+
+export async function assignTeam(
+  db: D1Database,
+  actor: AdminActor,
+  appointmentId: string,
+  memberIds: string[],
+): Promise<void> {
+  const current = await db
+    .prepare('SELECT team_member_id FROM appointment_resources WHERE appointment_id = ?')
+    .bind(appointmentId)
+    .all<{ team_member_id: string }>();
+  const merged = [...(current.results ?? []).map((row) => row.team_member_id), ...memberIds];
+  await setAppointmentTeam(db, actor, appointmentId, merged);
+}
+
+export async function removeTeamMember(
+  db: D1Database,
+  actor: AdminActor,
+  appointmentId: string,
+  memberId: string,
+): Promise<void> {
+  const current = await db
+    .prepare('SELECT team_member_id FROM appointment_resources WHERE appointment_id = ?')
+    .bind(appointmentId)
+    .all<{ team_member_id: string }>();
+  const remaining = (current.results ?? [])
+    .map((row) => row.team_member_id)
+    .filter((id) => id !== memberId);
+  await setAppointmentTeam(db, actor, appointmentId, remaining);
 }
 
 export async function updateAppointmentStatus(

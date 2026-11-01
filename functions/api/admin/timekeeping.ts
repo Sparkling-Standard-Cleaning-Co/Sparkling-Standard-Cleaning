@@ -2,7 +2,9 @@ import { adminDb, type AdminDbEnv, type D1Database } from '../../../src/lib/admi
 import { AdminAuthError, audit, requireActor, requireCsrf, type AdminActor } from '../../../src/lib/admin/operations.ts';
 import { managerOrOwner } from '../../../src/lib/employee/server.ts';
 import { inviteAdmin } from '../../../src/lib/admin/accounts.ts';
-import { buildOpsInvitationEmail, sendAdminEmail } from '../../../src/lib/admin/email.ts';
+import { findOrCreateTeamMember } from '../../../src/lib/admin/scheduling.ts';
+import { buildEmployeeInvitationEmail, sendAdminEmail } from '../../../src/lib/admin/email.ts';
+import { createSigningRequest, sendSigningEmail } from '../../../src/lib/documents/service.ts';
 import {
   DEFAULT_RATES_CENTS,
   formatMinutes,
@@ -344,20 +346,62 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'invite_employee') {
       const email = text(body.email, 200).toLowerCase();
       const branchId = text(body.branchId, 80) || actor.branchId || null;
+      const displayName = text(body.displayName, 120) || email.split('@')[0] || 'Team member';
+      const qualification = text(body.qualification, 20);
       if (!email) return json({ ok: false, error: 'email_required' }, 400);
-      const result = await inviteAdmin(db, actor, { email, role: 'cleaner', branchId });
-      const origin = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
-      const emailSent = await sendAdminEmail(
-        {
-          ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
-          ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
-          PUBLIC_SITE_URL: origin,
-        },
+      const member = await findOrCreateTeamMember(db, actor, {
+        displayName,
         email,
-        buildOpsInvitationEmail({ PUBLIC_SITE_URL: origin }, result.token, 'cleaner'),
+        branchId,
+        isSolo: qualification === 'solo',
+        isLead: qualification === 'lead',
+        isBookable: body.isBookable !== false,
+      });
+      const result = await inviteAdmin(db, actor, {
+        email,
+        role: 'cleaner',
+        branchId,
+        teamMemberId: member.id,
+      });
+      const origin = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+      const emailEnv = {
+        ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
+        ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+        PUBLIC_SITE_URL: origin,
+      };
+      const emailSent = await sendAdminEmail(
+        emailEnv,
+        email,
+        buildEmployeeInvitationEmail(emailEnv, result.token, displayName),
         `employee-invite-${result.token.slice(0, 16)}`,
       );
-      return json({ ok: true, ...result, emailSent });
+      const onboarding = await createSigningRequest(
+        db,
+        { subjectType: 'employee', teamMemberId: member.id, role: qualification || 'helper' },
+        { createdByAdminUserId: actor.id },
+      );
+      let onboardingSent = false;
+      if (onboarding.required && onboarding.token) {
+        onboardingSent = await sendSigningEmail(
+          emailEnv,
+          email,
+          onboarding.token,
+          onboarding.bundleCode ?? 'Employee onboarding',
+          `employee-onboarding-${onboarding.requestId}-${onboarding.token.slice(0, 12)}`,
+        );
+      }
+      return json({
+        ok: true,
+        ...result,
+        teamMemberId: member.id,
+        emailSent,
+        onboardingRequired: onboarding.required,
+        onboardingEmailSent: onboardingSent,
+        onboardingUrl:
+          onboarding.required && onboarding.token
+            ? `/document-sign/?token=${encodeURIComponent(onboarding.token)}`
+            : '',
+      });
     }
 
     return json({ ok: false, error: 'invalid_action' }, 400);

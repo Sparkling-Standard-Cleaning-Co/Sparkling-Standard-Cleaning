@@ -95,9 +95,16 @@ export function bookingResourceById(id: string): BookingResource | null {
   return bookingResources.find((resource) => resource.id === id) ?? null;
 }
 
-/** True when every supplied id names an active, known resource. */
+/**
+ * True when the supplied ids form a safe crew assignment. Resource ids are
+ * database-owned (team_members.booking_resource_id); this validates shape and
+ * uniqueness without freezing the roster in code.
+ */
 export function validResourceIds(ids: ReadonlyArray<string> | null | undefined): boolean {
-  if (!ids || ids.length === 0) return false;
+  if (!ids || ids.length === 0 || ids.length > bookingConfig.maxCrewSize) return false;
   if (new Set(ids).size !== ids.length) return false;
-  return ids.every((id) => activeBookingResources().some((resource) => resource.id === id));
+  const inactive = new Set(bookingResources.filter((resource) => !resource.active).map((resource) => resource.id));
+  return ids.every(
+    (id) => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(id) && !inactive.has(id),
+  );
 }

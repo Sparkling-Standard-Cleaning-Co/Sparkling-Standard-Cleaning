@@ -6,7 +6,7 @@
  * their own working window, travel origin and busy timeline. A job consumes
  * one resource by default; a joint job consumes two.
  */
-import { activeBookingResources, bookingConfig } from '../../config/booking.ts';
+import { bookingConfig } from '../../config/booking.ts';
 import {
   calendarJobsForDate,
   calendarJobsForRange,
@@ -21,6 +21,8 @@ import {
   type BookingResourceWindow,
   type ExistingJob,
 } from './availability.ts';
+import { loadStaffResources, toBookingResourceWindows } from './resources.ts';
+import type { AdminDbEnv, D1Database } from '../admin/d1.ts';
 import { formatLocalTime } from './time.ts';
 import { bookingStore, listActiveHolds, type BookingStorageEnv } from './holds.ts';
 import { resolveAddress, type GeocodeEnv } from '../location/server-geocode.ts';
@@ -31,7 +33,9 @@ import {
   type RoutingEnv,
 } from '../travel/server-routing.ts';
 
-export interface BookingEnv extends GoogleCalendarEnv, GeocodeEnv, RoutingEnv, BookingStorageEnv {}
+export interface BookingEnv extends GoogleCalendarEnv, GeocodeEnv, RoutingEnv, BookingStorageEnv, AdminDbEnv {
+  DB?: D1Database;
+}
 
 export type AvailabilityServiceResult =
   | { ok: false; enabled: false; reason: string; slots: AvailabilityResult['slots'] }
@@ -56,6 +60,8 @@ export interface AvailabilityInput {
   requiredResourceIds?: ReadonlyArray<string>;
   now?: Date;
   ignoreHoldId?: string;
+  /** Calendar events that belong to the operation being revalidated. */
+  excludeEventIds?: ReadonlyArray<string>;
 }
 
 export async function availabilityForDate(
@@ -98,7 +104,9 @@ export async function availabilityForDate(
     location: hold.destination,
     ...(hold.resourceIds && hold.resourceIds.length > 0 ? { resourceIds: hold.resourceIds } : {}),
   }));
+  const excludedEvents = new Set(input.excludeEventIds ?? []);
   for (const job of calendar.jobs) {
+    if (excludedEvents.has(job.id)) continue;
     if (job.blocksDay) {
       jobs.push({
         start: job.start,
@@ -135,13 +143,8 @@ export async function availabilityForDate(
     bookingConfig.maxCrewSize,
     Math.max(1, Math.round(input.crewSize ?? bookingConfig.defaultCrewSize)),
   );
-  const resources: BookingResourceWindow[] = activeBookingResources().map((resource) => ({
-    id: resource.id,
-    workdays: resource.workdays ?? bookingConfig.workdays,
-    workdayStart: resource.workdayStart ?? bookingConfig.workdayStart,
-    workdayEnd: resource.workdayEnd ?? bookingConfig.workdayEnd,
-    origin,
-  }));
+  const staff = await loadStaffResources(env.DB, input.date);
+  const resources: BookingResourceWindow[] = toBookingResourceWindows(staff, origin);
   const availability = await calculateAvailability(
     {
       date: input.date,
@@ -206,6 +209,7 @@ export async function availabilityForRange(
     crewSize?: number;
     now?: Date;
     ignoreHoldId?: string;
+    excludeEventIds?: ReadonlyArray<string>;
   },
 ): Promise<{ ok: true; timeZone: string; days: MonthAvailability[] } | { ok: false; reason: string; days: MonthAvailability[] }> {
   const empty = (reason: string): { ok: false; reason: string; days: MonthAvailability[] } => ({ ok: false, reason, days: [] });
@@ -224,8 +228,10 @@ export async function availabilityForRange(
   for (let cursor = input.from; cursor <= input.to; cursor = new Date(Date.parse(cursor + 'T12:00:00Z') + 86_400_000).toISOString().slice(0, 10)) {
     dates.push(cursor);
   }
+  const excludedEvents = new Set(input.excludeEventIds ?? []);
   const jobsByDay = new Map<string, typeof calendar.jobs>();
   for (const job of calendar.jobs) {
+    if (excludedEvents.has(job.id)) continue;
     const key = localDateKey(job.start, bookingConfig.timeZone);
     const list = jobsByDay.get(key) ?? [];
     list.push(job);
@@ -241,13 +247,6 @@ export async function availabilityForRange(
     bookingConfig.maxCrewSize,
     Math.max(1, Math.round(input.crewSize ?? bookingConfig.defaultCrewSize)),
   );
-  const resources: BookingResourceWindow[] = activeBookingResources().map((resource) => ({
-    id: resource.id,
-    workdays: resource.workdays ?? bookingConfig.workdays,
-    workdayStart: resource.workdayStart ?? bookingConfig.workdayStart,
-    workdayEnd: resource.workdayEnd ?? bookingConfig.workdayEnd,
-    origin,
-  }));
   const travelMinutes = async (from: LatLng, to: LatLng): Promise<number | null> => {
     const key = `${from.lat.toFixed(5)},${from.lng.toFixed(5)}>${to.lat.toFixed(5)},${to.lng.toFixed(5)}`;
     if (travelCache.has(key)) return travelCache.get(key) ?? null;
@@ -286,6 +285,8 @@ export async function availabilityForRange(
       const location = await resolveJobLocation(job.locationText);
       jobs.push({ start: job.start, end: job.end, location, ...(job.resourceIds?.length ? { resourceIds: job.resourceIds } : {}) });
     }
+    const staff = await loadStaffResources(env.DB, date);
+    const resources: BookingResourceWindow[] = toBookingResourceWindows(staff, origin);
     const availability = await calculateAvailability(
       {
         date,
@@ -360,13 +361,6 @@ export async function scheduleAvailabilityForRange(
   }
   const durations = Math.min(bookingConfig.maximumJobMinutes, Math.max(bookingConfig.minimumJobMinutes, Math.round(input.durationMinutes)));
   const crewSize = Math.min(bookingConfig.maxCrewSize, Math.max(1, Math.round(input.crewSize ?? bookingConfig.defaultCrewSize)));
-  const resources: BookingResourceWindow[] = activeBookingResources().map((resource) => ({
-    id: resource.id,
-    workdays: resource.workdays ?? bookingConfig.workdays,
-    workdayStart: resource.workdayStart ?? bookingConfig.workdayStart,
-    workdayEnd: resource.workdayEnd ?? bookingConfig.workdayEnd,
-    origin: { lat: 0, lng: 0 },
-  }));
   const days: MonthAvailability[] = [];
   for (const date of dates) {
     const holds = await listActiveHolds(bucket, date);
@@ -374,6 +368,8 @@ export async function scheduleAvailabilityForRange(
     for (const job of jobsByDay.get(date) ?? []) {
       jobs.push({ start: job.start, end: job.end, location: null, ...(job.blocksDay ? { blocksDay: true } : {}), ...(job.resourceIds?.length ? { resourceIds: job.resourceIds } : {}) });
     }
+    const staff = await loadStaffResources(env.DB, date);
+    const resources: BookingResourceWindow[] = toBookingResourceWindows(staff, { lat: 0, lng: 0 });
     const availability = calculateScheduleAvailability({
       date,
       timeZone: bookingConfig.timeZone,

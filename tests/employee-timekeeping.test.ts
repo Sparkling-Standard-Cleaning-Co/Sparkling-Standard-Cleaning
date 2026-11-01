@@ -211,7 +211,7 @@ test('denied location is recorded honestly and never blocks compensable time', a
   assert.equal(interval.ended_at, null);
 });
 
-test('the employee board shows only assigned jobs in the next three days', async () => {
+test('the employee board shows only assigned jobs today and tomorrow', async () => {
   const db = migratedDb();
   const owner = await enrollOwner(db, {
     email: 'owner-board@example.test',
@@ -251,7 +251,7 @@ test('the employee board shows only assigned jobs in the next three days', async
   assert.equal(response.status, 200);
   const data = (await response.json()) as Record<string, unknown>;
   const jobs = (data.jobs as Array<Record<string, unknown>>).map((job) => job.id);
-  assert.deepEqual(jobs, ['JOB-1', 'JOB-2', 'JOB-3'], 'only the assigned three-day window is returned');
+  assert.deepEqual(jobs, ['JOB-1', 'JOB-2'], 'only the assigned today-and-tomorrow window is returned');
   assert.equal((data.profile as Record<string, unknown>).defaultRateType, 'regular');
 });
 

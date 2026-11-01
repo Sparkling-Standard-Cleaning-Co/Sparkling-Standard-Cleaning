@@ -143,13 +143,13 @@ export function workweekBounds(now = new Date()): WorkweekBounds {
   };
 }
 
-/** Today, tomorrow and the day after (Central Time). */
+/** Today and tomorrow only (Central Time), per owner direction. */
 export function employeeJobWindow(now = new Date()): { fromIso: string; toIso: string; days: string[] } {
   const today = centralDateKey(now);
-  const days = [today, addDaysToKey(today, 1), addDaysToKey(today, 2)];
+  const days = [today, addDaysToKey(today, 1)];
   return {
     fromIso: centralMidnightUtc(today).toISOString(),
-    toIso: centralMidnightUtc(addDaysToKey(today, 3)).toISOString(),
+    toIso: centralMidnightUtc(addDaysToKey(today, 2)).toISOString(),
     days,
   };
 }

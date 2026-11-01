@@ -28,6 +28,12 @@ export interface BookingResourceWindow {
   workdayStart: string;
   workdayEnd: string;
   origin: LatLng;
+  /**
+   * A lead- or solo-qualified cleaner anchors an independent crew. Helpers may
+   * fill a crew seat but cannot create a bookable slot on their own. Legacy
+   * resources default to anchor so historical configuration keeps working.
+   */
+  anchor?: boolean;
 }
 
 export interface ExistingJob {
@@ -116,6 +122,57 @@ interface ResourceEvaluation {
   feasible: boolean;
   busyMinutes: number;
   reason?: 'day_closed' | 'past_cutoff' | 'beyond_window' | 'travel_unavailable' | 'blocked';
+}
+
+function isAnchor(resource: BookingResourceWindow | undefined): boolean {
+  return resource?.anchor !== false;
+}
+
+/**
+ * Forms a valid crew. Every crew needs at least one independent anchor
+ * (lead/solo). Helpers are preferred for the remaining seats so anchors stay
+ * available for a second simultaneous job.
+ */
+function chooseCrew(
+  feasible: ReadonlyArray<ResourceEvaluation>,
+  crewSize: number,
+  resourcesById: ReadonlyMap<string, BookingResourceWindow>,
+  resourceOrder: ReadonlyMap<string, number>,
+): ResourceEvaluation[] | null {
+  const order = (entry: ResourceEvaluation): number =>
+    entry.busyMinutes * 1000 + (resourceOrder.get(entry.resourceId) ?? 0);
+  const sorted = [...feasible].sort((a, b) => order(a) - order(b));
+  const anchor = sorted.find((entry) => isAnchor(resourcesById.get(entry.resourceId)));
+  if (!anchor) return null;
+  if (crewSize === 1) return [anchor];
+  const rest = sorted
+    .filter((entry) => entry.resourceId !== anchor.resourceId)
+    .sort((a, b) => {
+      const anchorDelta =
+        Number(isAnchor(resourcesById.get(a.resourceId))) -
+        Number(isAnchor(resourcesById.get(b.resourceId)));
+      return anchorDelta || order(a) - order(b);
+    });
+  if (rest.length < crewSize - 1) return null;
+  return [anchor, ...rest.slice(0, crewSize - 1)];
+}
+
+function chooseCrewResources(
+  feasible: ReadonlyArray<BookingResourceWindow>,
+  crewSize: number,
+  resourceOrder: ReadonlyMap<string, number>,
+): BookingResourceWindow[] | null {
+  const sorted = [...feasible].sort(
+    (a, b) => (resourceOrder.get(a.id) ?? 0) - (resourceOrder.get(b.id) ?? 0),
+  );
+  const anchor = sorted.find((resource) => isAnchor(resource));
+  if (!anchor) return null;
+  if (crewSize === 1) return [anchor];
+  const rest = sorted
+    .filter((resource) => resource.id !== anchor.id)
+    .sort((a, b) => Number(isAnchor(a)) - Number(isAnchor(b)));
+  if (rest.length < crewSize - 1) return null;
+  return [anchor, ...rest.slice(0, crewSize - 1)];
 }
 
 async function evaluateResource(
@@ -303,14 +360,8 @@ export async function calculateAvailability(
     }
 
     const feasible = evaluations.filter((evaluation) => evaluation.feasible);
-    if (feasible.length >= request.crewSize) {
-      const chosen = [...feasible]
-        .sort(
-          (a, b) =>
-            a.busyMinutes - b.busyMinutes ||
-            (resourceOrder.get(a.resourceId) ?? 0) - (resourceOrder.get(b.resourceId) ?? 0),
-        )
-        .slice(0, request.crewSize);
+    const chosen = chooseCrew(feasible, request.crewSize, resourcesById, resourceOrder);
+    if (chosen) {
       slots.push({
         start: localPartsToIso(candidateStart),
         end: localPartsToIso(candidateEnd),
@@ -387,6 +438,7 @@ export function calculateScheduleAvailability(
   if (request.jobs.some((job) => job.blocksDay)) {
     return { available: false, enabled: true, reason: 'day_closed', slots: [] };
   }
+  const resourceOrder = new Map(request.resources.map((resource, index) => [resource.id, index]));
   const slots: AvailableSlot[] = [];
   const startFloor = Math.max(dayStart.getTime(), earliest.getTime());
   for (let cursor = startFloor; cursor + request.durationMinutes * 60_000 <= dayEnd.getTime(); cursor += request.slotMinutes * 60_000) {
@@ -398,13 +450,14 @@ export function calculateScheduleAvailability(
         .filter((job) => jobAppliesToResource(job, resource.id))
         .some((job) => overlaps(candidateStart, candidateEnd, job.start, job.end));
     });
-    if (feasibleResources.length < request.crewSize) continue;
+    const chosen = chooseCrewResources(feasibleResources, request.crewSize, resourceOrder);
+    if (!chosen) continue;
     slots.push({
       start: localPartsToIso(candidateStart),
       end: localPartsToIso(candidateEnd),
       startLabel: formatTime(candidateStart, request.timeZone),
       endLabel: formatTime(candidateEnd, request.timeZone),
-      resourceIds: feasibleResources.slice(0, request.crewSize).map((resource) => resource.id),
+      resourceIds: chosen.map((resource) => resource.id),
     });
   }
   return { available: slots.length > 0, enabled: true, ...(slots.length === 0 ? { reason: 'fully_booked' as const } : {}), slots };

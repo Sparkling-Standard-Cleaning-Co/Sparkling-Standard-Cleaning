@@ -75,6 +75,10 @@ function migratedDb(): TestD1 {
     '0013_request_lifecycle.sql',
     '0014_request_payment_status.sql',
     '0015_recurring_schedule.sql',
+    '0016_recurring_occurrence_state.sql',
+    '0017_dynamic_booking_resources.sql',
+    '0018_document_management_and_signing.sql',
+    '0019_recurring_worker_runs.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -312,8 +316,8 @@ test('lead persistence is idempotent and creates a customer, property and reques
     end_at: string;
   };
   assert.equal(request.status, 'pending');
-  assert.equal(request.start_at, '2026-12-05T09:30:00');
-  assert.equal(request.end_at, '2026-12-05T11:30:00');
+  assert.equal(request.start_at, '2026-12-05T15:30:00.000Z');
+  assert.equal(request.end_at, '2026-12-05T17:30:00.000Z');
 });
 
 test('rate limiting is durable and blocks after the configured threshold', async () => {
@@ -563,7 +567,7 @@ test('scheduling prevents overlaps, assigns crews and tracks checklists', async 
     postalCode: '32502',
   });
   const property = db.raw.prepare('SELECT id FROM properties WHERE customer_id = ?').get(customer.id) as { id: string };
-  const team = await createTeamMember(db, actor, { displayName: 'Synthetic Cleaner' });
+  const team = await createTeamMember(db, actor, { displayName: 'Synthetic Cleaner', isSolo: true });
   const start = new Date(Date.now() + 10 * 86_400_000).toISOString();
   const end = new Date(Date.parse(start) + 2 * 60 * 60 * 1000).toISOString();
   for (const suffix of ['A', 'B']) {
@@ -572,7 +576,8 @@ test('scheduling prevents overlaps, assigns crews and tracks checklists', async 
        VALUES (?, ?, 'branch_pensacola', ?, ?, 'pending', ?, ?, ?, ?, 120)`,
     ).run(`req_${suffix}`, `hold_${suffix}`, customer.id, property.id, `REF-${suffix}`, start.slice(0, 10), start, end);
   }
-  const confirmed = await confirmRequest(db, actor, 'req_A', [team.id]);
+  const hayli = db.raw.prepare("SELECT id FROM team_members WHERE booking_resource_id = 'hayli'").get() as { id: string };
+  const confirmed = await confirmRequest(db, actor, 'req_A', [team.id, hayli.id]);
   assert.match(confirmed.reference, /^APT-/);
   await assert.rejects(() => confirmRequest(db, actor, 'req_B'), /schedule_conflict/);
   const appointments = await listAppointments(db, actor);
@@ -1373,4 +1378,35 @@ test('customers archive, restore and permanently delete when no history blocks i
     (error: Error & { code?: string }) => error.code === 'pending_booking_request',
   );
   assert.ok(db.raw.prepare('SELECT id FROM customers WHERE id = ?').get(protectedCustomer.id));
+});
+
+test('two independent solo cleaners can hold overlapping starts while a helper adds no phantom crew', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  db.raw.prepare("UPDATE team_members SET is_bookable = 0 WHERE booking_resource_id = 'hayli'").run();
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Capacity',
+    lastName: 'Customer',
+    addressLine1: '400 S Baylen St',
+    city: 'Pensacola',
+    postalCode: '32502',
+  });
+  const property = db.raw.prepare('SELECT id FROM properties WHERE customer_id = ?').get(customer.id) as { id: string };
+  const soloA = await createTeamMember(db, actor, { displayName: 'Solo A', isSolo: true });
+  const soloB = await createTeamMember(db, actor, { displayName: 'Solo B', isSolo: true });
+  const helper = await createTeamMember(db, actor, { displayName: 'Helper', isSolo: false, isLead: false });
+  const start = new Date(Date.now() + 12 * 86_400_000).toISOString();
+  const end = new Date(Date.parse(start) + 2 * 60 * 60 * 1000).toISOString();
+  for (const suffix of ['A', 'B', 'C', 'D']) {
+    db.raw.prepare(
+      `INSERT INTO booking_requests (id, hold_id, branch_id, customer_id, property_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes)
+       VALUES (?, ?, 'branch_pensacola', ?, ?, 'pending', ?, ?, ?, ?, 120)`,
+    ).run(`cap_${suffix}`, `hold_cap_${suffix}`, customer.id, property.id, `CAP-${suffix}`, start.slice(0, 10), start, end);
+  }
+  await confirmRequest(db, actor, 'cap_A', [soloA.id]);
+  await confirmRequest(db, actor, 'cap_B', [soloB.id]);
+  assert.equal((db.raw.prepare("SELECT COUNT(*) AS n FROM appointments WHERE status = 'confirmed'").get() as { n: number }).n, 2);
+  await assert.rejects(() => confirmRequest(db, actor, 'cap_C', [soloA.id]), /team_conflict/);
+  await assert.rejects(() => confirmRequest(db, actor, 'cap_D', [helper.id]), /crew_requires_lead/);
+  await assert.rejects(() => confirmRequest(db, actor, 'cap_D'), /schedule_conflict/);
 });

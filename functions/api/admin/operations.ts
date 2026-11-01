@@ -1,5 +1,10 @@
 ﻿import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
-import { syncRecurringPlan, type RecurringEnv } from '../../../src/lib/admin/recurring-schedule.ts';
+import {
+  applyRecurringScheduleChange,
+  setRecurringStatus,
+  syncRecurringPlan,
+  type RecurringEnv,
+} from '../../../src/lib/admin/recurring-schedule.ts';
 import type { BookingEnv } from '../../../src/lib/booking/service.ts';
 import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import {
@@ -11,6 +16,8 @@ import {
   listAppointments,
   listRecurring,
   listTeam,
+  removeTeamMember,
+  setAppointmentTeam,
   updateAppointmentStatus,
   updateChecklistItem,
   updateRecurring,
@@ -79,9 +86,62 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (action === 'update_recurring') {
       const planId = String(body.planId ?? '');
+      const requestedStatus = String(body.status ?? '');
+      const scheduleFields = ['frequency', 'startDate', 'window', 'startTime', 'durationMinutes', 'firstDurationMinutes', 'crewSize'];
+      const changesSchedule = scheduleFields.some((field) => body[field] !== undefined && body[field] !== '');
+      if (requestedStatus && requestedStatus !== 'active') {
+        await updateRecurring(db, actor, planId, body);
+        const sync = await setRecurringStatus(
+          context.env as RecurringEnv,
+          db,
+          actor,
+          planId,
+          requestedStatus as 'paused' | 'cancelled' | 'completed',
+        );
+        return json({ ok: sync.ok, sync }, sync.ok ? 200 : 502);
+      }
+      if (changesSchedule) {
+        const applied = await applyRecurringScheduleChange(
+          context.env as RecurringEnv,
+          db,
+          actor,
+          planId,
+          {
+            ...(body.frequency ? { frequency: String(body.frequency) } : {}),
+            ...(body.startDate ? { startDate: String(body.startDate) } : {}),
+            ...(body.window ? { window: String(body.window) } : {}),
+            ...(body.startTime ? { startTime: String(body.startTime) } : {}),
+            ...(body.durationMinutes ? { durationMinutes: Number(body.durationMinutes) } : {}),
+            ...(body.firstDurationMinutes ? { firstDurationMinutes: Number(body.firstDurationMinutes) } : {}),
+            ...(body.crewSize ? { crewSize: Number(body.crewSize) } : {}),
+          },
+        );
+        if (!applied.ok) return json({ ...applied, ok: false }, 409);
+        if (requestedStatus && ['active', 'paused', 'cancelled', 'completed'].includes(requestedStatus)) {
+          const status = await setRecurringStatus(
+            context.env as RecurringEnv,
+            db,
+            actor,
+            planId,
+            requestedStatus as 'active' | 'paused' | 'cancelled' | 'completed',
+          );
+          return json({ ok: status.ok, applied, sync: status }, status.ok ? 200 : 502);
+        }
+        return json({ ...applied, ok: true });
+      }
+      if (requestedStatus && ['active', 'paused', 'cancelled', 'completed'].includes(requestedStatus)) {
+        await updateRecurring(db, actor, planId, body);
+        const sync = await setRecurringStatus(
+          context.env as RecurringEnv,
+          db,
+          actor,
+          planId,
+          requestedStatus as 'active' | 'paused' | 'cancelled' | 'completed',
+        );
+        return json({ ok: sync.ok, sync }, sync.ok ? 200 : 502);
+      }
       await updateRecurring(db, actor, planId, body);
-      const sync = await syncRecurringPlan(context.env as RecurringEnv, db, actor, planId, { replaceFuture: true });
-      return json({ ok: sync.ok, sync }, sync.ok ? 200 : 502);
+      return json({ ok: true });
     }
     if (action === 'create_team') return json({ ok: true, ...(await createTeamMember(db, actor, body)) });
     if (action === 'update_team') {
@@ -93,6 +153,22 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         ? body.teamMemberIds.map((value) => String(value)).filter(Boolean).slice(0, 12)
         : [];
       await assignTeam(db, actor, String(body.appointmentId ?? ''), memberIds);
+      return json({ ok: true });
+    }
+    if (action === 'set_team') {
+      const memberIds = Array.isArray(body.teamMemberIds)
+        ? body.teamMemberIds.map((value) => String(value)).filter(Boolean).slice(0, 12)
+        : [];
+      const result = await setAppointmentTeam(db, actor, String(body.appointmentId ?? ''), memberIds);
+      return json({ ok: true, ...result });
+    }
+    if (action === 'remove_team') {
+      await removeTeamMember(
+        db,
+        actor,
+        String(body.appointmentId ?? ''),
+        String(body.teamMemberId ?? ''),
+      );
       return json({ ok: true });
     }
     if (action === 'job_status') {

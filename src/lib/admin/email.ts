@@ -127,6 +127,45 @@ export function buildOpsInvitationEmail(env: AdminEmailEnv, token: string, role:
   };
 }
 
+export function buildEmployeeInvitationEmail(
+  env: AdminEmailEnv,
+  token: string,
+  name: string,
+): AdminEmail {
+  const url = `${siteUrl(env)}/employee/?invite=${encodeURIComponent(token)}`;
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hello,';
+  const plainGreeting = name ? `Hi ${name},` : 'Hello,';
+  return {
+    subject: 'Your Sparkling Standard team invitation',
+    html: shell(
+      'Join the Sparkling Standard team',
+      `<p style="font-size:16px;line-height:1.6">${greeting}</p>
+       <p style="font-size:16px;line-height:1.6">Create your secure employee account to see your assigned jobs, clock in and out, and review your hours.</p>
+       <p><a href="${url}" style="display:inline-block;background:#9a5b61;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px">Create your employee account</a></p>
+       <p style="font-size:14px;line-height:1.6">This link expires in 72 hours and can be used once. Choose a password of at least 8 characters including one special character. Any required onboarding documents will be sent separately and must be completed before work assignments.</p>`,
+    ),
+    text: `${plainGreeting}\n\nCreate your Sparkling Standard employee account (single use, expires in 72 hours):\n${url}\n\nChoose a password of at least 8 characters including one special character. Required onboarding documents must be completed before work assignments.`,
+  };
+}
+
+export function buildDocumentSigningEmail(
+  env: AdminEmailEnv,
+  token: string,
+  bundleName: string,
+): AdminEmail {
+  const url = `${siteUrl(env)}/document-sign/?token=${encodeURIComponent(token)}`;
+  return {
+    subject: 'Sparkling Standard documents ready for your signature',
+    html: shell(
+      'Documents ready for signature',
+      `<p style="font-size:16px;line-height:1.6">The following document set is ready for your review and electronic signature: <strong>${escapeHtml(bundleName)}</strong>.</p>
+       <p><a href="${url}" style="display:inline-block;background:#9a5b61;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px">Review and sign securely</a></p>
+       <p style="font-size:14px;line-height:1.6">This secure link expires in 14 days and can be used until the required documents are signed. If you were not expecting this, contact Sparkling Standard directly.</p>`,
+    ),
+    text: `Documents ready for your electronic signature: ${bundleName}.\n\nReview and sign securely (expires in 14 days):\n${url}\n\nIf you were not expecting this, contact Sparkling Standard directly.`,
+  };
+}
+
 export async function sendAdminEmail(
   env: AdminEmailEnv,
   to: string,

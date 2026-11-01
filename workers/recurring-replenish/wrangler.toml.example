@@ -1,0 +1,18 @@
+# Copy to wrangler.toml, fill the EXISTING production D1 database id, then:
+#   npx wrangler deploy --config wrangler.toml
+# Secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN,
+# GOOGLE_CALENDAR_ID, TRAVEL_ORIGIN, MapMap keys, RECURRING_SCHEDULING_ENABLED)
+# must be added with `wrangler secret put` or in the Cloudflare dashboard.
+# Never commit real secrets or the production database id to this repository.
+
+name = "sparkling-standard-recurring"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+
+[triggers]
+crons = ["0 9 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sparkling-standard-operations"
+database_id = "REPLACE_WITH_EXISTING_D1_DATABASE_ID"

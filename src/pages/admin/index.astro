@@ -102,6 +102,7 @@ import '../../styles/admin.css';
             <button type="button" data-admin-nav="customers">Customers</button>
             <button type="button" data-admin-nav="recurring">Recurring Plans</button>
             <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
+            <button type="button" data-admin-nav="documents">Documents &amp; Agreements</button>
             <button type="button" data-admin-nav="timekeeping">Timekeeping</button>
             <button type="button" data-admin-nav="finance">Invoices &amp; Payments</button>
             <button type="button" data-admin-nav="gift">Gift Certificates</button>
@@ -239,6 +240,86 @@ import '../../styles/admin.css';
             </div>
           </section>
 
+          <section class="admin-view" data-admin-view="documents" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Document templates</h2>
+              <p class="admin-muted">Only owner-approved templates can create a signing requirement. Draft and retired templates never block a workflow.</p>
+              <div data-admin-documents-templates></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Add a document template</h2>
+              <div class="admin-grid">
+                <form class="admin-form" data-document-template-text>
+                  <h3>Approved text agreement</h3>
+                  <label>Title <input name="title" required maxlength="200" /></label>
+                  <label>Category <input name="category" maxlength="80" placeholder="residential, employee, commercial" /></label>
+                  <label>Version <input name="version" value="1.0" maxlength="40" /></label>
+                  <label>Signer <select name="signerParty"><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
+                  <label>Agreement text <textarea name="contentText" rows="8" required maxlength="200000"></textarea></label>
+                  <label><input type="checkbox" name="requiresVerification" value="yes" /> Requires owner/admin verification or countersignature</label>
+                  <button class="btn btn--secondary btn--small" type="submit">Save draft template</button>
+                </form>
+                <form class="admin-form" data-document-template-upload enctype="multipart/form-data">
+                  <h3>Upload an approved PDF</h3>
+                  <label>Title <input name="title" required maxlength="200" /></label>
+                  <label>Category <input name="category" maxlength="80" /></label>
+                  <label>Version <input name="version" value="1.0" maxlength="40" /></label>
+                  <label>Signer <select name="signerParty"><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
+                  <label>PDF file <input name="file" type="file" accept="application/pdf" required /></label>
+                  <label><input type="checkbox" name="requiresVerification" value="yes" /> Requires owner/admin verification or countersignature</label>
+                  <button class="btn btn--secondary btn--small" type="submit">Upload PDF template</button>
+                </form>
+              </div>
+              <div data-document-template-result style="margin-top:.6rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Document bundles</h2>
+              <p class="admin-muted">A bundle defines exactly which approved documents apply to a service, customer or employee group. Conditions are optional.</p>
+              <div data-admin-documents-bundles></div>
+              <form class="admin-inline-form" data-document-bundle-create style="margin-top:1rem;">
+                <label>Code <input name="code" required placeholder="customer.residential" /></label>
+                <label>Name <input name="name" required placeholder="Residential cleaning documents" /></label>
+                <label>Subject <select name="subjectType"><option value="customer">Customer</option><option value="employee">Employee</option></select></label>
+                <label>Service category <input name="serviceCategory" placeholder="residential" /></label>
+                <button class="btn btn--secondary btn--small" type="submit">Create bundle</button>
+              </form>
+              <form class="admin-inline-form" data-document-bundle-item style="margin-top:1rem;">
+                <label>Bundle <select name="bundleId" data-document-bundle-options required></select></label>
+                <label>Template <select name="templateId" data-document-template-options required></select></label>
+                <label>Stage
+                  <select name="enforcementStage">
+                    <option value="before_payment">Before payment</option>
+                    <option value="before_confirmation" selected>Before booking confirmation</option>
+                    <option value="before_employee_activation">Before employee activation</option>
+                    <option value="optional">Optional / informational</option>
+                  </select>
+                </label>
+                <label>Condition key <input name="conditionKey" placeholder="frequency, access_authorization, role" /></label>
+                <label>Condition value <input name="conditionValue" placeholder="weekly,biweekly,monthly" /></label>
+                <label><input type="checkbox" name="perBooking" value="yes" /> Sign for every booking</label>
+                <button class="btn btn--secondary btn--small" type="submit">Add / update document</button>
+              </form>
+              <div data-document-bundle-items style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Signing requests</h2>
+              <p class="admin-muted">Send a secure single-purpose link to a customer or employee. Signed versions are immutable and retained privately.</p>
+              <form class="admin-form admin-form--grid" data-document-send>
+                <label>Subject <select name="subjectType"><option value="customer">Customer</option><option value="employee">Employee</option></select></label>
+                <label>Customer ID <input name="customerId" placeholder="cust_..." /></label>
+                <label>Employee ID <input name="teamMemberId" placeholder="team_..." /></label>
+                <label>Service code <input name="serviceCode" placeholder="residential-cleaning" /></label>
+                <label>Frequency <input name="frequency" placeholder="weekly" /></label>
+                <label>Booking reference <input name="bookingReference" placeholder="SS-..." /></label>
+                <label>Recipient email <input name="email" type="email" /></label>
+                <button class="btn btn--secondary btn--small" type="submit">Create signing link</button>
+              </form>
+              <div data-document-send-result style="margin-top:.6rem;"></div>
+              <div data-admin-documents-requests style="margin-top:1rem;"></div>
+              <div data-document-request-detail style="margin-top:1rem;" hidden></div>
+            </div>
+          </section>
+
           <section class="admin-view" data-admin-view="timekeeping" hidden>
             <div class="admin-card">
               <div class="admin-inline-form" style="align-items:end;">
@@ -284,7 +365,16 @@ import '../../styles/admin.css';
                 <div>
                   <h3>Invite a cleaner</h3>
                   <form class="admin-form" data-form="time-invite">
+                    <label>Name <input name="displayName" required maxlength="120" /></label>
                     <label>Email <input name="email" type="email" required /></label>
+                    <label>Qualification
+                      <select name="qualification">
+                        <option value="helper">Helper / regular cleaner</option>
+                        <option value="lead">Lead cleaner</option>
+                        <option value="solo">Solo-qualified cleaner</option>
+                      </select>
+                    </label>
+                    <label><input type="checkbox" name="isBookable" value="yes" checked /> Eligible for booking</label>
                     <button class="btn btn--secondary btn--small" type="submit">Send Employee Invitation</button>
                   </form>
                   <div data-time-invite-result style="margin-top:.6rem;"></div>

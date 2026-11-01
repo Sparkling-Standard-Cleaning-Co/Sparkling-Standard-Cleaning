@@ -108,6 +108,8 @@ interface CheckoutLedgerRecord {
   photosOutstanding?: boolean;
   bookingStatus?: 'confirmed' | 'pending_owner_review';
   bookingEventId?: string;
+  recurringPlanId?: string;
+  recurringStatus?: string;
 }
 
 async function readCheckoutRecord(
@@ -156,7 +158,12 @@ async function updateCheckoutRecord(
   env: Env,
   attempt: string,
   session: NonNullable<StripeEvent['data']>['object'],
-  booking?: { status: CheckoutLedgerRecord['bookingStatus']; eventId?: string },
+  booking?: {
+    status: CheckoutLedgerRecord['bookingStatus'];
+    eventId?: string;
+    recurringPlanId?: string;
+    recurringStatus?: string;
+  },
 ): Promise<void> {
   if (!/^[a-f0-9]{64}$/i.test(attempt)) return;
   const bucket = paymentLedger(env);
@@ -186,6 +193,8 @@ async function updateCheckoutRecord(
         existing?.value.serviceType ?? session?.metadata?.service_type ?? 'cleaning',
       ...(booking?.status ? { bookingStatus: booking.status } : {}),
       ...(booking?.eventId ? { bookingEventId: booking.eventId } : {}),
+      ...(booking?.recurringPlanId ? { recurringPlanId: booking.recurringPlanId } : {}),
+      ...(booking?.recurringStatus ? { recurringStatus: booking.recurringStatus } : {}),
       ...(session?.id ? { sessionId: session.id } : {}),
     };
     await writeLedgerJson(bucket, key, record);
@@ -523,7 +532,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         }
       }
       let booking:
-        | { status: CheckoutLedgerRecord['bookingStatus']; eventId?: string; reason?: string }
+        | {
+            status: CheckoutLedgerRecord['bookingStatus'];
+            eventId?: string;
+            reason?: string;
+            recurringPlanId?: string;
+            recurringStatus?: string;
+          }
         | undefined;
       const holdId = metadata.booking_hold_id ?? '';
       const quoteReference = metadata.quote_reference ?? checkout?.reference ?? '';
@@ -535,9 +550,40 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         } else if (checkout.photosOutstanding === true || metadata.photos_outstanding === 'yes') {
           booking = { status: 'pending_owner_review', reason: 'photos_outstanding' };
         } else {
-          const confirmed = await autoConfirmPaidBooking(env, holdId, quoteReference);
+          const requestDetails = env.DB
+            ? await env.DB
+                .prepare('SELECT payload_json FROM booking_requests WHERE hold_id = ? LIMIT 1')
+                .bind(holdId)
+                .first<{ payload_json: string }>()
+                .catch(() => null)
+            : null;
+          let fields: Record<string, string> = {};
+          try {
+            const parsed = JSON.parse(requestDetails?.payload_json ?? '{}') as Record<string, unknown>;
+            fields = Object.fromEntries(
+              Object.entries(parsed).filter(([, value]) => typeof value === 'string'),
+            ) as Record<string, string>;
+          } catch {
+            fields = {};
+          }
+          const confirmed = await autoConfirmPaidBooking(env, holdId, quoteReference, {
+            customerName: fields.name ?? '',
+            customerEmail: fields.email ?? customerEmail ?? '',
+            serviceCode: fields.service_type ?? metadata.service_type ?? 'residential-cleaning',
+            frequency: fields.ongoing_frequency ?? fields.frequency ?? '',
+            ongoingPriceCents: Math.round(Number(fields.ongoing_price_per_visit || 0) * 100),
+            ...(Number(fields.ongoing_duration_minutes) > 0
+              ? { ongoingDurationMinutes: Number(fields.ongoing_duration_minutes) }
+              : {}),
+            termsVersion: fields.terms_version ?? '',
+          });
           booking = confirmed.ok
-            ? { status: 'confirmed', eventId: confirmed.eventId }
+            ? {
+                status: 'confirmed',
+                eventId: confirmed.eventId,
+                ...(confirmed.planId ? { recurringPlanId: confirmed.planId } : {}),
+                ...(confirmed.recurringStatus ? { recurringStatus: confirmed.recurringStatus } : {}),
+              }
             : { status: 'pending_owner_review', reason: confirmed.reason };
         }
       }
@@ -567,6 +613,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       if (booking?.status === 'confirmed') {
         metadata.booking_status = 'confirmed';
         metadata.booking_event_id = booking.eventId ?? '';
+        if (booking.recurringPlanId) {
+          metadata.recurring_plan_id = booking.recurringPlanId;
+          metadata.recurring_status = booking.recurringStatus ?? 'pending';
+        }
       } else if (booking) {
         metadata.booking_status = 'pending_owner_review';
         metadata.booking_status_reason = booking.reason ?? 'manual_review';
@@ -599,6 +649,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
                 : `Pending owner review (${metadata.booking_status_reason ?? 'manual review'})`,
             ...(metadata.booking_event_id
               ? { 'Calendar event id': metadata.booking_event_id }
+              : {}),
+            ...(metadata.recurring_plan_id
+              ? {
+                  'Recurring plan': metadata.recurring_plan_id,
+                  'Recurring schedule status': metadata.recurring_status ?? 'pending',
+                }
               : {}),
           }
         : {}),

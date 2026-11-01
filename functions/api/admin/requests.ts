@@ -11,6 +11,7 @@ import { createCustomer, getCustomer } from '../../../src/lib/admin/crm.ts';
 import type { BookingEnv } from '../../../src/lib/booking/service.ts';
 import { onRequestPost as bookingAdminPost } from '../booking-admin.ts';
 import { sendBookingEmail, type BookingEmailKind } from '../../../src/lib/forms/booking-email.ts';
+import { ensureRecurringPlan } from '../../../src/lib/booking/commitment.ts';
 
 interface Env extends AdminDbEnv, BookingEnv {
   BOOKING_OWNER_TOKEN?: string;
@@ -48,6 +49,66 @@ function json(body: unknown, status = 200): Response {
 
 function text(value: unknown, max = 300): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+async function recurringPlanForConfirmedRequest(
+  context: { request: Request; env: Env },
+  db: NonNullable<Env['DB']>,
+  requestId: string,
+  appointmentId: string,
+  eventId: string,
+): Promise<{ planId: string; status: string; conflicts: number } | null> {
+  if (!eventId) return null;
+  const row = await db
+    .prepare(
+      `SELECT r.quote_reference, r.customer_id, r.property_id, r.payload_json,
+              a.start_at, a.end_at, a.duration_minutes, a.crew_size
+       FROM booking_requests r JOIN appointments a ON a.booking_request_id = r.id
+       WHERE r.id = ? LIMIT 1`,
+    )
+    .bind(requestId)
+    .first<Record<string, unknown>>();
+  if (!row?.customer_id || !row.property_id) return null;
+  let fields: Record<string, string> = {};
+  try {
+    const parsed = JSON.parse(String(row.payload_json ?? '{}')) as Record<string, unknown>;
+    fields = Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) => typeof value === 'string'),
+    ) as Record<string, string>;
+  } catch {
+    fields = {};
+  }
+  const frequency = fields.ongoing_frequency || fields.frequency || '';
+  if (!['weekly', 'biweekly', 'monthly'].includes(frequency)) return null;
+  const ongoingPriceCents = Math.round(Number(fields.ongoing_price_per_visit || 0) * 100);
+  if (ongoingPriceCents <= 0) return null;
+  const resources = await db
+    .prepare(
+      `SELECT tm.booking_resource_id FROM appointment_resources ar
+       JOIN team_members tm ON tm.id = ar.team_member_id
+       WHERE ar.appointment_id = ?`,
+    )
+    .bind(appointmentId)
+    .all<{ booking_resource_id: string }>();
+  const resourceIds = (resources.results ?? []).map((entry) => entry.booking_resource_id).filter(Boolean);
+  if (resourceIds.length === 0) return null;
+  return ensureRecurringPlan(context.env, db, {
+    reference: String(row.quote_reference ?? ''),
+    customerId: String(row.customer_id),
+    propertyId: String(row.property_id),
+    serviceCode: fields.service_type || 'residential-cleaning',
+    frequency,
+    start: String(row.start_at ?? ''),
+    end: String(row.end_at ?? ''),
+    duration: Number(row.duration_minutes) || 120,
+    ongoingDuration: Number(fields.ongoing_duration_minutes) || Number(row.duration_minutes) || 120,
+    ongoingPriceCents,
+    crewSize: Number(row.crew_size) || resourceIds.length,
+    resourceIds,
+    appointmentId,
+    eventId,
+    termsVersion: fields.terms_version || 'admin.v1',
+  });
 }
 
 function scoped(actor: AdminActor, column: string): { sql: string; bind: unknown[] } {
@@ -521,18 +582,35 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         const result = await confirmRequest(db, actor, requestId, teamMemberIds);
         const eventId = String(calendar.data.eventId ?? '');
         if (eventId) await attachCalendarEvent(db, result.appointmentId, eventId);
+        const recurring = await recurringPlanForConfirmedRequest(
+          context,
+          db,
+          requestId,
+          result.appointmentId,
+          eventId,
+        ).catch(() => null);
         const confirmedRow = await requestRow(db, actor, requestId);
         const email = confirmedRow
           ? await sendForRequest(context, db, actor, confirmedRow, 'confirmation')
           : { status: 'skipped_no_email', recipient: false };
-        return json({ ok: true, ...result, calendarEventId: eventId || null, email });
+        return json({
+          ok: true,
+          ...result,
+          calendarEventId: eventId || null,
+          ...(recurring ? { recurring } : {}),
+          email,
+        });
       } catch (error) {
+        // The calendar commitment must not survive a failed operational write.
+        if (calendar.data.eventId) {
+          await bookingAction(context, { id: requestId, action: 'cancel' }).catch(() => undefined);
+        }
         return json(
           {
             ok: false,
             error: error instanceof AdminAuthError ? error.code : 'd1_confirm_failed',
-            calendarConfirmed: true,
-            calendarEventId: calendar.data.eventId ?? null,
+            calendarConfirmed: false,
+            calendarRollbackAttempted: Boolean(calendar.data.eventId),
           },
           error instanceof AdminAuthError ? error.status : 502,
         );

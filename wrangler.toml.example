@@ -34,6 +34,12 @@ compatibility_date = "2026-10-01"
 # binding = "PHOTOS_BUCKET"
 # bucket_name = "sparkling-standard-lead-photos"
 #
+# Private owner-approved document templates and signed PDFs (optional; text
+# templates and signing still work without it).
+# [[r2_buckets]]
+# binding = "DOCUMENTS_BUCKET"
+# bucket_name = "sparkling-standard-documents"
+#
 # Secrets (PHOTO_OWNER_TOKEN, optional TURNSTILE_SECRET_KEY / PHOTO_LINK_TTL_DAYS)
 # must be added in the Cloudflare dashboard or with `wrangler pages secret put`,
 # never in [vars].

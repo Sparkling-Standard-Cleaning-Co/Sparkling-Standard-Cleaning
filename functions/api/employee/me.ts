@@ -65,7 +65,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         .prepare(
           `SELECT a.id, a.status, a.start_at, a.end_at, a.duration_minutes, a.crew_size, a.reference, a.notes,
                   p.line1, p.city, p.state, p.postal_code, c.first_name, c.last_name,
-                  br.payload_json
+                  ar.role AS job_role, br.payload_json
            FROM appointments a
            JOIN appointment_resources ar ON ar.appointment_id = a.id AND ar.team_member_id = ?
            LEFT JOIN properties p ON p.id = a.property_id
@@ -167,16 +167,26 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       missingClockOut: open ? isMissingClockOut(open as unknown as TimeIntervalLike, now) : false,
       jobs: jobList.map((job) => {
         const payload = String(job.payload_json ?? '{}');
-        return {
+        const jobRole = String(job.job_role ?? 'cleaner');
+        // Visibility follows the actual role on THIS job, not the account's
+        // global qualification or a client-side setting. Helpers receive only
+        // the operational minimum required to arrive and clock in.
+        const detailLevel = jobRole === 'lead' || jobRole === 'solo' ? 'lead' : 'helper';
+        const base = {
           id: job.id,
           status: job.status,
           startAt: job.start_at,
           endAt: job.end_at,
+          reference: job.reference,
+          address: [job.line1, job.city, job.state, job.postal_code].filter(Boolean).join(', '),
+          detailLevel,
+        };
+        if (detailLevel === 'helper') return base;
+        return {
+          ...base,
           durationMinutes: job.duration_minutes,
           crewSize: job.crew_size,
-          reference: job.reference,
           service: payloadField(payload, 'service_label') || payloadField(payload, 'serviceType') || 'Cleaning',
-          address: [job.line1, job.city, job.state, job.postal_code].filter(Boolean).join(', '),
           customerFirstName: String(job.first_name ?? ''),
           instructions: [job.notes, payloadField(payload, 'special_instructions'), payloadField(payload, 'access_notes')]
             .filter(Boolean)

@@ -33,12 +33,24 @@ export async function inviteAdmin(
   const email = text(input.email, 200).toLowerCase();
   const role = text(input.role, 30);
   const branchId = text(input.branchId, 80) || null;
+  const teamMemberId = text(input.teamMemberId, 100) || null;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new AdminAuthError(400, 'email_invalid');
   const roleRow = await db.prepare('SELECT id FROM admin_roles WHERE id = ?').bind(role).first();
   if (!roleRow) throw new AdminAuthError(400, 'role_invalid');
   if (branchId) {
     const branch = await db.prepare("SELECT id FROM branches WHERE id = ? AND status = 'active'").bind(branchId).first();
     if (!branch) throw new AdminAuthError(400, 'branch_invalid');
+  }
+  if (teamMemberId) {
+    const member = await db
+      .prepare('SELECT id, email, admin_user_id FROM team_members WHERE id = ? LIMIT 1')
+      .bind(teamMemberId)
+      .first<{ id: string; email: string; admin_user_id: string | null }>();
+    if (!member) throw new AdminAuthError(404, 'team_member_not_found');
+    if (member.admin_user_id) throw new AdminAuthError(409, 'team_member_already_linked');
+    if (member.email && member.email.toLowerCase() !== email) {
+      throw new AdminAuthError(400, 'team_member_email_mismatch');
+    }
   }
   const existing = await db.prepare('SELECT id FROM admin_users WHERE email = ? LIMIT 1').bind(email).first();
   if (existing) throw new AdminAuthError(409, 'admin_exists');
@@ -47,14 +59,15 @@ export async function inviteAdmin(
   await db
     .prepare(
       `INSERT INTO admin_invitations
-       (id, email, role_id, branch_id, token_hash, expires_at, created_by_admin_user_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (id, email, role_id, branch_id, team_member_id, token_hash, expires_at, created_by_admin_user_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       `invite_${crypto.randomUUID()}`,
       email,
       role,
       branchId,
+      teamMemberId,
       await hashToken(token),
       expiresAt,
       actor.id,
@@ -81,7 +94,7 @@ export async function acceptInvite(
   if (problem) throw new AdminAuthError(400, problem);
   const row = await db
     .prepare(
-      `SELECT id, email, role_id, branch_id, expires_at, accepted_at
+      `SELECT id, email, role_id, branch_id, team_member_id, expires_at, accepted_at
        FROM admin_invitations WHERE token_hash = ? LIMIT 1`,
     )
     .bind(await hashToken(token))
@@ -90,6 +103,7 @@ export async function acceptInvite(
       email: string;
       role_id: string;
       branch_id: string | null;
+      team_member_id: string | null;
       expires_at: string;
       accepted_at: string | null;
     }>();
@@ -99,24 +113,56 @@ export async function acceptInvite(
   const existing = await db.prepare('SELECT id FROM admin_users WHERE email = ? LIMIT 1').bind(row.email).first();
   if (existing) throw new AdminAuthError(409, 'admin_exists');
   const id = `admin_${crypto.randomUUID()}`;
+  const displayName = text(input.name, 120) || row.email.split('@')[0] || 'Administrator';
   await db
     .prepare(
       `INSERT INTO admin_users (id, branch_id, role_id, email, password_hash, display_name, status)
        VALUES (?, ?, ?, ?, ?, ?, 'active')`,
     )
-    .bind(
-      id,
-      row.branch_id,
-      row.role_id,
-      row.email,
-      await hashPassword(password),
-      text(input.name, 120) || row.email.split('@')[0] || 'Administrator',
-    )
+    .bind(id, row.branch_id, row.role_id, row.email, await hashPassword(password), displayName)
     .run();
   await db
     .prepare('UPDATE admin_invitations SET accepted_at = ? WHERE id = ?')
     .bind(now(), row.id)
     .run();
+
+  // Link the new login to exactly one staff roster profile. An explicit
+  // invitation link wins; otherwise an existing unlinked profile with the same
+  // email is adopted. A cleaner invitation without a profile creates one that
+  // is NOT bookable until the owner sets qualifications.
+  let teamMemberId = row.team_member_id;
+  if (!teamMemberId && row.role_id === 'cleaner') {
+    const byEmail = await db
+      .prepare(
+        `SELECT id FROM team_members
+         WHERE lower(email) = ? AND (admin_user_id IS NULL OR admin_user_id = ?)
+         ORDER BY created_at LIMIT 1`,
+      )
+      .bind(row.email, id)
+      .first<{ id: string }>();
+    teamMemberId = byEmail?.id ?? `team_${crypto.randomUUID()}`;
+    if (!byEmail) {
+      await db
+        .prepare(
+          `INSERT INTO team_members
+           (id, branch_id, admin_user_id, display_name, email, status, is_bookable, booking_resource_id)
+           VALUES (?, ?, ?, ?, ?, 'active', 0, ?)`,
+        )
+        .bind(teamMemberId, row.branch_id, id, displayName, row.email, teamMemberId)
+        .run();
+    }
+  }
+  if (teamMemberId) {
+    await db
+      .prepare(
+        `UPDATE team_members
+         SET admin_user_id = ?, email = ?, display_name = CASE WHEN display_name = '' THEN ? ELSE display_name END,
+             updated_at = ?
+         WHERE id = ?`,
+      )
+      .bind(id, row.email, displayName, now(), teamMemberId)
+      .run();
+  }
   await audit(db, {
     actorUserId: id,
     action: 'admin.invite_accepted',
