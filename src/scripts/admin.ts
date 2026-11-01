@@ -1893,6 +1893,7 @@ document.querySelector<HTMLFormElement>('[data-document-bundle-item]')?.addEvent
       bundleId: data.get('bundleId'),
       templateId: data.get('templateId'),
       enforcementStage: data.get('enforcementStage'),
+      sortOrder: Number(data.get('sortOrder') ?? 0),
       conditionKey: data.get('conditionKey'),
       conditionValue: data.get('conditionValue'),
       perBooking: data.get('perBooking') === 'yes',
