@@ -163,6 +163,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   const pinConfirmWrap = root.querySelector<HTMLElement>('[data-pin-property-confirm-wrap]');
   const pinConfirm = root.querySelector<HTMLInputElement>('[data-pin-property-confirm]');
   const changeButton = root.querySelector<HTMLButtonElement>('[data-address-change]');
+  const compactChangeButton = root.querySelector<HTMLButtonElement>('[data-address-change-compact]');
   const manualBody = root.querySelector<HTMLElement>('.address-manual__body');
   const gpsSection = root.querySelector<HTMLElement>('.address-gps');
   const confirmedCard = root.querySelector<HTMLElement>('[data-address-confirmed]');
@@ -1218,7 +1219,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     if (showUi) {
       if (manualBody) manualBody.hidden = true;
       if (gpsSection) gpsSection.hidden = true;
-      if (mapCard) mapCard.hidden = false;
+      if (mapCard) mapCard.hidden = !(manualCandidate.streetLevel || manualCandidate.approximate);
       if (confirmedCard) confirmedCard.hidden = false;
       if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(manualConfirmed);
       setTravelNote(
@@ -1369,6 +1370,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   manualOpenButton?.addEventListener('click', () => openManualSection());
   confirmButton?.addEventListener('click', confirmLocation);
   changeButton?.addEventListener('click', startChange);
+  compactChangeButton?.addEventListener('click', startChange);
 
   unitInput?.addEventListener('change', () => {
     if (method === 'manual' && manualConfirmed) {
