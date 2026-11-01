@@ -220,6 +220,27 @@ function nextDate(startDate: string, frequency: string): string {
   return date.toISOString().slice(0, 10);
 }
 
+function recurringSchedule(input: Record<string, unknown>) {
+  const window = text(input.window, 20);
+  const startTime = text(input.startTime, 5);
+  const match = /^(\d{2}):(\d{2})$/.exec(startTime);
+  const minutes = match ? Number(match[1]) * 60 + Number(match[2]) : NaN;
+  if (!['morning', 'afternoon'].includes(window) || !Number.isFinite(minutes) || minutes % 15 !== 0) {
+    throw new AdminAuthError(400, 'recurring_window_invalid');
+  }
+  const valid = window === 'morning'
+    ? minutes >= 7 * 60 && minutes <= 8 * 60 + 30
+    : minutes >= 12 * 60 + 30 && minutes <= 14 * 60 + 30;
+  if (!valid) throw new AdminAuthError(400, 'recurring_start_outside_window');
+  const duration = Math.round(Number(input.durationMinutes));
+  if (!Number.isFinite(duration) || duration < 30 || duration > 600) {
+    throw new AdminAuthError(400, 'recurring_duration_invalid');
+  }
+  const crewSize = Math.round(Number(input.crewSize ?? 1));
+  if (![1, 2].includes(crewSize)) throw new AdminAuthError(400, 'recurring_crew_invalid');
+  return { window, startTime, duration, crewSize };
+}
+
 export async function createRecurring(
   db: D1Database,
   actor: AdminActor,
@@ -246,13 +267,14 @@ export async function createRecurring(
   const branchId = branchFor(actor, input.branchId) ?? ownership.primary_branch_id;
   const id = uuid('rec');
   const price = Math.max(0, Math.round(Number(input.ongoingPrice) * 100) || 0);
+  const schedule = recurringSchedule(input);
   await db
     .prepare(
       `INSERT INTO recurring_plans
-       (id, customer_id, property_id, branch_id, service_code, frequency, status, ongoing_price_cents, start_date, next_visit_date, terms_version)
-       VALUES (?, ?, ?, ?, 'residential-cleaning', ?, 'active', ?, ?, ?, ?)`,
+       (id, customer_id, property_id, branch_id, service_code, frequency, status, ongoing_price_cents, start_date, next_visit_date, terms_version, window, start_time, duration_minutes, crew_size, first_duration_minutes)
+       VALUES (?, ?, ?, ?, 'residential-cleaning', ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, customerId, propertyId, branchId, frequency, price, startDate, startDate, text(input.termsVersion, 80) || 'admin.v1')
+    .bind(id, customerId, propertyId, branchId, frequency, price, startDate, startDate, text(input.termsVersion, 80) || 'admin.v1', schedule.window, schedule.startTime, schedule.duration, schedule.crewSize, Number(input.firstDurationMinutes) > 0 ? Math.round(Number(input.firstDurationMinutes)) : schedule.duration)
     .run();
   await audit(db, { actorUserId: actor.id, action: 'recurring.created', entityType: 'recurring_plan', entityId: id });
   return { id };
@@ -275,11 +297,17 @@ export async function updateRecurring(
   if (!['weekly', 'biweekly', 'monthly'].includes(frequency)) throw new AdminAuthError(400, 'frequency_invalid');
   const startDate = text(input.startDate, 10) || String(current.start_date ?? '').slice(0, 10);
   const nextVisit = status === 'active' ? text(input.nextVisitDate, 10) || nextDate(startDate, frequency) : null;
+  const schedule = recurringSchedule({
+    window: text(input.window, 20) || current.window,
+    startTime: text(input.startTime, 5) || current.start_time,
+    durationMinutes: input.durationMinutes ?? current.duration_minutes,
+    crewSize: input.crewSize ?? current.crew_size,
+  });
   await db
     .prepare(
-      `UPDATE recurring_plans SET frequency = ?, status = ?, ongoing_price_cents = ?, start_date = ?, next_visit_date = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE recurring_plans SET frequency = ?, status = ?, ongoing_price_cents = ?, start_date = ?, next_visit_date = ?, window = ?, start_time = ?, duration_minutes = ?, crew_size = ?, first_duration_minutes = ?, updated_at = ? WHERE id = ?`,
     )
-    .bind(frequency, status, Math.max(0, Math.round(Number(input.ongoingPrice ?? Number(current.ongoing_price_cents) / 100) * 100) || 0), startDate, nextVisit, now(), planId)
+    .bind(frequency, status, Math.max(0, Math.round(Number(input.ongoingPrice ?? Number(current.ongoing_price_cents) / 100) * 100) || 0), startDate, nextVisit, schedule.window, schedule.startTime, schedule.duration, schedule.crewSize, input.firstDurationMinutes ?? current.first_duration_minutes ?? schedule.duration, now(), planId)
     .run();
   await audit(db, { actorUserId: actor.id, action: 'recurring.updated', entityType: 'recurring_plan', entityId: planId, detail: status });
 }

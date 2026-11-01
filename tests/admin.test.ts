@@ -74,6 +74,7 @@ function migratedDb(): TestD1 {
     '0012_employee_timekeeping.sql',
     '0013_request_lifecycle.sql',
     '0014_request_payment_status.sql',
+    '0015_recurring_schedule.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -583,6 +584,10 @@ test('scheduling prevents overlaps, assigns crews and tracks checklists', async 
     frequency: 'biweekly',
     startDate: start.slice(0, 10),
     ongoingPrice: 150,
+    window: 'morning',
+    startTime: '07:00',
+    durationMinutes: 180,
+    crewSize: 1,
   });
   assert.ok(recurring.id);
 

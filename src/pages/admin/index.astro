@@ -201,6 +201,21 @@ import '../../styles/admin.css';
                 <label>Property <select name="propertyId" data-admin-property-options required></select></label>
                 <label>Frequency <select name="frequency"><option value="biweekly">Every two weeks</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
                 <label>First visit date <input name="startDate" type="date" required /></label>
+                <fieldset class="admin-field--wide">
+                  <legend>Preferred cleaning window</legend>
+                  <label><input type="radio" name="window" value="morning" required /> Morning ? First Appointment (7:00?8:30 AM)</label>
+                  <label><input type="radio" name="window" value="afternoon" required /> Afternoon Appointment (12:30?2:30 PM)</label>
+                </fieldset>
+                <label>Scheduled start time (Central)
+                  <select name="startTime" required>
+                    <option value="">Choose a start time</option>
+                    <option value="07:00">7:00 AM</option><option value="07:15">7:15 AM</option><option value="07:30">7:30 AM</option><option value="07:45">7:45 AM</option><option value="08:00">8:00 AM</option><option value="08:15">8:15 AM</option><option value="08:30">8:30 AM</option>
+                    <option value="12:30">12:30 PM</option><option value="12:45">12:45 PM</option><option value="13:00">1:00 PM</option><option value="13:15">1:15 PM</option><option value="13:30">1:30 PM</option><option value="13:45">1:45 PM</option><option value="14:00">2:00 PM</option><option value="14:15">2:15 PM</option><option value="14:30">2:30 PM</option>
+                  </select>
+                </label>
+                <label>Ongoing cleaning duration (minutes) <input name="durationMinutes" type="number" min="30" max="600" step="15" required /></label>
+                <label>First deep-clean duration (minutes) <input name="firstDurationMinutes" type="number" min="30" max="600" step="15" /></label>
+                <label>Crew size <select name="crewSize"><option value="1">One cleaner</option><option value="2">Two cleaners</option></select></label>
                 <label>Ongoing price per visit (USD) <input name="ongoingPrice" type="number" min="0" step="0.01" required /></label>
                 <button class="btn btn--primary" type="submit">Create Plan</button>
               </form>

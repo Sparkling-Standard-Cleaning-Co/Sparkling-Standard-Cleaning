@@ -790,10 +790,13 @@ async function loadRecurring(): Promise<void> {
   const data = await api<{ recurring?: Array<Record<string, unknown>> }>('/api/admin/operations?view=recurring');
   const target = document.querySelector<HTMLElement>('[data-admin-recurring]');
   if (target) {
-    renderTable(target, ['Customer', 'Property', 'Frequency', 'Price', 'Next visit', 'Status', 'Action'], (data.recurring ?? []).map((plan) => [
+    renderTable(target, ['Customer', 'Property', 'Frequency', 'Window', 'Start', 'Duration', 'Price', 'Next visit', 'Status', 'Action'], (data.recurring ?? []).map((plan) => [
       esc([plan.first_name, plan.last_name].filter(Boolean).join(' ')),
       esc([plan.line1, plan.city].filter(Boolean).join(', ')),
       esc(titleCase(plan.frequency)),
+      can('job.write') ? `<select class="admin-select" data-recurring-window="${esc(plan.id)}"><option value="">Not scheduled</option><option value="morning"${plan.window === 'morning' ? ' selected' : ''}>Morning</option><option value="afternoon"${plan.window === 'afternoon' ? ' selected' : ''}>Afternoon</option></select>` : esc(plan.window ? titleCase(String(plan.window)) : 'Not scheduled'),
+      can('job.write') ? `<input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(plan.start_time ?? '')}" data-recurring-start="${esc(plan.id)}" />` : esc(plan.start_time ?? '?'),
+      can('job.write') ? `<input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" />` : esc(plan.duration_minutes ? `${plan.duration_minutes} min` : '?'),
       esc(money(plan.ongoing_price_cents)),
       esc(dateTime(plan.next_visit_date)),
       can('job.write') ? `<select class="admin-select" data-recurring-status="${esc(plan.id)}">${['active', 'paused', 'cancelled', 'completed'].map((status) => `<option value="${status}"${status === plan.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select>` : `<span class="admin-status">${esc(titleCase(plan.status))}</span>`,
@@ -1660,7 +1663,7 @@ for (const form of [
     event.preventDefault();
     const data = new FormData(form);
     if (form.matches('[data-admin-recurring-create]')) {
-      void action('/api/admin/operations', { action: 'create_recurring', customerId: data.get('customerId'), propertyId: data.get('propertyId'), frequency: data.get('frequency'), startDate: data.get('startDate'), ongoingPrice: data.get('ongoingPrice') });
+      void action('/api/admin/operations', { action: 'create_recurring', customerId: data.get('customerId'), propertyId: data.get('propertyId'), frequency: data.get('frequency'), startDate: data.get('startDate'), ongoingPrice: data.get('ongoingPrice'), window: data.get('window'), startTime: data.get('startTime'), durationMinutes: data.get('durationMinutes'), firstDurationMinutes: data.get('firstDurationMinutes'), crewSize: data.get('crewSize') });
     }
     if (form.matches('[data-admin-team-create]')) {
       void action('/api/admin/operations', { action: 'create_team', displayName: data.get('displayName'), email: data.get('email') });
@@ -1752,7 +1755,10 @@ document.addEventListener('click', (event) => {
   if (actionName === 'lead-retry') void action('/api/admin/leads', { action: 'retry_notification', leadId: id });
   if (actionName === 'recurring-save') {
     const select = document.querySelector<HTMLSelectElement>(`[data-recurring-status="${CSS.escape(id)}"]`);
-    void action('/api/admin/operations', { action: 'update_recurring', planId: id, status: select?.value ?? '' });
+    const start = document.querySelector<HTMLInputElement>(`[data-recurring-start="${CSS.escape(id)}"]`);
+    const duration = document.querySelector<HTMLInputElement>(`[data-recurring-duration="${CSS.escape(id)}"]`);
+    const window = document.querySelector<HTMLSelectElement>(`[data-recurring-window="${CSS.escape(id)}"]`);
+    void action('/api/admin/operations', { action: 'update_recurring', planId: id, status: select?.value ?? '', window: window?.value ?? '', startTime: start?.value ?? '', durationMinutes: duration?.value ?? '' });
   }
   if (actionName === 'job-save') {
     const select = document.querySelector<HTMLSelectElement>(`[data-job-status="${CSS.escape(id)}"]`);

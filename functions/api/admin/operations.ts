@@ -1,4 +1,6 @@
 ﻿import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
+import { syncRecurringPlan, type RecurringEnv } from '../../../src/lib/admin/recurring-schedule.ts';
+import type { BookingEnv } from '../../../src/lib/booking/service.ts';
 import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import {
   assignTeam,
@@ -15,7 +17,7 @@ import {
   updateTeamMember,
 } from '../../../src/lib/admin/scheduling.ts';
 
-interface Env extends AdminDbEnv {}
+interface Env extends AdminDbEnv, BookingEnv {}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -65,10 +67,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     requireCsrf(context.request, actor);
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = String(body.action ?? '');
-    if (action === 'create_recurring') return json({ ok: true, ...(await createRecurring(db, actor, body)) });
+    if (action === 'create_recurring') {
+      const created = await createRecurring(db, actor, body);
+      const sync = await syncRecurringPlan(context.env as RecurringEnv, db, actor, created.id);
+      return json({ ok: sync.ok, ...created, sync }, sync.ok ? 200 : 502);
+    }
     if (action === 'update_recurring') {
-      await updateRecurring(db, actor, String(body.planId ?? ''), body);
-      return json({ ok: true });
+      const planId = String(body.planId ?? '');
+      await updateRecurring(db, actor, planId, body);
+      const sync = await syncRecurringPlan(context.env as RecurringEnv, db, actor, planId, { replaceFuture: true });
+      return json({ ok: sync.ok, sync }, sync.ok ? 200 : 502);
     }
     if (action === 'create_team') return json({ ok: true, ...(await createTeamMember(db, actor, body)) });
     if (action === 'update_team') {
