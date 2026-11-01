@@ -66,6 +66,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const actor = await requireActor(db, context.request, 'job.write');
     requireCsrf(context.request, actor);
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
+    const recurringWriteEnabled = (context.env as { RECURRING_SCHEDULING_ENABLED?: string }).RECURRING_SCHEDULING_ENABLED === 'true';
+    const recurringAction = body.action === 'create_recurring' || body.action === 'update_recurring';
+    if (recurringAction && !recurringWriteEnabled) {
+      return json({ ok: false, error: 'recurring_scheduling_gated' }, 503);
+    }
     const action = String(body.action ?? '');
     if (action === 'create_recurring') {
       const created = await createRecurring(db, actor, body);

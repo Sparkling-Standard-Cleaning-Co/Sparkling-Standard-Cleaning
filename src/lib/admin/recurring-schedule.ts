@@ -1,4 +1,4 @@
-import { activeBookingResources, bookingConfig } from '../../config/booking.ts';
+import { bookingConfig } from '../../config/booking.ts';
 import { availabilityForDate, type BookingEnv } from '../booking/service.ts';
 import { createCalendarEvent, deleteCalendarEvent, findCalendarEventByReference } from '../booking/google-calendar.ts';
 import { addDays, zonedTimeToUtc } from '../booking/time.ts';
@@ -106,6 +106,7 @@ async function cancelFutureOccurrences(env: RecurringEnv, db: D1Database, planId
 
 export interface RecurringSyncResult {
   ok: boolean;
+  status: 'fully_scheduled' | 'partially_scheduled' | 'conflict' | 'sync_failed' | 'paused' | 'cancelled';
   created: number;
   skipped: number;
   conflicts: Array<{ date: string; reason: string }>;
@@ -120,10 +121,11 @@ export async function syncRecurringPlan(
   options: { replaceFuture?: boolean } = {},
 ): Promise<RecurringSyncResult> {
   const plan = await loadPlan(db, actor, planId);
-  const result: RecurringSyncResult = { ok: false, created: 0, skipped: 0, conflicts: [], errors: [] };
+  const result: RecurringSyncResult = { ok: false, status: 'sync_failed', created: 0, skipped: 0, conflicts: [], errors: [] };
   if (options.replaceFuture) result.errors.push(...await cancelFutureOccurrences(env, db, planId));
   if (plan.status !== 'active') {
     result.ok = result.errors.length === 0;
+    result.status = plan.status === 'paused' ? 'paused' : plan.status === 'cancelled' ? 'cancelled' : 'sync_failed';
     return result;
   }
   if (!plan.window || !plan.start_time || !plan.duration_minutes) {
@@ -139,14 +141,26 @@ export async function syncRecurringPlan(
   if (!Number.isFinite(destination.lat) || !Number.isFinite(destination.lng)) {
     throw new AdminAuthError(400, 'recurring_property_coordinates_missing');
   }
-  const resourceIds = activeBookingResources().slice(0, Math.max(1, Number(plan.crew_size) || 1)).map((resource) => resource.id);
   const durationOngoing = Number(plan.duration_minutes);
   const durationFirst = Number(plan.first_duration_minutes) || durationOngoing;
   const today = localToday();
   const horizon = addDays(today, bookingConfig.maxAdvanceDays);
+  let firstIndex = 0;
+  const startDate = plan.start_date.slice(0, 10);
+  if (plan.frequency === 'weekly' || plan.frequency === 'biweekly') {
+    const step = plan.frequency === 'weekly' ? 7 : 14;
+    const days = Math.floor((Date.parse(today + 'T12:00:00Z') - Date.parse(startDate + 'T12:00:00Z')) / 86_400_000);
+    firstIndex = Math.max(0, Math.floor(days / step));
+    while (occurrenceDate(startDate, plan.frequency, firstIndex) < today) firstIndex += 1;
+  } else {
+    const [sy = 1970, sm = 1] = startDate.split('-').map(Number);
+    const [ty = 1970, tm = 1] = today.split('-').map(Number);
+    firstIndex = Math.max(0, (ty - sy) * 12 + (tm - sm) - 1);
+    while (occurrenceDate(startDate, plan.frequency, firstIndex) < today) firstIndex += 1;
+  }
   const location = [plan.line1, plan.city, plan.state, plan.postal_code].filter(Boolean).join(', ');
 
-  for (let index = 0; index < 40; index += 1) {
+  for (let index = firstIndex; index < firstIndex + 100; index += 1) {
     const date = occurrenceDate(plan.start_date.slice(0, 10), plan.frequency, index);
     if (date > horizon) break;
     if (date < today) continue;
@@ -159,7 +173,6 @@ export async function syncRecurringPlan(
     }
     const duration = date === plan.start_date.slice(0, 10) ? durationFirst : durationOngoing;
     const start = zonedTimeToUtc(date, plan.start_time, bookingConfig.timeZone);
-    const end = new Date(start.getTime() + duration * 60_000);
     const availability = await availabilityForDate(env, {
       date,
       durationMinutes: duration,
@@ -170,10 +183,13 @@ export async function syncRecurringPlan(
       result.conflicts.push({ date, reason: availability.reason });
       continue;
     }
-    if (!availability.availability.slots.some((slot) => slot.start === start.toISOString())) {
+    const exact = availability.availability.slots.find((slot) => slot.start === start.toISOString());
+    if (!exact) {
       result.conflicts.push({ date, reason: 'slot_unavailable' });
       continue;
     }
+    const resourceIds = exact.resourceIds;
+    const end = new Date(exact.end);
     const occurrenceReference = reference(planId, date);
     let eventId = existing?.calendar_event_id ?? await findCalendarEventByReference(env, occurrenceReference);
     if (!eventId) {
@@ -236,6 +252,11 @@ export async function syncRecurringPlan(
     entityId: planId,
     detail: `created=${result.created} skipped=${result.skipped} conflicts=${result.conflicts.length} errors=${result.errors.length}`,
   });
-  result.ok = result.errors.length === 0;
+  result.ok = result.errors.length === 0 && result.conflicts.length === 0;
+  result.status = result.errors.length > 0
+    ? 'sync_failed'
+    : result.conflicts.length > 0
+      ? result.created > 0 ? 'partially_scheduled' : 'conflict'
+      : 'fully_scheduled';
   return result;
 }
