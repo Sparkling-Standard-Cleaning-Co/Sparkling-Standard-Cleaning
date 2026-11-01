@@ -929,6 +929,98 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   // ── Map + confirmation ────────────────────────────────────────────────────
+  let googleMap: any = null;
+  let googleMarker: any = null;
+  let googleMapsLoading: Promise<boolean> | null = null;
+
+  async function ensureGoogleMaps(): Promise<boolean> {
+    if (googleMap) return true;
+    if (!googleMapsLoading) {
+      googleMapsLoading = (async () => {
+        try {
+          const config = await fetch('/api/maps-browser-config', {
+            headers: { Accept: 'application/json' },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!config.ok) return false;
+          const data = (await config.json().catch(() => ({}))) as { ok?: boolean; key?: string };
+          if (data.ok !== true || !data.key) return false;
+          const existing = (window as unknown as { google?: { maps?: unknown } }).google;
+          if (existing?.maps) return true;
+          await new Promise<void>((resolve, reject) => {
+            const callback = '__sparklingGoogleMapsReady';
+            (window as unknown as Record<string, unknown>)[callback] = () => {
+              delete (window as unknown as Record<string, unknown>)[callback];
+              resolve();
+            };
+            const script = document.createElement('script');
+            script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(data.key) + '&v=weekly&loading=async&callback=' + callback;
+            script.async = true;
+            script.defer = true;
+            script.onerror = () => reject(new Error('maps_script_failed'));
+            document.head.appendChild(script);
+          });
+          return Boolean((window as unknown as { google?: { maps?: unknown } }).google?.maps);
+        } catch {
+          return false;
+        }
+      })();
+    }
+    return googleMapsLoading;
+  }
+
+  function applyDraggedPin(lat: number, lng: number): void {
+    const active = methodIsGps() ? gpsCandidate : manualCandidate;
+    if (!active) return;
+    const updated = { ...active, lat, lng, adjusted: true };
+    if (methodIsGps()) gpsCandidate = updated;
+    else manualCandidate = updated;
+    const confirmed = activeConfirmed();
+    if (confirmed) {
+      const nextConfirmed = { ...confirmed, lat, lng, adjusted: true };
+      if (methodIsGps()) gpsConfirmed = nextConfirmed;
+      else manualConfirmed = nextConfirmed;
+      emit();
+    }
+    setTravelNote('Pin moved — travel will use this corrected destination.');
+    setStatus('Pin adjusted. Confirm to use this corrected destination.', 'info');
+  }
+
+  async function showGoogleMap(resolved: ResolvedCandidate): Promise<boolean> {
+    if (!mapCanvas || !(await ensureGoogleMaps())) return false;
+    const maps = (window as unknown as { google: { maps: any } }).google.maps;
+    try {
+      if (!googleMap) {
+        googleMap = new maps.Map(mapCanvas, {
+          center: { lat: resolved.lat, lng: resolved.lng },
+          zoom: 16,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          clickableIcons: false,
+          gestureHandling: 'cooperative',
+        });
+        googleMarker = new maps.Marker({
+          map: googleMap,
+          position: { lat: resolved.lat, lng: resolved.lng },
+          draggable: true,
+          title: 'Cleaning destination',
+        });
+        googleMarker.addListener('dragend', () => {
+          const position = googleMarker.getPosition();
+          if (position) applyDraggedPin(position.lat(), position.lng());
+        });
+      } else {
+        googleMap.setCenter({ lat: resolved.lat, lng: resolved.lng });
+        googleMarker?.setPosition({ lat: resolved.lat, lng: resolved.lng });
+      }
+      mapFallback?.setAttribute('hidden', '');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function ensureMap(): Promise<MapLibreModule | null> {
     if (mapModule) return mapModule;
     if (!mapLoading) {
@@ -967,6 +1059,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
 
   async function showMap(resolved: ResolvedCandidate): Promise<void> {
     if (!mapCanvas) return;
+    if (await showGoogleMap(resolved)) return;
     const module = await ensureMap();
     if (!module) {
       mapFallback?.removeAttribute('hidden');
