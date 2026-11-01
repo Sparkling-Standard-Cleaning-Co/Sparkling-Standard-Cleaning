@@ -798,8 +798,8 @@ export function initBookingCalendar(
       revealedPeriodDate = '';
       availableSlots = [];
       liveAvailability = false;
-      viewYear = Number(today.slice(0, 4));
-      viewMonth = Number(today.slice(5, 7)) - 1;
+      viewYear = Number(initialMonth.slice(0, 4));
+      viewMonth = Number(initialMonth.slice(5, 7)) - 1;
       setInputs();
       renderCalendar();
       clearTimes();
