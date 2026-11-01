@@ -1,4 +1,4 @@
-import { bookingConfig } from '../../config/booking.ts';
+﻿import { bookingConfig } from '../../config/booking.ts';
 import { availabilityForDate, type BookingEnv } from '../booking/service.ts';
 import { createCalendarEvent, deleteCalendarEvent, findCalendarEventByReference, getCalendarEvent } from '../booking/google-calendar.ts';
 import { addDays, zonedTimeToUtc } from '../booking/time.ts';
@@ -6,6 +6,14 @@ import type { AdminActor } from './operations.ts';
 import { AdminAuthError, audit } from './operations.ts';
 import type { D1Database } from './d1.ts';
 import type { AdminDbEnv } from './d1.ts';
+
+export interface RecurringDependencies {
+  availability: typeof availabilityForDate;
+  findEvent: typeof findCalendarEventByReference;
+  getEvent: typeof getCalendarEvent;
+  createEvent: typeof createCalendarEvent;
+  deleteEvent: typeof deleteCalendarEvent;
+}
 
 export interface RecurringEnv extends BookingEnv, AdminDbEnv {}
 
@@ -101,7 +109,7 @@ async function loadPlan(db: D1Database, actor: AdminActor, planId: string): Prom
   return row;
 }
 
-async function cancelFutureOccurrences(env: RecurringEnv, db: D1Database, planId: string): Promise<string[]> {
+async function cancelFutureOccurrences(env: RecurringEnv, db: D1Database, planId: string, deleter: typeof deleteCalendarEvent = deleteCalendarEvent): Promise<string[]> {
   const today = localToday();
   const rows = await db.prepare(
     `SELECT o.id, o.calendar_event_id, o.appointment_id
@@ -111,7 +119,7 @@ async function cancelFutureOccurrences(env: RecurringEnv, db: D1Database, planId
   const errors: string[] = [];
   for (const row of rows.results ?? []) {
     if (row.calendar_event_id) {
-      const deleted = await deleteCalendarEvent(env, row.calendar_event_id);
+      const deleted = await deleter(env, row.calendar_event_id);
       if (!deleted.ok) {
         errors.push(`${row.id}:calendar_cancel_failed`);
         continue;
@@ -136,16 +144,97 @@ export interface RecurringSyncResult {
   errors: string[];
 }
 
+export interface ProposedRecurringSchedule {
+  frequency: string;
+  startDate: string;
+  window: string;
+  startTime: string;
+  durationMinutes: number;
+  firstDurationMinutes?: number;
+  crewSize: number;
+}
+
+export interface PreparedRecurringSchedule {
+  ok: boolean;
+  conflicts: Array<{ date: string; reason: string }>;
+  dates: Array<{ date: string; start: string; end: string; resourceIds: string[] }>;
+}
+
+export async function prepareRecurringScheduleChange(
+  env: RecurringEnv,
+  db: D1Database,
+  actor: AdminActor,
+  planId: string,
+  proposed: ProposedRecurringSchedule,
+  deps: Partial<RecurringDependencies> = {},
+): Promise<PreparedRecurringSchedule> {
+  const plan = await loadPlan(db, actor, planId);
+  const today = localToday();
+  const horizon = addDays(today, bookingConfig.maxAdvanceDays);
+  const dates = occurrenceDatesWithin(proposed.startDate, proposed.frequency, today, horizon);
+  const conflicts: PreparedRecurringSchedule['conflicts'] = [];
+  const prepared: PreparedRecurringSchedule['dates'] = [];
+  const destination = { lat: Number(plan.latitude), lng: Number(plan.longitude) };
+  if (!Number.isFinite(destination.lat) || !Number.isFinite(destination.lng)) {
+    return { ok: false, conflicts: [{ date: proposed.startDate, reason: 'property_coordinates_missing' }], dates: [] };
+  }
+  const availability = deps.availability ?? availabilityForDate;
+  for (const date of dates) {
+    const duration = date === proposed.startDate ? proposed.firstDurationMinutes || proposed.durationMinutes : proposed.durationMinutes;
+    const start = zonedTimeToUtc(date, proposed.startTime, bookingConfig.timeZone);
+    const result = await availability(env, { date, durationMinutes: duration, destination, crewSize: proposed.crewSize });
+    if (!result.ok) {
+      conflicts.push({ date, reason: result.reason });
+      continue;
+    }
+    const exact = result.availability.slots.find((slot) => slot.start === start.toISOString());
+    if (!exact) {
+      conflicts.push({ date, reason: 'slot_unavailable' });
+      continue;
+    }
+    prepared.push({ date, start: exact.start, end: exact.end, resourceIds: exact.resourceIds });
+  }
+  return { ok: conflicts.length === 0 && prepared.length === dates.length, conflicts, dates: prepared };
+}
+
+export async function applyRecurringScheduleChange(
+  env: RecurringEnv,
+  db: D1Database,
+  actor: AdminActor,
+  planId: string,
+  proposed: ProposedRecurringSchedule,
+  deps: Partial<RecurringDependencies> = {},
+): Promise<PreparedRecurringSchedule & { sync?: RecurringSyncResult }> {
+  const prepared = await prepareRecurringScheduleChange(env, db, actor, planId, proposed, deps);
+  if (!prepared.ok) return prepared;
+  await db.prepare(
+    `UPDATE recurring_plans SET frequency = ?, start_date = ?, window = ?, start_time = ?,
+       duration_minutes = ?, first_duration_minutes = ?, crew_size = ?, updated_at = ? WHERE id = ?`,
+  ).bind(proposed.frequency, proposed.startDate, proposed.window, proposed.startTime,
+    proposed.durationMinutes, proposed.firstDurationMinutes ?? proposed.durationMinutes,
+    proposed.crewSize, new Date().toISOString(), planId).run();
+  const sync = await syncRecurringPlan(env, db, actor, planId, { replaceFuture: true, deps });
+  return { ...prepared, sync };
+}
+
 export async function syncRecurringPlan(
   env: RecurringEnv,
   db: D1Database,
   actor: AdminActor,
   planId: string,
-  options: { replaceFuture?: boolean } = {},
+  options: { replaceFuture?: boolean; deps?: Partial<RecurringDependencies> } = {},
 ): Promise<RecurringSyncResult> {
+  const deps: RecurringDependencies = {
+    availability: availabilityForDate,
+    findEvent: findCalendarEventByReference,
+    getEvent: getCalendarEvent,
+    createEvent: createCalendarEvent,
+    deleteEvent: deleteCalendarEvent,
+    ...options.deps,
+  };
   const plan = await loadPlan(db, actor, planId);
   const result: RecurringSyncResult = { ok: false, status: 'sync_failed', created: 0, skipped: 0, conflicts: [], errors: [] };
-  if (options.replaceFuture) result.errors.push(...await cancelFutureOccurrences(env, db, planId));
+  if (options.replaceFuture) result.errors.push(...await cancelFutureOccurrences(env, db, planId, deps.deleteEvent));
   if (plan.status !== 'active') {
     result.ok = result.errors.length === 0;
     result.status = plan.status === 'paused' ? 'paused' : plan.status === 'cancelled' ? 'cancelled' : 'sync_failed';
@@ -168,14 +257,16 @@ export async function syncRecurringPlan(
   const durationFirst = Number(plan.first_duration_minutes) || durationOngoing;
   const today = localToday();
   const horizon = addDays(today, bookingConfig.maxAdvanceDays);
-  const location = [plan.line1, plan.city, plan.state, plan.postal_code].filter(Boolean).join(plan.start_date.slice(0, 10), plan.frequency, today, horizon);
+  const location = [plan.line1, plan.city, plan.state, plan.postal_code].filter(Boolean).join(', ');
+  const proposedDates = occurrenceDatesWithin(plan.start_date.slice(0, 10), plan.frequency, today, horizon);
   for (const date of proposedDates) {
     const existing = await db.prepare(
       'SELECT id, status, appointment_id, calendar_event_id FROM recurring_occurrences WHERE plan_id = ? AND occurrence_date = ? LIMIT 1',
     ).bind(planId, date).first<{ id: string; status: string; appointment_id: string | null; calendar_event_id: string | null }>();
+    if (existing && existing.status !== 'scheduled') { existing.calendar_event_id = null; existing.appointment_id = null; }
     if (existing && existing.status === 'scheduled' && existing.appointment_id && existing.calendar_event_id) {
       const appointment = await db.prepare('SELECT status FROM appointments WHERE id = ? LIMIT 1').bind(existing.appointment_id).first<{ status: string }>();
-      const event = await getCalendarEvent(env, existing.calendar_event_id).catch(() => null);
+      const event = await deps.getEvent(env, existing.calendar_event_id).catch(() => null);
       if (appointment && ['pending', 'confirmed'].includes(appointment.status) && event && event.status !== 'cancelled') {
         result.skipped += 1;
         continue;
@@ -183,7 +274,7 @@ export async function syncRecurringPlan(
     }
     const duration = date === plan.start_date.slice(0, 10) ? durationFirst : durationOngoing;
     const start = zonedTimeToUtc(date, plan.start_time, bookingConfig.timeZone);
-    const availability = await availabilityForDate(env, {
+    const availability = await deps.availability(env, {
       date,
       durationMinutes: duration,
       destination,
@@ -201,10 +292,10 @@ export async function syncRecurringPlan(
     const resourceIds = exact.resourceIds;
     const end = new Date(exact.end);
     const occurrenceReference = reference(planId, date);
-    let eventId = existing?.calendar_event_id ?? await findCalendarEventByReference(env, occurrenceReference);
+    let eventId = existing?.calendar_event_id ?? await deps.findEvent(env, occurrenceReference);
     let createdByThisAttempt = false;
     if (!eventId) {
-      const created = await createCalendarEvent(env, {
+      const created = await deps.createEvent(env, {
         summary: `Sparkling Standard Recurring Cleaning - ${[plan.first_name, plan.last_name].filter(Boolean).join(' ') || planId}`,
         description: `Recurring plan ${planId}. ${plan.frequency} service. ${plan.crew_size ?? 1} cleaner(s).`,
         location,
@@ -225,9 +316,13 @@ export async function syncRecurringPlan(
       eventId = created.eventId;
       createdByThisAttempt = true;
     }
-    const appointmentId = existing?.appointment_id ?? `appt_${crypto.randomUUID()}`;
+    const priorAppointment = await db.prepare('SELECT id FROM appointments WHERE reference = ? LIMIT 1').bind(occurrenceReference).first<{ id: string }>();
+    const appointmentId = existing?.appointment_id ?? priorAppointment?.id ?? `appt_${crypto.randomUUID()}`;
     try {
-      if (!existing?.appointment_id) {
+      if (priorAppointment) {
+        await db.prepare("UPDATE appointments SET status = 'confirmed', start_at = ?, end_at = ?, duration_minutes = ?, crew_size = ?, cancelled_at = NULL, updated_at = ? WHERE id = ?")
+          .bind(start.toISOString(), end.toISOString(), duration, Math.max(1, Number(plan.crew_size) || 1), new Date().toISOString(), appointmentId).run();
+      } else {
         await db.prepare(
           `INSERT INTO appointments
            (id, branch_id, customer_id, property_id, recurring_plan_id, status, start_at, end_at,
@@ -239,9 +334,9 @@ export async function syncRecurringPlan(
       }
       await db.prepare(
         `INSERT OR REPLACE INTO recurring_occurrences
-         (id, plan_id, occurrence_date, appointment_id, calendar_event_id, status)
-         VALUES (?, ?, ?, ?, ?, 'scheduled')`,
-      ).bind(occurrenceId(planId, date), planId, date, appointmentId, eventId).run();
+         (id, plan_id, occurrence_date, appointment_id, calendar_event_id, status, resource_ids)
+         VALUES (?, ?, ?, ?, ?, 'scheduled', ?)`,
+      ).bind(occurrenceId(planId, date), planId, date, appointmentId, eventId, JSON.stringify(resourceIds)).run();
       const link = await db.prepare('SELECT id FROM calendar_links WHERE provider = ? AND provider_event_id = ? LIMIT 1')
         .bind('google', eventId).first<{ id: string }>();
       if (!link) {
@@ -251,9 +346,9 @@ export async function syncRecurringPlan(
         ).bind(`cal_${crypto.randomUUID()}`, appointmentId, eventId, new Date().toISOString()).run();
       }
       result.created += 1;
-    } catch {
-      if (createdByThisAttempt && eventId) await deleteCalendarEvent(env, eventId);
-      result.errors.push(`${date}:d1_write_failed`);
+    } catch (error) {
+      if (createdByThisAttempt && eventId) await deps.deleteEvent(env, eventId);
+      result.errors.push(`${date}:d1_write_failed:${(error as Error).message}`);
     }
   }
   await db.prepare('UPDATE recurring_plans SET updated_at = ? WHERE id = ?').bind(new Date().toISOString(), planId).run();
