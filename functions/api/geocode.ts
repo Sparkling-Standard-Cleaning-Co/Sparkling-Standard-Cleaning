@@ -276,7 +276,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       if (googleConfigured) {
         try {
           const rows = await googleAutocomplete(env, parts.query || [parts.street, parts.city, parts.state, parts.zip].filter(Boolean).join(', '), sessionToken);
-          return json({ ok: true, suggestions: rows });
+          if (rows.length > 0) return json({ ok: true, suggestions: rows });
+          if (!mapMapKey(env)) return json({ ok: true, suggestions: [] });
+          // Places API (New) outage: preserve address entry through the last
+          // configured provider rather than dead-ending the customer.
         } catch {
           return json({ ok: false, error: 'provider_failed' }, 502);
         }
