@@ -40,29 +40,33 @@ export function centralDateKey(date: Date): string {
 
 async function claimRun(db: D1Database, runKey: string): Promise<{ ok: boolean; id?: string; reason?: string }> {
   const id = `run_${crypto.randomUUID()}`;
+  const owner = crypto.randomUUID();
   const startedAt = new Date().toISOString();
-  const inserted = await db
+  await db
     .prepare(
-      `INSERT OR IGNORE INTO recurring_worker_runs (id, run_key, status, started_at)
-       VALUES (?, ?, 'running', ?)`,
+      `INSERT OR IGNORE INTO recurring_worker_runs (id, run_key, status, started_at, owner_token)
+       VALUES (?, ?, 'running', ?, ?)`,
     )
-    .bind(id, runKey, startedAt)
+    .bind(id, runKey, startedAt, owner)
     .run();
-  // A fresh insert belongs to this request. Only inspect the existing row when
-  // the insert was ignored; otherwise we would mistake our own run for a
-  // concurrent one.
-  if (Number(inserted.meta?.changes ?? 0) > 0) return { ok: true, id };
   const row = await db
-    .prepare('SELECT id, status, started_at FROM recurring_worker_runs WHERE run_key = ? LIMIT 1')
+    .prepare(
+      'SELECT id, status, started_at, owner_token FROM recurring_worker_runs WHERE run_key = ? LIMIT 1',
+    )
     .bind(runKey)
-    .first<{ id: string; status: string; started_at: string }>();
+    .first<{ id: string; status: string; started_at: string; owner_token: string }>();
   if (!row) return { ok: false, reason: 'run_claim_failed' };
+  // Our own insert carries this request's owner token. Never treat it as a
+  // concurrent run.
+  if (row.owner_token === owner) return { ok: true, id: row.id };
   if (row.status === 'completed') return { ok: false, reason: 'already_completed' };
   const stale = Date.now() - Date.parse(row.started_at) > 30 * 60_000;
   if (row.status === 'running' && !stale) return { ok: false, reason: 'already_running' };
   await db
-    .prepare("UPDATE recurring_worker_runs SET status = 'running', started_at = ?, finished_at = NULL WHERE id = ?")
-    .bind(startedAt, row.id)
+    .prepare(
+      "UPDATE recurring_worker_runs SET status = 'running', started_at = ?, finished_at = NULL, owner_token = ? WHERE id = ?",
+    )
+    .bind(startedAt, owner, row.id)
     .run();
   return { ok: true, id: row.id };
 }
@@ -76,7 +80,8 @@ async function finishRun(
   await db
     .prepare(
       `UPDATE recurring_worker_runs
-       SET status = ?, finished_at = ?, plans_scanned = ?, plans_synced = ?, errors = ?, detail_json = ?
+       SET status = ?, finished_at = ?, plans_scanned = ?, plans_synced = ?, errors = ?, detail_json = ?,
+           owner_token = ''
        WHERE id = ?`,
     )
     .bind(
