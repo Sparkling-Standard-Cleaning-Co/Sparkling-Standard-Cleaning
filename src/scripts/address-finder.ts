@@ -1216,6 +1216,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     manualConfirmed = buildManualConfirmed(manualCandidate);
     settleDestinationValues();
     if (showUi) {
+      if (manualBody) manualBody.hidden = true;
+      if (gpsSection) gpsSection.hidden = true;
       if (mapCard) mapCard.hidden = false;
       if (confirmedCard) confirmedCard.hidden = false;
       if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(manualConfirmed);
