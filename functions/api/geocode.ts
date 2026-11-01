@@ -21,6 +21,11 @@
 import {
   featureId,
   featureLabel,
+  googleAutocomplete,
+  googleGeocode,
+  googleMapsKey,
+  googlePlaceDetails,
+  googleReverseGeocode,
   mapMapKey,
   mapMapResolveId,
   resolveAddress,
@@ -244,14 +249,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'rate_limited' }, 429);
   }
 
-  let payload: { action?: unknown; query?: unknown; id?: unknown; street?: unknown; city?: unknown; state?: unknown; zip?: unknown; lat?: unknown; lng?: unknown };
+  let payload: { action?: unknown; query?: unknown; id?: unknown; street?: unknown; city?: unknown; state?: unknown; zip?: unknown; lat?: unknown; lng?: unknown; sessionToken?: unknown };
   try {
     payload = (await request.json()) as typeof payload;
   } catch {
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
   const action = typeof payload.action === 'string' ? payload.action : '';
-  const configured = Boolean(mapMapKey(env));
+  const configured = Boolean(mapMapKey(env) || googleMapsKey(env));
+  const googleConfigured = Boolean(googleMapsKey(env));
+  const sessionToken = typeof payload.sessionToken === 'string' ? payload.sessionToken.trim().slice(0, 80) : '';
 
   try {
     if (action === 'suggest') {
@@ -266,6 +273,14 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       // Legacy callers may send only `query`; keep that working.
       if (!parts.query && !parts.street) return json({ ok: false, error: 'invalid_request' }, 400);
       if (!configured) return json({ ok: false, error: 'provider_not_configured' }, 503);
+      if (googleConfigured) {
+        try {
+          const rows = await googleAutocomplete(env, parts.query || [parts.street, parts.city, parts.state, parts.zip].filter(Boolean).join(', '), sessionToken);
+          return json({ ok: true, suggestions: rows });
+        } catch {
+          return json({ ok: false, error: 'provider_failed' }, 502);
+        }
+      }
       try {
         const { suggestions, needsLocation } = await suggestionsForAddress(env, parts);
         return json({ ok: true, suggestions, ...(needsLocation ? { needsLocation: true } : {}) });
@@ -280,7 +295,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       // Exact house-number resolution: MapMap when it has the exact address,
       // otherwise the free Census Geocoder. Street-level or POI results are
       // never substituted for a requested house number.
-      const resolved = await resolveAddress(env, query).catch(() => null);
+      const resolved = googleConfigured
+        ? await googleGeocode(env, query).catch(() => null)
+        : await resolveAddress(env, query).catch(() => null);
       if (resolved) return json({ ok: true, result: resolved });
       // Owner-directed fallback (Smart Estimate directive, Part 1): a fully
       // typed address that no provider could pinpoint must not dead-end the
@@ -317,7 +334,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         return json({ ok: false, error: 'invalid_request' }, 400);
       }
       if (!configured) return json({ ok: false, error: 'provider_not_configured' }, 503);
-      const result = await reverseGeocode(env, lat, lng).catch(() => null);
+      const result = googleConfigured
+        ? await googleReverseGeocode(env, lat, lng).catch(() => null)
+        : await reverseGeocode(env, lat, lng).catch(() => null);
       if (!result) return json({ ok: false, error: 'not_found' }, 404);
       return json({ ok: true, result });
     }
@@ -326,7 +345,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       if (!configured) return json({ ok: false, error: 'provider_not_configured' }, 503);
       const id = typeof payload.id === 'string' ? payload.id.trim().slice(0, 120) : '';
       if (!id) return json({ ok: false, error: 'invalid_request' }, 400);
-      const result = await mapMapResolveId(env, id).catch(() => null);
+      const result = googleConfigured
+        ? await googlePlaceDetails(env, id, sessionToken).catch(() => null)
+        : await mapMapResolveId(env, id).catch(() => null);
       if (!result) return json({ ok: false, error: 'not_found' }, 404);
       return json({ ok: true, result });
     }

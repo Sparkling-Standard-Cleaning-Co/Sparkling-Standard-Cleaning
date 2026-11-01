@@ -14,6 +14,8 @@ export interface RoutingEnv {
   TRAVEL_ORIGIN?: string;
   ROUTES_PROVIDER?: string;
   ROUTES_API_KEY?: string;
+  /** Owner-authorized Google Maps Platform server key. */
+  GOOGLE_MAPS_SERVER_API_KEY?: string;
   /** Optional MapMap gateway override (defaults to https://api.mapmap.ai). */
   MAPMAP_BASE?: string;
   EIA_API_KEY?: string;
@@ -63,6 +65,7 @@ export async function resolveRoute(
   origin: LatLng,
   destination: LatLng,
 ): Promise<ServerRoute> {
+  const googleKey = env.GOOGLE_MAPS_SERVER_API_KEY?.trim();
   const apiKey = env.ROUTES_API_KEY?.trim();
   // Paid providers are explicitly disabled for this deployment: only MapMap
   // (free tier, refuses at quota) may be activated, and only when its key is
@@ -70,7 +73,55 @@ export async function resolveRoute(
   // is ignored and degrades to the labeled straight-line fallback — it can
   // never reach a paid endpoint.
   const requested = env.ROUTES_PROVIDER?.trim().toLowerCase();
-  const provider = requested === 'mapmap' ? 'mapmap' : requested ? '' : apiKey ? 'mapmap' : '';
+  const provider = googleKey
+    ? 'google'
+    : requested === 'mapmap'
+      ? 'mapmap'
+      : requested
+        ? ''
+        : apiKey
+          ? 'mapmap'
+          : '';
+
+  if (provider === 'google' && googleKey) {
+    try {
+      const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': googleKey,
+          'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+        },
+        body: JSON.stringify({
+          origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
+          destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+          travelMode: 'DRIVE',
+          routingPreference: 'TRAFFIC_UNAWARE',
+          computeAlternativeRoutes: false,
+          languageCode: 'en-US',
+          units: 'METRIC',
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        routes?: Array<{ distanceMeters?: number; duration?: string }>;
+      };
+      const route = data.routes?.[0];
+      const meters = route?.distanceMeters;
+      const seconds = typeof route?.duration === 'string' ? Number(route.duration.replace(/s$/, '')) : NaN;
+      if (response.ok && typeof meters === 'number' && meters >= 0) {
+        return {
+          oneWayMiles: meters / 1609.344,
+          durationMinutes: Number.isFinite(seconds) && seconds >= 0 ? seconds / 60 : null,
+          provider: 'google',
+          method: 'route',
+          verified: true,
+        };
+      }
+    } catch {
+      // Fall through to the labeled straight-line fallback.
+    }
+  }
 
   if (provider === 'mapmap' && apiKey) {
     try {

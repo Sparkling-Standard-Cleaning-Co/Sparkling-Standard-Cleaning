@@ -18,13 +18,15 @@ export interface GeocodeEnv {
   /** Optional alias so the service also works with a dedicated key. */
   MAPMAP_API_KEY?: string;
   MAPMAP_BASE?: string;
+  /** Google Maps Platform server key (Places New, Geocoding, Routes). */
+  GOOGLE_MAPS_SERVER_API_KEY?: string;
 }
 
 export interface GeocodedAddress {
   label: string;
   lat: number;
   lng: number;
-  source: 'mapmap' | 'census';
+  source: 'mapmap' | 'census' | 'google';
   zip?: string;
   city?: string;
   state?: string;
@@ -258,4 +260,190 @@ export async function resolveAddress(env: GeocodeEnv, query: string): Promise<Ge
   // Census occasionally misses or times out once; one immediate retry is cheap,
   // keyless and materially improves exact-address resolution.
   return censusResolve(query).catch(() => null);
+}
+
+export function googleMapsKey(env: GeocodeEnv): string {
+  return env.GOOGLE_MAPS_SERVER_API_KEY?.trim() || '';
+}
+
+export interface GooglePrediction {
+  id: string;
+  label: string;
+  kind: 'address' | 'street' | 'locality';
+  state?: string;
+}
+
+function googleState(value: string | undefined): 'FL' | 'AL' | null {
+  const normalized = (value ?? '').trim().toUpperCase();
+  return normalized === 'FL' || normalized === 'FLORIDA' ? 'FL'
+    : normalized === 'AL' || normalized === 'ALABAMA' ? 'AL' : null;
+}
+
+function componentValue(
+  components: Array<{ longText?: string | undefined; shortText?: string | undefined; types?: string[] | undefined }> | undefined,
+  type: string,
+): string {
+  const component = (components ?? []).find((entry) => (entry.types ?? []).includes(type));
+  return (component?.longText ?? component?.shortText ?? '').trim();
+}
+
+function googleAddress(
+  place: {
+    formattedAddress?: string | undefined;
+    addressComponents?: Array<{ longText?: string | undefined; shortText?: string | undefined; types?: string[] | undefined }> | undefined;
+    location?: { latitude?: number | undefined; longitude?: number | undefined } | undefined;
+    types?: string[] | undefined;
+  },
+): GeocodedAddress | null {
+  const lat = Number(place.location?.latitude);
+  const lng = Number(place.location?.longitude);
+  const label = (place.formattedAddress ?? '').trim();
+  if (!label || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const state = googleState(
+    componentValue(place.addressComponents, 'administrative_area_level_1') ||
+      place.addressComponents?.find((entry) => (entry.types ?? []).includes('administrative_area_level_1'))?.shortText,
+  );
+  if (!state) return null;
+  const streetNumber = componentValue(place.addressComponents, 'street_number');
+  const route = componentValue(place.addressComponents, 'route');
+  const city = componentValue(place.addressComponents, 'locality') || componentValue(place.addressComponents, 'postal_town');
+  const zip = componentValue(place.addressComponents, 'postal_code').match(FIVE_DIGIT_ZIP)?.[1];
+  return {
+    label,
+    lat,
+    lng,
+    source: 'google',
+    precise: Boolean(streetNumber && route),
+    ...(zip ? { zip } : {}),
+    ...(city ? { city } : {}),
+    state,
+  };
+}
+
+export async function googleAutocomplete(
+  env: GeocodeEnv,
+  input: string,
+  sessionToken?: string,
+): Promise<GooglePrediction[]> {
+  const key = googleMapsKey(env);
+  if (!key) return [];
+  const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': key,
+      'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
+    },
+    body: JSON.stringify({
+      input: input.slice(0, 120),
+      includedRegionCodes: ['us'],
+      languageCode: 'en',
+      regionCode: 'us',
+      locationBias: { circle: { center: { latitude: 30.4213, longitude: -87.2169 }, radius: 80000 } },
+      ...(sessionToken ? { sessionToken } : {}),
+    }),
+    signal: AbortSignal.timeout(7000),
+  });
+  if (!response.ok) return [];
+  const data = (await response.json().catch(() => ({}))) as {
+    suggestions?: Array<{
+      placePrediction?: {
+        placeId?: string;
+        text?: { text?: string };
+        structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } };
+      };
+    }>;
+  };
+  const seen = new Set<string>();
+  const results: GooglePrediction[] = [];
+  for (const row of data.suggestions ?? []) {
+    const place = row.placePrediction;
+    const id = place?.placeId ?? '';
+    const label = (place?.text?.text ?? [place?.structuredFormat?.mainText?.text, place?.structuredFormat?.secondaryText?.text].filter(Boolean).join(', ')).trim();
+    if (!id || !label || seen.has(id)) continue;
+    seen.add(id);
+    const main = place?.structuredFormat?.mainText?.text ?? label.split(',')[0] ?? '';
+    results.push({ id, label, kind: /^\d+[a-z]?\b/i.test(main) ? 'address' : 'street' });
+    if (results.length >= 5) break;
+  }
+  return results;
+}
+
+export async function googlePlaceDetails(
+  env: GeocodeEnv,
+  placeId: string,
+  sessionToken?: string,
+): Promise<GeocodedAddress | null> {
+  const key = googleMapsKey(env);
+  if (!key || !placeId) return null;
+  const url = new URL(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`);
+  if (sessionToken) url.searchParams.set('sessionToken', sessionToken);
+  const response = await fetch(url, {
+    headers: {
+      'X-Goog-Api-Key': key,
+      'X-Goog-FieldMask': 'id,formattedAddress,addressComponents,location,types',
+    },
+    signal: AbortSignal.timeout(7000),
+  });
+  if (!response.ok) return null;
+  return googleAddress(await response.json().catch(() => ({})));
+}
+
+export async function googleGeocode(env: GeocodeEnv, query: string): Promise<GeocodedAddress | null> {
+  const key = googleMapsKey(env);
+  if (!key) return null;
+  const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+  url.searchParams.set('address', query);
+  url.searchParams.set('region', 'us');
+  url.searchParams.set('key', key);
+  const response = await fetch(url, { signal: AbortSignal.timeout(7000) });
+  if (!response.ok) return null;
+  const data = (await response.json().catch(() => ({}))) as {
+    results?: Array<{
+      formatted_address?: string;
+      address_components?: Array<{ long_name?: string; short_name?: string; types?: string[] }>;
+      geometry?: { location?: { lat?: number; lng?: number } };
+      types?: string[];
+    }>;
+  };
+  const first = data.results?.[0];
+  if (!first) return null;
+  return googleAddress({
+    formattedAddress: first.formatted_address,
+    addressComponents: (first.address_components ?? []).map((entry) => ({
+      longText: entry.long_name ?? '',
+      shortText: entry.short_name ?? '',
+      types: entry.types ?? [],
+    })),
+    ...(typeof first.geometry?.location?.lat === 'number' && typeof first.geometry?.location?.lng === 'number' ? { location: { latitude: first.geometry.location.lat, longitude: first.geometry.location.lng } } : {}),
+    types: first.types,
+  });
+}
+
+export async function googleReverseGeocode(env: GeocodeEnv, lat: number, lng: number): Promise<GeocodedAddress | null> {
+  const key = googleMapsKey(env);
+  if (!key) return null;
+  const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+  url.searchParams.set('latlng', `${lat},${lng}`);
+  url.searchParams.set('key', key);
+  const response = await fetch(url, { signal: AbortSignal.timeout(7000) });
+  if (!response.ok) return null;
+  const data = (await response.json().catch(() => ({}))) as {
+    results?: Array<{
+      formatted_address?: string;
+      address_components?: Array<{ long_name?: string; short_name?: string; types?: string[] }>;
+      geometry?: { location?: { lat?: number; lng?: number } };
+      types?: string[];
+    }>;
+  };
+  const first = data.results?.[0];
+  if (!first) return null;
+  return googleAddress({
+    formattedAddress: first.formatted_address,
+    addressComponents: (first.address_components ?? []).map((entry) => ({
+      longText: entry.long_name ?? '', shortText: entry.short_name ?? '', types: entry.types ?? [],
+    })),
+    ...(typeof first.geometry?.location?.lat === 'number' && typeof first.geometry?.location?.lng === 'number' ? { location: { latitude: first.geometry.location.lat, longitude: first.geometry.location.lng } } : {}),
+    types: first.types,
+  });
 }

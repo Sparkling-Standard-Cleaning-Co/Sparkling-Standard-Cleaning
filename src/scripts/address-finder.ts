@@ -27,7 +27,8 @@ import {
   type GeocodeSuggestion,
 } from '../lib/location/location';
 
-const SUGGEST_DEBOUNCE_MS = 350;
+const SUGGEST_DEBOUNCE_MS = 450;
+let placesSessionToken = '';
 const MIN_SUGGEST_LENGTH = 4;
 const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 /** GPS readings below this accuracy (metres) may fill the address fields. */
@@ -755,12 +756,13 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       const response = await fetch('/api/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ action: 'resolve-id', id }),
+        body: JSON.stringify({ action: 'resolve-id', id, ...(placesSessionToken ? { sessionToken: placesSessionToken } : {}) }),
       });
       if (methodIsGps()) return true;
       if (!response.ok) return false;
       const data = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: ResolveResult };
       if (!data.ok || !data.result) return false;
+      placesSessionToken = '';
       const houseNumber = houseNumberFromStreet(streetField.value);
       const precise =
         data.result.precise === true && labelHasHouseNumber(data.result.label ?? '', houseNumber);
@@ -845,6 +847,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
           city: cityInput?.value.trim().slice(0, 60) ?? '',
           state: stateInput?.value ?? 'FL',
           zip: zipInput?.value.trim() ?? '',
+          sessionToken: (placesSessionToken ||= crypto.randomUUID()),
         }),
         signal: suggestAbort.signal,
       });
