@@ -39,7 +39,7 @@ function localToday(): string {
   }).format(new Date());
 }
 
-function monthAnchored(startDate: string, months: number): string {
+export function monthAnchored(startDate: string, months: number): string {
   const [year, month, day] = startDate.slice(0, 10).split('-').map(Number);
   const targetMonth = (month ?? 1) - 1 + months;
   const targetYear = (year ?? 1970) + Math.floor(targetMonth / 12);
@@ -49,10 +49,33 @@ function monthAnchored(startDate: string, months: number): string {
   return `${targetYear}-${String(normalizedMonth + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
 }
 
-function occurrenceDate(startDate: string, frequency: string, index: number): string {
+export function occurrenceDate(startDate: string, frequency: string, index: number): string {
   if (frequency === 'weekly') return addDays(startDate, index * 7);
   if (frequency === 'biweekly') return addDays(startDate, index * 14);
   return monthAnchored(startDate, index);
+}
+
+export function occurrenceDatesWithin(startDate: string, frequency: string, fromDate: string, toDate: string): string[] {
+  if (!['weekly', 'biweekly', 'monthly'].includes(frequency)) return [];
+  const dates: string[] = [];
+  let index = 0;
+  if (frequency === 'weekly' || frequency === 'biweekly') {
+    const step = frequency === 'weekly' ? 7 : 14;
+    const days = Math.floor((Date.parse(fromDate + 'T12:00:00Z') - Date.parse(startDate + 'T12:00:00Z')) / 86_400_000);
+    index = Math.max(0, Math.floor(days / step));
+    while (occurrenceDate(startDate, frequency, index) < fromDate) index += 1;
+  } else {
+    const [sy = 1970, sm = 1] = startDate.split('-').map(Number);
+    const [fy = 1970, fm = 1] = fromDate.split('-').map(Number);
+    index = Math.max(0, (fy - sy) * 12 + (fm - sm) - 1);
+    while (occurrenceDate(startDate, frequency, index) < fromDate) index += 1;
+  }
+  for (let i = index; i < index + 200; i += 1) {
+    const date = occurrenceDate(startDate, frequency, i);
+    if (date > toDate) break;
+    dates.push(date);
+  }
+  return dates;
 }
 
 function occurrenceId(planId: string, date: string): string {
@@ -145,25 +168,8 @@ export async function syncRecurringPlan(
   const durationFirst = Number(plan.first_duration_minutes) || durationOngoing;
   const today = localToday();
   const horizon = addDays(today, bookingConfig.maxAdvanceDays);
-  let firstIndex = 0;
-  const startDate = plan.start_date.slice(0, 10);
-  if (plan.frequency === 'weekly' || plan.frequency === 'biweekly') {
-    const step = plan.frequency === 'weekly' ? 7 : 14;
-    const days = Math.floor((Date.parse(today + 'T12:00:00Z') - Date.parse(startDate + 'T12:00:00Z')) / 86_400_000);
-    firstIndex = Math.max(0, Math.floor(days / step));
-    while (occurrenceDate(startDate, plan.frequency, firstIndex) < today) firstIndex += 1;
-  } else {
-    const [sy = 1970, sm = 1] = startDate.split('-').map(Number);
-    const [ty = 1970, tm = 1] = today.split('-').map(Number);
-    firstIndex = Math.max(0, (ty - sy) * 12 + (tm - sm) - 1);
-    while (occurrenceDate(startDate, plan.frequency, firstIndex) < today) firstIndex += 1;
-  }
-  const location = [plan.line1, plan.city, plan.state, plan.postal_code].filter(Boolean).join(', ');
-
-  for (let index = firstIndex; index < firstIndex + 100; index += 1) {
-    const date = occurrenceDate(plan.start_date.slice(0, 10), plan.frequency, index);
-    if (date > horizon) break;
-    if (date < today) continue;
+  const location = [plan.line1, plan.city, plan.state, plan.postal_code].filter(Boolean).join(plan.start_date.slice(0, 10), plan.frequency, today, horizon);
+  for (const date of proposedDates) {
     const existing = await db.prepare(
       'SELECT id, status, appointment_id, calendar_event_id FROM recurring_occurrences WHERE plan_id = ? AND occurrence_date = ? LIMIT 1',
     ).bind(planId, date).first<{ id: string; status: string; appointment_id: string | null; calendar_event_id: string | null }>();
