@@ -1,4 +1,4 @@
-﻿import { test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -462,4 +462,3 @@ test('an owner can upload a PDF template and configure it without a deployment',
   const approved = f.db.raw.prepare('SELECT status FROM document_templates WHERE id = ?').get(uploaded.id!) as { status: string };
   assert.equal(approved.status, 'approved');
 });
-

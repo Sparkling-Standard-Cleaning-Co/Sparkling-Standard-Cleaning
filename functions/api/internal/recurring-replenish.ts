@@ -1,4 +1,4 @@
-﻿// Protected internal endpoint for the daily recurring replenishment Worker.
+// Protected internal endpoint for the daily recurring replenishment Worker.
 // The Worker holds only a single-purpose bearer token; the recurring engine
 // runs here with the existing Pages D1, Google Calendar and MapMap bindings.
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
@@ -44,4 +44,3 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 export async function onRequestGet(): Promise<Response> {
   return json({ ok: false, error: 'method_not_allowed' }, 405);
 }
-

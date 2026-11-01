@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Daily recurring replenishment trigger.
  *
  * The actual recurring engine runs in the existing Pages environment through a
@@ -66,4 +66,3 @@ export default {
     });
   },
 };
-

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * One shared confirmed-booking orchestration path.
  *
  * Customer Pay Now, owner-approved Pay Later, admin bookings and recurring
@@ -617,4 +617,3 @@ export async function ensureRecurringPlan(
   });
   return { planId, status, conflicts: sync?.conflicts.length ?? 0 };
 }
-
