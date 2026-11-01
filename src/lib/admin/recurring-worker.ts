@@ -145,6 +145,7 @@ export async function runRecurringReplenishment(
           updated: result.updated,
           skipped: result.skipped,
           conflicts: result.conflicts.length,
+          conflictDetails: result.conflicts.slice(0, 10),
           errors: result.errors,
         });
       } catch (error) {
