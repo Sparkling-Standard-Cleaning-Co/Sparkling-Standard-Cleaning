@@ -509,7 +509,7 @@ export function initBookingCalendar(
 
   function dayAvailability(dateKey: string): { morning: string; afternoon: string; title: string; unavailable: boolean } {
     if (monthState === 'loading') {
-      return { morning: 'AM ...', afternoon: 'PM ...', title: 'Checking live availability', unavailable: false };
+      return { morning: 'AM +', afternoon: 'PM +', title: 'Checking live availability', unavailable: false };
     }
     if (monthState === 'error') {
       return { morning: 'AM ?', afternoon: 'PM ?', title: 'Live availability could not be loaded. Select the date to check again.', unavailable: false };
@@ -552,9 +552,13 @@ export function initBookingCalendar(
       button.dataset.date = dateKey;
       button.innerHTML = '<span class="booking-calendar__day-number">' + day + '</span><span class="booking-calendar__day-windows" aria-hidden="true"><span class="booking-calendar__window ' + windowClass(availability.morning) + '"></span><span class="booking-calendar__window ' + windowClass(availability.afternoon) + '"></span></span>';
       button.title = availability.title;
+      const loading = availability.title === 'Checking live availability';
+      button.setAttribute('aria-busy', String(loading));
       button.setAttribute(
         'aria-label',
-        shortDateLabel(dateKey) + '. Morning ' + availability.morning.replace('AM ', '').replace('+', 'available').replace('x', 'fully booked') + '. Afternoon ' + availability.afternoon.replace('PM ', '').replace('+', 'available').replace('x', 'fully booked') + '.',
+        loading
+          ? shortDateLabel(dateKey) + '. Availability is loading.'
+          : shortDateLabel(dateKey) + '. Morning ' + availability.morning.replace('AM ', '').replace('+', 'available').replace('x', 'fully booked') + '. Afternoon ' + availability.afternoon.replace('PM ', '').replace('+', 'available').replace('x', 'fully booked') + '.',
       );
       button.setAttribute('role', 'gridcell');
       button.setAttribute('aria-selected', String(dateKey === selectedDate));

@@ -548,11 +548,7 @@ test('prices stay hidden until the final step, then the reveal shows the exact p
     await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
     const withOven = expectedResidentialPrice({ addonIds: ['inside_oven'] });
     assert.equal(await page.locator('[data-reservation-price]').textContent(), formatUsd(withOven));
-    assert.match(
-      (await page.locator('[data-reservation-qualification]').textContent()) ?? '',
-      /Travel-inclusive proposed price/i,
-      'confirmed travel is labeled only on the final estimate',
-    );
+    assert.equal(await page.locator('[data-reservation-qualification]').isVisible(), false);
     await page.waitForFunction(() => document.querySelector('[data-estimate-reveal]')?.hidden === true);
     await page.evaluate(() => window.scrollTo(0, 0));
     await shot(page, '02-price-desktop');
@@ -616,15 +612,9 @@ test('reservation summary carries every answer and the call/text actions work', 
 
     const reference = (await page.locator('[data-reservation-reference]').textContent()) ?? '';
     assert.match(reference, /Estimate reference SS-\d{8}-[0-9A-Z]{6}/);
-    const qualification = (await page.locator('[data-reservation-qualification]').textContent()) ?? '';
-    assert.match(qualification, /Travel-inclusive proposed price/i);
-
-    // Call and text actions are real, correctly formed links.
-    const callHref = await page.locator('[data-reserve-call]').getAttribute('href');
-    assert.equal(callHref, 'tel:+18504268479');
-    const textHref = await page.locator('[data-reserve-text]').getAttribute('href');
-    assert.match(textHref ?? '', /^sms:\+18504268479\?&body=/);
-    assert.match(decodeURIComponent(textHref ?? ''), /SS-\d{8}-[0-9A-Z]{6}/, 'text prefill carries the quote reference');
+    assert.equal(await page.locator('[data-reservation-qualification]').isVisible(), false);
+    assert.equal(await page.locator('[data-reserve-call]').count(), 0);
+    assert.equal(await page.locator('[data-reserve-text]').count(), 0);
 
     // One primary action: the reservation submit.
     const submitLabel = (await page.locator('[data-submit]').textContent())?.trim();

@@ -226,8 +226,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const customBundleText = form.querySelector<HTMLElement>('[data-custom-bundle-text]');
   const bundleOffers = [...form.querySelectorAll<HTMLElement>('[data-bundle-id]')];
   const extrasSummary = form.querySelector<HTMLElement>('[data-extras-summary]');
-  const reserveCall = document.querySelector<HTMLAnchorElement>('[data-reserve-call]');
-  const reserveText = document.querySelector<HTMLAnchorElement>('[data-reserve-text]');
+  const selectedExtras = form.querySelector<HTMLElement>('[data-selected-extras]');
   const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
   const engineNote = form.querySelector<HTMLElement>('[data-engine-note]');
   let engine: 'residential' | 'str' = 'residential';
@@ -628,11 +627,31 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (!extrasSummary) return;
     const count = result.status === 'estimated' ? result.addons.length : 0;
     if (count === 0) {
+      if (selectedExtras) { selectedExtras.hidden = true; selectedExtras.innerHTML = ''; }
       extrasSummary.textContent = 'No extras selected';
       return;
     }
     extrasSummary.textContent = `${count} selected — ${formatUsd(result.pricing.extrasSubtotal, { forceCents: true })}`;
+    if (selectedExtras) {
+      const prices = new Map(result.pricing.addonPrices.map((line) => [line.id, line.charge]));
+      selectedExtras.hidden = false;
+      selectedExtras.innerHTML = '<h3 class="selected-extras__title">Your Selected Extras</h3>' + result.addons.map((addon) => {
+        const charge = prices.get(addon.id);
+        return '<div class="selected-extras__row"><span class="selected-extras__label">' + addon.label + '</span><span class="selected-extras__price">' + (charge === null || charge === undefined ? 'Custom quote' : formatUsd(charge, { forceCents: true })) + '</span><button type="button" class="btn btn--ghost btn--small selected-extras__remove" data-remove-addon="' + addon.id + '">Remove</button></div>';
+      }).join('');
+    }
   }
+  form.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement | null;
+    const button = target?.closest<HTMLElement>('[data-remove-addon]');
+    if (!button) return;
+    const id = button.dataset.removeAddon ?? '';
+    const checkbox = form.querySelector<HTMLInputElement>(`input[name="addons"][value="${id}"]`);
+    if (!checkbox) return;
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
   function renderIncentive(result: EstimateResult): void {
     if (!addonIncentiveEl || !addonIncentiveText) return;
     const discount = result.status === 'estimated' ? result.pricing.discount : null;
@@ -1036,8 +1055,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
       if (requestAlreadySent) submitButton.disabled = true;
     }
     if (!hasQuote || !latestQuote) {
-      if (reserveCall) reserveCall.hidden = !phone;
-      if (reserveText) reserveText.hidden = !phone || !business.flags.smsEnabled;
       return;
     }
 
@@ -1077,9 +1094,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
       reservationValidity.textContent = '';
     }
     if (reservationQualification) {
+      reservationQualification.hidden = travelFullyVerified;
       reservationQualification.textContent = travelFullyVerified
-        ? 'Travel-inclusive proposed price — based on the driving distance to your confirmed location.'
-        : 'Preliminary proposed price — travel is estimated and Sparkling Standard confirms your location and final price before booking.';
+        ? ''
+        : 'Preliminary proposed price - travel is estimated and Sparkling Standard confirms your location and final price before booking.';
     }
 
     if (priceBreakdown) fillLines(priceBreakdown, priceLines(result));
@@ -1178,22 +1196,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
         );
       }
 
-    // Call / text actions carry the estimate context the customer is looking at.
-    if (reserveCall) {
-      reserveCall.hidden = !phone;
-      if (phone) reserveCall.href = phone.href;
-    }
-    if (reserveText) {
-      reserveText.hidden = !phone || !business.flags.smsEnabled;
-      if (phone) {
-        const ongoing = result.ongoing;
-        const pricePhrase = ongoing
-          ? `a proposed first-visit price of ${formatUsd(latestQuote.amount)}, then ${formatUsd(ongoing.perVisitPrice)} per ${FREQUENCY_RHYTHMS[ongoing.frequency]} visit`
-          : `a proposed price of $${latestQuote.amount}`;
-        const body = `Hi! I'd like to reserve a cleaning. My estimate reference is ${latestQuote.reference} with ${pricePhrase}${location ? ` at ${formatLocationLine(location)}` : ''}. Sparkling Standard will confirm the final price.`;
-        reserveText.href = `${phone.sms}?&body=${encodeURIComponent(body)}`;
-      }
-    }
   }
 
   // ── Progress + navigation ─────────────────────────────────────────────────

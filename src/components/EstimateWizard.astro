@@ -30,7 +30,6 @@ const activeBundles = pricing.promotions.addonBundles.filter((bundle) => bundle.
 const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const phone = contactPhone();
 const email = isPending(business.email) ? null : business.email;
-const smsEnabled = business.flags.smsEnabled;
 const incentiveEnabled = pricing.addonIncentive.enabled.value;
 const customThreeExtraEnabled = pricing.customThreeExtraBundle.enabled.value;
 const customThreeExtraPercent = pricing.customThreeExtraBundle.percent.value;
@@ -213,9 +212,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             </div>
 
             <div class="address-finder__actions">
-              <button type="button" class="btn btn--secondary btn--small" data-address-resolve>
-                Find My Address
-              </button>
+              <button type="button" data-address-resolve aria-hidden="true" tabindex="-1" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">Resolve address</button>
             </div>
             <p class="hint address-finder__status" data-address-status data-kind="" aria-live="polite"></p>
             </div>
@@ -504,6 +501,8 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </details>
 
 
+          <div class="selected-extras" data-selected-extras hidden></div>
+
           <details class="extras-accordion" data-extras-accordion>
             <summary class="extras-accordion__summary">
               <span class="extras-accordion__heading">Bundle and Save With These Add-Ons</span>
@@ -605,7 +604,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             </div>
           </details>
 
-          <p class="reservation-summary__qualification reservation-summary__qualification--compact" data-reservation-qualification></p>
+          <p class="reservation-summary__qualification reservation-summary__qualification--compact" data-reservation-qualification hidden></p>
 
           <div class="reservation-actions">
             <p class="reservation-actions__note" data-payment-note></p>
@@ -629,18 +628,6 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
               </p>
             </div>
             <p class="small text-muted" data-payment-unavailable hidden></p>
-            <div class="reservation-actions__links">
-              {phone && (
-                <a class="btn btn--ghost btn--small" data-reserve-call href={phone.href}>
-                  <Icon name="phone" size={16} /> Call to Reserve
-                </a>
-              )}
-              {phone && smsEnabled && (
-                <a class="btn btn--ghost btn--small" data-reserve-text href={phone.sms}>
-                  <Icon name="message" size={16} /> Text to Reserve
-                </a>
-              )}
-            </div>
           </div>
         </div>
         </div>
@@ -705,10 +692,10 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       <span class="spacer"></span>
       <button class="btn btn--primary" type="button" data-next>Continue <Icon name="arrow-right" size={16} /></button>
       <div class="wizard__final-actions" data-final-actions hidden>
-        <button class="btn btn--success btn--large" type="button" data-pay-now hidden>
+        <button class="btn btn--success btn--large" type="button" data-pay-now data-mobile-label="Pay Now &amp; Reserve" hidden>
           Pay Now and Reserve This Cleaning
         </button>
-        <button class="btn btn--secondary btn--large" type="submit" data-submit hidden data-cta="estimate-submit">
+        <button class="btn btn--secondary btn--large" type="submit" data-submit data-mobile-label="Reserve &amp; Pay Later" hidden data-cta="estimate-submit">
           Request to Reserve This Cleaning (Pay Later)
         </button>
       </div>
