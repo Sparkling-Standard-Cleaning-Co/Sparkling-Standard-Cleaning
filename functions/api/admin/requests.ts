@@ -12,6 +12,7 @@ import type { BookingEnv } from '../../../src/lib/booking/service.ts';
 import { onRequestPost as bookingAdminPost } from '../booking-admin.ts';
 import { sendBookingEmail, type BookingEmailKind } from '../../../src/lib/forms/booking-email.ts';
 import { ensureRecurringPlan } from '../../../src/lib/booking/commitment.ts';
+import { syncAppointmentCalendarResources } from '../../../src/lib/admin/scheduling.ts';
 
 interface Env extends AdminDbEnv, BookingEnv {
   BOOKING_OWNER_TOKEN?: string;
@@ -582,6 +583,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         const result = await confirmRequest(db, actor, requestId, teamMemberIds);
         const eventId = String(calendar.data.eventId ?? '');
         if (eventId) await attachCalendarEvent(db, result.appointmentId, eventId);
+        await syncAppointmentCalendarResources(context.env, db, result.appointmentId).catch(() => undefined);
         const recurring = await recurringPlanForConfirmedRequest(
           context,
           db,

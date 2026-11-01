@@ -18,6 +18,7 @@ import {
   listTeam,
   removeTeamMember,
   setAppointmentTeam,
+  syncAppointmentCalendarResources,
   updateAppointmentStatus,
   updateChecklistItem,
   updateRecurring,
@@ -152,23 +153,24 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const memberIds = Array.isArray(body.teamMemberIds)
         ? body.teamMemberIds.map((value) => String(value)).filter(Boolean).slice(0, 12)
         : [];
-      await assignTeam(db, actor, String(body.appointmentId ?? ''), memberIds);
+      const appointmentId = String(body.appointmentId ?? '');
+      await assignTeam(db, actor, appointmentId, memberIds);
+      await syncAppointmentCalendarResources(context.env, db, appointmentId).catch(() => undefined);
       return json({ ok: true });
     }
     if (action === 'set_team') {
       const memberIds = Array.isArray(body.teamMemberIds)
         ? body.teamMemberIds.map((value) => String(value)).filter(Boolean).slice(0, 12)
         : [];
-      const result = await setAppointmentTeam(db, actor, String(body.appointmentId ?? ''), memberIds);
+      const appointmentId = String(body.appointmentId ?? '');
+      const result = await setAppointmentTeam(db, actor, appointmentId, memberIds);
+      await syncAppointmentCalendarResources(context.env, db, appointmentId).catch(() => undefined);
       return json({ ok: true, ...result });
     }
     if (action === 'remove_team') {
-      await removeTeamMember(
-        db,
-        actor,
-        String(body.appointmentId ?? ''),
-        String(body.teamMemberId ?? ''),
-      );
+      const appointmentId = String(body.appointmentId ?? '');
+      await removeTeamMember(db, actor, appointmentId, String(body.teamMemberId ?? ''));
+      await syncAppointmentCalendarResources(context.env, db, appointmentId).catch(() => undefined);
       return json({ ok: true });
     }
     if (action === 'job_status') {

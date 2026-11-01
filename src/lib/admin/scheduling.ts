@@ -3,6 +3,7 @@ import { AdminAuthError, audit } from './operations.ts';
 import type { D1Database } from './d1.ts';
 import { bookingConfig } from '../../config/booking.ts';
 import { employeeOnboardingStatus, evaluateDocumentGate } from '../documents/service.ts';
+import { googleConfigured, updateCalendarEvent, type GoogleCalendarEnv } from '../booking/google-calendar.ts';
 
 function now(): string {
   return new Date().toISOString();
@@ -671,6 +672,36 @@ export async function removeTeamMember(
     .map((row) => row.team_member_id)
     .filter((id) => id !== memberId);
   await setAppointmentTeam(db, actor, appointmentId, remaining);
+}
+
+/**
+ * Keeps the existing Google event's resource metadata aligned with the
+ * appointment assignment. Never creates a second event.
+ */
+export async function syncAppointmentCalendarResources(
+  env: GoogleCalendarEnv,
+  db: D1Database,
+  appointmentId: string,
+): Promise<void> {
+  if (!googleConfigured(env)) return;
+  const link = await db
+    .prepare(
+      `SELECT provider_event_id FROM calendar_links
+       WHERE appointment_id = ? ORDER BY last_synced_at DESC LIMIT 1`,
+    )
+    .bind(appointmentId)
+    .first<{ provider_event_id: string }>();
+  if (!link?.provider_event_id) return;
+  const resources = await db
+    .prepare(
+      `SELECT tm.booking_resource_id FROM appointment_resources ar
+       JOIN team_members tm ON tm.id = ar.team_member_id
+       WHERE ar.appointment_id = ?`,
+    )
+    .bind(appointmentId)
+    .all<{ booking_resource_id: string }>();
+  const resourceIds = (resources.results ?? []).map((row) => row.booking_resource_id).filter(Boolean);
+  await updateCalendarEvent(env, link.provider_event_id, { resourceIds });
 }
 
 export async function updateAppointmentStatus(
