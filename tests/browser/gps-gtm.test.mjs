@@ -253,7 +253,7 @@ test('a street-level reverse result never invents a street address', async () =>
 test('the manual address fields reveal after time selection and preserve answers', async () => {
   const { context, page } = await openEstimate({});
   try {
-    assert.equal(await page.locator('[data-address-card]').isVisible(), true, 'address is available first');
+    assert.equal(await page.locator('[data-address-card]').isVisible(), false, 'address waits for time');
     await startAddressStep(page);
     assert.equal(await page.locator('#est-address').isVisible(), true, 'manual fields reveal after time');
     assert.equal(await page.locator('#est-address-city').isVisible(), false, 'city waits for a street');
@@ -422,7 +422,7 @@ test('missing required fields show an error summary, field errors and focus', as
     const summary = (await page.locator('[data-error-summary-list]').textContent()) ?? '';
     assert.match(summary, /preferred date/i);
     assert.match(summary, /preferred appointment time/i);
-    assert.match(summary, /street address/i, 'the address-first step reports the missing address');
+    assert.doesNotMatch(summary, /street address/i, 'street waits for the time selection');
 
     await startAddressStep(page);
     await page.click('[data-next]');

@@ -162,8 +162,10 @@ export function initBookingCalendar(
   const today = localDateKey(new Date(), timeZone);
   const latest = addDays(today, maxAdvance);
   let context: BookingContext = {};
-  let viewYear = Number(today.slice(0, 4));
-  let viewMonth = Number(today.slice(5, 7)) - 1;
+  const firstBookingDate = addDays(today, 1);
+  const initialMonth = firstBookingDate.slice(0, 7);
+  let viewYear = Number(initialMonth.slice(0, 4));
+  let viewMonth = Number(initialMonth.slice(5, 7)) - 1;
   let selectedDate = '';
   let selectedTime: BookingCalendarSelection | null = null;
   let selectedPeriod: Period | null = null;
@@ -303,12 +305,17 @@ export function initBookingCalendar(
 
   function renderPeriods(): void {
     if (!periodEl) return;
+    periodEl.hidden = false;
     if (!selectedDate) {
-      periodEl.hidden = true;
       if (picker) picker.hidden = true;
+      for (const button of periodButtons) {
+        button.disabled = true;
+        button.classList.add('is-unavailable');
+        const status = button.querySelector<HTMLElement>('[data-period-status]');
+        if (status) { status.textContent = 'Select a date'; status.dataset.state = 'unknown'; }
+      }
       return;
     }
-    periodEl.hidden = false;
     if (revealedPeriodDate !== selectedDate) {
       revealedPeriodDate = selectedDate;
       requestAnimationFrame(() => {
@@ -321,17 +328,20 @@ export function initBookingCalendar(
     for (const button of periodButtons) {
       const period = button.dataset.period as Period | undefined;
       if (!period) continue;
-      const available = periodMinutes(period).some(timeIsEnabled);
-      button.disabled = liveAvailability && !available;
-      button.classList.toggle('is-unavailable', liveAvailability && !available);
+      const preview = monthDays.get(selectedDate);
+      const previewOpen = period === 'first' ? preview?.morningAvailable : preview?.afternoonAvailable;
+      const hasPreview = Boolean(preview?.known);
+      const available = liveAvailability ? periodMinutes(period).some(timeIsEnabled) : previewOpen !== false;
+      button.disabled = liveAvailability ? !available : hasPreview ? !previewOpen : false;
+      button.classList.toggle('is-unavailable', button.disabled);
       const status = button.querySelector<HTMLElement>('[data-period-status]');
       if (status) {
-        status.textContent = !liveAvailability
-          ? 'Check availability'
-          : available
-            ? 'Available'
-            : 'Fully booked';
-        status.dataset.state = !liveAvailability ? 'unknown' : available ? 'open' : 'full';
+        status.textContent = liveAvailability
+          ? available ? 'Available' : 'Fully booked'
+          : hasPreview
+            ? previewOpen ? 'Available to request' : 'Unavailable'
+            : 'Check availability';
+        status.dataset.state = liveAvailability || hasPreview ? (available ? 'open' : 'full') : 'unknown';
       }
     }
     if (selectedPeriod && liveAvailability) {
@@ -355,8 +365,8 @@ export function initBookingCalendar(
     liveAvailability = false;
     selectedPeriod = null;
     selectedTime = null;
-    if (periodEl) periodEl.hidden = true;
     if (picker) picker.hidden = true;
+    renderPeriods();
     setStatus(message);
   }
 
@@ -439,13 +449,13 @@ export function initBookingCalendar(
   async function loadMonthAvailability(force = false): Promise<void> {
     const range = monthRange();
     const point = coordinates();
-    if (!range || !point) {
+    if (!range) {
       monthState = 'idle';
       monthDays.clear();
       renderCalendar();
       return;
     }
-    const key = `${range.from}|${range.to}|${point.lat.toFixed(5)}|${point.lng.toFixed(5)}`;
+    const key = `${range.from}|${range.to}|${point ? `${point.lat.toFixed(5)}|${point.lng.toFixed(5)}` : 'schedule'}`;
     if (!force && key === monthKey && monthState !== 'idle') return;
     monthKey = key;
     const cached = monthCache.get(key);
@@ -464,8 +474,7 @@ export function initBookingCalendar(
         from: range.from,
         to: range.to,
         durationMinutes: String(PROVISIONAL_DURATION),
-        lat: String(point.lat),
-        lng: String(point.lng),
+        ...(point ? { lat: String(point.lat), lng: String(point.lng) } : {}),
       });
       const response = await fetch(`/api/availability-month?${params}`, {
         headers: { Accept: 'application/json' },

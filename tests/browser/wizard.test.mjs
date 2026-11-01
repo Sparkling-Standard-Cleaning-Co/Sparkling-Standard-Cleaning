@@ -220,7 +220,7 @@ for (const [name, width, height] of [
         true,
         'STR-only fields hidden for standard',
       );
-      assert.equal(await isVisible(page, '[data-address-finder]'), true, 'address is available first');
+      assert.equal(await isVisible(page, '[data-address-finder]'), false, 'address waits for the appointment time');
 
       await fillStepOne(page);
       assert.equal(await activeStep(page), 2);

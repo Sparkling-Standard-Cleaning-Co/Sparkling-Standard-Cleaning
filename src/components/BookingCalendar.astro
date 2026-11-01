@@ -64,8 +64,6 @@ const { id = 'estimate-calendar' } = Astro.props;
         aria-label="Available cleaning dates"
       ></div>
       <div class="booking-calendar__legend" aria-label="Calendar availability legend">
-        <span class="booking-calendar__legend-bars" aria-hidden="true"><span class="booking-calendar__window is-open"></span><span class="booking-calendar__window is-open"></span></span>
-        <span>Top bar Morning &middot; Bottom bar Afternoon</span>
         <span class="booking-calendar__legend-key"><span class="booking-calendar__window is-open"></span> Available</span>
         <span class="booking-calendar__legend-key"><span class="booking-calendar__window is-full"></span> Unavailable</span>
       </div>
@@ -85,7 +83,6 @@ const { id = 'estimate-calendar' } = Astro.props;
         data-calendar-period
         role="group"
         aria-label="Appointment window"
-        hidden
       >
         <button class="booking-calendar__period-btn" type="button" data-period="first">
           <span class="booking-calendar__period-name">Morning — First Appointment</span>
@@ -93,7 +90,7 @@ const { id = 'estimate-calendar' } = Astro.props;
           <span class="booking-calendar__period-status" data-period-status>Check availability</span>
         </button>
         <button class="booking-calendar__period-btn" type="button" data-period="afternoon">
-          <span class="booking-calendar__period-name">Afternoon — Afternoon Appointment</span>
+          <span class="booking-calendar__period-name">Afternoon Appointment</span>
           <span class="booking-calendar__period-window">12:30–2:30 PM</span>
           <span class="booking-calendar__period-status" data-period-status>Check availability</span>
         </button>

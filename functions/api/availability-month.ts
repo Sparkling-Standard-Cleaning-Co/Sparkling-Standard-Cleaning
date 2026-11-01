@@ -1,5 +1,5 @@
 ﻿import { bookingConfig } from '../../src/config/booking.ts';
-import { availabilityForRange, type BookingEnv } from '../../src/lib/booking/service.ts';
+import { availabilityForRange, scheduleAvailabilityForRange, type BookingEnv } from '../../src/lib/booking/service.ts';
 
 const hits = new Map<string, { count: number; reset: number }>();
 function json(body: unknown, status = 200): Response {
@@ -33,12 +33,10 @@ export async function onRequestGet(context: { request: Request; env: BookingEnv 
   const durationRaw = Number(url.searchParams.get('durationMinutes'));
   const lat = Number(url.searchParams.get('lat'));
   const lng = Number(url.searchParams.get('lng'));
-  if (!Number.isFinite(durationRaw) || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return json({ ok: false, error: 'invalid_request' }, 400);
-  }
-  const result = await availabilityForRange(env, {
-    from, to, durationMinutes: durationRaw, destination: { lat, lng },
-  });
+  if (!Number.isFinite(durationRaw)) return json({ ok: false, error: 'invalid_request' }, 400);
+  const result = Number.isFinite(lat) && Number.isFinite(lng)
+    ? await availabilityForRange(env, { from, to, durationMinutes: durationRaw, destination: { lat, lng } })
+    : await scheduleAvailabilityForRange(env, { from, to, durationMinutes: durationRaw });
   if (!result.ok) return json({ ok: true, enabled: false, reason: result.reason, days: [] });
   return json({
     ok: true,

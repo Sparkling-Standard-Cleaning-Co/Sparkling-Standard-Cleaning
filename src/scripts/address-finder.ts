@@ -163,6 +163,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   const pinConfirmWrap = root.querySelector<HTMLElement>('[data-pin-property-confirm-wrap]');
   const pinConfirm = root.querySelector<HTMLInputElement>('[data-pin-property-confirm]');
   const changeButton = root.querySelector<HTMLButtonElement>('[data-address-change]');
+  const manualBody = root.querySelector<HTMLElement>('.address-manual__body');
+  const gpsSection = root.querySelector<HTMLElement>('.address-gps');
   const confirmedCard = root.querySelector<HTMLElement>('[data-address-confirmed]');
   const confirmedLabel = root.querySelector<HTMLElement>('[data-address-confirmed-label]');
   const confirmedTravel = root.querySelector<HTMLElement>('[data-address-confirmed-travel]');
@@ -954,7 +956,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
               resolve();
             };
             const script = document.createElement('script');
-            script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(data.key) + '&v=weekly&loading=async&callback=' + callback;
+            script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(String(data.key)) + '&v=weekly&loading=async&callback=' + callback;
             script.async = true;
             script.defer = true;
             script.onerror = () => reject(new Error('maps_script_failed'));
@@ -1143,6 +1145,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       confirmedAt: new Date().toISOString(),
     };
     if (showUi) {
+      if (manualBody) manualBody.hidden = true;
+      if (gpsSection) gpsSection.hidden = true;
       if (mapCard) mapCard.hidden = false;
       if (confirmedCard) confirmedCard.hidden = false;
       if (confirmedLabel) confirmedLabel.textContent = formatLocationLine(gpsConfirmed);
@@ -1240,6 +1244,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   function startChange(): void {
+    if (manualBody) manualBody.hidden = false;
+    if (gpsSection) gpsSection.hidden = false;
     if (methodIsGps()) {
       invalidateGps();
       if (mapCard) mapCard.hidden = true;

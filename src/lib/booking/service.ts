@@ -16,6 +16,7 @@ import {
 } from './google-calendar.ts';
 import {
   calculateAvailability,
+  calculateScheduleAvailability,
   type AvailabilityResult,
   type BookingResourceWindow,
   type ExistingJob,
@@ -332,6 +333,73 @@ export async function availabilityForRange(
       slotCount: availability.slots.length,
       ...(availability.reason ? { reason: availability.reason } : {}),
     });
+  }
+  return { ok: true, timeZone: bookingConfig.timeZone, days };
+}
+
+export async function scheduleAvailabilityForRange(
+  env: BookingEnv,
+  input: { from: string; to: string; durationMinutes: number; crewSize?: number; now?: Date },
+): Promise<{ ok: true; timeZone: string; days: MonthAvailability[] } | { ok: false; reason: string; days: MonthAvailability[] }> {
+  const empty = (reason: string): { ok: false; reason: string; days: MonthAvailability[] } => ({ ok: false, reason, days: [] });
+  if (!bookingConfig.enabled) return empty('booking_not_enabled');
+  if (!googleConfigured(env)) return empty('calendar_not_configured');
+  const status = await calendarStatus(env);
+  if (!status.connected) return empty(status.reason ?? 'calendar_unavailable');
+  const calendar = await calendarJobsForRange(env, input.from, input.to, bookingConfig.timeZone);
+  if (!calendar.ok) return empty(calendar.reason ?? 'calendar_unavailable');
+  const bucket = bookingStore(env);
+  if (!bucket) return empty('booking_store_not_configured');
+  const dates: string[] = [];
+  for (let cursor = input.from; cursor <= input.to; cursor = new Date(Date.parse(cursor + 'T12:00:00Z') + 86_400_000).toISOString().slice(0, 10)) dates.push(cursor);
+  const jobsByDay = new Map<string, typeof calendar.jobs>();
+  for (const job of calendar.jobs) {
+    const key = localDateKey(job.start, bookingConfig.timeZone);
+    const list = jobsByDay.get(key) ?? [];
+    list.push(job); jobsByDay.set(key, list);
+  }
+  const durations = Math.min(bookingConfig.maximumJobMinutes, Math.max(bookingConfig.minimumJobMinutes, Math.round(input.durationMinutes)));
+  const crewSize = Math.min(bookingConfig.maxCrewSize, Math.max(1, Math.round(input.crewSize ?? bookingConfig.defaultCrewSize)));
+  const resources: BookingResourceWindow[] = activeBookingResources().map((resource) => ({
+    id: resource.id,
+    workdays: resource.workdays ?? bookingConfig.workdays,
+    workdayStart: resource.workdayStart ?? bookingConfig.workdayStart,
+    workdayEnd: resource.workdayEnd ?? bookingConfig.workdayEnd,
+    origin: { lat: 0, lng: 0 },
+  }));
+  const days: MonthAvailability[] = [];
+  for (const date of dates) {
+    const holds = await listActiveHolds(bucket, date);
+    const jobs = holds.map((hold) => ({ start: new Date(hold.start), end: new Date(hold.end), location: null, ...(hold.resourceIds?.length ? { resourceIds: hold.resourceIds } : {}) }));
+    for (const job of jobsByDay.get(date) ?? []) {
+      jobs.push({ start: job.start, end: job.end, location: null, ...(job.blocksDay ? { blocksDay: true } : {}), ...(job.resourceIds?.length ? { resourceIds: job.resourceIds } : {}) });
+    }
+    const availability = calculateScheduleAvailability({
+      date,
+      timeZone: bookingConfig.timeZone,
+      workdayStart: bookingConfig.workdayStart,
+      workdayEnd: bookingConfig.workdayEnd,
+      workdays: bookingConfig.workdays,
+      slotMinutes: bookingConfig.slotMinutes,
+      minimumNoticeHours: bookingConfig.minimumNoticeHours,
+      maxAdvanceDays: bookingConfig.maxAdvanceDays,
+      resources,
+      crewSize,
+      minimumJobMinutes: bookingConfig.minimumJobMinutes,
+      maximumJobMinutes: bookingConfig.maximumJobMinutes,
+      durationMinutes: durations,
+      jobs,
+      now: input.now ?? new Date(),
+    }, formatLocalTime);
+    let morning = false, afternoon = false, morningSlots = 0, afternoonSlots = 0;
+    for (const slot of availability.slots) {
+      const local = new Intl.DateTimeFormat('en-US', { timeZone: bookingConfig.timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(slot.start));
+      const [hour = 0, minute = 0] = local.split(':').map(Number);
+      const minutes = hour * 60 + minute;
+      if (minutes >= 7 * 60 && minutes <= 8 * 60 + 30) { morning = true; morningSlots += 1; }
+      if (minutes >= 12 * 60 + 30 && minutes <= 14 * 60 + 30) { afternoon = true; afternoonSlots += 1; }
+    }
+    days.push({ date, enabled: true, morningAvailable: morning, afternoonAvailable: afternoon, morningSlots, afternoonSlots, available: availability.available, known: true, slotCount: availability.slots.length });
   }
   return { ok: true, timeZone: bookingConfig.timeZone, days };
 }

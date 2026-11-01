@@ -109,10 +109,10 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         <h2 class="wizard__step-heading" data-step-title={0}>{stepTitle(0)}</h2>
         <p class="wizard__step-lead">Let&rsquo;s find the perfect time for your cleaning.</p>
         <p class="wizard__step-copy">
-          Enter your cleaning address first, then choose an available date and time.
+          Choose your preferred date and time, then tell us where to clean.
         </p>
 
-        <div class="address-card" data-address-finder data-address-card data-state="idle" data-method="manual">
+        <div class="address-card" data-address-finder data-address-card data-state="idle" data-method="manual" hidden>
           <div class="address-card__head">
             <h3 class="address-card__title">Where should we clean?</h3>
             <p class="address-card__copy">
@@ -249,7 +249,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </div>
         </div>
 
-        <div class="booking-calendar__availability-gate" data-calendar-gate>
+        <div class="booking-calendar__availability-gate" data-calendar-gate hidden>
           <p class="booking-calendar__gate-title">Enter your cleaning address to see available dates and times.</p>
           <p class="booking-calendar__gate-copy small">Availability is checked against the live cleaning calendar and travel time.</p>
         </div>

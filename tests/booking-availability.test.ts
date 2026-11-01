@@ -64,7 +64,7 @@ test('a free day offers only slots that fit the workday, travel and notice perio
   assert.equal(result.enabled, true);
   assert.equal(result.available, true);
   const first = result.slots[0]!;
-  assert.equal(label(new Date(first.start)), '9:00 AM');
+  assert.equal(label(new Date(first.start)), '8:30 AM');
   const last = result.slots.at(-1)!;
   assert.ok(new Date(last.end) <= zonedTimeToUtc('2026-11-10', '18:00', tz));
 });
@@ -169,7 +169,7 @@ test('a job assigned to one cleaner leaves the other cleaner available', async (
   );
   assert.equal(result.available, true);
   const first = result.slots[0]!;
-  assert.equal(label(new Date(first.start)), '9:00 AM');
+  assert.equal(label(new Date(first.start)), '8:30 AM');
   assert.deepEqual(first.resourceIds, ['family-cleaner']);
 });
 

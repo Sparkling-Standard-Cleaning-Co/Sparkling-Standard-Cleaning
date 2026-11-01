@@ -264,15 +264,16 @@ test('the time picker is compact and uses the two residential windows', async ()
   }
 });
 
-test('Step 1 presents the address first, then time and details', async () => {
+test('Step 1 presents the calendar first, then time, address and details', async () => {
   const { context, page } = await open();
   try {
-    assert.equal(await page.locator('[data-address-card]').isVisible(), true, 'address is first');
-    assert.equal(await page.locator('[data-calendar-period]').isVisible(), false, 'period waits for a date');
+    assert.equal(await page.locator('[data-address-card]').isVisible(), false, 'address waits for a time');
+    assert.equal(await page.locator('[data-calendar-period]').isVisible(), true, 'window cards are always visible');
     await page.fill('#est-date', BOOKING_DATE);
     await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-    assert.equal(await page.locator('[data-address-card]').isVisible(), true, 'address remains available');
+    assert.equal(await page.locator('[data-address-card]').isVisible(), false, 'address still waits for a time');
     await page.click('[data-period="first"]');
+    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
     assert.equal(await page.locator('[data-address-details]').isVisible(), false, 'city waits for a street');
     await page.fill('#est-address', '100 S Baylen St');
     await page.locator('[data-address-details]').waitFor({ state: 'visible' });

@@ -170,9 +170,11 @@ async function evaluateResource(
   if (fromTravel === null) {
     return { resourceId: resource.id, feasible: false, busyMinutes, reason: 'travel_unavailable' };
   }
+  // The first job starts at the workday start plus actual mobilization travel;
+  // between-job buffers apply only after an existing appointment.
   const earliestStart = previousJob
     ? addMinutes(previousJob.end, bufferMinutes + fromTravel)
-    : addMinutes(dayStart, bufferMinutes + fromTravel);
+    : addMinutes(dayStart, fromTravel);
   if (candidateStart < earliestStart) {
     return { resourceId: resource.id, feasible: false, busyMinutes, reason: 'blocked' };
   }
@@ -339,4 +341,71 @@ export function bookingDateWindow(now: Date, maxAdvanceDays: number): string[] {
   const dates: string[] = [];
   for (let index = 0; index <= maxAdvanceDays; index += 1) dates.push(addDays(today, index));
   return dates;
+}
+
+export interface ScheduleAvailabilityRequest {
+  date: string;
+  timeZone: string;
+  workdayStart: string;
+  workdayEnd: string;
+  workdays: ReadonlyArray<number>;
+  slotMinutes: number;
+  minimumNoticeHours: number;
+  maxAdvanceDays: number;
+  resources: ReadonlyArray<BookingResourceWindow>;
+  crewSize: number;
+  minimumJobMinutes: number;
+  maximumJobMinutes: number;
+  durationMinutes: number;
+  jobs: ExistingJob[];
+  now: Date;
+}
+
+/** Location-independent schedule preview. Travel is intentionally absent. */
+export function calculateScheduleAvailability(
+  request: ScheduleAvailabilityRequest,
+  formatTime: (date: Date, timeZone: string) => string,
+): AvailabilityResult {
+  if (request.resources.length === 0 || request.crewSize < 1 || request.crewSize > request.resources.length) {
+    return { available: false, enabled: true, reason: 'crew_unavailable', slots: [] };
+  }
+  if (request.durationMinutes < request.minimumJobMinutes || request.durationMinutes > request.maximumJobMinutes) {
+    return { available: false, enabled: true, reason: 'duration_invalid', slots: [] };
+  }
+  const earliest = addMinutes(request.now, request.minimumNoticeHours * 60);
+  const latest = addMinutes(request.now, request.maxAdvanceDays * 24 * 60);
+  const dayStart = zonedTimeToUtc(request.date, request.workdayStart, request.timeZone);
+  const dayEnd = zonedTimeToUtc(request.date, request.workdayEnd, request.timeZone);
+  if (dayEnd <= earliest) return { available: false, enabled: true, reason: 'past_cutoff', slots: [] };
+  if (dayStart > latest) return { available: false, enabled: true, reason: 'beyond_window', slots: [] };
+  if (!request.workdays.includes(localWeekday(request.date, request.timeZone))) {
+    return { available: false, enabled: true, reason: 'day_closed', slots: [] };
+  }
+  const jobs = request.jobs.some((job) => job.blocksDay)
+    ? []
+    : request.jobs;
+  if (request.jobs.some((job) => job.blocksDay)) {
+    return { available: false, enabled: true, reason: 'day_closed', slots: [] };
+  }
+  const slots: AvailableSlot[] = [];
+  const startFloor = Math.max(dayStart.getTime(), earliest.getTime());
+  for (let cursor = startFloor; cursor + request.durationMinutes * 60_000 <= dayEnd.getTime(); cursor += request.slotMinutes * 60_000) {
+    const candidateStart = new Date(cursor);
+    const candidateEnd = addMinutes(candidateStart, request.durationMinutes);
+    const feasibleResources = request.resources.filter((resource) => {
+      if (!resource.workdays.includes(localWeekday(request.date, request.timeZone))) return false;
+      return !jobs
+        .filter((job) => jobAppliesToResource(job, resource.id))
+        .some((job) => overlaps(candidateStart, candidateEnd, job.start, job.end));
+    });
+    if (feasibleResources.length < request.crewSize) continue;
+    slots.push({
+      start: localPartsToIso(candidateStart),
+      end: localPartsToIso(candidateEnd),
+      startLabel: formatTime(candidateStart, request.timeZone),
+      endLabel: formatTime(candidateEnd, request.timeZone),
+      resourceIds: feasibleResources.slice(0, request.crewSize).map((resource) => resource.id),
+    });
+  }
+  return { available: slots.length > 0, enabled: true, ...(slots.length === 0 ? { reason: 'fully_booked' as const } : {}), slots };
 }
