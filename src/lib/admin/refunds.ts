@@ -137,6 +137,9 @@ export async function beginRefund(
     if (existing.payment_id !== paymentId || Number(existing.amount_cents) !== amount) {
       throw new AdminAuthError(409, 'refund_idempotency_conflict');
     }
+    // Repair a retry after a previous projection step failed after the refund row
+    // was written; the idempotency key still prevents a second refund.
+    await recomputePaymentFinancials(db, existing.payment_id);
     return { id: existing.id, status: existing.status, duplicate: true };
   }
 

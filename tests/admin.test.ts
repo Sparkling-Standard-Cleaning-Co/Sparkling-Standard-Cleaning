@@ -384,6 +384,7 @@ import {
   recordPayment,
   recordRefund,
 } from '../src/lib/admin/billing.ts';
+import { beginRefund, completeRefund, failRefund } from '../src/lib/admin/refunds.ts';
 import {
   addCustomerNote,
   addProperty,
@@ -731,6 +732,61 @@ test('refunds are cumulative, idempotent and never over-refund a payment', async
     () => recordRefund(db, actor, { paymentId: payment.id, amount: 1, idempotencyKey: 'refund-request-3' }),
     /refund_exceeds_remaining/,
   );
+});
+
+test('pending and failed refunds do not corrupt invoice balances', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Pending',
+    lastName: 'Refund',
+    addressLine1: '475 S Baylen St',
+    city: 'Pensacola',
+    postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    lines: [{ kind: 'service', description: 'Cleaning', quantity: 1, unitAmountCents: 10000, totalCents: 10000 }],
+  });
+  const payment = await recordPayment(db, actor, {
+    invoiceId: invoice.id,
+    provider: 'cash',
+    amount: 100,
+    idempotencyKey: 'pending-refund-payment',
+  });
+  const pending = await beginRefund(db, actor, {
+    paymentId: payment.id,
+    amountCents: 3000,
+    idempotencyKey: 'pending-refund-1',
+    status: 'pending',
+  });
+  let detail = await getInvoice(db, actor, invoice.id);
+  assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 10000);
+  await completeRefund(db, actor, pending.id);
+  detail = await getInvoice(db, actor, invoice.id);
+  assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 7000);
+  await completeRefund(db, actor, pending.id);
+  detail = await getInvoice(db, actor, invoice.id);
+  assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 7000);
+  await assert.rejects(
+    () =>
+      beginRefund(db, actor, {
+        paymentId: payment.id,
+        amountCents: 8000,
+        idempotencyKey: 'pending-refund-over',
+        status: 'pending',
+      }),
+    /refund_exceeds_remaining/,
+  );
+  const failing = await beginRefund(db, actor, {
+    paymentId: payment.id,
+    amountCents: 2000,
+    idempotencyKey: 'pending-refund-2',
+    status: 'pending',
+  });
+  await failRefund(db, actor, failing.id, 'synthetic provider failure');
+  detail = await getInvoice(db, actor, invoice.id);
+  assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 7000);
 });
 
 test('the login route requires MFA and issues a session only after verification', async () => {
