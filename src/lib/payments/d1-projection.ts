@@ -1,5 +1,7 @@
 ﻿import type { D1Database } from '../admin/d1.ts';
 
+export const FINANCIAL_SYSTEM_CUSTOMER_ID = 'customer_financial_system';
+
 export type FinancialPartyKind = 'service_payer' | 'gift_purchaser' | 'gift_recipient';
 
 interface PartyInput {
@@ -164,7 +166,7 @@ export async function projectStripePayment(
     )
     .bind(
       paymentId,
-      text(input.customerId, 100) || null,
+      text(input.customerId, 100) || FINANCIAL_SYSTEM_CUSTOMER_ID,
       text(input.payerPartyId, 200) || null,
       text(input.appointmentId, 100) || null,
       text(input.bookingRequestId, 100) || null,

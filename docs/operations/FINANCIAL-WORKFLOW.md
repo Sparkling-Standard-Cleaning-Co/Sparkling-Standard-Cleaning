@@ -44,18 +44,19 @@ message, document and dashboard uses the same five stages without blurring them.
 - `financial_parties` records gift purchasers and recipients without creating a
   cleaning-service customer. An exact normalized customer email may link the
   party to that existing customer; it never invents or duplicates a customer.
-- `payments` now records `payer_party_id`, `booking_request_id` and
-  `gift_certificate_id`; `customer_id` may be null for a gift purchaser who is
-  not a service customer.
+- `payments` records `payer_party_id`, `booking_request_id` and
+  `gift_certificate_id`. A payer who is not a cleaning-service customer uses the
+  single documented `customer_financial_system` ledger account; the real
+  purchaser identity remains the linked financial party.
 - Gift sales create one D1 gift certificate, one issue transaction and one
   Stripe payment keyed by the Stripe Checkout Session. Re-delivery is
   idempotent and does not overwrite financial history.
 - Estimate payments record the card amount, booking/appointment link and gift
   credit in metadata. Gift redemption is a liability transaction, not a second
   cash payment.
-- Migration `0024_financial_ledger_parties.sql` is additive except for the
-  backward-compatible payments rebuild. Historical R2 records require a
-  non-mutating dry-run before any backfill.
+- Migration `0024_financial_ledger_parties.sql` is additive and does not
+  rebuild `payments`. Historical R2 records require a non-mutating dry-run
+  before any backfill.
 
 ## Refund rules
 

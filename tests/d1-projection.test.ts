@@ -6,6 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import type { D1Database, D1PreparedStatement, D1Result } from '../src/lib/admin/d1.ts';
 import {
+  FINANCIAL_SYSTEM_CUSTOMER_ID,
   ensureFinancialParty,
   projectEstimatePayment,
   projectGiftSale,
@@ -75,7 +76,7 @@ test('a gift purchaser is a financial party, not a manufactured cleaning custome
   const payment = db.raw
     .prepare("SELECT customer_id, payer_party_id, gift_certificate_id, amount_cents FROM payments WHERE id = ?")
     .get(first.paymentId) as Record<string, unknown>;
-  assert.equal(payment.customer_id, null);
+  assert.equal(payment.customer_id, FINANCIAL_SYSTEM_CUSTOMER_ID);
   assert.ok(payment.payer_party_id);
   assert.equal(payment.gift_certificate_id, first.giftCertificateId);
   assert.equal(Number(payment.amount_cents), 15000);
@@ -127,7 +128,14 @@ test('a gift purchaser with an exact customer email links to that customer once'
     .prepare("SELECT customer_id FROM financial_parties WHERE kind = 'gift_purchaser'")
     .get() as { customer_id: string };
   assert.equal(party.customer_id, existingCustomer);
-  assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM customers').get() as { n: number }).n, 1);
+  assert.equal(
+    (
+      db.raw
+        .prepare('SELECT COUNT(*) AS n FROM customers WHERE id <> ?')
+        .get(FINANCIAL_SYSTEM_CUSTOMER_ID) as { n: number }
+    ).n,
+    1,
+  );
 });
 
 test('an estimate payment is projected with its booking and duplicate retry is safe', async () => {
@@ -155,7 +163,7 @@ test('an estimate payment is projected with its booking and duplicate retry is s
   const payment = db.raw
     .prepare('SELECT customer_id, payer_party_id, booking_request_id, amount_cents, metadata_json FROM payments WHERE id = ?')
     .get(projected.paymentId) as Record<string, unknown>;
-  assert.equal(payment.customer_id, null);
+  assert.equal(payment.customer_id, FINANCIAL_SYSTEM_CUSTOMER_ID);
   assert.ok(payment.payer_party_id);
   assert.equal(payment.booking_request_id, 'br_1');
   assert.equal(Number(payment.amount_cents), 10000);
