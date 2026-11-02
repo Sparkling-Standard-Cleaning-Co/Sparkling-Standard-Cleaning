@@ -5,6 +5,11 @@
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import type { D1Database, D1PreparedStatement, D1Result } from '../src/lib/admin/d1.ts';
+import { getActiveCheckoutSlot } from '../src/lib/payments/checkout-registry.ts';
 
 import {
   onRequestGet,
@@ -24,6 +29,47 @@ import {
   remainingCents,
   type GiftCertificateRecord,
 } from '../src/lib/gift/ledger.ts';
+
+class SqlStatement implements D1PreparedStatement {
+  private values: unknown[] = [];
+  private readonly db: DatabaseSync;
+  private readonly sql: string;
+  constructor(db: DatabaseSync, sql: string) {
+    this.db = db;
+    this.sql = sql;
+  }
+  bind(...values: unknown[]): D1PreparedStatement {
+    this.values = values;
+    return this;
+  }
+  async first<T = Record<string, unknown>>(): Promise<T | null> {
+    return (this.db.prepare(this.sql).get(...(this.values as never[])) as T | undefined) ?? null;
+  }
+  async all<T = Record<string, unknown>>(): Promise<D1Result<T>> {
+    return { success: true, results: this.db.prepare(this.sql).all(...(this.values as never[])) as T[] };
+  }
+  async run(): Promise<D1Result> {
+    this.db.prepare(this.sql).run(...(this.values as never[]));
+    return { success: true };
+  }
+}
+
+class TestD1 implements D1Database {
+  readonly raw = new DatabaseSync(':memory:');
+  prepare(query: string): D1PreparedStatement {
+    return new SqlStatement(this.raw, query);
+  }
+}
+
+function checkoutDb(): TestD1 {
+  const db = new TestD1();
+  db.raw.exec('PRAGMA foreign_keys = ON');
+  const directory = path.join(process.cwd(), 'migrations');
+  for (const file of fs.readdirSync(directory).filter((name) => name.endsWith('.sql')).sort()) {
+    db.raw.exec(fs.readFileSync(path.join(directory, file), 'utf8'));
+  }
+  return db;
+}
 
 let ip = 0;
 let secretSerial = 0;
@@ -344,6 +390,36 @@ test('a valid facility quote creates one session at the server-calculated amount
     [...ledger.values.keys()].some((key) => key.startsWith('payments/checkouts/')),
     'the checkout attempt is recorded after the hold-backed session is created',
   );
+});
+
+test('a second checkout attempt supersedes the first active session for the same hold', async () => {
+  const ledger = new FakeLedger();
+  const db = checkoutDb();
+  const env = { ...makeEnv(ledger), DB: db };
+  const provider = providerStub();
+  const { fields: baseFields } = validFacilityInput();
+  const fields = withHold(baseFields, ledger);
+
+  const first = await withFetch(provider.stub, () =>
+    onRequestPost({ request: jsonRequest({ fields, returnPath: '/estimate/commercial/' }), env } as never),
+  );
+  assert.equal(first.status, 200);
+
+  const secondFields = { ...fields, email: 'updated@example.test' };
+  const second = await withFetch(provider.stub, () =>
+    onRequestPost({ request: jsonRequest({ fields: secondFields, returnPath: '/estimate/commercial/' }), env } as never),
+  );
+  assert.equal(second.status, 200);
+  assert.equal(provider.postCount(), 2);
+
+  const rows = db.raw
+    .prepare('SELECT status, attempt FROM checkout_sessions WHERE booking_hold_id = ? ORDER BY created_at')
+    .all(fields.booking_hold_id) as Array<{ status: string; attempt: string }>;
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0]?.status, 'superseded');
+  assert.equal(rows[1]?.status, 'open');
+  const active = await getActiveCheckoutSlot(db, fields.booking_hold_id);
+  assert.equal(active?.attempt, rows[1]?.attempt);
 });
 
 test('a Tier B facility quote cannot create a checkout session through the API', async () => {

@@ -38,6 +38,7 @@ import { autoConfirmPaidBooking } from '../../src/lib/booking/auto-confirm.ts';
 import type { BookingEnv } from '../../src/lib/booking/service.ts';
 import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { applyInvoiceCheckoutPayment } from '../../src/lib/admin/stripe-reconcile.ts';
+import { completeCheckoutSlotByAttempt, expireCheckoutSlotByAttempt } from '../../src/lib/payments/checkout-registry.ts';
 import { recordSavedCardSetup } from '../../src/lib/admin/stripe-billing.ts';
 import {
   projectStripeDispute,
@@ -498,6 +499,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           updatedAt: new Date().toISOString(),
         }).catch(() => undefined);
       }
+      if (env.DB) await expireCheckoutSlotByAttempt(env.DB, attempt).catch(() => undefined);
     }
     return json({ ok: true, received: true, expired: true });
   }
@@ -760,6 +762,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         }
       }
       await updateCheckoutRecord(env, metadata.checkout_attempt, session, booking);
+      if (env.DB) {
+        await completeCheckoutSlotByAttempt(
+          env.DB,
+          metadata.checkout_attempt,
+          session.id ?? null,
+        ).catch(() => undefined);
+      }
       if (booking?.status === 'confirmed') {
         metadata.booking_status = 'confirmed';
         metadata.booking_event_id = booking.eventId ?? '';

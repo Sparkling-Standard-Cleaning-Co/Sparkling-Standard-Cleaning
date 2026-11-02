@@ -61,6 +61,15 @@ import {
 } from '../../src/lib/photos.ts';
 import { bookingStore, getBookingHold, holdIsActive, holdKey } from '../../src/lib/booking/holds.ts';
 import {
+  activateCheckoutSlot,
+  claimCheckoutSlot,
+  completeCheckoutSlotByAttempt,
+  expireCheckoutSlotByAttempt,
+  failCheckoutSlotByAttempt,
+  setCheckoutSlotStatus,
+  supersedeCheckoutSlot,
+} from '../../src/lib/payments/checkout-registry.ts';
+import {
   createSigningRequest,
   evaluateDocumentGate,
   rotateSigningRequestToken,
@@ -233,13 +242,28 @@ async function authoritativePhotosOutstanding(
   return true;
 }
 
-async function expireCheckoutSession(env: Env, sessionId: string): Promise<void> {
-  if (!env.STRIPE_SECRET_KEY?.trim() || !sessionId) return;
-  await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}/expire`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY.trim()}` },
-    signal: AbortSignal.timeout(10_000),
-  }).catch(() => undefined);
+type CheckoutExpiry = 'expired' | 'completed' | 'failed';
+
+async function expireCheckoutSession(env: Env, sessionId: string): Promise<CheckoutExpiry> {
+  if (!env.STRIPE_SECRET_KEY?.trim() || !sessionId) return 'failed';
+  try {
+    const response = await fetch(
+      `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}/expire`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY.trim()}` },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    if (response.ok) return 'expired';
+    const data = (await response.json().catch(() => ({}))) as { error?: { code?: string } };
+    const code = data.error?.code ?? '';
+    if (/expired/i.test(code)) return 'expired';
+    if (/completed/i.test(code)) return 'completed';
+    return 'failed';
+  } catch {
+    return 'failed';
+  }
 }
 async function authoritativeHoldId(
   fields: Record<string, string>,
@@ -829,11 +853,13 @@ async function existingCheckoutResponse(
       return json({ ok: false, error: 'checkout_in_progress' }, 409);
     }
     await releaseCheckoutGift(env, record);
+    if (env.DB && record.attempt) await failCheckoutSlotByAttempt(env.DB, record.attempt);
     await deleteLedgerKey(bucket, key);
     return null;
   }
   if (record.status === 'failed') {
     await releaseCheckoutGift(env, record);
+    if (env.DB && record.attempt) await failCheckoutSlotByAttempt(env.DB, record.attempt);
     await deleteLedgerKey(bucket, key);
     return null;
   }
@@ -852,10 +878,12 @@ async function existingCheckoutResponse(
         updatedAt: new Date().toISOString(),
       }).catch(() => undefined);
     }
+    if (env.DB && record.attempt) await completeCheckoutSlotByAttempt(env.DB, record.attempt, record.sessionId);
     return json({ ok: true, url: successUrl(env, record.sessionId) });
   }
   if (session.status === 'expired') {
     await releaseCheckoutGift(env, record);
+    if (env.DB && record.attempt) await expireCheckoutSlotByAttempt(env.DB, record.attempt);
     await deleteLedgerKey(bucket, key);
     return null;
   }
@@ -902,6 +930,7 @@ async function fulfillGiftOnlyOrder(
     await releaseGiftReservation(giftLedger, input.giftCode, input.reservationId).catch(
       () => undefined,
     );
+    if (env.DB) await failCheckoutSlotByAttempt(env.DB, input.attempt).catch(() => undefined);
     await deleteLedgerKey(bucket, key).catch(() => undefined);
     return json({ ok: false, error: 'storage_unavailable' }, 503);
   }
@@ -916,9 +945,11 @@ async function fulfillGiftOnlyOrder(
     await releaseGiftReservation(giftLedger, input.giftCode, input.reservationId).catch(
       () => undefined,
     );
+    if (env.DB) await failCheckoutSlotByAttempt(env.DB, input.attempt).catch(() => undefined);
     await deleteLedgerKey(bucket, key).catch(() => undefined);
     return json({ ok: false, error: 'gift_commit_failed' }, 502);
   }
+  if (env.DB) await completeCheckoutSlotByAttempt(env.DB, input.attempt, null).catch(() => undefined);
   const receipt: ReceiptData | null = snapshot
     ? {
         receiptNumber: `SSR-${input.candidate.reference}`,
@@ -1137,6 +1168,48 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (response) return response;
   }
 
+  // One active Stripe session per booking hold. A new attempt must expire and
+  // supersede the previous session before it can claim the slot; this prevents
+  // two payable sessions from the same hold after an edit/retry.
+  let checkoutSlotId: string | null = null;
+  if (env.DB) {
+    for (let pass = 0; pass < 4; pass += 1) {
+      const slot = await claimCheckoutSlot(env.DB, {
+        bookingHoldId: fields.booking_hold_id,
+        quoteReference: candidate.reference,
+        attempt: attemptFingerprint,
+        amountCents: totalCents,
+        expiresAt: fields.booking_hold_expires_at ?? null,
+      });
+      if (slot.ok) {
+        checkoutSlotId = slot.row.id;
+        break;
+      }
+      if (slot.reason === 'completed' && slot.row) {
+        const previousKey = ledgerKey('checkouts', slot.row.attempt);
+        const previous = await readLedgerJson<CheckoutRecord>(bucket, previousKey).catch(() => null);
+        if (previous) {
+          const response = await existingCheckoutResponse(env, bucket, previousKey, previous.value);
+          if (response) return response;
+        }
+        return json({ ok: false, error: 'checkout_already_completed' }, 409);
+      }
+      if (slot.reason === 'open' && slot.row) {
+        if (!slot.row.stripeSessionId) {
+          await setCheckoutSlotStatus(env.DB, slot.row.id, 'superseded');
+          continue;
+        }
+        const expiry = await expireCheckoutSession(env, slot.row.stripeSessionId);
+        if (expiry === 'completed') return json({ ok: false, error: 'checkout_already_completed' }, 409);
+        if (expiry !== 'expired') return json({ ok: false, error: 'checkout_session_conflict' }, 409);
+        await supersedeCheckoutSlot(env.DB, slot.row.id, slot.row.attempt);
+        continue;
+      }
+      return json({ ok: false, error: 'checkout_in_progress' }, 409);
+    }
+    if (!checkoutSlotId) return json({ ok: false, error: 'checkout_in_progress' }, 409);
+  }
+
   const generation = (existing?.value.generation ?? 0) + 1;
   const now = new Date().toISOString();
   const claim: CheckoutRecord = {
@@ -1166,6 +1239,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const response = await existingCheckoutResponse(env, bucket, key, current.value);
       if (response) return response;
     }
+    if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
     return json({ ok: false, error: 'checkout_in_progress' }, 409);
   }
 
@@ -1205,6 +1279,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       await releaseGiftReservation(giftLedger, giftCode, reserved.reservation.id).catch(
         () => undefined,
       );
+      if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
       await deleteLedgerKey(bucket, key).catch(() => undefined);
       return json({ ok: false, error: 'storage_unavailable' }, 503);
     }
@@ -1288,6 +1363,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           () => undefined,
         );
       }
+      if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
       await deleteLedgerKey(bucket, key).catch(() => undefined);
       return json({ ok: false, error: 'stripe_unavailable' }, 502);
     }
@@ -1315,6 +1391,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (!persisted) {
       await expireCheckoutSession(env, data.id);
+      if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
       if (gift && giftLedger) {
         await releaseGiftReservation(giftLedger, gift.code, gift.reservationId).catch(
           () => undefined,
@@ -1323,6 +1400,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       console.error('[estimate-checkout] checkout_state_uncertain', { sessionId: data.id });
       return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
     }
+    if (env.DB && checkoutSlotId) {
+      const activated = await activateCheckoutSlot(env.DB, checkoutSlotId, data.id).catch(() => false);
+      if (!activated) {
+        await expireCheckoutSession(env, data.id);
+        if (gift && giftLedger) {
+          await releaseGiftReservation(giftLedger, gift.code, gift.reservationId).catch(
+            () => undefined,
+          );
+        }
+        await deleteLedgerKey(bucket, key).catch(() => undefined);
+        return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
+      }
+    }
     return json({ ok: true, url: data.url });
   } catch (error) {
     if (gift && giftLedger) {
@@ -1330,6 +1420,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         () => undefined,
       );
     }
+    if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
     await deleteLedgerKey(bucket, key).catch(() => undefined);
     console.error('[estimate-checkout] stripe_transport_failed', {
       name: error instanceof Error ? error.name : 'unknown',
