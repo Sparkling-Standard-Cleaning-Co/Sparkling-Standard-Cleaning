@@ -1,5 +1,41 @@
 # Verification status
 
+## Verified - 2026-11-02 complete customer property profiles
+
+**Release:** `2f1ddad` on `production-safe`; Cloudflare Pages deployment
+`012ddfd6-9e67-4481-9910-55977d402853`. Migration `0028_property_profiles.sql`
+applied to production D1 (28 migrations total).
+
+**Scope:** complete per-property profiles in the existing Admin → Customers flow:
+label, full address, property type, square footage, bedrooms, full/half bathrooms,
+floors/stories, STR beds, pets, access and parking instructions, and internal
+property notes. The first property can be entered with a new customer; existing
+customers can add and independently edit multiple properties. Property update
+never rewrites historical quotes, bookings, invoices or payments.
+
+**Data preservation:** before/after production counts were customers **5**,
+properties **3**, booking requests **6**, payments **0**; all pre-existing rows
+remain. A verified encrypted backup was created first:
+`sparkling-standard-20261102-181719.ssbk` (SHA-256
+`394c2f4ece3229a4079885dc973ab82f86c57965c802b143c3642f2f3ed17091`).
+
+**Verification:**
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **794 tests: 793 passed, 1 skipped, 0 failed** |
+| Browser suite | **192 passed, 0 failed** (includes customer property profile tests at desktop and phone width) |
+| Type check | 0 errors, 0 warnings, 1 hint |
+| Build + validation | `npm run build` and `npm run validate` passed |
+| Production admin bundle | contains the new property-type, square-footage and internal-note controls |
+| Production `/admin/` | 200 |
+| Production `/api/admin/customers` unauthenticated | 401 |
+| Production homepage | 200 |
+| D1 | 28 migrations; nine new property columns present; existing properties preserved |
+
+**Not yet verified:** the owner has not yet exercised the production form with her
+real account; no real customer record was edited during verification.
+
 ## Verified - 2026-11-02 checkout session supersession release
 
 **Release:** `14a1f5d` on `production-safe`; Cloudflare Pages deployment
