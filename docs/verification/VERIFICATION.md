@@ -1,5 +1,21 @@
 # Verification status
 
+## Verified - 2026-11-02 invoice checkout link integrity
+
+**Release:** `385fcf5` on `production-safe`; Cloudflare Pages deployment
+`5ddc560d-4a0a-4fdf-a382-fbef88b509dc`.
+
+**Scope:** an existing invoice payment link is reused only when Stripe confirms the
+stored session is open and its amount still equals the invoice balance. A stale,
+mismatched or unverifiable session is expired and cleared before a new link is
+created; a completed session is rejected for reconciliation instead of creating a
+second charge. No customer price or historical invoice was changed.
+
+**Verification:** unit suite **795 tests: 794 passed, 1 skipped, 0 failed**; the
+admin/invoice suite includes the stale-session expiry test; `npm run check`, build
+and validation passed; production homepage, `/admin/` and live checkout readiness
+returned 200. No live Stripe session was expired or paid during verification.
+
 ## Verified - 2026-11-02 complete customer property profiles
 
 **Release:** `2f1ddad` on `production-safe`; Cloudflare Pages deployment
