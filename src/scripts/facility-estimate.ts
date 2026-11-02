@@ -1041,6 +1041,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     if (
       failure.error === 'quote_not_payable' ||
       failure.error === 'payment_not_ready' ||
+      failure.error === 'recurring_scheduling_gated' ||
       failure.error === 'email_required' ||
       failure.error === 'email_invalid'
     ) {

@@ -147,7 +147,7 @@ async function fixture(conflictDates = new Set<string>()) {
 
 test('a verified paid recurring booking creates one plan and future confirmed occurrences', async () => {
   const f = await fixture();
-  const env = { DB: f.db } as never;
+  const env = { DB: f.db, RECURRING_SCHEDULING_ENABLED: 'true' } as never;
   const committed = await commitConfirmedBooking(
     env,
     f.db,
@@ -198,7 +198,7 @@ test('a future recurring conflict is reported honestly while the paid first visi
   const laterConflict = addDays(f.startDate, 14);
   f.calendar = makeCalendar(new Set([laterConflict]));
   const committed = await commitConfirmedBooking(
-    { DB: f.db } as never,
+    { DB: f.db, RECURRING_SCHEDULING_ENABLED: 'true' } as never,
     f.db,
     {
       reference: f.reference,

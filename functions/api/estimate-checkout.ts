@@ -38,6 +38,7 @@ import {
   type PaymentStorageEnv,
 } from '../../src/lib/payments/ledger.ts';
 import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.ts';
+import { recurringSchedulingEnabled } from '../../src/lib/booking/recurring-gate.ts';
 import { legalTerms } from '../../src/config/legal.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
 import { calculateServiceTax, type ServiceTaxResult } from '../../src/lib/tax/engine.ts';
@@ -71,6 +72,7 @@ interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
   PUBLIC_SITE_URL?: string;
+  RECURRING_SCHEDULING_ENABLED?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   GIFT_LEDGER?: LedgerBucket;
@@ -1001,6 +1003,21 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       checks: ready.checks,
     });
     return json({ ok: false, error: 'payment_not_ready', reason: 'configuration' }, 503);
+  }
+  const recurringFrequency = (fields.frequency ?? fields.ongoing_frequency ?? '').trim().toLowerCase();
+  if (
+    fields.request_type !== 'facility_estimate' &&
+    ['weekly', 'biweekly', 'monthly'].includes(recurringFrequency) &&
+    !recurringSchedulingEnabled(env)
+  ) {
+    return json(
+      {
+        ok: false,
+        error: 'recurring_scheduling_gated',
+        reason: 'Recurring scheduling is being finalized. Send a request to reserve and Sparkling Standard will confirm the schedule personally.',
+      },
+      409,
+    );
   }
   const hold = await authoritativeHoldId(fields, env);
   if (!hold.ok) return json({ ok: false, error: hold.error }, 400);

@@ -9,6 +9,7 @@ import { createOpsSession, enrollOwner, readOpsActor } from '../src/lib/admin/op
 import { createCustomer } from '../src/lib/admin/crm.ts';
 import {
   centralDateKey,
+  centralMidnightUtc,
   employeeJobWindow,
   formatMinutes,
   isMissingClockOut,
@@ -237,11 +238,21 @@ test('the employee board shows only assigned jobs today and tomorrow', async () 
      (id, branch_id, customer_id, property_id, status, start_at, end_at, duration_minutes, crew_size, reference)
      VALUES (?, 'branch_pensacola', ?, ?, 'confirmed', ?, ?, 120, 1, ?)`,
   );
-  const now = Date.now();
-  const at = (offsetHours: number) => new Date(now + offsetHours * 3_600_000).toISOString();
+  const today = centralDateKey(new Date());
+  const dayKey = (offset: number) =>
+    new Date(Date.parse(today + 'T12:00:00Z') + offset * 86_400_000).toISOString().slice(0, 10);
+  const at = (dayOffset: number, hour: number) =>
+    new Date(centralMidnightUtc(dayKey(dayOffset)).getTime() + hour * 3_600_000).toISOString();
   const ids = ['JOB-1', 'JOB-2', 'JOB-3', 'JOB-4'];
+  const windows = [
+    [0, 10, 12],
+    [1, 10, 12],
+    [2, 10, 12],
+    [4, 10, 12],
+  ] as const;
   ids.forEach((id, index) => {
-    insertAppointment.run(id, customer.id, property.id, at([2, 26, 40, 120][index]!), at([4, 28, 42, 122][index]!), id);
+    const [dayOffset, startHour, endHour] = windows[index]!;
+    insertAppointment.run(id, customer.id, property.id, at(dayOffset, startHour), at(dayOffset, endHour), id);
     db.raw
       .prepare('INSERT INTO appointment_resources (appointment_id, team_member_id) VALUES (?, ?)')
       .run(id, index === 3 ? other.teamMemberId : employee.teamMemberId);

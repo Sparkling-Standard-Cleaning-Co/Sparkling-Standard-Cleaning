@@ -365,6 +365,27 @@ test('a Tier B facility quote cannot create a checkout session through the API',
   assert.equal(provider.postCount(), 0, 'no Stripe session for a Tier B range');
 });
 
+test('recurring Pay Now fails closed when the recurring flag is absent', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub();
+  const { fields } = validResidentialInput('standard');
+  const recurringFields = {
+    ...fields,
+    frequency: 'weekly',
+    ongoing_frequency: 'weekly',
+  };
+  const response = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ fields: recurringFields, returnPath: '/estimate/residential/' }),
+      env,
+    } as never),
+  );
+  assert.equal(response.status, 409);
+  assert.equal(((await response.json()) as { error?: string }).error, 'recurring_scheduling_gated');
+  assert.equal(provider.postCount(), 0);
+});
+
 test('appointment Pay Now rejects a missing booking hold', async () => {
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
