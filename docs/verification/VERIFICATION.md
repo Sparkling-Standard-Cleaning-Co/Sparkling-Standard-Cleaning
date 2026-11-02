@@ -1,5 +1,41 @@
 # Verification status
 
+## Verified - 2026-11-02 checkout session supersession release
+
+**Release:** `14a1f5d` on `production-safe`; Cloudflare Pages deployment
+`87309f44-67e6-4352-b8be-706929fa628d`. Migration `0027_checkout_session_registry.sql`
+applied to production D1 (27 migrations total; table empty at release).
+
+**Scope:** one active Stripe Checkout Session per booking hold. A new attempt must
+expire and supersede the previous session before claiming the D1 slot; a completed
+slot blocks a second charge; expired webhooks release the slot. The partial unique
+index is the database-level backstop. No customer price, quote, payment or booking
+record was changed.
+
+**Verification:**
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **794 tests: 793 passed, 1 skipped, 0 failed** |
+| Browser suite | **190 passed, 0 failed** |
+| Type check | 0 errors, 0 warnings, 1 hint |
+| Checkout registry tests | 4/4 pass (single active slot, supersede, completed/stale handling, schema unique index) |
+| Checkout integration | A second attempt for the same hold expires/supersedes the first and the registry keeps exactly one open slot |
+| Production `/api/estimate-checkout` | 200, live mode, all readiness checks true |
+| Production homepage | 200 |
+| D1 | 27 migrations; `checkout_sessions` exists and is empty |
+
+**Not yet verified:** no live Stripe test-mode checkout or refund was performed; no real
+customer session was superseded in production.
+
+## Verified - 2026-11-02 pricing accordion correction
+
+**Release:** `970a95f` on `production-safe`; Cloudflare Pages deployment
+`8cfcf293-1da3-4cb3-83db-b05e76372167`. Every Pricing & Estimator Control accordion
+starts collapsed, toggles independently, and preserves the open sections across a
+draft save. The browser regression test covers the default state, independent open/close,
+and post-save state. No pricing value or calculation changed.
+
 ## Verified - 2026-11-02 owner pricing control release
 
 **Release:** `25e245b` on `production-safe`; Cloudflare Pages deployment
