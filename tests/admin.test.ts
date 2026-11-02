@@ -332,7 +332,9 @@ test('lead persistence is idempotent and creates a customer, property and reques
   assert.ok(first);
   assert.deepEqual(second, first);
   const leads = db.raw.prepare('SELECT COUNT(*) AS count FROM leads').get() as { count: number };
-  const customers = db.raw.prepare('SELECT COUNT(*) AS count FROM customers').get() as { count: number };
+  const customers = db.raw
+    .prepare("SELECT COUNT(*) AS count FROM customers WHERE id <> 'customer_financial_system'")
+    .get() as { count: number };
   const properties = db.raw.prepare('SELECT COUNT(*) AS count FROM properties').get() as { count: number };
   assert.equal(leads.count, 1);
   assert.equal(customers.count, 1);
