@@ -39,6 +39,10 @@ import type { BookingEnv } from '../../src/lib/booking/service.ts';
 import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { applyInvoiceCheckoutPayment } from '../../src/lib/admin/stripe-reconcile.ts';
 import { recordSavedCardSetup } from '../../src/lib/admin/stripe-billing.ts';
+import {
+  projectEstimatePayment,
+  projectGiftSale,
+} from '../../src/lib/payments/d1-projection.ts';
 import type { ReceiptData, ReceiptLine } from '../../src/lib/payments/receipt.ts';
 
 interface Env extends PaymentStorageEnv, BookingEnv {
@@ -609,6 +613,30 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           .run()
           .catch(() => undefined);
       }
+      if (env.DB) {
+        try {
+          await projectEstimatePayment(env.DB, {
+            sessionId: String(session.id ?? ''),
+            ...(session.payment_intent ? { paymentIntentId: String(session.payment_intent) } : {}),
+            amountCents: amountCents ?? 0,
+            ...(session.currency ? { currency: String(session.currency) } : {}),
+            ...(holdId ? { holdId } : {}),
+            ...(quoteReference ? { quoteReference } : {}),
+            ...(metadata.checkout_attempt ? { checkoutAttempt: metadata.checkout_attempt } : {}),
+            giftAppliedCents: Number(metadata.gift_applied_cents) || 0,
+            totalCents: Number(checkout?.amountCents) || amountCents || 0,
+            customerName: customerName || '',
+            customerEmail: customerEmail || '',
+            paidAt,
+          });
+        } catch (error) {
+          console.error('[stripe-webhook] estimate_projection_failed', {
+            name: error instanceof Error ? error.name : 'unknown',
+          });
+          if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'd1_projection_failed');
+          return json({ ok: false, error: 'd1_projection_failed' }, 500);
+        }
+      }
       await updateCheckoutRecord(env, metadata.checkout_attempt, session, booking);
       if (booking?.status === 'confirmed') {
         metadata.booking_status = 'confirmed';
@@ -734,6 +762,34 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   } catch {
     if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'gift_issue_failed');
     return json({ ok: false, error: 'gift_issue_failed' }, 500);
+  }
+  if (env.DB) {
+    try {
+      await projectGiftSale(env.DB, {
+        code,
+        sessionId: String(session.id ?? ''),
+        ...(session.payment_intent ? { paymentIntentId: String(session.payment_intent) } : {}),
+        amountCents: amountCents ?? 0,
+        ...(session.currency ? { currency: String(session.currency) } : {}),
+        valueCents: Math.round(seed.gift.valueUsd * 100),
+        purchaserName: seed.gift.purchaserName,
+        purchaserEmail: seed.gift.purchaserEmail,
+        recipientName: seed.gift.recipientName,
+        ...(seed.gift.recipientEmail ? { recipientEmail: seed.gift.recipientEmail } : {}),
+        ...(seed.gift.message ? { message: seed.gift.message } : {}),
+        deliveryMethod: seed.gift.deliveryMethod ?? 'print',
+        ...(validFromDate ? { validFromDate } : {}),
+        ...(activationInstant(validFromDate) ? { activatesAt: activationInstant(validFromDate) } : {}),
+        eventId,
+        paidAt,
+      });
+    } catch (error) {
+      console.error('[stripe-webhook] gift_projection_failed', {
+        name: error instanceof Error ? error.name : 'unknown',
+      });
+      if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'd1_projection_failed');
+      return json({ ok: false, error: 'd1_projection_failed' }, 500);
+    }
   }
   const fulfillment = buildGiftFulfillment({
     eventId,

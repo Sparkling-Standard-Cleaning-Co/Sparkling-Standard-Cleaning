@@ -85,6 +85,7 @@ function migratedDb(): TestD1 {
     '0021_least_privilege_cleaner_role.sql',
     '0022_refund_idempotency.sql',
     '0023_document_signature_attempts.sql',
+    '0024_financial_ledger_parties.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
