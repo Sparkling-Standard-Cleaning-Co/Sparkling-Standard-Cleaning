@@ -141,6 +141,19 @@ test('the owner can open Pricing & Estimator Control, edit, save and simulate', 
     await page.goto(BASE + '/admin/', { waitUntil: 'load' });
     await page.locator('[data-admin-app]').waitFor({ state: 'visible' });
     await page.locator('[data-admin-nav="pricing"]').click();
+    await page.locator('details.pricing-category').first().waitFor({ state: 'attached' });
+
+    const categories = page.locator('details.pricing-category');
+    assert.ok((await categories.count()) > 5);
+    assert.equal(await categories.evaluateAll((items) => items.filter((item) => item.open).length), 0);
+    assert.equal(await page.locator('[data-pricing-sim-form] details').first().evaluate((item) => item.open), false);
+
+    await categories.first().locator('summary').click();
+    assert.equal(await categories.first().evaluate((item) => item.open), true);
+    assert.equal(await categories.evaluateAll((items) => items.filter((item) => item.open).length), 1);
+    await categories.first().locator('summary').click();
+    assert.equal(await categories.first().evaluate((item) => item.open), false);
+    await categories.first().locator('summary').click();
     await page.locator('[data-pricing-path="owner.minimumJob"]').waitFor({ state: 'visible' });
 
     const minimum = page.locator('[data-pricing-path="owner.minimumJob"]');
@@ -155,6 +168,8 @@ test('the owner can open Pricing & Estimator Control, edit, save and simulate', 
       (document.querySelector('[data-pricing-notice]')?.textContent ?? '').includes('Draft saved'),
     );
     assert.ok(postActions.includes('create_draft'));
+    assert.equal(await categories.first().evaluate((item) => item.open), true);
+    assert.equal(await categories.evaluateAll((items) => items.filter((item) => item.open).length), 1);
 
     await page.locator('.pricing-sim-card').first().waitFor({ state: 'visible' });
     const prices = await page.locator('.pricing-sim-price').allInnerTexts();

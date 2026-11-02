@@ -121,6 +121,7 @@ const state: PricingState = {
 let eventsBound = false;
 let simulateTimer: number | null = null;
 let csrfCache = '';
+const openCategories = new Set<string>();
 
 function esc(value: unknown): string {
   return String(value ?? '')
@@ -258,7 +259,7 @@ function renderEditor(): void {
   target.innerHTML = categories
     .map((category) => {
       const entries = state.catalog.filter((entry) => entry.category === category);
-      return `<details class="pricing-category" open>
+      return `<details class="pricing-category" data-pricing-category="${esc(category)}">
         <summary>${esc(categoryLabel(category))} <span class="admin-muted">(${entries.length})</span></summary>
         <div class="pricing-field-grid">
           ${entries.map((entry) => renderField(entry, published)).join('')}
@@ -266,6 +267,14 @@ function renderEditor(): void {
       </details>`;
     })
     .join('');
+  for (const details of target.querySelectorAll<HTMLDetailsElement>('details.pricing-category')) {
+    const category = details.dataset.pricingCategory ?? '';
+    details.open = openCategories.has(category);
+    details.addEventListener('toggle', () => {
+      if (details.open) openCategories.add(category);
+      else openCategories.delete(category);
+    });
+  }
   bindEditorInputs(target);
 }
 
