@@ -126,7 +126,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       : payload.deliveryMethod === 'print' || payload.deliveryMethod === undefined
         ? 'print'
         : null;
-  if (!purchaserName || !deliveryMethod) {
+  if (!purchaserName || !recipientName || !deliveryMethod) {
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
   const purchaserEmailProblem = customerEmailProblem(purchaserEmail);
@@ -174,8 +174,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const claim = {
     status: 'creating',
     amount,
+    purchaserName,
     purchaserEmail,
+    recipientName,
     recipientEmail,
+    message,
+    deliveryMethod,
     validFromDate,
     termsVersion: legalTerms.termsVersion,
     createdAt: new Date().toISOString(),

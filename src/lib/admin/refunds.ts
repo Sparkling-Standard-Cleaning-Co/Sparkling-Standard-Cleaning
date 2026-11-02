@@ -238,3 +238,136 @@ export async function failRefund(
     detail: text(detail, 500),
   });
 }
+
+export async function projectStripeRefund(
+  db: D1Database,
+  input: {
+    paymentId: string;
+    stripeRefundId: string;
+    amountCents: number;
+    status: 'pending' | 'succeeded' | 'failed';
+    reason?: string;
+  },
+): Promise<{ refundId: string; duplicate: boolean }> {
+  const stripeRefundId = text(input.stripeRefundId, 200);
+  if (!stripeRefundId) throw new AdminAuthError(400, 'stripe_refund_id_required');
+  const existing = await db
+    .prepare('SELECT * FROM refunds WHERE stripe_refund_id = ? LIMIT 1')
+    .bind(stripeRefundId)
+    .first<RefundRecord>();
+  if (existing) {
+    if (existing.status !== input.status) {
+      await db
+        .prepare('UPDATE refunds SET status = ? WHERE id = ?')
+        .bind(input.status, existing.id)
+        .run();
+      await recomputePaymentFinancials(db, existing.payment_id);
+    }
+    return { refundId: existing.id, duplicate: true };
+  }
+  const refundId = `refund_${crypto.randomUUID()}`;
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO refunds
+       (id, payment_id, amount_cents, reason, status, stripe_refund_id, idempotency_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      refundId,
+      input.paymentId,
+      Math.max(0, Math.round(input.amountCents)),
+      text(input.reason, 500),
+      input.status,
+      stripeRefundId,
+      `stripe-refund:${stripeRefundId}`,
+    )
+    .run();
+  const stored = await db
+    .prepare('SELECT id FROM refunds WHERE stripe_refund_id = ? LIMIT 1')
+    .bind(stripeRefundId)
+    .first<{ id: string }>();
+  if (!stored) throw new Error('refund_projection_failed');
+  await recomputePaymentFinancials(db, input.paymentId);
+  return { refundId: stored.id, duplicate: false };
+}
+
+export async function projectStripeDispute(
+  db: D1Database,
+  input: {
+    paymentId: string | null;
+    disputeId: string;
+    status: string;
+    amountCents: number;
+    currency?: string;
+    reason?: string;
+    evidenceDueBy?: string | null;
+  },
+): Promise<void> {
+  const allowed = new Set([
+    'warning_needs_response',
+    'needs_response',
+    'under_review',
+    'won',
+    'lost',
+    'charge_refunded',
+    'closed',
+  ]);
+  const status = allowed.has(input.status) ? input.status : 'unknown';
+  const existing = await db
+    .prepare('SELECT id FROM payment_disputes WHERE provider_dispute_id = ? LIMIT 1')
+    .bind(input.disputeId)
+    .first<{ id: string }>();
+  if (existing) {
+    await db
+      .prepare(
+        'UPDATE payment_disputes SET status = ?, amount_cents = ?, reason = ?, evidence_due_by = ?, updated_at = ? WHERE id = ?',
+      )
+      .bind(
+        status,
+        Math.max(0, Math.round(input.amountCents)),
+        text(input.reason, 500),
+        input.evidenceDueBy ?? null,
+        now(),
+        existing.id,
+      )
+      .run();
+    return;
+  }
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO payment_disputes
+       (id, payment_id, provider_dispute_id, status, amount_cents, currency, reason, evidence_due_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      `dispute_${crypto.randomUUID()}`,
+      input.paymentId,
+      input.disputeId,
+      status,
+      Math.max(0, Math.round(input.amountCents)),
+      text(input.currency, 10).toUpperCase() || 'USD',
+      text(input.reason, 500),
+      input.evidenceDueBy ?? null,
+    )
+    .run();
+}
+
+export async function recordReconciliationIssue(
+  db: D1Database,
+  input: { eventId: string; kind: string; detail: string; payload?: unknown },
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO payment_reconciliation_issues
+       (id, provider_event_id, kind, detail, payload_json)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      `issue_${crypto.randomUUID()}`,
+      text(input.eventId, 200) || 'unknown',
+      text(input.kind, 100),
+      text(input.detail, 500),
+      JSON.stringify(input.payload ?? {}),
+    )
+    .run();
+}

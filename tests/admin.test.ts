@@ -86,6 +86,7 @@ function migratedDb(): TestD1 {
     '0022_refund_idempotency.sql',
     '0023_document_signature_attempts.sql',
     '0024_financial_ledger_parties.sql',
+    '0025_refunds_disputes_webhooks.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -387,7 +388,14 @@ import {
   recordPayment,
   recordRefund,
 } from '../src/lib/admin/billing.ts';
-import { beginRefund, completeRefund, failRefund } from '../src/lib/admin/refunds.ts';
+import {
+  beginRefund,
+  completeRefund,
+  failRefund,
+  projectStripeDispute,
+  projectStripeRefund,
+  recordReconciliationIssue,
+} from '../src/lib/admin/refunds.ts';
 import {
   addCustomerNote,
   addProperty,
@@ -790,6 +798,80 @@ test('pending and failed refunds do not corrupt invoice balances', async () => {
   await failRefund(db, actor, failing.id, 'synthetic provider failure');
   detail = await getInvoice(db, actor, invoice.id);
   assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 7000);
+});
+
+test('provider refund and dispute events project idempotently', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Provider',
+    lastName: 'Events',
+    addressLine1: '480 S Baylen St',
+    city: 'Pensacola',
+    postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    lines: [{ kind: 'service', description: 'Cleaning', quantity: 1, unitAmountCents: 10000, totalCents: 10000 }],
+  });
+  const payment = await recordPayment(db, actor, {
+    invoiceId: invoice.id,
+    provider: 'cash',
+    amount: 100,
+    idempotencyKey: 'provider-event-payment',
+  });
+  const first = await projectStripeRefund(db, {
+    paymentId: payment.id,
+    stripeRefundId: 're_provider_1',
+    amountCents: 4000,
+    status: 'succeeded',
+    reason: 'requested_by_customer',
+  });
+  const retry = await projectStripeRefund(db, {
+    paymentId: payment.id,
+    stripeRefundId: 're_provider_1',
+    amountCents: 4000,
+    status: 'succeeded',
+  });
+  assert.equal(retry.refundId, first.refundId);
+  assert.equal(retry.duplicate, true);
+  let detail = await getInvoice(db, actor, invoice.id);
+  assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 6000);
+  await projectStripeRefund(db, {
+    paymentId: payment.id,
+    stripeRefundId: 're_provider_pending',
+    amountCents: 6000,
+    status: 'pending',
+  });
+  detail = await getInvoice(db, actor, invoice.id);
+  assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 6000);
+  await projectStripeDispute(db, {
+    paymentId: payment.id,
+    disputeId: 'dp_provider_1',
+    status: 'needs_response',
+    amountCents: 6000,
+    currency: 'usd',
+    reason: 'product_not_received',
+  });
+  await projectStripeDispute(db, {
+    paymentId: payment.id,
+    disputeId: 'dp_provider_1',
+    status: 'won',
+    amountCents: 6000,
+  });
+  const dispute = db.raw
+    .prepare("SELECT status FROM payment_disputes WHERE provider_dispute_id = 'dp_provider_1'")
+    .get() as { status: string };
+  assert.equal(dispute.status, 'won');
+  await recordReconciliationIssue(db, {
+    eventId: 'evt_unmatched',
+    kind: 'refund_payment_unmatched',
+    detail: 'synthetic unmatched',
+  });
+  assert.equal(
+    (db.raw.prepare('SELECT COUNT(*) AS n FROM payment_reconciliation_issues').get() as { n: number }).n,
+    1,
+  );
 });
 
 test('the login route requires MFA and issues a session only after verification', async () => {

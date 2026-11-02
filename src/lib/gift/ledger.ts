@@ -53,6 +53,9 @@ export interface GiftCertificateRecord {
   stripeEventId: string;
   stripeSessionId: string;
   issuedAt: string;
+  deliveryMethod?: 'print' | 'recipient_email';
+  deliveryStatus?: 'pending' | 'sent' | 'failed';
+  deliveredAt?: string;
   history: GiftRedemption[];
   adjustments?: GiftAdjustment[];
   /** Temporary checkout reservations reduce available value until committed/released. */

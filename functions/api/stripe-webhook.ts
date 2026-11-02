@@ -40,6 +40,11 @@ import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { applyInvoiceCheckoutPayment } from '../../src/lib/admin/stripe-reconcile.ts';
 import { recordSavedCardSetup } from '../../src/lib/admin/stripe-billing.ts';
 import {
+  projectStripeDispute,
+  projectStripeRefund,
+  recordReconciliationIssue,
+} from '../../src/lib/admin/refunds.ts';
+import {
   projectEstimatePayment,
   projectGiftSale,
 } from '../../src/lib/payments/d1-projection.ts';
@@ -72,8 +77,122 @@ interface StripeEvent {
       payment_intent?: string;
       mode?: string;
       setup_intent?: string;
+      charge?: string;
+      amount_refunded?: number;
+      amount?: number;
+      status?: string;
+      reason?: string;
+      dispute?: string;
+      evidence_details?: { due_by?: number };
+      refunds?: { data?: Array<{ id?: string; amount?: number; status?: string; reason?: string }> };
     };
   };
+}
+
+type StripeObject = NonNullable<NonNullable<StripeEvent['data']>['object']>;
+
+async function paymentForProviderObject(
+  db: D1Database,
+  object: StripeObject,
+): Promise<Record<string, unknown> | null> {
+  const paymentIntent = String(object?.payment_intent ?? '');
+  const chargeId = String(object?.charge ?? (String(object?.id ?? '').startsWith('ch_') ? object?.id : ''));
+  if (!paymentIntent && !chargeId) return null;
+  return db
+    .prepare(
+      'SELECT * FROM payments WHERE (stripe_payment_intent_id = ? AND ? <> \'\') OR (stripe_charge_id = ? AND ? <> \'\') LIMIT 1',
+    )
+    .bind(paymentIntent, paymentIntent, chargeId, chargeId)
+    .first<Record<string, unknown>>();
+}
+
+async function reconcileProviderFinancialEvent(
+  env: Env,
+  event: StripeEvent,
+): Promise<Response | null> {
+  const type = String(event.type ?? '');
+  if (
+    !type.startsWith('charge.refund') &&
+    !type.startsWith('charge.dispute.') &&
+    !type.startsWith('refund.')
+  ) {
+    return null;
+  }
+  if (!env.DB) return json({ ok: false, error: 'database_not_configured' }, 503);
+  const object = event.data?.object;
+  if (!object) return json({ ok: true, received: true, unmatched: true });
+  const eventId = String(event.id ?? '');
+  if (type.startsWith('charge.dispute.')) {
+    const payment = await paymentForProviderObject(env.DB, object);
+    const disputeId = String(object.dispute ?? object.id ?? '');
+    if (!disputeId) return json({ ok: true, received: true, unmatched: true });
+    await projectStripeDispute(env.DB, {
+      paymentId: payment ? String(payment.id) : null,
+      disputeId,
+      status: String(object.status ?? 'unknown'),
+      amountCents: Number(object.amount) || 0,
+      currency: object.currency ?? 'USD',
+      reason: object.reason ?? '',
+      evidenceDueBy: object.evidence_details?.due_by
+        ? new Date(object.evidence_details.due_by * 1000).toISOString()
+        : null,
+    });
+    if (!payment) {
+      await recordReconciliationIssue(env.DB, {
+        eventId,
+        kind: 'dispute_payment_unmatched',
+        detail: 'Stripe dispute did not match a projected D1 payment.',
+        payload: { disputeId, chargeId: object.charge ?? '', amount: object.amount ?? 0 },
+      });
+    }
+    return json({ ok: true, received: true, dispute: true });
+  }
+
+  const payment = await paymentForProviderObject(env.DB, object);
+  if (!payment) {
+    await recordReconciliationIssue(env.DB, {
+      eventId,
+      kind: 'refund_payment_unmatched',
+      detail: 'Stripe refund did not match a projected D1 payment.',
+      payload: {
+        eventType: type,
+        paymentIntent: object.payment_intent ?? '',
+        chargeId: object.charge ?? '',
+        amount: object.amount ?? object.amount_refunded ?? 0,
+      },
+    });
+    return json({ ok: true, received: true, unmatched: true });
+  }
+  const refunds = Array.isArray(object.refunds?.data) ? object.refunds.data : [];
+  const rows =
+    refunds.length > 0
+      ? refunds
+      : object.id?.startsWith('re_')
+        ? [{ id: object.id, amount: object.amount, status: object.status, reason: object.reason }]
+        : [];
+  if (rows.length === 0) {
+    await recordReconciliationIssue(env.DB, {
+      eventId,
+      kind: 'refund_rows_missing',
+      detail: 'Stripe refund event had no refund row to project.',
+      payload: { eventType: type, paymentId: payment.id },
+    });
+    return json({ ok: true, received: true, unmatched: true });
+  }
+  for (const row of rows) {
+    const stripeRefundId = String(row.id ?? '');
+    if (!stripeRefundId) continue;
+    const status =
+      row.status === 'succeeded' ? 'succeeded' : row.status === 'failed' || row.status === 'canceled' ? 'failed' : 'pending';
+    await projectStripeRefund(env.DB, {
+      paymentId: String(payment.id),
+      stripeRefundId,
+      amountCents: Number(row.amount) || 0,
+      status,
+      reason: row.reason ?? '',
+    });
+  }
+  return json({ ok: true, received: true, refunds: rows.length });
 }
 
 interface CheckoutReceiptSnapshot {
@@ -347,6 +466,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   } catch {
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
+
+  const providerFinancial = await reconcileProviderFinancialEvent(env, event);
+  if (providerFinancial) return providerFinancial;
 
   if (event.type === 'checkout.session.expired') {
     const expired = event.data?.object;
@@ -757,6 +879,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       stripeEventId: eventId,
       stripeSessionId: session.id ?? '',
       issuedAt: paidAt,
+      ...(seed.gift.deliveryMethod ? { deliveryMethod: seed.gift.deliveryMethod } : {}),
+      deliveryStatus: 'pending',
       history: [],
     });
   } catch {
@@ -854,6 +978,17 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       ? 'Sent to purchaser' +
         (seed.gift.deliveryMethod === 'recipient_email' && seed.gift.recipientEmail ? ' and recipient' : '')
       : 'FAILED - retry via Stripe or deliver manually';
+  if (env.DB) {
+    await env.DB
+      .prepare('UPDATE gift_certificates SET delivery_status = ?, delivered_at = ?, updated_at = CURRENT_TIMESTAMP WHERE code = ?')
+      .bind(
+        purchaserDelivered && recipientDelivered ? 'sent' : 'failed',
+        purchaserDelivered && recipientDelivered ? new Date().toISOString() : null,
+        code,
+      )
+      .run()
+      .catch(() => undefined);
+  }
   if (!purchaserDelivered || !recipientDelivered) {
     if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'customer_delivery_failed');
     return json({ ok: false, error: 'customer_delivery_failed' }, 500);

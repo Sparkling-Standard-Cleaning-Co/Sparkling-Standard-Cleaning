@@ -90,6 +90,22 @@ test('gift checkout reports missing payment configuration without side effects',
       env: checkoutEnv(),
     } as never);
     assert.equal(invalid.status, 400);
+    const missingRecipient = await giftCheckout({
+      request: jsonRequest(
+        {
+          purchaserName: 'Purchaser',
+          purchaserEmail: 'purchaser@example.com',
+          recipientName: '',
+          amountUsd: 100,
+          termsAccepted: true,
+          termsVersion: '2026-10-28.terms.v2',
+        },
+        '10.10.0.30',
+      ),
+      env: checkoutEnv(),
+    } as never);
+    assert.equal(missingRecipient.status, 400);
+    assert.deepEqual(await missingRecipient.json(), { ok: false, error: 'invalid_request' });
   } finally {
     config.enabled = original;
   }
