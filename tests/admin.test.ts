@@ -89,6 +89,7 @@ function migratedDb(): TestD1 {
     '0025_refunds_disputes_webhooks.sql',
     '0026_pricing_control.sql',
     '0027_checkout_session_registry.sql',
+    '0028_property_profiles.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -410,6 +411,7 @@ import {
   setCustomerStatus,
   updateCustomer,
   updateLead,
+  updateProperty,
 } from '../src/lib/admin/crm.ts';
 import {
   acceptInvite,
@@ -548,7 +550,24 @@ test('customer CRUD, properties, notes and lead recovery are functional', async 
     city: 'Pensacola',
     state: 'FL',
     postalCode: '32502',
+    propertyLabel: 'Home',
+    propertyType: 'house',
+    squareFeet: 1800,
+    bedrooms: 3,
+    fullBaths: 2,
+    halfBaths: 1,
+    stories: 1,
+    pets: 'none',
+    accessNotes: 'Side gate code 1102.',
+    parkingNotes: 'Driveway.',
+    internalNotes: 'Dog is friendly.',
   });
+  const createdDetail = await getCustomer(db, actor, created.id);
+  const firstProperty = (createdDetail?.properties as Array<Record<string, unknown>>)?.[0];
+  assert.equal(firstProperty?.label, 'Home');
+  assert.equal(firstProperty?.property_type, 'house');
+  assert.equal(firstProperty?.square_feet, 1800);
+  assert.equal(firstProperty?.is_primary, 1);
   const customers = await listCustomers(db, actor, { q: 'Synthetic' });
   assert.equal(customers.length, 1);
   assert.equal(customers[0]?.email, 'customer@example.test');
@@ -561,11 +580,59 @@ test('customer CRUD, properties, notes and lead recovery are functional', async 
   });
   const property = await addProperty(db, actor, created.id, {
     line1: '200 S Palafox St',
+    line2: 'Unit 4',
     city: 'Pensacola',
     state: 'FL',
     postalCode: '32502',
     label: 'Second property',
+    propertyType: 'condo',
+    squareFeet: 1450,
+    bedrooms: 2,
+    fullBaths: 2,
+    halfBaths: 1,
+    stories: 1,
+    beds: 2,
+    pets: 'one',
+    accessNotes: 'Lockbox 4421; use the north stairwell.',
+    parkingNotes: 'Guest spaces 12 and 14 only.',
+    internalNotes: 'Fragile blinds in the primary bedroom.',
+    isPrimary: true,
   });
+  await updateProperty(db, actor, property.id, {
+    line1: '200 S Palafox St',
+    line2: 'Unit 4',
+    city: 'Pensacola',
+    state: 'FL',
+    postalCode: '32502',
+    label: 'Second property - updated',
+    propertyType: 'condo',
+    squareFeet: 1500,
+    bedrooms: 2,
+    fullBaths: 2,
+    halfBaths: 1,
+    stories: 2,
+    beds: 3,
+    pets: 'none',
+    accessNotes: 'Lockbox 4421.',
+    parkingNotes: 'Guest spaces 12 and 14 only.',
+    internalNotes: 'Fragile blinds in the primary bedroom.',
+    status: 'active',
+  });
+  const detail = await getCustomer(db, actor, created.id);
+  const savedProperty = (detail?.properties as Array<Record<string, unknown>>)?.find((row) => row.id === property.id);
+  assert.equal(savedProperty?.property_type, 'condo');
+  assert.equal(savedProperty?.square_feet, 1500);
+  assert.equal(savedProperty?.beds, 3);
+  assert.equal(savedProperty?.pets, 'none');
+  assert.equal(savedProperty?.internal_notes, 'Fragile blinds in the primary bedroom.');
+  await assert.rejects(
+    () => addProperty(db, actor, created.id, { line1: '3 Bad St', propertyType: 'castle' }),
+    (error: unknown) => (error as { code?: string }).code === 'property_type_invalid',
+  );
+  await assert.rejects(
+    () => addProperty(db, actor, created.id, { line1: '3 Bad St', squareFeet: 99999 }),
+    (error: unknown) => (error as { code?: string }).code === 'property_square_feet_invalid',
+  );
   await addCustomerNote(db, actor, created.id, 'Prefers morning appointments.');
 
   const fields: Record<string, string> = {

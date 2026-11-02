@@ -1,6 +1,7 @@
 import type { AdminActor } from './operations.ts';
 import { AdminAuthError, audit } from './operations.ts';
-import type { D1Database } from './d1.ts';
+import type { D1Database, D1PreparedStatement } from './d1.ts';
+import { hasPropertyInput, normalizePropertyInput, type NormalizedProperty } from './property-profile.ts';
 import { buildLeadNotification } from '../forms/lead-notification.ts';
 
 function now(): string {
@@ -116,7 +117,9 @@ export async function getCustomer(
   return {
     customer,
     contacts: contacts.results ?? [],
-    properties: properties.results ?? [],
+    properties: (properties.results ?? []).map((property) =>
+      canSeeNotes ? property : { ...property, internal_notes: '' },
+    ),
     notes: notes.results ?? [],
     leads: leads.results ?? [],
     estimates: estimates.results ?? [],
@@ -144,27 +147,46 @@ export async function createCustomer(
     const used = await db.prepare('SELECT customer_id FROM customer_contacts WHERE kind = ? AND normalized_value = ? LIMIT 1').bind(kind, normalized).first();
     if (used) throw new AdminAuthError(409, 'contact_in_use');
   }
-  await db
-    .prepare(
-      `INSERT INTO customers (id, primary_branch_id, first_name, last_name, company_name, status, source, notes_summary, do_not_contact, marketing_consent)
-       VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
-    )
-    .bind(id, branchId, first, last, company, text(input.source, 80) || 'admin', text(input.notesSummary, 2000), flag(input.doNotContact), flag(input.marketingConsent))
-    .run();
-  await upsertContact(db, id, 'email', text(input.email, 200));
-  await upsertContact(db, id, 'phone', text(input.phone, 30));
-  if (text(input.addressLine1, 200)) {
-    await addProperty(db, actor, id, {
-      label: text(input.propertyLabel, 80) || 'Service property',
-      line1: text(input.addressLine1, 200),
-      line2: text(input.addressLine2, 120),
-      city: text(input.city, 80),
-      state: text(input.state, 20) || 'FL',
-      postalCode: text(input.postalCode, 12),
-      accessNotes: text(input.accessNotes, 1000),
-      parkingNotes: text(input.parkingNotes, 1000),
-      isPrimary: true,
-    });
+  const propertyInput = Boolean(text(input.addressLine1, 200)) || hasPropertyInput(input)
+    ? normalizePropertyInput({ ...input, isPrimary: true })
+    : null;
+  const statements: D1PreparedStatement[] = [];
+  statements.push(
+    db
+      .prepare(
+        `INSERT INTO customers (id, primary_branch_id, first_name, last_name, company_name, status, source, notes_summary, do_not_contact, marketing_consent)
+         VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
+      )
+      .bind(id, branchId, first, last, company, text(input.source, 80) || 'admin', text(input.notesSummary, 2000), flag(input.doNotContact), flag(input.marketingConsent)),
+  );
+  for (const [kind, raw] of [['email', text(input.email, 200)], ['phone', text(input.phone, 30)]] as const) {
+    const normalized = kind === 'email' ? raw.toLowerCase() : raw.replace(/\D/g, '');
+    if (!normalized) continue;
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO customer_contacts (id, customer_id, kind, value, normalized_value, is_primary)
+           VALUES (?, ?, ?, ?, ?, 1)
+           ON CONFLICT(kind, normalized_value) DO UPDATE SET value = excluded.value`,
+        )
+        .bind(`ct_${crypto.randomUUID()}`, id, kind, raw, normalized),
+    );
+  }
+  if (propertyInput) {
+    statements.push(
+      propertyInsertStatement(db, {
+        id: `prop_${crypto.randomUUID()}`,
+        customerId: id,
+        branchId,
+        property: propertyInput,
+      }),
+    );
+  }
+  try {
+    await runWriteBatch(db, statements);
+  } catch (error) {
+    await db.prepare('DELETE FROM customers WHERE id = ?').bind(id).run().catch(() => undefined);
+    throw error;
   }
   await audit(db, { actorUserId: actor.id, action: 'customer.created', entityType: 'customer', entityId: id });
   return { id };
@@ -222,6 +244,70 @@ export async function updateCustomer(
   await audit(db, { actorUserId: actor.id, action: 'customer.updated', entityType: 'customer', entityId: customerId });
 }
 
+const PROPERTY_COLUMNS =
+  'label, line1, line2, city, state, postal_code, access_notes, parking_notes, property_type, square_feet, bedrooms, full_baths, half_baths, stories, beds, pets, internal_notes, is_primary';
+
+function propertyBindValues(property: NormalizedProperty): unknown[] {
+  return [
+    property.label,
+    property.line1,
+    property.line2,
+    property.city,
+    property.state,
+    property.postalCode,
+    property.accessNotes,
+    property.parkingNotes,
+    property.propertyType,
+    property.squareFeet,
+    property.bedrooms,
+    property.fullBaths,
+    property.halfBaths,
+    property.stories,
+    property.beds,
+    property.pets,
+    property.internalNotes,
+    property.isPrimary ? 1 : 0,
+  ];
+}
+
+function propertyInsertStatement(
+  db: D1Database,
+  input: { id: string; customerId: string; branchId: string | null; property: NormalizedProperty },
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO properties (id, customer_id, branch_id, ${PROPERTY_COLUMNS})
+       VALUES (?, ?, ?, ${new Array(18).fill('?').join(', ')})`,
+    )
+    .bind(input.id, input.customerId, input.branchId, ...propertyBindValues(input.property));
+}
+
+function propertyUpdateStatement(
+  db: D1Database,
+  input: { id: string; status: string; property: NormalizedProperty },
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE properties SET label = ?, line1 = ?, line2 = ?, city = ?, state = ?, postal_code = ?,
+         access_notes = ?, parking_notes = ?, property_type = ?, square_feet = ?, bedrooms = ?,
+         full_baths = ?, half_baths = ?, stories = ?, beds = ?, pets = ?, internal_notes = ?,
+         is_primary = ?, status = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(...propertyBindValues(input.property), input.status, now(), input.id);
+}
+
+async function runWriteBatch(db: D1Database, statements: D1PreparedStatement[]): Promise<void> {
+  if (db.batch) {
+    await db.batch(statements);
+    return;
+  }
+  for (const statement of statements) {
+    const result = await statement.run();
+    if (!result.success) throw new AdminAuthError(500, 'write_failed');
+  }
+}
+
 export async function addProperty(
   db: D1Database,
   actor: AdminActor,
@@ -230,20 +316,25 @@ export async function addProperty(
 ): Promise<{ id: string }> {
   const current = await getCustomer(db, actor, customerId);
   if (!current) throw new AdminAuthError(404, 'customer_not_found');
-  const line1 = text(input.line1, 200);
-  if (!line1) throw new AdminAuthError(400, 'address_required');
+  const customerRow = (current.customer ?? {}) as Record<string, unknown>;
+  const existingProperties = (current.properties as Array<Record<string, unknown>>) ?? [];
+  const hasPrimary = existingProperties.some(
+    (row) => Number(row.is_primary) === 1 && row.status !== 'archived',
+  );
+  const normalized = normalizePropertyInput(input);
+  const property = normalized.isPrimary || !hasPrimary ? { ...normalized, isPrimary: true } : normalized;
   const id = `prop_${crypto.randomUUID()}`;
-  const branch = await assertBranch(db, customerBranch(actor, input.branchId));
-  if (flag(input.isPrimary)) {
-    await db.prepare('UPDATE properties SET is_primary = 0 WHERE customer_id = ?').bind(customerId).run();
+  const requestedBranch = actor.role === 'owner' ? text(input.branchId, 80) : '';
+  const branch = await assertBranch(
+    db,
+    requestedBranch || String(customerRow.primary_branch_id ?? '') || customerBranch(actor, input.branchId),
+  );
+  const statements: D1PreparedStatement[] = [];
+  if (property.isPrimary) {
+    statements.push(db.prepare('UPDATE properties SET is_primary = 0 WHERE customer_id = ?').bind(customerId));
   }
-  await db
-    .prepare(
-      `INSERT INTO properties (id, customer_id, branch_id, label, line1, line2, city, state, postal_code, access_notes, parking_notes, is_primary)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(id, customerId, branch, text(input.label, 80) || 'Service property', line1, text(input.line2, 120), text(input.city, 80), text(input.state, 20) || 'FL', text(input.postalCode, 12), text(input.accessNotes, 1000), text(input.parkingNotes, 1000), flag(input.isPrimary))
-    .run();
+  statements.push(propertyInsertStatement(db, { id, customerId, branchId: branch, property }));
+  await runWriteBatch(db, statements);
   await audit(db, { actorUserId: actor.id, action: 'property.created', entityType: 'property', entityId: id });
   return { id };
 }
@@ -256,25 +347,22 @@ export async function updateProperty(
 ): Promise<void> {
   const property = await db
     .prepare(
-      `SELECT p.id, p.customer_id FROM properties p
+      `SELECT p.id, p.customer_id, p.status FROM properties p
        JOIN customers c ON c.id = p.customer_id
        WHERE p.id = ? ${scope(actor, 'c.primary_branch_id').sql} LIMIT 1`,
     )
     .bind(propertyId, ...scope(actor, 'c.primary_branch_id').bind)
-    .first<{ id: string; customer_id: string }>();
+    .first<{ id: string; customer_id: string; status: string }>();
   if (!property) throw new AdminAuthError(404, 'property_not_found');
-  const status = input.status === 'archived' ? 'archived' : 'active';
-  if (flag(input.isPrimary)) {
-    await db.prepare('UPDATE properties SET is_primary = 0 WHERE customer_id = ?').bind(property.customer_id).run();
+  const normalized = normalizePropertyInput(input);
+  const status =
+    input.status === 'archived' ? 'archived' : input.status === 'active' ? 'active' : property.status;
+  const statements: D1PreparedStatement[] = [];
+  if (normalized.isPrimary) {
+    statements.push(db.prepare('UPDATE properties SET is_primary = 0 WHERE customer_id = ?').bind(property.customer_id));
   }
-  await db
-    .prepare(
-      `UPDATE properties SET label = ?, line1 = ?, line2 = ?, city = ?, state = ?, postal_code = ?,
-         access_notes = ?, parking_notes = ?, is_primary = ?, status = ?, updated_at = ?
-       WHERE id = ?`,
-    )
-    .bind(text(input.label, 80), text(input.line1, 200), text(input.line2, 120), text(input.city, 80), text(input.state, 20) || 'FL', text(input.postalCode, 12), text(input.accessNotes, 1000), text(input.parkingNotes, 1000), flag(input.isPrimary), status, now(), propertyId)
-    .run();
+  statements.push(propertyUpdateStatement(db, { id: propertyId, status, property: normalized }));
+  await runWriteBatch(db, statements);
   await audit(db, { actorUserId: actor.id, action: 'property.updated', entityType: 'property', entityId: propertyId });
 }
 

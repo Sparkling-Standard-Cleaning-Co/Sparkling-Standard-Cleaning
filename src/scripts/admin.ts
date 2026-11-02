@@ -5,6 +5,7 @@ import {
   passwordProblem,
 } from '../lib/password-policy.ts';
 import { loadPricingView } from './pricing-admin';
+import { PET_OPTIONS, PROPERTY_TYPE_OPTIONS, RESIDENTIAL_INPUT_LIMITS } from '../config/estimators/input-definitions';
 
 interface AdminActor {
   id: string;
@@ -732,8 +733,67 @@ async function loadCustomers(query = ''): Promise<void> {
   void loadCustomerOptions();
 }
 
+function optionMarkup(
+  options: readonly { value: string; label: string }[],
+  current: unknown,
+  blankLabel: string,
+): string {
+  const selected = String(current ?? '');
+  return `<option value="">${esc(blankLabel)}</option>${options
+    .map((option) => `<option value="${esc(option.value)}"${option.value === selected ? ' selected' : ''}>${esc(option.label)}</option>`)
+    .join('')}`;
+}
+
+function propertyFields(property: Record<string, unknown> = {}, options: { firstProperty?: boolean } = {}): string {
+  const propertyType = String(property.property_type ?? '');
+  const pets = String(property.pets ?? '');
+  const isPrimary = options.firstProperty ? true : Number(property.is_primary) === 1;
+  const numberInput = (name: string, label: string, limits: { min: number; max: number; step?: number }, value: unknown, hint = '') =>
+    `<label>${esc(label)}${hint ? ` <span class="admin-muted">${esc(hint)}</span>` : ''}<input name="${name}" type="number" min="${limits.min}" max="${limits.max}" step="${limits.step ?? 1}" value="${value === null || value === undefined ? '' : esc(value)}" /></label>`;
+  return `<div class="admin-form--grid">
+    <label>Property label <input name="label" value="${esc(property.label ?? 'Service property')}" maxlength="80" /></label>
+    <label class="admin-field--wide">Street address <input name="line1" value="${esc(property.line1 ?? '')}" maxlength="200" required /></label>
+    <label>Address line 2 <input name="line2" value="${esc(property.line2 ?? '')}" maxlength="120" /></label>
+    <label>City <input name="city" value="${esc(property.city ?? '')}" maxlength="80" /></label>
+    <label>State <input name="state" value="${esc(property.state ?? 'FL')}" maxlength="2" /></label>
+    <label>ZIP <input name="postalCode" value="${esc(property.postal_code ?? '')}" inputmode="numeric" maxlength="10" /></label>
+    <label>Property type <select name="propertyType">${optionMarkup(PROPERTY_TYPE_OPTIONS, propertyType, 'Not specified')}</select></label>
+    ${numberInput('squareFeet', 'Square footage', RESIDENTIAL_INPUT_LIMITS.squareFeet, property.square_feet)}
+    ${numberInput('bedrooms', 'Bedrooms', RESIDENTIAL_INPUT_LIMITS.bedrooms, property.bedrooms)}
+    ${numberInput('fullBaths', 'Full bathrooms', RESIDENTIAL_INPUT_LIMITS.fullBaths, property.full_baths)}
+    ${numberInput('halfBaths', 'Half bathrooms', RESIDENTIAL_INPUT_LIMITS.halfBaths, property.half_baths)}
+    ${numberInput('stories', 'Floors / stories', { min: 0, max: 20, step: 1 }, property.stories)}
+    ${numberInput('beds', 'Beds to reset (STR)', RESIDENTIAL_INPUT_LIMITS.beds, property.beds)}
+    <label>Pets <select name="pets">${optionMarkup(PET_OPTIONS, pets, 'Not specified')}</select></label>
+    <label class="admin-field--wide">Access instructions <textarea name="accessNotes" rows="2" maxlength="1000">${esc(property.access_notes ?? '')}</textarea></label>
+    <label class="admin-field--wide">Parking instructions <textarea name="parkingNotes" rows="2" maxlength="1000">${esc(property.parking_notes ?? '')}</textarea></label>
+    <label class="admin-field--wide">Internal property notes <textarea name="internalNotes" rows="2" maxlength="4000">${esc(property.internal_notes ?? '')}</textarea></label>
+    <label><input type="checkbox" name="isPrimary" value="yes"${isPrimary ? ' checked' : ''} /> Primary property</label>
+  </div>`;
+}
+
+function propertyProfileSummary(property: Record<string, unknown>): string {
+  const type = PROPERTY_TYPE_OPTIONS.find((option) => option.value === property.property_type)?.label;
+  const pet = PET_OPTIONS.find((option) => option.value === property.pets)?.label;
+  const specs = [
+    type,
+    property.square_feet ? `${property.square_feet} sq ft` : '',
+    property.bedrooms !== null && property.bedrooms !== undefined ? `${property.bedrooms} bedrooms` : '',
+    property.full_baths !== null && property.full_baths !== undefined ? `${property.full_baths} full baths` : '',
+    property.half_baths ? `${property.half_baths} half baths` : '',
+    property.stories ? `${property.stories} stories` : '',
+    property.beds ? `${property.beds} beds to reset` : '',
+    pet,
+  ].filter(Boolean);
+  return `<p>${esc([property.line1, property.line2, property.city, property.state, property.postal_code].filter(Boolean).join(', '))}</p>
+    ${specs.length ? `<p class="admin-muted">${esc(specs.join(' · '))}</p>` : ''}
+    ${property.access_notes ? `<p class="admin-muted"><strong>Access:</strong> ${esc(property.access_notes)}</p>` : ''}
+    ${property.parking_notes ? `<p class="admin-muted"><strong>Parking:</strong> ${esc(property.parking_notes)}</p>` : ''}
+    ${property.internal_notes ? `<p class="admin-muted"><strong>Internal property note:</strong> ${esc(property.internal_notes)}</p>` : ''}`;
+}
+
 function customerForm(customer: Record<string, unknown> = {}): string {
-  return `<form class="admin-form admin-form--grid" data-form="${customer.id ? 'customer-update' : 'customer-create'}">
+  return `<form class="admin-form admin-form--grid" style="max-width:none" data-form="${customer.id ? 'customer-update' : 'customer-create'}">
     ${customer.id ? `<input type="hidden" name="customerId" value="${esc(customer.id)}" />` : ''}
     <label>First name <input name="firstName" value="${esc(customer.first_name)}" /></label>
     <label>Last name <input name="lastName" value="${esc(customer.last_name)}" /></label>
@@ -744,7 +804,7 @@ function customerForm(customer: Record<string, unknown> = {}): string {
     <label class="admin-field--wide">Notes summary <textarea name="notesSummary" rows="3">${esc(customer.notes_summary)}</textarea></label>
     <label><input type="checkbox" name="doNotContact" value="yes"${Number(customer.do_not_contact) ? ' checked' : ''} /> Do not contact</label>
     <label><input type="checkbox" name="marketingConsent" value="yes"${Number(customer.marketing_consent) ? ' checked' : ''} /> Marketing consent</label>
-    ${customer.id ? '' : `<label class="admin-field--wide">Service address <input name="addressLine1" placeholder="Street address" /></label><label>City <input name="city" /></label><label>State <input name="state" value="FL" maxlength="2" /></label><label>ZIP <input name="postalCode" inputmode="numeric" maxlength="10" /></label>`}
+    ${customer.id ? '' : `<fieldset class="admin-field--wide"><legend>First property (optional)</legend>${propertyFields({}, { firstProperty: true })}</fieldset>`}
     <button class="btn btn--primary btn--small" type="submit">${customer.id ? 'Save customer' : 'Create customer'}</button>
   </form>`;
 }
@@ -779,8 +839,8 @@ async function openCustomer(customerId: string): Promise<void> {
     <div class="admin-detail-head"><h2 class="admin-section-title">${esc([customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || 'Customer')}</h2><div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-edit">Edit Customer</button><form class="admin-inline-form" data-form="customer-archive"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="targetStatus" value="${customer.status === 'archived' ? 'active' : 'archived'}" /><button class="btn btn--ghost btn--small" type="submit">${customer.status === 'archived' ? 'Restore Archived Customer' : 'Archive Customer'}</button></form>${actor?.role === 'owner' ? `<form class="admin-inline-form" data-form="customer-delete"><input type="hidden" name="customerId" value="${esc(customerId)}" /><button class="btn btn--danger btn--small" type="submit">Delete Customer</button></form>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-create">Close</button></div></div>
     <dl class="admin-definition"><dt>Status</dt><dd>${esc(customer.status)}</dd><dt>Branch</dt><dd>${esc(customer.branch_name)}</dd><dt>Source</dt><dd>${esc(customer.source)}</dd><dt>Contacts</dt><dd>${contacts.map((contact) => `${esc(titleCase(contact.kind))}: ${esc(contact.value)}`).join('<br />') || '—'}</dd></dl>
     <h3>Properties</h3>
-    ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}</strong><p>${esc([property.line1, property.city, property.state, property.postal_code].filter(Boolean).join(', '))}</p>${property.access_notes ? `<p class="admin-muted">Access: ${esc(property.access_notes)}</p>` : ''}</div>`).join('') || '<p class="admin-muted">No properties.</p>'}
-    <details class="admin-detail-toggle"><summary>Add a property</summary><form class="admin-form" data-form="property-add"><input type="hidden" name="customerId" value="${esc(customerId)}" /><label>Label <input name="label" value="Service property" /></label><label>Address <input name="line1" required /></label><label>City <input name="city" /></label><label>State <input name="state" value="FL" maxlength="2" /></label><label>ZIP <input name="postalCode" maxlength="10" /></label><label>Access notes <textarea name="accessNotes" rows="2"></textarea></label><button class="btn btn--secondary btn--small" type="submit">Add property</button></form></details>
+    ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}${Number(property.is_primary) === 1 ? ' · Primary' : ''}</strong>${propertyProfileSummary(property)}<details class="admin-detail-toggle"><summary>Edit property</summary><form class="admin-form" style="max-width:none" data-form="property-update"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="propertyId" value="${esc(property.id)}" />${propertyFields(property)}<label>Status <select name="status"><option value="active"${property.status !== 'archived' ? ' selected' : ''}>Active</option><option value="archived"${property.status === 'archived' ? ' selected' : ''}>Archived</option></select></label><button class="btn btn--secondary btn--small" type="submit">Save property</button></form></details></div>`).join('') || '<p class="admin-muted">No properties.</p>'}
+    <details class="admin-detail-toggle"><summary>Add a property</summary><form class="admin-form" style="max-width:none" data-form="property-add"><input type="hidden" name="customerId" value="${esc(customerId)}" />${propertyFields({})}<button class="btn btn--secondary btn--small" type="submit">Add property</button></form></details>
     <h3>History</h3><div class="admin-history">${leads.length ? `<p><strong>Requests:</strong> ${leads.map((lead) => `${esc(lead.request_type)} (${esc(lead.status)})`).join(', ')}</p>` : ''}${estimates.length ? `<p><strong>Estimates:</strong> ${estimates.map((estimate) => `${esc(estimate.quote_reference)} (${money(estimate.total_cents)})`).join(', ')}</p>` : ''}${appointments.length ? `<p><strong>Appointments:</strong> ${appointments.map((appointment) => `${esc(appointment.reference)} (${esc(appointment.status)})`).join(', ')}</p>` : ''}${invoices.length ? `<p><strong>Invoices:</strong> ${invoices.map((invoice) => `${esc(invoice.number)} (${money(invoice.balance_cents)} balance)`).join(', ')}</p>` : ''}</div>
     <h3>Documents &amp; agreements</h3>${documentRequests.length ? documentRequests.map((request) => `<div class="admin-record"><p><strong>${esc(request.bundle_code)}</strong> — ${esc(titleCase(request.status))}</p><p class="admin-muted">Signed ${esc(request.signed_count)} · Awaiting verification ${esc(request.awaiting_verification)} · ${esc(dateTime(request.created_at))}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded.</p>'}
     <h3>Notes</h3>${notes.map((note) => `<div class="admin-record"><p>${esc(note.body)}</p><p class="admin-muted">${esc(dateTime(note.created_at))}</p></div>`).join('') || '<p class="admin-muted">No notes.</p>'}
@@ -1584,15 +1644,30 @@ document.addEventListener('submit', (event) => {
   const data = new FormData(form);
   const value = (key: string) => String(data.get(key) ?? '');
   const checked = (key: string) => data.get(key) === 'yes';
+  const propertyPayload = {
+    label: value('label'), line1: value('line1'), line2: value('line2'), city: value('city'),
+    state: value('state'), postalCode: value('postalCode'), propertyType: value('propertyType'),
+    squareFeet: value('squareFeet'), bedrooms: value('bedrooms'), fullBaths: value('fullBaths'),
+    halfBaths: value('halfBaths'), stories: value('stories'), beds: value('beds'), pets: value('pets'),
+    accessNotes: value('accessNotes'), parkingNotes: value('parkingNotes'),
+    internalNotes: value('internalNotes'), isPrimary: checked('isPrimary'),
+  };
   if (kind === 'customer-create' || kind === 'customer-update') {
-    void action('/api/admin/customers', {
+    const customerId = value('customerId');
+    const body = {
       action: kind === 'customer-update' ? 'update' : 'create',
-      customerId: value('customerId'), firstName: value('firstName'), lastName: value('lastName'),
+      customerId, firstName: value('firstName'), lastName: value('lastName'),
       companyName: value('companyName'), email: value('email'), phone: value('phone'),
       status: value('status'), notesSummary: value('notesSummary'), doNotContact: checked('doNotContact'),
-      marketingConsent: checked('marketingConsent'), addressLine1: value('addressLine1'),
-      city: value('city'), state: value('state'), postalCode: value('postalCode'),
-    });
+      marketingConsent: checked('marketingConsent'), addressLine1: value('line1'),
+      ...propertyPayload,
+    };
+    void api<Record<string, unknown>>('/api/admin/customers', { method: 'POST', body: JSON.stringify(body) })
+      .then(async (result) => {
+        await loadCustomers();
+        await openCustomer(String(result.id ?? customerId));
+      })
+      .catch((error) => setAppError(friendly(error)));
   }
   if (kind === 'customer-archive') {
     const customerId = value('customerId');
@@ -1618,7 +1693,18 @@ document.addEventListener('submit', (event) => {
       }).catch((error) => setAppError(friendly(error)));
     }
   }
-  if (kind === 'property-add') void action('/api/admin/customers', { action: 'add_property', customerId: value('customerId'), label: value('label'), line1: value('line1'), city: value('city'), state: value('state'), postalCode: value('postalCode'), accessNotes: value('accessNotes') });
+  if (kind === 'property-add') {
+    const customerId = value('customerId');
+    void api('/api/admin/customers', { method: 'POST', body: JSON.stringify({ action: 'add_property', customerId, ...propertyPayload }) })
+      .then(() => openCustomer(customerId))
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (kind === 'property-update') {
+    const customerId = value('customerId');
+    void api('/api/admin/customers', { method: 'POST', body: JSON.stringify({ action: 'update_property', customerId, propertyId: value('propertyId'), status: value('status'), ...propertyPayload }) })
+      .then(() => openCustomer(customerId))
+      .catch((error) => setAppError(friendly(error)));
+  }
   if (kind === 'note-add') void action('/api/admin/customers', { action: 'add_note', customerId: value('customerId'), body: value('body') });
   if (kind === 'payment') void action('/api/admin/finance', { action: 'record_payment', invoiceId: value('invoiceId'), provider: value('provider'), amount: value('amount'), reference: value('reference'), idempotencyKey: value('idempotencyKey') });
   if (kind === 'refund') void action('/api/admin/finance', { action: 'record_refund', paymentId: value('paymentId'), amount: value('amount'), reason: value('reason'), idempotencyKey: value('idempotencyKey') });

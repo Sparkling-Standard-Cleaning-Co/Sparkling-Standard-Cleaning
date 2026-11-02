@@ -178,4 +178,9 @@
 .pricing-diff--none { background: #f3f1ee; }
 @media (max-width: 48rem) {
   .pricing-field-grid, .pricing-sim-result-grid { grid-template-columns: 1fr; }
+}.admin-form fieldset { border: 1px solid #eadfd3; border-radius: .6rem; padding: .8rem; margin: 0; min-width: 0; }
+.admin-form fieldset legend { font-weight: 700; color: var(--color-rose-700); padding: 0 .35rem; }
+.admin-record .admin-detail-toggle form { margin-top: .6rem; }
+@media (max-width: 48rem) {
+  .admin-form fieldset { padding: .65rem; }
 }
