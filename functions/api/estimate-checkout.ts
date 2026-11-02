@@ -26,6 +26,7 @@ import {
   type QuoteVerificationEnv,
 } from '../../src/lib/estimate/verify.ts';
 import { verifyFacilityQuote } from '../../src/lib/estimate/facility-verify.ts';
+import { requestPricingConfig } from '../../src/lib/pricing/server.ts';
 import {
   createLedgerJson,
   deleteLedgerKey,
@@ -632,6 +633,7 @@ async function facilityReference(
 async function verifyFacilityPayment(
   fields: Record<string, string>,
   env: Env,
+  pricingConfig: Awaited<ReturnType<typeof requestPricingConfig>>,
 ): Promise<CandidateResult> {
   const quoted = Number(fields.quoted_price);
   if (!Number.isFinite(quoted) || quoted <= 0) return { ok: false, reason: 'quote_missing' };
@@ -655,6 +657,7 @@ async function verifyFacilityPayment(
   const verification = verifyFacilityQuote(fields, {
     routedOneWayMiles: route.oneWayMiles,
     routedTravelVerified: true,
+    pricingConfig,
   });
   if (verification.configMatch === 'mismatch') return { ok: false, reason: 'quote_stale' };
   if (verification.status === 'mismatch') return { ok: false, reason: 'price_mismatch' };
@@ -718,11 +721,12 @@ async function verifyFacilityPayment(
 async function verifyResidentialPayment(
   fields: Record<string, string>,
   env: Env,
+  pricingConfig: Awaited<ReturnType<typeof requestPricingConfig>>,
 ): Promise<CandidateResult> {
   const quoted = Number(fields.quoted_price);
   if (!Number.isFinite(quoted) || quoted <= 0) return { ok: false, reason: 'quote_missing' };
 
-  const verification = await verifyReservationQuote(fields, env);
+  const verification = await verifyReservationQuote(fields, env, Date.now(), pricingConfig);
   if (verification.configMatch === 'mismatch') return { ok: false, reason: 'quote_stale' };
   if (verification.verifiedPrice === null) return { ok: false, reason: 'quote_not_verified' };
   if (verification.status === 'mismatch' || verification.status === 'unverifiable') {
@@ -1039,10 +1043,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     );
   }
 
+  const pricingConfig = await requestPricingConfig(env.DB);
   const candidate =
     fields.request_type === 'facility_estimate'
-      ? await verifyFacilityPayment(fields, env)
-      : await verifyResidentialPayment(fields, env);
+      ? await verifyFacilityPayment(fields, env, pricingConfig)
+      : await verifyResidentialPayment(fields, env, pricingConfig);
 
   if (!candidate.ok) {
     return json(

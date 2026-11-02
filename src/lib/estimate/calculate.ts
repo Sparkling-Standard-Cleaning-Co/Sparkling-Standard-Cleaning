@@ -8,7 +8,7 @@
 //  - the minimum job value is applied silently to every estimate;
 //  - prices are never negative or nonsensical.
 
-import { pricing, resolveEstimatorCalibration } from '../../config/pricing.ts';
+import { pricing, resolveEstimatorCalibration, type PricingConfig } from '../../config/pricing.ts';
 import { zoneForZip } from '../../config/geography.ts';
 import type { AddonBundleDefinition, CampaignPromotionConfig, FoundingTenConfig, PromotionCustomerKind, PromotionTerms } from '../../config/estimators/pricing-values.ts';
 import { calculateTravelAdjustment } from '../travel/calculateTravelAdjustment.ts';
@@ -35,6 +35,8 @@ import type {
 } from './types.ts';
 
 export interface EstimateContext {
+  /** Optional request/config snapshot; defaults to the active configuration. */
+  pricingConfig?: PricingConfig;
   /** Test-only override for this engine calibration factor; production reads config. */
   globalFactorOverride?: number;
   travel: {
@@ -146,6 +148,7 @@ export function calculateEstimate(
   raw: EstimateInputDraft | null | undefined,
   context: EstimateContext,
 ): EstimateResult {
+  const activeConfig = context.pricingConfig ?? pricing;
   const validation = validateEstimateInput(raw);
   if (!validation.ok) {
     return {
@@ -226,7 +229,7 @@ export function calculateEstimate(
     ongoing.status === 'estimated' && ongoing.expectedPrice !== null
       ? {
           frequency: input.frequency,
-          perVisitPrice: selectInstantAmount(ongoing) ?? ongoing.expectedPrice,
+          perVisitPrice: selectInstantAmount(ongoing, undefined, activeConfig) ?? ongoing.expectedPrice,
           modelPrice: ongoing.expectedPrice,
           range: {
             low: ongoing.low ?? ongoing.expectedPrice,
@@ -282,15 +285,16 @@ export function calculateEstimate(
  * recurring split above is the only behavior layered on top of it.
  */
 function computeCore(input: NormalizedEstimateInput, context: EstimateContext): EstimateResult {
+  const cfg = context.pricingConfig ?? pricing;
   const travelZone = zoneForZip(input.zip);
   const travel = calculateTravelAdjustment({ ...context.travel, zone: travelZone });
-  const addonSelection = selectAddons(input.addonIds);
-  const labor = computeLaborHours(input, addonSelection.totalLaborHours);
+  const addonSelection = selectAddons(input.addonIds, cfg);
+  const labor = computeLaborHours(input, addonSelection.totalLaborHours, cfg);
   const trace: CalculationTraceEntry[] = [...labor.trace];
   const flags: EstimateFlag[] = [];
 
   // ── Custom-confirmation gates (directive §27) ──────────────────────────────
-  const thresholds = pricing.customQuoteThresholds;
+  const thresholds = cfg.customQuoteThresholds;
   let customRequired = false;
   let customReason = '';
 
@@ -341,10 +345,10 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
   // exact values.
   const isRecurringMaintenance = input.serviceType === 'standard' && input.frequency !== 'one_time';
   const rate = isRecurringMaintenance
-    ? pricing.laborEconomics.recurringGrossRevenuePerLaborHour.value
-    : pricing.laborEconomics.targetGrossRevenuePerLaborHour.value;
-  const minimumJob = pricing.minimumJob.value;
-  const step = pricing.rounding.toNearest.value;
+    ? cfg.laborEconomics.recurringGrossRevenuePerLaborHour.value
+    : cfg.laborEconomics.targetGrossRevenuePerLaborHour.value;
+  const minimumJob = cfg.minimumJob.value;
+  const step = cfg.rounding.toNearest.value;
   const baseRaw = labor.baseHours * rate;
 
   // Every non-specialty add-on charge resolves through ONE helper: the
@@ -352,8 +356,8 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
   // owner-approved 15% residential extra reduction is applied exactly once
   // here; STR turnover extras are not reduced.
   const addonPriceFactor =
-    input.serviceType === 'str_turnover' ? 1 : pricing.residentialExtras.priceFactor.value;
-  const addonPrices: AddonPriceLine[] = pricing.addons.items.map((item) => ({
+    input.serviceType === 'str_turnover' ? 1 : cfg.residentialExtras.priceFactor.value;
+  const addonPrices: AddonPriceLine[] = cfg.addons.items.map((item) => ({
     id: item.id,
     label: item.label,
     laborHours: item.laborHours ?? 0,
@@ -377,12 +381,12 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
   //    calibration adjustments are calculated before the final $5 floor.
 
   const incentive = context.addonIncentive ?? {
-    enabled: pricing.addonIncentive.enabled.value,
-    tiers: pricing.addonIncentive.tiers.map((tier) => ({
+    enabled: cfg.addonIncentive.enabled.value,
+    tiers: cfg.addonIncentive.tiers.map((tier) => ({
       minAddons: tier.minAddons,
       percent: tier.percent.value,
     })),
-    maxDiscount: pricing.addonIncentive.maxDiscount.value,
+    maxDiscount: cfg.addonIncentive.maxDiscount.value,
   };
   const evaluation = evaluatePromotions({
     serviceType: input.serviceType,
@@ -395,23 +399,23 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
     todayIso: context.promotions?.todayIso ?? new Date().toISOString().slice(0, 10),
     customerKind: context.promotions?.customerKind ?? 'unknown',
     addonIncentive: incentive,
-    appreciationDiscounts: context.promotions?.appreciationDiscounts ?? pricing.promotions.appreciationDiscounts,
-    addonBundles: context.promotions?.addonBundles ?? pricing.promotions.addonBundles,
-    customThreeExtraBundle: pricing.customThreeExtraBundle.enabled.value
+    appreciationDiscounts: context.promotions?.appreciationDiscounts ?? cfg.promotions.appreciationDiscounts,
+    addonBundles: context.promotions?.addonBundles ?? cfg.promotions.addonBundles,
+    customThreeExtraBundle: cfg.customThreeExtraBundle.enabled.value
       ? {
           enabled: true,
-          percent: pricing.customThreeExtraBundle.percent.value,
-          maxDiscountUsd: pricing.customThreeExtraBundle.maxDiscountUsd,
+          percent: cfg.customThreeExtraBundle.percent.value,
+          maxDiscountUsd: cfg.customThreeExtraBundle.maxDiscountUsd,
         }
       : null,
-    foundingTen: context.promotions?.foundingTen ?? pricing.promotions.foundingTen,
-    campaign: context.promotions?.campaign !== undefined ? context.promotions.campaign : pricing.promotions.campaign.value,
+    foundingTen: context.promotions?.foundingTen ?? cfg.promotions.foundingTen,
+    campaign: context.promotions?.campaign !== undefined ? context.promotions.campaign : cfg.promotions.campaign.value,
     claimedCampaignCode: context.promotions?.claimedCampaignCode ?? null,
     campaignArrangement: context.promotions?.campaignArrangement ?? null,
     supportiveDiscount: {
-      enabled: pricing.supportiveHomeDiscount.enabled.value,
-      percent: pricing.supportiveHomeDiscount.percent.value,
-      eligibleServices: pricing.supportiveHomeDiscount.eligibleServices.value,
+      enabled: cfg.supportiveHomeDiscount.enabled.value,
+      percent: cfg.supportiveHomeDiscount.percent.value,
+      eligibleServices: cfg.supportiveHomeDiscount.eligibleServices.value,
     },
     supportiveEligible: input.supportiveEligible === true,
   });
@@ -420,7 +424,7 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
   const discountedBase = discount ? round2(gross - discount.amount) : gross;
   // 3. The selected engine calibration factor applies to the discounted service subtotal.
   const calibrationEngine = input.serviceType === 'str_turnover' ? 'str' : 'residential';
-  const globalFactor = resolveEstimatorCalibration(calibrationEngine, context.globalFactorOverride);
+  const globalFactor = resolveEstimatorCalibration(calibrationEngine, context.globalFactorOverride, cfg);
   const calibrationLabel = calibrationEngine === 'str' ? 'STR' : 'Residential';
   const adjustedBase = round2(discountedBase * globalFactor);
   const globalAdjustment = round2(adjustedBase - discountedBase);
@@ -513,11 +517,11 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
       severity: 'info',
       message: schedulingConfig.recurringResidential.message,
     });
-  } else if (recurringResetSuggested(input.frequency, input.lastClean)) {
+  } else if (recurringResetSuggested(input.frequency, input.lastClean, cfg)) {
     flags.push({
       code: 'INITIAL_DETAILED_CLEAN_SUGGESTED',
       severity: 'info',
-      message: pricing.recurringReset.message,
+      message: cfg.recurringReset.message,
     });
   }
 
@@ -541,11 +545,11 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
   }
 
   const low = hasAdjustment
-    ? round2(expectedPrice * pricing.range.lowFactor.value)
-    : Math.max(minimumJob, roundToNearest(expectedPrice * pricing.range.lowFactor.value, step));
+    ? round2(expectedPrice * cfg.range.lowFactor.value)
+    : Math.max(minimumJob, roundToNearest(expectedPrice * cfg.range.lowFactor.value, step));
   const high = hasAdjustment
-    ? round2(expectedPrice * pricing.range.highFactor.value)
-    : Math.max(low, roundToNearest(expectedPrice * pricing.range.highFactor.value, step));
+    ? round2(expectedPrice * cfg.range.highFactor.value)
+    : Math.max(low, roundToNearest(expectedPrice * cfg.range.highFactor.value, step));
 
   // ── Confidence ─────────────────────────────────────────────────────────────
   let score = 1;

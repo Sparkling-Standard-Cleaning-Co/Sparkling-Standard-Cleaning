@@ -13,10 +13,22 @@ Estimator details: [Estimator Control Center](docs/ESTIMATOR-CONTROL-CENTER.md).
 
 ---
 
-## HOW TO CHANGE ANY ESTIMATOR PRICE IN GITHUB
+## CHANGE PRICING IN THE ADMIN DASHBOARD (PREFERRED)
 
-This is the routine owner workflow. You do **not** edit tests, calculation
-code or a quote-version field for a legitimate numeric change.
+Sign in at `/admin/` → **Pricing & Estimator Control**. This is the routine
+owner workflow now:
+
+1. Edit a value in the draft.
+2. Watch the live simulator compare the published price with the draft price.
+3. **Save draft** — customer prices do not change.
+4. **Publish draft** — new estimates use the new prices immediately.
+5. Use **Version history → Restore** to undo a published change safely.
+
+Full instructions: [Pricing & Estimator Control Center](docs/operations/PRICING-CONTROL-CENTER.md).
+
+The GitHub workflow below is the developer fallback for a new pricing variable
+or an emergency code change. You do **not** edit tests, calculation code or a
+quote-version field for an ordinary numeric change.
 
 1. Open [`src/config/estimators/pricing-values.ts`](src/config/estimators/pricing-values.ts)
    in GitHub.
@@ -35,10 +47,10 @@ code or a quote-version field for a legitimate numeric change.
 6. GitHub Actions runs `config:validate`, TypeScript checks, unit tests, the
    build, pricing impact preview and browser/integration checks. A valid
    one-number change passes without editing any test file.
-7. Cloudflare Pages deploys from `main`. Its build command runs the same
-   `config:validate` gate **before** Astro builds, so an invalid value fails
-   the deployment and the previous live release remains in place. GitHub
-   validation is not the only guard.
+7. Cloudflare Pages deploys the current production branch (`production-safe`).
+   Its build command runs the same `config:validate` gate **before** Astro
+   builds, so an invalid value fails the deployment and the previous live
+   release remains in place. GitHub validation is not the only guard.
 8. Check **Actions** and **Cloudflare Pages → Deployments**. When both succeed,
    open the live estimator and spot-check a representative quote.
 

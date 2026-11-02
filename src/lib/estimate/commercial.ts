@@ -23,7 +23,7 @@
 // price is produced for the customer, the request or the owner notification.
 
 import type { Condition } from '../../config/pricing.ts';
-import { pricing, resolveEstimatorCalibration } from '../../config/pricing.ts';
+import { pricing, resolveEstimatorCalibration, type PricingConfig } from '../../config/pricing.ts';
 import { commercialTierConfig } from '../../config/estimators/commercial.ts';
 import { calculateChurchDiscount, type ChurchDiscountResult } from './church-discount.ts';
 
@@ -66,7 +66,7 @@ function finiteOrZero(value: number | null | undefined): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-export function calculateFacilityWorkload(input: FacilityWorkloadInput): FacilityWorkload {
+export function calculateFacilityWorkload(input: FacilityWorkloadInput, config: PricingConfig = pricing): FacilityWorkload {
   const sqft = finiteOrZero(input.cleanableSqft);
   const fixtures = Math.min(40, finiteOrZero(input.restroomFixtures));
   const facilityType = FACILITY_TYPES.has(input.facilityType ?? 'office') ? (input.facilityType ?? 'office') : 'office';
@@ -74,25 +74,25 @@ export function calculateFacilityWorkload(input: FacilityWorkloadInput): Facilit
   const traffic = input.traffic ?? 'average';
   const flooring = input.flooring ?? 'mixed';
 
-  const productionRates = pricing.commercialPricing.productionSqftPerHour as Record<string, { value: number }>;
+  const productionRates = config.commercialPricing.productionSqftPerHour as Record<string, { value: number }>;
   const productionRate = productionRates[facilityType]?.value ?? 4200;
   const areaHours = sqft > 0 ? sqft / productionRate : 0;
-  const fixtureHours = (fixtures * pricing.commercialPricing.fixtureMinutes.value) / 60;
-  const breakroomHours = input.breakroom ? pricing.commercialPricing.breakroomMinutes.value / 60 : 0;
-  const setupHours = pricing.commercialPricing.setupMinutes.value / 60;
+  const fixtureHours = (fixtures * config.commercialPricing.fixtureMinutes.value) / 60;
+  const breakroomHours = input.breakroom ? config.commercialPricing.breakroomMinutes.value / 60 : 0;
+  const setupHours = config.commercialPricing.setupMinutes.value / 60;
 
   const flooringFactor = flooring === 'carpet' ? 1.08 : flooring === 'mixed' ? 1.04 : 1;
-  const conditionFactor = pricing.conditionFactors[condition].value;
+  const conditionFactor = config.conditionFactors[condition].value;
   const trafficFactor = traffic === 'high' ? 1.15 : traffic === 'low' ? 0.95 : 1;
-  const firstCleanFactor = input.firstClean ? pricing.commercialPricing.firstCleanFactor.value : 1;
+  const firstCleanFactor = input.firstClean ? config.commercialPricing.firstCleanFactor.value : 1;
 
   const laborHours =
     Math.round((areaHours + fixtureHours + breakroomHours + setupHours) * flooringFactor * conditionFactor * trafficFactor * firstCleanFactor * 100) / 100;
 
   const tier: 'A' | 'B' | 'C' =
-    input.specialty || fixtures > 20 || laborHours > pricing.commercialPricing.tierBHours.value
+    input.specialty || fixtures > 20 || laborHours > config.commercialPricing.tierBHours.value
       ? 'C'
-      : laborHours > pricing.commercialPricing.tierAHours.value
+      : laborHours > config.commercialPricing.tierAHours.value
         ? 'B'
         : 'A';
 
@@ -125,6 +125,8 @@ export interface FacilityQuoteOptions {
   numericEstimatesEnabled?: boolean | undefined;
   /** Test-only override for this engine calibration factor; production reads config. */
   globalFactorOverride?: number | undefined;
+  /** Request-scoped pricing configuration (published snapshot). */
+  pricingConfig?: PricingConfig | undefined;
 }
 
 export interface FacilityPrice {
@@ -159,19 +161,19 @@ const VISITS_PER_MONTH: Record<string, number> = {
 };
 
 /** Travel uses the SAME shared economics as the residential engine. */
-export function facilityTravelAdjustment(oneWayMiles: number | null | undefined): number {
+export function facilityTravelAdjustment(oneWayMiles: number | null | undefined, config: PricingConfig = pricing): number {
   if (!oneWayMiles || !Number.isFinite(oneWayMiles) || oneWayMiles <= 0) return 0;
-  const included = pricing.travel.includedOneWayMiles.value;
+  const included = config.travel.includedOneWayMiles.value;
   const extraMiles = Math.max(0, oneWayMiles - included) * 2;
   if (extraMiles <= 0) return 0;
-  const perMileFuel = pricing.travel.fallbackGasPrice.value / pricing.travel.clientDefaults.mpg.value;
-  const cost = extraMiles * (pricing.travel.perMileWearCost.value + perMileFuel);
+  const perMileFuel = config.travel.fallbackGasPrice.value / config.travel.clientDefaults.mpg.value;
+  const cost = extraMiles * (config.travel.perMileWearCost.value + perMileFuel);
   return Math.round(cost * 100) / 100;
 }
 
-function roundUpToStep(value: number): number {
+function roundUpToStep(value: number, config: PricingConfig): number {
   if (!Number.isFinite(value) || value <= 0) return 0;
-  const step = pricing.rounding.toNearest.value;
+  const step = config.rounding.toNearest.value;
   return Math.ceil((value - 0.01) / step) * step;
 }
 
@@ -184,6 +186,7 @@ export function calculateFacilityPrice(
   frequency: string,
   options: FacilityQuoteOptions = {},
 ): FacilityPrice {
+  const config = options.pricingConfig ?? pricing;
   const numericEnabled =
     options.numericEstimatesEnabled ?? commercialTierConfig.numericEstimatesEnabled;
   if (!numericEnabled) {
@@ -204,24 +207,24 @@ export function calculateFacilityPrice(
     };
   }
 
-  const rate = pricing.commercialPricing.grossRatePerHour.value;
+  const rate = config.commercialPricing.grossRatePerHour.value;
   const rawCleaning = workload.laborHours * rate;
-  const cleaningSubtotal = Math.max(pricing.minimumJob.value, roundUpToStep(rawCleaning));
+  const cleaningSubtotal = Math.max(config.minimumJob.value, roundUpToStep(rawCleaning, config));
   const church = options.church === true;
   const discount = church
-    ? calculateChurchDiscount(cleaningSubtotal, { otherDiscountApplied: options.otherDiscountApplied === true })
+    ? calculateChurchDiscount(cleaningSubtotal, { otherDiscountApplied: options.otherDiscountApplied === true, pricingConfig: config })
     : null;
   // The church discount is applied to the already-rounded cleaning subtotal and
   // is NOT rounded upward again; the full 10% benefit survives to the cent.
   const discountedSubtotal = discount?.applied ? discount.discountedSubtotal : cleaningSubtotal;
-  const globalFactor = resolveEstimatorCalibration(church ? 'church' : 'commercial', options.globalFactorOverride);
+  const globalFactor = resolveEstimatorCalibration(church ? 'church' : 'commercial', options.globalFactorOverride, config);
   const adjustedService = round2(discountedSubtotal * globalFactor);
   const globalAdjustment = round2(adjustedService - discountedSubtotal);
   const perVisitCore = adjustedService;
-  const travelAdjustment = round2(facilityTravelAdjustment(options.oneWayMiles ?? null));
+  const travelAdjustment = round2(facilityTravelAdjustment(options.oneWayMiles ?? null, config));
   const total = round2(perVisitCore + travelAdjustment);
 
-  const spread = pricing.commercialPricing.rangeSpreadPercent.value / 100;
+  const spread = config.commercialPricing.rangeSpreadPercent.value / 100;
   const range =
     workload.tier === 'B'
       ? {
@@ -254,6 +257,7 @@ export interface ChurchEstimateInput extends FacilityWorkloadInput {
   otherDiscountApplied?: boolean;
   numericEstimatesEnabled?: boolean | undefined;
   globalFactorOverride?: number | undefined;
+  pricingConfig?: PricingConfig | undefined;
 }
 
 export interface ChurchEstimateSummary {
@@ -263,7 +267,7 @@ export interface ChurchEstimateSummary {
 
 /** Church estimate = facility workload + owner-directed 10% discount. */
 export function calculateChurchEstimate(input: ChurchEstimateInput): ChurchEstimateSummary {
-  const workload = calculateFacilityWorkload({ ...input, facilityType: 'church' });
+  const workload = calculateFacilityWorkload({ ...input, facilityType: 'church' }, input.pricingConfig);
   return {
     workload,
     price: calculateFacilityPrice(workload, input.frequency ?? 'weekly', {
@@ -272,6 +276,7 @@ export function calculateChurchEstimate(input: ChurchEstimateInput): ChurchEstim
       otherDiscountApplied: input.otherDiscountApplied,
       numericEstimatesEnabled: input.numericEstimatesEnabled,
       globalFactorOverride: input.globalFactorOverride,
+      pricingConfig: input.pricingConfig,
     }),
   };
 }

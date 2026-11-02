@@ -4,6 +4,7 @@ import {
   passwordPolicyMessage,
   passwordProblem,
 } from '../lib/password-policy.ts';
+import { loadPricingView } from './pricing-admin';
 
 interface AdminActor {
   id: string;
@@ -58,6 +59,7 @@ const viewMeta: Record<string, [string, string]> = {
   finance: ['Invoices & Payments', 'Invoicing, payments, credits and reconciliation.'],
   gift: ['Gift Certificates', 'Existing production gift register.'],
   reports: ['Reports', 'Operational and financial reporting.'],
+  pricing: ['Pricing & Estimator Control', 'Published prices, draft changes, simulations and version history.'],
   settings: ['Settings & Audit', 'Access, security, configuration and audit history.'],
 };
 
@@ -72,6 +74,7 @@ const navPermission: Record<string, string> = {
   finance: 'finance.read',
   gift: 'finance.read',
   reports: 'finance.read',
+  pricing: 'settings.write',
 };
 
 function esc(value: unknown): string {
@@ -1315,6 +1318,7 @@ async function loadView(view: string): Promise<void> {
     if (view === 'finance') await loadFinance();
     if (view === 'gift') await loadGifts();
     if (view === 'reports') await loadReports();
+    if (view === 'pricing') await loadPricingView();
     if (view === 'settings') await loadSettings();
   } catch (error) {
     setAppError(friendly(error));

@@ -8,7 +8,7 @@
 // The estimator reasons in LABOR-HOURS, never wall-clock time: two cleaners
 // halve the clock, not the labor (directive §20).
 
-import { pricing } from '../../config/pricing.ts';
+import { pricing, type PricingConfig } from '../../config/pricing.ts';
 import { conditionFactor, lastCleanFactor } from './conditions.ts';
 import { frequencyFactor } from './frequency.ts';
 import type { CalculationTraceEntry, NormalizedEstimateInput } from './types.ts';
@@ -22,8 +22,8 @@ export interface LaborResult {
   trace: CalculationTraceEntry[];
 }
 
-function computeBaseHours(input: NormalizedEstimateInput): { hours: number; trace: CalculationTraceEntry[] } {
-  const model = pricing.laborModel;
+function computeBaseHours(input: NormalizedEstimateInput, config: PricingConfig): { hours: number; trace: CalculationTraceEntry[] } {
+  const model = config.laborModel;
   const trace: CalculationTraceEntry[] = [];
 
   let subtotal = 0;
@@ -56,9 +56,9 @@ function computeBaseHours(input: NormalizedEstimateInput): { hours: number; trac
     );
   }
 
-  const condition = conditionFactor(input.condition);
-  const lastClean = lastCleanFactor(input.lastClean);
-  const frequency = frequencyFactor(input.frequency, input.serviceType);
+  const condition = conditionFactor(input.condition, config);
+  const lastClean = lastCleanFactor(input.lastClean, config);
+  const frequency = frequencyFactor(input.frequency, input.serviceType, config);
 
   const hours = subtotal * condition * lastClean * frequency;
   trace.push(
@@ -71,8 +71,8 @@ function computeBaseHours(input: NormalizedEstimateInput): { hours: number; trac
   return { hours, trace };
 }
 
-export function computeLaborHours(input: NormalizedEstimateInput, addonHours: number): LaborResult {
-  const { hours: baseHours, trace } = computeBaseHours(input);
+export function computeLaborHours(input: NormalizedEstimateInput, addonHours: number, config: PricingConfig = pricing): LaborResult {
+  const { hours: baseHours, trace } = computeBaseHours(input, config);
   trace.push({ step: 'labor:addons', detail: 'Discrete add-on time', value: addonHours });
   return {
     hours: baseHours + addonHours,

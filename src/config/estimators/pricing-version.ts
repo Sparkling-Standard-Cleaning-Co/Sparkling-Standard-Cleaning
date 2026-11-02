@@ -12,7 +12,7 @@
 // without a build identifier, timestamp, random value or secret.
 
 import { ownerPricing, type OwnerPricingConfig } from './pricing-values.ts';
-import { travelConfig, type TravelConfig } from './travel.ts';
+import { travelConfig, type TravelConfigValues } from './travel.ts';
 import { PRICING_CALCULATION_SCHEMA_VERSION } from './calculation-schema.ts';
 
 /** Keys that describe presentation, approval provenance or owner-only policy
@@ -71,7 +71,7 @@ export function pricingFingerprint(value: unknown): string {
 
 export interface EffectivePricingInputs {
   owner?: OwnerPricingConfig;
-  travel?: TravelConfig;
+  travel?: TravelConfigValues;
   schemaVersion?: string;
 }
 

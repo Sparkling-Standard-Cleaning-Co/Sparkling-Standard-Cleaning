@@ -14,6 +14,8 @@ export interface D1PreparedStatement {
 
 export interface D1Database {
   prepare(query: string): D1PreparedStatement;
+  /** Optional D1 batch surface; when present a publish is one transaction. */
+  batch?<T = Record<string, unknown>>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]>;
 }
 
 export interface AdminDbEnv {

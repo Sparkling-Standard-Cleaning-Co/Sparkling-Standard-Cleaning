@@ -15,8 +15,7 @@
 // The private origin and provider keys live only in the function environment
 // and are never included in any returned value.
 
-import { pricing } from '../../config/pricing.ts';
-import { travelConfig } from '../../config/estimators/travel.ts';
+import { pricing, type PricingConfig } from '../../config/pricing.ts';
 import { zipReference } from '../../config/geography.ts';
 import { calculateEstimate, type EstimateContext } from './calculate.ts';
 import { parseDirtLevel } from './dirt-levels.ts';
@@ -216,21 +215,22 @@ export function isConfirmedPropertyPin(fields: Record<string, string>): boolean 
   );
 }
 
-function buildEstimateContext(routed: RoutedTravelInfo | undefined, fields: Record<string, string>): EstimateContext {
+function buildEstimateContext(routed: RoutedTravelInfo | undefined, fields: Record<string, string>, config: PricingConfig): EstimateContext {
   return {
+    pricingConfig: config,
     travel: {
       ...(routed ? { routed } : {}),
-      includedOneWayMiles: travelConfig.includedOneWayMiles,
-      mpg: travelConfig.mpg,
-      wearPerMile: travelConfig.wearPerMile,
-      referenceGasPrice: travelConfig.fallbackGasPrice,
+      includedOneWayMiles: config.travel.includedOneWayMiles.value,
+      mpg: config.travel.clientDefaults.mpg.value,
+      wearPerMile: config.travel.perMileWearCost.value,
+      referenceGasPrice: config.travel.fallbackGasPrice.value,
       zoneAdjustments: {
-        core: pricing.travel.zoneAdjustments.core.value,
-        surrounding: pricing.travel.zoneAdjustments.surrounding.value,
+        core: config.travel.zoneAdjustments.core.value,
+        surrounding: config.travel.zoneAdjustments.surrounding.value,
       },
-      maxInstantDistanceMiles: travelConfig.maxInstantDistanceMiles,
-      maxDrivingMinutes: travelConfig.maxDrivingMinutes,
-      reviewBandMinutes: travelConfig.reviewBandMinutes,
+      maxInstantDistanceMiles: config.travel.clientDefaults.maxInstantDistanceMiles.value,
+      maxDrivingMinutes: config.drivingPolicy.maxDrivingMinutes.value,
+      reviewBandMinutes: config.drivingPolicy.reviewBandMinutes.value,
     },
     promotions: {
       // The claimed campaign code is a customer assertion, not a proof: the
@@ -304,8 +304,9 @@ export async function verifyReservationQuote(
   fields: Record<string, string>,
   env: QuoteVerificationEnv,
   now: number = Date.now(),
+  config: PricingConfig = pricing,
 ): Promise<QuoteVerification> {
-  const configVersion = pricing.instantQuote.configVersion.value;
+  const configVersion = config.instantQuote.configVersion.value;
   const clientConfigVersion = fields.quote_config_version?.trim() || null;
   const configMatch: QuoteConfigMatch =
     clientConfigVersion === null
@@ -354,7 +355,7 @@ export async function verifyReservationQuote(
     breakdown,
     note,
     verifiedAt: new Date(now).toISOString(),
-    validThrough: new Date(now + pricing.instantQuote.validityHours.value * 3_600_000).toISOString(),
+    validThrough: new Date(now + config.instantQuote.validityHours.value * 3_600_000).toISOString(),
   });
 
   const draft = mapReservationFields(fields);
@@ -425,7 +426,7 @@ export async function verifyReservationQuote(
     pinCheck = 'unknown';
   }
 
-  const estimate = calculateEstimate(draft, buildEstimateContext(routed, fields));
+  const estimate = calculateEstimate(draft, buildEstimateContext(routed, fields, config));
   breakdown = estimate.pricing;
   ongoingServer = estimate.ongoing
     ? { frequency: estimate.ongoing.frequency, perVisitPrice: estimate.ongoing.perVisitPrice }
@@ -439,7 +440,7 @@ export async function verifyReservationQuote(
     );
   }
 
-  const amount = selectInstantAmount(estimate);
+  const amount = selectInstantAmount(estimate, config.instantQuote.selection.value, config);
   const range =
     estimate.low !== null && estimate.high !== null ? { low: estimate.low, high: estimate.high } : null;
 

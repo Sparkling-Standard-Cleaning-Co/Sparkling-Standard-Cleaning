@@ -1,10 +1,10 @@
 // Condition handling — how the home's current state changes expected labor.
 
-import { pricing } from '../../config/pricing.ts';
+import { pricing, type PricingConfig } from '../../config/pricing.ts';
 import type { Condition, LastProfessionalClean, CalculationTraceEntry } from './types.ts';
 
-export function conditionFactor(condition: Condition): number {
-  const entry = pricing.conditionFactors[condition];
+export function conditionFactor(condition: Condition, config: PricingConfig = pricing): number {
+  const entry = config.conditionFactors[condition];
   return entry ? entry.value : 1.1;
 }
 
@@ -22,7 +22,7 @@ export function conditionTrace(condition: Condition): CalculationTraceEntry {
 }
 
 /** Conservative default when the customer is unsure (flagged for review). */
-export function lastCleanFactor(lastClean: LastProfessionalClean | undefined): number {
+export function lastCleanFactor(lastClean: LastProfessionalClean | undefined, config: PricingConfig = pricing): number {
   if (!lastClean) return 1.05;
-  return pricing.lastCleanFactors[lastClean]?.value ?? 1.05;
+  return config.lastCleanFactors[lastClean]?.value ?? 1.05;
 }

@@ -11,7 +11,7 @@
 // returns no prices, no labour hours and no discount amount, and the relay
 // strips any client-supplied facility price fields before the owner notification.
 
-import { pricing } from '../../config/pricing.ts';
+import { pricing, type PricingConfig } from '../../config/pricing.ts';
 import { commercialTierConfig } from '../../config/estimators/commercial.ts';
 import {
   calculateFacilityPrice,
@@ -48,6 +48,8 @@ export interface FacilityVerifyOptions {
   routedOneWayMiles?: number | null | undefined;
   /** True only when the payment endpoint independently obtained a live route. */
   routedTravelVerified?: boolean | undefined;
+  /** Request-scoped pricing configuration (published snapshot). */
+  pricingConfig?: PricingConfig | undefined;
 }
 
 /** Client-supplied facility fields that must never survive a disabled switch. */
@@ -91,6 +93,7 @@ export function verifyFacilityQuote(
   fields: Record<string, string>,
   options: FacilityVerifyOptions = {},
 ): FacilityVerification {
+  const config = options.pricingConfig ?? pricing;
   const numericEnabled =
     options.numericEstimatesEnabled ?? commercialTierConfig.numericEstimatesEnabled;
   if (!numericEnabled) {
@@ -117,7 +120,7 @@ export function verifyFacilityQuote(
   const configMatch =
     clientVersion === ''
       ? 'unknown'
-      : clientVersion === pricing.commercialPricing.configVersion.value
+      : clientVersion === config.commercialPricing.configVersion.value
         ? 'match'
         : 'mismatch';
 
@@ -150,13 +153,14 @@ export function verifyFacilityQuote(
     firstClean: fields.first_clean === 'yes',
     specialty: (fields.specialty_services ?? '') !== '',
   };
-  const workload = calculateFacilityWorkload(input);
+  const workload = calculateFacilityWorkload(input, config);
   const price = calculateFacilityPrice(workload, fields.frequency ?? 'weekly', {
     oneWayMiles:
       options.routedOneWayMiles !== undefined
         ? options.routedOneWayMiles
         : num(fields.travel_one_way_miles),
     church: input.facilityType === 'church' || fields.service_type === 'church_cleaning',
+    pricingConfig: config,
   });
 
   if (!price.priced) {
@@ -167,7 +171,7 @@ export function verifyFacilityQuote(
       expectedRange: null,
       laborHours: workload.laborHours,
       discountAmount: price.discount?.applied ? price.discount.amount : null,
-      discountLabel: price.discount?.applied ? `Church discount (${pricing.churchDiscount.percent.value}%)` : null,
+      discountLabel: price.discount?.applied ? `Church discount (${config.churchDiscount.percent.value}%)` : null,
       globalFactor: price.globalFactor,
       globalAdjustment: price.globalAdjustment,
       configMatch,
@@ -195,7 +199,7 @@ export function verifyFacilityQuote(
       expectedRange: price.range,
       laborHours: workload.laborHours,
       discountAmount: price.discount?.applied ? price.discount.amount : null,
-      discountLabel: price.discount?.applied ? `Church discount (${pricing.churchDiscount.percent.value}%)` : null,
+      discountLabel: price.discount?.applied ? `Church discount (${config.churchDiscount.percent.value}%)` : null,
       globalFactor: price.globalFactor,
       globalAdjustment: price.globalAdjustment,
       configMatch,
@@ -216,7 +220,7 @@ export function verifyFacilityQuote(
     expectedRange: price.range,
     laborHours: workload.laborHours,
     discountAmount: price.discount?.applied ? price.discount.amount : null,
-    discountLabel: price.discount?.applied ? `Church discount (${pricing.churchDiscount.percent.value}%)` : null,
+    discountLabel: price.discount?.applied ? `Church discount (${config.churchDiscount.percent.value}%)` : null,
     globalFactor: price.globalFactor,
     globalAdjustment: price.globalAdjustment,
     configMatch,

@@ -36,6 +36,7 @@ import {
   FREQUENCY_RHYTHMS,
 } from '../lib/estimate/labels';
 import { serviceAsksFrequency, serviceSupportsFrequency } from '../lib/estimate/service-matrix';
+import { loadPublishedPricingOnce } from '../lib/pricing/client';
 import { ENGINE_STEPS, parseResidentialServiceParam } from '../lib/estimate/engines';
 import type { EstimateInput, EstimateInputDraft, EstimateResult, RoutedTravelInfo, ServiceType } from '../lib/estimate/types';
 import { locationKey, formatLocationLine, type ConfirmedLocation } from '../lib/location/location';
@@ -102,7 +103,11 @@ let STEP_LABELS: readonly string[] = ESTIMATE_STEPS.map((step) => step.title);
 
 const formHost = document.querySelector<HTMLFormElement>('[data-estimate-form]');
 if (formHost) {
-  initEstimateWizard(formHost);
+  const host = formHost;
+  initEstimateWizard(host);
+  void loadPublishedPricingOnce().then((active) => {
+    if (active) host.dispatchEvent(new Event('estimate:pricing-updated'));
+  });
 }
 
 function initEstimateWizard(form: HTMLFormElement): void {
@@ -2813,6 +2818,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
     syncConditionalFields();
     showStep(currentStep);
   }
+  form.addEventListener('estimate:pricing-updated', () => {
+    syncConditionalFields();
+    recalc();
+    void lookupTravel();
+  });
   applyDeepLinkSelections();
   recalc();
   void lookupTravel();

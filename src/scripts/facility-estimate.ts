@@ -1,4 +1,4 @@
-﻿// Facility estimate engine (commercial + church) â€” shared location finder,
+// Facility estimate engine (commercial + church) â€” shared location finder,
 // travel lookup, and the ONE lead submission pipeline. Numeric pricing is
 // controlled by the owner kill switch: enabled = Tier A/B preliminary numbers,
 // Tier C scope review; disabled = scope-review only with no numeric fields sent
@@ -20,6 +20,7 @@ import { attributionFields } from '../lib/attribution';
 import { legalTerms } from '../config/legal';
 import { bookingConfig } from '../config/booking';
 import { initBookingPicker, type BookingPickerHandle } from './booking-picker';
+import { loadPublishedPricingOnce } from '../lib/pricing/client';
 import { track } from '../lib/analytics/events';
 import {
   calculateFacilityPrice,
@@ -41,12 +42,18 @@ interface RoutedTravel {
 
 const form = document.querySelector<HTMLFormElement>('[data-facility-form]');
 const engine = (form?.dataset.engine === 'church' ? 'church' : 'commercial') as Engine;
-const churchDiscountLabel = pricing.churchDiscount.enabled.value
-  ? `${pricing.churchDiscount.percent.value}% church discount`
-  : 'church discount';
+function churchDiscountLabel(): string {
+  return pricing.churchDiscount.enabled.value
+    ? `${pricing.churchDiscount.percent.value}% church discount`
+    : 'church discount';
+}
 
 if (form) {
-  initFacilityForm(form, engine);
+  const host = form;
+  initFacilityForm(host, engine);
+  void loadPublishedPricingOnce().then((active) => {
+    if (active) host.dispatchEvent(new Event('facility:pricing-updated'));
+  });
 }
 
 function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
@@ -831,13 +838,13 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     if (!reviewNote) return;
     if (!numericEstimatesEnabled) {
       reviewNote.textContent = facilityEngine === 'church'
-        ? `This is a scope-review request. The ${churchDiscountLabel} applies to the confirmed cleaning quote, and we will confirm the scope and price with you.`
+        ? `This is a scope-review request. The ${churchDiscountLabel()} applies to the confirmed cleaning quote, and we will confirm the scope and price with you.`
         : 'This is a scope-review request. We will confirm the scope and price with you before scheduling.';
       return;
     }
     if (latestPrice?.priced) {
       reviewNote.textContent = facilityEngine === 'church'
-        ? `This is a preliminary estimate with the ${churchDiscountLabel} applied. Facility visits are scheduled after personal review; request the visit and we will confirm the scope, time and price with you.`
+        ? `This is a preliminary estimate with the ${churchDiscountLabel()} applied. Facility visits are scheduled after personal review; request the visit and we will confirm the scope, time and price with you.`
         : 'This is a preliminary estimate. Facility visits are scheduled after personal review; request the visit and we will confirm the scope, time and price with you.';
       return;
     }
@@ -1261,8 +1268,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         resultNote.textContent =
           facilityEngine === 'church'
             ? latestPrice?.priced
-              ? `Not booked yet. Sparkling Standard will review your preliminary estimate and confirm the final scope, price and your ${churchDiscountLabel} personally.`
-              : `Not booked yet. Sparkling Standard will review the scope and confirm your ${churchDiscountLabel} and price personally.`
+              ? `Not booked yet. Sparkling Standard will review your preliminary estimate and confirm the final scope, price and your ${churchDiscountLabel()} personally.`
+              : `Not booked yet. Sparkling Standard will review the scope and confirm your ${churchDiscountLabel()} and price personally.`
             : latestPrice?.priced
               ? 'Not booked yet. Sparkling Standard will review your preliminary estimate and confirm the final scope and price personally.'
               : 'Not booked yet. Sparkling Standard will review the scope and confirm the price personally.';
@@ -1288,6 +1295,10 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     setStatus('error', failureCopy(reason, contact));
   }
 
+  host.addEventListener('facility:pricing-updated', () => {
+    renderSummary();
+    updateSummary();
+  });
   renderSummary();
   updateSummary();
   void (async () => {

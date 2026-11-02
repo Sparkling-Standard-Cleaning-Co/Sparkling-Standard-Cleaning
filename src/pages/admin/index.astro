@@ -107,6 +107,7 @@ import '../../styles/admin.css';
             <button type="button" data-admin-nav="finance">Invoices &amp; Payments</button>
             <button type="button" data-admin-nav="gift">Gift Certificates</button>
             <button type="button" data-admin-nav="reports">Reports</button>
+            <button type="button" data-admin-nav="pricing">Pricing &amp; Estimator Control</button>
             <button type="button" data-admin-nav="settings">Settings &amp; Audit</button>
           </nav>
           <div class="admin-sidebar__meta">
@@ -439,6 +440,52 @@ import '../../styles/admin.css';
 
           <section class="admin-view" data-admin-view="reports" hidden>
             <div data-admin-reports></div>
+          </section>
+
+          <section class="admin-view" data-admin-view="pricing" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Pricing &amp; Estimator Control</h2>
+              <p class="admin-muted">
+                Change the pricing used by the residential, STR, commercial and church estimators.
+                Edits stay in a draft until you publish them. Publishing creates a new version and
+                new estimates use it immediately; historical quotes and payments keep the price they
+                were created with.
+              </p>
+              <div data-pricing-status>
+                <p class="admin-muted">Loading pricing configuration…</p>
+              </div>
+              <div class="admin-actions" style="margin-top:1rem;">
+                <button class="btn btn--primary btn--small" type="button" data-pricing-action="save-draft">Save draft</button>
+                <button class="btn btn--secondary btn--small" type="button" data-pricing-action="publish">Publish draft</button>
+                <button class="btn btn--ghost btn--small" type="button" data-pricing-action="discard">Discard draft</button>
+                <button class="btn btn--ghost btn--small" type="button" data-pricing-action="refresh">Refresh</button>
+              </div>
+              <p class="admin-muted" data-pricing-notice role="status" aria-live="polite"></p>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Pricing variables</h2>
+              <p class="admin-muted">
+                Each value lists the published price, the editable draft, the unit and the effect on
+                the calculation. Structural rules (how labor, discounts and rounding are applied) are
+                fixed in code and are not editable here.
+              </p>
+              <div data-pricing-editor></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Live estimate simulator</h2>
+              <p class="admin-muted">
+                Uses the same four pricing engines as the customer site. It creates no lead, hold,
+                booking, payment, email or calendar event. Tax is calculated separately at checkout
+                from the service address and is not changed by these pricing values.
+              </p>
+              <div data-pricing-simulator></div>
+              <div data-pricing-simulation-result style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Version history</h2>
+              <p class="admin-muted">Published versions are immutable. Restoring an older version creates a new version, so nothing is erased.</p>
+              <div data-pricing-history></div>
+            </div>
           </section>
 
           <section class="admin-view" data-admin-view="settings" hidden>

@@ -2,15 +2,15 @@
 // home takes less labor per visit. This is a labor-efficiency model, not a
 // stacked marketing discount (directive §28).
 
-import { pricing } from '../../config/pricing.ts';
+import { pricing, type PricingConfig } from '../../config/pricing.ts';
 import { schedulingConfig } from '../../config/scheduling.ts';
 import type { Frequency, LastProfessionalClean } from './types.ts';
 
-export function frequencyFactor(frequency: Frequency, serviceType: string): number {
+export function frequencyFactor(frequency: Frequency, serviceType: string, config: PricingConfig = pricing): number {
   // Frequency efficiency only applies to repeatable residential cleaning.
   // Move-outs and STR turnovers are always one-off scopes.
   if (serviceType === 'move_in_out' || serviceType === 'str_turnover') return 1.0;
-  return pricing.frequencyFactors[frequency]?.value ?? 1.0;
+  return config.frequencyFactors[frequency]?.value ?? 1.0;
 }
 
 /**
@@ -34,7 +34,8 @@ export function requiresInitialDeepClean(serviceType: string, frequency: Frequen
 export function recurringResetSuggested(
   frequency: Frequency,
   lastClean: LastProfessionalClean | undefined,
+  config: PricingConfig = pricing,
 ): boolean {
   if (frequency === 'one_time' || !lastClean) return false;
-  return (pricing.recurringReset.flagWhenLastCleanIn as readonly string[]).includes(lastClean);
+  return (config.recurringReset.flagWhenLastCleanIn as readonly string[]).includes(lastClean);
 }

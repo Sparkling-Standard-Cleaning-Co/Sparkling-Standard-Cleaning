@@ -51,3 +51,11 @@ export const travelConfig = {
 } as const;
 
 export type TravelConfig = typeof travelConfig;
+
+/**
+ * Mutable numeric form used by owner-published pricing snapshots. Literal
+ * source values stay exact; snapshots can carry any validated number.
+ */
+export type TravelConfigValues = {
+  -readonly [K in keyof TravelConfig]: TravelConfig[K] extends number ? number : TravelConfig[K];
+};

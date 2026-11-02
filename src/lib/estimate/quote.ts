@@ -18,7 +18,7 @@
 //    server issues its own validity timestamp when it verifies a quote, and
 //    the client-side `expiresAt` below is not presented to customers.
 
-import { pricing } from '../../config/pricing.ts';
+import { pricing, type PricingConfig } from '../../config/pricing.ts';
 import type { EstimateResult } from './types.ts';
 
 export type QuoteSelection = 'expected' | 'midpoint' | 'high';
@@ -51,6 +51,7 @@ export interface InstantQuote {
 export function selectInstantAmount(
   result: EstimateResult,
   selection: QuoteSelection = pricing.instantQuote.selection.value,
+  config: PricingConfig = pricing,
 ): number | null {
   if (result.status !== 'estimated') return null;
   if (result.expectedPrice === null || result.low === null || result.high === null) return null;
@@ -70,8 +71,8 @@ export function selectInstantAmount(
   }
   const hasAdjustment = result.pricing.discount !== null || result.pricing.globalFactor !== 1;
   if (hasAdjustment) return Math.round((result.expectedPrice + Number.EPSILON) * 100) / 100;
-  const marginFloor = result.expectedPrice * pricing.instantQuote.marginFloor.value;
-  const candidate = Math.max(candidates[selection], marginFloor, pricing.minimumJob.value);
+  const marginFloor = result.expectedPrice * config.instantQuote.marginFloor.value;
+  const candidate = Math.max(candidates[selection], marginFloor, config.minimumJob.value);
   return Math.round((candidate + Number.EPSILON) * 100) / 100;
 }
 
@@ -87,21 +88,22 @@ export function buildInstantQuote(
   result: EstimateResult,
   input: { serviceType: string; zip: string; destinationConfirmed?: boolean },
   now: number = Date.now(),
+  config: PricingConfig = pricing,
 ): InstantQuote | null {
-  const amount = selectInstantAmount(result);
+  const amount = selectInstantAmount(result, config.instantQuote.selection.value, config);
   if (amount === null || result.laborHours === null) return null;
 
   return {
     reference: createQuoteReference({ amount, serviceType: input.serviceType, zip: input.zip, timestamp: now }),
     amount,
     laborHours: result.laborHours,
-    expiresAt: new Date(now + pricing.instantQuote.validityHours.value * 3_600_000).toISOString(),
-    selection: pricing.instantQuote.selection.value,
+    expiresAt: new Date(now + config.instantQuote.validityHours.value * 3_600_000).toISOString(),
+    selection: config.instantQuote.selection.value,
     travelMode: result.travel.mode,
     travelVerified: result.travel.verified && (input.destinationConfirmed ?? true),
     confidence: result.confidence,
     minimumApplied: result.minimumApplied,
-    configVersion: pricing.instantQuote.configVersion.value,
+    configVersion: config.instantQuote.configVersion.value,
   };
 }
 
@@ -128,6 +130,6 @@ export function createQuoteReference(input: {
 }
 
 /** True when a quote built at `createdAt` is still valid at `now`. */
-export function isQuoteValid(createdAt: number, now: number = Date.now()): boolean {
-  return now - createdAt <= pricing.instantQuote.validityHours.value * 3_600_000;
+export function isQuoteValid(createdAt: number, now: number = Date.now(), config: PricingConfig = pricing): boolean {
+  return now - createdAt <= config.instantQuote.validityHours.value * 3_600_000;
 }

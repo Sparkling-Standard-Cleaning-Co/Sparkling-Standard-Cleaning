@@ -11,7 +11,7 @@
 //  - This is a SERVICE DISCOUNT, never a charitable donation or a
 //    tax-deductible tithe, and it is never described as one.
 
-import { pricing } from '../../config/pricing.ts';
+import { pricing, type PricingConfig } from '../../config/pricing.ts';
 
 export interface ChurchDiscountResult {
   enabled: boolean;
@@ -30,16 +30,19 @@ export interface ChurchDiscountResult {
 export interface ChurchDiscountOptions {
   /** True when another promotion already applies; stacking is prohibited. */
   otherDiscountApplied?: boolean;
+  /** Request-scoped pricing configuration (published snapshot). */
+  pricingConfig?: PricingConfig;
 }
 
 export function calculateChurchDiscount(
   cleaningSubtotalUsd: number,
   options: ChurchDiscountOptions = {},
 ): ChurchDiscountResult {
-  const enabled = pricing.churchDiscount.enabled.value;
-  const percent = pricing.churchDiscount.percent.value;
+  const config = options.pricingConfig ?? pricing;
+  const enabled = config.churchDiscount.enabled.value;
+  const percent = config.churchDiscount.percent.value;
   const label = '10% church discount';
-  const termsVersion = pricing.churchDiscount.termsVersion.value;
+  const termsVersion = config.churchDiscount.termsVersion.value;
   const subtotal = Number.isFinite(cleaningSubtotalUsd) && cleaningSubtotalUsd > 0 ? cleaningSubtotalUsd : 0;
 
   const base: ChurchDiscountResult = {

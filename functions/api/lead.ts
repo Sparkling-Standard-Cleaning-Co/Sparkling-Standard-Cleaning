@@ -58,6 +58,7 @@ import { paymentLedger, type LedgerBucket } from '../../src/lib/payments/ledger.
 import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.ts';
 import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { persistLeadSubmission, updateLeadDelivery } from '../../src/lib/admin/lead-persistence.ts';
+import { requestPricingConfig } from '../../src/lib/pricing/server.ts';
 
 interface R2ObjectLike {
   arrayBuffer?(): Promise<ArrayBuffer>;
@@ -296,6 +297,7 @@ export async function onRequestPost(context: {
   env: Env;
 }): Promise<Response> {
   const { request, env } = context;
+  const pricingConfig = await requestPricingConfig(env.DB);
 
   let payload: { subject?: unknown; fields?: unknown; turnstileToken?: unknown };
   try {
@@ -416,6 +418,7 @@ export async function onRequestPost(context: {
     const facility = verifyFacilityQuote(clean, {
       routedOneWayMiles: facilityRoute?.oneWayMiles ?? null,
       routedTravelVerified: facilityTravelVerified,
+      pricingConfig,
     });
     if (!facility.pricingEnabled) stripFacilityPricingFields(clean);
     clean.facility_quote_verified = !facilityTravelVerified
@@ -501,6 +504,8 @@ export async function onRequestPost(context: {
       const verification = await verifyReservationQuote(
         clientOngoingPrice ? { ...clean, ongoing_price_per_visit: clientOngoingPrice } : clean,
         env,
+        Date.now(),
+        pricingConfig,
       );
       clean.verification_status = 'authoritative';
       clean.quote_verified = verification.status;

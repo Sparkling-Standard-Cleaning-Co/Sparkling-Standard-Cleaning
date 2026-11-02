@@ -10,9 +10,9 @@
 // Travel economics are shared with the serverless function via
 // `src/config/estimators/travel.ts` (imported below) — do not duplicate those numbers.
 
-import { travelConfig } from './estimators/travel.ts';
-import { ownerPricing } from './estimators/pricing-values.ts';
-import { PRICING_CONFIG_VERSION } from './estimators/pricing-version.ts';
+import { travelConfig, type TravelConfigValues } from './estimators/travel.ts';
+import { ownerPricing, type OwnerPricingConfig } from './estimators/pricing-values.ts';
+import { computePricingConfigVersion, PRICING_CONFIG_VERSION } from './estimators/pricing-version.ts';
 
 // ── WHAT IS PUBLIC vs INTERNAL ───────────────────────────────────────────────
 // PUBLIC (may be shown to customers):
@@ -82,7 +82,8 @@ export interface AddonDefinition {
   category: 'kitchen' | 'bath_laundry' | 'windows' | 'interior_detail' | 'pets' | 'organization' | 'specialty';
 }
 
-export const pricing = {
+function buildPricing(owner: OwnerPricingConfig, travel: TravelConfigValues, configVersion: string) {
+  return {
   // ── Internal labor economics (directive §21) ───────────────────────────────
   laborEconomics: {
     /**
@@ -95,11 +96,11 @@ export const pricing = {
      * hourly rate. The model must still cover real operating costs and margin.
      */
     targetGrossRevenuePerLaborHour: approved(
-      ownerPricing.hourlyRates.otherServices,
+      owner.hourlyRates.otherServices,
       'Owner-approved $55 productive labor-hour billing target (2026-10-21), applied to one-time, deep, move-in/out and STR work. Never displayed publicly.',
     ),
     recurringGrossRevenuePerLaborHour: approved(
-      ownerPricing.hourlyRates.recurring,
+      owner.hourlyRates.recurring,
       'Owner-approved $55 productive labor-hour billing target (2026-10-21), applied to recurring maintenance. Never displayed publicly.',
     ),
     /**
@@ -107,14 +108,14 @@ export const pricing = {
      * INTERNAL ONLY.
      */
     ownerLaborTargetPerHour: provisional(
-      ownerPricing.hourlyRates.ownerLaborTarget,
+      owner.hourlyRates.ownerLaborTarget,
       'Directive §21 owner labor target floor. The estimate engine must keep even small jobs economically rational against this floor.',
     ),
   },
 
   // ── Minimum job value (directive §22) ──────────────────────────────────────
   minimumJob: provisional(
-    ownerPricing.minimumJob,
+    owner.minimumJob,
     'Directive 22 initial provisional minimum. One setting only. Applied silently to the estimate range; the number is not advertised unless the owner approves.',
   ),
 
@@ -127,7 +128,7 @@ export const pricing = {
   residentialExtras: {
     state: 'approved' as ApprovalState,
     priceFactor: approved(
-      ownerPricing.residentialExtras.priceFactor,
+      owner.residentialExtras.priceFactor,
       'Owner-approved 15% reduction of residential optional-extra prices (2026-10-28).',
     ),
     note: 'Applies exactly once to each residential add-on charge. Existing bundles and the three-extra bundle calculate from the reduced extras subtotal.',
@@ -141,19 +142,19 @@ export const pricing = {
    */
   estimatorCalibration: {
     residential: approved(
-      ownerPricing.estimatorCalibration.residential,
+      owner.estimatorCalibration.residential,
       'Owner calibration factor for the Residential engine. Applies to the eligible service subtotal after the existing discount/minimum order; travel and tax are separate.',
     ),
     str: approved(
-      ownerPricing.estimatorCalibration.str,
+      owner.estimatorCalibration.str,
       'Owner calibration factor for the Short-Term Rental / Turnover engine. Independent from Residential; travel and tax are separate.',
     ),
     commercial: approved(
-      ownerPricing.estimatorCalibration.commercial,
+      owner.estimatorCalibration.commercial,
       'Owner calibration factor for the Commercial engine. Independent from Church; travel and tax are separate.',
     ),
     church: approved(
-      ownerPricing.estimatorCalibration.church,
+      owner.estimatorCalibration.church,
       'Owner calibration factor for the Church engine. Independent from Commercial; travel and tax are separate.',
     ),
   },
@@ -167,19 +168,19 @@ export const pricing = {
   supportiveHomeDiscount: {
     state: 'approved' as ApprovalState,
     termsVersion: approved(
-      ownerPricing.supportiveHomeDiscount.termsVersion,
+      owner.supportiveHomeDiscount.termsVersion,
       'Version marker for the Community Support eligibility-discount terms.',
     ),
     enabled: approved(
-      ownerPricing.supportiveHomeDiscount.enabled,
+      owner.supportiveHomeDiscount.enabled,
       'Owner-directed Community Support 10% discount (2026-10-25).',
     ),
     percent: approved(
-      ownerPricing.supportiveHomeDiscount.percent,
+      owner.supportiveHomeDiscount.percent,
       'Owner-directed 10% appreciation discount for eligible Community Support customers.',
     ),
     eligibleServices: approved(
-      ownerPricing.supportiveHomeDiscount.eligibleServices,
+      owner.supportiveHomeDiscount.eligibleServices,
       'Residential services eligible for the Community Support discount (never commercial, church or STR).',
     ),
     appliesTo: 'cleaning_subtotal' as const,
@@ -198,8 +199,8 @@ export const pricing = {
   churchDiscount: {
     state: 'approved' as ApprovalState,
     termsVersion: approved('2026-10-24.church10.v1', 'Version marker for the owner-directed 10% church discount terms.'),
-    enabled: approved(ownerPricing.churchDiscount.enabled, 'Owner directed the church discount on 2026-10-24.'),
-    percent: approved(ownerPricing.churchDiscount.percent, 'Owner-directed 10% off eligible church cleaning services.'),
+    enabled: approved(owner.churchDiscount.enabled, 'Owner directed the church discount on 2026-10-24.'),
+    percent: approved(owner.churchDiscount.percent, 'Owner-directed 10% off eligible church cleaning services.'),
     appliesTo: 'cleaning_subtotal' as const,
     stacking: false as const,
     minimumRule: 'applied_after_minimum' as const,
@@ -213,24 +214,24 @@ export const pricing = {
   // scope-review experience with no numeric prices.
   commercialPricing: {
     state: 'approved' as ApprovalState,
-    configVersion: approved(PRICING_CONFIG_VERSION, 'Automatic deterministic fingerprint of the effective facility pricing configuration.'),
-    grossRatePerHour: approved(ownerPricing.commercialPricing.grossRatePerHour, 'Middle of the published Pensacola market range (-75/hr); sustains owner labour, overhead and a modest margin.'),
+    configVersion: approved(configVersion, 'Automatic deterministic fingerprint of the effective facility pricing configuration.'),
+    grossRatePerHour: approved(owner.commercialPricing.grossRatePerHour, 'Middle of the published Pensacola market range (-75/hr); sustains owner labour, overhead and a modest margin.'),
     productionSqftPerHour: {
-      office: approved(ownerPricing.commercialPricing.productionSqftPerHour.office, 'Conservative effective rate for a DETAILED office standard (ISSA routine benchmark is ~4,200 sqft/hr; lowered for quality, obstacle density and nonproductive time).'),
-      retail: approved(ownerPricing.commercialPricing.productionSqftPerHour.retail, 'Conservative retail production rate.'),
-      salon: approved(ownerPricing.commercialPricing.productionSqftPerHour.salon, 'Salon/barbershop: denser fixtures and detail.'),
-      gym: approved(ownerPricing.commercialPricing.productionSqftPerHour.gym, 'Gym/fitness: dense high-touch and floor work.'),
-      community: approved(ownerPricing.commercialPricing.productionSqftPerHour.community, 'Apartment common areas and community spaces.'),
-      church: approved(ownerPricing.commercialPricing.productionSqftPerHour.church, 'Church facilities: pews, classrooms and mixed spaces.'),
+      office: approved(owner.commercialPricing.productionSqftPerHour.office, 'Conservative effective rate for a DETAILED office standard (ISSA routine benchmark is ~4,200 sqft/hr; lowered for quality, obstacle density and nonproductive time).'),
+      retail: approved(owner.commercialPricing.productionSqftPerHour.retail, 'Conservative retail production rate.'),
+      salon: approved(owner.commercialPricing.productionSqftPerHour.salon, 'Salon/barbershop: denser fixtures and detail.'),
+      gym: approved(owner.commercialPricing.productionSqftPerHour.gym, 'Gym/fitness: dense high-touch and floor work.'),
+      community: approved(owner.commercialPricing.productionSqftPerHour.community, 'Apartment common areas and community spaces.'),
+      church: approved(owner.commercialPricing.productionSqftPerHour.church, 'Church facilities: pews, classrooms and mixed spaces.'),
     },
-    fixtureMinutes: approved(ownerPricing.commercialPricing.fixtureMinutes, 'ISSA fixture method: restroom cleaning measured per fixture, not per room (3 min fixture routine).'),
-    breakroomMinutes: approved(ownerPricing.commercialPricing.breakroomMinutes, 'Supplemental breakroom/kitchen detail beyond the area rate.'),
-    setupMinutes: approved(ownerPricing.commercialPricing.setupMinutes, 'Arrival, equipment and close-out overhead per visit.'),
-    firstCleanFactor: approved(ownerPricing.commercialPricing.firstCleanFactor, 'Initial detail clean takes longer than routine maintenance.'),
-    rangeSpreadPercent: approved(ownerPricing.commercialPricing.rangeSpreadPercent, 'Tier B uncertainty band.'),
-    tierAHours: approved(ownerPricing.commercialPricing.tierAHours, 'Up to ~3 labour hours for a single preliminary price.'),
-    tierBHours: approved(ownerPricing.commercialPricing.tierBHours, 'Up to ~8 labour hours for a preliminary range; above is custom scope review.'),
-    overheadRatePercent: approved(ownerPricing.commercialPricing.overheadRatePercent, 'Conservative operating overhead allowance (supplies, admin, insurance, payment processing, rework) used for the financial audit. Travel is additional.'),
+    fixtureMinutes: approved(owner.commercialPricing.fixtureMinutes, 'ISSA fixture method: restroom cleaning measured per fixture, not per room (3 min fixture routine).'),
+    breakroomMinutes: approved(owner.commercialPricing.breakroomMinutes, 'Supplemental breakroom/kitchen detail beyond the area rate.'),
+    setupMinutes: approved(owner.commercialPricing.setupMinutes, 'Arrival, equipment and close-out overhead per visit.'),
+    firstCleanFactor: approved(owner.commercialPricing.firstCleanFactor, 'Initial detail clean takes longer than routine maintenance.'),
+    rangeSpreadPercent: approved(owner.commercialPricing.rangeSpreadPercent, 'Tier B uncertainty band.'),
+    tierAHours: approved(owner.commercialPricing.tierAHours, 'Up to ~3 labour hours for a single preliminary price.'),
+    tierBHours: approved(owner.commercialPricing.tierBHours, 'Up to ~8 labour hours for a preliminary range; above is custom scope review.'),
+    overheadRatePercent: approved(owner.commercialPricing.overheadRatePercent, 'Conservative operating overhead allowance (supplies, admin, insurance, payment processing, rework) used for the financial audit. Travel is additional.'),
     note: 'Enables nonbinding preliminary facility estimates. Owner review and final scope confirmation remain required. Commercial prices round UP to the next $5.',
   },
 
@@ -240,38 +241,38 @@ export const pricing = {
   // below reproduces those anchors and is intended for recalibration.
   laborModel: {
     baseHours: {
-      standard: provisional(ownerPricing.baseLaborHours.standard, 'Chosen so a maintained ~1600 sqft 3/2 standard clean lands at ≈4.8–4.9 labor-hours (directive §20 anchor).'),
-      deep: provisional(ownerPricing.baseLaborHours.deep, 'Deep cleaning adds baseboard/trim/door/frame/wall-detail time on top of the standard scope.'),
-      move_in_out: provisional(ownerPricing.baseLaborHours.move_in_out, 'Move-in/move-out assumes an empty or nearly empty home with inside-cabinet and appliance attention.'),
-      str_turnover: provisional(ownerPricing.baseLaborHours.str_turnover, 'STR turnover base excludes size/beds; a 2/2 with 2 beds lands at ≈3.0–3.2 labor-hours including linen reset.'),
+      standard: provisional(owner.baseLaborHours.standard, 'Chosen so a maintained ~1600 sqft 3/2 standard clean lands at ≈4.8–4.9 labor-hours (directive §20 anchor).'),
+      deep: provisional(owner.baseLaborHours.deep, 'Deep cleaning adds baseboard/trim/door/frame/wall-detail time on top of the standard scope.'),
+      move_in_out: provisional(owner.baseLaborHours.move_in_out, 'Move-in/move-out assumes an empty or nearly empty home with inside-cabinet and appliance attention.'),
+      str_turnover: provisional(owner.baseLaborHours.str_turnover, 'STR turnover base excludes size/beds; a 2/2 with 2 beds lands at ≈3.0–3.2 labor-hours including linen reset.'),
     } satisfies Record<PricingServiceType, ConfigValue<number>>,
-    sqftHoursPerThousand: provisional(ownerPricing.laborUnits.sqftHoursPerThousand, 'Square footage matters more than bedroom count (directive §27). 1000 sqft ≈ 1.1 labor-hours at standard condition.'),
-    fullBathHours: provisional(ownerPricing.laborUnits.fullBathHours, 'Bathrooms are the most labor-dense rooms in the home.'),
-    halfBathHours: provisional(ownerPricing.laborUnits.halfBathHours, 'Half baths take roughly half a full bath.'),
-    bedroomHours: provisional(ownerPricing.laborUnits.bedroomHours, 'Bedrooms beyond the first two add light time; deliberately small so the model does not overfit bedroom count (directive §27).'),
-    bedroomsIncludedInBase: provisional(ownerPricing.laborUnits.bedroomsIncludedInBase, 'First two bedrooms are already inside baseHours.'),
-    strBathHours: provisional(ownerPricing.laborUnits.strBathHours, 'STR bathroom reset per full bath.'),
-    strBedHours: provisional(ownerPricing.laborUnits.strBedHours, 'STR bed reset (linens, presentation) per bed.'),
-    strSqftHoursPerThousand: provisional(ownerPricing.laborUnits.strSqftHoursPerThousand, 'STR turnover is a reset, not a deep clean; square footage contributes less than residential cleaning.'),
+    sqftHoursPerThousand: provisional(owner.laborUnits.sqftHoursPerThousand, 'Square footage matters more than bedroom count (directive §27). 1000 sqft ≈ 1.1 labor-hours at standard condition.'),
+    fullBathHours: provisional(owner.laborUnits.fullBathHours, 'Bathrooms are the most labor-dense rooms in the home.'),
+    halfBathHours: provisional(owner.laborUnits.halfBathHours, 'Half baths take roughly half a full bath.'),
+    bedroomHours: provisional(owner.laborUnits.bedroomHours, 'Bedrooms beyond the first two add light time; deliberately small so the model does not overfit bedroom count (directive §27).'),
+    bedroomsIncludedInBase: provisional(owner.laborUnits.bedroomsIncludedInBase, 'First two bedrooms are already inside baseHours.'),
+    strBathHours: provisional(owner.laborUnits.strBathHours, 'STR bathroom reset per full bath.'),
+    strBedHours: provisional(owner.laborUnits.strBedHours, 'STR bed reset (linens, presentation) per bed.'),
+    strSqftHoursPerThousand: provisional(owner.laborUnits.strSqftHoursPerThousand, 'STR turnover is a reset, not a deep clean; square footage contributes less than residential cleaning.'),
   },
 
   /** Condition multiplier applied to total labor (directive §25 step 3). */
   conditionFactors: {
-    maintained: provisional(ownerPricing.conditionFactors.maintained, 'Recently and regularly cleaned home in good shape.'),
-    average: provisional(ownerPricing.conditionFactors.average, 'Lived-in home with normal buildup.'),
-    needs_attention: provisional(ownerPricing.conditionFactors.needs_attention, 'Noticeably overdue cleaning; extra attention throughout.'),
-    heavy: provisional(ownerPricing.conditionFactors.heavy, 'Heavy buildup; multiple areas need detail work.'),
-    severe: provisional(ownerPricing.conditionFactors.severe, 'Severe condition — always routed to custom confirmation, never an instant estimate.'),
+    maintained: provisional(owner.conditionFactors.maintained, 'Recently and regularly cleaned home in good shape.'),
+    average: provisional(owner.conditionFactors.average, 'Lived-in home with normal buildup.'),
+    needs_attention: provisional(owner.conditionFactors.needs_attention, 'Noticeably overdue cleaning; extra attention throughout.'),
+    heavy: provisional(owner.conditionFactors.heavy, 'Heavy buildup; multiple areas need detail work.'),
+    severe: provisional(owner.conditionFactors.severe, 'Severe condition — always routed to custom confirmation, never an instant estimate.'),
   } satisfies Record<Condition, ConfigValue<number>>,
 
   /** How long since the last professional clean (directive §25 step 3). */
   lastCleanFactors: {
-    within_month: provisional(ownerPricing.lastCleanFactors.within_month, 'Home maintained recently; recurring service is realistic.'),
-    one_to_three_months: provisional(ownerPricing.lastCleanFactors.one_to_three_months, 'Small additional detail time expected.'),
-    three_to_twelve_months: provisional(ownerPricing.lastCleanFactors.three_to_twelve_months, 'Noticeable buildup in neglected areas.'),
-    over_a_year: provisional(ownerPricing.lastCleanFactors.over_a_year, 'Extended gap; first visit behaves close to a first professional clean.'),
-    never_professional: provisional(ownerPricing.lastCleanFactors.never_professional, 'First professional clean — matches the directive §20 ≈6 labor-hour anchor for a maintained 3/2.'),
-    not_sure: provisional(ownerPricing.lastCleanFactors.not_sure, 'Conservative middle value when the customer is unsure; flagged for review.'),
+    within_month: provisional(owner.lastCleanFactors.within_month, 'Home maintained recently; recurring service is realistic.'),
+    one_to_three_months: provisional(owner.lastCleanFactors.one_to_three_months, 'Small additional detail time expected.'),
+    three_to_twelve_months: provisional(owner.lastCleanFactors.three_to_twelve_months, 'Noticeable buildup in neglected areas.'),
+    over_a_year: provisional(owner.lastCleanFactors.over_a_year, 'Extended gap; first visit behaves close to a first professional clean.'),
+    never_professional: provisional(owner.lastCleanFactors.never_professional, 'First professional clean — matches the directive §20 ≈6 labor-hour anchor for a maintained 3/2.'),
+    not_sure: provisional(owner.lastCleanFactors.not_sure, 'Conservative middle value when the customer is unsure; flagged for review.'),
   } satisfies Record<LastProfessionalClean, ConfigValue<number>>,
 
   /**
@@ -280,10 +281,10 @@ export const pricing = {
    * not a marketing discount (directive §28).
    */
   frequencyFactors: {
-    weekly: provisional(ownerPricing.frequencyFactors.weekly, 'Weekly homes are the most maintainable; best per-visit value follows from labor efficiency.'),
-    biweekly: provisional(ownerPricing.frequencyFactors.biweekly, 'Biweekly homes remain close to maintenance level.'),
-    monthly: provisional(ownerPricing.frequencyFactors.monthly, 'Monthly homes drift; smaller efficiency benefit.'),
-    one_time: provisional(ownerPricing.frequencyFactors.one_time, 'One-time baseline — no maintenance benefit.'),
+    weekly: provisional(owner.frequencyFactors.weekly, 'Weekly homes are the most maintainable; best per-visit value follows from labor efficiency.'),
+    biweekly: provisional(owner.frequencyFactors.biweekly, 'Biweekly homes remain close to maintenance level.'),
+    monthly: provisional(owner.frequencyFactors.monthly, 'Monthly homes drift; smaller efficiency benefit.'),
+    one_time: provisional(owner.frequencyFactors.one_time, 'One-time baseline — no maintenance benefit.'),
   } satisfies Record<Frequency, ConfigValue<number>>,
 
   /**
@@ -306,7 +307,7 @@ export const pricing = {
   addons: {
     state: 'provisional' as ApprovalState,
     // Raw items (including any optional fixedPriceUsd) live in estimators/pricing-values.ts.
-    items: ownerPricing.addons,
+    items: owner.addons,
     note: 'Add-on amounts are calculated from labor-hours × the applicable approved rate (or the owner-set fixed price when one exists). Specialty items show “Custom quote” and are never priced instantly.',
   },
 
@@ -315,18 +316,18 @@ export const pricing = {
   // engine applies exactly ONE tier to the eligible add-on subtotal; it never
   // discounts base cleaning, travel, specialty work or the minimum job price.
   addonIncentive: {
-    enabled: provisional(ownerPricing.promotions.addonIncentive.enabled, 'PROPOSED promotion — requires owner approval before publication. Off by default.'),
+    enabled: provisional(owner.promotions.addonIncentive.enabled, 'PROPOSED promotion — requires owner approval before publication. Off by default.'),
     tiers: [
       {
-        minAddons: ownerPricing.promotions.addonIncentive.twoAddons.minAddons,
-        percent: provisional(ownerPricing.promotions.addonIncentive.twoAddons.percent, 'Proposed: 5% off the eligible add-on subtotal for two add-ons.'),
+        minAddons: owner.promotions.addonIncentive.twoAddons.minAddons,
+        percent: provisional(owner.promotions.addonIncentive.twoAddons.percent, 'Proposed: 5% off the eligible add-on subtotal for two add-ons.'),
       },
       {
-        minAddons: ownerPricing.promotions.addonIncentive.threeOrMoreAddons.minAddons,
-        percent: provisional(ownerPricing.promotions.addonIncentive.threeOrMoreAddons.percent, 'Proposed: 8% off the eligible add-on subtotal for three or more add-ons.'),
+        minAddons: owner.promotions.addonIncentive.threeOrMoreAddons.minAddons,
+        percent: provisional(owner.promotions.addonIncentive.threeOrMoreAddons.percent, 'Proposed: 8% off the eligible add-on subtotal for three or more add-ons.'),
       },
     ],
-    maxDiscount: provisional(ownerPricing.promotions.addonIncentive.maxDiscount, 'Internal safety cap on the incentive amount; keep below the smallest realistic add-on subtotal without owner review.'),
+    maxDiscount: provisional(owner.promotions.addonIncentive.maxDiscount, 'Internal safety cap on the incentive amount; keep below the smallest realistic add-on subtotal without owner review.'),
     note: 'Single tier only (never stacked). Applies only to non-specialty add-ons. Requires owner approval before it can be enabled.',
   },
 
@@ -339,14 +340,14 @@ export const pricing = {
   customThreeExtraBundle: {
     state: 'approved' as ApprovalState,
     enabled: approved(
-      ownerPricing.promotions.customThreeExtraBundle.enabled,
+      owner.promotions.customThreeExtraBundle.enabled,
       'Owner-approved three-extra bundle (2026-10-28).',
     ),
     percent: approved(
-      ownerPricing.promotions.customThreeExtraBundle.percent,
+      owner.promotions.customThreeExtraBundle.percent,
       'Owner-approved 20% off exactly three eligible residential extras.',
     ),
-    maxDiscountUsd: ownerPricing.promotions.customThreeExtraBundle.maxDiscountUsd,
+    maxDiscountUsd: owner.promotions.customThreeExtraBundle.maxDiscountUsd,
     note: 'Exact-three qualifying rule. Specialty/custom-quote items are ineligible. The standard bundles and this bundle compete under the single-discount policy.',
   },
 
@@ -354,12 +355,12 @@ export const pricing = {
   // Requires owner approval AND operational evidence before publication. The
   // discount is a service-recovery credit, never an automatic booking promise.
   responseGuarantee: {
-    enabled: provisional(ownerPricing.promotions.responseGuarantee.enabled, 'PROPOSED customer-service guarantee — requires owner approval and documented response tracking before publication.'),
-    windowBusinessHours: provisional(ownerPricing.promotions.responseGuarantee.windowBusinessHours, 'One business hour, measured during published business hours (America/Chicago).'),
-    discountPercent: provisional(ownerPricing.promotions.responseGuarantee.discountPercent, 'Proposed 25% off the first eligible cleaning when the personal response misses the window.'),
-    maxDiscount: provisional(ownerPricing.promotions.responseGuarantee.maxDiscount, 'Proposed $50 maximum credit.'),
-    eligibleServices: ownerPricing.promotions.responseGuarantee.eligibleServices,
-    businessTimezone: ownerPricing.promotions.responseGuarantee.businessTimezone,
+    enabled: provisional(owner.promotions.responseGuarantee.enabled, 'PROPOSED customer-service guarantee — requires owner approval and documented response tracking before publication.'),
+    windowBusinessHours: provisional(owner.promotions.responseGuarantee.windowBusinessHours, 'One business hour, measured during published business hours (America/Chicago).'),
+    discountPercent: provisional(owner.promotions.responseGuarantee.discountPercent, 'Proposed 25% off the first eligible cleaning when the personal response misses the window.'),
+    maxDiscount: provisional(owner.promotions.responseGuarantee.maxDiscount, 'Proposed $50 maximum credit.'),
+    eligibleServices: owner.promotions.responseGuarantee.eligibleServices,
+    businessTimezone: owner.promotions.responseGuarantee.businessTimezone,
     note: 'Automatic acknowledgments do not count as a response; the clock starts when a request arrives during business hours, or when the next business day begins. Does not combine with other promotions. Requires documented receipt and response timestamps.',
   },
 
@@ -370,9 +371,9 @@ export const pricing = {
   // docs/launch/PROMOTION-PROPOSALS.md. The effective configuration fingerprint
   // changes automatically so old quotes cannot be silently reused.
   promotions: {
-    appreciationDiscounts: ownerPricing.promotions.appreciationDiscounts,
-    addonBundles: ownerPricing.promotions.addonBundles,
-    foundingTen: ownerPricing.promotions.foundingTen,
+    appreciationDiscounts: owner.promotions.appreciationDiscounts,
+    addonBundles: owner.promotions.addonBundles,
+    foundingTen: owner.promotions.foundingTen,
     /**
      * SPARKLE15 welcome campaign — the one owner-approved, ENABLED program
      * (2026-10-21 directive). Claim-based: it applies only when the customer
@@ -383,7 +384,7 @@ export const pricing = {
      * ownerPricing.promotions.campaign.enabled to false.
      */
     campaign: approved(
-      ownerPricing.promotions.campaign,
+      owner.promotions.campaign,
       'Owner-approved 15%-off (capped at $100) first-clean welcome campaign for new weekly, biweekly or monthly recurring residential customers (2026-10-30). Claim-only; redemption confirmed by the owner; never stacks with another promotion. Legacy SPARKLE100 claims are honored with their original $100 fixed terms.',
     ),
     note: 'Prepared, unpublished promotion programs ship disabled with no terms until owner approval. The SPARKLE15 campaign is the single approved exception.',
@@ -402,11 +403,11 @@ export const pricing = {
 
   // ── Estimate range presentation (directive §23) ────────────────────────────
   range: {
-    lowFactor: provisional(ownerPricing.range.lowFactor, 'Low end of the presented range.'),
-    highFactor: provisional(ownerPricing.range.highFactor, 'High end of the presented range.'),
+    lowFactor: provisional(owner.range.lowFactor, 'Low end of the presented range.'),
+    highFactor: provisional(owner.range.highFactor, 'High end of the presented range.'),
   },
   rounding: {
-    toNearest: provisional(ownerPricing.rounding.roundToNearest, 'Round estimates to the nearest $5 to avoid false precision.'),
+    toNearest: provisional(owner.rounding.roundToNearest, 'Round estimates to the nearest $5 to avoid false precision.'),
   },
 
   // ── Travel policy (directive §31, §34) ─────────────────────────────────────
@@ -417,17 +418,17 @@ export const pricing = {
      * client and the serverless function cannot drift apart.
      */
     includedOneWayMiles: provisional(
-      travelConfig.includedOneWayMiles,
+      travel.includedOneWayMiles,
       'Shared with functions/api/travel.ts via src/config/estimators/travel.ts. Directive §31 starting point.',
     ),
     /** Per-mile vehicle cost (fuel excluded; fuel is priced live) in USD. */
     perMileWearCost: provisional(
-      travelConfig.wearPerMile,
+      travel.wearPerMile,
       'Shared wear allowance (tires, oil, depreciation). Reviewed monthly against real job data.',
     ),
     /** Gulf Coast weekly retail gasoline reference used when the EIA feed is down. */
     fallbackGasPrice: provisional(
-      travelConfig.fallbackGasPrice,
+      travel.fallbackGasPrice,
       'Reference only — NOT a Pensacola pump price claim. The live EIA feed overrides it when available.',
     ),
     /** Flat adjustments used by the offline zone fallback (no routing). */
@@ -441,9 +442,9 @@ export const pricing = {
      * these keep the offline estimator reasonable.
      */
     clientDefaults: {
-      mpg: provisional(travelConfig.mpg, 'Shared with functions/api/travel.ts. Update both together when the vehicle changes.'),
+      mpg: provisional(travel.mpg, 'Shared with functions/api/travel.ts. Update both together when the vehicle changes.'),
       maxInstantDistanceMiles: provisional(
-        travelConfig.maxInstantDistanceMiles,
+        travel.maxInstantDistanceMiles,
         'Hard safety cap for routed trips without a duration. Beyond this a routed job requires manual confirmation.',
       ),
     },
@@ -457,12 +458,12 @@ export const pricing = {
      * PROVISIONAL — owner must approve the final value before binding quotes.
      */
     maxDrivingMinutes: provisional(
-      travelConfig.maxDrivingMinutes,
+      travel.maxDrivingMinutes,
       'Owner intent: about one hour of actual driving time from the private operating origin. Requires owner approval before binding instant prices.',
     ),
     /** Additional review band beyond the boundary (needs personal confirmation). */
     reviewBandMinutes: provisional(
-      travelConfig.reviewBandMinutes,
+      travel.reviewBandMinutes,
       'Proposed 15-minute band; owner approval required. Within the band the estimate is shown and marked for personal confirmation.',
     ),
   },
@@ -489,7 +490,7 @@ export const pricing = {
      * for owner pricing edits and manual calculation-schema changes; never edit
      * this field for a routine price change.
      */
-    configVersion: approved(PRICING_CONFIG_VERSION, 'Automatic deterministic fingerprint of the effective pricing configuration plus calculation-schema marker. Never edit manually.'),
+    configVersion: approved(configVersion, 'Automatic deterministic fingerprint of the effective pricing configuration plus calculation-schema marker. Never edit manually.'),
     /**
      * Which value from the calculation becomes the offered price. 'expected' is
      * the model price and never the lowest range value; 'midpoint' and 'high'
@@ -543,8 +544,39 @@ export const pricing = {
     publishMinimumJob: false,
   },
 } as const;
+}
 
-export type PricingConfig = typeof pricing;
+export type PricingConfig = ReturnType<typeof buildPricing>;
+
+/**
+ * Active effective pricing configuration. ES module live bindings mean every
+ * importer reads the current configuration after `activatePricingConfig`.
+ * The source values remain the safe default when no published snapshot exists.
+ */
+export let pricing: PricingConfig = buildPricing(ownerPricing, travelConfig, PRICING_CONFIG_VERSION);
+
+/** Builds a complete, validated pricing configuration from a snapshot. */
+export function buildPricingConfig(
+  owner: OwnerPricingConfig,
+  travel: TravelConfigValues = travelConfig,
+): PricingConfig {
+  return buildPricing(owner, travel, computePricingConfigVersion({ owner, travel }));
+}
+
+/** Activates a published pricing snapshot for this isolate/request. */
+export function activatePricingConfig(
+  owner: OwnerPricingConfig,
+  travel: TravelConfigValues = travelConfig,
+): PricingConfig {
+  pricing = buildPricingConfig(owner, travel);
+  return pricing;
+}
+
+/** Restores the source-controlled baseline (tests and safe fallback). */
+export function resetActivePricing(): PricingConfig {
+  pricing = buildPricing(ownerPricing, travelConfig, PRICING_CONFIG_VERSION);
+  return pricing;
+}
 
 /** Convenience accessor that keeps call sites readable. */
 export function pricingValue<T>(configValue: ConfigValue<T>): T {
@@ -567,8 +599,9 @@ export type EstimatorCalibrationEngine = 'residential' | 'str' | 'commercial' | 
 export function resolveEstimatorCalibration(
   engine: EstimatorCalibrationEngine,
   override?: number | undefined,
+  config: PricingConfig = pricing,
 ): number {
-  const configured = pricing.estimatorCalibration[engine].value;
+  const configured = config.estimatorCalibration[engine].value;
   const value = override ?? configured;
   if (!Number.isFinite(value)) return 1;
   if (value < ESTIMATOR_CALIBRATION_MIN || value > ESTIMATOR_CALIBRATION_MAX) return 1;

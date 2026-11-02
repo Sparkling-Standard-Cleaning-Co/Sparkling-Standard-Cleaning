@@ -6,7 +6,7 @@
 // estimator uses this helper for the per-add-on display, the selected extras,
 // the add-on subtotal and the instant quote, so those values cannot drift.
 
-import { pricing } from '../../config/pricing.ts';
+import { pricing, type PricingConfig } from '../../config/pricing.ts';
 import type { AddonDefinition } from '../../config/pricing.ts';
 import type { SelectedAddon } from './types.ts';
 
@@ -43,13 +43,13 @@ export function resolveAddonCharge(
   return round2((definition.laborHours ?? 0) * ratePerLaborHour * factor);
 }
 
-export function selectAddons(addonIds: string[]): AddonSelection {
+export function selectAddons(addonIds: string[], config: PricingConfig = pricing): AddonSelection {
   const selected: SelectedAddon[] = [];
   let totalLaborHours = 0;
   let hasCustomQuoteAddon = false;
 
   for (const id of addonIds) {
-    const definition = pricing.addons.items.find((item) => item.id === id);
+    const definition = config.addons.items.find((item) => item.id === id);
     if (!definition) continue;
     selected.push({
       id: definition.id,

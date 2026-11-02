@@ -87,6 +87,7 @@ function migratedDb(): TestD1 {
     '0023_document_signature_attempts.sql',
     '0024_financial_ledger_parties.sql',
     '0025_refunds_disputes_webhooks.sql',
+    '0026_pricing_control.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
