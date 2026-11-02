@@ -184,6 +184,9 @@ test('the owner can open the timekeeping board and see hours and corrections', a
   try {
     await page.locator('[data-admin-nav="timekeeping"]').click();
     await page.locator('[data-admin-view="timekeeping"]').waitFor({ state: 'visible' });
+    await page.waitForFunction(() =>
+      document.querySelector('[data-admin-time-employees]')?.textContent?.includes('Test Cleaner'),
+    );
     assert.equal(await page.locator('[data-admin-view-title]').innerText(), 'Timekeeping');
     const text = await page.locator('[data-admin-view="timekeeping"]').innerText();
     assert.match(text, /Test Cleaner/);
