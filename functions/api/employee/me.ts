@@ -41,6 +41,9 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     }
     const profile = await employeeProfile(db, actor.id);
     if (!profile) return json({ ok: false, error: 'employee_profile_missing', actor: { name: actor.name } }, 403);
+    if (profile.status !== 'active') {
+      return json({ ok: false, error: 'employee_profile_inactive' }, 403);
+    }
 
     const now = new Date();
     const week = workweekBounds(now);

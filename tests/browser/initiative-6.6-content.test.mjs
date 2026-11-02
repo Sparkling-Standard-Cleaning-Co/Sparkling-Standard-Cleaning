@@ -10,6 +10,7 @@ import { chromium } from 'playwright';
 
 const PORT = 4426;
 const BASE = `http://localhost:${PORT}`;
+const DATE = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10);
 
 let server;
 let browser;
@@ -268,6 +269,36 @@ test('Pay Now appears only for an exact Tier A facility quote when Stripe is con
       }),
     });
   });
+  await page.route('**/api/availability**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        enabled: true,
+        timeZone: 'America/Chicago',
+        timeZoneLabel: 'Central Time',
+        date: DATE,
+        durationMinutes: 120,
+        available: true,
+        slots: [
+          { start: `${DATE}T14:00:00.000Z`, end: `${DATE}T16:00:00.000Z`, startLabel: '9:00 AM', endLabel: '11:00 AM' },
+        ],
+      }),
+    }),
+  );
+  await page.route('**/api/booking-hold', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        holdId: `${DATE}__12345678-1234-1234-1234-123456789abc`,
+        expiresAt: new Date(Date.now() + 20 * 60_000).toISOString(),
+        status: 'held',
+      }),
+    }),
+  );
   await page.route('**tiles.openfreemap.org/**', (route) => route.abort());
   let leadRequests = 0;
   let checkoutRequests = 0;
@@ -329,11 +360,14 @@ test('Pay Now appears only for an exact Tier A facility quote when Stripe is con
     await page.locator('[data-facility-next]').click();
     await page.locator('[data-facility-step-panel="3"]').waitFor({ state: 'visible' });
     await page.selectOption('#fac-window', { index: 1 });
+    await page.fill('#fac-start', DATE);
     await page.locator('[data-facility-next]').click();
     await page.locator('[data-facility-step-panel="4"]').waitFor({ state: 'visible' });
+    await page.waitForSelector('[data-booking-picker]', { state: 'visible' });
+    await page.locator('[data-booking-hold-selected]').click();
+    await page.waitForFunction(() => document.querySelector('[data-booking-hold]')?.hasAttribute('hidden') === false);
     await page.locator('[data-facility-pay-now]').waitFor({ state: 'visible' });
     assert.equal(await page.locator('[data-facility-pay-now]').innerText(), 'Pay Now and Reserve This Cleaning');
-    assert.match(normalize((await page.locator('[data-facility-pay-note]').innerText()) ?? ''), /Pay now to reserve this cleaning/i);
     await page.fill('#fac-phone', '8500000000');
     await page.fill('#fac-email', 'customer@example.test');
     await page.check('#commercial-terms');

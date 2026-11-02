@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+﻿import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { bookingConfig } from '../src/config/booking.ts';
@@ -65,7 +65,7 @@ function googleStub(events: unknown[] = []) {
       return jsonResponse({ items: events });
     }
     if (url.includes('/calendar/v3/calendars/')) {
-      return jsonResponse({ summary: 'Sparkling Standard — Bookings', timeZone: 'America/Chicago' });
+      return jsonResponse({ summary: 'Sparkling Standard â€” Bookings', timeZone: 'America/Chicago' });
     }
     if (url.includes('api.mapmap.ai/route/v1/')) {
       return jsonResponse({ routes: [{ distance: 16093, duration: 1200 }] });
@@ -100,7 +100,7 @@ test('calendar status and jobs use the dedicated calendar, not any other calenda
   ]), async () => {
     const status = await calendarStatus(env as never);
     assert.equal(status.connected, true);
-    assert.equal(status.calendarName, 'Sparkling Standard — Bookings');
+    assert.equal(status.calendarName, 'Sparkling Standard â€” Bookings');
     const jobs = await calendarJobsForDate(env as never, '2026-11-10', 'America/Chicago');
     assert.equal(jobs.ok, true);
     assert.equal(jobs.jobs.length, 1);
@@ -108,6 +108,51 @@ test('calendar status and jobs use the dedicated calendar, not any other calenda
   });
 });
 
+test('calendar jobs follow nextPageToken instead of truncating at one page', async () => {
+  let calls = 0;
+  await withFetch(
+    async (url) => {
+      if (url.includes('oauth2.googleapis.com/token')) {
+        return jsonResponse({ access_token: 'access', expires_in: 3600 });
+      }
+      if (url.includes('/calendar/v3/calendars/') && url.includes('/events')) {
+        calls += 1;
+        if (calls === 1) {
+          return jsonResponse({
+            items: [
+              {
+                id: 'page-1',
+                summary: 'Cleaning one',
+                location: '100 S Baylen St, Pensacola, FL 32502',
+                start: { dateTime: '2026-11-10T14:00:00Z' },
+                end: { dateTime: '2026-11-10T16:00:00Z' },
+              },
+            ],
+            nextPageToken: 'page-2',
+          });
+        }
+        return jsonResponse({
+          items: [
+            {
+              id: 'page-2',
+              summary: 'Cleaning two',
+              location: '200 S Baylen St, Pensacola, FL 32502',
+              start: { dateTime: '2026-11-10T17:00:00Z' },
+              end: { dateTime: '2026-11-10T19:00:00Z' },
+            },
+          ],
+        });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    },
+    async () => {
+      const jobs = await calendarJobsForDate(env as never, '2026-11-10', 'America/Chicago');
+      assert.equal(jobs.ok, true);
+      assert.equal(jobs.jobs.length, 2);
+      assert.equal(calls, 2);
+    },
+  );
+});
 test('creating a confirmed calendar event sends the exact held interval', async () => {
   let body: Record<string, unknown> = {};
   await withFetch(
@@ -121,7 +166,7 @@ test('creating a confirmed calendar event sends the exact held interval', async 
     },
     async () => {
       const created = await createCalendarEvent(env as never, {
-        summary: 'Cleaning — SS-20261027-ABC123',
+        summary: 'Cleaning â€” SS-20261027-ABC123',
         description: 'Customer request',
         location: '100 S Baylen St, Pensacola, FL 32502',
         start: '2026-11-10T15:00:00Z',
@@ -218,7 +263,7 @@ test('owner confirmation revalidates the slot and writes one calendar event', as
           return jsonResponse({ id: 'evt-confirmed' });
         }
         if (url.includes('/calendar/v3/calendars/') && url.includes('/events')) return jsonResponse({ items: [] });
-        if (url.includes('/calendar/v3/calendars/')) return jsonResponse({ summary: 'Sparkling Standard — Bookings', timeZone: 'America/Chicago' });
+        if (url.includes('/calendar/v3/calendars/')) return jsonResponse({ summary: 'Sparkling Standard â€” Bookings', timeZone: 'America/Chicago' });
         if (url.includes('api.mapmap.ai/route/v1/')) return jsonResponse({ routes: [{ distance: 16093, duration: 900 }] });
         throw new Error(`unexpected fetch: ${url}`);
       },

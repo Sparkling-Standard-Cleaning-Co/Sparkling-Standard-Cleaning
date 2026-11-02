@@ -58,6 +58,7 @@ function hour12(hour24: number): number {
 export function initBookingPicker(
   root: HTMLElement,
   getContext: () => BookingContext | null,
+  onChange?: () => void,
 ): BookingPickerHandle {
   const dateInput = root.querySelector<HTMLInputElement>('[data-booking-date]');
   const checkButton = root.querySelector<HTMLButtonElement>('[data-booking-check]');
@@ -91,6 +92,7 @@ export function initBookingPicker(
     }
     if (timePicker) timePicker.hidden = true;
     if (selectedEl) selectedEl.textContent = '';
+    onChange?.();
   }
 
   function slotsForHour(hour24: number): Slot[] {
@@ -272,6 +274,7 @@ export function initBookingPicker(
       }
       if (selectedEl) selectedEl.textContent = `Held start: ${slot.startLabel} (${slot.endLabel} end)`;
       setStatus('Time held temporarily. Send your request to keep the confirmation process moving.', 'success');
+      onChange?.();
     } catch {
       setStatus('That time could not be held. Please try again or send a reservation request.', 'error');
     }

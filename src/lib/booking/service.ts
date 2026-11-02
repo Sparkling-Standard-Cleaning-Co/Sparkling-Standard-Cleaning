@@ -35,6 +35,7 @@ import {
 
 export interface BookingEnv extends GoogleCalendarEnv, GeocodeEnv, RoutingEnv, BookingStorageEnv, AdminDbEnv {
   DB?: D1Database;
+  RECURRING_SCHEDULING_ENABLED?: string;
 }
 
 export type AvailabilityServiceResult =

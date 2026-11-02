@@ -19,6 +19,8 @@ import { persistLeadSubmission } from '../src/lib/admin/lead-persistence.ts';
 import { onRequestGet as overviewGet } from '../functions/api/admin/overview.ts';
 import { onRequestPost as authPost } from '../functions/api/admin/auth.ts';
 import { onRequestGet as adminRequestsGet, onRequestPost as adminRequestsPost } from '../functions/api/admin/requests.ts';
+import { onRequestGet as operationsGet } from '../functions/api/admin/operations.ts';
+import { onRequestGet as customersGet } from '../functions/api/admin/customers.ts';
 
 const MFA_KEY = 'synthetic-mfa-encryption-key-32-bytes-minimum';
 
@@ -79,6 +81,8 @@ function migratedDb(): TestD1 {
     '0017_dynamic_booking_resources.sql',
     '0018_document_management_and_signing.sql',
     '0019_recurring_worker_runs.sql',
+    '0020_recurring_worker_claim_owner.sql',
+    '0021_least_privilege_cleaner_role.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -132,6 +136,34 @@ test('the cleaning-only migrations apply and preserve core integrity', () => {
   assert.deepEqual(fk, []);
 });
 
+test('cleaner sessions cannot reach admin operations or customer APIs', async () => {
+  const db = migratedDb();
+  db.raw
+    .prepare(
+      `INSERT INTO admin_users
+       (id, branch_id, role_id, email, password_hash, display_name, status)
+       VALUES (?, ?, ?, ?, ?, ?, 'active')`,
+    )
+    .run('user_cleaner', 'branch_pensacola', 'cleaner', 'cleaner@example.test', 'unused', 'Synthetic Cleaner');
+  const session = await createOpsSession(db, 'user_cleaner', request());
+  const cookie = `ss_ops=${session.token}`;
+
+  const operations = await operationsGet({
+    request: new Request('https://example.test/api/admin/operations?view=jobs', {
+      headers: { Cookie: cookie },
+    }),
+    env: { DB: db },
+  } as never);
+  assert.equal(operations.status, 403);
+
+  const customers = await customersGet({
+    request: new Request('https://example.test/api/admin/customers', {
+      headers: { Cookie: cookie },
+    }),
+    env: { DB: db },
+  } as never);
+  assert.equal(customers.status, 403);
+});
 test('owner enrollment, login, sessions, expiration and CSRF work', async () => {
   const db = migratedDb();
   const owner = await enrollOwner(db, {
@@ -849,7 +881,7 @@ test('signed payment authorization gates saved-card setup and off-session chargi
   }
 });
 
-// ── Owner password policy and self-service recovery (2026-10-30) ─────────────
+// â”€â”€ Owner password policy and self-service recovery (2026-10-30) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function authRequest(body: unknown, ip = '198.51.100.10', origin?: string): Request {
   const headers: Record<string, string> = {

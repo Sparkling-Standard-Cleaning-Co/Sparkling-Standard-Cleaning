@@ -19,6 +19,7 @@ import {
   updateCalendarEvent,
 } from './google-calendar.ts';
 import { availabilityForDate, type BookingEnv } from './service.ts';
+import { recurringSchedulingEnabled } from './recurring-gate.ts';
 import {
   bookingStore,
   getBookingHold,
@@ -449,7 +450,7 @@ export async function commitConfirmedBooking(
   let planId = '';
   let recurringStatus = '';
   let recurringConflicts = 0;
-  if (['weekly', 'biweekly', 'monthly'].includes(frequency)) {
+  if (recurringSchedulingEnabled(env) && ['weekly', 'biweekly', 'monthly'].includes(frequency)) {
     const ongoingPrice = Math.round(
       Number(input.ongoingPriceCents) ||
         Math.round(Number(fields.ongoing_price_per_visit || 0) * 100),

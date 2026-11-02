@@ -170,6 +170,15 @@ test('helpers receive only operational basics from the server response', async (
   assert.equal('service' in job, false);
 });
 
+test('an inactive employee profile is rejected by the employee portal', async () => {
+  const f = await fixture();
+  f.db.raw
+    .prepare("UPDATE team_members SET status = 'inactive' WHERE lower(email) = ?")
+    .run('solo-employee@example.test');
+  const response = await onRequestGet({ request: request(f.soloCookie), env: { DB: f.db } });
+  assert.equal(response.status, 403);
+  assert.equal(((await response.json()) as { error?: string }).error, 'employee_profile_inactive');
+});
 test('employee invitations automatically link the new account to the roster profile', async () => {
   const f = await fixture();
   const linked = f.db.raw

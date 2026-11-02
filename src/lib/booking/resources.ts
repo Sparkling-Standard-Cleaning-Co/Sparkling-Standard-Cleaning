@@ -151,7 +151,9 @@ export async function loadStaffResources(
       .all<TeamRow>();
     rows = result.results ?? [];
   } catch {
-    return fallbackResources();
+    // A transient D1/schema failure must never resurrect a placeholder
+    // cleaner. No roster means no bookable capacity.
+    return [];
   }
   if (rows.length === 0) return [];
 
@@ -166,7 +168,9 @@ export async function loadStaffResources(
         .all<{ team_member_id: string }>();
       unavailable = new Set((timeOff.results ?? []).map((row) => row.team_member_id));
     } catch {
-      // Missing time-off storage must not invent availability; treat as none.
+      // Unreadable time-off storage means we cannot prove who is available.
+      // Fail closed rather than allowing a booking into an unknown gap.
+      return [];
     }
   }
 

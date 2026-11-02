@@ -1,4 +1,4 @@
-﻿// POST /api/estimate-checkout â€” starts a Stripe-hosted Checkout Session for
+// POST /api/estimate-checkout â€” starts a Stripe-hosted Checkout Session for
 // an exact, server-verified residential/STR quote or an exact Tier A facility
 // quote.
 //
@@ -57,7 +57,7 @@ import {
   photoKeyBelongsToRequest,
   sanitizePhotoRequestRef,
 } from '../../src/lib/photos.ts';
-import { bookingStore, getBookingHold, holdIsActive } from '../../src/lib/booking/holds.ts';
+import { bookingStore, getBookingHold, holdIsActive, holdKey } from '../../src/lib/booking/holds.ts';
 import {
   createSigningRequest,
   evaluateDocumentGate,
@@ -241,20 +241,37 @@ async function expireCheckoutSession(env: Env, sessionId: string): Promise<void>
 async function authoritativeHoldId(
   fields: Record<string, string>,
   env: Env,
-): Promise<{ ok: true; holdId: string } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; holdId: string; expiresAt: string; start: string; end: string }
+  | { ok: false; error: string }
+> {
   const holdId = (fields.booking_hold_id ?? '').trim();
-  if (!holdId) return { ok: true, holdId: '' };
+  if (!holdId) return { ok: false, error: 'booking_hold_required' };
   if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
     return { ok: false, error: 'booking_hold_invalid' };
   }
   const store = bookingStore(env);
   if (!store) return { ok: false, error: 'booking_hold_unavailable' };
   const hold = await getBookingHold(store, holdId).catch(() => null);
-  if (!hold || !holdIsActive(hold)) return { ok: false, error: 'booking_hold_expired' };
-  if (hold.reference !== (fields.quote_reference ?? '').trim()) {
+  if (!hold || !holdIsActive(hold) || hold.status !== 'held') {
+    return { ok: false, error: 'booking_hold_expired' };
+  }
+  const facilityHold =
+    fields.request_type === 'facility_estimate' &&
+    hold.start === (fields.booking_slot_start ?? '').trim() &&
+    hold.end === (fields.booking_slot_end ?? '').trim() &&
+    Math.abs(hold.destination.lat - Number(fields.pin_latitude)) < 0.0001 &&
+    Math.abs(hold.destination.lng - Number(fields.pin_longitude)) < 0.0001;
+  if (!facilityHold && hold.reference !== (fields.quote_reference ?? '').trim()) {
     return { ok: false, error: 'booking_hold_mismatch' };
   }
-  return { ok: true, holdId };
+
+  // Stripe Checkout enforces a 30-minute minimum lifetime. Keep the capacity
+  // hold at least as long as the payment window so a session cannot silently
+  // outlive the reserved slot. This is a small extension of the normal hold.
+  const expiresAt = new Date(Date.now() + 31 * 60_000).toISOString();
+  await writeLedgerJson(store, holdKey(hold.id), { ...hold, expiresAt }).catch(() => undefined);
+  return { ok: true, holdId, expiresAt, start: hold.start, end: hold.end };
 }
 async function documentGateForCheckout(
   env: Env,
@@ -589,6 +606,9 @@ async function residentialReference(
   fields: Record<string, string>,
   amountCents: number,
 ): Promise<string> {
+  // The server-issued hold id is the booking/payment identity. The display
+  // quote reference is never used as authorization or idempotency.
+  if (fields.booking_hold_id?.trim()) return fields.booking_hold_id.trim();
   if (verification.referenceValid && verification.clientReference) return verification.clientReference;
   const hash = await paymentHash(
     `${fields.service_type ?? 'standard'}|${amountCents}|${fields.zip ?? ''}|${fields.email ?? ''}`,
@@ -600,6 +620,7 @@ async function facilityReference(
   fields: Record<string, string>,
   amountCents: number,
 ): Promise<string> {
+  if (fields.booking_hold_id?.trim()) return fields.booking_hold_id.trim();
   const hash = await paymentHash(
     `${fields.engine_type ?? 'commercial'}|${amountCents}|${fields.organization ?? ''}|${fields.preferred_date ?? ''}`,
   );
@@ -973,10 +994,20 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
   const photosOutstanding = await authoritativePhotosOutstanding(fields, env);
   fields.photos_outstanding = photosOutstanding ? 'yes' : 'no';
+  const ready = await paymentReadiness(env);
+  if (!ready.enabled) {
+    console.error('[estimate-checkout] payment_not_ready', {
+      mode: ready.mode,
+      checks: ready.checks,
+    });
+    return json({ ok: false, error: 'payment_not_ready', reason: 'configuration' }, 503);
+  }
   const hold = await authoritativeHoldId(fields, env);
   if (!hold.ok) return json({ ok: false, error: hold.error }, 400);
-  if (hold.holdId) fields.booking_hold_id = hold.holdId;
-  else delete fields.booking_hold_id;
+  fields.booking_hold_id = hold.holdId;
+  fields.booking_slot_start = hold.start;
+  fields.booking_slot_end = hold.end;
+  fields.booking_hold_expires_at = hold.expiresAt;
 
   const documentGate = await documentGateForCheckout(env, fields, returnPath);
   if (!documentGate.satisfied) {
@@ -989,15 +1020,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       },
       409,
     );
-  }
-
-  const ready = await paymentReadiness(env);
-  if (!ready.enabled) {
-    console.error('[estimate-checkout] payment_not_ready', {
-      mode: ready.mode,
-      checks: ready.checks,
-    });
-    return json({ ok: false, error: 'payment_not_ready', reason: 'configuration' }, 503);
   }
 
   const candidate =
@@ -1076,6 +1098,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       candidate.serviceType,
       fields.quote_config_version ?? '',
       fields.preferred_date ?? '',
+      fields.booking_hold_id ?? '',
+      fields.booking_slot_start ?? '',
+      fields.booking_slot_end ?? '',
       giftCode,
       String(giftAppliedCents),
     ].join('|'),
@@ -1203,7 +1228,15 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('metadata[tax_jurisdiction]', candidate.tax.jurisdictionKey ?? '');
   if (fields.booking_hold_id) body.set('metadata[booking_hold_id]', fields.booking_hold_id);
   body.set('metadata[photos_outstanding]', photosOutstanding ? 'yes' : 'no');
-  if (gift) body.set('expires_at', String(Math.floor(Date.now() / 1000) + 31 * 60));
+  const holdExpiresAt = Date.parse(fields.booking_hold_expires_at ?? '');
+  body.set(
+    'expires_at',
+    String(
+      Math.floor(
+        (Number.isFinite(holdExpiresAt) ? holdExpiresAt : Date.now() + 31 * 60_000) / 1000,
+      ),
+    ),
+  );
   body.set('customer_email', email);
 
   try {

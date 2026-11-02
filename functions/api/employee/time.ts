@@ -30,6 +30,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     if (!employeeRoleAllowed(actor)) return json({ ok: false, error: 'employee_portal_not_available_for_role' }, 403);
     const profile = await employeeProfile(db, actor.id);
     if (!profile) return json({ ok: false, error: 'employee_profile_missing' }, 403);
+    if (profile.status !== 'active') return json({ ok: false, error: 'employee_profile_inactive' }, 403);
 
     const url = new URL(context.request.url);
     const week = workweekBounds(new Date());

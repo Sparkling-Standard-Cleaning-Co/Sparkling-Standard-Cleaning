@@ -37,14 +37,23 @@ export async function autoConfirmPaidBooking(
     return { ok: false, reason: 'auto_confirm_disabled' };
   }
 
-  if (expectedReference && !expectedReference.match(/^SS-[0-9]{8}-[0-9A-Z]{6}$/)) {
+  const holdIdentity = /^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/i;
+  if (
+    expectedReference &&
+    !expectedReference.match(/^SS-[0-9]{8}-[0-9A-Z]{6}$/) &&
+    !holdIdentity.test(expectedReference)
+  ) {
     return { ok: false, reason: 'reference_invalid' };
   }
 
   const bucket = bookingStore(env);
   if (!bucket) return { ok: false, reason: 'booking_store_not_configured' };
   const hold = await getBookingHold(bucket, holdId);
-  if (expectedReference && hold?.reference !== expectedReference) {
+  if (
+    expectedReference &&
+    hold?.reference !== expectedReference &&
+    hold?.id !== expectedReference
+  ) {
     return { ok: false, reason: 'hold_reference_mismatch' };
   }
   if (hold?.status === 'confirmed' && hold.calendarEventId && !env.DB) {

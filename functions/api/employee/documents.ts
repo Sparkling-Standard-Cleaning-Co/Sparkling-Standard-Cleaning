@@ -26,6 +26,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     if (!employeeRoleAllowed(actor)) return json({ ok: false, error: 'forbidden' }, 403);
     const profile = await employeeProfile(db, actor.id);
     if (!profile) return json({ ok: false, error: 'employee_profile_missing' }, 403);
+    if (profile.status !== 'active') return json({ ok: false, error: 'employee_profile_inactive' }, 403);
     const role = profile.isSolo ? 'solo' : profile.isLead ? 'lead' : 'helper';
     const status = await employeeOnboardingStatus(db, profile.teamMemberId, role);
     if (status.satisfied) {

@@ -2,6 +2,7 @@
 // idempotency, exact-price enforcement and price-change acceptance.
 // No network: geocoding, routing, Stripe and readiness probes are stubbed.
 
+import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -312,7 +313,8 @@ test('a valid facility quote creates one session at the server-calculated amount
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
-  const { price, tax, fields } = validFacilityInput();
+  const { price, tax, fields: baseFields } = validFacilityInput();
+  const fields = withHold(baseFields, ledger);
   let amountCents = '';
 
   const response = await withFetch(
@@ -338,14 +340,18 @@ test('a valid facility quote creates one session at the server-calculated amount
   assert.equal(amountCents, String(Math.round((tax.total ?? price.total) * 100)));
   assert.ok((tax.taxAmount ?? 0) > 0, 'Florida commercial service tax is included');
   assert.equal(provider.postCount(), 1);
-  assert.equal(ledger.values.size, 1);
+  assert.ok(
+    [...ledger.values.keys()].some((key) => key.startsWith('payments/checkouts/')),
+    'the checkout attempt is recorded after the hold-backed session is created',
+  );
 });
 
 test('a Tier B facility quote cannot create a checkout session through the API', async () => {
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
-  const { fields } = tierBFacilityInput();
+  const { fields: baseFields } = tierBFacilityInput();
+  const fields = withHold(baseFields, ledger);
   const response = await withFetch(provider.stub, () =>
     onRequestPost({
       request: jsonRequest({ fields, returnPath: '/estimate/commercial/' }),
@@ -359,11 +365,64 @@ test('a Tier B facility quote cannot create a checkout session through the API',
   assert.equal(provider.postCount(), 0, 'no Stripe session for a Tier B range');
 });
 
-test('repeated requests return the existing session instead of charging twice', async () => {
+test('appointment Pay Now rejects a missing booking hold', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub();
+  const { fields } = validResidentialInput('standard');
+  const response = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ fields, returnPath: '/estimate/residential/' }),
+      env,
+    } as never),
+  );
+  assert.equal(response.status, 400);
+  assert.equal(((await response.json()) as { error?: string }).error, 'booking_hold_required');
+  assert.equal(provider.postCount(), 0);
+});
+
+test('appointment Pay Now rejects an expired booking hold', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub();
+  const { fields: baseFields } = validResidentialInput('standard');
+  const fields = withHold(baseFields, ledger);
+  const holdKey = `booking/holds/${fields.booking_hold_id}.json`;
+  const hold = JSON.parse(ledger.values.get(holdKey) ?? '{}') as { expiresAt?: string };
+  hold.expiresAt = '2020-01-01T00:00:00.000Z';
+  ledger.values.set(holdKey, JSON.stringify(hold));
+  const response = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ fields, returnPath: '/estimate/residential/' }),
+      env,
+    } as never),
+  );
+  assert.equal(response.status, 400);
+  assert.equal(((await response.json()) as { error?: string }).error, 'booking_hold_expired');
+  assert.equal(provider.postCount(), 0);
+});
+
+test('facility Pay Now rejects a missing booking hold', async () => {
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
   const { fields } = validFacilityInput();
+  const response = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ fields, returnPath: '/estimate/commercial/' }),
+      env,
+    } as never),
+  );
+  assert.equal(response.status, 400);
+  assert.equal(((await response.json()) as { error?: string }).error, 'booking_hold_required');
+  assert.equal(provider.postCount(), 0);
+});
+test('repeated requests return the existing session instead of charging twice', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub();
+  const { fields: baseFields } = validFacilityInput();
+  const fields = withHold(baseFields, ledger);
   const run = () =>
     onRequestPost({
       request: jsonRequest({ fields, returnPath: '/estimate/commercial/' }),
@@ -382,7 +441,8 @@ test('client price manipulation is rejected before Stripe is called', async () =
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
-  const { fields } = validFacilityInput();
+  const { fields: baseFields } = validFacilityInput();
+  const fields = withHold(baseFields, ledger);
   const response = await withFetch(provider.stub, () =>
     onRequestPost({
       request: jsonRequest({ fields: { ...fields, quoted_price: '1' }, returnPath: '/estimate/commercial/' }),
@@ -400,7 +460,8 @@ test('a small server price difference requires explicit acceptance before checko
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
-  const { price, tax, fields } = validFacilityInput();
+  const { price, tax, fields: baseFields } = validFacilityInput();
+  const fields = withHold(baseFields, ledger);
   const changed = { ...fields, quoted_price: String(Number(price.total) - 1) };
   const first = await withFetch(provider.stub, () =>
     onRequestPost({
@@ -438,7 +499,8 @@ test('a facility payment without a server-confirmed street address is reservatio
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
-  const { fields } = validFacilityInput();
+  const { fields: baseFields } = validFacilityInput();
+  const fields = withHold(baseFields, ledger);
   const response = await withFetch(provider.stub, () =>
     onRequestPost({
       request: jsonRequest({
@@ -542,12 +604,46 @@ function validResidentialInput(serviceType: 'standard' | 'str_turnover') {
   };
 }
 
+function withHold(fields: Record<string, string>, ledger: FakeLedger): Record<string, string> {
+  const start = fields.booking_slot_start ?? '2026-11-03T13:00:00.000Z';
+  const end = fields.booking_slot_end ?? '2026-11-03T15:00:00.000Z';
+  const id = `2026-11-03__${randomUUID()}`;
+  const pinLatitude = fields.pin_latitude ?? '30.411100';
+  const pinLongitude = fields.pin_longitude ?? '-87.216400';
+  const reference = fields.quote_reference ?? `FAC-TEST-${id}`;
+  const hold = {
+    version: 1,
+    id,
+    date: '2026-11-03',
+    start,
+    end,
+    durationMinutes: 120,
+    destination: { lat: Number(pinLatitude), lng: Number(pinLongitude) },
+    locationText: fields.service_address ?? '100 S Baylen St',
+    reference,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+    status: 'held',
+  };
+  ledger.values.set(`booking/holds/${id}.json`, JSON.stringify(hold));
+  return {
+    ...fields,
+    pin_latitude: pinLatitude,
+    pin_longitude: pinLongitude,
+    quote_reference: reference,
+    booking_hold_id: id,
+    booking_slot_start: start,
+    booking_slot_end: end,
+    booking_hold_expires_at: hold.expiresAt,
+  };
+}
 for (const serviceType of ['standard', 'str_turnover'] as const) {
   test(`${serviceType} exact verified quote creates checkout at the server amount`, async () => {
     const ledger = new FakeLedger();
     const env = makeEnv(ledger);
     const provider = providerStub();
-    const { amount, fields } = validResidentialInput(serviceType);
+    const { amount, fields: baseFields } = validResidentialInput(serviceType);
+    const fields = withHold(baseFields, ledger);
     const response = await withFetch(provider.stub, () =>
       onRequestPost({
         request: jsonRequest({ fields, returnPath: serviceType === 'str_turnover' ? '/estimate/str/' : '/estimate/residential/' }),
@@ -564,7 +660,8 @@ test('a residential route without a driving duration cannot create checkout', as
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub({ includeDuration: false });
-  const { fields } = validResidentialInput('standard');
+  const { fields: baseFields } = validResidentialInput('standard');
+  const fields = withHold(baseFields, ledger);
   const response = await withFetch(provider.stub, () =>
     onRequestPost({
       request: jsonRequest({ fields, returnPath: '/estimate/residential/' }),
@@ -582,7 +679,8 @@ test('church Tier A uses the discounted server total and creates checkout', asyn
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
-  const { price, fields } = validFacilityInput('church');
+  const { price, fields: baseFields } = validFacilityInput('church');
+  const fields = withHold(baseFields, ledger);
   const response = await withFetch(provider.stub, () =>
     onRequestPost({
       request: jsonRequest({ fields, returnPath: '/estimate/church/' }),
@@ -597,7 +695,8 @@ test('church Tier A uses the discounted server total and creates checkout', asyn
 test('a preliminary residential quote cannot be paid', async () => {
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
-  const { fields } = validResidentialInput('standard');
+  const { fields: baseFields } = validResidentialInput('standard');
+  const fields = withHold(baseFields, ledger);
   const provider = providerStub();
   const response = await withFetch(
     async (url, init) => {
@@ -621,7 +720,8 @@ test('concurrent Pay Now requests cannot create two Checkout Sessions', async ()
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
-  const { fields } = validFacilityInput();
+  const { fields: baseFields } = validFacilityInput();
+  const fields = withHold(baseFields, ledger);
   const call = () =>
     onRequestPost({
       request: jsonRequest({ fields, returnPath: '/estimate/commercial/' }),
@@ -639,7 +739,8 @@ test('a gift certificate reduces the Stripe charge and reserves its balance', as
   const env = { ...makeEnv(ledger), WEB3FORMS_ENDPOINT: 'https://notify.test/submit' };
   await activeGift(ledger);
   const provider = providerStub();
-  const { price, tax, fields } = validFacilityInput();
+  const { price, tax, fields: baseFields } = validFacilityInput();
+  const fields = withHold(baseFields, ledger);
   const totalCents = Math.round((tax.total ?? price.total) * 100);
   let unitAmount = '';
 
@@ -679,7 +780,8 @@ test('a gift certificate covering the full total completes without a card charge
   const env = { ...makeEnv(ledger), WEB3FORMS_ENDPOINT: 'https://notify.test/submit' };
   await activeGift(ledger, 500_000);
   const provider = providerStub();
-  const { fields } = validFacilityInput();
+  const { fields: baseFields } = validFacilityInput();
+  const fields = withHold(baseFields, ledger);
   let ownerNotified = false;
 
   const response = await withFetch(
@@ -746,7 +848,8 @@ test('an unknown gift code is rejected before any Stripe session or reservation'
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
-  const { fields } = validFacilityInput();
+  const { fields: baseFields } = validFacilityInput();
+  const fields = withHold(baseFields, ledger);
   const response = await withFetch(provider.stub, () =>
     onRequestPost({
       request: jsonRequest({ fields: { ...fields, gift_code: 'SSGC-AAAA-2222' }, returnPath: '/estimate/commercial/' }),
@@ -763,7 +866,8 @@ test('checkout accepts a confirmed property pin for structural payment eligibili
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
   const provider = providerStub();
-  const { fields } = validResidentialInput('standard');
+  const { fields: baseFields } = validResidentialInput('standard');
+  const fields = withHold(baseFields, ledger);
   const pinFields = {
     ...fields,
     service_address: '12345 Rural Lane',

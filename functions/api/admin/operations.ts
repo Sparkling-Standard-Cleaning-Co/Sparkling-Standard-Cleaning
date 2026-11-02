@@ -1,4 +1,4 @@
-﻿import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
+import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
 import {
   applyRecurringScheduleChange,
   setRecurringStatus,
@@ -6,6 +6,7 @@ import {
   type RecurringEnv,
 } from '../../../src/lib/admin/recurring-schedule.ts';
 import type { BookingEnv } from '../../../src/lib/booking/service.ts';
+import { recurringSchedulingEnabled } from '../../../src/lib/booking/recurring-gate.ts';
 import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import {
   assignTeam,
@@ -74,7 +75,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const actor = await requireActor(db, context.request, 'job.write');
     requireCsrf(context.request, actor);
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
-    const recurringWriteEnabled = (context.env as { RECURRING_SCHEDULING_ENABLED?: string }).RECURRING_SCHEDULING_ENABLED === 'true';
+    const recurringWriteEnabled = recurringSchedulingEnabled(context.env);
     const recurringAction = body.action === 'create_recurring' || body.action === 'update_recurring';
     if (recurringAction && !recurringWriteEnabled) {
       return json({ ok: false, error: 'recurring_scheduling_gated' }, 503);

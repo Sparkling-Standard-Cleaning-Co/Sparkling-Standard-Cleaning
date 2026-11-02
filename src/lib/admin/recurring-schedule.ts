@@ -1,4 +1,4 @@
-﻿import { bookingConfig } from '../../config/booking.ts';
+import { bookingConfig } from '../../config/booking.ts';
 import { availabilityForDate, type BookingEnv } from '../booking/service.ts';
 import {
   createCalendarEvent,
@@ -368,6 +368,33 @@ export async function setRecurringStatus(
   return syncRecurringPlan(env, db, actor, planId, { replaceFuture: true, deps });
 }
 
+async function persistRecurringResources(
+  db: D1Database,
+  appointmentId: string,
+  resourceIds: ReadonlyArray<string>,
+): Promise<void> {
+  const unique = [...new Set(resourceIds.map((value) => value.trim()).filter(Boolean))];
+  await db.prepare('DELETE FROM appointment_resources WHERE appointment_id = ?').bind(appointmentId).run();
+  if (unique.length === 0) return;
+  const placeholders = unique.map(() => '?').join(',');
+  const members = await db
+    .prepare(
+      `SELECT id, is_solo, is_lead FROM team_members
+       WHERE booking_resource_id IN (${placeholders})`,
+    )
+    .bind(...unique)
+    .all<{ id: string; is_solo: number; is_lead: number }>();
+  for (const member of members.results ?? []) {
+    const role = Number(member.is_solo) === 1 ? 'solo' : Number(member.is_lead) === 1 ? 'lead' : 'cleaner';
+    await db
+      .prepare(
+        'INSERT OR REPLACE INTO appointment_resources (appointment_id, team_member_id, role) VALUES (?, ?, ?)',
+      )
+      .bind(appointmentId, member.id, role)
+      .run();
+  }
+}
+
 export async function syncRecurringPlan(
   env: RecurringEnv,
   db: D1Database,
@@ -434,7 +461,11 @@ export async function syncRecurringPlan(
     const occurrenceReference = reference(planId, date);
     const existing = await db
       .prepare(
-        'SELECT id, status, appointment_id, calendar_event_id FROM recurring_occurrences WHERE plan_id = ? AND occurrence_date = ? LIMIT 1',
+        `SELECT ro.id, ro.status, ro.appointment_id, ro.calendar_event_id,
+                a.status AS appointment_status
+         FROM recurring_occurrences ro
+         LEFT JOIN appointments a ON a.id = ro.appointment_id
+         WHERE ro.plan_id = ? AND ro.occurrence_date = ? LIMIT 1`,
       )
       .bind(planId, date)
       .first<{
@@ -442,7 +473,20 @@ export async function syncRecurringPlan(
         status: string;
         appointment_id: string | null;
         calendar_event_id: string | null;
+        appointment_status: string | null;
       }>();
+
+    // A cancelled/completed occurrence or appointment is an owner decision,
+    // not a missing event. Never resurrect it during a later sync.
+    if (
+      existing &&
+      (['cancelled', 'completed'].includes(existing.status) ||
+        (existing.appointment_status !== null &&
+          ['cancelled', 'completed'].includes(existing.appointment_status)))
+    ) {
+      result.skipped += 1;
+      continue;
+    }
 
     const availability = await deps.availability(env, {
       date,
@@ -476,7 +520,9 @@ export async function syncRecurringPlan(
         continue;
       }
       if (inspection.state === 'missing' || inspection.state === 'cancelled') {
-        eventId = null;
+        result.conflicts.push({ date, reason: 'calendar_event_missing' });
+        await recordOccurrenceFailure(db, planId, date, 'calendar_event_missing');
+        continue;
       } else {
         const event = inspection.event;
         const sameTime =
@@ -564,6 +610,7 @@ export async function syncRecurringPlan(
           )
           .run();
       }
+      await persistRecurringResources(db, appointmentId, resourceIds);
       await db
         .prepare(
           `INSERT OR REPLACE INTO recurring_occurrences

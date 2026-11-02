@@ -1,4 +1,4 @@
-﻿import { test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,7 +34,7 @@ class TestD1 implements D1Database {
 function migratedDb(): TestD1 {
   const db = new TestD1();
   db.raw.exec('PRAGMA foreign_keys = ON');
-  const files = fs.readdirSync('migrations').filter((file) => /^00(0[1-9]|1[0-9])_.*\.sql$/.test(file)).sort();
+  const files = fs.readdirSync('migrations').filter((file) => /^\d{4}_.*\.sql$/.test(file)).sort();
   for (const file of files) db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   return db;
 }
@@ -61,6 +61,7 @@ async function fixture(startOffset = 55) {
   const customerId = `cust_${crypto.randomUUID()}`;
   const propertyId = `prop_${crypto.randomUUID()}`;
   db.raw.prepare("INSERT INTO customers (id, primary_branch_id, first_name, last_name, status) VALUES (?, ?, 'Synthetic', 'Recurring', 'active')").run(customerId, branchId);
+  db.raw.prepare("INSERT OR IGNORE INTO team_members (id, branch_id, display_name, email, status, is_bookable, booking_resource_id, is_solo, is_lead) VALUES ('team_family', ?, 'Family Cleaner', 'family@example.test', 'active', 1, 'family-cleaner', 0, 1)").run(branchId);
   db.raw.prepare("INSERT INTO properties (id, customer_id, branch_id, label, line1, city, state, postal_code, latitude, longitude, status) VALUES (?, ?, ?, 'Home', '100 S Baylen St', 'Pensacola', 'FL', '32502', 30.4111, -87.2164, 'active')").run(propertyId, customerId, branchId);
   return { db, actor: actor!, customerId, propertyId, startDate: addDays(todayCentral(), startOffset) };
 }
@@ -147,9 +148,45 @@ test('recurring sync creates a linked Google event and operational appointment',
   assert.equal(occurrence.resource_ids, JSON.stringify(['family-cleaner']));
   const link = f.db.raw.prepare('SELECT * FROM calendar_links WHERE appointment_id = ?').get(appointment.id) as Record<string, unknown>;
   assert.equal(link.provider_event_id, event.id);
+  const assigned = f.db.raw
+    .prepare('SELECT team_member_id, role FROM appointment_resources WHERE appointment_id = ?')
+    .all(appointment.id) as Array<{ team_member_id: string; role: string }>;
+  assert.deepEqual(assigned.map((row) => ({ ...row })), [{ team_member_id: 'team_family', role: 'lead' }]);
   assert.equal(f.db.raw.prepare('PRAGMA foreign_key_check').all().length, 0);
 });
 
+test('recurring sync does not recreate an owner-cancelled occurrence', async () => {
+  const f = await fixture();
+  const plan = await createRecurring(f.db, f.actor, {
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    frequency: 'monthly',
+    startDate: f.startDate,
+    window: 'morning',
+    startTime: '07:00',
+    durationMinutes: 120,
+    crewSize: 1,
+    ongoingPrice: 150,
+  });
+  const calendar = makeCalendar(['family-cleaner']);
+  const env = { GOOGLE_CLIENT_ID: 'x', GOOGLE_CLIENT_SECRET: 'x', GOOGLE_REFRESH_TOKEN: 'x', GOOGLE_CALENDAR_ID: 'x' } as never;
+  await syncRecurringPlan(env, f.db, f.actor, plan.id, { deps: calendar.deps });
+  const occurrence = f.db.raw
+    .prepare('SELECT id, calendar_event_id FROM recurring_occurrences WHERE plan_id = ?')
+    .get(plan.id) as { id: string; calendar_event_id: string };
+  f.db.raw.prepare("UPDATE recurring_occurrences SET status = 'cancelled' WHERE id = ?").run(occurrence.id);
+  calendar.events.delete(occurrence.calendar_event_id);
+  const before = calendar.creates();
+
+  const result = await syncRecurringPlan(env, f.db, f.actor, plan.id, { deps: calendar.deps });
+  assert.equal(result.ok, true);
+  assert.equal(calendar.creates(), before, 'no replacement event is created');
+  assert.equal(calendar.events.size, 0);
+  const after = f.db.raw
+    .prepare('SELECT status FROM recurring_occurrences WHERE id = ?')
+    .get(occurrence.id) as { status: string };
+  assert.equal(after.status, 'cancelled');
+});
 test('repeated recurring synchronization creates no duplicate bookings', async () => {
   const f = await fixture();
   const plan = await createRecurring(f.db, f.actor, {

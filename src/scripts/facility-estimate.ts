@@ -1,4 +1,4 @@
-// Facility estimate engine (commercial + church) — shared location finder,
+﻿// Facility estimate engine (commercial + church) â€” shared location finder,
 // travel lookup, and the ONE lead submission pipeline. Numeric pricing is
 // controlled by the owner kill switch: enabled = Tier A/B preliminary numbers,
 // Tier C scope review; disabled = scope-review only with no numeric fields sent
@@ -158,7 +158,9 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       latestPrice.tier === 'A';
     const taxReady = latestTax === null || latestTax.canCharge;
     const eligibleBase = priceReady && currentStep === stepPanels.length;
-    const payable = eligibleBase && paymentEnabled && !paymentBlocked && addressReady && taxReady;
+    const holdReady = Boolean(bookingPicker?.holdFields());
+    const payable =
+      eligibleBase && paymentEnabled && holdReady && !paymentBlocked && addressReady && taxReady;
     const canVerify =
       eligibleBase &&
       paymentEnabled &&
@@ -189,8 +191,10 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         : canVerify
           ? 'Verify the service address to unlock secure payment. You can also request to reserve and pay later.'
           : addressReviewRequired
-            ? "We couldn't verify the exact facility address online. Request the visit without paying — we'll confirm the address and arrange payment personally."
-            : "Request to reserve and we'll confirm any outstanding detail with you.";
+            ? "We couldn't verify the exact facility address online. Request the visit without paying online - we'll confirm the address and arrange payment personally."
+            : !holdReady
+              ? 'Select and hold an available time to unlock Pay Now, or request to reserve and pay later.'
+              : "Request to reserve and we'll confirm any outstanding detail with you.";
     }
     if (payNowNote) payNowNote.hidden = !payable;
     if (bookingPicker) {
@@ -461,7 +465,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     if (progressPercent) progressPercent.textContent = `${percent}%`;
     if (stepLabel) {
       const title = stepButtons[currentStep - 1]?.querySelector<HTMLElement>('.facility-steps__title')?.textContent?.trim() ?? '';
-      stepLabel.textContent = `Step ${currentStep} of ${total} — ${title}`;
+      stepLabel.textContent = `Step ${currentStep} of ${total} â€” ${title}`;
     }
     if (stepDescription) {
       const panel = stepPanels[currentStep - 1];
@@ -540,7 +544,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       setStatus(
         'info',
         exact
-          ? 'Address confirmed. Returning to your final facility estimate…'
+          ? 'Address confirmed. Returning to your final facility estimateâ€¦'
           : 'We confirmed the general area, but not the exact facility. Returning to your estimate so you can request the visit without online payment.',
       );
       window.setTimeout(() => showStep(stepPanels.length), 250);
@@ -574,13 +578,13 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
           .join(', '),
         preferredDate,
       };
-    });
+    }, () => syncFacilityPayment());
   }
   verifyAddressButton?.addEventListener('click', async () => {
     addressVerificationPending = true;
     verifyAddressButton.disabled = true;
     verifyAddressButton.setAttribute('aria-busy', 'true');
-    verifyAddressButton.textContent = 'Opening Address Verification…';
+    verifyAddressButton.textContent = 'Opening Address Verificationâ€¦';
     showStep(1);
     setStatus(
       'info',
@@ -729,7 +733,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     if (estimateRange) {
       if (price.range) {
         estimateRange.hidden = false;
-        estimateRange.textContent = `Typical range ${formatUsd(price.range.low, { forceCents: true })}–${formatUsd(price.range.high, { forceCents: true })} per visit`;
+        estimateRange.textContent = `Typical range ${formatUsd(price.range.low, { forceCents: true })}â€“${formatUsd(price.range.high, { forceCents: true })} per visit`;
       } else {
         estimateRange.hidden = true;
       }
@@ -772,13 +776,13 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         priceLines.push(`<li><span>Cleaning (${latestWorkload.laborHours} labor hrs)</span><strong>${formatUsd(latestPrice.cleaningSubtotal, { forceCents: true })}</strong></li>`);
         if (latestPrice.discount?.applied) {
           priceLines.push(
-            `<li><span>Church discount (${pricing.churchDiscount.percent.value}%)</span><strong>−${formatUsd(latestPrice.discount.amount, { forceCents: true })}</strong></li>`,
+            `<li><span>Church discount (${pricing.churchDiscount.percent.value}%)</span><strong>âˆ’${formatUsd(latestPrice.discount.amount, { forceCents: true })}</strong></li>`,
           );
           priceLines.push(`<li><span>Subtotal after discount</span><strong>${formatUsd(latestPrice.discount.discountedSubtotal, { forceCents: true })}</strong></li>`);
         }
         if (latestPrice.globalFactor !== 1) {
           priceLines.push(
-            `<li><span>${facilityEngine === 'church' ? 'Church' : 'Commercial'} calibration adjustment (×${latestPrice.globalFactor.toFixed(2)})</span><strong>${latestPrice.globalAdjustment < 0 ? '−' : '+'}${formatUsd(Math.abs(latestPrice.globalAdjustment), { forceCents: true })}</strong></li>`,
+            `<li><span>${facilityEngine === 'church' ? 'Church' : 'Commercial'} calibration adjustment (Ã—${latestPrice.globalFactor.toFixed(2)})</span><strong>${latestPrice.globalAdjustment < 0 ? 'âˆ’' : '+'}${formatUsd(Math.abs(latestPrice.globalAdjustment), { forceCents: true })}</strong></li>`,
           );
         }
         if (latestPrice.travelAdjustment > 0) {
@@ -789,13 +793,13 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         }
         if (latestTax?.treatment === 'taxable') {
           priceLines.push(
-            `<li><span>Sales tax (${latestTax.ratePercent}%${latestTax.jurisdictionLabel ? ` — ${escapeHtml(latestTax.jurisdictionLabel)}` : ''})</span><strong>${formatUsd(latestTax.taxAmount ?? 0, { forceCents: true })}</strong></li>`,
+            `<li><span>Sales tax (${latestTax.ratePercent}%${latestTax.jurisdictionLabel ? ` â€” ${escapeHtml(latestTax.jurisdictionLabel)}` : ''})</span><strong>${formatUsd(latestTax.taxAmount ?? 0, { forceCents: true })}</strong></li>`,
           );
           priceLines.push(
             `<li><span>Total with tax</span><strong>${formatUsd(latestTax.total ?? latestPrice.total, { forceCents: true })} per visit</strong></li>`,
           );
         } else if (latestTax?.treatment === 'exempt') {
-          priceLines.push('<li><span>Sales tax</span><strong>Exempt — certificate on file</strong></li>');
+          priceLines.push('<li><span>Sales tax</span><strong>Exempt â€” certificate on file</strong></li>');
         } else if (latestTax?.treatment === 'not_taxable') {
           priceLines.push('<li><span>Sales tax</span><strong>No sales tax applicable</strong></li>');
         } else {
@@ -833,8 +837,8 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     }
     if (latestPrice?.priced) {
       reviewNote.textContent = facilityEngine === 'church'
-        ? `This is a preliminary estimate with the ${churchDiscountLabel} applied. Pay Now is offered only when we can verify the address, photos, time and resources; otherwise we will confirm the visit with you.`
-        : 'This is a preliminary estimate. Pay Now is offered only when we can verify the address, photos, time and resources; otherwise we will confirm the visit with you.';
+        ? `This is a preliminary estimate with the ${churchDiscountLabel} applied. Facility visits are scheduled after personal review; request the visit and we will confirm the scope, time and price with you.`
+        : 'This is a preliminary estimate. Facility visits are scheduled after personal review; request the visit and we will confirm the scope, time and price with you.';
       return;
     }
     if (latestPrice) {
@@ -1222,12 +1226,12 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
 
     if (submitButton) submitButton.disabled = true;
     if (paymentChoice === 'pay_now') setPayNowBusy(true);
-    setStatus('info', paymentChoice === 'pay_now' ? 'Saving your request and preparing secure checkout…' : 'Sending your request…');
+    setStatus('info', paymentChoice === 'pay_now' ? 'Saving your request and preparing secure checkoutâ€¦' : 'Sending your requestâ€¦');
 
     const subject =
       facilityEngine === 'church'
-        ? `Church cleaning request — ${organization || 'church'}`
-        : `Commercial estimate request — ${organization || 'facility'}`;
+        ? `Church cleaning request â€” ${organization || 'church'}`
+        : `Commercial estimate request â€” ${organization || 'facility'}`;
 
     const outcome = await submitLead(fields, subject);
 
@@ -1264,7 +1268,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       }
       setStatus(
         'success',
-        'Request received — not booked yet. Sparkling Standard reviews every request personally and will confirm scope, date and price with you before anything is scheduled.',
+        'Request received â€” not booked yet. Sparkling Standard reviews every request personally and will confirm scope, date and price with you before anything is scheduled.',
       );
       addressVerificationPending = false;
       addressReviewRequired = false;

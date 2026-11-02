@@ -5,10 +5,12 @@ import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
 import { constantTimeEqual } from '../../../src/lib/admin/auth.ts';
 import { runRecurringReplenishment } from '../../../src/lib/admin/recurring-worker.ts';
 import type { RecurringEnv } from '../../../src/lib/admin/recurring-schedule.ts';
+import { recurringSchedulingEnabled } from '../../../src/lib/booking/recurring-gate.ts';
 
 interface Env extends AdminDbEnv, RecurringEnv {
   RECURRING_WORKER_TOKEN?: string;
   RECURRING_WORKER_ENABLED?: string;
+  RECURRING_SCHEDULING_ENABLED?: string;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -28,7 +30,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (!provided || !constantTimeEqual(provided, expected)) {
     return json({ ok: false, error: 'unauthorized' }, 401);
   }
-  if (context.env.RECURRING_WORKER_ENABLED !== 'true') {
+  if (!recurringSchedulingEnabled(context.env) || context.env.RECURRING_WORKER_ENABLED !== 'true') {
     return json({ ok: true, disabled: true, reason: 'recurring_scheduling_gated' });
   }
   try {

@@ -20,6 +20,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     requireCsrf(context.request, actor);
     const profile = await employeeProfile(db, actor.id);
     if (!profile) return json({ ok: false, error: 'employee_profile_missing' }, 403);
+    if (profile.status !== 'active') return json({ ok: false, error: 'employee_profile_inactive' }, 403);
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const message = typeof body.message === 'string' ? body.message.trim().slice(0, 1000) : '';
     const intervalId = typeof body.intervalId === 'string' ? body.intervalId.trim().slice(0, 120) : '';

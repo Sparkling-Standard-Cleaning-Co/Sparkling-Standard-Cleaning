@@ -211,10 +211,24 @@ export async function requireActor(
 ): Promise<AdminActor> {
   const actor = await readOpsActor(db, request);
   if (!actor) throw new AdminAuthError(401, 'unauthorized');
+  if (actor.role === 'cleaner' && isAdminConsolePath(request)) {
+    throw new AdminAuthError(403, 'forbidden');
+  }
   if (permission && actor.role !== 'owner' && !actor.permissions.includes(permission)) {
     throw new AdminAuthError(403, 'forbidden');
   }
   return actor;
+}
+
+function isAdminConsolePath(request: Request): boolean {
+  const path = new URL(request.url).pathname;
+  // The shared auth endpoint is the employee portal's sign-in/session/logout
+  // surface. Everything else under /api/admin is an owner/manager/finance API.
+  return (
+    path.startsWith('/api/admin/') &&
+    path !== '/api/admin/auth' &&
+    !path.startsWith('/api/admin/auth/')
+  );
 }
 
 export function requireCsrf(request: Request, actor: AdminActor): void {
