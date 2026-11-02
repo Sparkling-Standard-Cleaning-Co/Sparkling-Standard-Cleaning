@@ -192,6 +192,71 @@ test('an owner-configured residential bundle gates exactly its approved document
   assert.equal(cross.satisfied, false);
 });
 
+test('a rejected signature never counts as signed and can be signed again', async () => {
+  const f = await fixture();
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Residential Agreement');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.residential',
+    name: 'Residential documents',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    frequency: 'one_time',
+    bookingReference: 'SS-20261101-REJECT1',
+  };
+  const request = await createSigningRequest(f.db, context, { createdByAdminUserId: f.owner.id });
+  await signSigningRequest(f.db, request.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'customer@example.test',
+    consent: true,
+    signatures: { [templateId]: { value: 'Synthetic Customer' } },
+    request: signingRequest(),
+  });
+  const first = f.db.raw
+    .prepare('SELECT id, status, attempt FROM document_signatures WHERE signing_request_id = ?')
+    .get(String(request.requestId)) as { id: string; status: string; attempt: number };
+  assert.equal(first.attempt, 1);
+  await verifySignature(f.db, f.owner.id, first.id, false, 'Synthetic rejection');
+  const rejected = await evaluateDocumentGate(f.db, context, 'before_confirmation');
+  assert.equal(rejected.satisfied, false);
+  assert.deepEqual(rejected.missing.map((item) => item.templateId), [templateId]);
+  const storedRequest = f.db.raw
+    .prepare('SELECT status FROM signing_requests WHERE id = ?')
+    .get(String(request.requestId)) as { status: string };
+  assert.equal(storedRequest.status, 'partially_signed');
+
+  const resigned = await signSigningRequest(f.db, request.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'customer@example.test',
+    consent: true,
+    signatures: { [templateId]: { value: 'Synthetic Customer' } },
+    request: signingRequest(),
+  });
+  assert.equal(resigned.status, 'signed');
+  const rows = f.db.raw
+    .prepare('SELECT status, attempt FROM document_signatures WHERE signing_request_id = ? ORDER BY attempt')
+    .all(String(request.requestId)) as Array<{ status: string; attempt: number }>;
+  assert.deepEqual(
+    rows.map((row) => ({ status: row.status, attempt: row.attempt })),
+    [
+      { status: 'rejected', attempt: 1 },
+      { status: 'signed', attempt: 2 },
+    ],
+  );
+  assert.equal((await evaluateDocumentGate(f.db, context, 'before_confirmation')).satisfied, true);
+});
+
 test('employee onboarding stays unverified until the owner verifies the signature', async () => {
   const f = await fixture();
   const onboarding = await approvedTemplate(f.db, f.owner.id, 'Employee Handbook Acknowledgement', {

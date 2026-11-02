@@ -91,6 +91,9 @@ and verify paperwork. Cleaners cannot change policy.
 - Signing requires affirmative electronic-signature consent and a typed legal
   name. Duplicate callbacks are idempotent and never overwrite the first
   signature.
+- A rejected signature remains immutable evidence and never counts as signed.
+  Re-signing creates a new attempt; the gate and signing page use the latest
+  attempt only. A rejected signature cannot be verified without a new signature.
 - Reusable customer agreements satisfy future bookings by customer/version/hash
   unless the item is marked **per booking**.
 - Items requiring verification or countersignature remain
@@ -130,8 +133,9 @@ activation flags must remain off until then.
 
 ## 9. Provisioning
 
-- Apply migrations `0018_document_management_and_signing.sql` and
-  `0019_recurring_worker_runs.sql`.
+- Apply migrations `0018_document_management_and_signing.sql`,
+  `0019_recurring_worker_runs.sql` and
+  `0023_document_signature_attempts.sql`.
 - Add a private `DOCUMENTS_BUCKET` R2 binding for PDF uploads. Without it, text
   templates and signing still work; PDF upload returns
   `document_storage_not_configured`.

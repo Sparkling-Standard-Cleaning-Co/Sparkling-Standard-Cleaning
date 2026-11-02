@@ -36,6 +36,24 @@ message, document and dashboard uses the same five stages without blurring them.
    received"; "confirmed" appears only in the owner's own confirmation message
    after the customer agrees (`docs/operations/COMMUNICATION-TEMPLATES.md`).
 
+## Refund rules
+
+- Refunds are recorded as immutable attempts with a caller-supplied idempotency
+  key. Retrying the same request never creates a second refund or reduces the
+  invoice twice.
+- The cumulative succeeded and pending refunds may never exceed the original
+  payment amount. A full refund makes the payment `refunded`; a partial refund
+  makes it `partially_refunded`.
+- Invoice paid and balance values are recomputed from payment and refund rows,
+  not by decrementing stored totals.
+- Stripe refunds reserve the amount as `pending` before the provider call. Only
+  a returned `succeeded` refund adjusts the invoice; `pending` waits for
+  reconciliation, and a failed/canceled refund releases the reservation.
+- Voiding an invoice, recording a payment or recording a refund clears its
+  stored payment link so a stale or superseded amount cannot be reused.
+
+Migration `0022_refund_idempotency.sql` adds the unique refund request key.
+
 ## Quick reference for written communication
 
 - Before confirmation: *request*, *provisional estimate*, *proposed price*,

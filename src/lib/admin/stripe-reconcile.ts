@@ -18,16 +18,18 @@ export async function applyInvoiceCheckoutPayment(
   const amount = Math.max(0, Math.round(Number(session.amount_total) || 0));
   if (amount <= 0) throw new Error('invoice_amount_missing');
   const idempotencyKey = `stripe-checkout:${String(session.id ?? '')}`;
-  const invoice = await db
-    .prepare('SELECT * FROM invoices WHERE id = ? LIMIT 1')
-    .bind(invoiceId)
-    .first<Record<string, unknown>>();
-  if (!invoice) throw new Error('invoice_not_found');
   const existing = await db
     .prepare('SELECT id FROM payments WHERE idempotency_key = ? LIMIT 1')
     .bind(idempotencyKey)
     .first<{ id: string }>();
   if (existing) return { applied: false, invoiceId, duplicate: true };
+  const invoice = await db
+    .prepare('SELECT * FROM invoices WHERE id = ? LIMIT 1')
+    .bind(invoiceId)
+    .first<Record<string, unknown>>();
+  if (!invoice) throw new Error('invoice_not_found');
+  if (String(invoice.status) === 'void') throw new Error('invoice_void');
+  if (amount > Number(invoice.balance_cents ?? 0)) throw new Error('invoice_overpayment');
   const paymentId = `payment_${crypto.randomUUID()}`;
   await db
     .prepare(

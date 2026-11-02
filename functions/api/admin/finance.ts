@@ -77,7 +77,17 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       if (!stored || !(await verifyPassword(String(body.password ?? ''), stored.password_hash))) {
         return json({ ok: false, error: 'reauth_failed' }, 401);
       }
-      return json({ ok: true, ...(await refundStripePayment(db, actor, String(body.paymentId ?? ''), Number(body.amountCents) || 0, context.env)) });
+      return json({
+        ok: true,
+        ...(await refundStripePayment(
+          db,
+          actor,
+          String(body.paymentId ?? ''),
+          Number(body.amountCents) || 0,
+          context.env,
+          String(body.idempotencyKey ?? ''),
+        )),
+      });
     }
     return json({ ok: false, error: 'invalid_action' }, 400);
   } catch (error) {

@@ -221,6 +221,52 @@ function stageApplies(requirementStage: EnforcementStage, requested: Enforcement
   return STAGE_ORDER[requirementStage] <= STAGE_ORDER[requested];
 }
 
+const ACCEPTED_SIGNATURE_STATUSES = new Set(['signed', 'awaiting_verification', 'verified']);
+
+function latestSignatureState(
+  rows: Array<Record<string, unknown>>,
+): Map<string, { attempt: number; status: string }> {
+  const latest = new Map<string, { attempt: number; status: string }>();
+  for (const row of rows) {
+    const templateId = String(row.template_id ?? '');
+    const attempt = Number(row.attempt) || 1;
+    const current = latest.get(templateId);
+    if (!current || attempt > current.attempt) {
+      latest.set(templateId, { attempt, status: String(row.status ?? '') });
+    }
+  }
+  return latest;
+}
+
+async function refreshSigningRequestStatus(
+  db: D1Database,
+  requestId: string,
+): Promise<string> {
+  const request = await db
+    .prepare('SELECT requirement_snapshot_json FROM signing_requests WHERE id = ? LIMIT 1')
+    .bind(requestId)
+    .first<{ requirement_snapshot_json: string }>();
+  if (!request) throw new AdminAuthError(404, 'signing_request_not_found');
+  const parsed = JSON.parse(request.requirement_snapshot_json || '[]') as unknown;
+  const requirements = Array.isArray(parsed)
+    ? (parsed as RequirementSnapshot[]).filter((item) => item && item.required)
+    : [];
+  const rows = await db
+    .prepare('SELECT template_id, status, attempt FROM document_signatures WHERE signing_request_id = ?')
+    .bind(requestId)
+    .all<Record<string, unknown>>();
+  const latest = latestSignatureState(rows.results ?? []);
+  const accepted = requirements.filter((requirement) =>
+    ACCEPTED_SIGNATURE_STATUSES.has(latest.get(requirement.templateId)?.status ?? ''),
+  ).length;
+  const status = accepted >= requirements.length ? 'signed' : 'partially_signed';
+  await db
+    .prepare('UPDATE signing_requests SET status = ?, updated_at = ? WHERE id = ?')
+    .bind(status, now(), requestId)
+    .run();
+  return status;
+}
+
 async function hasValidSignature(
   db: D1Database,
   requirement: Requirement,
@@ -253,6 +299,10 @@ async function hasValidSignature(
       `SELECT s.id FROM document_signatures s
        JOIN signing_requests sr ON sr.id = s.signing_request_id
        WHERE s.template_id = ? AND s.template_version = ? AND s.document_sha256 = ?
+         AND s.attempt = (
+           SELECT MAX(s2.attempt) FROM document_signatures s2
+           WHERE s2.signing_request_id = s.signing_request_id AND s2.template_id = s.template_id
+         )
          AND sr.status IN ('pending','partially_signed','signed')
          AND ${statuses}
          AND (${subjectClause.join(' OR ')})
@@ -449,17 +499,23 @@ export async function signSigningRequest(
   const submitted = Object.values(input.signatures).filter((signature) => text(signature?.value, 200));
   if (submitted.length === 0) throw new AdminAuthError(400, 'signature_required');
   const existing = await db
-    .prepare('SELECT template_id FROM document_signatures WHERE signing_request_id = ?')
+    .prepare('SELECT template_id, status, attempt FROM document_signatures WHERE signing_request_id = ?')
     .bind(request.id)
-    .all<{ template_id: string }>();
-  const already = new Set((existing.results ?? []).map((row) => row.template_id));
+    .all<Record<string, unknown>>();
+  const latest = latestSignatureState(existing.results ?? []);
+  const attempts = new Map<string, number>();
+  for (const row of existing.results ?? []) {
+    const templateId = String(row.template_id ?? '');
+    attempts.set(templateId, Math.max(attempts.get(templateId) ?? 0, Number(row.attempt) || 1));
+  }
   const ip = input.request.headers.get('CF-Connecting-IP') ?? '';
   const userAgent = input.request.headers.get('User-Agent') ?? '';
   let signedCount = 0;
   for (const requirement of requirements) {
     const signature = input.signatures[requirement.templateId];
     if (!signature) continue;
-    if (already.has(requirement.templateId)) {
+    const current = latest.get(requirement.templateId)?.status ?? '';
+    if (ACCEPTED_SIGNATURE_STATUSES.has(current)) {
       signedCount += 1;
       continue;
     }
@@ -467,13 +523,14 @@ export async function signSigningRequest(
       throw new AdminAuthError(400, `signer_party_mismatch:${requirement.templateId}`);
     }
     const needsReview = requirement.requiresVerification || requirement.requiresCountersignature;
+    const attempt = (attempts.get(requirement.templateId) ?? 0) + 1;
     await db
       .prepare(
         `INSERT OR IGNORE INTO document_signatures
          (id, signing_request_id, template_id, template_version, document_sha256, signed_content_text,
           signer_party, signer_name, signer_email, signature_json, consent_version, signed_at,
-          signed_ip_hash, signed_user_agent_hash, status, r2_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          signed_ip_hash, signed_user_agent_hash, status, r2_key, attempt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         `sig_${crypto.randomUUID()}`,
@@ -497,22 +554,17 @@ export async function signSigningRequest(
         userAgent ? await hashToken(userAgent) : null,
         needsReview ? 'awaiting_verification' : 'signed',
         requirement.r2Key,
+        attempt,
       )
       .run();
+    latest.set(requirement.templateId, {
+      attempt,
+      status: needsReview ? 'awaiting_verification' : 'signed',
+    });
+    attempts.set(requirement.templateId, attempt);
     signedCount += 1;
   }
-  const total = await db
-    .prepare(
-      `SELECT COUNT(*) AS count FROM document_signatures
-       WHERE signing_request_id = ? AND template_id IN (${required.map(() => '?').join(',') || "''"})`,
-    )
-    .bind(request.id, ...required.map((item) => item.templateId))
-    .first<{ count: number }>();
-  const status = Number(total?.count ?? 0) >= required.length ? 'signed' : 'partially_signed';
-  await db
-    .prepare("UPDATE signing_requests SET status = ?, updated_at = ? WHERE id = ?")
-    .bind(status, now(), request.id)
-    .run();
+  const status = await refreshSigningRequestStatus(db, request.id);
   await audit(db, {
     actorUserId: null,
     action: 'documents.signed',
@@ -574,18 +626,24 @@ export async function verifySignature(
   reason = '',
 ): Promise<void> {
   const row = await db
-    .prepare('SELECT id, signing_request_id FROM document_signatures WHERE id = ? LIMIT 1')
+    .prepare('SELECT id, signing_request_id, status FROM document_signatures WHERE id = ? LIMIT 1')
     .bind(signatureId)
-    .first<{ id: string; signing_request_id: string }>();
+    .first<{ id: string; signing_request_id: string; status: string }>();
   if (!row) throw new AdminAuthError(404, 'signature_not_found');
+  if (row.status === 'rejected') throw new AdminAuthError(409, 'signature_rejected');
+  if (row.status === 'verified' && approve) return;
+  if (row.status !== 'signed' && row.status !== 'awaiting_verification') {
+    throw new AdminAuthError(409, 'signature_not_reviewable');
+  }
   await db
     .prepare(
       `UPDATE document_signatures
        SET status = ?, verified_by_admin_user_id = ?, verified_at = ?, rejection_reason = ?
-       WHERE id = ?`,
+       WHERE id = ? AND status IN ('signed','awaiting_verification')`,
     )
     .bind(approve ? 'verified' : 'rejected', actorUserId, now(), text(reason, 500), signatureId)
     .run();
+  await refreshSigningRequestStatus(db, row.signing_request_id);
   await audit(db, {
     actorUserId,
     action: approve ? 'documents.signature_verified' : 'documents.signature_rejected',

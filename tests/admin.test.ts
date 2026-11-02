@@ -83,6 +83,8 @@ function migratedDb(): TestD1 {
     '0019_recurring_worker_runs.sql',
     '0020_recurring_worker_claim_owner.sql',
     '0021_least_privilege_cleaner_role.sql',
+    '0022_refund_idempotency.sql',
+    '0023_document_signature_attempts.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -678,6 +680,59 @@ test('invoices, manual payments, refunds and credits reconcile in integer cents'
   assert.ok((report.branches as Array<Record<string, unknown>>).length >= 2);
 });
 
+test('refunds are cumulative, idempotent and never over-refund a payment', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Refund',
+    lastName: 'Customer',
+    addressLine1: '450 S Baylen St',
+    city: 'Pensacola',
+    postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    lines: [{ kind: 'service', description: 'Cleaning', quantity: 1, unitAmountCents: 20000, totalCents: 20000 }],
+  });
+  const payment = await recordPayment(db, actor, {
+    invoiceId: invoice.id,
+    provider: 'cash',
+    amount: 100,
+    idempotencyKey: 'refund-cash-1',
+  });
+
+  const first = await recordRefund(db, actor, {
+    paymentId: payment.id,
+    amount: 40,
+    idempotencyKey: 'refund-request-1',
+  });
+  const retry = await recordRefund(db, actor, {
+    paymentId: payment.id,
+    amount: 40,
+    idempotencyKey: 'refund-request-1',
+  });
+  assert.equal(retry.id, first.id);
+  let detail = await getInvoice(db, actor, invoice.id);
+  assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 6000);
+  assert.equal((detail?.payments as Array<Record<string, unknown>>)[0]?.status, 'partially_refunded');
+  assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM refunds').get() as { n: number }).n, 1);
+
+  await recordRefund(db, actor, {
+    paymentId: payment.id,
+    amount: 60,
+    idempotencyKey: 'refund-request-2',
+  });
+  detail = await getInvoice(db, actor, invoice.id);
+  assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 0);
+  assert.equal((detail?.invoice as Record<string, unknown>).status, 'open');
+  assert.equal((detail?.payments as Array<Record<string, unknown>>)[0]?.status, 'refunded');
+
+  await assert.rejects(
+    () => recordRefund(db, actor, { paymentId: payment.id, amount: 1, idempotencyKey: 'refund-request-3' }),
+    /refund_exceeds_remaining/,
+  );
+});
+
 test('the login route requires MFA and issues a session only after verification', async () => {
   const db = migratedDb();
   const owner = await enrollOwner(db, {
@@ -784,8 +839,16 @@ test('invoice payment links and Stripe reconciliation are gated and idempotent',
     const refund = await refundStripePayment(db, actor, String(stripePayment?.id), 2500, {
       STRIPE_SECRET_KEY: 'sk_test_synthetic',
       ADMIN_STRIPE_REFUNDS_ENABLED: 'true',
-    });
+    }, 'refund-request-stripe-1');
     assert.equal(refund.refundId, 're_test_123');
+    detail = await getInvoice(db, actor, invoice.id);
+    assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 9500);
+    assert.equal((detail?.invoice as Record<string, unknown>).balance_cents, 2500);
+    const retry = await refundStripePayment(db, actor, String(stripePayment?.id), 2500, {
+      STRIPE_SECRET_KEY: 'sk_test_synthetic',
+      ADMIN_STRIPE_REFUNDS_ENABLED: 'true',
+    }, 'refund-request-stripe-1');
+    assert.equal(retry.refundId, 're_test_123');
     detail = await getInvoice(db, actor, invoice.id);
     assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 9500);
     assert.equal((detail?.invoice as Record<string, unknown>).balance_cents, 2500);

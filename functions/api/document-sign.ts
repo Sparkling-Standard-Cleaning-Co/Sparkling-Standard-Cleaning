@@ -28,7 +28,12 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-function publicRequirement(requirement: RequirementSnapshot, signed: Set<string>) {
+function publicRequirement(
+  requirement: RequirementSnapshot,
+  latest: Map<string, { attempt: number; status: string }>,
+) {
+  const state = latest.get(requirement.templateId);
+  const status = state?.status ?? '';
   return {
     templateId: requirement.templateId,
     title: requirement.title,
@@ -39,7 +44,9 @@ function publicRequirement(requirement: RequirementSnapshot, signed: Set<string>
     signerParty: requirement.signerParty,
     required: requirement.required,
     stage: requirement.stage,
-    signed: signed.has(requirement.templateId),
+    signed: status === 'signed' || status === 'awaiting_verification' || status === 'verified',
+    canResign: status === 'rejected',
+    signatureStatus: status,
     downloadUrl: requirement.r2Key
       ? `/api/document-sign?token=${encodeURIComponent('__TOKEN__')}&download=${encodeURIComponent(requirement.templateId)}`
       : '',
@@ -55,7 +62,20 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const resolved = await getSigningRequestByToken(db, token);
     if (!resolved) return json({ ok: false, error: 'signing_link_invalid' }, 404);
     const { request, requirements, signatures } = resolved;
-    const signed = new Set(signatures.map((row) => String(row.template_id)));
+    const latest = new Map<string, { attempt: number; status: string }>();
+    for (const row of signatures) {
+      const templateId = String(row.template_id ?? '');
+      const attempt = Number(row.attempt) || 1;
+      const current = latest.get(templateId);
+      if (!current || attempt > current.attempt) {
+        latest.set(templateId, { attempt, status: String(row.status ?? '') });
+      }
+    }
+    const signed = new Set(
+      [...latest.entries()]
+        .filter(([, state]) => ['signed', 'awaiting_verification', 'verified'].includes(state.status))
+        .map(([templateId]) => templateId),
+    );
     const downloadId = url.searchParams.get('download') ?? '';
     if (downloadId) {
       const requirement = requirements.find((item) => item.templateId === downloadId);
@@ -86,7 +106,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         expiresAt: request.token_expires_at,
       },
       documents: requirements.map((requirement) => {
-        const item = publicRequirement(requirement, signed);
+        const item = publicRequirement(requirement, latest);
         item.downloadUrl = item.downloadUrl.replace('__TOKEN__', token);
         return item;
       }),

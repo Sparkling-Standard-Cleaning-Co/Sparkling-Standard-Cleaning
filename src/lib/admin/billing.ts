@@ -1,6 +1,7 @@
 import type { AdminActor } from './operations.ts';
 import { AdminAuthError, audit } from './operations.ts';
 import type { D1Database } from './d1.ts';
+import { beginRefund, recomputeInvoiceFinancials } from './refunds.ts';
 
 function now(): string {
   return new Date().toISOString();
@@ -178,7 +179,16 @@ export async function updateInvoiceStatus(
     .first<Record<string, unknown>>();
   if (!invoice) throw new AdminAuthError(404, 'invoice_not_found');
   if (Number(invoice.amount_paid_cents) > 0 && status === 'void') throw new AdminAuthError(409, 'invoice_has_payments');
-  await db.prepare('UPDATE invoices SET status = ?, updated_at = ? WHERE id = ?').bind(status, now(), invoiceId).run();
+  if (status === 'void') {
+    await db
+      .prepare(
+        'UPDATE invoices SET status = ?, payment_url = NULL, stripe_checkout_session_id = NULL, updated_at = ? WHERE id = ?',
+      )
+      .bind(status, now(), invoiceId)
+      .run();
+  } else {
+    await db.prepare('UPDATE invoices SET status = ?, updated_at = ? WHERE id = ?').bind(status, now(), invoiceId).run();
+  }
   await audit(db, { actorUserId: actor.id, action: 'invoice.status_updated', entityType: 'invoice', entityId: invoiceId, detail: status });
 }
 
@@ -220,12 +230,7 @@ export async function recordPayment(
     )
     .bind(paymentId, invoice.branch_id, invoice.customer_id, invoiceId, provider, amount, idempotency, now(), actor.id, JSON.stringify({ note: text(input.note, 500), reference: text(input.reference, 120) }))
     .run();
-  const paid = Number(invoice.amount_paid_cents) + amount;
-  const nextBalance = Math.max(0, balance - amount);
-  await db
-    .prepare('UPDATE invoices SET amount_paid_cents = ?, balance_cents = ?, status = ?, updated_at = ? WHERE id = ?')
-    .bind(paid, nextBalance, nextBalance === 0 ? 'paid' : 'partially_paid', now(), invoiceId)
-    .run();
+  await recomputeInvoiceFinancials(db, invoiceId);
   await audit(db, { actorUserId: actor.id, action: 'payment.recorded', entityType: 'payment', entityId: paymentId, detail: `${provider}:${amount}` });
   return { id: paymentId };
 }
@@ -242,29 +247,25 @@ export async function recordRefund(
     .first<Record<string, unknown>>();
   if (!payment) throw new AdminAuthError(404, 'manual_payment_not_found');
   const amount = cents(input.amount);
-  if (amount <= 0 || amount > Number(payment.amount_cents)) throw new AdminAuthError(400, 'refund_amount_invalid');
-  const refundId = id('refund');
-  await db
-    .prepare(
-      `INSERT INTO refunds (id, payment_id, amount_cents, reason, status, created_by_admin_user_id)
-       VALUES (?, ?, ?, ?, 'succeeded', ?)`,
-    )
-    .bind(refundId, paymentId, amount, text(input.reason, 500), actor.id)
-    .run();
-  await db.prepare("UPDATE payments SET status = 'partially_refunded' WHERE id = ?").bind(paymentId).run();
-  const invoiceId = payment.invoice_id as string | null;
-  if (invoiceId) {
-    const invoice = await db.prepare('SELECT amount_paid_cents, total_cents FROM invoices WHERE id = ?').bind(invoiceId).first<{ amount_paid_cents: number; total_cents: number }>();
-    if (invoice) {
-      const paid = Math.max(0, Number(invoice.amount_paid_cents) - amount);
-      const balance = Math.max(0, Number(invoice.total_cents) - paid);
-      await db.prepare('UPDATE invoices SET amount_paid_cents = ?, balance_cents = ?, status = ?, updated_at = ? WHERE id = ?')
-        .bind(paid, balance, balance === 0 ? 'paid' : 'partially_paid', now(), invoiceId)
-        .run();
-    }
+  if (amount <= 0) throw new AdminAuthError(400, 'refund_amount_invalid');
+  const idempotencyKey = text(input.idempotencyKey, 200) || id('refund-idem');
+  const refund = await beginRefund(db, actor, {
+    paymentId,
+    amountCents: amount,
+    reason: text(input.reason, 500),
+    idempotencyKey,
+    status: 'succeeded',
+  });
+  if (!refund.duplicate) {
+    await audit(db, {
+      actorUserId: actor.id,
+      action: 'refund.recorded',
+      entityType: 'refund',
+      entityId: refund.id,
+      detail: String(amount),
+    });
   }
-  await audit(db, { actorUserId: actor.id, action: 'refund.recorded', entityType: 'refund', entityId: refundId, detail: String(amount) });
-  return { id: refundId };
+  return { id: refund.id };
 }
 
 export async function createCredit(

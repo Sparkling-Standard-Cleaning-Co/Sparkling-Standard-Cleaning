@@ -9,6 +9,8 @@ interface SigningDocument {
   required: boolean;
   stage: string;
   signed: boolean;
+  canResign?: boolean;
+  signatureStatus?: string;
   downloadUrl: string;
 }
 
@@ -79,7 +81,7 @@ function render(payload: SigningPayload): void {
           ${
             document.signed
               ? '<p class="employee-status" data-kind="ok">Already signed.</p>'
-              : `${
+              : `${document.canResign ? '<p class="employee-status" data-kind="error">This signature was rejected. Please review the document and sign again.</p>' : ''}${
                   document.sourceKind === 'text'
                     ? `<details><summary>Read the document</summary><div style="white-space:pre-wrap;max-height:22rem;overflow:auto;border:1px solid rgba(138,74,82,.18);border-radius:.6rem;padding:.8rem;background:#fffdfa;font-size:.9rem;line-height:1.55">${esc(document.contentText)}</div></details>`
                     : `<p class="employee-muted">A PDF document is attached to this request. <a href="${esc(document.downloadUrl)}" target="_blank" rel="noopener">Open the PDF</a> to review it before signing.</p>`

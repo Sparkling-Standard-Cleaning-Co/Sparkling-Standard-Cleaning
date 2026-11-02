@@ -1,5 +1,6 @@
 import { AdminAuthError, audit, type AdminActor } from './operations.ts';
 import type { D1Database } from './d1.ts';
+import { beginRefund, completeRefund, failRefund } from './refunds.ts';
 
 export interface StripeBillingEnv {
   STRIPE_SECRET_KEY?: string;
@@ -134,7 +135,8 @@ export async function refundStripePayment(
   paymentId: string,
   amountCents: number,
   env: StripeBillingEnv,
-): Promise<{ refundId: string }> {
+  idempotencyKey?: string,
+): Promise<{ refundId: string; status: 'succeeded' | 'pending' }> {
   if (env.ADMIN_STRIPE_REFUNDS_ENABLED !== 'true') throw new AdminAuthError(503, 'stripe_refunds_disabled');
   const payment = await db
     .prepare("SELECT * FROM payments WHERE id = ? AND provider = 'stripe' LIMIT 1")
@@ -145,39 +147,47 @@ export async function refundStripePayment(
   const intent = String(payment.stripe_payment_intent_id ?? '');
   if (!intent) throw new AdminAuthError(400, 'stripe_payment_intent_missing');
   const amount = Math.round(amountCents);
-  if (amount <= 0 || amount > Number(payment.amount_cents)) throw new AdminAuthError(400, 'refund_amount_invalid');
+  if (amount <= 0) throw new AdminAuthError(400, 'refund_amount_invalid');
+  const requestId = idempotencyKey?.trim() || `stripe-refund-${crypto.randomUUID()}`;
+  const local = await beginRefund(db, actor, {
+    paymentId,
+    amountCents: amount,
+    reason: 'admin stripe refund',
+    idempotencyKey: requestId,
+    status: 'pending',
+  });
+  if (local.status === 'succeeded') {
+    const stored = await db
+      .prepare('SELECT stripe_refund_id FROM refunds WHERE id = ? LIMIT 1')
+      .bind(local.id)
+      .first<{ stripe_refund_id: string | null }>();
+    return { refundId: stored?.stripe_refund_id || local.id, status: 'succeeded' };
+  }
+  if (local.status === 'failed') throw new AdminAuthError(409, 'refund_failed');
+
   const form = new URLSearchParams();
   form.set('payment_intent', intent);
   form.set('amount', String(amount));
-  const refund = await stripeRequest(env, 'refunds', form, `invoice-refund-${paymentId}-${amount}`);
-  const refundId = String(refund.id ?? '');
-  if (!refundId) throw new AdminAuthError(502, 'stripe_refund_failed');
-  await db
-    .prepare(
-      `INSERT OR IGNORE INTO refunds (id, payment_id, amount_cents, reason, status, stripe_refund_id, created_by_admin_user_id)
-       VALUES (?, ?, ?, ?, 'succeeded', ?, ?)`,
-    )
-    .bind(`refund_${crypto.randomUUID()}`, paymentId, amount, 'admin stripe refund', refundId, actor.id)
-    .run();
-  const full = amount >= Number(payment.amount_cents);
-  await db.prepare('UPDATE payments SET status = ? WHERE id = ?').bind(full ? 'refunded' : 'partially_refunded', paymentId).run();
-  const invoiceId = String(payment.invoice_id ?? '');
-  if (invoiceId) {
-    const invoice = await db
-      .prepare('SELECT amount_paid_cents, total_cents FROM invoices WHERE id = ?')
-      .bind(invoiceId)
-      .first<{ amount_paid_cents: number; total_cents: number }>();
-    if (invoice) {
-      const paid = Math.max(0, Number(invoice.amount_paid_cents) - amount);
-      const balance = Math.max(0, Number(invoice.total_cents) - paid);
-      await db
-        .prepare('UPDATE invoices SET amount_paid_cents = ?, balance_cents = ?, status = ?, payment_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .bind(paid, balance, balance === 0 ? 'paid' : 'partially_paid', invoiceId)
-        .run();
-    }
+  const refund = await stripeRequest(env, 'refunds', form, `invoice-refund-${requestId}`);
+  const stripeRefundId = String(refund.id ?? '');
+  if (!stripeRefundId) throw new AdminAuthError(502, 'stripe_refund_failed');
+  const stripeStatus = String(refund.status ?? 'succeeded').toLowerCase();
+  if (stripeStatus === 'failed' || stripeStatus === 'canceled') {
+    await failRefund(db, actor, local.id, `stripe:${stripeStatus}`);
+    throw new AdminAuthError(502, 'refund_failed');
   }
-  await audit(db, { actorUserId: actor.id, action: 'refund.stripe_succeeded', entityType: 'payment', entityId: paymentId, detail: refundId });
-  return { refundId };
+  if (stripeStatus === 'pending') {
+    return { refundId: local.id, status: 'pending' };
+  }
+  await completeRefund(db, actor, local.id, stripeRefundId);
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'refund.stripe_succeeded',
+    entityType: 'payment',
+    entityId: paymentId,
+    detail: stripeRefundId,
+  });
+  return { refundId: stripeRefundId, status: 'succeeded' };
 }
 
 async function stripeGet(env: StripeBillingEnv, path: string): Promise<Record<string, unknown>> {
