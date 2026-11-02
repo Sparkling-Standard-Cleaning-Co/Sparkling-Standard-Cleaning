@@ -1067,6 +1067,64 @@ test('invoice payment links and Stripe reconciliation are gated and idempotent',
   }
 });
 
+test('stale or mismatched invoice checkout sessions are expired before a new link', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Invoice',
+    lastName: 'Link',
+    email: 'invoice-link@example.test',
+  });
+  const invoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    lines: [{ kind: 'service', description: 'Cleaning', quantity: 1, unitAmountCents: 12000, totalCents: 12000 }],
+  });
+  db.raw
+    .prepare("UPDATE invoices SET payment_url = 'https://checkout.stripe.test/cs_old', stripe_checkout_session_id = 'cs_old' WHERE id = ?")
+    .run(invoice.id);
+  const originalFetch = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    calls.push(`${init?.method ?? 'GET'} ${url}`);
+    if (url.includes('/checkout/sessions/cs_old/expire')) {
+      return new Response(JSON.stringify({ id: 'cs_old', status: 'expired' }), { status: 200 });
+    }
+    if (url.includes('/checkout/sessions/cs_old')) {
+      return new Response(JSON.stringify({ id: 'cs_old', status: 'open', amount_total: 10000 }), { status: 200 });
+    }
+    if (url.includes('/checkout/sessions/cs_new')) {
+      return new Response(JSON.stringify({ id: 'cs_new', status: 'open', amount_total: 12000 }), { status: 200 });
+    }
+    if (url.includes('/checkout/sessions')) {
+      return new Response(JSON.stringify({ id: 'cs_new', url: 'https://checkout.stripe.test/cs_new' }), { status: 200 });
+    }
+    if (url.includes('/customers')) {
+      return new Response(JSON.stringify({ id: 'cus_new' }), { status: 200 });
+    }
+    return new Response('{}', { status: 500 });
+  };
+  const env = {
+    STRIPE_SECRET_KEY: 'sk_test_synthetic',
+    ADMIN_STRIPE_BILLING_ENABLED: 'true',
+    PUBLIC_SITE_URL: 'https://example.test',
+  };
+  try {
+    const link = await createInvoicePaymentLink(db, actor, invoice.id, env);
+    assert.equal(link.sessionId, 'cs_new');
+    assert.ok(calls.some((call) => call.includes('/cs_old/expire')));
+    const stored = db.raw
+      .prepare('SELECT stripe_checkout_session_id FROM invoices WHERE id = ?')
+      .get(invoice.id) as { stripe_checkout_session_id: string };
+    assert.equal(stored.stripe_checkout_session_id, 'cs_new');
+
+    const reused = await createInvoicePaymentLink(db, actor, invoice.id, env);
+    assert.equal(reused.sessionId, 'cs_new');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('signed payment authorization gates saved-card setup and off-session charging', async () => {
   const db = migratedDb();
   const { actor } = await ownerActor(db);

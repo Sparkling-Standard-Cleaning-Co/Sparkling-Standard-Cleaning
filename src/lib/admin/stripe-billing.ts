@@ -95,7 +95,30 @@ export async function createInvoicePaymentLink(
   const balance = Number(result.balance_cents) || 0;
   if (balance <= 0) throw new AdminAuthError(409, 'invoice_paid');
   if (result.payment_url) {
-    return { url: String(result.payment_url), sessionId: String(result.stripe_checkout_session_id ?? '') };
+    const existingSessionId = String(result.stripe_checkout_session_id ?? '');
+    if (!existingSessionId) throw new AdminAuthError(502, 'invoice_session_unverified');
+    const session = await stripeGet(env, `checkout/sessions/${encodeURIComponent(existingSessionId)}`).catch(
+      () => null,
+    );
+    if (!session) throw new AdminAuthError(502, 'invoice_session_unverified');
+    const status = String(session.status ?? '');
+    const sessionAmount = Number(session.amount_total);
+    if (status === 'open' && sessionAmount === balance) {
+      return { url: String(result.payment_url), sessionId: existingSessionId };
+    }
+    if (status === 'complete') throw new AdminAuthError(409, 'invoice_payment_processing');
+    if (status === 'open') {
+      const expired = await expireInvoiceCheckoutSession(env, existingSessionId);
+      if (!expired) throw new AdminAuthError(502, 'invoice_session_unverified');
+    } else if (status !== 'expired') {
+      throw new AdminAuthError(502, 'invoice_session_unverified');
+    }
+    await db
+      .prepare(
+        'UPDATE invoices SET payment_url = NULL, stripe_checkout_session_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      )
+      .bind(invoiceId)
+      .run();
   }
   const origin = (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
   const stripeCustomerId = await customerForInvoice(db, result, env);
@@ -188,6 +211,24 @@ export async function refundStripePayment(
     detail: stripeRefundId,
   });
   return { refundId: stripeRefundId, status: 'succeeded' };
+}
+
+async function expireInvoiceCheckoutSession(env: StripeBillingEnv, sessionId: string): Promise<boolean> {
+  const key = env.STRIPE_SECRET_KEY?.trim();
+  if (!key || !sessionId) return false;
+  try {
+    const response = await fetch(
+      `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}/expire`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function stripeGet(env: StripeBillingEnv, path: string): Promise<Record<string, unknown>> {
