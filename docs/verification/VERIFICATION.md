@@ -1,5 +1,42 @@
 # Verification status
 
+## Verified - 2026-11-02 owner pricing control release
+
+**Release:** `25e245b` on `production-safe`; Cloudflare Pages deployment
+`f376c632-e712-4ffe-aae2-921b8a53b6fd` (source `25e245b`). Previous production was
+`7c439d6` / deployment `3ccfffb1-922a-4398-a383-01f8191ef666`.
+
+**Scope:** owner Pricing & Estimator Control Center: allow-listed pricing catalog, versioned D1
+draft/publish/rollback store, four-engine side-effect-free simulator, admin tab, public active
+pricing endpoint, and request-scoped server verification configuration. Migration
+`0026_pricing_control.sql` was applied to production D1 with 25 existing migrations preserved
+(26 total). No customer price, rate, discount, travel assumption or engine calibration was changed;
+the source baseline remains active until the owner publishes a version, and the live
+`/api/pricing` response reported `source: true` with the existing source fingerprint.
+
+**Verification (exact code `25e245b`):**
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **789 tests: 788 passed, 1 skipped, 0 failed** |
+| Browser suite | **190 passed, 0 failed** (includes the new owner pricing-control browser test) |
+| Type check | `npm run check` 0 errors, 0 warnings, 1 hint |
+| Build + validation | `npm run build` and `npm run validate` passed |
+| Golden master | Residential, recurring first/ongoing, deep, STR, travel, office and church prices match the pre-control values |
+| D1 | Migration `0026` applied and tracked; `pricing_versions` exists; 0 versions published |
+| `/api/pricing` | HTTP 200, `source: true`, `version: null`, existing source fingerprint, minimum job unchanged |
+| `/admin/` | HTTP 200; Pricing & Estimator Control navigation present |
+| `/api/estimate-checkout` | HTTP 200, live mode, all readiness checks true |
+| Homepage | HTTP 200 |
+
+**Not yet verified:**
+
+- The owner has not yet exercised the production admin tab with her real account; the tab was
+  verified in the browser suite against a mocked authenticated API and the endpoint enforces an
+  authenticated owner session plus CSRF.
+- No production draft, publish or rollback was performed; the table starts empty by design.
+- No real-money payment or refund was involved in this release.
+
 ## Verified - 2026-11-01 booking, recurring, document and employee release
 
 **Release:** `7eab309` on `production-safe`; Cloudflare Pages deployment
