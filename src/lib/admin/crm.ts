@@ -54,7 +54,8 @@ export async function listCustomers(
               (SELECT value FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.kind = 'phone' ORDER BY cc.is_primary DESC LIMIT 1) AS phone,
               (SELECT COUNT(*) FROM properties p WHERE p.customer_id = c.id AND p.status = 'active') AS property_count
        FROM customers c LEFT JOIN branches b ON b.id = c.primary_branch_id
-       WHERE (? = '' OR c.status = ?)
+       WHERE c.source <> 'financial_system'
+         AND (? = '' OR c.status = ?)
          AND (? = '' OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company_name LIKE ?
               OR EXISTS (SELECT 1 FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.normalized_value LIKE ?))
          ${branch.sql}
@@ -85,7 +86,7 @@ export async function getCustomer(
     .prepare(
       `SELECT c.*, b.name AS branch_name FROM customers c
        LEFT JOIN branches b ON b.id = c.primary_branch_id
-       WHERE c.id = ? ${branch.sql} LIMIT 1`,
+       WHERE c.id = ? AND c.source <> 'financial_system' ${branch.sql} LIMIT 1`,
     )
     .bind(customerId, ...branch.bind)
     .first();

@@ -34,7 +34,7 @@ export async function operationsReport(
       `SELECT
          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active,
          SUM(CASE WHEN status = 'archived' THEN 1 ELSE 0 END) AS archived
-       FROM customers WHERE 1 = 1 ${customerBranch.sql}`,
+       FROM customers WHERE source <> 'financial_system' ${customerBranch.sql}`,
     ).bind(...customerBranch.bind).first<Record<string, number>>(),
     db.prepare(
       `SELECT status, COUNT(*) AS count FROM leads WHERE 1 = 1 ${leadBranch.sql} GROUP BY status`,
