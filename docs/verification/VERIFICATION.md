@@ -1,5 +1,24 @@
 # Verification status
 
+## Verified - 2026-11-02 paid-booking signature recovery
+
+**Release:** `e81e225` on `production-safe`; Cloudflare Pages deployment
+`f66c6d39-056f-4168-a8f8-f8fdcda68b91`.
+
+**Scope:** a paid booking whose required approved documents are still outstanding no
+longer confirms silently. Auto-confirm creates or rotates a secure signing request,
+returns the signing link to the webhook, emails the customer when an address is
+available, and leaves the booking in pending-owner-review with an explicit
+`documents_required` reason. The owner notification includes the private signing
+link. This closes the post-payment document dead end without inventing agreement
+wording or activating unapproved templates.
+
+**Verification:** unit suite **796 tests: 795 passed, 1 skipped, 0 failed**; the
+documents integration test proves an unsigned paid commitment creates exactly one
+signing request and returns a token/email; typecheck, build and validation passed.
+**Not verified:** no owner-approved legal template or live Stripe payment was used;
+post-payment email delivery was not exercised against Resend production.
+
 ## Verified - 2026-11-02 invoice checkout link integrity
 
 **Release:** `385fcf5` on `production-safe`; Cloudflare Pages deployment
