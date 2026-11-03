@@ -9,6 +9,11 @@ import {
 import { createCalendarEvent, findCalendarEventByReference } from './google-calendar.ts';
 import { writeLedgerJson } from '../payments/ledger.ts';
 import { commitConfirmedBooking, type CommitmentInput } from './commitment.ts';
+import {
+  createSigningRequest,
+  evaluateDocumentGate,
+  rotateSigningRequestToken,
+} from '../documents/service.ts';
 
 export type AutoConfirmResult =
   | {
@@ -19,7 +24,11 @@ export type AutoConfirmResult =
       planId?: string;
       recurringStatus?: string;
     }
-  | { ok: false; reason: string };
+  | {
+      ok: false;
+      reason: string;
+      documentRequest?: { token: string; bundleCode: string; email: string };
+    };
 
 /**
  * Confirms a paid, fully eligible booking without owner intervention.
@@ -67,6 +76,84 @@ export async function autoConfirmPaidBooking(
   }
 
   if (env.DB) {
+    // A paid booking may still have required signatures that enforce at
+    // confirmation rather than at payment. Never commit an unsigned agreement:
+    // create a fresh signing link so the customer has a recovery path.
+    const requestRow = await env.DB
+      .prepare(
+        `SELECT id, customer_id, property_id, quote_reference, payload_json
+         FROM booking_requests
+         WHERE hold_id = ? OR quote_reference = ?
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+      .bind(hold.id, expectedReference || hold.reference)
+      .first<{
+        id: string;
+        customer_id: string | null;
+        property_id: string | null;
+        quote_reference: string;
+        payload_json: string;
+      }>()
+      .catch(() => null);
+    let requestFields: Record<string, string> = {};
+    try {
+      const parsed = JSON.parse(requestRow?.payload_json ?? '{}') as Record<string, unknown>;
+      requestFields = Object.fromEntries(
+        Object.entries(parsed).filter(([, value]) => typeof value === 'string'),
+      ) as Record<string, string>;
+    } catch {
+      requestFields = {};
+    }
+    const documentContext = {
+      subjectType: 'customer' as const,
+      ...(requestRow?.customer_id ? { customerId: requestRow.customer_id } : {}),
+      ...(requestRow?.property_id ? { propertyId: requestRow.property_id } : {}),
+      ...(requestRow?.id ? { bookingRequestId: requestRow.id } : {}),
+      serviceCode: details.serviceCode ?? requestFields.service_type ?? 'residential-cleaning',
+      frequency: details.frequency ?? requestFields.ongoing_frequency ?? requestFields.frequency ?? '',
+      bookingReference: expectedReference || requestRow?.quote_reference || hold.reference,
+      accessAuthorization: requestFields.access_authorization === 'yes',
+      customerProducts: requestFields.customer_products === 'yes',
+    };
+    const gate = await evaluateDocumentGate(env.DB, documentContext, 'before_confirmation');
+    if (!gate.satisfied) {
+      const pending = await env.DB
+        .prepare(
+          `SELECT id FROM signing_requests
+           WHERE status IN ('pending','partially_signed') AND subject_type = 'customer'
+             AND (customer_id = ? OR (customer_id IS NULL AND booking_reference = ?))
+           ORDER BY created_at DESC LIMIT 1`,
+        )
+        .bind(documentContext.customerId ?? '', documentContext.bookingReference)
+        .first<{ id: string }>()
+        .catch(() => null);
+      if (pending) {
+        const rotated = await rotateSigningRequestToken(env.DB, null, pending.id);
+        return {
+          ok: false,
+          reason: 'documents_required',
+          documentRequest: {
+            token: rotated.token,
+            bundleCode: rotated.bundleCode,
+            email: rotated.email || details.customerEmail || requestFields.email || '',
+          },
+        };
+      }
+      const created = await createSigningRequest(env.DB, documentContext);
+      if (created.token) {
+        return {
+          ok: false,
+          reason: 'documents_required',
+          documentRequest: {
+            token: created.token,
+            bundleCode: created.bundleCode ?? 'documents',
+            email: details.customerEmail || requestFields.email || '',
+          },
+        };
+      }
+      return { ok: false, reason: 'documents_required' };
+    }
+
     const committed = await commitConfirmedBooking(env, env.DB, {
       reference: expectedReference || hold.reference,
       holdId: hold.id,

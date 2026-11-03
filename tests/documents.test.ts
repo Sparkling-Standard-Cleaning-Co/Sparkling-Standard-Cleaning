@@ -9,6 +9,8 @@ import { createOpsSession, enrollOwner, type AdminActor } from '../src/lib/admin
 import { onRequestGet as documentsAdminGet, onRequestPost as documentsAdminPost } from '../functions/api/admin/documents.ts';
 import { confirmRequest, createTeamMember } from '../src/lib/admin/scheduling.ts';
 import { commitConfirmedBooking } from '../src/lib/booking/commitment.ts';
+import { autoConfirmPaidBooking } from '../src/lib/booking/auto-confirm.ts';
+import { FakeLedger } from './helpers/payment-fakes.ts';
 import {
   activeRequirements,
   addBundleItem,
@@ -466,6 +468,62 @@ test('an unsigned paid commitment cannot create a calendar event', async () => {
   assert.equal((f.db.raw.prepare('SELECT COUNT(*) AS n FROM appointments').get() as { n: number }).n, 0);
 });
 
+
+test('paid confirmation creates a post-payment signing link when documents are outstanding', async () => {
+  const f = await fixture();
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Paid Booking Agreement');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.residential',
+    name: 'Residential documents',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  const ledger = new FakeLedger();
+  const holdId = '2026-11-20__33333333-3333-4333-8333-333333333333';
+  const start = '2026-11-20T14:00:00.000Z';
+  const end = '2026-11-20T16:00:00.000Z';
+  ledger.values.set(`booking/holds/${holdId}.json`, JSON.stringify({
+    version: 1,
+    id: holdId,
+    date: '2026-11-20',
+    start,
+    end,
+    durationMinutes: 120,
+    destination: { lat: 30.42, lng: -87.22 },
+    locationText: '1 Test Way, Pensacola, FL',
+    reference: 'SS-20261120-DOC001',
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+    status: 'held',
+    resourceIds: ['synthetic'],
+    crewSize: 1,
+  }));
+  const result = await autoConfirmPaidBooking(
+    { DB: f.db, PAYMENT_LEDGER: ledger } as never,
+    holdId,
+    'SS-20261120-DOC001',
+    {
+      customerId: f.customerId,
+      propertyId: f.propertyId,
+      serviceCode: 'residential-cleaning',
+      frequency: 'one_time',
+      customerEmail: 'customer@example.test',
+    },
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.reason, 'documents_required');
+    assert.ok(result.documentRequest?.token);
+    assert.equal(result.documentRequest?.email, 'customer@example.test');
+  }
+  assert.equal((f.db.raw.prepare('SELECT COUNT(*) AS n FROM signing_requests').get() as { n: number }).n, 1);
+});
 
 test('an owner can upload a PDF template and configure it without a deployment', async () => {
   const f = await fixture();

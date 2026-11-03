@@ -39,6 +39,7 @@ import type { BookingEnv } from '../../src/lib/booking/service.ts';
 import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { applyInvoiceCheckoutPayment } from '../../src/lib/admin/stripe-reconcile.ts';
 import { completeCheckoutSlotByAttempt, expireCheckoutSlotByAttempt } from '../../src/lib/payments/checkout-registry.ts';
+import { sendSigningEmail } from '../../src/lib/documents/service.ts';
 import { recordSavedCardSetup } from '../../src/lib/admin/stripe-billing.ts';
 import {
   projectStripeDispute,
@@ -713,6 +714,20 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
                 ...(confirmed.recurringStatus ? { recurringStatus: confirmed.recurringStatus } : {}),
               }
             : { status: 'pending_owner_review', reason: confirmed.reason };
+          if (!confirmed.ok && confirmed.reason === 'documents_required' && confirmed.documentRequest) {
+            const recipient = confirmed.documentRequest.email.trim();
+            if (recipient) {
+              await sendSigningEmail(
+                env,
+                recipient,
+                confirmed.documentRequest.token,
+                confirmed.documentRequest.bundleCode,
+                `documents-post-payment-${eventId}-${confirmed.documentRequest.token.slice(0, 12)}`,
+              ).catch(() => false);
+            }
+            const site = (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
+            metadata.documents_signing_url = `${site}/document-sign/?token=${encodeURIComponent(confirmed.documentRequest.token)}`;
+          }
         }
       }
       if (env.DB && /^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
@@ -800,6 +815,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       'Stripe event': eventId,
       'Stripe session': session.id ?? '',
       'Checkout attempt': metadata.checkout_attempt ?? '',
+      ...(metadata.documents_signing_url
+        ? { 'Documents signing link': metadata.documents_signing_url }
+        : {}),
       ...(metadata.booking_status
         ? {
             'Booking status':
