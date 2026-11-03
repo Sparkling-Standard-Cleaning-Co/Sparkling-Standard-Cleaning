@@ -120,10 +120,12 @@ function conditionMatches(item: Record<string, unknown>, context: DocumentSubjec
   const values = splitValues(text(item.condition_value, 300));
   if (key === 'frequency') return values.includes((context.frequency ?? '').toLowerCase());
   if (key === 'access_authorization') {
-    return context.accessAuthorization === true || values.includes('yes') === context.accessAuthorization;
+    const expected = values.includes('yes') || values.includes('true');
+    return (context.accessAuthorization === true) === expected;
   }
   if (key === 'customer_products') {
-    return context.customerProducts === true || values.includes('yes') === context.customerProducts;
+    const expected = values.includes('yes') || values.includes('true');
+    return (context.customerProducts === true) === expected;
   }
   if (key === 'role') return values.includes((context.role ?? '').toLowerCase());
   if (key === 'service') {
@@ -243,11 +245,11 @@ async function refreshSigningRequestStatus(
   requestId: string,
 ): Promise<string> {
   const request = await db
-    .prepare('SELECT requirement_snapshot_json FROM signing_requests WHERE id = ? LIMIT 1')
+    .prepare('SELECT * FROM signing_requests WHERE id = ? LIMIT 1')
     .bind(requestId)
-    .first<{ requirement_snapshot_json: string }>();
+    .first<Record<string, unknown>>();
   if (!request) throw new AdminAuthError(404, 'signing_request_not_found');
-  const parsed = JSON.parse(request.requirement_snapshot_json || '[]') as unknown;
+  const parsed = JSON.parse(String(request.requirement_snapshot_json || '[]')) as unknown;
   const requirements = Array.isArray(parsed)
     ? (parsed as RequirementSnapshot[]).filter((item) => item && item.required)
     : [];
@@ -264,7 +266,81 @@ async function refreshSigningRequestStatus(
     .prepare('UPDATE signing_requests SET status = ?, updated_at = ? WHERE id = ?')
     .bind(status, now(), requestId)
     .run();
+  if (status === 'signed' && !String(request.executed_copy_text ?? '').trim()) {
+    const executed = await buildExecutedCopy(db, request);
+    if (executed) {
+      await db
+        .prepare(
+          `UPDATE signing_requests
+           SET executed_copy_text = ?, executed_sha256 = ?, executed_at = ?, updated_at = ?
+           WHERE id = ? AND executed_copy_text = ''`,
+        )
+        .bind(executed.text, executed.sha256, now(), now(), requestId)
+        .run();
+    }
+  }
   return status;
+}
+
+async function buildExecutedCopy(
+  db: D1Database,
+  request: Record<string, unknown>,
+): Promise<{ text: string; sha256: string } | null> {
+  const signatures = await db
+    .prepare(
+      `SELECT s.*, t.title FROM document_signatures s
+       JOIN document_templates t ON t.id = s.template_id
+       WHERE s.signing_request_id = ?
+       ORDER BY t.title, s.attempt`,
+    )
+    .bind(String(request.id))
+    .all<Record<string, unknown>>();
+  if (!signatures.results?.length) return null;
+  const latest = new Map<string, Record<string, unknown>>();
+  for (const row of signatures.results) {
+    const id = String(row.template_id ?? '');
+    const attempt = Number(row.attempt) || 1;
+    const current = latest.get(id);
+    if (!current || attempt > (Number(current.attempt) || 1)) latest.set(id, row);
+  }
+  const lines = [
+    'SPARKLING STANDARD LLC',
+    'EXECUTED DOCUMENT COPY',
+    '',
+    `Signing request: ${String(request.id)}`,
+    `Bundle: ${String(request.bundle_code ?? '')} v${String(request.bundle_version ?? '')}`,
+    `Subject type: ${String(request.subject_type ?? '')}`,
+    `Customer: ${String(request.customer_id ?? '')}`,
+    `Employee: ${String(request.team_member_id ?? '')}`,
+    `Booking reference: ${String(request.booking_reference ?? '')}`,
+    `Service: ${String(request.service_code ?? '')}`,
+    `Executed at: ${now()}`,
+    `Countersigned by: ${String(request.counter_signature_name ?? '') || 'not required'}`,
+    '',
+  ];
+  for (const row of latest.values()) {
+    const signature = (() => {
+      try {
+        return JSON.parse(String(row.signature_json ?? '{}')) as { value?: string; consentVersion?: string };
+      } catch {
+        return {};
+      }
+    })();
+    lines.push(
+      '------------------------------------------------------------',
+      `Document: ${String(row.title ?? row.template_id ?? '')}`,
+      `Version: ${String(row.template_version ?? '')}`,
+      `SHA-256: ${String(row.document_sha256 ?? '')}`,
+      `Signer: ${String(row.signer_name ?? '')} <${String(row.signer_email ?? '')}>`,
+      `Signed at: ${String(row.signed_at ?? '')}`,
+      `Consent: ${String(row.consent_version ?? signature.consentVersion ?? '')}`,
+      `Status: ${String(row.status ?? '')}`,
+      `Typed signature: ${String(signature.value ?? '')}`,
+      '',
+    );
+  }
+  const text = lines.join('\n');
+  return { text, sha256: await sha256Hex(text) };
 }
 
 async function hasValidSignature(
@@ -372,6 +448,38 @@ export interface CreatedSigningRequest {
   requirements?: Requirement[];
 }
 
+async function signingSubjectIdentity(
+  db: D1Database,
+  context: DocumentSubjectContext,
+): Promise<{ branchId: string | null; signerEmail: string }> {
+  if (context.subjectType === 'employee' && context.teamMemberId) {
+    const row = await db
+      .prepare('SELECT branch_id, email FROM team_members WHERE id = ? LIMIT 1')
+      .bind(context.teamMemberId)
+      .first<{ branch_id: string | null; email: string }>();
+    return {
+      branchId: row?.branch_id ?? null,
+      signerEmail: (row?.email ?? context.email ?? '').trim().toLowerCase(),
+    };
+  }
+  if (context.customerId) {
+    const row = await db
+      .prepare(
+        `SELECT c.primary_branch_id,
+                (SELECT value FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.kind = 'email'
+                  ORDER BY cc.is_primary DESC LIMIT 1) AS email
+         FROM customers c WHERE c.id = ? LIMIT 1`,
+      )
+      .bind(context.customerId)
+      .first<{ primary_branch_id: string | null; email: string | null }>();
+    return {
+      branchId: row?.primary_branch_id ?? null,
+      signerEmail: (row?.email ?? context.email ?? '').trim().toLowerCase(),
+    };
+  }
+  return { branchId: null, signerEmail: (context.email ?? '').trim().toLowerCase() };
+}
+
 export async function createSigningRequest(
   db: D1Database,
   context: DocumentSubjectContext,
@@ -386,6 +494,7 @@ export async function createSigningRequest(
     bundleCode: String(bundle.code),
     bundleVersion: Number(bundle.version) || 1,
   }));
+  const identity = await signingSubjectIdentity(db, context);
   const id = `signreq_${crypto.randomUUID()}`;
   const token = randomToken(32);
   const expiresAt = new Date(Date.now() + SIGNING_TOKEN_TTL_MS).toISOString();
@@ -395,8 +504,8 @@ export async function createSigningRequest(
        (id, bundle_id, bundle_code, bundle_version, subject_type, customer_id, team_member_id,
         property_id, booking_request_id, appointment_id, recurring_plan_id, booking_reference,
         service_code, status, requirement_snapshot_json, token_hash, token_expires_at,
-        created_by_admin_user_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+        created_by_admin_user_id, branch_id, signer_email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -416,6 +525,8 @@ export async function createSigningRequest(
       await hashToken(token),
       expiresAt,
       options.createdByAdminUserId ?? null,
+      identity.branchId,
+      identity.signerEmail,
     )
     .run();
   await audit(db, {
@@ -447,6 +558,8 @@ interface SigningRequestRow extends Record<string, unknown> {
   team_member_id: string | null;
   booking_reference: string;
   service_code: string;
+  signer_email?: string;
+  branch_id?: string | null;
 }
 
 export async function getSigningRequestByToken(
@@ -495,6 +608,11 @@ export async function signSigningRequest(
   const signerEmail = text(input.signerEmail, 200).toLowerCase();
   if (!input.consent) throw new AdminAuthError(400, 'esign_consent_required');
   if (!signerName) throw new AdminAuthError(400, 'signer_name_required');
+  if (!signerEmail) throw new AdminAuthError(400, 'signer_email_required');
+  const boundEmail = String(request.signer_email ?? '').trim().toLowerCase();
+  if (boundEmail && signerEmail !== boundEmail) {
+    throw new AdminAuthError(403, 'signer_email_mismatch');
+  }
   const required = requirements.filter((item) => item.required);
   const submitted = Object.values(input.signatures).filter((signature) => text(signature?.value, 200));
   if (submitted.length === 0) throw new AdminAuthError(400, 'signature_required');
@@ -951,7 +1069,7 @@ export async function listBundleItems(
 
 export async function listSigningRequests(
   db: D1Database,
-  filters: { customerId?: string; teamMemberId?: string; bookingReference?: string } = {},
+  filters: { customerId?: string; teamMemberId?: string; bookingReference?: string; branchId?: string } = {},
 ): Promise<Array<Record<string, unknown>>> {
   const clauses: string[] = [];
   const binds: unknown[] = [];
@@ -967,6 +1085,10 @@ export async function listSigningRequests(
     clauses.push('sr.booking_reference = ?');
     binds.push(filters.bookingReference);
   }
+  if (filters.branchId) {
+    clauses.push('sr.branch_id = ?');
+    binds.push(filters.branchId);
+  }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const rows = await db
     .prepare(
@@ -974,6 +1096,8 @@ export async function listSigningRequests(
               sr.customer_id, sr.team_member_id, sr.property_id, sr.booking_request_id,
               sr.appointment_id, sr.recurring_plan_id, sr.booking_reference, sr.service_code,
               sr.status, sr.requirement_snapshot_json, sr.token_expires_at,
+              sr.branch_id, sr.signer_email, sr.executed_at, sr.executed_sha256,
+              sr.counter_signature_name, sr.counter_signed_at,
               sr.created_by_admin_user_id, sr.created_at, sr.updated_at,
               c.first_name, c.last_name, tm.display_name,
               (SELECT COUNT(*) FROM document_signatures s WHERE s.signing_request_id = sr.id) AS signed_count,
@@ -999,7 +1123,8 @@ export async function getSigningRequestDetails(
       `SELECT id, bundle_id, bundle_code, bundle_version, subject_type, customer_id,
               team_member_id, property_id, booking_request_id, appointment_id, recurring_plan_id,
               booking_reference, service_code, status, requirement_snapshot_json,
-              token_expires_at, created_by_admin_user_id, created_at, updated_at
+              token_expires_at, branch_id, signer_email, executed_at, executed_sha256,
+              counter_signature_name, counter_signed_at, created_by_admin_user_id, created_at, updated_at
        FROM signing_requests WHERE id = ? LIMIT 1`,
     )
     .bind(requestId)
@@ -1014,6 +1139,78 @@ export async function getSigningRequestDetails(
     .bind(requestId)
     .all();
   return { request, signatures: signatures.results ?? [] };
+}
+
+export async function getExecutedCopy(
+  db: D1Database,
+  requestId: string,
+): Promise<{ requestId: string; text: string; sha256: string; executedAt: string | null; branchId: string | null } | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, executed_copy_text, executed_sha256, executed_at, branch_id
+       FROM signing_requests WHERE id = ? LIMIT 1`,
+    )
+    .bind(requestId)
+    .first<{
+      id: string;
+      executed_copy_text: string;
+      executed_sha256: string;
+      executed_at: string | null;
+      branch_id: string | null;
+    }>();
+  if (!row || !row.executed_copy_text) return null;
+  return {
+    requestId: row.id,
+    text: row.executed_copy_text,
+    sha256: row.executed_sha256,
+    executedAt: row.executed_at,
+    branchId: row.branch_id,
+  };
+}
+
+export async function countersignSigningRequest(
+  db: D1Database,
+  actorUserId: string,
+  requestId: string,
+  name: string,
+): Promise<{ status: string; countersignedBy: string }> {
+  const signerName = text(name, 200);
+  if (!signerName) throw new AdminAuthError(400, 'countersigner_name_required');
+  const request = await db
+    .prepare('SELECT id, status FROM signing_requests WHERE id = ? LIMIT 1')
+    .bind(requestId)
+    .first<{ id: string; status: string }>();
+  if (!request) throw new AdminAuthError(404, 'signing_request_not_found');
+  if (!['signed', 'partially_signed'].includes(request.status)) {
+    throw new AdminAuthError(409, 'signing_request_not_signable');
+  }
+  const statements = [
+    db
+      .prepare(
+        `UPDATE document_signatures
+         SET status = 'verified', verified_by_admin_user_id = ?, verified_at = ?
+         WHERE signing_request_id = ? AND status = 'awaiting_verification'`,
+      )
+      .bind(actorUserId, now(), requestId),
+    db
+      .prepare(
+        `UPDATE signing_requests SET counter_signed_by_admin_user_id = ?, counter_signed_at = ?,
+           counter_signature_name = ?, executed_copy_text = '', executed_sha256 = '',
+           executed_at = NULL, updated_at = ? WHERE id = ?`,
+      )
+      .bind(actorUserId, now(), signerName, now(), requestId),
+  ];
+  if (db.batch) await db.batch(statements);
+  else for (const statement of statements) await statement.run();
+  const status = await refreshSigningRequestStatus(db, requestId);
+  await audit(db, {
+    actorUserId,
+    action: 'documents.countersigned',
+    entityType: 'signing_request',
+    entityId: requestId,
+    detail: signerName,
+  });
+  return { status, countersignedBy: signerName };
 }
 
 export async function getSignatureForDownload(

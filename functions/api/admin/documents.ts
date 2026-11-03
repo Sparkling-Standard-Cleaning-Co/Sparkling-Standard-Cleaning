@@ -8,6 +8,8 @@ import {
   createBundle,
   createSigningRequest,
   createTemplate,
+  countersignSigningRequest,
+  getExecutedCopy,
   getSignatureForDownload,
   getSigningRequestDetails,
   listBundleItems,
@@ -52,6 +54,15 @@ function json(body: unknown, status = 200): Response {
 
 function text(value: unknown, max = 300): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+function checked(value: unknown): boolean {
+  return value === true || value === 'yes' || value === 'true' || value === 'on';
+}
+
+function branchAllowed(actor: { role: string; branchId: string | null }, branchId: unknown): boolean {
+  if (actor.role === 'owner') return true;
+  return Boolean(actor.branchId) && String(branchId ?? '') === actor.branchId;
 }
 
 function ownerOnly(actor: { role: string }): void {
@@ -113,11 +124,30 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
           ...(url.searchParams.get('bookingReference')
             ? { bookingReference: url.searchParams.get('bookingReference')! }
             : {}),
+          ...(actor.role === 'owner' ? {} : { branchId: actor.branchId ?? '__no_branch__' }),
         }),
       });
     }
     if (view === 'request') {
-      return json({ ok: true, request: await getSigningRequestDetails(db, url.searchParams.get('id') ?? '') });
+      const details = await getSigningRequestDetails(db, url.searchParams.get('id') ?? '');
+      if (!details) return json({ ok: false, error: 'signing_request_not_found' }, 404);
+      const request = (details.request ?? {}) as Record<string, unknown>;
+      if (!branchAllowed(actor, request.branch_id)) return json({ ok: false, error: 'forbidden' }, 403);
+      return json({ ok: true, ...details });
+    }
+    if (view === 'executed') {
+      const executed = await getExecutedCopy(db, url.searchParams.get('id') ?? '');
+      if (!executed) return json({ ok: false, error: 'executed_copy_not_available' }, 404);
+      if (!branchAllowed(actor, executed.branchId)) return json({ ok: false, error: 'forbidden' }, 403);
+      return new Response(executed.text, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Content-Disposition': `attachment; filename="executed-${executed.requestId}.txt"`,
+          'Cache-Control': 'private, no-store',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Executed-SHA256': executed.sha256,
+        },
+      });
     }
     if (view === 'download') {
       const signature = await getSignatureForDownload(db, url.searchParams.get('signatureId') ?? '');
@@ -202,8 +232,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         contentSha256: hash,
         r2Key: key,
         signerParty: body.signerParty === 'employee' ? 'employee' : body.signerParty === 'both' ? 'both' : 'customer',
-        requiresCountersignature: body.requiresCountersignature === 'true',
-        requiresVerification: body.requiresVerification === 'true',
+        requiresCountersignature: checked(body.requiresCountersignature),
+        requiresVerification: checked(body.requiresVerification),
       });
       return json({ ok: true, ...created });
     }
@@ -300,6 +330,20 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         emailSent,
         signingUrl: `/document-sign/?token=${encodeURIComponent(rotated.token)}`,
       });
+    }
+    if (action === 'countersign') {
+      const requestId = text(body.requestId, 100);
+      const details = await getSigningRequestDetails(db, requestId);
+      if (!details) return json({ ok: false, error: 'signing_request_not_found' }, 404);
+      const request = (details.request ?? {}) as Record<string, unknown>;
+      if (!branchAllowed(actor, request.branch_id)) return json({ ok: false, error: 'forbidden' }, 403);
+      const result = await countersignSigningRequest(
+        db,
+        actor.id,
+        requestId,
+        text(body.name, 200) || actor.name,
+      );
+      return json({ ok: true, ...result });
     }
     if (action === 'verify_signature' || action === 'reject_signature') {
       await verifySignature(

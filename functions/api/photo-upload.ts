@@ -32,6 +32,8 @@ import {
   type PhotoCategory,
 } from '../../src/lib/photos.ts';
 import { sanitizePhotoBytes, sniffPhotoFormat } from './photo-utils.ts';
+import type { D1Database } from '../../src/lib/admin/d1.ts';
+import { PUBLIC_RATE_LIMITS, checkPublicRateLimit, clientIp, consumePublicRateLimit } from '../../src/lib/public-rate-limit.ts';
 
 export { sniffPhotoFormat } from './photo-utils.ts';
 
@@ -48,6 +50,7 @@ interface Env {
   PHOTO_OWNER_TOKEN?: string;
   TURNSTILE_SECRET_KEY?: string;
   PHOTOS_MAX_BYTES?: string;
+  DB?: D1Database;
 }
 
 const WINDOW_MS = 60_000;
@@ -65,10 +68,6 @@ function json(body: unknown, status = 200): Response {
       'X-Content-Type-Options': 'nosniff',
     },
   });
-}
-
-function clientIp(request: Request): string {
-  return request.headers.get('CF-Connecting-IP') ?? request.headers.get('x-forwarded-for') ?? 'unknown';
 }
 
 function throttled(request: Request): boolean {
@@ -143,6 +142,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const { request, env } = context;
   if (!sameOrigin(request)) return json({ ok: false, error: 'origin_rejected' }, 403);
   if (throttled(request)) return json({ ok: false, error: 'rate_limited' }, 429);
+  const ip = clientIp(request);
+  const ipStatus = await checkPublicRateLimit(env.DB, 'photo-upload', ip, PUBLIC_RATE_LIMITS.photoIp);
+  if (ipStatus.limited) {
+    return json({ ok: false, error: 'rate_limited', retryAfterSeconds: ipStatus.retryAfterSeconds }, 429);
+  }
+  await consumePublicRateLimit(env.DB, 'photo-upload', ip, PUBLIC_RATE_LIMITS.photoIp);
 
   const bucket = env.PHOTOS_BUCKET;
   if (!bucket || !env.PHOTO_OWNER_TOKEN) {

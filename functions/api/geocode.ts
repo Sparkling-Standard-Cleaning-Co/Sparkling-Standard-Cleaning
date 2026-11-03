@@ -39,8 +39,12 @@ import {
   suggestQueryVariants,
   type RawSuggestion,
 } from '../../src/lib/location/suggestion-ranking.ts';
+import type { D1Database } from '../../src/lib/admin/d1.ts';
+import { PUBLIC_RATE_LIMITS, checkPublicRateLimit, clientIp as rateClientIp, consumePublicRateLimit } from '../../src/lib/public-rate-limit.ts';
 
-interface Env extends GeocodeEnv {}
+interface Env extends GeocodeEnv {
+  DB?: D1Database;
+}
 
 const MAX_QUERY = 120;
 const MIN_QUERY = 3;
@@ -248,6 +252,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (throttled(request)) {
     return json({ ok: false, error: 'rate_limited' }, 429);
   }
+  const rateIp = rateClientIp(request);
+  const rateStatus = await checkPublicRateLimit(env.DB, 'geocode', rateIp, PUBLIC_RATE_LIMITS.geocodeIp);
+  if (rateStatus.limited) {
+    return json({ ok: false, error: 'rate_limited', retryAfterSeconds: rateStatus.retryAfterSeconds }, 429);
+  }
+  await consumePublicRateLimit(env.DB, 'geocode', rateIp, PUBLIC_RATE_LIMITS.geocodeIp);
 
   let payload: { action?: unknown; query?: unknown; id?: unknown; street?: unknown; city?: unknown; state?: unknown; zip?: unknown; lat?: unknown; lng?: unknown; sessionToken?: unknown };
   try {

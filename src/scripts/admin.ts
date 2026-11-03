@@ -6,6 +6,7 @@ import {
 } from '../lib/password-policy.ts';
 import { loadPricingView } from './pricing-admin';
 import { PET_OPTIONS, PROPERTY_TYPE_OPTIONS, RESIDENTIAL_INPUT_LIMITS } from '../config/estimators/input-definitions';
+import { pricing } from '../config/pricing';
 
 interface AdminActor {
   id: string;
@@ -53,6 +54,7 @@ const viewMeta: Record<string, [string, string]> = {
   calendar: ['Calendar & Requests', 'Pending reservations and upcoming appointments.'],
   leads: ['Leads & Inquiries', 'Website inquiries, delivery status and follow-up.'],
   customers: ['Customers', 'Customer profiles, properties and history.'],
+  'new-booking': ['New Booking', 'Create a one-time estimate and booking from a saved customer and property.'],
   recurring: ['Recurring Plans', 'Recurring cleaning administration.'],
   jobs: ['Jobs & Team', 'Cleaning jobs, assignments and checklists.'],
   documents: ['Documents & Agreements', 'Owner-controlled templates, bundles and electronic signatures.'],
@@ -68,6 +70,7 @@ const navPermission: Record<string, string> = {
   calendar: 'booking.read',
   leads: 'lead.read',
   customers: 'customer.read',
+  'new-booking': 'booking.write',
   recurring: 'job.read',
   jobs: 'job.read',
   documents: 'job.read',
@@ -308,7 +311,11 @@ function leadDetails(value: unknown): string {
 }
 
 async function loadOverview(): Promise<void> {
-  const data = await api<{ counts?: Record<string, number>; recentLeads?: Array<Record<string, unknown>> }>('/api/admin/overview');
+  const data = await api<{
+    counts?: Record<string, number>;
+    alerts?: Array<Record<string, unknown>>;
+    recentLeads?: Array<Record<string, unknown>>;
+  }>('/api/admin/overview');
   const counts = data.counts ?? {};
   const kpis = document.querySelector<HTMLElement>('[data-admin-kpis]');
   if (kpis) {
@@ -319,7 +326,28 @@ async function loadOverview(): Promise<void> {
       ['Upcoming appointments', counts.upcomingAppointments ?? 0],
       ['Active gifts', counts.activeGifts ?? 0],
       ['Lead delivery failures', counts.failedLeadDeliveries ?? 0],
+      ['Booking recovery', counts.failedCommitments ?? 0],
+      ['Financial issues', counts.financialIssues ?? 0],
+      ['Failed emails', counts.failedNotifications ?? 0],
+      ['Failed payment events', counts.failedPaymentEvents ?? 0],
+      ['Recurring failures', counts.failedWorkerRuns ?? 0],
     ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('');
+  }
+  const alerts = document.querySelector<HTMLElement>('[data-admin-alerts]');
+  if (alerts) {
+    const rows = data.alerts ?? [];
+    alerts.innerHTML = rows.length
+      ? `<div class="admin-card"><h2 class="admin-section-title">Action required</h2>${rows
+          .map(
+            (alert) =>
+              `<p class="${String(alert.severity) === 'high' ? 'admin-error' : 'admin-muted'}">${esc(
+                alert.message,
+              )} <button class="btn btn--ghost btn--small" type="button" data-admin-action="overview-open" data-view="${esc(
+                alert.view,
+              )}">Open</button></p>`,
+          )
+          .join('')}</div>`
+      : '<p class="admin-muted">No operational exceptions are open.</p>';
   }
   const recent = document.querySelector<HTMLElement>('[data-admin-recent]');
   if (recent) {
@@ -863,8 +891,7 @@ async function openCustomer(customerId: string): Promise<void> {
 }
 
 async function loadRecurring(): Promise<void> {
-  const data = await api<{ recurring?: Array<Record<string, unknown>> }>('/api/admin/operations?view=recurring');
-  const target = document.querySelector<HTMLElement>('[data-admin-recurring]');
+  const data = await api<{ recurring?: Array<Record<string, unknown>> }>('/api/admin/operations?view=recurring');  const target = document.querySelector<HTMLElement>('[data-admin-recurring]');
   if (target) {
     renderTable(target, ['Customer', 'Property', 'Frequency', 'Window', 'Start', 'Duration', 'Price', 'Next visit', 'Sync', 'Status', 'Action'], (data.recurring ?? []).map((plan) => [
       esc([plan.first_name, plan.last_name].filter(Boolean).join(' ')),
@@ -877,10 +904,38 @@ async function loadRecurring(): Promise<void> {
       esc(dateTime(plan.next_visit_date)),
       `<span class="admin-status">${esc(titleCase(plan.sync_status ?? 'pending'))}</span>`,
       can('job.write') ? `<select class="admin-select" data-recurring-status="${esc(plan.id)}">${['active', 'paused', 'cancelled', 'completed'].map((status) => `<option value="${status}"${status === plan.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select>` : `<span class="admin-status">${esc(titleCase(plan.status))}</span>`,
-      can('job.write') ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-save" data-id="${esc(plan.id)}">Save</button>` : '',
+      can('job.write') ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-save" data-id="${esc(plan.id)}">Save</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrences" data-id="${esc(plan.id)}">Occurrences</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-sync" data-id="${esc(plan.id)}">Sync</button></div>` : '',
     ]), 'No recurring plans are recorded yet.');
   }
   await loadCustomerOptions();
+}
+
+async function loadRecurringOccurrences(planId: string): Promise<void> {
+  const data = await api<{ occurrences?: Array<Record<string, unknown>> }>(
+    `/api/admin/operations?view=occurrences&planId=${encodeURIComponent(planId)}`,
+  );
+  const target = document.querySelector<HTMLElement>('[data-admin-recurring-occurrences]');
+  if (!target) return;
+  renderTable(
+    target,
+    ['Date', 'Status', 'Appointment', 'Sync note', 'Actions'],
+    (data.occurrences ?? []).map((occurrence) => [
+      esc(dateTime(occurrence.occurrence_date)),
+      esc(titleCase(occurrence.status)),
+      esc(occurrence.appointment_reference || '—'),
+      esc(occurrence.sync_error || occurrence.appointment_status || '—'),
+      `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrence-skip" data-plan="${esc(
+        planId,
+      )}" data-id="${esc(occurrence.id)}">Skip</button><input class="input" type="date" value="${esc(
+        occurrence.occurrence_date,
+      )}" data-occurrence-date /><input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(
+        occurrence.start_at ? new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(String(occurrence.start_at))) : '08:00',
+      )}" data-occurrence-time /><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrence-reschedule" data-plan="${esc(
+        planId,
+      )}" data-id="${esc(occurrence.id)}">Reschedule</button></div>`,
+    ]),
+    'No occurrences found for this plan.',
+  );
 }
 
 async function loadPropertiesFor(customerId: string): Promise<void> {
@@ -892,6 +947,585 @@ async function loadPropertiesFor(customerId: string): Promise<void> {
   for (const property of (detail.properties as Array<Record<string, unknown>>) ?? []) {
     select.insertAdjacentHTML('beforeend', `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' — '))}</option>`);
   }
+}
+
+interface ManualQuoteView {
+  engine: string;
+  status: string;
+  totalCents: number | null;
+  range: { low: number; high: number } | null;
+  laborHours: number | null;
+  durationMinutes: number | null;
+  cleaningSubtotalCents: number | null;
+  extrasSubtotalCents: number | null;
+  discountAmountCents: number | null;
+  discountLabel: string | null;
+  travelAdjustmentCents: number | null;
+  ongoingPerVisitCents: number | null;
+  ongoingFrequency: string | null;
+  tier: string | null;
+  pricingVersion: string;
+  serviceCode: string;
+  message: string | null;
+  travel: { oneWayMiles: number | null; durationMinutes: number | null; verified: boolean; method: string };
+  fields: Record<string, string>;
+  documentsRequired: Array<{ title: string; stage: string }>;
+  breakdown: {
+    basePrice: number;
+    extrasSubtotal: number;
+    travelAdjustment: number;
+    discount: { label: string; amount: number } | null;
+    globalFactor: number;
+    globalAdjustment: number;
+    roundingAdjustment: number;
+    totalLaborHours: number;
+  } | null;
+}
+
+interface ManualAvailabilityView {
+  ok: boolean;
+  reason?: string;
+  date: string;
+  durationMinutes: number;
+  crewSize: number;
+  slots: Array<{ start: string; end: string; label: string; resourceIds: string[] }>;
+  staff: Array<{ id: string; name: string; resourceId: string; isSolo: boolean; isLead: boolean }>;
+}
+
+interface ManualCreatedView {
+  requestId: string;
+  reference: string;
+  quote: ManualQuoteView;
+}
+
+let manualContext: { customer: Record<string, unknown>; properties: Array<Record<string, unknown>> } | null = null;
+let manualQuote: ManualQuoteView | null = null;
+let manualAvailabilityResult: ManualAvailabilityView | null = null;
+let manualCreated: ManualCreatedView | null = null;
+
+function manualForm(): HTMLFormElement | null {
+  return document.querySelector<HTMLFormElement>('[data-manual-booking-form]');
+}
+
+function manualField<T extends HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(name: string): T | null {
+  return manualForm()?.querySelector<T>(`[name="${name}"]`) ?? null;
+}
+
+function manualNumber(name: string): number | undefined {
+  const value = manualField<HTMLInputElement>(name)?.value ?? '';
+  if (value.trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function manualChecked(name: string): boolean {
+  return manualField<HTMLInputElement>(name)?.checked === true;
+}
+
+function localToday(offsetDays = 0): string {
+  const date = new Date(Date.now() + offsetDays * 86_400_000);
+  return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+}
+
+function renderManualOptionLists(): void {
+  const addonList = document.querySelector<HTMLElement>('[data-manual-addon-list]');
+  if (addonList && addonList.childElementCount === 0) {
+    addonList.innerHTML = pricing.addons.items
+      .map(
+        (addon) =>
+          `<label><input type="checkbox" data-manual-addon value="${esc(addon.id)}" /> ${esc(addon.label)}${
+            addon.customQuote ? ' <span class="admin-muted">(custom quote)</span>' : ''
+          }</label>`,
+      )
+      .join('');
+  }
+  const bundleList = document.querySelector<HTMLElement>('[data-manual-bundle-list]');
+  if (bundleList && bundleList.childElementCount === 0) {
+    const enabled = pricing.promotions.addonBundles.filter((bundle) => bundle.enabled);
+    bundleList.innerHTML = enabled.length
+      ? enabled
+          .map(
+            (bundle) =>
+              `<label><input type="checkbox" data-manual-bundle value="${esc(bundle.id)}" data-bundle-required="${esc(
+                bundle.requiredAddonIds.join(','),
+              )}" /> ${esc(bundle.label)} <span class="admin-muted">(selecting this checks the required extras)</span></label>`,
+          )
+          .join('')
+      : '<p class="admin-muted">No add-on bundles are enabled.</p>';
+  }
+}
+
+function syncManualEngine(): void {
+  const engine = manualField<HTMLSelectElement>('engine')?.value ?? 'residential';
+  const residential = document.querySelector<HTMLElement>('[data-manual-residential]');
+  const facility = document.querySelector<HTMLElement>('[data-manual-facility]');
+  const service = manualField<HTMLSelectElement>('serviceType');
+  const extras = document.querySelector<HTMLElement>('[data-manual-extras]');
+  const isFacility = engine === 'commercial' || engine === 'church';
+  if (residential) residential.hidden = isFacility;
+  if (facility) facility.hidden = !isFacility;
+  if (extras) extras.hidden = isFacility;
+  if (service) {
+    service.closest('label')?.toggleAttribute('hidden', isFacility || engine === 'str');
+    if (engine === 'str') service.value = 'str_turnover';
+  }
+  manualQuote = null;
+  manualAvailabilityResult = null;
+  manualCreated = null;
+  const quoteBox = document.querySelector<HTMLElement>('[data-manual-quote-result]');
+  if (quoteBox) quoteBox.innerHTML = '';
+  const resultBox = document.querySelector<HTMLElement>('[data-manual-booking-result]');
+  if (resultBox) resultBox.innerHTML = '';
+  renderManualSlots();
+}
+
+function populateManualProperties(): void {
+  const select = manualField<HTMLSelectElement>('propertyId');
+  if (!select) return;
+  const properties = manualContext?.properties ?? [];
+  select.innerHTML = properties.length
+    ? `<option value="">Choose a property</option>${properties
+        .map(
+          (property) =>
+            `<option value="${esc(property.id)}">${esc(
+              [property.label, property.line1, property.city].filter(Boolean).join(' — '),
+            )}</option>`,
+        )
+        .join('')}`
+    : '<option value="">No active property for this customer</option>';
+}
+
+function applyManualProperty(): void {
+  const propertyId = manualField<HTMLSelectElement>('propertyId')?.value ?? '';
+  const property = manualContext?.properties.find((entry) => entry.id === propertyId);
+  if (!property) return;
+  const type = manualField<HTMLSelectElement>('propertyType');
+  if (type && property.property_type) type.value = String(property.property_type);
+  const values: Record<string, unknown> = {
+    squareFeet: property.square_feet,
+    bedrooms: property.bedrooms,
+    fullBaths: property.full_baths,
+    halfBaths: property.half_baths,
+    beds: property.beds,
+  };
+  for (const [name, value] of Object.entries(values)) {
+    const field = manualField<HTMLInputElement>(name);
+    if (field) field.value = value === null || value === undefined ? '' : String(value);
+  }
+  const pets = manualField<HTMLSelectElement>('pets');
+  if (pets && property.pets) pets.value = String(property.pets);
+  const facilityType = manualField<HTMLSelectElement>('facilityType');
+  if (facilityType && manualField<HTMLSelectElement>('engine')?.value === 'church') facilityType.value = 'church';
+  manualQuote = null;
+  manualAvailabilityResult = null;
+  renderManualSlots();
+}
+
+async function loadManualContext(customerId: string): Promise<void> {
+  manualContext = null;
+  manualQuote = null;
+  manualAvailabilityResult = null;
+  manualCreated = null;
+  populateManualProperties();
+  const resultBox = document.querySelector<HTMLElement>('[data-manual-booking-result]');
+  if (resultBox) resultBox.innerHTML = '';
+  if (!customerId) return;
+  const data = await api<Record<string, unknown>>(
+    `/api/admin/bookings?view=context&customerId=${encodeURIComponent(customerId)}`,
+  );
+  manualContext = {
+    customer: (data.customer ?? {}) as Record<string, unknown>,
+    properties: (data.properties as Array<Record<string, unknown>>) ?? [],
+  };
+  populateManualProperties();
+  const only = manualContext.properties[0];
+  if (only) {
+    const select = manualField<HTMLSelectElement>('propertyId');
+    if (select) select.value = String(only.id);
+    applyManualProperty();
+  }
+}
+
+function manualPayload(): Record<string, unknown> {
+  const engine = (manualField<HTMLSelectElement>('engine')?.value ?? 'residential') as string;
+  const facility = engine === 'commercial' || engine === 'church';
+  const payload: Record<string, unknown> = {
+    engine,
+    customerId: manualField<HTMLSelectElement>('customerId')?.value ?? '',
+    propertyId: manualField<HTMLSelectElement>('propertyId')?.value ?? '',
+    serviceType: engine === 'str' ? 'str_turnover' : manualField<HTMLSelectElement>('serviceType')?.value ?? 'standard',
+    propertyType: manualField<HTMLSelectElement>('propertyType')?.value || undefined,
+    squareFeet: manualNumber('squareFeet'),
+    bedrooms: manualNumber('bedrooms'),
+    fullBaths: manualNumber('fullBaths'),
+    halfBaths: manualNumber('halfBaths'),
+    beds: manualNumber('beds'),
+    frequency: manualField<HTMLSelectElement>('frequency')?.value || undefined,
+    condition: manualField<HTMLSelectElement>('condition')?.value || undefined,
+    lastClean: manualField<HTMLSelectElement>('lastClean')?.value || undefined,
+    pets: manualField<HTMLSelectElement>('pets')?.value || undefined,
+    supportiveEligible: manualChecked('supportiveEligible'),
+    addonIds: [...document.querySelectorAll<HTMLInputElement>('[data-manual-addon]:checked')].map((input) => input.value),
+    facility: facility
+      ? {
+          cleanableSqft: manualNumber('cleanableSqft'),
+          restroomFixtures: manualNumber('restroomFixtures'),
+          breakroom: manualField<HTMLSelectElement>('breakroom')?.value !== 'none',
+          facilityType: engine === 'church' ? 'church' : manualField<HTMLSelectElement>('facilityType')?.value,
+          condition: manualField<HTMLSelectElement>('facilityCondition')?.value || 'average',
+          traffic: manualField<HTMLSelectElement>('traffic')?.value || 'average',
+          flooring: manualField<HTMLSelectElement>('flooring')?.value || 'mixed',
+          firstClean: manualChecked('firstClean'),
+          specialty: manualChecked('specialty'),
+          frequency:
+            manualField<HTMLSelectElement>('facilityFrequency')?.value === 'one-time'
+              ? 'one_time'
+              : manualField<HTMLSelectElement>('facilityFrequency')?.value || 'weekly',
+        }
+      : undefined,
+  };
+  return payload;
+}
+
+function renderManualSlots(): void {
+  const select = manualField<HTMLSelectElement>('slot');
+  const staffTarget = document.querySelector<HTMLElement>('[data-manual-staff]');
+  const availability = manualAvailabilityResult;
+  if (!select) return;
+  if (!availability?.ok || availability.slots.length === 0) {
+    select.innerHTML = `<option value="">${
+      availability && !availability.ok ? esc(titleCase(availability.reason ?? 'unavailable')) : 'No available times — choose another date or crew'
+    }</option>`;
+    if (staffTarget) staffTarget.innerHTML = '';
+    return;
+  }
+  select.innerHTML = availability.slots
+    .map(
+      (slot) =>
+        `<option value="${esc(slot.start)}" data-slot-end="${esc(slot.end)}">${esc(slot.label)} — ${
+          slot.resourceIds.length
+        } cleaner${slot.resourceIds.length === 1 ? '' : 's'}</option>`,
+    )
+    .join('');
+  if (staffTarget) {
+    staffTarget.innerHTML = availability.staff.length
+      ? `<p class="admin-muted">Preferred staff (optional — leave blank to use the server assignment)</p><div class="admin-form admin-form--grid">${availability.staff
+          .map(
+            (member) =>
+              `<label><input type="checkbox" data-manual-staff-pick value="${esc(member.id)}" /> ${esc(
+                member.name,
+              )} <span class="admin-muted">${member.isSolo ? 'Solo-qualified' : member.isLead ? 'Lead' : 'Helper'}</span></label>`,
+          )
+          .join('')}</div>`
+      : '<p class="admin-muted">No bookable staff are configured.</p>';
+  }
+}
+
+function renderManualQuote(quote: ManualQuoteView): void {
+  manualQuote = quote;
+  const target = document.querySelector<HTMLElement>('[data-manual-quote-result]');
+  if (!target) return;
+  const travelNote = quote.travel.oneWayMiles === null
+    ? 'Travel could not be established from the saved property; review before confirming.'
+    : `${quote.travel.oneWayMiles} mi one-way (${quote.travel.verified ? 'live route' : 'preliminary'})`;
+  const docs = quote.documentsRequired.length
+    ? `<p class="admin-error">Required before confirmation: ${quote.documentsRequired
+        .map((item) => esc(item.title))
+        .join(', ')}. Send the signing request after creating the pending booking.</p>`
+    : '<p class="admin-muted">No approved document requirements are active for this booking.</p>';
+  if (quote.status !== 'priced' || quote.totalCents === null) {
+    target.innerHTML = `<div class="admin-card"><h3>Estimate requires review</h3><p>${esc(
+      quote.message ?? 'This scope cannot receive an instant price.',
+    )}</p>${docs}</div>`;
+    return;
+  }
+  const breakdown = quote.breakdown;
+  const rows: string[] = [];
+  if (breakdown) {
+    rows.push(`<tr><td>Base cleaning</td><td>${esc(money(Math.round(breakdown.basePrice * 100)))}</td></tr>`);
+    if (breakdown.extrasSubtotal > 0) {
+      rows.push(`<tr><td>Selected extras</td><td>${esc(money(Math.round(breakdown.extrasSubtotal * 100)))}</td></tr>`);
+    }
+    if (breakdown.discount) {
+      rows.push(
+        `<tr><td>${esc(breakdown.discount.label)}</td><td>−${esc(money(Math.round(breakdown.discount.amount * 100)))}</td></tr>`,
+      );
+    }
+    if (breakdown.travelAdjustment !== 0) {
+      rows.push(`<tr><td>Travel</td><td>${esc(money(Math.round(breakdown.travelAdjustment * 100)))}</td></tr>`);
+    }
+  }
+  target.innerHTML = `<div class="admin-card">
+    <h3>Estimate ${esc(quote.pricingVersion)}</h3>
+    <p><strong>${esc(money(quote.totalCents))}</strong>${
+      quote.range ? ` · typical range ${esc(money(Math.round(quote.range.low * 100)))}–${esc(money(Math.round(quote.range.high * 100)))}` : ''
+    }</p>
+    <p class="admin-muted">${esc(quote.laborHours ?? '—')} labor hours · ${esc(quote.durationMinutes ?? '—')} minutes on site · ${esc(travelNote)}</p>
+    ${rows.length ? `<div class="admin-table-scroll"><table class="admin-table"><tbody>${rows.join('')}</tbody></table></div>` : ''}
+    ${quote.ongoingPerVisitCents !== null ? `<p class="admin-muted">Ongoing (${esc(quote.ongoingFrequency)}): ${esc(money(quote.ongoingPerVisitCents))} per visit after the first deep clean.</p>` : ''}
+    ${quote.tier ? `<p class="admin-muted">Facility tier ${esc(quote.tier)}</p>` : ''}
+    ${docs}
+  </div>`;
+}
+
+async function generateManualQuote(autoAvailability = true): Promise<void> {
+  setAppError();
+  const form = manualForm();
+  if (!form) return;
+  try {
+    const quote = await api<{ quote: ManualQuoteView }>('/api/admin/bookings', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'quote', ...manualPayload() }),
+    }).then((result) => result.quote);
+    renderManualQuote(quote);
+    manualAvailabilityResult = null;
+    renderManualSlots();
+    if (autoAvailability && quote.status === 'priced' && manualField<HTMLInputElement>('date')?.value) {
+      await checkManualAvailability();
+    }
+  } catch (error) {
+    setAppError(friendly(error));
+  }
+}
+
+async function checkManualAvailability(): Promise<void> {
+  setAppError();
+  if (!manualQuote || manualQuote.status !== 'priced') {
+    setAppError('Generate a priced estimate before checking available times.');
+    return;
+  }
+  const form = manualForm();
+  if (!form) return;
+  const customerId = manualField<HTMLSelectElement>('customerId')?.value ?? '';
+  const propertyId = manualField<HTMLSelectElement>('propertyId')?.value ?? '';
+  const date = manualField<HTMLInputElement>('date')?.value ?? '';
+  if (!customerId || !propertyId || !date) {
+    setAppError('Choose the customer, property and cleaning date first.');
+    return;
+  }
+  try {
+    const teamMemberIds = [...document.querySelectorAll<HTMLInputElement>('[data-manual-staff-pick]:checked')].map(
+      (input) => input.value,
+    );
+    const params = new URLSearchParams({
+      view: 'availability',
+      customerId,
+      propertyId,
+      date,
+      durationMinutes: String(manualQuote.durationMinutes ?? 120),
+      crewSize: manualField<HTMLSelectElement>('crewSize')?.value ?? '1',
+      ...(teamMemberIds.length ? { teamMemberIds: teamMemberIds.join(',') } : {}),
+    });
+    const data = await api<{ availability: ManualAvailabilityView }>(`/api/admin/bookings?${params.toString()}`);
+    manualAvailabilityResult = data.availability;
+    renderManualSlots();
+    if (!data.availability.ok) {
+      setAppError(`No availability: ${titleCase(data.availability.reason ?? 'unavailable')}.`);
+    }
+  } catch (error) {
+    setAppError(friendly(error));
+  }
+}
+
+function selectedManualTeam(): string[] {
+  return [...document.querySelectorAll<HTMLInputElement>('[data-manual-staff-pick]:checked')].map((input) => input.value);
+}
+
+function renderManualCreated(): void {
+  const target = document.querySelector<HTMLElement>('[data-manual-booking-result]');
+  if (!target || !manualCreated) return;
+  const email = String(manualContext?.customer.email ?? '');
+  target.innerHTML = `<div class="admin-card">
+    <h3>Pending booking ${esc(manualCreated.reference)}</h3>
+    <p class="admin-muted">Saved for ${esc(String(manualContext?.customer.first_name ?? ''))} ${esc(
+      String(manualContext?.customer.last_name ?? ''),
+    )}. Confirmation re-validates the slot, staff assignment, documents and calendar.</p>
+    <div class="admin-actions">
+      <button class="btn btn--primary btn--small" type="button" data-admin-action="manual-confirm" data-id="${esc(
+        manualCreated.requestId,
+      )}">Confirm Booking</button>
+      <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-send-documents" data-id="${esc(
+        manualCreated.requestId,
+      )}">Send Required Documents${email ? ` to ${esc(email)}` : ''}</button>
+      <button class="btn btn--ghost btn--small" type="button" data-admin-action="manual-invoice" data-id="${esc(
+        manualCreated.requestId,
+      )}">Create Invoice (Pay Later)</button>
+      <button class="btn btn--ghost btn--small" type="button" data-admin-action="manual-invoice-link" data-id="${esc(
+        manualCreated.requestId,
+      )}">Create Invoice + Payment Link</button>
+    </div>
+    <div data-manual-booking-followup style="margin-top:.75rem;"></div>
+  </div>`;
+}
+
+async function saveManualBooking(confirmNow: boolean): Promise<void> {
+  setAppError();
+  if (!manualQuote || manualQuote.status !== 'priced') {
+    setAppError('Generate a priced estimate before saving the booking.');
+    return;
+  }
+  const start = manualField<HTMLSelectElement>('slot')?.value ?? '';
+  const selected = manualField<HTMLSelectElement>('slot')?.selectedOptions[0];
+  const end = selected?.getAttribute('data-slot-end') ?? '';
+  const date = manualField<HTMLInputElement>('date')?.value ?? '';
+  if (!start || !end || !date) {
+    setAppError('Choose an available appointment time first.');
+    return;
+  }
+  try {
+    const created = await api<ManualCreatedView>('/api/admin/bookings', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'create',
+        ...manualPayload(),
+        date,
+        start,
+        end,
+        crewSize: manualField<HTMLSelectElement>('crewSize')?.value ?? '1',
+        teamMemberIds: selectedManualTeam(),
+        notes: manualField<HTMLTextAreaElement>('notes')?.value ?? '',
+      }),
+    });
+    manualCreated = created;
+    renderManualCreated();
+    if (confirmNow) await confirmManualBooking(created.requestId);
+  } catch (error) {
+    setAppError(friendly(error));
+  }
+}
+
+async function confirmManualBooking(requestId: string): Promise<void> {
+  setAppError();
+  try {
+    const result = await api<{ appointmentId: string; eventId: string; reference: string }>('/api/admin/bookings', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'confirm', requestId, teamMemberIds: selectedManualTeam() }),
+    });
+    const target = document.querySelector<HTMLElement>('[data-manual-booking-followup]');
+    if (target) {
+      target.innerHTML = `<p class="admin-status-message" role="status">Confirmed ${esc(
+        result.reference,
+      )}. Appointment ${esc(result.appointmentId)} and calendar event ${esc(result.eventId)} are recorded.</p>`;
+    }
+    await refreshManualCommitments();
+  } catch (error) {
+    setAppError(friendly(error));
+    await refreshManualCommitments();
+  }
+}
+
+async function sendManualDocuments(_requestId: string): Promise<void> {
+  setAppError();
+  if (!manualQuote) return;
+  try {
+    const result = await api<{ required?: boolean; signingUrl?: string; emailSent?: boolean; message?: string }>(
+      '/api/admin/documents',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'send_request',
+          subjectType: 'customer',
+          customerId: manualField<HTMLSelectElement>('customerId')?.value ?? '',
+          propertyId: manualField<HTMLSelectElement>('propertyId')?.value ?? '',
+          serviceCode: manualQuote.serviceCode,
+          frequency: manualQuote.fields.frequency ?? '',
+          bookingReference: manualCreated?.reference ?? '',
+          email: String(manualContext?.customer.email ?? ''),
+        }),
+      },
+    );
+    const target = document.querySelector<HTMLElement>('[data-manual-booking-followup]');
+    if (target) {
+      target.innerHTML = result.required
+        ? `<p class="admin-muted">${result.emailSent ? 'Signing email sent.' : 'Email was not sent; share this private link with the customer.'} <a href="${esc(
+            result.signingUrl,
+          )}">${esc(result.signingUrl)}</a></p>`
+        : `<p class="admin-muted">${esc(result.message ?? 'No approved document requirements are active for this booking.')}</p>`;
+    }
+  } catch (error) {
+    setAppError(friendly(error));
+  }
+}
+
+async function createManualInvoice(requestId: string, paymentLink: boolean): Promise<void> {
+  setAppError();
+  try {
+    const result = await api<{
+      invoice?: { id: string; number: string };
+      paymentLink?: { url?: string };
+      paymentLinkError?: string;
+    }>('/api/admin/bookings', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'invoice', requestId, paymentLink }),
+    });
+    const target = document.querySelector<HTMLElement>('[data-manual-booking-followup]');
+    if (target) {
+      target.innerHTML = `<p class="admin-status-message" role="status">Invoice ${esc(
+        result.invoice?.number ?? '',
+      )} created.${result.paymentLink?.url ? ` Payment link: <a href="${esc(result.paymentLink.url)}">${esc(result.paymentLink.url)}</a>` : ''}${
+        result.paymentLinkError ? ` Payment link unavailable: ${esc(titleCase(result.paymentLinkError))}.` : ''
+      }</p>`;
+    }
+  } catch (error) {
+    setAppError(friendly(error));
+  }
+}
+
+async function refreshManualCommitments(): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-manual-commitments]');
+  if (!target) return;
+  try {
+    const data = await api<{ commitments?: Array<Record<string, unknown>> }>(
+      '/api/admin/bookings?view=commitments',
+    );
+    renderTable(
+      target,
+      ['Reference', 'State', 'Customer', 'Start', 'Last error', 'Updated', ''],
+      (data.commitments ?? []).map((row) => [
+        esc(row.quote_reference ?? row.reference),
+        esc(titleCase(row.state)),
+        esc([row.first_name, row.last_name].filter(Boolean).join(' ') || '—'),
+        esc(dateTime(row.start_at)),
+        esc(row.last_error || '—'),
+        esc(dateTime(row.updated_at)),
+        `<button class="btn btn--ghost btn--small" type="button" data-admin-action="commitment-retry" data-id="${esc(
+          row.booking_request_id ?? '',
+        )}">Reconcile</button>`,
+      ]),
+      'No booking recovery items.',
+    );
+  } catch (error) {
+    renderEmpty(target, friendly(error));
+  }
+}
+
+async function loadManualBooking(): Promise<void> {
+  renderManualOptionLists();
+  const customerSelect = manualField<HTMLSelectElement>('customerId');
+  if (customerSelect) {
+    customerSelect.innerHTML = '<option value="">Choose a customer</option>';
+    const data = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?limit=200');
+    for (const customer of data.customers ?? []) {
+      customerSelect.insertAdjacentHTML(
+        'beforeend',
+        `<option value="${esc(customer.id)}">${esc(
+          [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || customer.id,
+        )}${customer.email ? ` — ${esc(customer.email)}` : ''}</option>`,
+      );
+    }
+  }
+  const dateField = manualField<HTMLInputElement>('date');
+  if (dateField && !dateField.value) dateField.value = localToday(1);
+  syncManualEngine();
+  manualContext = null;
+  manualQuote = null;
+  manualAvailabilityResult = null;
+  manualCreated = null;
+  const quoteBox = document.querySelector<HTMLElement>('[data-manual-quote-result]');
+  if (quoteBox) quoteBox.innerHTML = '';
+  const resultBox = document.querySelector<HTMLElement>('[data-manual-booking-result]');
+  if (resultBox) resultBox.innerHTML = '';
+  await refreshManualCommitments();
 }
 
 async function loadJobs(): Promise<void> {
@@ -1008,6 +1642,33 @@ async function openInvoice(invoiceId: string): Promise<void> {
           controls.insertAdjacentHTML(
             'beforeend',
             `<details class="admin-detail-toggle"><summary>Charge saved card after service</summary><form class="admin-form" data-form="offsession"><label>Signed authorization <select name="authorizationId">${active.map((authorization) => `<option value="${esc(authorization.id)}">${esc(money(authorization.max_amount_cents))} max · signed ${esc(dateTime(authorization.signed_at))}</option>`).join('')}</select></label><label>Your password (step-up) <input name="password" type="password" required /></label><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><button class="btn btn--secondary btn--small" type="submit">Charge authorized card</button></form></details>`,
+          );
+        })
+        .catch(() => undefined);
+    }
+    if (can('finance.write') && Number(invoice.balance_cents) > 0 && invoice.customer_id) {
+      void api<{ credits?: Array<Record<string, unknown>> }>(
+        `/api/admin/finance?view=credits&customerId=${encodeURIComponent(String(invoice.customer_id))}`,
+      )
+        .then((result) => {
+          const active = (result.credits ?? []).filter(
+            (credit) => credit.status === 'active' && Number(credit.remaining_cents) > 0,
+          );
+          if (active.length === 0 || !controls) return;
+          controls.insertAdjacentHTML(
+            'beforeend',
+            `<details class="admin-detail-toggle"><summary>Apply customer credit</summary><form class="admin-form" data-form="credit-apply"><input type="hidden" name="invoiceId" value="${esc(
+              invoiceId,
+            )}" /><label>Credit <select name="creditId">${active
+              .map(
+                (credit) =>
+                  `<option value="${esc(credit.id)}">${esc(credit.source || 'Credit')} — ${esc(
+                    money(credit.remaining_cents),
+                  )} remaining</option>`,
+              )
+              .join('')}</select></label><label>Amount to apply (USD) <input name="amount" type="number" min="0.01" step="0.01" value="${(
+                Number(invoice.balance_cents) / 100
+              ).toFixed(2)}" required /></label><button class="btn btn--secondary btn--small" type="submit">Apply credit</button></form></details>`,
           );
         })
         .catch(() => undefined);
@@ -1205,7 +1866,7 @@ function renderGiftAction(code: string, action: string): void {
     if (detail) { detail.hidden = true; detail.innerHTML = ''; }
     return;
   }
-  target.innerHTML = `<div class="admin-card"><h3>${action === 'redeem' ? 'Redeem' : 'Void'} ${esc(code)}</h3><form class="admin-form" data-form="gift-action"><input type="hidden" name="code" value="${esc(code)}" /><input type="hidden" name="giftAction" value="${esc(action)}" />${action === 'redeem' ? '<label>Amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reference <input name="reference" /></label>' : ''}<label>Reason / note <input name="note" /></label><label>Your password (step-up) <input name="password" type="password" autocomplete="current-password" required /></label><button class="btn btn--primary btn--small" type="submit">Confirm ${action === 'redeem' ? 'redemption' : 'void'}</button></form></div>`;
+  target.innerHTML = `<div class="admin-card"><h3>${action === 'redeem' ? 'Redeem' : 'Void'} ${esc(code)}</h3><form class="admin-form" data-form="gift-action"><input type="hidden" name="code" value="${esc(code)}" /><input type="hidden" name="giftAction" value="${esc(action)}" />${action === 'redeem' ? '<label>Amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Apply to booking request (optional) <input name="bookingRequestId" placeholder="request_..." /></label><label>Reference <input name="reference" /></label>' : ''}<label>Reason / note <input name="note" /></label><label>Your password (step-up) <input name="password" type="password" autocomplete="current-password" required /></label><button class="btn btn--primary btn--small" type="submit">Confirm ${action === 'redeem' ? 'redemption' : 'void'}</button></form></div>`;
 }
 
 async function loadReports(): Promise<void> {
@@ -1345,9 +2006,10 @@ async function openDocumentRequest(id: string): Promise<void> {
   }
   const request = detail.request as Record<string, unknown>;
   const signatures = (detail.signatures as Array<Record<string, unknown>>) ?? [];
+  const awaiting = signatures.some((signature) => signature.status === 'awaiting_verification');
   target.hidden = false;
-  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">Signing request ${esc(request.bundle_code)}</h2><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-close">Close</button></div>
-    <dl class="admin-definition"><dt>Status</dt><dd>${esc(titleCase(request.status))}</dd><dt>Subject</dt><dd>${esc(request.subject_type)}</dd><dt>Booking reference</dt><dd>${esc(request.booking_reference || '—')}</dd></dl>
+  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">Signing request ${esc(request.bundle_code)}</h2><div class="admin-actions">${request.executed_at ? `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=executed&id=${encodeURIComponent(id)}">Executed copy</a>` : ''}${awaiting ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-countersign" data-id="${esc(id)}">Countersign and verify</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-close">Close</button></div></div>
+    <dl class="admin-definition"><dt>Status</dt><dd>${esc(titleCase(request.status))}</dd><dt>Subject</dt><dd>${esc(request.subject_type)}</dd><dt>Branch</dt><dd>${esc(request.branch_id || '—')}</dd><dt>Bound signer</dt><dd>${esc(request.signer_email || 'not bound')}</dd><dt>Booking reference</dt><dd>${esc(request.booking_reference || '-')}</dd><dt>Countersigned</dt><dd>${request.counter_signed_at ? `${esc(request.counter_signature_name)} · ${esc(dateTime(request.counter_signed_at))}` : 'Not countersigned'}</dd><dt>Executed copy</dt><dd>${request.executed_at ? `${esc(dateTime(request.executed_at))} · SHA-256 ${esc(request.executed_sha256)}` : 'Not available until fully signed'}</dd></dl>
     ${signatures.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Document</th><th>Version</th><th>Signer</th><th>Status</th><th>Signed</th><th>Actions</th></tr></thead><tbody>${signatures.map((signature) => `<tr><td>${esc(signature.title)}</td><td>${esc(signature.template_version)}</td><td>${esc(signature.signer_name)}</td><td><span class="admin-status">${esc(titleCase(signature.status))}</span></td><td>${esc(dateTime(signature.signed_at))}</td><td><div class="admin-actions"><a class="btn btn--ghost btn--small" href="/api/admin/documents?view=download&signatureId=${encodeURIComponent(String(signature.id))}">Download</a>${signature.status === 'awaiting_verification' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-verify" data-id="${esc(signature.id)}">Verify</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-reject" data-id="${esc(signature.id)}">Reject</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No signatures yet.</p>'}</div>`;
 }
 
@@ -1371,6 +2033,7 @@ async function loadView(view: string): Promise<void> {
     if (view === 'calendar') await loadCalendar();
     if (view === 'leads') await loadLeads();
     if (view === 'customers') await loadCustomers();
+    if (view === 'new-booking') await loadManualBooking();
     if (view === 'recurring') await loadRecurring();
     if (view === 'jobs') await loadJobs();
     if (view === 'documents') await loadDocuments();
@@ -1596,6 +2259,18 @@ document.querySelector<HTMLButtonElement>('[data-admin-logout]')?.addEventListen
 
 for (const button of navButtons) button.addEventListener('click', () => void loadView(button.dataset.adminNav ?? 'overview'));
 
+manualField<HTMLSelectElement>('customerId')?.addEventListener('change', (event) => {
+  void loadManualContext((event.target as HTMLSelectElement).value).catch((error) => setAppError(friendly(error)));
+});
+manualField<HTMLSelectElement>('propertyId')?.addEventListener('change', () => applyManualProperty());
+manualField<HTMLSelectElement>('engine')?.addEventListener('change', () => syncManualEngine());
+for (const name of ['date', 'crewSize']) {
+  manualField<HTMLInputElement | HTMLSelectElement>(name)?.addEventListener('change', () => {
+    manualAvailabilityResult = null;
+    renderManualSlots();
+  });
+}
+
 document.querySelector<HTMLFormElement>('[data-admin-gift-filter]')?.addEventListener('submit', (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget as HTMLFormElement);
@@ -1709,6 +2384,14 @@ document.addEventListener('submit', (event) => {
   if (kind === 'payment') void action('/api/admin/finance', { action: 'record_payment', invoiceId: value('invoiceId'), provider: value('provider'), amount: value('amount'), reference: value('reference'), idempotencyKey: value('idempotencyKey') });
   if (kind === 'refund') void action('/api/admin/finance', { action: 'record_refund', paymentId: value('paymentId'), amount: value('amount'), reason: value('reason'), idempotencyKey: value('idempotencyKey') });
   if (kind === 'credit') void action('/api/admin/finance', { action: 'create_credit', customerId: value('customerId'), amount: value('amount'), source: value('source') });
+  if (kind === 'credit-apply') {
+    void action('/api/admin/finance', {
+      action: 'apply_credit',
+      invoiceId: value('invoiceId'),
+      creditId: value('creditId'),
+      amountCents: Math.round(Number(value('amount')) * 100),
+    }).then(() => openInvoice(value('invoiceId')));
+  }
   if (kind === 'offsession') {
     setAppError();
     void api<Record<string, unknown>>('/api/admin/payment-authorizations', {
@@ -1759,6 +2442,7 @@ document.addEventListener('submit', (event) => {
       action: value('giftAction'),
       code: value('code'),
       amountCents: Math.round(Number(value('amount')) * 100),
+      bookingRequestId: value('bookingRequestId'),
       note: value('note'),
       reference: value('reference'),
       password: value('password'),
@@ -1931,6 +2615,7 @@ document.querySelector<HTMLFormElement>('[data-document-template-text]')?.addEve
       signerParty: data.get('signerParty'),
       contentText: data.get('contentText'),
       requiresVerification: data.get('requiresVerification') === 'yes',
+      requiresCountersignature: data.get('requiresCountersignature') === 'yes',
     }),
   }).then(() => {
     documentResult('Draft template saved. Approve it before it can be required.');
@@ -2029,6 +2714,16 @@ document.addEventListener('change', (event) => {
   if (target.matches('[data-document-bundle-options]')) {
     void loadDocumentBundleItems(target.value).catch((error) => setAppError(friendly(error)));
   }
+  const bundle = (event.target as HTMLElement).closest<HTMLInputElement>('[data-manual-bundle]');
+  if (bundle) {
+    const required = (bundle.dataset.bundleRequired ?? '').split(',').filter(Boolean);
+    for (const id of required) {
+      const addon = document.querySelector<HTMLInputElement>(
+        `[data-manual-addon][value="${CSS.escape(id)}"]`,
+      );
+      if (addon && bundle.checked) addon.checked = true;
+    }
+  }
 });
 
 document.addEventListener('click', (event) => {
@@ -2104,6 +2799,39 @@ document.addEventListener('click', (event) => {
     const window = document.querySelector<HTMLSelectElement>(`[data-recurring-window="${CSS.escape(id)}"]`);
     void action('/api/admin/operations', { action: 'update_recurring', planId: id, status: select?.value ?? '', window: window?.value ?? '', startTime: start?.value ?? '', durationMinutes: duration?.value ?? '' });
   }
+  if (actionName === 'recurring-occurrences') {
+    void loadRecurringOccurrences(id).catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'recurring-sync') {
+    setAppError();
+    void api('/api/admin/operations', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'sync_recurring', planId: id, cancelSuperseded: false }),
+    })
+      .then(() => loadRecurringOccurrences(id))
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'recurring-occurrence-skip') {
+    void action('/api/admin/operations', {
+      action: 'update_occurrence',
+      occurrenceAction: 'skip',
+      planId: target.dataset.plan ?? '',
+      occurrenceId: id,
+    }).then(() => loadRecurringOccurrences(target.dataset.plan ?? ''));
+  }
+  if (actionName === 'recurring-occurrence-reschedule') {
+    const row = target.closest('tr');
+    const date = row?.querySelector<HTMLInputElement>('[data-occurrence-date]')?.value ?? '';
+    const startTime = row?.querySelector<HTMLInputElement>('[data-occurrence-time]')?.value ?? '';
+    void action('/api/admin/operations', {
+      action: 'update_occurrence',
+      occurrenceAction: 'reschedule',
+      planId: target.dataset.plan ?? '',
+      occurrenceId: id,
+      date,
+      startTime,
+    }).then(() => loadRecurringOccurrences(target.dataset.plan ?? ''));
+  }
   if (actionName === 'team-save') {
     const qualification = document.querySelector<HTMLSelectElement>(`[data-team-qualification="${CSS.escape(id)}"]`);
     const bookable = document.querySelector<HTMLInputElement>(`[data-team-bookable="${CSS.escape(id)}"]`);
@@ -2151,6 +2879,15 @@ document.addEventListener('click', (event) => {
   if (actionName === 'document-signature-verify') {
     void action('/api/admin/documents', { action: 'verify_signature', signatureId: id });
   }
+  if (actionName === 'document-countersign') {
+    setAppError();
+    void api('/api/admin/documents', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'countersign', requestId: id, name: actor?.name ?? '' }),
+    })
+      .then(() => openDocumentRequest(id))
+      .catch((error) => setAppError(friendly(error)));
+  }
   if (actionName === 'document-signature-reject') {
     void action('/api/admin/documents', { action: 'reject_signature', signatureId: id, reason: 'Rejected by owner' });
   }
@@ -2190,6 +2927,30 @@ document.addEventListener('click', (event) => {
   if (actionName === 'admin-toggle') void action('/api/admin/accounts', { action: 'status', userId: id, status: target.dataset.status });
   if (actionName === 'admin-revoke') void action('/api/admin/accounts', { action: 'revoke_user', userId: id });
   if (actionName === 'revoke-others') void action('/api/admin/accounts', { action: 'revoke_others' });
+  if (actionName === 'manual-quote') void generateManualQuote();
+  if (actionName === 'overview-open') void loadView(target.dataset.view ?? 'overview');
+  if (actionName === 'manual-manage-customer') {
+    const customerId = manualField<HTMLSelectElement>('customerId')?.value ?? '';
+    void loadView('customers')
+      .then(() => (customerId ? openCustomer(customerId) : undefined))
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'manual-availability') void checkManualAvailability();
+  if (actionName === 'manual-create') void saveManualBooking(false);
+  if (actionName === 'manual-create-confirm') void saveManualBooking(true);
+  if (actionName === 'manual-confirm') void confirmManualBooking(id);
+  if (actionName === 'manual-send-documents') void sendManualDocuments(id);
+  if (actionName === 'manual-invoice') void createManualInvoice(id, false);
+  if (actionName === 'manual-invoice-link') void createManualInvoice(id, true);
+  if (actionName === 'commitment-retry') {
+    setAppError();
+    void api('/api/admin/bookings', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reconcile', requestId: id }),
+    })
+      .then(() => refreshManualCommitments())
+      .catch((error) => setAppError(friendly(error)));
+  }
 });
 
 void loadAuth();

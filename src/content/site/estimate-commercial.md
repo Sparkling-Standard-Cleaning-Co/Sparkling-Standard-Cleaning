@@ -1,6 +1,6 @@
 ---
-metaTitle: Commercial Cleaning Estimate | Pensacola Facilities | Sparkling Standard
-metaDescription: Tell us about your office, retail space, salon, gym or professional facility and receive a personally reviewed cleaning scope. Sparkling Standard confirms every commercial price before work begins.
+metaTitle: Commercial Cleaning Estimate | Sparkling Standard
+metaDescription: Tell us about your office, retail space, salon or gym and receive a personally reviewed cleaning scope from Sparkling Standard.
 hero:
   headline: A cleaning estimate built around
   accent: your facility.

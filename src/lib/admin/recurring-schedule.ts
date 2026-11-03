@@ -867,3 +867,214 @@ async function restoreRecurringSnapshot(
     .run();
   return { ok: errors.length === 0, errors };
 }
+export interface RecurringOccurrenceRow extends Record<string, unknown> {
+  id: string;
+  plan_id: string;
+  occurrence_date: string;
+  appointment_id: string | null;
+  calendar_event_id: string | null;
+  status: string;
+  sync_error: string;
+}
+
+export async function listRecurringOccurrences(
+  db: D1Database,
+  actor: AdminActor,
+  planId: string,
+  input: { from?: string; limit?: number } = {},
+): Promise<Array<Record<string, unknown>>> {
+  const branch = actor.role === 'owner'
+    ? { sql: '', bind: [] as unknown[] }
+    : actor.branchId
+      ? { sql: ' AND r.branch_id = ?', bind: [actor.branchId] }
+      : { sql: ' AND 1 = 0', bind: [] as unknown[] };
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(input.from ?? '') ? input.from! : addDays(localToday(), -30);
+  const limit = Math.min(200, Math.max(1, Math.round(input.limit ?? 60)));
+  const rows = await db
+    .prepare(
+      `SELECT o.*, a.start_at, a.end_at, a.status AS appointment_status, a.reference AS appointment_reference
+       FROM recurring_occurrences o
+       JOIN recurring_plans r ON r.id = o.plan_id
+       LEFT JOIN appointments a ON a.id = o.appointment_id
+       WHERE o.plan_id = ? AND o.occurrence_date >= ? ${branch.sql}
+       ORDER BY o.occurrence_date ASC LIMIT ?`,
+    )
+    .bind(planId, from, ...branch.bind, limit)
+    .all();
+  return rows.results ?? [];
+}
+
+async function refreshPlanNextVisit(db: D1Database, planId: string): Promise<void> {
+  const next = await db
+    .prepare(
+      `SELECT occurrence_date FROM recurring_occurrences
+       WHERE plan_id = ? AND status = 'scheduled' AND occurrence_date >= ?
+       ORDER BY occurrence_date ASC LIMIT 1`,
+    )
+    .bind(planId, localToday())
+    .first<{ occurrence_date: string }>();
+  await db
+    .prepare('UPDATE recurring_plans SET next_visit_date = ?, updated_at = ? WHERE id = ?')
+    .bind(next?.occurrence_date ?? null, new Date().toISOString(), planId)
+    .run();
+}
+
+export interface RecurringOccurrenceUpdate {
+  action: 'skip' | 'reschedule';
+  date?: string;
+  startTime?: string;
+}
+
+export async function updateRecurringOccurrence(
+  env: RecurringEnv,
+  db: D1Database,
+  actor: AdminActor,
+  planId: string,
+  occurrenceId: string,
+  input: RecurringOccurrenceUpdate,
+  depsOverride: Partial<RecurringDependencies> = {},
+): Promise<{ ok: boolean; action: string; occurrenceDate?: string; error?: string }> {
+  const deps: RecurringDependencies = {
+    availability: availabilityForDate,
+    findEvent: findCalendarEventByReference,
+    getEvent: getCalendarEvent,
+    inspectEvent: inspectCalendarEvent,
+    createEvent: createCalendarEvent,
+    updateEvent: updateCalendarEvent,
+    deleteEvent: deleteCalendarEvent,
+    ...depsOverride,
+  };
+  const plan = await loadPlan(db, actor, planId);
+  const occurrence = await db
+    .prepare(
+      `SELECT o.*, a.start_at, a.end_at, a.status AS appointment_status
+       FROM recurring_occurrences o
+       LEFT JOIN appointments a ON a.id = o.appointment_id
+       WHERE o.id = ? AND o.plan_id = ? LIMIT 1`,
+    )
+    .bind(occurrenceId, planId)
+    .first<RecurringOccurrenceRow & { start_at: string | null; end_at: string | null; appointment_status: string | null }>();
+  if (!occurrence) throw new AdminAuthError(404, 'recurring_occurrence_not_found');
+  if (occurrence.status !== 'scheduled') throw new AdminAuthError(409, 'recurring_occurrence_not_scheduled');
+
+  if (input.action === 'skip') {
+    if (occurrence.calendar_event_id) {
+      const deleted = await deps.deleteEvent(env, occurrence.calendar_event_id);
+      if (!deleted.ok) throw new AdminAuthError(502, deleted.reason ?? 'calendar_delete_failed');
+    }
+    const statements = [
+      db.prepare("UPDATE recurring_occurrences SET status = 'cancelled', sync_error = 'skipped_by_owner' WHERE id = ?").bind(occurrenceId),
+      ...(occurrence.appointment_id
+        ? [
+            db
+              .prepare("UPDATE appointments SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ? AND status IN ('pending','confirmed')")
+              .bind(new Date().toISOString(), new Date().toISOString(), occurrence.appointment_id),
+          ]
+        : []),
+    ];
+    if (db.batch) await db.batch(statements);
+    else for (const statement of statements) await statement.run();
+    await refreshPlanNextVisit(db, planId);
+    await audit(db, {
+      actorUserId: actor.id,
+      action: 'recurring.occurrence_skipped',
+      entityType: 'recurring_occurrence',
+      entityId: occurrenceId,
+      detail: occurrence.occurrence_date,
+    });
+    return { ok: true, action: 'skip', occurrenceDate: occurrence.occurrence_date };
+  }
+
+  const date = (input.date ?? '').trim();
+  const startTime = (input.startTime ?? plan.start_time ?? '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(startTime)) {
+    throw new AdminAuthError(400, 'recurring_occurrence_time_required');
+  }
+  if (date < localToday()) throw new AdminAuthError(400, 'recurring_occurrence_in_past');
+  const existing = await db
+    .prepare('SELECT id FROM recurring_occurrences WHERE plan_id = ? AND occurrence_date = ? LIMIT 1')
+    .bind(planId, date)
+    .first<{ id: string }>();
+  if (existing) throw new AdminAuthError(409, 'recurring_occurrence_date_conflict');
+  const destination = { lat: Number(plan.latitude), lng: Number(plan.longitude) };
+  if (!Number.isFinite(destination.lat) || !Number.isFinite(destination.lng)) {
+    throw new AdminAuthError(400, 'recurring_property_coordinates_missing');
+  }
+  const duration =
+    occurrence.occurrence_date === plan.start_date
+      ? Number(plan.first_duration_minutes) || Number(plan.duration_minutes) || 120
+      : Number(plan.duration_minutes) || 120;
+  const start = zonedTimeToUtc(date, startTime, bookingConfig.timeZone);
+  const availability = await deps.availability(env, {
+    date,
+    durationMinutes: duration,
+    destination,
+    crewSize: Number(plan.crew_size) || 1,
+    ...(occurrence.calendar_event_id ? { excludeEventIds: [occurrence.calendar_event_id] } : {}),
+  });
+  if (!availability.ok) throw new AdminAuthError(409, availability.reason);
+  const exact = availability.availability.slots.find((slot) => slot.start === start.toISOString());
+  if (!exact) throw new AdminAuthError(409, 'slot_unavailable');
+  if (occurrence.calendar_event_id) {
+    const updated = await deps.updateEvent(env, occurrence.calendar_event_id, {
+      start: exact.start,
+      end: exact.end,
+      timeZone: bookingConfig.timeZone,
+      resourceIds: exact.resourceIds,
+    });
+    if (!updated.ok) throw new AdminAuthError(502, updated.reason ?? 'calendar_write_failed');
+  }
+  const newOccurrenceId = occurrenceIdFor(planId, date);
+  const statements = [
+    db.prepare("UPDATE recurring_occurrences SET status = 'cancelled', sync_error = 'rescheduled_by_owner' WHERE id = ?").bind(occurrenceId),
+    db
+      .prepare(
+        `INSERT INTO recurring_occurrences
+         (id, plan_id, occurrence_date, appointment_id, calendar_event_id, status, resource_ids, sync_error)
+         VALUES (?, ?, ?, ?, ?, 'scheduled', ?, '')`,
+      )
+      .bind(
+        newOccurrenceId,
+        planId,
+        date,
+        occurrence.appointment_id,
+        occurrence.calendar_event_id,
+        JSON.stringify(exact.resourceIds),
+      ),
+    ...(occurrence.appointment_id
+      ? [
+          db
+            .prepare(
+              "UPDATE appointments SET start_at = ?, end_at = ?, duration_minutes = ?, updated_at = ? WHERE id = ?",
+            )
+            .bind(exact.start, exact.end, duration, new Date().toISOString(), occurrence.appointment_id),
+        ]
+      : []),
+  ];
+  try {
+    if (db.batch) await db.batch(statements);
+    else for (const statement of statements) await statement.run();
+  } catch {
+    if (occurrence.calendar_event_id && occurrence.start_at && occurrence.end_at) {
+      await deps.updateEvent(env, occurrence.calendar_event_id, {
+        start: occurrence.start_at,
+        end: occurrence.end_at,
+        timeZone: bookingConfig.timeZone,
+      }).catch(() => undefined);
+    }
+    throw new AdminAuthError(502, 'recurring_occurrence_recovery_required');
+  }
+  await refreshPlanNextVisit(db, planId);
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'recurring.occurrence_rescheduled',
+    entityType: 'recurring_occurrence',
+    entityId: newOccurrenceId,
+    detail: `${occurrence.occurrence_date} -> ${date} ${startTime}`,
+  });
+  return { ok: true, action: 'reschedule', occurrenceDate: date };
+}
+
+function occurrenceIdFor(planId: string, date: string): string {
+  return `occ_${planId}_${date}`;
+}

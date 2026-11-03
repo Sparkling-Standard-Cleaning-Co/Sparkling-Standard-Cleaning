@@ -1,6 +1,6 @@
 ---
-metaTitle: About Hayli, Our Founder | Pensacola Cleaning Company
-metaDescription: Meet the founder of our Pensacola-area cleaning company — raised around a family cleaning business, trained in established local companies, and building a company around detail instead of rush.
+metaTitle: About Hayli | Sparkling Standard Cleaning
+metaDescription: Meet the founder of our Pensacola-area cleaning company — raised around a family cleaning business and building a company around detail instead of rush.
 hero:
   headline: Young entrepreneur.
   accent: Old-fashioned standards.

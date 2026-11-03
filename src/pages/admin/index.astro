@@ -1,6 +1,19 @@
 ﻿---
 import '../../styles/global.css';
 import '../../styles/admin.css';
+import {
+  COMMERCIAL_FACILITY_TYPES,
+  CONDITION_OPTIONS,
+  FACILITY_CONDITION_OPTIONS,
+  FACILITY_FREQUENCY_OPTIONS,
+  FLOORING_OPTIONS,
+  FREQUENCY_OPTIONS,
+  LAST_CLEAN_OPTIONS,
+  PET_OPTIONS,
+  PROPERTY_TYPE_OPTIONS,
+  RESIDENTIAL_INPUT_LIMITS,
+  TRAFFIC_OPTIONS,
+} from '../../config/estimators/input-definitions';
 ---
 
 <!doctype html>
@@ -100,6 +113,7 @@ import '../../styles/admin.css';
             <button type="button" data-admin-nav="calendar">Calendar &amp; Requests</button>
             <button type="button" data-admin-nav="leads">Leads &amp; Inquiries</button>
             <button type="button" data-admin-nav="customers">Customers</button>
+            <button type="button" data-admin-nav="new-booking">New Booking</button>
             <button type="button" data-admin-nav="recurring">Recurring Plans</button>
             <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
             <button type="button" data-admin-nav="documents">Documents &amp; Agreements</button>
@@ -128,6 +142,7 @@ import '../../styles/admin.css';
 
           <section class="admin-view" data-admin-view="overview">
             <div class="admin-grid" data-admin-kpis></div>
+            <div data-admin-alerts style="margin-top:1rem;"></div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Recent inquiries</h2>
               <div data-admin-recent></div>
@@ -191,10 +206,92 @@ import '../../styles/admin.css';
             </div>
           </section>
 
+          <section class="admin-view" data-admin-view="new-booking" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Create a one-time booking</h2>
+              <p class="admin-muted">
+                Uses the same estimators, published pricing, document requirements and staffing rules as the
+                public website. Property facts are loaded from the saved profile; condition and extras belong to
+                this estimate only and never rewrite the profile.
+              </p>
+              <form class="admin-form admin-form--grid" data-manual-booking-form style="max-width:none">
+                <label>Customer <select name="customerId" data-manual-customer required><option value="">Choose a customer</option></select></label>
+                <label>Property <select name="propertyId" data-manual-property required><option value="">Choose a customer first</option></select></label>
+                <p class="admin-field--wide admin-muted">Need a new customer or another property? <button class="btn btn--ghost btn--small" type="button" data-admin-action="manual-manage-customer">Open the customer record</button></p>
+                <label>Booking type
+                  <select name="engine" data-manual-engine>
+                    <option value="residential">Residential cleaning</option>
+                    <option value="str">Short-term rental turnover</option>
+                    <option value="commercial">Commercial cleaning</option>
+                    <option value="church">Church cleaning</option>
+                  </select>
+                </label>
+                <label>Service
+                  <select name="serviceType" data-manual-service>
+                    <option value="standard">Residential maintenance</option>
+                    <option value="deep">Deep cleaning</option>
+                    <option value="move_in_out">Move-in / move-out</option>
+                  </select>
+                </label>
+                <div class="admin-field--wide admin-form admin-form--grid" data-manual-residential>
+                  <label>Property type <select name="propertyType">{PROPERTY_TYPE_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Square feet <input name="squareFeet" type="number" min={RESIDENTIAL_INPUT_LIMITS.squareFeet.min} max={RESIDENTIAL_INPUT_LIMITS.squareFeet.max} step={RESIDENTIAL_INPUT_LIMITS.squareFeet.step} data-manual-square-feet /></label>
+                  <label>Bedrooms <input name="bedrooms" type="number" min="0" max="12" data-manual-bedrooms /></label>
+                  <label>Full bathrooms <input name="fullBaths" type="number" min="0" max="12" data-manual-full-baths /></label>
+                  <label>Half bathrooms <input name="halfBaths" type="number" min="0" max="12" data-manual-half-baths /></label>
+                  <label>Beds to reset (STR) <input name="beds" type="number" min="1" max="30" data-manual-beds /></label>
+                  <label>Pets <select name="pets">{PET_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Condition <select name="condition">{CONDITION_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Last professional clean <select name="lastClean">{LAST_CLEAN_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Frequency <select name="frequency">{FREQUENCY_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label class="admin-field--wide"><input type="checkbox" name="supportiveEligible" value="yes" /> Community Support eligibility (10% — client attestation only)</label>
+                </div>
+                <div class="admin-field--wide admin-form admin-form--grid" data-manual-facility hidden>
+                  <label>Facility type <select name="facilityType">{COMMERCIAL_FACILITY_TYPES.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Cleanable square feet <input name="cleanableSqft" type="number" min="100" max="200000" step="50" /></label>
+                  <label>Restroom fixtures <input name="restroomFixtures" type="number" min="0" max="40" step="1" /></label>
+                  <label>Breakroom / kitchen <select name="breakroom"><option value="none">None</option><option value="breakroom">Small breakroom</option><option value="kitchen">Full kitchen</option></select></label>
+                  <label>Condition <select name="facilityCondition">{FACILITY_CONDITION_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Traffic <select name="traffic">{TRAFFIC_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Flooring <select name="flooring">{FLOORING_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Visit frequency <select name="facilityFrequency">{FACILITY_FREQUENCY_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label><input type="checkbox" name="firstClean" value="yes" /> First clean / overdue reset</label>
+                  <label><input type="checkbox" name="specialty" value="yes" /> Specialty work requiring review</label>
+                </div>
+                <fieldset class="admin-field--wide" data-manual-extras>
+                  <legend>Extras and bundles</legend>
+                  <div class="admin-form admin-form--grid" data-manual-addon-list></div>
+                  <div class="admin-form admin-form--grid" data-manual-bundle-list style="margin-top:.5rem;"></div>
+                </fieldset>
+                <label>Cleaning date <input name="date" type="date" data-manual-date required /></label>
+                <label>Crew size <select name="crewSize" data-manual-crew><option value="1">One cleaner</option><option value="2">Two cleaners</option></select></label>
+                <label class="admin-field--wide">Internal booking notes <textarea name="notes" rows="2" maxlength="2000" placeholder="Access details, special instructions, or why this estimate differs from the saved profile."></textarea></label>
+                <div class="admin-field--wide admin-actions">
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-quote">Generate Estimate and Check Times</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="manual-availability">Check Available Times</button>
+                </div>
+                <div class="admin-field--wide" data-manual-quote-result aria-live="polite"></div>
+                <label>Available appointment start <select name="slot" data-manual-slots><option value="">Generate an estimate and check times first</option></select></label>
+                <div class="admin-field--wide" data-manual-staff></div>
+                <div class="admin-field--wide admin-actions">
+                  <button class="btn btn--primary btn--small" type="button" data-admin-action="manual-create">Save Pending Booking</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-create-confirm">Create Booking and Confirm</button>
+                </div>
+              </form>
+              <div data-manual-booking-result style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Booking recovery queue</h2>
+              <p class="admin-muted">Provider writes that did not complete cleanly. Retry from the booking itself; nothing here is deleted automatically.</p>
+              <div data-manual-commitments></div>
+            </div>
+          </section>
+
           <section class="admin-view" data-admin-view="recurring" hidden>
             <div class="admin-card">
               <h2 class="admin-section-title">Recurring cleaning plans</h2>
               <div data-admin-recurring></div>
+              <div data-admin-recurring-occurrences style="margin-top:1rem;"></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Create a recurring plan</h2>
@@ -258,6 +355,7 @@ import '../../styles/admin.css';
                   <label>Signer <select name="signerParty"><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
                   <label>Agreement text <textarea name="contentText" rows="8" required maxlength="200000"></textarea></label>
                   <label><input type="checkbox" name="requiresVerification" value="yes" /> Requires owner/admin verification or countersignature</label>
+                  <label><input type="checkbox" name="requiresCountersignature" value="yes" /> Requires an explicit owner countersignature</label>
                   <button class="btn btn--secondary btn--small" type="submit">Save draft template</button>
                 </form>
                 <form class="admin-form" data-document-template-upload enctype="multipart/form-data">
@@ -268,6 +366,7 @@ import '../../styles/admin.css';
                   <label>Signer <select name="signerParty"><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
                   <label>PDF file <input name="file" type="file" accept="application/pdf" required /></label>
                   <label><input type="checkbox" name="requiresVerification" value="yes" /> Requires owner/admin verification or countersignature</label>
+                  <label><input type="checkbox" name="requiresCountersignature" value="yes" /> Requires an explicit owner countersignature</label>
                   <button class="btn btn--secondary btn--small" type="submit">Upload PDF template</button>
                 </form>
               </div>

@@ -560,8 +560,7 @@ export function initBookingCalendar(
           ? shortDateLabel(dateKey) + '. Availability is loading.'
           : shortDateLabel(dateKey) + '. Morning ' + availability.morning.replace('AM ', '').replace('+', 'available').replace('x', 'fully booked') + '. Afternoon ' + availability.afternoon.replace('PM ', '').replace('+', 'available').replace('x', 'fully booked') + '.',
       );
-      button.setAttribute('role', 'gridcell');
-      button.setAttribute('aria-selected', String(dateKey === selectedDate));
+      button.setAttribute('aria-pressed', String(dateKey === selectedDate));
       const disabled = dateKey < today || dateKey > latest || availability.unavailable;
       if (disabled) {
         button.disabled = true;

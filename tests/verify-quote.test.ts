@@ -697,3 +697,15 @@ test('a confirmed property pin wins over a street-level geocode for routing', as
   assert.equal(verification.pinCheck, 'ok');
   assert.equal(verification.destinationPrecise, false);
 });
+test('the verified destination, not client state or ZIP fields, establishes tax jurisdiction', async () => {
+  const env: QuoteVerificationEnv = {
+    MAPMAP_BASE: 'https://api.mapmap.ai',
+    ROUTES_API_KEY: MAPMAP_KEY,
+    TRAVEL_ORIGIN: ORIGIN,
+  };
+  const submission = fields({ zip: '36532', address_state: '', address_city: 'Pensacola' });
+  const verification = await withFetch(providerStub(), () => verifyReservationQuote(submission, env));
+  assert.equal(verification.travel.destinationSource, 'address_geocode');
+  assert.equal(verification.travel.destinationZip, '32502');
+  assert.equal(verification.travel.destinationState, 'FL');
+});

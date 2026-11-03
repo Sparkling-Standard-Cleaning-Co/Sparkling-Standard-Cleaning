@@ -13,6 +13,7 @@ import {
 import { isGiftActive, activationDateFor } from '../../../src/lib/gift/activation.ts';
 import { readLedgerJson } from '../../../src/lib/payments/ledger.ts';
 import { applyGiftPaymentToInvoice } from '../../../src/lib/admin/gift-reconcile.ts';
+import { projectGiftCleaningPayment } from '../../../src/lib/payments/d1-projection.ts';
 
 interface Env extends GiftStorageEnv, AdminDbEnv {}
 
@@ -195,6 +196,45 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         }
       }
 
+      let booking: Record<string, unknown> | null = null;
+      const bookingRequestId = text(body.bookingRequestId, 120);
+      if (bookingRequestId) {
+        const row = await context.env.DB
+          .prepare('SELECT id, hold_id, quote_reference FROM booking_requests WHERE id = ? LIMIT 1')
+          .bind(bookingRequestId)
+          .first<{ id: string; hold_id: string; quote_reference: string }>();
+        if (!row) return json({ ok: false, error: 'booking_request_not_found', giftRedeemed: !already, reference }, 404);
+        try {
+          const projected = await projectGiftCleaningPayment(context.env.DB, {
+            code,
+            sessionId: reference,
+            holdId: row.hold_id,
+            quoteReference: row.quote_reference,
+            amountCents: already ? already.amountCents : amountCents,
+            paidAt: new Date().toISOString(),
+            metadata: { admin_gift_redemption: true },
+          });
+          booking = { ...row, ...projected };
+          await audit(context.env.DB, {
+            actorUserId: actor.id,
+            action: 'gift.booking_payment_projected',
+            entityType: 'booking_request',
+            entityId: bookingRequestId,
+            detail: `${code}:${amountCents}`,
+          });
+        } catch (error) {
+          return json(
+            {
+              ok: false,
+              error: error instanceof Error ? error.message : 'gift_booking_projection_failed',
+              giftRedeemed: !already,
+              reference,
+            },
+            502,
+          );
+        }
+      }
+
       return json({
         ok: true,
         already: Boolean(already),
@@ -207,6 +247,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           active: isGiftActive(record),
         },
         invoice,
+        booking,
         reference,
       });
     }

@@ -2,6 +2,7 @@ import type { AdminActor } from './operations.ts';
 import { AdminAuthError, audit } from './operations.ts';
 import type { D1Database } from './d1.ts';
 import { bookingConfig } from '../../config/booking.ts';
+import { defaultActiveBranch } from './branches.ts';
 import { employeeOnboardingStatus, evaluateDocumentGate } from '../documents/service.ts';
 import { googleConfigured, updateCalendarEvent, type GoogleCalendarEnv } from '../booking/google-calendar.ts';
 
@@ -225,6 +226,7 @@ export async function confirmRequest(
   actor: AdminActor,
   requestId: string,
   teamMemberIds: string[] = [],
+  calendarEventId = '',
 ): Promise<{ appointmentId: string; reference: string }> {
   const row = await db
     .prepare(
@@ -269,35 +271,64 @@ export async function confirmRequest(
   );
   const appointmentId = uuid('appt');
   const reference = `APT-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-  await db
-    .prepare(
-      `INSERT INTO appointments
-       (id, branch_id, customer_id, property_id, booking_request_id, status, start_at, end_at,
-        duration_minutes, crew_size, source, reference)
-       VALUES (?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, 'admin', ?)`,
-    )
-    .bind(
-      appointmentId,
-      branchId,
-      row.customer_id,
-      row.property_id,
-      requestId,
-      startAt,
-      endAt,
-      Number(row.duration_minutes) || 120,
-      assigned.length,
-      reference,
-    )
-    .run();
-  await db
-    .prepare("UPDATE booking_requests SET status = 'confirmed', updated_at = ? WHERE id = ?")
-    .bind(now(), requestId)
-    .run();
-  await db
-    .prepare("UPDATE booking_holds SET status = 'confirmed' WHERE request_id = ?")
-    .bind(requestId)
-    .run();
-  await assignTeam(db, actor, appointmentId, assigned);
+  const statements = [
+    db
+      .prepare(
+        `INSERT INTO appointments
+         (id, branch_id, customer_id, property_id, booking_request_id, status, start_at, end_at,
+          duration_minutes, crew_size, source, reference)
+         VALUES (?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, 'admin', ?)`,
+      )
+      .bind(
+        appointmentId,
+        branchId,
+        row.customer_id,
+        row.property_id,
+        requestId,
+        startAt,
+        endAt,
+        Number(row.duration_minutes) || 120,
+        assigned.length,
+        reference,
+      ),
+    db
+      .prepare("UPDATE booking_requests SET status = 'confirmed', updated_at = ? WHERE id = ?")
+      .bind(now(), requestId),
+    db
+      .prepare("UPDATE booking_holds SET status = 'confirmed' WHERE request_id = ?")
+      .bind(requestId),
+    ...assigned.map((memberId) =>
+      db
+        .prepare(
+          `INSERT INTO appointment_resources (appointment_id, team_member_id, role)
+           VALUES (?, ?, (SELECT CASE WHEN is_solo = 1 THEN 'solo' WHEN is_lead = 1 THEN 'lead' ELSE 'cleaner' END
+                           FROM team_members WHERE id = ?))`,
+        )
+        .bind(appointmentId, memberId, memberId),
+    ),
+    ...(calendarEventId
+      ? [
+          db
+            .prepare(
+              `INSERT INTO calendar_links (id, appointment_id, provider, provider_event_id, sync_status, last_synced_at)
+               VALUES (?, ?, 'google', ?, 'synced', ?)
+               ON CONFLICT(provider, provider_event_id) DO UPDATE SET
+                 appointment_id = excluded.appointment_id, sync_status = 'synced',
+                 last_synced_at = excluded.last_synced_at, error_detail = ''`,
+            )
+            .bind(`cal_${crypto.randomUUID()}`, appointmentId, calendarEventId, now()),
+        ]
+      : []),
+  ];
+  try {
+    if (db.batch) await db.batch(statements);
+    else for (const statement of statements) await statement.run();
+  } catch (error) {
+    if (!db.batch) {
+      await db.prepare('DELETE FROM appointments WHERE id = ?').bind(appointmentId).run().catch(() => undefined);
+    }
+    throw new AdminAuthError(502, 'appointment_write_failed');
+  }
   await audit(db, { actorUserId: actor.id, action: 'booking.confirmed', entityType: 'appointment', entityId: appointmentId });
   return { appointmentId, reference };
 }
@@ -486,6 +517,7 @@ export async function createTeamMember(
   const bookingResourceId = resourceIdInput(input.bookingResourceId, id);
   const isSolo = booleanInput(input.isSolo);
   const isLead = booleanInput(input.isLead);
+  const branchId = branchFor(actor, input.branchId) ?? (await defaultActiveBranch(db));
   await db
     .prepare(
       `INSERT INTO team_members
@@ -496,7 +528,7 @@ export async function createTeamMember(
     )
     .bind(
       id,
-      branchFor(actor, input.branchId),
+      branchId,
       name,
       text(input.email, 200).toLowerCase(),
       text(input.phone, 30),
@@ -549,6 +581,24 @@ export async function updateTeamMember(
   const isSolo = input.isSolo === undefined ? Number(current.is_solo) === 1 : booleanInput(input.isSolo);
   const isLead = input.isLead === undefined ? Number(current.is_lead) === 1 : booleanInput(input.isLead);
   const bookingResourceId = resourceIdInput(input.bookingResourceId, String(current.booking_resource_id ?? memberId));
+  const nextStatus = input.status === 'inactive' ? 'inactive' : input.status === 'active' ? 'active' : String(current.status);
+  const nextBookable = input.isBookable === undefined ? Number(current.is_bookable) === 1 : input.isBookable !== false;
+  if (!isSolo && !isLead || nextStatus !== 'active' || !nextBookable) {
+    const assigned = await db
+      .prepare(
+        `SELECT a.id FROM appointment_resources ar
+         JOIN appointments a ON a.id = ar.appointment_id
+         WHERE ar.team_member_id = ? AND a.status IN ('pending','confirmed','in_progress')
+           AND a.start_at > ?
+           AND (SELECT COUNT(*) FROM appointment_resources ar2
+                JOIN team_members tm2 ON tm2.id = ar2.team_member_id
+                WHERE ar2.appointment_id = a.id AND (tm2.is_solo = 1 OR tm2.is_lead = 1)) <= 1
+         LIMIT 1`,
+      )
+      .bind(memberId, now())
+      .first<{ id: string }>();
+    if (assigned) throw new AdminAuthError(409, 'team_qualification_in_use');
+  }
   await db
     .prepare(
       `UPDATE team_members

@@ -1,5 +1,37 @@
 # Verification status
 
+## Local remediation checkpoint - 2026-11-03 (not deployed)
+
+**Branch:** `remediation/audit-2026-11-01` (local only). **Production remains**
+`e81e225` on `production-safe` / deployment `f66c6d39-056f-4168-a8f8-f8fdcda68b91`
+until the owner authorizes deployment.
+
+**Scope:** completed BOOK-09 (admin manual estimate and one-time booking creator),
+BOOK-07 (shared calendar-first commitment with durable recovery records, atomic D1
+appointment writes, reschedule rollback, and duplicate Stripe-settlement claims),
+BOOK-04/10 recurring occurrence administration and full-roster Worker pagination,
+FIN-04 gift-covered cleaning payment projection, FIN-06 server-derived tax
+jurisdiction, DOC-03/04 branch-owned signing requests with bound signer identity,
+countersignatures and immutable executed copies, CRM-01/02/05/06 branch/assignment
+and time-correction fixes, CRM-03 payload/signature/gift anonymization, SEC-03
+token-page analytics isolation, SEC-06 canonical gift administration identity,
+photo legacy-token removal, durable public D1 rate limits, CSP tightening, INF-02
+CI/production-branch validation, INF-04 actionable monitoring, UX-01/02/03 fixes,
+SEO-01 measured metadata lengths, and MAINT-03 customer-credit application.
+
+**Verification:** typecheck **0 errors**; unit suite **813 tests: 812 passed, 1
+skipped, 0 failed**; browser suite **194 passed, 0 failed**; build and
+`validate-site` passed; every page title is now ≤60 characters and every
+description ≤160 characters after rendering. New migrations `0029`–`0031` are
+additive; existing tests apply them through the same migration harness.
+
+**Not verified / deliberately deferred:** no production deployment, D1 migration
+application, real-money Stripe charge, live Stripe session race, off-site backup
+restore, owner MFA enrollment, Google OAuth secret rotation, or Cloudflare preview
+resource isolation was performed in this pass. Those remain owner-authorized
+production actions. The legacy `/gift-admin/` page is retired when the canonical
+database is bound; `/admin/` is the only identity path.
+
 ## Verified - 2026-11-02 paid-booking signature recovery
 
 **Release:** `e81e225` on `production-safe`; Cloudflare Pages deployment

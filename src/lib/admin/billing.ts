@@ -293,6 +293,100 @@ export async function createCredit(
   return { id: creditId };
 }
 
+export async function applyCreditToInvoice(
+  db: D1Database,
+  actor: AdminActor,
+  input: Record<string, unknown>,
+): Promise<{ id: string; appliedCents: number; remainingCents: number }> {
+  const invoiceId = text(input.invoiceId, 100);
+  const creditId = text(input.creditId, 100);
+  if (!invoiceId || !creditId) throw new AdminAuthError(400, 'credit_fields_required');
+  const invoice = await db
+    .prepare(`SELECT * FROM invoices WHERE id = ? ${scope(actor, 'branch_id').sql} LIMIT 1`)
+    .bind(invoiceId, ...scope(actor, 'branch_id').bind)
+    .first<Record<string, unknown>>();
+  if (!invoice) throw new AdminAuthError(404, 'invoice_not_found');
+  const credit = await db
+    .prepare('SELECT * FROM credits WHERE id = ? AND customer_id = ? LIMIT 1')
+    .bind(creditId, String(invoice.customer_id ?? ''))
+    .first<Record<string, unknown>>();
+  if (!credit) throw new AdminAuthError(404, 'credit_not_found');
+  if (String(credit.status) !== 'active') throw new AdminAuthError(409, 'credit_not_active');
+  if (credit.expires_at && Date.parse(String(credit.expires_at)) <= Date.now()) {
+    await db.prepare("UPDATE credits SET status = 'expired' WHERE id = ?").bind(creditId).run();
+    throw new AdminAuthError(409, 'credit_expired');
+  }
+  const balance = Math.max(0, Number(invoice.balance_cents) || 0);
+  if (balance <= 0) throw new AdminAuthError(409, 'invoice_already_paid');
+  const remaining = Math.max(0, Number(credit.remaining_cents) || 0);
+  const requested = input.amountCents === undefined ? balance : Math.round(Number(input.amountCents) || 0);
+  const applied = Math.min(balance, remaining, requested);
+  if (applied <= 0) throw new AdminAuthError(400, 'credit_amount_invalid');
+  const applicationId = id('creditapp');
+  const paymentId = id('payment');
+  const nextRemaining = remaining - applied;
+  const statements = [
+    db
+      .prepare(
+        `INSERT INTO payments
+         (id, branch_id, customer_id, invoice_id, provider, status, amount_cents, idempotency_key,
+          received_at, created_by_admin_user_id, metadata_json)
+         VALUES (?, ?, ?, ?, 'external', 'succeeded', ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        paymentId,
+        invoice.branch_id,
+        invoice.customer_id,
+        invoiceId,
+        applied,
+        `credit:${creditId}:${invoiceId}`,
+        now(),
+        actor.id,
+        JSON.stringify({ payment_method: 'customer_credit', credit_id: creditId }),
+      ),
+    db
+      .prepare(
+        `INSERT INTO credit_applications (id, credit_id, invoice_id, payment_id, amount_cents, applied_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(applicationId, creditId, invoiceId, paymentId, applied, now()),
+    db
+      .prepare('UPDATE credits SET remaining_cents = ?, status = ? WHERE id = ?')
+      .bind(nextRemaining, nextRemaining === 0 ? 'used' : 'active', creditId),
+  ];
+  if (db.batch) await db.batch(statements);
+  else for (const statement of statements) await statement.run();
+  await recomputeInvoiceFinancials(db, invoiceId);
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'credit.applied',
+    entityType: 'credit_application',
+    entityId: applicationId,
+    detail: `${creditId}:${invoiceId}:${applied}`,
+  });
+  return { id: applicationId, appliedCents: applied, remainingCents: nextRemaining };
+}
+
+export async function listCustomerCredits(
+  db: D1Database,
+  actor: AdminActor,
+  customerId: string,
+): Promise<Array<Record<string, unknown>>> {
+  const customer = await db
+    .prepare(`SELECT id FROM customers WHERE id = ? ${scope(actor, 'primary_branch_id').sql} LIMIT 1`)
+    .bind(customerId, ...scope(actor, 'primary_branch_id').bind)
+    .first();
+  if (!customer) throw new AdminAuthError(404, 'customer_not_found');
+  const rows = await db
+    .prepare(
+      `SELECT id, source, original_amount_cents, remaining_cents, status, expires_at, created_at
+       FROM credits WHERE customer_id = ? ORDER BY created_at DESC LIMIT 100`,
+    )
+    .bind(customerId)
+    .all();
+  return rows.results ?? [];
+}
+
 export async function financeSummary(
   db: D1Database,
   actor: AdminActor,

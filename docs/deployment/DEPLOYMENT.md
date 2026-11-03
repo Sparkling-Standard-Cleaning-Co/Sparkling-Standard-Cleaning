@@ -365,3 +365,13 @@ one.
 | `wrangler.toml.example` | Optional Wrangler CLI configuration template (no secrets) |
 | `scripts/validate-production-env.mjs` | Production environment gate |
 | `scripts/check-pending-facts.mjs` | Built-output placeholder gate |
+## Branch validation (2026-11-03)
+
+`.github/workflows/validate.yml` validates pushes to both `main` and
+`production-safe`, plus every pull request. Production continues to deploy from
+`production-safe`; a push to `main` alone does not authorize deployment.
+
+The remediation branch adds migrations `0029` (booking commitments), `0030`
+(booking payment claims) and `0031` (document execution integrity). They are
+additive and must be applied in order before deploying code that reads the new
+columns.

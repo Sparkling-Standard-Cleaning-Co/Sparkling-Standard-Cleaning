@@ -59,6 +59,12 @@ import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.t
 import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { persistLeadSubmission, updateLeadDelivery } from '../../src/lib/admin/lead-persistence.ts';
 import { requestPricingConfig } from '../../src/lib/pricing/server.ts';
+import {
+  PUBLIC_RATE_LIMITS,
+  checkPublicRateLimit,
+  clientIp,
+  consumePublicRateLimit,
+} from '../../src/lib/public-rate-limit.ts';
 
 interface R2ObjectLike {
   arrayBuffer?(): Promise<ArrayBuffer>;
@@ -245,7 +251,11 @@ async function recordTermsAcceptance(
  * tax amount that survives: this recomputes from the confirmed service
  * address and the verified cleaning total.
  */
-function applyServiceTax(clean: Record<string, string>, taxableBase: number | null): void {
+function applyServiceTax(
+  clean: Record<string, string>,
+  taxableBase: number | null,
+  jurisdiction: { state?: string | null; zip?: string | null } = {},
+): void {
   if (taxableBase === null || !Number.isFinite(taxableBase)) {
     clean.tax_status = 'review_required';
     clean.tax_review_reason = 'quote_unpriced';
@@ -255,8 +265,8 @@ function applyServiceTax(clean: Record<string, string>, taxableBase: number | nu
   }
   const tax = calculateServiceTax({
     serviceType: clean.service_type ?? '',
-    state: clean.address_state ?? null,
-    zip: clean.zip ?? null,
+    state: jurisdiction.state ?? null,
+    zip: jurisdiction.zip ?? null,
     taxableBase,
   });
   clean.tax_status = tax.treatment;
@@ -298,6 +308,12 @@ export async function onRequestPost(context: {
 }): Promise<Response> {
   const { request, env } = context;
   const pricingConfig = await requestPricingConfig(env.DB);
+  const ip = clientIp(request);
+  const ipStatus = await checkPublicRateLimit(env.DB, 'lead', ip, PUBLIC_RATE_LIMITS.leadIp);
+  if (ipStatus.limited) {
+    return json({ ok: false, error: 'rate_limited', retryAfterSeconds: ipStatus.retryAfterSeconds }, 429);
+  }
+  await consumePublicRateLimit(env.DB, 'lead', ip, PUBLIC_RATE_LIMITS.leadIp);
 
   let payload: { subject?: unknown; fields?: unknown; turnstileToken?: unknown };
   try {
@@ -339,6 +355,16 @@ export async function onRequestPost(context: {
   const emailProblem = customerEmailProblem(clean.email);
   if (emailProblem) return json({ ok: false, error: emailProblem }, 400);
   clean.email = normalizeCustomerEmail(clean.email);
+  const emailStatus = await checkPublicRateLimit(
+    env.DB,
+    'lead-email',
+    clean.email,
+    PUBLIC_RATE_LIMITS.leadEmail,
+  );
+  if (emailStatus.limited) {
+    return json({ ok: false, error: 'rate_limited', retryAfterSeconds: emailStatus.retryAfterSeconds }, 429);
+  }
+  await consumePublicRateLimit(env.DB, 'lead-email', clean.email, PUBLIC_RATE_LIMITS.leadEmail);
 
   // Owner requirement: a cleaning request or reservation must carry a
   // server-verified acceptance of the current terms and applicable policies.
@@ -454,7 +480,10 @@ export async function onRequestPost(context: {
       clean.global_factor = String(facility.globalFactor);
       clean.global_adjustment = String(facility.globalAdjustment ?? 0);
     }
-    applyServiceTax(clean, facility.expectedTotal);
+    applyServiceTax(clean, facility.expectedTotal, {
+      state: facilityDestination?.state ?? null,
+      zip: facilityDestination?.zip ?? null,
+    });
   }
 
   // Turnstile verification when the secret is configured.
@@ -576,7 +605,17 @@ export async function onRequestPost(context: {
         clean.ongoing_frequency = verification.ongoing.frequency;
       }
 
-      applyServiceTax(clean, verification.verifiedPrice);
+      const nonTaxableService = ['standard', 'deep', 'move_in_out', 'str_turnover'].includes(
+        clean.service_type ?? '',
+      );
+      applyServiceTax(clean, verification.verifiedPrice, {
+        state:
+          verification.travel.destinationState ??
+          (nonTaxableService ? clean.address_state ?? null : null),
+        zip:
+          verification.travel.destinationZip ??
+          (nonTaxableService ? clean.zip ?? null : null),
+      });
 
       // The customer-facing receipt carries the verdict (no prices) so the
       // browser can never imply an unverified price was accepted.

@@ -122,24 +122,33 @@ export async function runRecurringReplenishment(
     detail: [],
   };
   try {
-    const plans = await db
-      .prepare(
-        `SELECT id FROM recurring_plans
-         WHERE status = 'active' AND window IS NOT NULL AND start_time IS NOT NULL
-           AND duration_minutes IS NOT NULL
-         ORDER BY next_visit_date ASC LIMIT 50`,
-      )
-      .all<{ id: string }>();
-    for (const plan of plans.results ?? []) {
+    const planIds: string[] = [];
+    let cursor = '';
+    for (let page = 0; page < 20; page += 1) {
+      const batch = await db
+        .prepare(
+          `SELECT id FROM recurring_plans
+           WHERE status = 'active' AND window IS NOT NULL AND start_time IS NOT NULL
+             AND duration_minutes IS NOT NULL AND id > ?
+           ORDER BY id ASC LIMIT 50`,
+        )
+        .bind(cursor)
+        .all<{ id: string }>();
+      const rows = batch.results ?? [];
+      for (const row of rows) planIds.push(row.id);
+      if (rows.length < 50) break;
+      cursor = rows[rows.length - 1]!.id;
+    }
+    for (const planId of planIds) {
       summary.scanned += 1;
       try {
-        const result = await syncRecurringPlan(env, db, SYSTEM_ACTOR, plan.id, {
+        const result = await syncRecurringPlan(env, db, SYSTEM_ACTOR, planId, {
           cancelSuperseded: false,
         });
         if (result.ok) summary.synced += 1;
         else summary.errors += 1;
         summary.detail.push({
-          planId: plan.id,
+          planId,
           status: result.status,
           created: result.created,
           updated: result.updated,
@@ -150,7 +159,7 @@ export async function runRecurringReplenishment(
         });
       } catch (error) {
         summary.errors += 1;
-        summary.detail.push({ planId: plan.id, status: 'exception', error: (error as Error).message });
+        summary.detail.push({ planId, status: 'exception', error: (error as Error).message });
       }
     }
     summary.ok = summary.errors === 0;

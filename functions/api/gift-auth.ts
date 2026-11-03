@@ -130,6 +130,11 @@ function csrfMatches(request: Request, session: AdminSession): boolean {
 
 export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
+  // The legacy single-factor gift console is retired on any deployment with
+  // the canonical administrator database. /admin/ is the only identity path.
+  if ('DB' in env) {
+    return json({ ok: false, error: 'gift_admin_retired_use_admin_signin' }, 410);
+  }
   const bucket = adminBucket(env);
   if (!bucket) return json({ ok: false, error: 'auth_storage_not_configured' }, 503);
   const admin = await readAdmin(bucket);
@@ -161,6 +166,9 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
+  if ('DB' in env) {
+    return json({ ok: false, error: 'gift_admin_retired_use_admin_signin' }, 410);
+  }
   if (!sameOrigin(request)) return json({ ok: false, error: 'origin_rejected' }, 403);
   const bucket = adminBucket(env);
   if (!bucket) return json({ ok: false, error: 'auth_storage_not_configured' }, 503);

@@ -41,6 +41,30 @@ function rateFor(profile: { rates: Record<RateType, number> }, type: RateType): 
   return profile.rates[type] ?? profile.rates.regular;
 }
 
+async function effectiveRate(
+  db: NonNullable<ReturnType<typeof adminDb>>,
+  profile: { teamMemberId?: string | null; rates: Record<RateType, number> },
+  type: RateType,
+): Promise<number> {
+  if (profile.teamMemberId) {
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      const row = await db
+        .prepare(
+          `SELECT hourly_cents FROM employee_rate_history
+           WHERE team_member_id = ? AND rate_type = ? AND effective_from <= ?
+           ORDER BY effective_from DESC, created_at DESC LIMIT 1`,
+        )
+        .bind(profile.teamMemberId, type, today)
+        .first<{ hourly_cents: number }>();
+      if (row && Number(row.hourly_cents) >= 0) return Number(row.hourly_cents);
+    } catch {
+      // Legacy schema before rate history existed.
+    }
+  }
+  return rateFor(profile, type);
+}
+
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const db = adminDb(context.env);
   if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
@@ -124,7 +148,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         location,
       });
       try {
-        await openWork({ eventId: event.id, appointmentId, rateType, rateCents: rateFor(profile, rateType) });
+        await openWork({ eventId: event.id, appointmentId, rateType, rateCents: await effectiveRate(db, profile, rateType) });
       } catch {
         return json({ ok: false, error: 'already_clocked_in' }, 409);
       }

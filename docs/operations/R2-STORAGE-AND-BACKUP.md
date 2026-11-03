@@ -50,24 +50,23 @@ proof of the production bucket.
 
 ## Backup status
 
-**No independent backup is implemented or verified.** R2 object persistence is not a backup.
-There is no committed backup destination, snapshot schedule, restore test or recovery runbook yet.
+**Implemented in the private owner kit:** `_PRIVATE_BACKUPS` runs an encrypted
+D1 + R2 archive with a SHA-256 manifest and a restore test. The R2 export covers
+`payments/`, `booking/`, `legal/`, `gifts/`, `agreements/`, `leads/` and
+`documents/`. The archive is written outside the product repository; the recovery
+key is held separately.
 
-Recommended owner-controlled baseline (requires a separately configured destination and owner
-approval before any paid service):
+Still outstanding (owner action):
 
-1. Daily incremental export of `payments/`, `booking/`, `gifts/`, `legal/` and `agreements/` to a
-   separate protected bucket or encrypted archive.
-2. Weekly full snapshot with integrity hash/manifest.
-3. Monthly restoration test into a non-production bucket; record counts and checksums.
-4. Retention distinct from cleanup: financial/legal records stay; backup generations roll.
-5. Restricted credentials; no customer data in personal storage or public repositories.
-6. Cost review before enabling any paid storage/egress.
+1. An independent off-site destination for the encrypted archive.
+2. A observed scheduled-task run and a documented restore drill from that off-site
+   copy (local restore tests already pass).
+3. A retention policy review that does not use photo cleanup to stay below the R2
+   free allowance.
 
-Cloudflare R2 usage and lifecycle rules must be checked in the Cloudflare dashboard. This
-environment has no Cloudflare account credential, so object counts, byte totals, lifecycle rules,
-and backup coverage cannot be verified from the repository. The owner must provide dashboard
-evidence or a read-only API credential before the inventory can show actual usage.
+R2 object persistence is not a backup. Cloudflare usage and lifecycle rules must be
+checked in the Cloudflare dashboard; this repository cannot prove object counts or
+byte totals.
 
 ## Photo cleanup safety
 

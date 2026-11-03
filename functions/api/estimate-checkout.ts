@@ -27,6 +27,14 @@ import {
 } from '../../src/lib/estimate/verify.ts';
 import { verifyFacilityQuote } from '../../src/lib/estimate/facility-verify.ts';
 import { requestPricingConfig } from '../../src/lib/pricing/server.ts';
+import { autoConfirmPaidBooking } from '../../src/lib/booking/auto-confirm.ts';
+import { projectGiftCleaningPayment } from '../../src/lib/payments/d1-projection.ts';
+import {
+  PUBLIC_RATE_LIMITS,
+  checkPublicRateLimit,
+  clientIp,
+  consumePublicRateLimit,
+} from '../../src/lib/public-rate-limit.ts';
 import {
   createLedgerJson,
   deleteLedgerKey,
@@ -705,8 +713,8 @@ async function verifyFacilityPayment(
   }
   const tax = calculateServiceTax({
     serviceType,
-    state: fields.address_state ?? null,
-    zip: fields.zip ?? null,
+    state: destination.state ?? null,
+    zip: destination.zip ?? null,
     taxableBase: verification.expectedTotal,
   });
   if (!tax.canCharge) return { ok: false, reason: `tax_${tax.reviewReason ?? 'review_required'}` };
@@ -781,10 +789,11 @@ async function verifyResidentialPayment(
   if (!withinAcceptance(quotedCents, cleaningAmountCents)) {
     return { ok: false, reason: 'price_mismatch' };
   }
+  const nonTaxableService = ['standard', 'deep', 'move_in_out', 'str_turnover'].includes(serviceType);
   const tax = calculateServiceTax({
     serviceType,
-    state: fields.address_state ?? null,
-    zip: fields.zip ?? null,
+    state: verification.travel.destinationState ?? (nonTaxableService ? fields.address_state ?? null : null),
+    zip: verification.travel.destinationZip ?? (nonTaxableService ? fields.zip ?? null : null),
     taxableBase: verification.verifiedPrice,
   });
   if (!tax.canCharge) return { ok: false, reason: `tax_${tax.reviewReason ?? 'review_required'}` };
@@ -901,6 +910,7 @@ async function fulfillGiftOnlyOrder(
     reservationId: string;
     email: string;
     attempt: string;
+    holdId: string;
   },
 ): Promise<Response> {
   const giftLedger = giftBucket(env);
@@ -949,6 +959,78 @@ async function fulfillGiftOnlyOrder(
     await deleteLedgerKey(bucket, key).catch(() => undefined);
     return json({ ok: false, error: 'gift_commit_failed' }, 502);
   }
+  let bookingStatus: 'confirmed' | 'pending_owner_review' | undefined;
+  let bookingEventId = '';
+  let bookingReason = '';
+  if (env.DB && /^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(input.holdId)) {
+    try {
+      await projectGiftCleaningPayment(env.DB, {
+        code: input.giftCode,
+        sessionId: input.attempt,
+        holdId: input.holdId,
+        quoteReference: input.candidate.reference,
+        amountCents: input.candidate.amountCents,
+        paidAt,
+        metadata: { gift_reservation_id: input.reservationId, photos_outstanding: input.record.photosOutstanding === true },
+      });
+    } catch (error) {
+      console.error('[estimate-checkout] gift_projection_failed', {
+        name: error instanceof Error ? error.name : 'unknown',
+      });
+    }
+    const requestDetails = await env.DB
+      .prepare('SELECT payload_json FROM booking_requests WHERE hold_id = ? LIMIT 1')
+      .bind(input.holdId)
+      .first<{ payload_json: string }>()
+      .catch(() => null);
+    let fields: Record<string, string> = {};
+    try {
+      const parsed = JSON.parse(requestDetails?.payload_json ?? '{}') as Record<string, unknown>;
+      fields = Object.fromEntries(
+        Object.entries(parsed).filter(([, value]) => typeof value === 'string'),
+      ) as Record<string, string>;
+    } catch {
+      fields = {};
+    }
+    const confirmed = await autoConfirmPaidBooking(env, input.holdId, input.candidate.reference, {
+      customerName: fields.name ?? snapshot?.customerName ?? '',
+      customerEmail: fields.email ?? input.email,
+      serviceCode: fields.service_type ?? input.candidate.serviceType,
+      frequency: fields.ongoing_frequency ?? fields.frequency ?? '',
+      ongoingPriceCents: Math.round(Number(fields.ongoing_price_per_visit || 0) * 100),
+      ...(Number(fields.ongoing_duration_minutes) > 0
+        ? { ongoingDurationMinutes: Number(fields.ongoing_duration_minutes) }
+        : {}),
+      termsVersion: fields.terms_version ?? '',
+    });
+    if (confirmed.ok) {
+      bookingStatus = 'confirmed';
+      bookingEventId = confirmed.eventId ?? '';
+    } else {
+      bookingStatus = 'pending_owner_review';
+      bookingReason = confirmed.reason ?? 'manual_review';
+    }
+    const paymentStatus = confirmed.ok ? 'paid_gift_confirmed' : 'paid_gift_awaiting_confirmation';
+    await env.DB
+      .prepare(
+        `UPDATE booking_requests SET payment_status = ?, payment_reference = ?,
+           payment_amount_cents = COALESCE(payment_amount_cents, 0) + ?,
+           paid_at = COALESCE(paid_at, ?), updated_at = ? WHERE hold_id = ?`,
+      )
+      .bind(
+        paymentStatus,
+        input.giftCode,
+        Number(input.candidate.amountCents) || 0,
+        paidAt,
+        new Date().toISOString(),
+        input.holdId,
+      )
+      .run()
+      .catch(() => undefined);
+    completed.bookingStatus = bookingStatus;
+    if (bookingEventId) completed.bookingEventId = bookingEventId;
+    await writeLedgerJson(bucket, key, completed).catch(() => undefined);
+  }
   if (env.DB) await completeCheckoutSlotByAttempt(env.DB, input.attempt, null).catch(() => undefined);
   const receipt: ReceiptData | null = snapshot
     ? {
@@ -989,6 +1071,15 @@ async function fulfillGiftOnlyOrder(
       Customer: snapshot?.customerName ?? 'name unavailable',
       Email: input.email,
       'Photos outstanding': input.record.photosOutstanding ? 'yes â€” confirm after photos' : 'no',
+      ...(bookingStatus
+        ? {
+            'Booking status':
+              bookingStatus === 'confirmed'
+                ? 'CONFIRMED automatically (verified slot, complete details, paid by gift)'
+                : `Pending owner review (${bookingReason || 'manual review'})`,
+            ...(bookingEventId ? { 'Calendar event id': bookingEventId } : {}),
+          }
+        : {}),
       'Customer receipt': receiptStatus,
       Note:
         'The gift balance was committed. Confirm the requested date, scope and final details personally before scheduling.',
@@ -1006,6 +1097,12 @@ async function fulfillGiftOnlyOrder(
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
   if (throttled(request)) return json({ ok: false, error: 'rate_limited' }, 429);
+  const ip = clientIp(request);
+  const ipStatus = await checkPublicRateLimit(env.DB, 'checkout', ip, PUBLIC_RATE_LIMITS.checkoutIp);
+  if (ipStatus.limited) {
+    return json({ ok: false, error: 'rate_limited', retryAfterSeconds: ipStatus.retryAfterSeconds }, 429);
+  }
+  await consumePublicRateLimit(env.DB, 'checkout', ip, PUBLIC_RATE_LIMITS.checkoutIp);
 
   let payload: {
     fields?: unknown;
@@ -1291,6 +1388,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         reservationId: reserved.reservation.id,
         email,
         attempt: attemptFingerprint,
+        holdId: fields.booking_hold_id,
       });
     }
   }

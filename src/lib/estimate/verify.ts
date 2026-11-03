@@ -30,7 +30,7 @@ import {
   resolveRoute,
   type RoutingEnv,
 } from '../travel/server-routing.ts';
-import { resolveAddress, type GeocodeEnv } from '../location/server-geocode.ts';
+import { resolveAddress, reverseGeocode, type GeocodeEnv } from '../location/server-geocode.ts';
 import { formatDriveDuration } from '../travel/calculateTravelAdjustment.ts';
 
 export interface QuoteVerificationEnv extends RoutingEnv, GeocodeEnv {}
@@ -66,14 +66,15 @@ export type PinCheck = 'ok' | 'adjusted' | 'divergent' | 'unknown';
 export const PIN_DIVERGENCE_METERS = 500;
 
 export interface QuoteVerificationTravel {
-  method: 'route' | 'straight_line_estimate' | 'zone';
+  method: 'route' | 'straight_line_estimate' | 'zone' | 'none';
   provider: string;
   oneWayMiles: number | null;
   durationMinutes: number | null;
-  /** True only when a live provider route was used. */
   verified: boolean;
-  /** How the server established the destination point. */
-  destinationSource: 'address_geocode' | 'zip_centroid' | 'customer_pin' | 'none';
+  destinationSource: 'address_geocode' | 'customer_pin' | 'zip_centroid' | 'none';
+  /** Server-derived jurisdiction facts for the verified destination. */
+  destinationZip: string | null;
+  destinationState: string | null;
 }
 
 export interface QuoteVerification {
@@ -245,6 +246,8 @@ interface ServerDestination {
   lat: number;
   lng: number;
   source: QuoteVerificationTravel['destinationSource'];
+  zip?: string;
+  state?: string;
 }
 
 /**
@@ -268,7 +271,16 @@ export async function resolveServerDestination(
   // the pin; the quote remains preliminary and the address is verified later.
   if (isConfirmedPropertyPin(fields)) {
     const pin = parseSubmittedPin(fields);
-    if (pin) return { lat: pin.lat, lng: pin.lng, source: 'customer_pin' };
+    if (pin) {
+      const located = await reverseGeocode(env, pin.lat, pin.lng).catch(() => null);
+      return {
+        lat: pin.lat,
+        lng: pin.lng,
+        source: 'customer_pin',
+        ...(located?.zip ? { zip: located.zip } : {}),
+        ...(located?.state ? { state: located.state } : {}),
+      };
+    }
   }
 
   if (street.length >= 5) {
@@ -276,20 +288,46 @@ export async function resolveServerDestination(
     const region = [city, state].filter(Boolean).join(', ');
     const queryParts = [line1, region, zip].filter(Boolean);
     const resolved = await resolveAddress(env, queryParts.join(', ')).catch(() => null);
-    if (resolved) return { lat: resolved.lat, lng: resolved.lng, source: 'address_geocode' };
+    if (resolved) {
+      return {
+        lat: resolved.lat,
+        lng: resolved.lng,
+        source: 'address_geocode',
+        ...(resolved.zip ? { zip: resolved.zip } : {}),
+        ...(resolved.state ? { state: resolved.state } : {}),
+      };
+    }
   }
 
   // GPS-confirmed pin wins over the ZIP centroid: it is the actual confirmed
   // destination, while the centroid is only a coverage reference.
   if (isGpsPinDestination(fields)) {
     const pin = parseSubmittedPin(fields);
-    if (pin) return { lat: pin.lat, lng: pin.lng, source: 'customer_pin' };
+    if (pin) {
+      const located = await reverseGeocode(env, pin.lat, pin.lng).catch(() => null);
+      return {
+        lat: pin.lat,
+        lng: pin.lng,
+        source: 'customer_pin',
+        ...(located?.zip ? { zip: located.zip } : {}),
+        ...(located?.state ? { state: located.state } : {}),
+      };
+    }
   }
 
   const zipMatch = zip.match(/^(\d{5})(?:-\d{4})?$/);
-  if (zipMatch) {
-    const reference = zipReference[zipMatch[1] as string];
-    if (reference) return { lat: reference.lat, lng: reference.lng, source: 'zip_centroid' };
+  if (zipMatch && zipMatch[1]) {
+    const zipCode = zipMatch[1];
+    const reference = zipReference[zipCode];
+    if (reference) {
+      return {
+        lat: reference.lat,
+        lng: reference.lng,
+        source: 'zip_centroid',
+        zip: zipCode,
+        state: reference.state,
+      };
+    }
   }
 
   return null;
@@ -326,6 +364,8 @@ export async function verifyReservationQuote(
     durationMinutes: null,
     verified: false,
     destinationSource: 'none',
+    destinationZip: null,
+    destinationState: null,
   };
   let pinCheck: PinCheck = 'unknown';
   let pinDistanceMeters: number | null = null;
@@ -376,6 +416,8 @@ export async function verifyReservationQuote(
   let routed: RoutedTravelInfo | undefined;
   if (origin && destination) {
     travel.destinationSource = destination.source;
+    travel.destinationZip = destination.zip ?? null;
+    travel.destinationState = destination.state ?? null;
     const route = await resolveRoute(env, origin, destination).catch(() => null);
     if (route) {
       const gas = await gulfCoastGasPrice(
@@ -399,6 +441,8 @@ export async function verifyReservationQuote(
     }
   } else if (destination) {
     travel.destinationSource = destination.source;
+    travel.destinationZip = destination.zip ?? null;
+    travel.destinationState = destination.state ?? null;
   }
 
   // Pin integrity: a customer-moved pin is a real destination change. The

@@ -1,5 +1,5 @@
 ---
-metaTitle: Service Area | Pensacola, Cantonment & Surrounding Communities
+metaTitle: Service Area | Pensacola and Cantonment
 metaDescription: Sparkling Standard serves Pensacola, Cantonment and surrounding Northwest Florida communities, with select nearby Alabama locations available by arrangement.
 hero:
   headline: Serving Pensacola, Cantonment, and beyond

@@ -84,3 +84,10 @@ engine.
 - No tax is invented when the address is ambiguous. A ZIP-level fallback may be used for travel
   estimates, but it does not by itself authorize a county tax rate where a ZIP could cross a
   jurisdictional boundary.
+## Jurisdiction source (2026-11-03)
+
+Taxable checkout no longer trusts the browser's state or ZIP fields. The server
+routes to the verified destination and passes that destination's ZIP/state to the
+tax engine. A confirmed property pin without a usable geocoded jurisdiction stays
+`review_required` and cannot be charged. Residential and STR services remain
+non-taxable, so a missing jurisdiction does not change their price.

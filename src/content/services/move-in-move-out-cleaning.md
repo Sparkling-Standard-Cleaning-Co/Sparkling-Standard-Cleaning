@@ -1,7 +1,7 @@
 ---
 title: Move-in and Move-out Cleaning
-metaTitle: Move-in and Move-out Cleaning in Pensacola | Get a Move-Out Estimate
-metaDescription: Move-out and move-in cleaning for renters, homeowners, landlords, realtors and property managers in the Pensacola area. Request a move-out estimate and get an honest scope.
+metaTitle: Move-In & Move-Out Cleaning | Sparkling Standard
+metaDescription: Move-out and move-in cleaning for renters, homeowners, landlords and realtors in the Pensacola area. Request an honest move-out estimate.
 summary: Give your home a fresh start with a thorough, top-to-bottom cleaning. Whether you’re moving into a new home or preparing to sell or rent your property, we’ll leave it sparkling clean, and ready for its next residents.
 homepageParagraphs:
   - Give your home a fresh start with a thorough, top-to-bottom cleaning. Whether you’re moving into a new home or preparing to sell or rent your property, we’ll leave it sparkling clean, and ready for its next residents.

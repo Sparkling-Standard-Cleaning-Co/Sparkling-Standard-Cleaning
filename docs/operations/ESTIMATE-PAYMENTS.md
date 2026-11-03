@@ -267,3 +267,20 @@ No administrative charging gate was enabled.
 
 The Batch A hardening described above was released in `8edce3a`; the sentence calling it "local
 only" is historical and no longer describes production.
+## Duplicate settlement protection
+
+Stripe can settle an older Checkout Session while a replacement session is being
+created. The D1 session registry prevents creating two open sessions, but money is
+proof of payment, so the webhook also claims the primary successful payment per
+booking request in `booking_payment_claims`.
+
+- The first successful session owns the claim.
+- A later successful session is still recorded in `payments`, but it is marked
+  `duplicate_booking_payment` and the booking payment status becomes
+  `paid_duplicate_review`.
+- A `payment_reconciliation_issues` row is written and the owner notification says
+  to refund the duplicate in Stripe.
+- No successful payment is ever silently discarded, and the booking is not
+  confirmed twice against one cleaning slot.
+
+The admin Overview links straight to open financial reconciliation issues.

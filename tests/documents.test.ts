@@ -18,6 +18,8 @@ import {
   createBundle,
   createSigningRequest,
   createTemplate,
+  countersignSigningRequest,
+  getExecutedCopy,
   employeeOnboardingStatus,
   evaluateDocumentGate,
   listSigningRequests,
@@ -584,4 +586,70 @@ test('an owner can upload a PDF template and configure it without a deployment',
   assert.equal(((await approve.json()) as { ok: boolean }).ok, true);
   const approved = f.db.raw.prepare('SELECT status FROM document_templates WHERE id = ?').get(uploaded.id!) as { status: string };
   assert.equal(approved.status, 'approved');
+});
+test('signing requests bind the signer identity, carry branch ownership and produce an executed copy', async () => {
+  const f = await fixture();
+  f.db.raw
+    .prepare("INSERT INTO customer_contacts (id, customer_id, kind, value, normalized_value, is_primary) VALUES ('ct_bound', ?, 'email', 'bound@example.test', 'bound@example.test', 1)")
+    .run(f.customerId);
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Countersigned Agreement', { requiresVerification: true });
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.residential',
+    name: 'Residential documents',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId,
+    sortOrder: 0,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    frequency: 'one_time',
+    bookingReference: 'SS-20261215-BOUND1',
+  };
+  const request = await createSigningRequest(f.db, context, { createdByAdminUserId: f.owner.id });
+  const row = f.db.raw
+    .prepare('SELECT branch_id, signer_email FROM signing_requests WHERE id = ?')
+    .get(String(request.requestId)) as { branch_id: string; signer_email: string };
+  assert.equal(row.branch_id, 'branch_pensacola');
+  assert.equal(row.signer_email, 'bound@example.test');
+  await assert.rejects(
+    () =>
+      signSigningRequest(f.db, request.token!, {
+        signerName: 'Impostor',
+        signerEmail: 'impostor@example.test',
+        consent: true,
+        signatures: { [templateId]: { value: 'Impostor' } },
+        request: signingRequest(),
+      }),
+    /signer_email_mismatch/,
+  );
+  const signed = await signSigningRequest(f.db, request.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'bound@example.test',
+    consent: true,
+    signatures: { [templateId]: { value: 'Synthetic Customer' } },
+    request: signingRequest(),
+  });
+  assert.equal(signed.status, 'signed');
+  const executed = await getExecutedCopy(f.db, String(request.requestId));
+  assert.ok(executed);
+  assert.match(executed.text, /EXECUTED DOCUMENT COPY/);
+  assert.match(executed.text, /Synthetic Customer/);
+  assert.equal(executed.sha256.length, 64);
+  const countersigned = await countersignSigningRequest(f.db, f.owner.id, String(request.requestId), 'Synthetic Owner');
+  assert.equal(countersigned.status, 'signed');
+  const status = f.db.raw
+    .prepare("SELECT status FROM document_signatures WHERE signing_request_id = ?")
+    .get(String(request.requestId)) as { status: string };
+  assert.equal(status.status, 'verified');
+  const finalCopy = await getExecutedCopy(f.db, String(request.requestId));
+  assert.match(finalCopy?.text ?? '', /Synthetic Owner/);
 });

@@ -1,7 +1,7 @@
 ---
 title: House Cleaning
-metaTitle: House Cleaning in Pensacola & Cantonment
-metaDescription: Residential house cleaning in Pensacola, Cantonment and nearby communities. Sparkling Standard cleans homes through Recurring Residential Cleaning and Deep Cleaning — see which fits your home.
+metaTitle: House Cleaning in Pensacola | Sparkling Standard
+metaDescription: Residential house cleaning in Pensacola, Cantonment and nearby communities through Recurring Residential Cleaning and Deep Cleaning.
 summary: "Residential house cleaning at Sparkling Standard is simple to choose: Recurring Residential Cleaning for a maintained home on a schedule, or Deep Cleaning for the intensive reset."
 icon: recurring-residential
 order: 1

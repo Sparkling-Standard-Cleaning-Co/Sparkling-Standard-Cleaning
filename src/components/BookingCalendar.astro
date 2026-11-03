@@ -54,15 +54,15 @@ const { id = 'estimate-calendar' } = Astro.props;
         </button>
       </div>
 
-      <div class="booking-calendar__weekdays" aria-hidden="true">
-        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
-      </div>
-      <div
-        class="booking-calendar__grid"
-        data-calendar-grid
-        role="grid"
-        aria-label="Available cleaning dates"
-      ></div>
+        <div class="booking-calendar__weekdays" aria-hidden="true">
+          <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+        </div>
+        <div
+          class="booking-calendar__grid"
+          data-calendar-grid
+          role="group"
+          aria-label="Available cleaning dates"
+        ></div>
       <div class="booking-calendar__legend" aria-label="Calendar availability legend">
         <span class="booking-calendar__legend-key"><span class="booking-calendar__window is-open"></span> Available</span>
         <span class="booking-calendar__legend-key"><span class="booking-calendar__window is-full"></span> Unavailable</span>

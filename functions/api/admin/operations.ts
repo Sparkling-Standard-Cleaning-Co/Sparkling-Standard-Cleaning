@@ -1,8 +1,10 @@
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
 import {
   applyRecurringScheduleChange,
+  listRecurringOccurrences,
   setRecurringStatus,
   syncRecurringPlan,
+  updateRecurringOccurrence,
   type RecurringEnv,
 } from '../../../src/lib/admin/recurring-schedule.ts';
 import type { BookingEnv } from '../../../src/lib/booking/service.ts';
@@ -44,6 +46,16 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const view = url.searchParams.get('view') ?? 'jobs';
     if (view === 'recurring') {
       return json({ ok: true, recurring: await listRecurring(db, actor) });
+    }
+    if (view === 'occurrences') {
+      const planId = url.searchParams.get('planId') ?? '';
+      if (!planId) return json({ ok: false, error: 'plan_required' }, 400);
+      return json({
+        ok: true,
+        occurrences: await listRecurringOccurrences(db, actor, planId, {
+          ...(url.searchParams.get('from') ? { from: url.searchParams.get('from')! } : {}),
+        }),
+      });
     }
     if (view === 'team') {
       return json({ ok: true, team: await listTeam(db, actor) });
@@ -144,6 +156,32 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       await updateRecurring(db, actor, planId, body);
       return json({ ok: true });
+    }
+    if (action === 'sync_recurring') {
+      const planId = String(body.planId ?? '');
+      const sync = await syncRecurringPlan(context.env as RecurringEnv, db, actor, planId, {
+        cancelSuperseded: body.cancelSuperseded === true,
+      });
+      return json({ ...sync, ok: sync.ok }, sync.ok ? 200 : 502);
+    }
+    if (action === 'update_occurrence') {
+      const occurrenceAction = String(body.occurrenceAction ?? '');
+      if (occurrenceAction !== 'skip' && occurrenceAction !== 'reschedule') {
+        return json({ ok: false, error: 'occurrence_action_invalid' }, 400);
+      }
+      const result = await updateRecurringOccurrence(
+        context.env as RecurringEnv,
+        db,
+        actor,
+        String(body.planId ?? ''),
+        String(body.occurrenceId ?? ''),
+        {
+          action: occurrenceAction,
+          ...(body.date ? { date: String(body.date) } : {}),
+          ...(body.startTime ? { startTime: String(body.startTime) } : {}),
+        },
+      );
+      return json(result);
     }
     if (action === 'create_team') return json({ ok: true, ...(await createTeamMember(db, actor, body)) });
     if (action === 'update_team') {

@@ -119,6 +119,7 @@ function allow(): void {
   granted = true;
   writeConsent(true);
   document.querySelector('[data-consent-banner]')?.setAttribute('data-visible', 'false');
+  document.body.toggleAttribute('data-consent-open', false);
   closeSettings();
   if (GTM_ID) {
     window.gtag = gtag;
@@ -133,6 +134,7 @@ function deny(): void {
   granted = false;
   writeConsent(false);
   document.querySelector('[data-consent-banner]')?.setAttribute('data-visible', 'false');
+  document.body.toggleAttribute('data-consent-open', false);
   closeSettings();
   if (GTM_ID) {
     window.gtag = gtag;
@@ -198,15 +200,18 @@ function boot(): void {
   if (stored?.analytics === true) {
     allow();
     banner?.setAttribute('data-visible', 'false');
+    document.body.toggleAttribute('data-consent-open', false);
     return;
   }
   if (stored?.analytics === false) {
     deny();
     banner?.setAttribute('data-visible', 'false');
+    document.body.toggleAttribute('data-consent-open', false);
     return;
   }
 
   banner?.setAttribute('data-visible', 'true');
+  document.body.toggleAttribute('data-consent-open', true);
 }
 
 if (document.readyState === 'loading') {

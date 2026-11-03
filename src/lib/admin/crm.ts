@@ -2,6 +2,7 @@ import type { AdminActor } from './operations.ts';
 import { AdminAuthError, audit } from './operations.ts';
 import type { D1Database, D1PreparedStatement } from './d1.ts';
 import { hasPropertyInput, normalizePropertyInput, type NormalizedProperty } from './property-profile.ts';
+import { defaultActiveBranch } from './branches.ts';
 import { buildLeadNotification } from '../forms/lead-notification.ts';
 
 function now(): string {
@@ -136,7 +137,10 @@ export async function createCustomer(
   input: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const id = `cust_${crypto.randomUUID()}`;
-  const branchId = await assertBranch(db, customerBranch(actor, input.branchId));
+  const branchId = await assertBranch(
+    db,
+    customerBranch(actor, input.branchId) ?? (await defaultActiveBranch(db)),
+  );
   const first = text(input.firstName, 80);
   const last = text(input.lastName, 80);
   const company = text(input.companyName, 120);
@@ -555,6 +559,27 @@ export async function deleteCustomer(
   await db.prepare('DELETE FROM customer_contacts WHERE customer_id = ?').bind(customerId).run();
   await db.prepare('DELETE FROM customer_notes WHERE customer_id = ?').bind(customerId).run();
   await db.prepare('DELETE FROM customer_consents WHERE customer_id = ?').bind(customerId).run();
+  const scrubStatements = [
+    db.prepare("UPDATE leads SET payload_json = '{}', source = 'redacted', updated_at = ? WHERE customer_id = ?").bind(stamp, customerId),
+    db.prepare("UPDATE booking_requests SET payload_json = '{}', updated_at = ? WHERE customer_id = ?").bind(stamp, customerId),
+    db.prepare("UPDATE estimates SET input_snapshot_json = '{}', updated_at = ? WHERE customer_id = ?").bind(stamp, customerId),
+    db.prepare("UPDATE signing_requests SET signer_email = '', updated_at = ? WHERE customer_id = ?").bind(stamp, customerId),
+    db
+      .prepare(
+        `UPDATE document_signatures SET signer_name = 'Redacted', signer_email = ''
+         WHERE signing_request_id IN (SELECT id FROM signing_requests WHERE customer_id = ?)`,
+      )
+      .bind(customerId),
+    db
+      .prepare(
+        `UPDATE gift_certificates SET purchaser_name = 'Redacted', purchaser_email = '',
+           recipient_name = 'Redacted', recipient_email = ''
+         WHERE purchaser_customer_id = ? OR recipient_customer_id = ?`,
+      )
+      .bind(customerId, customerId),
+  ];
+  if (db.batch) await db.batch(scrubStatements);
+  else for (const statement of scrubStatements) await statement.run();
   const hasHistory = history.some((value) => value > 0);
   if (hasHistory) {
     await db

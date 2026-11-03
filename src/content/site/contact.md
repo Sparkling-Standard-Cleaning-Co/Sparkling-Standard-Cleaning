@@ -1,6 +1,6 @@
 ---
 metaTitle: Contact Our Pensacola Cleaning Company | Sparkling Standard
-metaDescription: Contact our Pensacola-area cleaning company — call, text or send a message. We respond personally and honestly, and every request is reviewed by Sparkling Standard.
+metaDescription: Contact our Pensacola-area cleaning company — call, text or send a message. Every request is reviewed personally by Sparkling Standard.
 hero:
   headline: Let's talk about your home
   accent: or your facility.

@@ -22,15 +22,21 @@ import { buildGiftCertificateEmail } from '../../src/lib/gift/delivery.ts';
 import { activationInstantFor, activationDateFor, isGiftActive } from '../../src/lib/gift/activation.ts';
 import { refundStripeGiftPayment, type GiftRefundResult } from '../../src/lib/gift/stripe-refund.ts';
 import { readLedgerJson } from '../../src/lib/payments/ledger.ts';
+import { adminDb, type AdminDbEnv } from '../../src/lib/admin/d1.ts';
+import {
+  AdminAuthError,
+  audit as adminAudit,
+  requireActor,
+  requireCsrf,
+  type AdminActor,
+} from '../../src/lib/admin/operations.ts';
+import { audit, requestIp, verifyPassword } from '../../src/lib/admin/auth.ts';
 import {
   adminBucket,
-  audit,
   constantTimeEqual,
   readAdmin,
   readSession,
-  requestIp,
   sessionTokenFromRequest,
-  verifyPassword,
   type AdminRecord,
   type AdminSession,
   type AdminStorageEnv,
@@ -38,7 +44,7 @@ import {
 
 type StripeRefunder = (sessionId: string, code: string) => Promise<GiftRefundResult>;
 
-interface Env extends GiftStorageEnv, AdminStorageEnv {
+interface Env extends GiftStorageEnv, AdminDbEnv, AdminStorageEnv {
   STRIPE_SECRET_KEY?: string;
   STRIPE_REFUNDER?: StripeRefunder;
   RESEND_API_KEY?: string;
@@ -64,11 +70,6 @@ interface GiftSummary {
   }>;
 }
 
-interface AuthContext {
-  session: AdminSession;
-  admin: AdminRecord;
-}
-
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -76,7 +77,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-async function currentAuth(request: Request, env: Env): Promise<AuthContext | null> {
+async function legacyAuth(request: Request, env: Env): Promise<{ session: AdminSession; admin: AdminRecord } | null> {
   const bucket = adminBucket(env);
   if (!bucket) return null;
   const session = await readSession(bucket, sessionTokenFromRequest(request));
@@ -86,22 +87,21 @@ async function currentAuth(request: Request, env: Env): Promise<AuthContext | nu
   return { session, admin };
 }
 
-function csrfMatches(request: Request, session: AdminSession): boolean {
-  return constantTimeEqual(request.headers.get('X-CSRF-Token') ?? '', session.csrf);
-}
-
 async function stepUp(
-  bucket: NonNullable<ReturnType<typeof adminBucket>>,
-  request: Request,
-  auth: AuthContext,
+  db: NonNullable<ReturnType<typeof adminDb>>,
+  actor: AdminActor,
   password: string,
 ): Promise<boolean> {
   if (!password || password.length > 200) return false;
-  if (await verifyPassword(password, auth.admin.passwordHash)) return true;
-  await audit(bucket, 'gift.financial.reauth', {
+  const stored = await db
+    .prepare('SELECT password_hash FROM admin_users WHERE id = ? LIMIT 1')
+    .bind(actor.id)
+    .first<{ password_hash: string }>();
+  if (stored && (await verifyPassword(password, stored.password_hash))) return true;
+  await adminAudit(db, {
+    actorUserId: actor.id,
+    action: 'gift.financial.reauth',
     success: false,
-    ip: requestIp(request),
-    actor: 'hayli',
   });
   return false;
 }
@@ -258,8 +258,17 @@ async function giftList(
 
 export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
-  const auth = await currentAuth(request, env);
-  if (!auth) return json({ ok: false, error: 'unauthorized' }, 401);
+  const db = adminDb(env);
+  if (db) {
+    try {
+      await requireActor(db, request, 'finance.read');
+    } catch {
+      return json({ ok: false, error: 'unauthorized' }, 401);
+    }
+  } else {
+    const legacy = await legacyAuth(request, env);
+    if (!legacy) return json({ ok: false, error: 'unauthorized' }, 401);
+  }
   const bucket = giftBucket(env);
   if (!bucket) return json({ ok: false, error: 'ledger_not_configured' }, 503);
   const url = new URL(request.url);
@@ -280,9 +289,26 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
-  const auth = await currentAuth(request, env);
-  if (!auth) return json({ ok: false, error: 'unauthorized' }, 401);
-  if (!csrfMatches(request, auth.session)) return json({ ok: false, error: 'csrf_failed' }, 403);
+  const db = adminDb(env);
+  let actor: AdminActor | null = null;
+  let legacy: { session: AdminSession; admin: AdminRecord } | null = null;
+  if (db) {
+    try {
+      actor = await requireActor(db, request, 'finance.write');
+      requireCsrf(request, actor);
+    } catch (error) {
+      return json(
+        { ok: false, error: error instanceof AdminAuthError ? error.code : 'unauthorized' },
+        error instanceof AdminAuthError ? error.status : 401,
+      );
+    }
+  } else {
+    legacy = await legacyAuth(request, env);
+    if (!legacy) return json({ ok: false, error: 'unauthorized' }, 401);
+    if (!constantTimeEqual(request.headers.get('X-CSRF-Token') ?? '', legacy.session.csrf)) {
+      return json({ ok: false, error: 'csrf_failed' }, 403);
+    }
+  }
   const bucket = giftBucket(env);
   if (!bucket) return json({ ok: false, error: 'ledger_not_configured' }, 503);
   let payload: Record<string, unknown>;
@@ -307,7 +333,15 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (!/^SSGC-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(code)) {
     return json({ ok: false, error: 'invalid_code' }, 400);
   }
-  if (action !== 'resend' && !(await stepUp(bucket, request, auth, password))) {
+  const passwordOk =
+    action === 'resend'
+      ? true
+      : db && actor
+        ? await stepUp(db, actor, password)
+        : legacy
+          ? await verifyPassword(password, legacy.admin.passwordHash)
+          : false;
+  if (!passwordOk) {
     return json({ ok: false, error: 'reauth_failed' }, 401);
   }
 

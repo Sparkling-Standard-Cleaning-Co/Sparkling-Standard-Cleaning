@@ -1,6 +1,6 @@
 ---
-metaTitle: Community Support Cleaning in Pensacola | {{communityDiscount}} Eligibility Discount
-metaDescription: Community Support Cleaning is ordinary residential cleaning with a {{communityDiscount}} appreciation discount for adults 65+, first responders, military veterans, people with disabilities, and other eligible community members in Pensacola and Cantonment. No diagnosis or documentation required.
+metaTitle: Community Support Cleaning | Sparkling Standard
+metaDescription: Residential cleaning with a {{communityDiscount}} appreciation discount for eligible community members in Pensacola and Cantonment. No documentation required.
 hero:
   headline: 'A Cleaner Home.'
   accent: ' A Little More Peace of Mind.'

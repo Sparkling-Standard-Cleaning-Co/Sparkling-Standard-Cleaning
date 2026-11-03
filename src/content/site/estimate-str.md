@@ -1,6 +1,6 @@
 ---
-metaTitle: Turnover Estimate | Airbnb & Vrbo Cleaning | Sparkling Standard
-metaDescription: A per-turnover estimate for your Airbnb, Vrbo or vacation rental — property size, beds, linen handling, guest windows and travel, confirmed personally by Sparkling Standard.
+metaTitle: STR Turnover Estimate | Sparkling Standard
+metaDescription: A per-turnover estimate for your Airbnb, Vrbo or vacation rental — size, beds, linen handling and travel, confirmed personally.
 hero:
   headline: A guest-ready reset,
   accent: priced for your rental.

@@ -2,7 +2,6 @@ import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
 import { AdminAuthError, audit, requireActor, requireCsrf, type AdminActor } from '../../../src/lib/admin/operations.ts';
 import {
   assertRequestConfirmable,
-  attachCalendarEvent,
   confirmRequest,
   updateAppointmentStatus,
   updateRequestStatus,
@@ -11,8 +10,18 @@ import { createCustomer, getCustomer } from '../../../src/lib/admin/crm.ts';
 import type { BookingEnv } from '../../../src/lib/booking/service.ts';
 import { onRequestPost as bookingAdminPost } from '../booking-admin.ts';
 import { sendBookingEmail, type BookingEmailKind } from '../../../src/lib/forms/booking-email.ts';
+import { updateCalendarEvent } from '../../../src/lib/booking/google-calendar.ts';
+import {
+  beginBookingCommitment,
+  markBookingCommitment,
+} from '../../../src/lib/booking/commitments.ts';
 import { ensureRecurringPlan } from '../../../src/lib/booking/commitment.ts';
 import { syncAppointmentCalendarResources } from '../../../src/lib/admin/scheduling.ts';
+import {
+  cancelManualBooking,
+  confirmManualBooking,
+  rescheduleManualBooking,
+} from '../../../src/lib/admin/manual-booking.ts';
 
 interface Env extends AdminDbEnv, BookingEnv {
   BOOKING_OWNER_TOKEN?: string;
@@ -445,6 +454,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!requestId) return json({ ok: false, error: 'request_required' }, 400);
     const row = await requestRow(db, actor, requestId);
     if (!row) return json({ ok: false, error: 'request_not_found' }, 404);
+    const manualBooking = String(row.hold_id ?? '').startsWith('manual_');
 
     if (action === 'close' || action === 'duplicate' || action === 'archive' || action === 'reopen') {
       const status = String(row.status ?? '');
@@ -490,11 +500,24 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         if (!match) return json({ ok: false, error: 'duplicate_request_not_found' }, 404);
         duplicateOf = match.id;
       }
-      const released = await bookingAction(context, { id: requestId, action: 'release' });
+      const reason = text(body.reason, 500) || (duplicateOf ? 'Duplicate request' : 'Closed by staff');
+      let released: { status: number; data: Record<string, unknown> };
+      if (manualBooking) {
+        try {
+          await cancelManualBooking(context.env, db, actor, requestId, reason);
+          released = { status: 200, data: { ok: true } };
+        } catch (error) {
+          released = {
+            status: error instanceof AdminAuthError ? error.status : 502,
+            data: { ok: false, error: error instanceof AdminAuthError ? error.code : 'manual_release_failed' },
+          };
+        }
+      } else {
+        released = await bookingAction(context, { id: requestId, action: 'release' });
+      }
       if (!released.data.ok) {
         return json({ ok: false, error: released.data.error ?? 'hold_release_failed', calendarStatus: released.status }, released.status === 200 ? 502 : released.status);
       }
-      const reason = text(body.reason, 500) || (duplicateOf ? 'Duplicate request' : 'Closed by staff');
       await db
         .prepare("UPDATE booking_requests SET status = 'released', closed_at = CURRENT_TIMESTAMP, closed_reason = ?, duplicate_of_request_id = ?, previous_status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
         .bind(reason, duplicateOf, requestId)
@@ -568,21 +591,62 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
 
     if (action === 'confirm') {
+      if (manualBooking) {
+        const teamMemberIds = Array.isArray(body.teamMemberIds)
+          ? body.teamMemberIds.map((value) => String(value)).filter(Boolean).slice(0, 12)
+          : [];
+        try {
+          const result = await confirmManualBooking(context.env, db, actor, requestId, teamMemberIds);
+          const confirmedRow = await requestRow(db, actor, requestId);
+          const email = confirmedRow
+            ? await sendForRequest(context, db, actor, confirmedRow, 'confirmation')
+            : { status: 'skipped_no_email', recipient: false };
+          return json({ ok: true, ...result, email });
+        } catch (error) {
+          return json(
+            {
+              ok: false,
+              error: error instanceof AdminAuthError ? error.code : 'manual_confirm_failed',
+            },
+            error instanceof AdminAuthError ? error.status : 502,
+          );
+        }
+      }
       await assertRequestConfirmable(db, actor, requestId);
+      const commitmentReference = String(row.quote_reference ?? '').trim() || requestId;
+      const commitmentId = await beginBookingCommitment(db, {
+        bookingRequestId: requestId,
+        reference: commitmentReference,
+        payload: { source: 'admin_confirmation', start: row.start_at, end: row.end_at },
+      });
       const calendar = await bookingAction(context, { id: requestId, action: 'confirm' });
       if (!calendar.data.ok) {
+        await markBookingCommitment(db, commitmentId, 'failed', {
+          error: String(calendar.data.error ?? 'calendar_confirm_failed'),
+          attempts: 1,
+        }).catch(() => undefined);
         return json(
           { ok: false, error: calendar.data.error ?? 'calendar_confirm_failed', calendarStatus: calendar.status },
           calendar.status === 200 ? 502 : calendar.status,
         );
       }
+      const calendarEventId = String(calendar.data.eventId ?? '');
+      await markBookingCommitment(db, commitmentId, 'calendar_created', {
+        eventId: calendarEventId,
+        owned: true,
+        attempts: 1,
+      }).catch(() => undefined);
       const teamMemberIds = Array.isArray(body.teamMemberIds)
         ? body.teamMemberIds.map((value) => String(value)).filter(Boolean).slice(0, 12)
         : [];
       try {
-        const result = await confirmRequest(db, actor, requestId, teamMemberIds);
-        const eventId = String(calendar.data.eventId ?? '');
-        if (eventId) await attachCalendarEvent(db, result.appointmentId, eventId);
+        const eventId = calendarEventId;
+        const result = await confirmRequest(db, actor, requestId, teamMemberIds, eventId);
+        await markBookingCommitment(db, commitmentId, 'confirmed', {
+          eventId,
+          appointmentId: result.appointmentId,
+          attempts: 2,
+        }).catch(() => undefined);
         await syncAppointmentCalendarResources(context.env, db, result.appointmentId).catch(() => undefined);
         const recurring = await recurringPlanForConfirmedRequest(
           context,
@@ -604,15 +668,24 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         });
       } catch (error) {
         // The calendar commitment must not survive a failed operational write.
-        if (calendar.data.eventId) {
-          await bookingAction(context, { id: requestId, action: 'cancel' }).catch(() => undefined);
+        let compensated = false;
+        if (calendarEventId) {
+          const cancelled = await bookingAction(context, { id: requestId, action: 'cancel' }).catch(() => null);
+          compensated = cancelled?.data.ok === true;
         }
+        await markBookingCommitment(db, commitmentId, compensated ? 'compensated' : 'failed', {
+          eventId: calendarEventId,
+          owned: true,
+          error: error instanceof AdminAuthError ? error.code : 'd1_confirm_failed',
+          attempts: 2,
+        }).catch(() => undefined);
         return json(
           {
             ok: false,
             error: error instanceof AdminAuthError ? error.code : 'd1_confirm_failed',
             calendarConfirmed: false,
-            calendarRollbackAttempted: Boolean(calendar.data.eventId),
+            calendarRollbackAttempted: Boolean(calendarEventId),
+            calendarRollbackSucceeded: compensated,
           },
           error instanceof AdminAuthError ? error.status : 502,
         );
@@ -621,6 +694,20 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
     if (action === 'decline') {
       const reason = text(body.reason, 500);
+      if (manualBooking) {
+        const cancelled = await cancelManualBooking(context.env, db, actor, requestId, reason).catch((error) => {
+          throw error instanceof AdminAuthError ? error : new AdminAuthError(502, 'manual_release_failed');
+        });
+        await db
+          .prepare("UPDATE booking_requests SET status = 'declined', decline_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+          .bind(reason, requestId)
+          .run();
+        const email =
+          body.notify === true
+            ? await sendForRequest(context, db, actor, row, 'decline', { reason })
+            : { status: 'skipped_not_requested', recipient: false };
+        return json({ ok: true, calendarEventId: cancelled.calendarEventId, email });
+      }
       const calendar = await bookingAction(context, { id: requestId, action: 'decline' });
       if (!calendar.data.ok) {
         return json(
@@ -632,6 +719,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         .prepare("UPDATE booking_requests SET status = 'declined', decline_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
         .bind(reason, requestId)
         .run();
+      await db
+        .prepare("UPDATE booking_commitments SET state = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE reference = ?")
+        .bind(String(row.quote_reference ?? ''))
+        .run()
+        .catch(() => undefined);
       await audit(db, {
         actorUserId: actor.id,
         action: 'request.declined',
@@ -652,6 +744,35 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const start = text(body.start, 40);
       const end = text(body.end, 40);
       if (!date || !start || !end) return json({ ok: false, error: 'new_slot_required' }, 400);
+      if (manualBooking) {
+        try {
+          const result = await rescheduleManualBooking(context.env, db, actor, requestId, {
+            date,
+            start,
+            end,
+            ...(body.durationMinutes !== undefined ? { durationMinutes: Number(body.durationMinutes) } : {}),
+            ...(Array.isArray(body.teamMemberIds)
+              ? { teamMemberIds: body.teamMemberIds.map((value) => String(value)).filter(Boolean) }
+              : {}),
+          });
+          await db
+            .prepare(
+              `UPDATE booking_requests SET proposed_start_at = ?, proposed_end_at = ?, proposal_sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            )
+            .bind(result.start, result.end, requestId)
+            .run();
+          const email = await sendForRequest(context, db, actor, row, 'proposal', {
+            dateLabel: dateLabel(result.start),
+            timeLabel: timeLabel(result.start, result.end),
+          });
+          return json({ ok: true, slot: { start: result.start, end: result.end }, email });
+        } catch (error) {
+          return json(
+            { ok: false, error: error instanceof AdminAuthError ? error.code : 'slot_unavailable' },
+            error instanceof AdminAuthError ? error.status : 409,
+          );
+        }
+      }
       const calendar = await bookingAction(context, {
         id: requestId,
         action: 'reschedule',
@@ -693,8 +814,50 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
     if (action === 'reschedule' || action === 'cancel') {
       const appointmentId = (row.appointment_id as string | null) ?? '';
-      if (!appointmentId) return json({ ok: false, error: 'appointment_not_found' }, 409);
       const reason = text(body.reason, 500);
+      if (manualBooking) {
+        if (action === 'cancel') {
+          try {
+            const cancelled = await cancelManualBooking(context.env, db, actor, requestId, reason);
+            const email =
+              body.notify === true
+                ? await sendForRequest(context, db, actor, row, 'cancellation', { reason })
+                : { status: 'skipped_not_requested', recipient: false };
+            return json({ ok: true, calendarEventId: cancelled.calendarEventId, email });
+          } catch (error) {
+            return json(
+              { ok: false, error: error instanceof AdminAuthError ? error.code : 'calendar_delete_failed' },
+              error instanceof AdminAuthError ? error.status : 502,
+            );
+          }
+        }
+        const date = text(body.date, 10);
+        const start = text(body.start, 40);
+        const end = text(body.end, 40);
+        if (!date || !start || !end) return json({ ok: false, error: 'new_slot_required' }, 400);
+        try {
+          const result = await rescheduleManualBooking(context.env, db, actor, requestId, {
+            date,
+            start,
+            end,
+            ...(body.durationMinutes !== undefined ? { durationMinutes: Number(body.durationMinutes) } : {}),
+            ...(Array.isArray(body.teamMemberIds)
+              ? { teamMemberIds: body.teamMemberIds.map((value) => String(value)).filter(Boolean) }
+              : {}),
+          });
+          const email = await sendForRequest(context, db, actor, row, 'reschedule', {
+            dateLabel: dateLabel(result.start),
+            timeLabel: timeLabel(result.start, result.end),
+          });
+          return json({ ok: true, slot: { start: result.start, end: result.end }, email });
+        } catch (error) {
+          return json(
+            { ok: false, error: error instanceof AdminAuthError ? error.code : 'slot_unavailable' },
+            error instanceof AdminAuthError ? error.status : 409,
+          );
+        }
+      }
+      if (!appointmentId) return json({ ok: false, error: 'appointment_not_found' }, 409);
       if (action === 'cancel') {
         const calendar = await bookingAction(context, { id: requestId, action: 'cancel' });
         if (!calendar.data.ok) {
@@ -708,6 +871,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           .prepare("UPDATE booking_requests SET status = 'released', decline_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
           .bind(reason, requestId)
           .run();
+        await db
+          .prepare("UPDATE booking_commitments SET state = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE reference = ?")
+          .bind(String(row.quote_reference ?? ''))
+          .run()
+          .catch(() => undefined);
         await audit(db, {
           actorUserId: actor.id,
           action: 'request.appointment_cancelled',
@@ -736,14 +904,28 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const newStart = String(slot.start ?? start);
       const newEnd = String(slot.end ?? end);
       const duration = Number(slot.durationMinutes) || Number(row.duration_minutes) || 120;
-      await db
-        .prepare('UPDATE appointments SET start_at = ?, end_at = ?, duration_minutes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .bind(newStart, newEnd, duration, appointmentId)
-        .run();
-      await db
-        .prepare('UPDATE booking_requests SET requested_date = ?, start_at = ?, end_at = ?, duration_minutes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .bind(date, newStart, newEnd, duration, requestId)
-        .run();
+      const statements = [
+        db
+          .prepare('UPDATE appointments SET start_at = ?, end_at = ?, duration_minutes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .bind(newStart, newEnd, duration, appointmentId),
+        db
+          .prepare('UPDATE booking_requests SET requested_date = ?, start_at = ?, end_at = ?, duration_minutes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .bind(date, newStart, newEnd, duration, requestId),
+      ];
+      try {
+        if (db.batch) await db.batch(statements);
+        else for (const statement of statements) await statement.run();
+      } catch {
+        const eventId = String(row.calendar_event_id ?? '');
+        if (eventId && row.start_at && row.end_at) {
+          await updateCalendarEvent(context.env, eventId, {
+            start: String(row.start_at),
+            end: String(row.end_at),
+            timeZone: 'America/Chicago',
+          }).catch(() => undefined);
+        }
+        return json({ ok: false, error: 'reschedule_recovery_required' }, 502);
+      }
       await audit(db, {
         actorUserId: actor.id,
         action: 'request.appointment_rescheduled',
@@ -777,6 +959,20 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'status') {
       const status = text(body.status, 20);
       if (status === 'declined' || status === 'released') {
+        if (manualBooking) {
+          try {
+            await cancelManualBooking(context.env, db, actor, requestId, `Status changed to ${status}`);
+            if (status === 'declined') {
+              await updateRequestStatus(db, actor, requestId, 'declined');
+            }
+            return json({ ok: true });
+          } catch (error) {
+            return json(
+              { ok: false, error: error instanceof AdminAuthError ? error.code : 'calendar_release_failed' },
+              error instanceof AdminAuthError ? error.status : 502,
+            );
+          }
+        }
         const calendar = await bookingAction(context, {
           id: requestId,
           action: status === 'declined' ? 'decline' : 'release',

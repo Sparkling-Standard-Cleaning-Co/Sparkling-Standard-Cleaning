@@ -262,14 +262,77 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const id = text(body.correctionId, 120);
       const status = body.approve === true ? 'approved' : 'declined';
       const row = await db
-        .prepare('SELECT id FROM time_correction_requests WHERE id = ? LIMIT 1')
+        .prepare(
+          `SELECT id, interval_id, requested_started_at, requested_ended_at
+           FROM time_correction_requests WHERE id = ? LIMIT 1`,
+        )
         .bind(id)
-        .first();
+        .first<{
+          id: string;
+          interval_id: string | null;
+          requested_started_at: string | null;
+          requested_ended_at: string | null;
+        }>();
       if (!row) return json({ ok: false, error: 'correction_not_found' }, 404);
-      await db
-        .prepare('UPDATE time_correction_requests SET status = ?, reviewed_by_admin_user_id = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .bind(status, actor.id, id)
-        .run();
+      const statements = [
+        db
+          .prepare('UPDATE time_correction_requests SET status = ?, reviewed_by_admin_user_id = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .bind(status, actor.id, id),
+      ];
+      if (
+        status === 'approved' &&
+        row.interval_id &&
+        row.requested_started_at &&
+        row.requested_ended_at &&
+        /^\d{4}-\d{2}-\d{2}T/.test(row.requested_started_at) &&
+        /^\d{4}-\d{2}-\d{2}T/.test(row.requested_ended_at) &&
+        Date.parse(row.requested_ended_at) > Date.parse(row.requested_started_at)
+      ) {
+        const interval = await db
+          .prepare('SELECT * FROM time_intervals WHERE id = ? LIMIT 1')
+          .bind(row.interval_id)
+          .first<Record<string, unknown>>();
+        if (interval) {
+          statements.push(
+            db
+              .prepare(
+                `UPDATE time_intervals SET started_at = ?, ended_at = ?, status = 'corrected',
+                   corrected_by_admin_user_id = ?, correction_reason = ?, updated_at = ?
+                 WHERE id = ?`,
+              )
+              .bind(
+                row.requested_started_at,
+                row.requested_ended_at,
+                actor.id,
+                'Employee correction request approved',
+                new Date().toISOString(),
+                row.interval_id,
+              ),
+            db
+              .prepare(
+                `INSERT INTO time_entry_corrections
+                 (id, interval_id, before_json, after_json, reason, corrected_by_admin_user_id)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+              )
+              .bind(
+                `corr_${crypto.randomUUID()}`,
+                row.interval_id,
+                JSON.stringify({
+                  started_at: interval.started_at,
+                  ended_at: interval.ended_at,
+                }),
+                JSON.stringify({
+                  started_at: row.requested_started_at,
+                  ended_at: row.requested_ended_at,
+                }),
+                'Employee correction request approved',
+                actor.id,
+              ),
+          );
+        }
+      }
+      if (db.batch) await db.batch(statements);
+      else for (const statement of statements) await statement.run();
       await audit(db, {
         actorUserId: actor.id,
         action: `timekeeping.correction_${status}`,

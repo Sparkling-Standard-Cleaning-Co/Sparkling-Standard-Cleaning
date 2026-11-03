@@ -230,7 +230,7 @@ test('signed owner links work, expire and reject tampering', async () => {
   assert.equal((await photoViewGet({
     request: new Request(legacy),
     env: { PHOTOS_BUCKET: bucket, PHOTO_OWNER_TOKEN: OWNER },
-  })).status, 200);
+  })).status, 403);
 });
 
 test('associates verified photos with the correct inquiry and uses signed links in the owner email', async () => {

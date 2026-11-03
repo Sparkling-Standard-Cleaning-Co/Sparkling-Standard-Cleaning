@@ -10,10 +10,7 @@
 // Responses: 200 (photo bytes) | 400 | 403 | 404 | 405
 
 import { isPhotoKey } from '../../src/lib/photos.ts';
-import {
-  constantTimeEqual,
-  verifyPhotoLink,
-} from './photo-auth.ts';
+import { verifyPhotoLink } from './photo-auth.ts';
 
 interface R2Object {
   body: ArrayBuffer | ReadableStream;
@@ -52,13 +49,8 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
 
   const signature = url.searchParams.get('sig') ?? '';
   const expiresAt = Number(url.searchParams.get('exp') ?? '');
-  const legacyToken = url.searchParams.get('t') ?? '';
-  let authorized = false;
-  if (signature) {
-    authorized = await verifyPhotoLink(key, expiresAt, signature, secret);
-  } else if (legacyToken) {
-    authorized = constantTimeEqual(legacyToken, secret);
-  }
+  if (!signature) return deny(403, 'Forbidden');
+  const authorized = await verifyPhotoLink(key, expiresAt, signature, secret);
   if (!authorized) return deny(403, 'Forbidden');
 
   const bucket = env.PHOTOS_BUCKET;

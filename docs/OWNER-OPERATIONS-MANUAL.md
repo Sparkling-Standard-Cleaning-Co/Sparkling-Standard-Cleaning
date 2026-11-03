@@ -214,3 +214,32 @@ originals, customer files and archives never belong in the public repo.
 
 **Emergency contacts / accounts:** owner-controlled GitHub, Cloudflare, Resend,
 Stripe and Google accounts. No credentials belong in this repository.
+## 16. Create a booking by hand
+
+1. Open `/admin/` and choose **New Booking**.
+2. Pick the saved customer and property (use **Open the customer record** to add a property first).
+3. Choose the engine, confirm the loaded home facts, and set condition, frequency, extras and bundles.
+4. Choose a date and click **Generate Estimate and Check Times**. The estimate uses the same published pricing as the public site.
+5. Select a real server-offered time, optionally choose preferred staff, and choose:
+   - **Save Pending Booking** to review first, or
+   - **Create Booking and Confirm** to confirm immediately.
+6. Confirmation re-checks the slot, staff qualification, documents and calendar. If documents are required, send the signing link from the booking result before confirming.
+7. Use **Create Invoice (Pay Later)** or **Create Invoice + Payment Link** for an authorized invoice or Stripe link.
+
+The property profile is never rewritten by an estimate. Condition and extras belong to that job only.
+
+## 17. Recurring plans and single occurrences
+
+In **Recurring Plans**, each plan has **Occurrences** and **Sync** actions. Open Occurrences to see dates, status and sync notes. You can **Skip** one occurrence or move one occurrence to another date/time without changing the plan. Plan status controls pause, resume, cancel and completion.
+
+## 18. Action-required monitoring
+
+The Overview shows live counts for booking recovery, financial reconciliation, failed booking emails, failed payment events and failed recurring runs. Open the linked area to resolve them. The New Booking page also lists the booking recovery queue with a **Reconcile** action.
+
+## 19. Gift-covered cleanings
+
+A gift certificate can be redeemed against a booking request in **Gift Certificates** (or the invoice flow). The gift amount is recorded in the payment ledger and the booking payment summary; it is never treated as a discount. Remainders stay on the certificate for later use.
+
+## 20. Customer privacy deletion
+
+Deleting a customer with history anonymizes the customer, property, request/estimate payloads, signer identity and historical gift party names. Active bookings, outstanding balances and open liabilities block deletion until resolved. Executed R2 documents remain subject to the owner-approved legal-retention policy.

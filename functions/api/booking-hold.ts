@@ -3,6 +3,12 @@
 import { bookingConfig } from '../../src/config/booking.ts';
 import { availabilityForDate, type BookingEnv } from '../../src/lib/booking/service.ts';
 import { bookingStore, createBookingHold, type BookingStorageEnv } from '../../src/lib/booking/holds.ts';
+import {
+  PUBLIC_RATE_LIMITS,
+  checkPublicRateLimit,
+  clientIp,
+  consumePublicRateLimit,
+} from '../../src/lib/public-rate-limit.ts';
 
 interface Env extends BookingEnv, BookingStorageEnv {}
 
@@ -30,6 +36,12 @@ function throttled(request: Request): boolean {
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
   if (throttled(request)) return json({ ok: false, error: 'rate_limited' }, 429);
+  const ip = clientIp(request);
+  const ipStatus = await checkPublicRateLimit(env.DB, 'booking-hold', ip, PUBLIC_RATE_LIMITS.holdIp);
+  if (ipStatus.limited) {
+    return json({ ok: false, error: 'rate_limited', retryAfterSeconds: ipStatus.retryAfterSeconds }, 429);
+  }
+  await consumePublicRateLimit(env.DB, 'booking-hold', ip, PUBLIC_RATE_LIMITS.holdIp);
   if (!bookingConfig.enabled) return json({ ok: false, error: 'booking_not_enabled' }, 403);
   const bucket = bookingStore(env);
   if (!bucket) return json({ ok: false, error: 'booking_store_not_configured' }, 503);

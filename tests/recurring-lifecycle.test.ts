@@ -7,7 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import type { D1Database, D1PreparedStatement, D1Result } from '../src/lib/admin/d1.ts';
 import { createOpsSession, enrollOwner, readOpsActor } from '../src/lib/admin/operations.ts';
 import { createRecurring } from '../src/lib/admin/scheduling.ts';
-import { applyRecurringScheduleChange, prepareRecurringScheduleChange, syncRecurringPlan, type RecurringDependencies } from '../src/lib/admin/recurring-schedule.ts';
+import { applyRecurringScheduleChange, prepareRecurringScheduleChange, syncRecurringPlan, updateRecurringOccurrence, type RecurringDependencies } from '../src/lib/admin/recurring-schedule.ts';
 import { zonedTimeToUtc } from '../src/lib/booking/time.ts';
 
 class SqlStatement implements D1PreparedStatement {
@@ -326,4 +326,75 @@ test('a partial external failure rolls back to the original schedule without era
   assert.ok(appointments.every((appointment) => appointment.status === 'confirmed'));
   const planRow = f.db.raw.prepare('SELECT sync_status FROM recurring_plans WHERE id = ?').get(plan.id) as { sync_status: string };
   assert.notEqual(planRow.sync_status, 'sync_failed');
+});
+test('an owner can skip or reschedule one recurring occurrence without touching the plan', async () => {
+  const env = { GOOGLE_CLIENT_ID: 'x', GOOGLE_CLIENT_SECRET: 'x', GOOGLE_REFRESH_TOKEN: 'x', GOOGLE_CALENDAR_ID: 'x' } as never;
+  const f = await fixture();
+  const plan = await createRecurring(f.db, f.actor, {
+    customerId: f.customerId, propertyId: f.propertyId, frequency: 'monthly', startDate: f.startDate,
+    window: 'morning', startTime: '07:00', durationMinutes: 120, crewSize: 1, ongoingPrice: 150,
+  });
+  const calendar = makeCalendar(['family-cleaner']);
+  await syncRecurringPlan(env, f.db, f.actor, plan.id, { deps: calendar.deps });
+  const occurrence = f.db.raw
+    .prepare("SELECT * FROM recurring_occurrences WHERE plan_id = ? AND status = 'scheduled' LIMIT 1")
+    .get(plan.id) as Record<string, unknown>;
+  const appointment = f.db.raw
+    .prepare('SELECT * FROM appointments WHERE id = ?')
+    .get(String(occurrence.appointment_id)) as Record<string, unknown>;
+
+  const skipped = await updateRecurringOccurrence(env, f.db, f.actor, plan.id, String(occurrence.id), { action: 'skip' }, calendar.deps);
+  assert.equal(skipped.ok, true);
+  assert.equal(calendar.events.size, 0);
+  assert.equal(
+    (f.db.raw.prepare('SELECT status FROM recurring_occurrences WHERE id = ?').get(String(occurrence.id)) as { status: string }).status,
+    'cancelled',
+  );
+  assert.equal(
+    (f.db.raw.prepare('SELECT status FROM appointments WHERE id = ?').get(String(occurrence.appointment_id)) as { status: string }).status,
+    'cancelled',
+  );
+  assert.equal(
+    (f.db.raw.prepare('SELECT status FROM recurring_plans WHERE id = ?').get(plan.id) as { status: string }).status,
+    'active',
+  );
+
+  const f2 = await fixture();
+  const plan2 = await createRecurring(f2.db, f2.actor, {
+    customerId: f2.customerId, propertyId: f2.propertyId, frequency: 'monthly', startDate: f2.startDate,
+    window: 'morning', startTime: '07:00', durationMinutes: 120, crewSize: 1, ongoingPrice: 150,
+  });
+  const calendar2 = makeCalendar(['family-cleaner']);
+  await syncRecurringPlan(env, f2.db, f2.actor, plan2.id, { deps: calendar2.deps });
+  const occurrence2 = f2.db.raw
+    .prepare("SELECT * FROM recurring_occurrences WHERE plan_id = ? AND status = 'scheduled' LIMIT 1")
+    .get(plan2.id) as Record<string, unknown>;
+  const newDate = addDays(String(occurrence2.occurrence_date), 2);
+  const moved = await updateRecurringOccurrence(
+    env,
+    f2.db,
+    f2.actor,
+    plan2.id,
+    String(occurrence2.id),
+    { action: 'reschedule', date: newDate, startTime: '07:00' },
+    calendar2.deps,
+  );
+  assert.equal(moved.ok, true);
+  assert.equal(moved.occurrenceDate, newDate);
+  assert.equal(
+    (f2.db.raw.prepare('SELECT status FROM recurring_occurrences WHERE id = ?').get(String(occurrence2.id)) as { status: string }).status,
+    'cancelled',
+  );
+  const movedRow = f2.db.raw
+    .prepare("SELECT * FROM recurring_occurrences WHERE plan_id = ? AND occurrence_date = ?")
+    .get(plan2.id, newDate) as Record<string, unknown>;
+  assert.equal(movedRow.status, 'scheduled');
+  const movedAppointment = f2.db.raw
+    .prepare('SELECT * FROM appointments WHERE id = ?')
+    .get(String(occurrence2.appointment_id)) as Record<string, unknown>;
+  assert.equal(movedAppointment.start_at, zonedTimeToUtc(newDate, '07:00', 'America/Chicago').toISOString());
+  assert.equal(
+    (f2.db.raw.prepare('SELECT status FROM recurring_plans WHERE id = ?').get(plan2.id) as { status: string }).status,
+    'active',
+  );
 });

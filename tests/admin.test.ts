@@ -90,6 +90,9 @@ function migratedDb(): TestD1 {
     '0026_pricing_control.sql',
     '0027_checkout_session_registry.sql',
     '0028_property_profiles.sql',
+    '0029_booking_commitments.sql',
+    '0030_booking_payment_claims.sql',
+    '0031_document_execution_integrity.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -385,9 +388,11 @@ import {
   updateChecklistItem,
 } from '../src/lib/admin/scheduling.ts';
 import {
+  applyCreditToInvoice,
   createCredit,
   createInvoice,
   getInvoice,
+  listCustomerCredits,
   recordPayment,
   recordRefund,
 } from '../src/lib/admin/billing.ts';
@@ -755,6 +760,18 @@ test('invoices, manual payments, refunds and credits reconcile in integer cents'
   assert.equal((detail?.invoice as Record<string, unknown>).amount_paid_cents, 7500);
   const credit = await createCredit(db, actor, { customerId: customer.id, amount: 20, source: 'synthetic' });
   assert.ok(credit.id);
+  const applied = await applyCreditToInvoice(db, actor, {
+    invoiceId: invoice.id,
+    creditId: credit.id,
+    amountCents: 2000,
+  });
+  assert.equal(applied.appliedCents, 2000);
+  assert.equal(applied.remainingCents, 0);
+  const afterCredit = await getInvoice(db, actor, invoice.id);
+  assert.equal((afterCredit?.invoice as Record<string, unknown>).balance_cents, 18000);
+  assert.equal((afterCredit?.invoice as Record<string, unknown>).amount_paid_cents, 9500);
+  const credits = await listCustomerCredits(db, actor, customer.id);
+  assert.equal(credits[0]?.status, 'used');
 
   const report = await operationsReport(db, actor);
   assert.ok(Array.isArray(report.invoices));

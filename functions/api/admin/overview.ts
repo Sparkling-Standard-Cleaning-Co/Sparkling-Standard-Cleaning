@@ -33,7 +33,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const giftScope = scope(actor, 'branch_id');
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
-    const [customers, leads, requests, appointments, gifts, failedLeads, recent] = await Promise.all([
+    const [customers, leads, requests, appointments, gifts, failedLeads, recent, failedCommitments, financialIssues, failedNotifications, failedPaymentEvents, failedWorkerRuns] = await Promise.all([
       count(db, "SELECT COUNT(*) AS count FROM customers WHERE status = 'active'" + customerScope.where, customerScope.bind),
       count(db, "SELECT COUNT(*) AS count FROM leads WHERE status IN ('new','contacted')" + leadScope.where, leadScope.bind),
       count(db, "SELECT COUNT(*) AS count FROM booking_requests WHERE status = 'pending'" + requestScope.where, requestScope.bind),
@@ -55,6 +55,14 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         )
         .bind(...leadScope.bind)
         .all(),
+      count(
+        db,
+        "SELECT COUNT(*) AS count FROM booking_commitments WHERE state IN ('failed','calendar_created') OR (state = 'pending' AND updated_at < datetime('now','-10 minutes'))",
+      ),
+      count(db, 'SELECT COUNT(*) AS count FROM payment_reconciliation_issues'),
+      count(db, "SELECT COUNT(*) AS count FROM booking_notifications WHERE status = 'failed'"),
+      count(db, "SELECT COUNT(*) AS count FROM payment_events WHERE status IN ('failed','incomplete')"),
+      count(db, "SELECT COUNT(*) AS count FROM recurring_worker_runs WHERE status = 'failed'"),
     ]);
     return json({
       ok: true,
@@ -66,7 +74,32 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         upcomingAppointments: appointments,
         activeGifts: gifts,
         failedLeadDeliveries: failedLeads,
+        failedCommitments,
+        financialIssues,
+        failedNotifications,
+        failedPaymentEvents,
+        failedWorkerRuns,
       },
+      alerts: [
+        ...(failedCommitments > 0
+          ? [{ kind: 'booking_recovery', severity: 'high', message: `${failedCommitments} booking commitment(s) need reconciliation.`, view: 'new-booking' }]
+          : []),
+        ...(financialIssues > 0
+          ? [{ kind: 'financial_reconciliation', severity: 'high', message: `${financialIssues} financial reconciliation issue(s) are open.`, view: 'finance' }]
+          : []),
+        ...(failedNotifications > 0
+          ? [{ kind: 'booking_notification', severity: 'medium', message: `${failedNotifications} booking email(s) failed to send.`, view: 'calendar' }]
+          : []),
+        ...(failedPaymentEvents > 0
+          ? [{ kind: 'payment_event', severity: 'high', message: `${failedPaymentEvents} payment event(s) failed or are incomplete.`, view: 'finance' }]
+          : []),
+        ...(failedWorkerRuns > 0
+          ? [{ kind: 'recurring_worker', severity: 'high', message: `${failedWorkerRuns} recurring worker run(s) failed.`, view: 'recurring' }]
+          : []),
+        ...(failedLeads > 0
+          ? [{ kind: 'lead_delivery', severity: 'medium', message: `${failedLeads} lead notification(s) failed delivery.`, view: 'leads' }]
+          : []),
+      ],
       today,
       recentLeads: recent.results ?? [],
     });

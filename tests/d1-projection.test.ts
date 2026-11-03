@@ -10,6 +10,7 @@ import {
   ensureFinancialParty,
   projectEstimatePayment,
   projectGiftSale,
+  projectGiftCleaningPayment,
 } from '../src/lib/payments/d1-projection.ts';
 
 class SqlStatement implements D1PreparedStatement {
@@ -193,4 +194,97 @@ test('financial party reuse is deterministic by kind and normalized email', asyn
   });
   assert.equal(second.id, first.id);
   assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM financial_parties').get() as { n: number }).n, 1);
+});
+test('a second successful Stripe session for one booking is projected and flagged as a duplicate', async () => {
+  const db = migratedDb();
+  const customerId = customer(db, 'booking@example.test');
+  db.raw
+    .prepare(
+      `INSERT INTO booking_requests
+       (id, hold_id, branch_id, customer_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+       VALUES ('req_dup', '2026-12-15__11111111-1111-1111-1111-111111111111', 'branch_pensacola', ?,
+               'pending', 'SS-20261215-AAAAAA', '2026-12-15', '2026-12-15T15:00:00.000Z',
+               '2026-12-15T18:00:00.000Z', 180, '{}')`,
+    )
+    .run(customerId);
+  const first = await projectEstimatePayment(db, {
+    sessionId: 'cs_primary',
+    paymentIntentId: 'pi_primary',
+    amountCents: 14900,
+    holdId: '2026-12-15__11111111-1111-1111-1111-111111111111',
+    quoteReference: 'SS-20261215-AAAAAA',
+    paidAt,
+  });
+  assert.equal(first.duplicateBookingPayment, false);
+  assert.equal(first.primaryPaymentSessionId, 'cs_primary');
+  const second = await projectEstimatePayment(db, {
+    sessionId: 'cs_replacement',
+    paymentIntentId: 'pi_replacement',
+    amountCents: 14900,
+    holdId: '2026-12-15__11111111-1111-1111-1111-111111111111',
+    quoteReference: 'SS-20261215-AAAAAA',
+    paidAt,
+    duplicateBookingPayment: true,
+  });
+  assert.equal(second.duplicateBookingPayment, true);
+  assert.equal(second.primaryPaymentSessionId, 'cs_primary');
+  const payments = db.raw
+    .prepare("SELECT idempotency_key, metadata_json FROM payments WHERE booking_request_id = 'req_dup' ORDER BY idempotency_key")
+    .all() as Array<{ idempotency_key: string; metadata_json: string }>;
+  assert.equal(payments.length, 2);
+  const replacement = payments.find((row) => row.idempotency_key === 'stripe-checkout:cs_replacement');
+  assert.ok(replacement);
+  assert.match(replacement.metadata_json, /"duplicate_booking_payment":true/);
+  const claim = db.raw
+    .prepare("SELECT stripe_session_id FROM booking_payment_claims WHERE booking_request_id = 'req_dup'")
+    .get() as { stripe_session_id: string };
+  assert.equal(claim.stripe_session_id, 'cs_primary');
+});
+test('a gift-covered cleaning enters the canonical payment ledger once', async () => {
+  const db = migratedDb();
+  const customerId = customer(db, 'giftclean@example.test');
+  db.raw
+    .prepare(
+      `INSERT INTO booking_requests
+       (id, hold_id, branch_id, customer_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+       VALUES ('req_gift_clean', '2026-12-20__22222222-2222-2222-2222-222222222222', 'branch_pensacola', ?,
+               'pending', 'SS-20261220-GIFT01', '2026-12-20', '2026-12-20T15:00:00.000Z',
+               '2026-12-20T18:00:00.000Z', 180, '{}')`,
+    )
+    .run(customerId);
+  const first = await projectGiftCleaningPayment(db, {
+    code: 'SSGC-TEST-0002',
+    sessionId: 'gift-attempt-1',
+    holdId: '2026-12-20__22222222-2222-2222-2222-222222222222',
+    quoteReference: 'SS-20261220-GIFT01',
+    amountCents: 14900,
+    paidAt,
+  });
+  assert.equal(first.duplicate, false);
+  const payment = db.raw
+    .prepare("SELECT provider, status, amount_cents, booking_request_id FROM payments WHERE id = ?")
+    .get(first.paymentId) as Record<string, unknown>;
+  assert.equal(payment.provider, 'external');
+  assert.equal(payment.status, 'succeeded');
+  assert.equal(payment.amount_cents, 14900);
+  assert.equal(payment.booking_request_id, 'req_gift_clean');
+  const request = db.raw
+    .prepare("SELECT payment_status, payment_reference, payment_amount_cents FROM booking_requests WHERE id = 'req_gift_clean'")
+    .get() as Record<string, unknown>;
+  assert.equal(request.payment_status, 'paid_gift');
+  assert.equal(request.payment_reference, 'SSGC-TEST-0002');
+  assert.equal(request.payment_amount_cents, 14900);
+  const retry = await projectGiftCleaningPayment(db, {
+    code: 'SSGC-TEST-0002',
+    sessionId: 'gift-attempt-1',
+    holdId: '2026-12-20__22222222-2222-2222-2222-222222222222',
+    quoteReference: 'SS20261220-GIFT01',
+    amountCents: 14900,
+    paidAt,
+  });
+  assert.equal(retry.duplicate, true);
+  assert.equal(
+    (db.raw.prepare("SELECT COUNT(*) AS count FROM payments WHERE idempotency_key LIKE 'gift-cleaning:%'").get() as { count: number }).count,
+    1,
+  );
 });

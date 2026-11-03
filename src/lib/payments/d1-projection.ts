@@ -183,6 +183,121 @@ export async function projectStripePayment(
   return { applied: true, duplicate: false, paymentId, idempotencyKey };
 }
 
+export interface GiftCleaningProjectionInput {
+  code: string;
+  sessionId: string;
+  holdId?: string;
+  quoteReference?: string;
+  amountCents: number;
+  paidAt: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Projects a gift-covered cleaning into the canonical payment ledger and the
+ * booking-request payment summary. The gift ledger is authoritative for the
+ * balance; this record makes the financial event visible to invoicing,
+ * reporting and refunds instead of leaving a gift-only order outside the
+ * payment lifecycle.
+ */
+export async function projectGiftCleaningPayment(
+  db: D1Database,
+  input: GiftCleaningProjectionInput,
+): Promise<{
+  paymentId: string;
+  duplicate: boolean;
+  bookingRequestId: string | null;
+  duplicateBookingPayment: boolean;
+}> {
+  const holdId = text(input.holdId, 120);
+  const quoteReference = text(input.quoteReference, 120);
+  const code = text(input.code, 40).toUpperCase();
+  const amount = Math.round(Number(input.amountCents));
+  if (!code || !Number.isFinite(amount) || amount <= 0) throw new Error('gift_payment_invalid');
+  const booking = holdId
+    ? await db
+        .prepare('SELECT id, customer_id FROM booking_requests WHERE hold_id = ? LIMIT 1')
+        .bind(holdId)
+        .first<{ id: string; customer_id: string | null }>()
+    : quoteReference
+      ? await db
+          .prepare('SELECT id, customer_id FROM booking_requests WHERE quote_reference = ? ORDER BY created_at DESC LIMIT 1')
+          .bind(quoteReference)
+          .first<{ id: string; customer_id: string | null }>()
+      : null;
+  const paymentId = `payment_${crypto.randomUUID()}`;
+  const idempotencyKey = `gift-cleaning:${code}:${text(input.sessionId, 200) || quoteReference || holdId}`;
+  const existing = await db
+    .prepare('SELECT id FROM payments WHERE idempotency_key = ? LIMIT 1')
+    .bind(idempotencyKey)
+    .first<{ id: string }>();
+  if (existing) {
+    return {
+      paymentId: existing.id,
+      duplicate: true,
+      bookingRequestId: booking?.id ?? null,
+      duplicateBookingPayment: false,
+    };
+  }
+  const giftSessionId = `gift:${code}:${text(input.sessionId, 200) || quoteReference || holdId}`;
+  const claim = booking
+    ? await claimBookingPayment(db, {
+        bookingRequestId: booking.id,
+        sessionId: giftSessionId,
+        amountCents: amount,
+      })
+    : null;
+  const statements = [
+    db
+      .prepare(
+        `INSERT INTO payments
+         (id, branch_id, customer_id, payer_party_id, invoice_id, appointment_id,
+          booking_request_id, gift_certificate_id, provider, status, amount_cents, currency,
+          stripe_customer_id, stripe_payment_intent_id, stripe_charge_id, idempotency_key,
+          received_at, metadata_json)
+         VALUES (?, NULL, ?, NULL, NULL, NULL, ?, NULL, 'external', 'succeeded', ?, 'USD',
+                 NULL, NULL, NULL, ?, ?, ?)`,
+      )
+      .bind(
+        paymentId,
+        booking?.customer_id ?? FINANCIAL_SYSTEM_CUSTOMER_ID,
+        booking?.id ?? null,
+        amount,
+        idempotencyKey,
+        input.paidAt,
+        JSON.stringify({
+          checkout_kind: 'estimate',
+          payment_method: 'gift_certificate',
+          gift_code: code,
+          quote_reference: quoteReference,
+          booking_hold_id: holdId,
+          duplicate_booking_payment: claim?.duplicate === true,
+          ...(claim?.duplicate ? { primary_payment_session_id: claim.primarySessionId } : {}),
+          ...(input.metadata ?? {}),
+        }),
+      ),
+  ];
+  if (booking) {
+    statements.push(
+      db
+        .prepare(
+          `UPDATE booking_requests SET payment_status = 'paid_gift', payment_reference = ?,
+             payment_amount_cents = COALESCE(payment_amount_cents, 0) + ?,
+             paid_at = COALESCE(paid_at, ?), updated_at = ? WHERE id = ?`,
+        )
+        .bind(code, amount, input.paidAt, new Date().toISOString(), booking.id),
+    );
+  }
+  if (db.batch) await db.batch(statements);
+  else for (const statement of statements) await statement.run();
+  return {
+    paymentId,
+    duplicate: false,
+    bookingRequestId: booking?.id ?? null,
+    duplicateBookingPayment: claim?.duplicate === true,
+  };
+}
+
 export interface GiftSaleProjectionInput {
   code: string;
   sessionId: string;
@@ -336,6 +451,62 @@ export async function projectGiftSale(
   return { giftCertificateId, paymentId: payment.paymentId, duplicate: payment.duplicate };
 }
 
+export interface BookingPaymentClaim {
+  duplicate: boolean;
+  primarySessionId: string;
+  primaryPaymentIntentId: string;
+  claimedAt: string;
+}
+
+/**
+ * Atomically claims the primary successful payment for one booking request.
+ * The first settlement wins; any later settlement is reported as a duplicate so
+ * the owner can refund it without ever losing the financial record.
+ */
+export async function claimBookingPayment(
+  db: D1Database,
+  input: {
+    bookingRequestId: string;
+    sessionId: string;
+    paymentIntentId?: string;
+    amountCents: number;
+  },
+): Promise<BookingPaymentClaim | null> {
+  const bookingRequestId = text(input.bookingRequestId, 120);
+  const sessionId = text(input.sessionId, 200);
+  if (!bookingRequestId || !sessionId) return null;
+  const timestamp = new Date().toISOString();
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO booking_payment_claims
+       (booking_request_id, stripe_session_id, payment_intent_id, amount_cents, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      bookingRequestId,
+      sessionId,
+      text(input.paymentIntentId, 200),
+      Math.max(0, Math.round(Number(input.amountCents) || 0)),
+      timestamp,
+      timestamp,
+    )
+    .run();
+  const row = await db
+    .prepare(
+      `SELECT stripe_session_id, payment_intent_id, created_at
+       FROM booking_payment_claims WHERE booking_request_id = ? LIMIT 1`,
+    )
+    .bind(bookingRequestId)
+    .first<{ stripe_session_id: string; payment_intent_id: string; created_at: string }>();
+  if (!row) return null;
+  return {
+    duplicate: row.stripe_session_id !== sessionId,
+    primarySessionId: row.stripe_session_id,
+    primaryPaymentIntentId: row.payment_intent_id,
+    claimedAt: row.created_at,
+  };
+}
+
 export interface EstimatePaymentProjectionInput {
   sessionId: string;
   paymentIntentId?: string;
@@ -349,13 +520,21 @@ export interface EstimatePaymentProjectionInput {
   customerName?: string;
   customerEmail?: string;
   paidAt: string;
+  duplicateBookingPayment?: boolean;
   metadata?: Record<string, unknown>;
 }
 
 export async function projectEstimatePayment(
   db: D1Database,
   input: EstimatePaymentProjectionInput,
-): Promise<{ paymentId: string; duplicate: boolean; bookingRequestId: string | null; appointmentId: string | null }> {
+): Promise<{
+  paymentId: string;
+  duplicate: boolean;
+  bookingRequestId: string | null;
+  appointmentId: string | null;
+  duplicateBookingPayment: boolean;
+  primaryPaymentSessionId: string;
+}> {
   const holdId = text(input.holdId, 120);
   const quoteReference = text(input.quoteReference, 120);
   const booking = holdId
@@ -374,6 +553,14 @@ export async function projectEstimatePayment(
         .prepare('SELECT id FROM appointments WHERE booking_request_id = ? ORDER BY created_at DESC LIMIT 1')
         .bind(booking.id)
         .first<{ id: string }>()
+    : null;
+  const claim = booking
+    ? await claimBookingPayment(db, {
+        bookingRequestId: booking.id,
+        sessionId: input.sessionId,
+        ...(input.paymentIntentId ? { paymentIntentId: input.paymentIntentId } : {}),
+        amountCents: input.amountCents,
+      })
     : null;
 
   let payerPartyId: string | null = null;
@@ -404,6 +591,8 @@ export async function projectEstimatePayment(
       checkout_attempt: input.checkoutAttempt ?? '',
       gift_applied_cents: Math.max(0, Math.round(Number(input.giftAppliedCents) || 0)),
       total_cents: Math.max(0, Math.round(Number(input.totalCents) || input.amountCents)),
+      duplicate_booking_payment: input.duplicateBookingPayment ?? claim?.duplicate === true,
+      ...(claim?.duplicate ? { primary_payment_session_id: claim.primarySessionId } : {}),
       ...(input.metadata ?? {}),
     },
   });
@@ -412,6 +601,8 @@ export async function projectEstimatePayment(
     duplicate: payment.duplicate,
     bookingRequestId: booking?.id ?? null,
     appointmentId: appointment?.id ?? null,
+    duplicateBookingPayment: claim?.duplicate === true,
+    primaryPaymentSessionId: claim?.primarySessionId ?? input.sessionId,
   };
 }
 

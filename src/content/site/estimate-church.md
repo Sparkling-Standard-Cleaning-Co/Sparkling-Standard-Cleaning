@@ -1,6 +1,6 @@
 ---
-metaTitle: Church Cleaning Estimate | {{churchDiscount}} Church Discount | Sparkling Standard
-metaDescription: A respectful church cleaning estimate for Pensacola-area congregations — sanctuaries, fellowship halls, nurseries, classrooms and offices, with Sparkling Standard's {{churchDiscount}} church discount.
+metaTitle: Church Cleaning Estimate | Sparkling Standard
+metaDescription: A respectful church cleaning estimate for Pensacola-area congregations, with {{churchDiscount}} off eligible church cleaning.
 hero:
   headline: Care for your church home,
   accent: with our {{churchDiscount}} church discount.

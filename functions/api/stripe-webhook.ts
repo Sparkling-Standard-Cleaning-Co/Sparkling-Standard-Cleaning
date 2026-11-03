@@ -47,6 +47,7 @@ import {
   recordReconciliationIssue,
 } from '../../src/lib/admin/refunds.ts';
 import {
+  claimBookingPayment,
   projectEstimatePayment,
   projectGiftSale,
 } from '../../src/lib/payments/d1-projection.ts';
@@ -632,6 +633,41 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const checkout = metadata.checkout_attempt
       ? await readCheckoutRecord(env, metadata.checkout_attempt)
       : null;
+    const holdId = metadata.booking_hold_id ?? '';
+    const quoteReference = metadata.quote_reference ?? checkout?.reference ?? '';
+    let duplicateBookingPayment = false;
+    if (env.DB && /^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
+      const bookingRow = await env.DB
+        .prepare('SELECT id FROM booking_requests WHERE hold_id = ? LIMIT 1')
+        .bind(holdId)
+        .first<{ id: string }>()
+        .catch(() => null);
+      if (bookingRow) {
+        const claim = await claimBookingPayment(env.DB, {
+          bookingRequestId: bookingRow.id,
+          sessionId: session.id ?? '',
+          ...(session.payment_intent ? { paymentIntentId: session.payment_intent } : {}),
+          amountCents: amountCents ?? 0,
+        }).catch(() => null);
+        if (claim?.duplicate) {
+          duplicateBookingPayment = true;
+          metadata.duplicate_payment = 'yes';
+          metadata.primary_payment_session_id = claim.primarySessionId;
+          await recordReconciliationIssue(env.DB, {
+            eventId,
+            kind: 'duplicate_booking_payment',
+            detail: 'A second successful Stripe payment was received for one booking request.',
+            payload: {
+              holdId,
+              quoteReference,
+              sessionId: session.id ?? '',
+              primarySessionId: claim.primarySessionId,
+              amountCents,
+            },
+          }).catch(() => undefined);
+        }
+      }
+    }
     if (session.id && metadata.checkout_attempt) {
       const giftAppliedCents = Number(metadata.gift_applied_cents) || 0;
       if (giftAppliedCents > 0) {
@@ -669,8 +705,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             recurringStatus?: string;
           }
         | undefined;
-      const holdId = metadata.booking_hold_id ?? '';
-      const quoteReference = metadata.quote_reference ?? checkout?.reference ?? '';
       if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
         if (!checkout) {
           booking = { status: 'pending_owner_review', reason: 'checkout_record_missing' };
@@ -732,25 +766,42 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       if (env.DB && /^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
         const paymentStatus =
-          booking?.status === 'confirmed'
-            ? 'paid_confirmed'
-            : checkout?.photosOutstanding === true || metadata.photos_outstanding === 'yes'
-              ? 'paid_awaiting_photos'
-              : 'paid_awaiting_confirmation';
-        await env.DB
-          .prepare(
-            `UPDATE booking_requests SET payment_status = ?, payment_reference = ?,
-               payment_amount_cents = ?, paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP),
-               updated_at = CURRENT_TIMESTAMP WHERE hold_id = ?`,
-          )
-          .bind(
-            paymentStatus,
-            String(session.payment_intent ?? session.id ?? '').slice(0, 200),
-            Number(session.amount_total) || 0,
-            holdId,
-          )
-          .run()
-          .catch(() => undefined);
+          duplicateBookingPayment
+            ? 'paid_duplicate_review'
+            : booking?.status === 'confirmed'
+              ? 'paid_confirmed'
+              : checkout?.photosOutstanding === true || metadata.photos_outstanding === 'yes'
+                ? 'paid_awaiting_photos'
+                : 'paid_awaiting_confirmation';
+        if (duplicateBookingPayment) {
+          await env.DB
+            .prepare(
+              `UPDATE booking_requests
+               SET payment_status = ?,
+                   payment_amount_cents = COALESCE(payment_amount_cents, 0) + ?,
+                   paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP),
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE hold_id = ?`,
+            )
+            .bind(paymentStatus, Number(session.amount_total) || 0, holdId)
+            .run()
+            .catch(() => undefined);
+        } else {
+          await env.DB
+            .prepare(
+              `UPDATE booking_requests SET payment_status = ?, payment_reference = ?,
+                 payment_amount_cents = ?, paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP),
+                 updated_at = CURRENT_TIMESTAMP WHERE hold_id = ?`,
+            )
+            .bind(
+              paymentStatus,
+              String(session.payment_intent ?? session.id ?? '').slice(0, 200),
+              Number(session.amount_total) || 0,
+              holdId,
+            )
+            .run()
+            .catch(() => undefined);
+        }
       }
       if (env.DB) {
         try {
@@ -767,6 +818,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             customerName: customerName || '',
             customerEmail: customerEmail || '',
             paidAt,
+            duplicateBookingPayment,
           });
         } catch (error) {
           console.error('[stripe-webhook] estimate_projection_failed', {
@@ -799,8 +851,17 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
     const amount = amountCents === null ? 'unknown' : (amountCents / 100).toFixed(2);
     const fields: Record<string, string> = {
-      'Payment status': 'PAID - verify in Stripe before scheduling',
+      'Payment status': duplicateBookingPayment
+        ? 'DUPLICATE PAYMENT - review and refund the second charge in Stripe'
+        : 'PAID - verify in Stripe before scheduling',
       'Amount paid': `$${amount} USD${checkout?.gift ? ' (card remainder after gift credit)' : ''}`,
+      ...(duplicateBookingPayment
+        ? {
+            'Duplicate payment warning':
+              'A second successful Stripe payment was received for this booking. Do not schedule or confirm a second job. Refund the duplicate in Stripe.',
+            'Primary payment session': metadata.primary_payment_session_id ?? '',
+          }
+        : {}),
       ...(checkout?.gift
         ? {
             'Gift credit applied': `$${((checkout.gift.appliedCents ?? 0) / 100).toFixed(2)}`,
