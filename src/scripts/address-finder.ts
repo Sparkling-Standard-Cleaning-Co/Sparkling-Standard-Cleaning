@@ -441,7 +441,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       return;
     }
     void showMap(resolved);
-    confirmButton?.focus();
+    confirmButton?.focus({ preventScroll: true });
   }
 
   function exactResolveFailed(): void {
@@ -606,7 +606,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
             'info',
           );
         }
-        confirmButton?.focus();
+        confirmButton?.focus({ preventScroll: true });
         return;
       }
       setStatus(

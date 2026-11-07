@@ -19,14 +19,6 @@ export function playEstimateReveal({ reveal, target }: EstimateRevealElements): 
 
   reveal.hidden = false;
   target.dataset.revealing = 'true';
-  if (!reduceMotion) {
-    window.requestAnimationFrame(() => {
-      const header = document.querySelector<HTMLElement>('.site-header, header');
-      const offset = (header?.getBoundingClientRect().height ?? 72) + 16;
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      window.scrollBy({ top: -offset, behavior: 'auto' });
-    });
-  }
 
   return new Promise((resolve) => {
     window.setTimeout(() => {

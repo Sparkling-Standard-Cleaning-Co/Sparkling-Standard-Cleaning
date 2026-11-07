@@ -1,5 +1,36 @@
 # Verification status
 
+## Local estimator UX release candidate - 2026-11-07 (not deployed)
+
+**Branch:** `remediation/audit-2026-11-01`. This candidate includes the earlier
+remediation commit `5f8e264` plus the estimator UX corrections below. Production
+remains `e81e225` on `origin/production-safe` until owner approval.
+
+**Corrections:** the calendar no longer auto-scrolls to the appointment-window
+container; selecting Morning or Afternoon targets the exact-time picker heading
+and keeps the hour/minute controls in view. Address confirmation and late geocoding
+no longer cause surprise scrolling. Entering the final step performs one controlled
+scroll to the start of the estimate content; totals, extras and terms changes do not
+scroll again. The mobile-only shortened CTA labels were removed, so mobile and
+desktop wording are identical. Calendar and month availability show concise
+"Checking…" spinner states with empty/error states, a working retry, and request
+cancellation so stale responses cannot replace newer results.
+
+**Verification:** typecheck 0 errors; unit suite **813 tests: 812 passed, 1 skipped,
+0 failed**; browser suite **200 passed, 0 failed**; build and `validate-site`
+passed; rendered SEO lengths remain within limits. New Playwright coverage proves
+both appointment windows stay in view, address confirmation keeps the viewport,
+Step 5 scrolls to its heading, terms changes do not scroll, CTA wording matches at
+320/360/375/390/430/768/1280px with no overflow, loading appears/clears, retry works
+and rapid date changes cannot display stale availability.
+
+**Release prerequisites:** fresh encrypted backup
+`sparkling-standard-20261107-123919.ssbk` (SHA-256
+`fa664faa93c584008b1274d9a8848681a926711ea504f481fada2687492231c6`, D1+R2,
+66 R2 objects) and local restore test passed. Apply migrations `0029`–`0031` before
+deploying code. No pricing values, financial records, legal documents or Cloudflare
+bindings were changed by this UX pass.
+
 ## Local remediation checkpoint - 2026-11-03 (not deployed)
 
 **Branch:** `remediation/audit-2026-11-01` (local only). **Production remains**

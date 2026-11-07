@@ -152,13 +152,16 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const streetInputEl = form.querySelector<HTMLInputElement>('#est-address');
   let addressDetailsRevealed = false;
 
-  function scrollToTopOf(element: HTMLElement): void {
+  function scrollToTopOf(element: HTMLElement, behavior: ScrollBehavior = 'smooth'): void {
     const header = document.querySelector<HTMLElement>('.site-header, header');
     const offset = (header?.getBoundingClientRect().height ?? 72) + 16;
     const top = Math.max(0, element.getBoundingClientRect().top + window.scrollY - offset);
     window.scrollTo({
       top,
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      behavior:
+        behavior === 'smooth' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'auto'
+          : behavior,
     });
   }
 
@@ -170,7 +173,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (!addressCardEl || addressCardRevealed) return;
     addressCardEl.hidden = false;
     addressCardRevealed = true;
-    smoothReveal(addressCardEl);
   }
 
   function revealAddressDetails(scroll: boolean): void {
@@ -1256,19 +1258,20 @@ function initEstimateWizard(form: HTMLFormElement): void {
       heading.focus({ preventScroll: true });
     }
 
-    // Stable viewport: the new step must never leave the customer at the
-    // bottom of the page or scrolled past the questionnaire. When the form top
-    // is already in a comfortable band we do not move the page at all; when a
-    // shorter/taller step would move it out of view, we place the form top
-    // just below the sticky header. This is deterministic at every width and
-    // cannot be clamped the way relative scroll compensation can.
-    const header = document.querySelector<HTMLElement>('.site-header');
-    const headerOffset =
-      header && window.getComputedStyle(header).display !== 'none' ? header.getBoundingClientRect().height : 0;
-    const comfortableTop = headerOffset + 12;
-    const rect = form.getBoundingClientRect();
-    if (rect.top < headerOffset + 4 || rect.top > window.innerHeight * 0.35) {
-      window.scrollTo({ top: Math.max(0, rect.top + window.scrollY - comfortableTop), behavior: 'instant' });
+    // Steps 1-4 preserve a stable questionnaire viewport. The final step has
+    // its own controlled scroll so the customer lands at the beginning of the
+    // estimate content rather than midway down a long result page.
+    if (currentStep === steps.length) {
+      scrollToTopOf(steps[currentStep - 1] ?? form, 'instant');
+    } else {
+      const header = document.querySelector<HTMLElement>('.site-header');
+      const headerOffset =
+        header && window.getComputedStyle(header).display !== 'none' ? header.getBoundingClientRect().height : 0;
+      const comfortableTop = headerOffset + 12;
+      const rect = form.getBoundingClientRect();
+      if (rect.top < headerOffset + 4 || rect.top > window.innerHeight * 0.35) {
+        window.scrollTo({ top: Math.max(0, rect.top + window.scrollY - comfortableTop), behavior: 'instant' });
+      }
     }
 
     // Scroll the horizontal step navigator internally (never the page) so the
@@ -1821,7 +1824,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   });
 
   streetInputEl?.addEventListener('input', () => revealAddressDetails(false));
-  streetInputEl?.addEventListener('change', () => revealAddressDetails(true));
+  streetInputEl?.addEventListener('change', () => revealAddressDetails(false));
 
   // ── Fresh start (no drafts are ever stored) ───────────────────────────────
   const calendarRoot = form.querySelector<HTMLElement>('[data-booking-calendar]');
@@ -2631,7 +2634,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     if (consentOnlyChange(target)) return;
     syncConditionalFields();
-    syncRevealGroups(true);
+    syncRevealGroups(false);
     recalc();
   });
 
@@ -2660,7 +2663,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     if (consentOnlyChange(target)) return;
     syncConditionalFields();
-    syncRevealGroups(true);
+    syncRevealGroups(false);
     recalc();
       if (target instanceof HTMLInputElement && target.name === 'zip') {
       void lookupTravel();

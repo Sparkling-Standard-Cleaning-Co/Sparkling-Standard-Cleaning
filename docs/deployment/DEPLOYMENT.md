@@ -375,3 +375,48 @@ The remediation branch adds migrations `0029` (booking commitments), `0030`
 (booking payment claims) and `0031` (document execution integrity). They are
 additive and must be applied in order before deploying code that reads the new
 columns.
+## 2026-11-07 combined release candidate (owner approval required)
+
+**Candidate:** `remediation/audit-2026-11-01` at the commit containing this note.
+**Production baseline:** `e81e225` / migration 28.
+
+### Migration order
+
+Apply in this exact order, before deploying the new code:
+
+1. `0029_booking_commitments.sql`
+2. `0030_booking_payment_claims.sql`
+3. `0031_document_execution_integrity.sql`
+
+All three are additive. Old code ignores the new tables and columns, so applying
+them first is backward compatible. New code expects them, so do not deploy first.
+
+### Backup
+
+Fresh encrypted archive:
+`_PRIVATE_BACKUPS/archives/daily/2026/11/sparkling-standard-20261107-123919.ssbk`
+SHA-256 `fa664faa93c584008b1274d9a8848681a926711ea504f481fada2687492231c6`
+(8,352,197 bytes; D1 included; 66 R2 objects; restore test passed).
+
+### Rollback / forward recovery
+
+- If the deployment fails before migrations: restore the prior Pages deployment.
+- If migrations succeed but code fails: roll back the Pages deployment; the
+  additive schema remains safe for `e81e225`.
+- If a partial migration is reported: do not re-run blindly; inspect the D1
+  migration table and apply only the missing file. All new objects are additive.
+- If a booking-commitment record remains in `failed` or `calendar_created`, use
+  the admin Overview/New Booking reconciliation queue; do not delete the record.
+- Never restore production D1 over a database with newer successful payments
+  without first exporting and checking the newer data.
+
+### Pre-deploy verification
+
+1. Confirm the candidate commit and that `e81e225` is its ancestor.
+2. Confirm the fresh backup hash and restore-test result.
+3. Confirm the existing Cloudflare DB, R2, Stripe, Google, Resend and Turnstile
+   bindings remain; do not replace environment configuration wholesale.
+4. Do not run live-money tests or customer communications without explicit owner
+   authorization.
+5. After deployment, verify homepage, `/admin/`, estimator, pricing dashboard,
+   checkout readiness and production health endpoints.

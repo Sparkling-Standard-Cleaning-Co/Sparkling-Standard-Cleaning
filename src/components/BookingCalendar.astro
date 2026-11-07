@@ -68,6 +68,10 @@ const { id = 'estimate-calendar' } = Astro.props;
         <span class="booking-calendar__legend-key"><span class="booking-calendar__window is-full"></span> Unavailable</span>
       </div>
       <button class="btn btn--ghost btn--small" type="button" data-calendar-retry hidden>Retry availability</button>
+      <p class="booking-calendar__loading" data-calendar-month-loading hidden role="status" aria-live="polite">
+        <span class="booking-calendar__spinner" aria-hidden="true"></span>
+        Checking calendar availability…
+      </p>
       <p class="booking-calendar__hint small" data-calendar-date-note>
         Past dates are unavailable. Requests can be made up to {bookingConfig.maxAdvanceDays} days
         ahead.
@@ -97,6 +101,7 @@ const { id = 'estimate-calendar' } = Astro.props;
       </div>
 
       <div class="booking-calendar__time-picker" data-calendar-picker hidden>
+        <p class="booking-calendar__picker-heading">Choose your exact start time</p>
         <div class="booking-calendar__time-fields">
           <label class="booking-calendar__time-field">
             <span>Hour</span>
@@ -114,7 +119,15 @@ const { id = 'estimate-calendar' } = Astro.props;
       <p class="booking-calendar__time-note small" data-calendar-time-note>
         Times are Central Time.
       </p>
+      <p class="booking-calendar__loading" data-calendar-loading hidden role="status" aria-live="polite">
+        <span class="booking-calendar__spinner" aria-hidden="true"></span>
+        Checking available appointments…
+      </p>
+      <p class="booking-calendar__empty small" data-calendar-empty hidden>
+        No appointments are available on this date. Choose another date.
+      </p>
       <p class="booking-calendar__status small" data-calendar-status role="status" aria-live="polite"></p>
+      <button class="btn btn--ghost btn--small" type="button" data-calendar-times-retry hidden>Retry available times</button>
     </div>
   </div>
 

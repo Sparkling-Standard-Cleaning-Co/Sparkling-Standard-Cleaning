@@ -150,6 +150,10 @@ export function initBookingCalendar(
   const selectedLabel = root.querySelector<HTMLElement>('[data-calendar-selected-label]');
   const statusEl = root.querySelector<HTMLElement>('[data-calendar-status]');
   const retryButton = root.querySelector<HTMLButtonElement>('[data-calendar-retry]');
+  const timesRetryButton = root.querySelector<HTMLButtonElement>('[data-calendar-times-retry]');
+  const loadingEl = root.querySelector<HTMLElement>('[data-calendar-loading]');
+  const monthLoadingEl = root.querySelector<HTMLElement>('[data-calendar-month-loading]');
+  const emptyEl = root.querySelector<HTMLElement>('[data-calendar-empty]');
   const timeNote = root.querySelector<HTMLElement>('[data-calendar-time-note]');
   const dateInput = root.querySelector<HTMLInputElement>('[data-calendar-date-input]');
   const timeInput = root.querySelector<HTMLInputElement>('[data-calendar-time-input]');
@@ -169,13 +173,42 @@ export function initBookingCalendar(
   let selectedDate = '';
   let selectedTime: BookingCalendarSelection | null = null;
   let selectedPeriod: Period | null = null;
-  let revealedPeriodDate = '';
   let availableSlots: Slot[] = [];
   let liveAvailability = false;
   let timesSeq = 0;
+  let timesAbort: AbortController | null = null;
+  let timesLoading = false;
+  let loadedTimesDate = '';
+
+  function setTimesLoading(loading: boolean): void {
+    timesLoading = loading;
+    if (loadingEl) loadingEl.hidden = !loading;
+    root.setAttribute('aria-busy', loading ? 'true' : 'false');
+    if (loading) {
+      if (emptyEl) emptyEl.hidden = true;
+      if (timesRetryButton) timesRetryButton.hidden = true;
+    }
+  }
+
+  function revealPicker(): void {
+    if (!picker || picker.hidden) return;
+    requestAnimationFrame(() => {
+      if (!picker || picker.hidden) return;
+      const header = document.querySelector<HTMLElement>('.site-header, header');
+      const offset = (header?.getBoundingClientRect().height ?? 72) + 16;
+      const rect = picker.getBoundingClientRect();
+      const fullyVisible = rect.top >= offset && rect.bottom <= window.innerHeight - 16;
+      if (fullyVisible) return;
+      window.scrollTo({
+        top: Math.max(0, rect.top + window.scrollY - offset),
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      });
+    });
+  }
   let monthDays = new Map<string, MonthDay>();
   let monthState: 'idle' | 'loading' | 'ready' | 'error' = 'idle';
   let monthSeq = 0;
+  let monthAbort: AbortController | null = null;
   let monthKey = '';
   const monthCache = new Map<string, { at: number; days: MonthDay[] }>();
 
@@ -218,18 +251,13 @@ export function initBookingCalendar(
 
   function setPeriod(period: Period): void {
     selectedPeriod = period;
-    retryButton?.addEventListener('click', () => {
-    if (retryButton) retryButton.hidden = true;
-    void loadMonthAvailability(true);
-    if (selectedDate) void refreshTimes();
-  });
-
-  for (const button of periodButtons) {
+    for (const button of periodButtons) {
       const pressed = button.dataset.period === period;
       button.setAttribute('aria-pressed', String(pressed));
       button.classList.toggle('is-selected', pressed);
     }
     populatePicker();
+    revealPicker();
   }
 
   function populatePicker(): void {
@@ -316,18 +344,16 @@ export function initBookingCalendar(
       }
       return;
     }
-    if (revealedPeriodDate !== selectedDate) {
-      revealedPeriodDate = selectedDate;
-      requestAnimationFrame(() => {
-        periodEl.scrollIntoView({
-          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-          block: 'center',
-        });
-      });
-    }
     for (const button of periodButtons) {
       const period = button.dataset.period as Period | undefined;
       if (!period) continue;
+      if (timesLoading) {
+        button.disabled = true;
+        button.classList.add('is-unavailable');
+        const status = button.querySelector<HTMLElement>('[data-period-status]');
+        if (status) { status.textContent = 'Checking…'; status.dataset.state = 'unknown'; }
+        continue;
+      }
       const preview = monthDays.get(selectedDate);
       const previewOpen = period === 'first' ? preview?.morningAvailable : preview?.afternoonAvailable;
       const hasPreview = Boolean(preview?.known);
@@ -343,6 +369,10 @@ export function initBookingCalendar(
             : 'Check availability';
         status.dataset.state = liveAvailability || hasPreview ? (available ? 'open' : 'full') : 'unknown';
       }
+    }
+    if (timesLoading) {
+      if (picker) picker.hidden = true;
+      return;
     }
     if (selectedPeriod && liveAvailability) {
       const stillAvailable = periodMinutes(selectedPeriod).some(timeIsEnabled);
@@ -363,6 +393,10 @@ export function initBookingCalendar(
   function clearTimes(message = 'Select a date to see preferred start times.'): void {
     availableSlots = [];
     liveAvailability = false;
+    loadedTimesDate = '';
+    setTimesLoading(false);
+    if (emptyEl) emptyEl.hidden = true;
+    if (timesRetryButton) timesRetryButton.hidden = true;
     selectedPeriod = null;
     selectedTime = null;
     if (picker) picker.hidden = true;
@@ -387,16 +421,30 @@ export function initBookingCalendar(
       return;
     }
     if (selectedLabel) selectedLabel.textContent = shortDateLabel(selectedDate);
+    const dateChanged = loadedTimesDate !== selectedDate;
+    loadedTimesDate = selectedDate;
+    if (dateChanged) {
+      selectedPeriod = null;
+      selectedTime = null;
+      if (picker) picker.hidden = true;
+    }
+    setTimesLoading(true);
+    if (emptyEl) emptyEl.hidden = true;
+    renderPeriods();
     const seq = ++timesSeq;
     const point = coordinates();
     if (!point) {
+      setTimesLoading(false);
       availableSlots = [];
       liveAvailability = false;
       setStatus('Enter your address above to see live availability. Choose a preferred start below.');
       renderPeriods();
       return;
     }
-    setStatus('Checking available times…');
+    setStatus('');
+    timesAbort?.abort();
+    const controller = new AbortController();
+    timesAbort = controller;
     try {
       const params = new URLSearchParams({
         date: selectedDate,
@@ -406,8 +454,10 @@ export function initBookingCalendar(
       });
       const response = await fetch(`/api/availability?${params}`, {
         headers: { Accept: 'application/json' },
+        signal: controller.signal,
       });
       if (seq !== timesSeq) return;
+      setTimesLoading(false);
       const data = (await response.json().catch(() => ({}))) as {
         ok?: boolean;
         enabled?: boolean;
@@ -416,7 +466,8 @@ export function initBookingCalendar(
       if (!response.ok || data.ok !== true || data.enabled !== true) {
         availableSlots = [];
         liveAvailability = false;
-        setStatus('Live scheduling is unavailable right now. Choose a preferred start.');
+        setStatus('We could not load available times. Retry or choose a preferred start.', 'error');
+        if (timesRetryButton) timesRetryButton.hidden = false;
         renderPeriods();
         return;
       }
@@ -426,13 +477,21 @@ export function initBookingCalendar(
         timeNote.textContent =
           'Live times from the Sparkling Standard booking calendar in Central Time.';
       }
-      setStatus('Choose First Appointment or Afternoon Appointment.');
+      if (availableSlots.length === 0) {
+        if (emptyEl) emptyEl.hidden = false;
+        setStatus('No appointments are available on this date. Choose another date.', 'error');
+      } else {
+        if (emptyEl) emptyEl.hidden = true;
+        setStatus('Choose First Appointment or Afternoon Appointment.');
+      }
       renderPeriods();
     } catch {
-      if (seq !== timesSeq) return;
+      if (controller.signal.aborted || seq !== timesSeq) return;
+      setTimesLoading(false);
       availableSlots = [];
       liveAvailability = false;
-      setStatus('We could not reach the booking calendar. Choose a preferred start.');
+      setStatus('We could not reach the booking calendar. Retry or choose a preferred start.', 'error');
+      if (timesRetryButton) timesRetryButton.hidden = false;
       renderPeriods();
     }
   }
@@ -466,6 +525,10 @@ export function initBookingCalendar(
       return;
     }
     const seq = ++monthSeq;
+    monthAbort?.abort();
+    const controller = new AbortController();
+    monthAbort = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
     monthState = 'loading';
     monthDays.clear();
     renderCalendar();
@@ -499,6 +562,7 @@ export function initBookingCalendar(
       if (retryButton) retryButton.hidden = true;
       renderCalendar();
     } catch {
+      window.clearTimeout(timeoutId);
       if (seq !== monthSeq) return;
       monthState = 'error';
       monthDays.clear();
@@ -529,6 +593,7 @@ export function initBookingCalendar(
 
   function renderCalendar(): void {
     monthLabelEl.textContent = monthLabel(viewYear, viewMonth);
+    if (monthLoadingEl) monthLoadingEl.hidden = monthState !== 'loading';
     const first = new Date(Date.UTC(viewYear, viewMonth, 1, 12));
     const daysInMonth = new Date(Date.UTC(viewYear, viewMonth + 1, 0, 12)).getUTCDate();
     const leading = first.getUTCDay();
@@ -615,6 +680,15 @@ export function initBookingCalendar(
       setPeriod(period);
     });
   }
+  retryButton?.addEventListener('click', () => {
+    if (retryButton) retryButton.hidden = true;
+    void loadMonthAvailability(true);
+    if (selectedDate) void refreshTimes();
+  });
+  timesRetryButton?.addEventListener('click', () => {
+    if (timesRetryButton) timesRetryButton.hidden = true;
+    void refreshTimes();
+  });
   hourSelect?.addEventListener('change', () => {
     populateMinutes(Number(hourSelect.value));
     updateSelectedTime();
@@ -798,8 +872,7 @@ export function initBookingCalendar(
       selectedDate = '';
       selectedTime = null;
       selectedPeriod = null;
-      revealedPeriodDate = '';
-      availableSlots = [];
+        availableSlots = [];
       liveAvailability = false;
       viewYear = Number(initialMonth.slice(0, 4));
       viewMonth = Number(initialMonth.slice(5, 7)) - 1;

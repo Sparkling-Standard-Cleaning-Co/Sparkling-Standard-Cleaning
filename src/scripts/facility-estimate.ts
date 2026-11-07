@@ -450,6 +450,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
   }
 
   function showStep(step: number, focus = true): void {
+    const changed = currentStep !== Math.min(stepPanels.length, Math.max(1, step));
     currentStep = Math.min(stepPanels.length, Math.max(1, step));
     for (const panel of stepPanels) {
       const panelStep = Number(panel.dataset.facilityStepPanel ?? '0');
@@ -480,7 +481,19 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     }
     syncFacilityPayment();
     maybeRevealFacilityEstimate();
-    if (focus) stepPanels[currentStep - 1]?.querySelector<HTMLElement>('[data-facility-step-title]')?.focus();
+    if (changed && focus) {
+      const panel = stepPanels[currentStep - 1];
+      const title = panel?.querySelector<HTMLElement>('[data-facility-step-title]');
+      title?.focus({ preventScroll: true });
+      if (panel) {
+        const header = document.querySelector<HTMLElement>('.site-header, header');
+        const offset = (header?.getBoundingClientRect().height ?? 72) + 16;
+        window.scrollTo({
+          top: Math.max(0, panel.getBoundingClientRect().top + window.scrollY - offset),
+          behavior: 'instant',
+        });
+      }
+    }
   }
 
   async function advance(): Promise<void> {
