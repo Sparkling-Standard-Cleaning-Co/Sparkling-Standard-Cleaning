@@ -20,6 +20,7 @@ import { onRequestGet as overviewGet } from '../functions/api/admin/overview.ts'
 import { onRequestPost as authPost } from '../functions/api/admin/auth.ts';
 import { onRequestGet as adminRequestsGet, onRequestPost as adminRequestsPost } from '../functions/api/admin/requests.ts';
 import { onRequestGet as operationsGet } from '../functions/api/admin/operations.ts';
+import { onRequestPost as operationsPost } from '../functions/api/admin/operations.ts';
 import { onRequestGet as customersGet } from '../functions/api/admin/customers.ts';
 
 const MFA_KEY = 'synthetic-mfa-encryption-key-32-bytes-minimum';
@@ -1789,4 +1790,30 @@ test('two independent solo cleaners can hold overlapping starts while a helper a
   await assert.rejects(() => confirmRequest(db, actor, 'cap_C', [soloA.id]), /team_conflict/);
   await assert.rejects(() => confirmRequest(db, actor, 'cap_D', [helper.id]), /crew_requires_lead/);
   await assert.rejects(() => confirmRequest(db, actor, 'cap_D'), /schedule_conflict/);
+});
+test('the recurring write gate fails closed and opens only when explicitly enabled', async () => {
+  const db = migratedDb();
+  const { owner, actor } = await ownerActor(db);
+  const session = await createOpsSession(db, owner.id, request());
+  const cookie = `ss_ops=${session.token}`;
+  const post = (env: Record<string, unknown>) =>
+    operationsPost({
+      request: new Request('https://example.test/api/admin/operations', {
+        method: 'POST',
+        headers: {
+          Cookie: cookie,
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': session.csrf,
+        },
+        body: JSON.stringify({ action: 'create_recurring' }),
+      }),
+      env,
+    } as never);
+  const closed = await post({ DB: db });
+  assert.equal(closed.status, 503);
+  assert.equal(((await closed.json()) as { error?: string }).error, 'recurring_scheduling_gated');
+  const open = await post({ DB: db, RECURRING_SCHEDULING_ENABLED: 'true' });
+  assert.equal(open.status, 400, 'the gate opens and reaches validation');
+  assert.equal(((await open.json()) as { error?: string }).error, 'recurring_fields_required');
+  assert.ok(actor);
 });
