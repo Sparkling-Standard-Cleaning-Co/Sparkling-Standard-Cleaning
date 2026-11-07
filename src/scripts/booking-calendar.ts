@@ -385,6 +385,10 @@ export function initBookingCalendar(
         }
         if (picker) picker.hidden = true;
         if (selectedLabel) selectedLabel.textContent = shortDateLabel(selectedDate);
+        setStatus(
+          'The time you selected is no longer available for this address. Please choose another time.',
+          'error',
+        );
       }
     }
     if (selectedPeriod) populatePicker();
