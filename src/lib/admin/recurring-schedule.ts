@@ -122,7 +122,13 @@ async function loadPlan(db: D1Database, actor: AdminActor, planId: string): Prom
   return row;
 }
 
-async function cancelFutureOccurrences(env: RecurringEnv, db: D1Database, planId: string, deleter: typeof deleteCalendarEvent = deleteCalendarEvent): Promise<string[]> {
+async function cancelFutureOccurrences(
+  env: RecurringEnv,
+  db: D1Database,
+  planId: string,
+  deleter: typeof deleteCalendarEvent = deleteCalendarEvent,
+  reason = '',
+): Promise<string[]> {
   const today = localToday();
   const rows = await db.prepare(
     `SELECT o.id, o.calendar_event_id, o.appointment_id
@@ -138,7 +144,7 @@ async function cancelFutureOccurrences(env: RecurringEnv, db: D1Database, planId
         continue;
       }
     }
-    await db.prepare("UPDATE recurring_occurrences SET status = 'cancelled' WHERE id = ?").bind(row.id).run();
+    await db.prepare("UPDATE recurring_occurrences SET status = 'cancelled', sync_error = ? WHERE id = ?").bind(reason, row.id).run();
     if (row.appointment_id) {
       await db.prepare(
         "UPDATE appointments SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ? AND status IN ('pending','confirmed')",
@@ -363,9 +369,22 @@ export async function setRecurringStatus(
     .bind(status, status === 'active' ? plan.start_date : null, new Date().toISOString(), planId)
     .run();
   if (status === 'active') {
+    // Occurrences cancelled by a pause are not owner decisions. Clear those
+    // rows so resuming can recreate the remaining horizon. A single occurrence
+    // the owner deliberately skipped keeps its cancelled state and is skipped.
+    await db
+      .prepare(
+        "DELETE FROM recurring_occurrences WHERE plan_id = ? AND status = 'cancelled' AND sync_error = 'paused_by_plan'",
+      )
+      .bind(planId)
+      .run();
     return syncRecurringPlan(env, db, actor, planId, { cancelSuperseded: true, deps });
   }
-  return syncRecurringPlan(env, db, actor, planId, { replaceFuture: true, deps });
+  return syncRecurringPlan(env, db, actor, planId, {
+    replaceFuture: true,
+    cancelReason: status === 'paused' ? 'paused_by_plan' : 'plan_cancelled',
+    deps,
+  });
 }
 
 async function persistRecurringResources(
@@ -402,6 +421,7 @@ export async function syncRecurringPlan(
   planId: string,
   options: {
     replaceFuture?: boolean;
+    cancelReason?: string;
     cancelSuperseded?: boolean;
     schedule?: ProposedRecurringSchedule;
     deps?: Partial<RecurringDependencies>;
@@ -428,7 +448,9 @@ export async function syncRecurringPlan(
     errors: [],
   };
   if (options.replaceFuture) {
-    result.errors.push(...(await cancelFutureOccurrences(env, db, planId, deps.deleteEvent)));
+    result.errors.push(
+      ...(await cancelFutureOccurrences(env, db, planId, deps.deleteEvent, options.cancelReason ?? '')),
+    );
   }
   if (plan.status !== 'active') {
     result.ok = result.errors.length === 0;
@@ -667,8 +689,8 @@ export async function syncRecurringPlan(
           continue;
         }
       }
-      await db.prepare("UPDATE recurring_occurrences SET status = 'cancelled' WHERE id = ?").bind(row.id).run();
-      if (row.appointment_id) {
+    await db.prepare("UPDATE recurring_occurrences SET status = 'cancelled' WHERE id = ?").bind(row.id).run();
+    if (row.appointment_id) {
         await db
           .prepare(
             "UPDATE appointments SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ? AND status IN ('pending','confirmed')",

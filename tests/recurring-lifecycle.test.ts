@@ -7,7 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import type { D1Database, D1PreparedStatement, D1Result } from '../src/lib/admin/d1.ts';
 import { createOpsSession, enrollOwner, readOpsActor } from '../src/lib/admin/operations.ts';
 import { createRecurring } from '../src/lib/admin/scheduling.ts';
-import { applyRecurringScheduleChange, prepareRecurringScheduleChange, syncRecurringPlan, updateRecurringOccurrence, type RecurringDependencies } from '../src/lib/admin/recurring-schedule.ts';
+import { applyRecurringScheduleChange, prepareRecurringScheduleChange, setRecurringStatus, syncRecurringPlan, updateRecurringOccurrence, type RecurringDependencies } from '../src/lib/admin/recurring-schedule.ts';
 import { zonedTimeToUtc } from '../src/lib/booking/time.ts';
 
 class SqlStatement implements D1PreparedStatement {
@@ -396,5 +396,72 @@ test('an owner can skip or reschedule one recurring occurrence without touching 
   assert.equal(
     (f2.db.raw.prepare('SELECT status FROM recurring_plans WHERE id = ?').get(plan2.id) as { status: string }).status,
     'active',
+  );
+});
+test('pause, resume and cancel preserve the horizon without duplicates or owner-skip revival', async () => {
+  const env = { GOOGLE_CLIENT_ID: 'x', GOOGLE_CLIENT_SECRET: 'x', GOOGLE_REFRESH_TOKEN: 'x', GOOGLE_CALENDAR_ID: 'x' } as never;
+  const f = await fixture(1);
+  const plan = await createRecurring(f.db, f.actor, {
+    customerId: f.customerId, propertyId: f.propertyId, frequency: 'weekly', startDate: f.startDate,
+    window: 'morning', startTime: '07:00', durationMinutes: 120, crewSize: 1, ongoingPrice: 150,
+  });
+  const calendar = makeCalendar(['family-cleaner']);
+  await syncRecurringPlan(env, f.db, f.actor, plan.id, { deps: calendar.deps });
+  const planned = f.db.raw
+    .prepare("SELECT COUNT(*) AS n FROM recurring_occurrences WHERE plan_id = ? AND status = 'scheduled'")
+    .get(plan.id) as { n: number };
+  assert.ok(planned.n > 1, 'future occurrences were generated');
+  assert.equal(calendar.events.size, planned.n);
+
+  const paused = await setRecurringStatus(env, f.db, f.actor, plan.id, 'paused', calendar.deps);
+  assert.equal(paused.ok, true);
+  assert.equal(
+    (f.db.raw.prepare("SELECT COUNT(*) AS n FROM recurring_occurrences WHERE plan_id = ? AND status = 'scheduled'").get(plan.id) as { n: number }).n,
+    0,
+  );
+  assert.equal(calendar.events.size, 0, 'pause removed future calendar events');
+  assert.equal(
+    (f.db.raw.prepare('SELECT status FROM recurring_plans WHERE id = ?').get(plan.id) as { status: string }).status,
+    'paused',
+  );
+
+  const resumed = await setRecurringStatus(env, f.db, f.actor, plan.id, 'active', calendar.deps);
+  assert.equal(resumed.ok, true);
+  const afterResume = f.db.raw
+    .prepare("SELECT COUNT(*) AS n FROM recurring_occurrences WHERE plan_id = ? AND status = 'scheduled'")
+    .get(plan.id) as { n: number };
+  assert.equal(afterResume.n, planned.n, 'resume recreated the same horizon without duplicates');
+  assert.equal(calendar.events.size, planned.n);
+  assert.equal(
+    (f.db.raw.prepare('SELECT status FROM recurring_plans WHERE id = ?').get(plan.id) as { status: string }).status,
+    'active',
+  );
+
+  const skipTarget = f.db.raw
+    .prepare("SELECT id FROM recurring_occurrences WHERE plan_id = ? AND status = 'scheduled' ORDER BY occurrence_date LIMIT 1")
+    .get(plan.id) as { id: string };
+  await updateRecurringOccurrence(env, f.db, f.actor, plan.id, skipTarget.id, { action: 'skip' }, calendar.deps);
+  await setRecurringStatus(env, f.db, f.actor, plan.id, 'paused', calendar.deps);
+  await setRecurringStatus(env, f.db, f.actor, plan.id, 'active', calendar.deps);
+  assert.equal(
+    (f.db.raw.prepare('SELECT status FROM recurring_occurrences WHERE id = ?').get(skipTarget.id) as { status: string }).status,
+    'cancelled',
+    'an owner-skipped occurrence is never revived by pause/resume',
+  );
+  assert.equal(
+    (f.db.raw.prepare("SELECT COUNT(*) AS n FROM recurring_occurrences WHERE plan_id = ? AND status = 'scheduled'").get(plan.id) as { n: number }).n,
+    planned.n - 1,
+  );
+
+  const cancelled = await setRecurringStatus(env, f.db, f.actor, plan.id, 'cancelled', calendar.deps);
+  assert.equal(cancelled.ok, true);
+  assert.equal(
+    (f.db.raw.prepare("SELECT COUNT(*) AS n FROM recurring_occurrences WHERE plan_id = ? AND status = 'scheduled'").get(plan.id) as { n: number }).n,
+    0,
+  );
+  assert.equal(calendar.events.size, 0);
+  assert.equal(
+    (f.db.raw.prepare('SELECT status FROM recurring_plans WHERE id = ?').get(plan.id) as { status: string }).status,
+    'cancelled',
   );
 });

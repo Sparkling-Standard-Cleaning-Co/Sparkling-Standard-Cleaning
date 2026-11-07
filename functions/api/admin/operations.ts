@@ -45,7 +45,11 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const url = new URL(context.request.url);
     const view = url.searchParams.get('view') ?? 'jobs';
     if (view === 'recurring') {
-      return json({ ok: true, recurring: await listRecurring(db, actor) });
+      return json({
+        ok: true,
+        recurring: await listRecurring(db, actor),
+        recurringEnabled: recurringSchedulingEnabled(context.env),
+      });
     }
     if (view === 'occurrences') {
       const planId = url.searchParams.get('planId') ?? '';

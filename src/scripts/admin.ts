@@ -164,6 +164,8 @@ function friendly(error: unknown): string {
     insufficient_balance: 'The redemption exceeds the available gift balance.',
     not_active_yet: 'This gift is not active yet.',
     d1_confirm_failed: 'Calendar confirmed, but the local appointment record failed. Retry safely.',
+    recurring_scheduling_gated:
+      'Recurring scheduling is temporarily disabled in this deployment. Existing plans and appointments are unchanged. Ask the owner to enable recurring scheduling.',
     contact_in_use: 'That email or phone belongs to another customer.',
   };
   return messages[code] ?? titleCase(code);
@@ -890,21 +892,37 @@ async function openCustomer(customerId: string): Promise<void> {
   }
 }
 
+let recurringSchedulingAvailable = true;
+
 async function loadRecurring(): Promise<void> {
-  const data = await api<{ recurring?: Array<Record<string, unknown>> }>('/api/admin/operations?view=recurring');  const target = document.querySelector<HTMLElement>('[data-admin-recurring]');
+  const data = await api<{ recurring?: Array<Record<string, unknown>>; recurringEnabled?: boolean }>(
+    '/api/admin/operations?view=recurring',
+  );
+  const recurringEnabled = data.recurringEnabled !== false;
+  recurringSchedulingAvailable = recurringEnabled;
+  const notice = document.querySelector<HTMLElement>('[data-admin-recurring-notice]');
+  if (notice) {
+    notice.innerHTML = recurringEnabled
+      ? ''
+      : '<p class="admin-error" role="status">Recurring scheduling is temporarily disabled in this deployment. Existing plans and appointments are unchanged. Ask the owner to enable recurring scheduling.</p>';
+  }
+  const createForm = document.querySelector<HTMLFormElement>('[data-admin-recurring-create]');
+  if (createForm) createForm.hidden = !recurringEnabled;
+  const writable = can('job.write') && recurringEnabled;
+  const target = document.querySelector<HTMLElement>('[data-admin-recurring]');
   if (target) {
     renderTable(target, ['Customer', 'Property', 'Frequency', 'Window', 'Start', 'Duration', 'Price', 'Next visit', 'Sync', 'Status', 'Action'], (data.recurring ?? []).map((plan) => [
       esc([plan.first_name, plan.last_name].filter(Boolean).join(' ')),
       esc([plan.line1, plan.city].filter(Boolean).join(', ')),
       esc(titleCase(plan.frequency)),
-      can('job.write') ? `<select class="admin-select" data-recurring-window="${esc(plan.id)}"><option value="">Not scheduled</option><option value="morning"${plan.window === 'morning' ? ' selected' : ''}>Morning</option><option value="afternoon"${plan.window === 'afternoon' ? ' selected' : ''}>Afternoon</option></select>` : esc(plan.window ? titleCase(String(plan.window)) : 'Not scheduled'),
-      can('job.write') ? `<input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(plan.start_time ?? '')}" data-recurring-start="${esc(plan.id)}" />` : esc(plan.start_time ?? '?'),
-      can('job.write') ? `<input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" />` : esc(plan.duration_minutes ? `${plan.duration_minutes} min` : '?'),
+      writable ? `<select class="admin-select" data-recurring-window="${esc(plan.id)}"><option value="">Not scheduled</option><option value="morning"${plan.window === 'morning' ? ' selected' : ''}>Morning</option><option value="afternoon"${plan.window === 'afternoon' ? ' selected' : ''}>Afternoon</option></select>` : esc(plan.window ? titleCase(String(plan.window)) : 'Not scheduled'),
+      writable ? `<input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(plan.start_time ?? '')}" data-recurring-start="${esc(plan.id)}" />` : esc(plan.start_time ?? '?'),
+      writable ? `<input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" />` : esc(plan.duration_minutes ? `${plan.duration_minutes} min` : '?'),
       esc(money(plan.ongoing_price_cents)),
       esc(dateTime(plan.next_visit_date)),
       `<span class="admin-status">${esc(titleCase(plan.sync_status ?? 'pending'))}</span>`,
-      can('job.write') ? `<select class="admin-select" data-recurring-status="${esc(plan.id)}">${['active', 'paused', 'cancelled', 'completed'].map((status) => `<option value="${status}"${status === plan.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select>` : `<span class="admin-status">${esc(titleCase(plan.status))}</span>`,
-      can('job.write') ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-save" data-id="${esc(plan.id)}">Save</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrences" data-id="${esc(plan.id)}">Occurrences</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-sync" data-id="${esc(plan.id)}">Sync</button></div>` : '',
+      writable ? `<select class="admin-select" data-recurring-status="${esc(plan.id)}">${['active', 'paused', 'cancelled', 'completed'].map((status) => `<option value="${status}"${status === plan.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select>` : `<span class="admin-status">${esc(titleCase(plan.status))}</span>`,
+      `<div class="admin-actions">${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-save" data-id="${esc(plan.id)}">Save</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrences" data-id="${esc(plan.id)}">Occurrences</button>${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-sync" data-id="${esc(plan.id)}">Sync</button>` : ''}</div>`,
     ]), 'No recurring plans are recorded yet.');
   }
   await loadCustomerOptions();
@@ -924,15 +942,17 @@ async function loadRecurringOccurrences(planId: string): Promise<void> {
       esc(titleCase(occurrence.status)),
       esc(occurrence.appointment_reference || '—'),
       esc(occurrence.sync_error || occurrence.appointment_status || '—'),
-      `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrence-skip" data-plan="${esc(
-        planId,
-      )}" data-id="${esc(occurrence.id)}">Skip</button><input class="input" type="date" value="${esc(
-        occurrence.occurrence_date,
-      )}" data-occurrence-date /><input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(
-        occurrence.start_at ? new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(String(occurrence.start_at))) : '08:00',
-      )}" data-occurrence-time /><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrence-reschedule" data-plan="${esc(
-        planId,
-      )}" data-id="${esc(occurrence.id)}">Reschedule</button></div>`,
+      recurringSchedulingAvailable && can('job.write')
+        ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrence-skip" data-plan="${esc(
+            planId,
+          )}" data-id="${esc(occurrence.id)}">Skip</button><input class="input" type="date" value="${esc(
+            occurrence.occurrence_date,
+          )}" data-occurrence-date /><input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(
+            occurrence.start_at ? new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(String(occurrence.start_at))) : '08:00',
+          )}" data-occurrence-time /><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrence-reschedule" data-plan="${esc(
+            planId,
+          )}" data-id="${esc(occurrence.id)}">Reschedule</button></div>`
+        : '<span class="admin-muted">View only while recurring scheduling is disabled.</span>',
     ]),
     'No occurrences found for this plan.',
   );

@@ -237,3 +237,25 @@ test('the manual booking form stays usable at phone width without horizontal ove
     await context.close();
   }
 });
+
+test('the admin explains that recurring scheduling is temporarily disabled', async () => {
+  const { context, page } = await openAdmin();
+  try {
+    await page.route('**/api/admin/operations*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, recurring: [], recurringEnabled: false }),
+      });
+    });
+    await page.getByRole('button', { name: 'Recurring Plans' }).click();
+    await page.waitForSelector('[data-admin-recurring-notice]');
+    assert.match(
+      (await page.textContent('[data-admin-recurring-notice]')) ?? '',
+      /Recurring scheduling is temporarily disabled/i,
+    );
+    assert.equal(await page.locator('[data-admin-recurring-create]').isHidden(), true);
+  } finally {
+    await context.close();
+  }
+});
