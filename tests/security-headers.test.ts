@@ -13,6 +13,8 @@ test('the production CSP allows the first-party integrations without wildcard sc
   assert.match(script, /https:\/\/www\.googletagmanager\.com/);
   assert.match(script, /https:\/\/challenges\.cloudflare\.com/);
   assert.doesNotMatch(script, /(^|\s)https:(\s|$)/, 'no wildcard https script source');
+  assert.match(line ?? '', /style-src [^;]*https:\/\/fonts\.googleapis\.com/);
+  assert.match(line ?? '', /font-src [^;]*https:\/\/fonts\.gstatic\.com/);
   assert.match(line ?? '', /frame-ancestors 'none'/);
   assert.match(line ?? '', /object-src 'none'/);
 });
