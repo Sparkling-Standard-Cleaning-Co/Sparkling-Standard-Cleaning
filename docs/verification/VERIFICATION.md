@@ -1,5 +1,39 @@
 # Verification status
 
+## Production release - 2026-11-07
+
+**Production code:** `a4f0b85` on `production-safe`. **Cloudflare Pages
+deployment:** `4c008a4c-8847-4744-be94-4841a2b06bee` (Active).
+**Migrations:** 31 total; `0029`, `0030`, `0031` applied successfully in order.
+**Backup:** `sparkling-standard-20261107-123919.ssbk`, SHA-256
+`fa664faa93c584008b1274d9a8848681a926711ea504f481fada2687492231c6`; restore test
+passed.
+
+**Deployed scope:** the complete remediation commit `5f8e264` (admin manual
+booking, booking recovery, recurring administration, financial, document, CRM,
+security, infrastructure, accessibility and SEO work), the estimator UX
+corrections `d96cd2e`, and the CSP/Maps fixes.
+
+**Production verification:** homepage, service pages, four estimator routes,
+admin page, document/gift/invoice/authorization token pages and employee portal
+returned 200. Live Google availability produced real slots; the calendar picker,
+address confirmation, final-step scroll and 320–1280px CTA layout passed a real
+browser flow with no console/page errors. Checkout readiness is live mode with all
+checks true. Webhook rejects unsigned requests (400). Every admin/employee API
+rejects unauthenticated requests (401). Production pricing fingerprint matches the
+local source exactly. D1 foreign-key check is clean and business counts match the
+pre-deployment backup (6 customers, 6 requests, 1 appointment, 0 payments).
+
+**Regression found and fixed during smoke:** the initial CSP tightening blocked
+Google Maps scripts and fonts. Production smoke caught it; `9eee9cd` and `a4f0b85`
+added only `maps.googleapis.com`, `maps.gstatic.com`, `fonts.googleapis.com` and
+`fonts.gstatic.com`, and the final browser check shows zero CSP errors. A
+`security-headers` test now guards the explicit allowlist.
+
+**Not performed:** real-money charges/refunds, live Stripe session races, real
+customer emails, appointment changes, legal-document activation, owner MFA
+enrollment, Google secret rotation or off-site restore.
+
 ## Local estimator UX release candidate - 2026-11-07 (not deployed)
 
 **Branch:** `remediation/audit-2026-11-01`. This candidate includes the earlier

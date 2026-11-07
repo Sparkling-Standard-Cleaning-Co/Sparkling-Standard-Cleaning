@@ -375,7 +375,9 @@ The remediation branch adds migrations `0029` (booking commitments), `0030`
 (booking payment claims) and `0031` (document execution integrity). They are
 additive and must be applied in order before deploying code that reads the new
 columns.
-## 2026-11-07 combined release candidate (owner approval required)
+## 2026-11-07 combined release - DEPLOYED
+
+**Production code:** `a4f0b85` on `production-safe`. **Cloudflare Pages:** `4c008a4c-8847-4744-be94-4841a2b06bee`. **Migrations:** 31 applied; `0029`-`0031` succeeded in order. The CSP regression found in the first smoke pass was fixed and reverified before closeout.
 
 **Candidate:** `remediation/audit-2026-11-01` at the commit containing this note.
 **Production baseline:** `e81e225` / migration 28.
