@@ -465,3 +465,81 @@ test('pause, resume and cancel preserve the horizon without duplicates or owner-
     'cancelled',
   );
 });
+test('a property without saved coordinates is geocoded before recurring scheduling', async () => {
+  const env = { GOOGLE_CLIENT_ID: 'x', GOOGLE_CLIENT_SECRET: 'x', GOOGLE_REFRESH_TOKEN: 'x', GOOGLE_CALENDAR_ID: 'x' } as never;
+  const f = await fixture(1);
+  f.db.raw.prepare('UPDATE properties SET latitude = NULL, longitude = NULL WHERE id = ?').run(f.propertyId);
+  const plan = await createRecurring(f.db, f.actor, {
+    customerId: f.customerId, propertyId: f.propertyId, frequency: 'biweekly', startDate: f.startDate,
+    window: 'morning', startTime: '08:30', durationMinutes: 270, crewSize: 1, ongoingPrice: 120,
+  });
+  const calendar = makeCalendar(['family-cleaner'], '08:30');
+  const geocoded = {
+    label: '228 Promenade Ln, Cantonment, FL 32533',
+    lat: 30.5822045,
+    lng: -87.3244645,
+    source: 'census' as const,
+    zip: '32533',
+    state: 'FL',
+    precise: true,
+  };
+  const result = await syncRecurringPlan(env, f.db, f.actor, plan.id, {
+    deps: { ...calendar.deps, geocode: (async () => geocoded) as never },
+  });
+  assert.equal(result.ok, true);
+  assert.ok(result.created > 0);
+  assert.ok(calendar.events.size > 0);
+  const occurrence = f.db.raw
+    .prepare("SELECT status, occurrence_date FROM recurring_occurrences WHERE plan_id = ? AND status = 'scheduled' LIMIT 1")
+    .get(plan.id) as { status: string; occurrence_date: string };
+  assert.equal(occurrence.status, 'scheduled');
+
+  const f2 = await fixture(1);
+  f2.db.raw.prepare('UPDATE properties SET latitude = NULL, longitude = NULL WHERE id = ?').run(f2.propertyId);
+  const plan2 = await createRecurring(f2.db, f2.actor, {
+    customerId: f2.customerId, propertyId: f2.propertyId, frequency: 'weekly', startDate: f2.startDate,
+    window: 'morning', startTime: '08:30', durationMinutes: 270, crewSize: 1, ongoingPrice: 120,
+  });
+  const prepared = await prepareRecurringScheduleChange(
+    env,
+    f2.db,
+    f2.actor,
+    plan2.id,
+    {},
+    { geocode: (async () => null) as never },
+  );
+  assert.equal(prepared.ok, false);
+  assert.equal(prepared.conflicts[0]?.reason, 'property_location_missing');
+});
+test('a partially scheduled plan records its conflict and a retry fills only the missing date', async () => {
+  const env = { GOOGLE_CLIENT_ID: 'x', GOOGLE_CLIENT_SECRET: 'x', GOOGLE_REFRESH_TOKEN: 'x', GOOGLE_CALENDAR_ID: 'x' } as never;
+  const f = await fixture(1);
+  const plan = await createRecurring(f.db, f.actor, {
+    customerId: f.customerId, propertyId: f.propertyId, frequency: 'biweekly', startDate: f.startDate,
+    window: 'morning', startTime: '07:00', durationMinutes: 120, crewSize: 1, ongoingPrice: 120,
+  });
+  const conflicts = new Set([f.startDate]);
+  const calendar = makeCalendar(['family-cleaner'], '07:00', conflicts);
+  const partial = await syncRecurringPlan(env, f.db, f.actor, plan.id, { deps: calendar.deps });
+  assert.equal(partial.ok, false);
+  assert.equal(partial.status, 'partially_scheduled');
+  assert.ok(partial.conflicts.some((conflict) => conflict.date === f.startDate && conflict.reason === 'slot_unavailable'));
+  const stored = f.db.raw.prepare('SELECT sync_status, sync_error FROM recurring_plans WHERE id = ?').get(plan.id) as {
+    sync_status: string;
+    sync_error: string;
+  };
+  assert.equal(stored.sync_status, 'partially_scheduled');
+  assert.match(stored.sync_error, new RegExp(`${f.startDate}:slot_unavailable`));
+  const before = f.db.raw.prepare("SELECT COUNT(*) AS n FROM recurring_occurrences WHERE plan_id = ? AND status = 'scheduled'").get(plan.id) as { n: number };
+
+  conflicts.delete(f.startDate);
+  const retried = await syncRecurringPlan(env, f.db, f.actor, plan.id, { deps: calendar.deps });
+  assert.equal(retried.ok, true);
+  assert.equal(retried.status, 'fully_scheduled');
+  const after = f.db.raw.prepare("SELECT COUNT(*) AS n FROM recurring_occurrences WHERE plan_id = ? AND status = 'scheduled'").get(plan.id) as { n: number };
+  assert.equal(after.n, before.n + 1, 'retry creates exactly the missing occurrence');
+  assert.equal(
+    (f.db.raw.prepare('SELECT sync_error FROM recurring_plans WHERE id = ?').get(plan.id) as { sync_error: string }).sync_error,
+    '',
+  );
+});

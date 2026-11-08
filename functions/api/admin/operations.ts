@@ -84,6 +84,19 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
   }
 }
 
+function planSyncResponse(planId: string, sync: Awaited<ReturnType<typeof syncRecurringPlan>>): Response {
+  return json(
+    {
+      ok: true,
+      saved: true,
+      planId,
+      scheduling: sync.ok ? 'scheduled' : sync.errors.length > 0 ? 'sync_pending' : 'needs_attention',
+      sync,
+    },
+    200,
+  );
+}
+
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const db = adminDb(context.env);
   if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
@@ -99,8 +112,22 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const action = String(body.action ?? '');
     if (action === 'create_recurring') {
       const created = await createRecurring(db, actor, body);
-      const sync = await syncRecurringPlan(context.env as RecurringEnv, db, actor, created.id);
-      return json({ ok: sync.ok, ...created, sync }, sync.ok ? 200 : 502);
+      let sync: Awaited<ReturnType<typeof syncRecurringPlan>>;
+      try {
+        sync = await syncRecurringPlan(context.env as RecurringEnv, db, actor, created.id);
+      } catch (error) {
+        return json(
+          {
+            ok: true,
+            saved: true,
+            planId: created.id,
+            scheduling: 'needs_attention',
+            error: error instanceof AdminAuthError ? error.code : 'sync_failed',
+          },
+          200,
+        );
+      }
+      return planSyncResponse(created.id, sync);
     }
     if (action === 'update_recurring') {
       const planId = String(body.planId ?? '');
@@ -116,7 +143,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           planId,
           requestedStatus as 'paused' | 'cancelled' | 'completed',
         );
-        return json({ ok: sync.ok, sync }, sync.ok ? 200 : 502);
+        return planSyncResponse(planId, sync);
       }
       if (changesSchedule) {
         const applied = await applyRecurringScheduleChange(
@@ -143,7 +170,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             planId,
             requestedStatus as 'active' | 'paused' | 'cancelled' | 'completed',
           );
-          return json({ ok: status.ok, applied, sync: status }, status.ok ? 200 : 502);
+          return planSyncResponse(planId, status);
         }
         return json({ ...applied, ok: true });
       }
@@ -156,7 +183,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           planId,
           requestedStatus as 'active' | 'paused' | 'cancelled' | 'completed',
         );
-        return json({ ok: sync.ok, sync }, sync.ok ? 200 : 502);
+        return planSyncResponse(planId, sync);
       }
       await updateRecurring(db, actor, planId, body);
       return json({ ok: true });
@@ -166,7 +193,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const sync = await syncRecurringPlan(context.env as RecurringEnv, db, actor, planId, {
         cancelSuperseded: body.cancelSuperseded === true,
       });
-      return json({ ...sync, ok: sync.ok }, sync.ok ? 200 : 502);
+      return planSyncResponse(planId, sync);
     }
     if (action === 'update_occurrence') {
       const occurrenceAction = String(body.occurrenceAction ?? '');

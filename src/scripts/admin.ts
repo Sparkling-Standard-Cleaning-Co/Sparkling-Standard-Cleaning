@@ -166,6 +166,10 @@ function friendly(error: unknown): string {
     d1_confirm_failed: 'Calendar confirmed, but the local appointment record failed. Retry safely.',
     recurring_scheduling_gated:
       'Recurring scheduling is temporarily disabled in this deployment. Existing plans and appointments are unchanged. Ask the owner to enable recurring scheduling.',
+    recurring_property_location_missing:
+      'The property address could not be located for scheduling. Check the saved address or add the map coordinates, then use Sync.',
+    recurring_property_coordinates_missing:
+      'The property has no usable map coordinates. Correct the saved property location, then use Sync.',
     contact_in_use: 'That email or phone belongs to another customer.',
   };
   return messages[code] ?? titleCase(code);
@@ -894,6 +898,93 @@ async function openCustomer(customerId: string): Promise<void> {
 
 let recurringSchedulingAvailable = true;
 
+function recurringReasonLabel(reason: string): string {
+  const labels: Record<string, string> = {
+    travel_unavailable: 'travel route could not be established',
+    slot_unavailable: 'no available start time for the requested duration',
+    fully_booked: 'fully booked',
+    insufficient_resources: 'no qualified crew available',
+    crew_unavailable: 'no qualified crew available',
+    property_location_missing: 'property address could not be located',
+    property_coordinates_missing: 'property map coordinates are missing',
+    past_cutoff: 'date is inside the booking cutoff',
+    day_closed: 'day is closed',
+    beyond_window: 'date is beyond the booking window',
+    resource_unavailable: 'assigned resource is unavailable',
+    calendar_unavailable: 'Google Calendar is temporarily unavailable',
+    calendar_write_failed: 'Google Calendar write failed',
+    calendar_update_failed: 'Google Calendar update failed',
+    calendar_event_missing: 'calendar event is missing',
+    calendar_event_unverified: 'calendar event could not be verified',
+  };
+  return labels[reason] ?? titleCase(reason);
+}
+
+function recurringSyncDetail(value: unknown): string {
+  return String(value ?? '')
+    .split(';')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const separator = entry.indexOf(':');
+      if (separator <= 0) return recurringReasonLabel(entry);
+      const date = entry.slice(0, separator);
+      const reason = entry.slice(separator + 1);
+      return `${date}: ${recurringReasonLabel(reason)}`;
+    })
+    .join(' · ');
+}
+
+async function createRecurringPlan(form: HTMLFormElement): Promise<void> {
+  const data = new FormData(form);
+  const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+  if (submit) submit.disabled = true;
+  setAppError();
+  setSuccess();
+  try {
+    const result = await api<{
+      planId?: string;
+      scheduling?: string;
+      sync?: { conflicts?: Array<{ date?: string; reason?: string }>; errors?: string[] };
+    }>('/api/admin/operations', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'create_recurring',
+        customerId: data.get('customerId'),
+        propertyId: data.get('propertyId'),
+        frequency: data.get('frequency'),
+        startDate: data.get('startDate'),
+        ongoingPrice: data.get('ongoingPrice'),
+        window: data.get('window'),
+        startTime: data.get('startTime'),
+        durationMinutes: data.get('durationMinutes'),
+        firstDurationMinutes: data.get('firstDurationMinutes'),
+        crewSize: data.get('crewSize'),
+      }),
+    });
+    await loadRecurring();
+    if (result.scheduling === 'scheduled') {
+      setSuccess('Recurring plan saved and scheduled.');
+    } else if (result.scheduling === 'sync_pending') {
+      setAppError(
+        'Recurring plan saved. Calendar synchronization is pending; the plan already exists, so use Sync to retry and do not submit it again.',
+      );
+    } else {
+      const affected = (result.sync?.conflicts ?? [])
+        .map((conflict) => `${conflict.date ?? 'date'}: ${recurringReasonLabel(conflict.reason ?? '')}`)
+        .join(' · ');
+      setAppError(
+        `Recurring plan saved, but scheduling needs attention${affected ? ` — ${affected}` : ''}. The plan already exists; do not create it again. Use Sync to retry.`,
+      );
+    }
+  } catch (error) {
+    setAppError(friendly(error));
+    await loadRecurring().catch(() => undefined);
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+}
+
 async function loadRecurring(): Promise<void> {
   const data = await api<{ recurring?: Array<Record<string, unknown>>; recurringEnabled?: boolean }>(
     '/api/admin/operations?view=recurring',
@@ -920,7 +1011,11 @@ async function loadRecurring(): Promise<void> {
       writable ? `<input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" />` : esc(plan.duration_minutes ? `${plan.duration_minutes} min` : '?'),
       esc(money(plan.ongoing_price_cents)),
       esc(dateTime(plan.next_visit_date)),
-      `<span class="admin-status">${esc(titleCase(plan.sync_status ?? 'pending'))}</span>`,
+      `<span class="admin-status">${esc(titleCase(plan.sync_status ?? 'pending'))}</span>${
+        plan.sync_error
+          ? `<p class="admin-muted">${esc(recurringSyncDetail(plan.sync_error))}</p>`
+          : ''
+      }`,
       writable ? `<select class="admin-select" data-recurring-status="${esc(plan.id)}">${['active', 'paused', 'cancelled', 'completed'].map((status) => `<option value="${status}"${status === plan.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select>` : `<span class="admin-status">${esc(titleCase(plan.status))}</span>`,
       `<div class="admin-actions">${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-save" data-id="${esc(plan.id)}">Save</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrences" data-id="${esc(plan.id)}">Occurrences</button>${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-sync" data-id="${esc(plan.id)}">Sync</button>` : ''}</div>`,
     ]), 'No recurring plans are recorded yet.');
@@ -2592,7 +2687,7 @@ for (const form of [
     event.preventDefault();
     const data = new FormData(form);
     if (form.matches('[data-admin-recurring-create]')) {
-      void action('/api/admin/operations', { action: 'create_recurring', customerId: data.get('customerId'), propertyId: data.get('propertyId'), frequency: data.get('frequency'), startDate: data.get('startDate'), ongoingPrice: data.get('ongoingPrice'), window: data.get('window'), startTime: data.get('startTime'), durationMinutes: data.get('durationMinutes'), firstDurationMinutes: data.get('firstDurationMinutes'), crewSize: data.get('crewSize') });
+      void createRecurringPlan(form);
     }
     if (form.matches('[data-admin-team-create]')) {
       void action('/api/admin/operations', { action: 'create_team', displayName: data.get('displayName'), email: data.get('email') });

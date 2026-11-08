@@ -259,3 +259,47 @@ test('the admin explains that recurring scheduling is temporarily disabled', asy
     await context.close();
   }
 });
+test('an unresolved recurring sync is shown as a readable conflict with its date', async () => {
+  const { context, page } = await openAdmin();
+  try {
+    await page.route('**/api/admin/operations*', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            recurringEnabled: true,
+            recurring: [
+              {
+                id: 'rec_test',
+                first_name: 'Christina',
+                last_name: 'Sherwin',
+                line1: '228 Promenade Lane',
+                city: 'Cantonment',
+                frequency: 'biweekly',
+                window: 'morning',
+                start_time: '08:30',
+                duration_minutes: 270,
+                ongoing_price_cents: 12000,
+                next_visit_date: '2026-11-10',
+                sync_status: 'conflict',
+                sync_error: '2026-11-10:travel_unavailable',
+                status: 'active',
+              },
+            ],
+          }),
+        });
+      } else {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+      }
+    });
+    await page.getByRole('button', { name: 'Recurring Plans' }).click();
+    await page.waitForSelector('[data-admin-recurring] table');
+    const text = (await page.textContent('[data-admin-recurring]')) ?? '';
+    assert.match(text, /Conflict/);
+    assert.match(text, /2026-11-10: Travel route could not be established/i);
+  } finally {
+    await context.close();
+  }
+});

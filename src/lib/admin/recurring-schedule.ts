@@ -10,6 +10,7 @@ import {
   type CalendarEventState,
 } from '../booking/google-calendar.ts';
 import { addDays, zonedTimeToUtc } from '../booking/time.ts';
+import { resolveAddress } from '../location/server-geocode.ts';
 import type { AdminActor } from './operations.ts';
 import { AdminAuthError, audit } from './operations.ts';
 import type { D1Database } from './d1.ts';
@@ -23,6 +24,7 @@ export interface RecurringDependencies {
   createEvent: typeof createCalendarEvent;
   updateEvent: typeof updateCalendarEvent;
   deleteEvent: typeof deleteCalendarEvent;
+  geocode: typeof resolveAddress;
 }
 
 export interface RecurringEnv extends BookingEnv, AdminDbEnv {}
@@ -107,8 +109,7 @@ function reference(planId: string, date: string): string {
   return `RECURRING-${planId}-${date}`;
 }
 
-async function loadPlan(db: D1Database, actor: AdminActor, planId: string): Promise<PlanRow> {
-  const branch = actor.role === 'owner' ? { sql: '', bind: [] as unknown[] }
+async function loadPlan(db: D1Database, actor: AdminActor, planId: string): Promise<PlanRow> {  const branch = actor.role === 'owner' ? { sql: '', bind: [] as unknown[] }
     : actor.branchId ? { sql: ' AND r.branch_id = ?', bind: [actor.branchId] } : { sql: ' AND 1 = 0', bind: [] as unknown[] };
   const row = await db.prepare(
     `SELECT r.*, p.line1, p.city, p.state, p.postal_code, p.latitude, p.longitude,
@@ -120,6 +121,29 @@ async function loadPlan(db: D1Database, actor: AdminActor, planId: string): Prom
   ).bind(planId, ...branch.bind).first<PlanRow>();
   if (!row) throw new AdminAuthError(404, 'recurring_not_found');
   return row;
+}
+
+async function recurringDestination(
+  env: RecurringEnv,
+  plan: PlanRow,
+  geocode: typeof resolveAddress,
+): Promise<{ lat: number; lng: number } | null> {
+  const lat = plan.latitude === null || plan.latitude === undefined ? Number.NaN : Number(plan.latitude);
+  const lng = plan.longitude === null || plan.longitude === undefined ? Number.NaN : Number(plan.longitude);
+  if (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    Math.abs(lat) > 0.01 &&
+    Math.abs(lng) > 0.01
+  ) {
+    return { lat, lng };
+  }
+  const address = [plan.line1, plan.city, plan.state, plan.postal_code]
+    .filter((part) => typeof part === 'string' && part.trim().length > 1)
+    .join(', ');
+  if (address.length < 5) return null;
+  const resolved = await geocode(env, address).catch(() => null);
+  return resolved ? { lat: resolved.lat, lng: resolved.lng } : null;
 }
 
 async function cancelFutureOccurrences(
@@ -261,9 +285,9 @@ export async function prepareRecurringScheduleChange(
   const dates = occurrenceDatesWithin(schedule.startDate, schedule.frequency, today, horizon);
   const conflicts: PreparedRecurringSchedule['conflicts'] = [];
   const prepared: PreparedRecurringSchedule['dates'] = [];
-  const destination = { lat: Number(plan.latitude), lng: Number(plan.longitude) };
-  if (!Number.isFinite(destination.lat) || !Number.isFinite(destination.lng)) {
-    return { ok: false, conflicts: [{ date: schedule.startDate, reason: 'property_coordinates_missing' }], dates: [], schedule };
+  const destination = await recurringDestination(env, plan, deps.geocode ?? resolveAddress);
+  if (!destination) {
+    return { ok: false, conflicts: [{ date: schedule.startDate, reason: 'property_location_missing' }], dates: [], schedule };
   }
   const availability = deps.availability ?? availabilityForDate;
   const excludeEventIds = await occurrenceEventIds(db, planId);
@@ -435,6 +459,7 @@ export async function syncRecurringPlan(
     createEvent: createCalendarEvent,
     updateEvent: updateCalendarEvent,
     deleteEvent: deleteCalendarEvent,
+    geocode: resolveAddress,
     ...options.deps,
   };
   const plan = await loadPlan(db, actor, planId);
@@ -466,9 +491,9 @@ export async function syncRecurringPlan(
   }
 
   const schedule = effectiveRecurringSchedule(plan, options.schedule);
-  const destination = { lat: Number(plan.latitude), lng: Number(plan.longitude) };
-  if (!Number.isFinite(destination.lat) || !Number.isFinite(destination.lng)) {
-    throw new AdminAuthError(400, 'recurring_property_coordinates_missing');
+  const destination = await recurringDestination(env, plan, deps.geocode);
+  if (!destination) {
+    throw new AdminAuthError(400, 'recurring_property_location_missing');
   }
   const today = localToday();
   const horizon = addDays(today, bookingConfig.maxAdvanceDays);
@@ -701,6 +726,13 @@ export async function syncRecurringPlan(
     }
   }
 
+  const conflictDetail = result.conflicts
+    .map((conflict) => `${conflict.date}:${conflict.reason}`)
+    .join('; ');
+  const syncDetail = [...result.errors, conflictDetail]
+    .filter((entry) => entry.length > 0)
+    .join('; ')
+    .slice(0, 1000);
   await db
     .prepare(
       'UPDATE recurring_plans SET next_visit_date = ?, sync_status = ?, sync_error = ?, updated_at = ? WHERE id = ?',
@@ -714,7 +746,7 @@ export async function syncRecurringPlan(
             ? 'partially_scheduled'
             : 'conflict'
           : 'fully_scheduled',
-      result.errors.join('; ').slice(0, 1000),
+      syncDetail,
       new Date().toISOString(),
       planId,
     )
@@ -964,6 +996,7 @@ export async function updateRecurringOccurrence(
     createEvent: createCalendarEvent,
     updateEvent: updateCalendarEvent,
     deleteEvent: deleteCalendarEvent,
+    geocode: resolveAddress,
     ...depsOverride,
   };
   const plan = await loadPlan(db, actor, planId);
@@ -1018,9 +1051,9 @@ export async function updateRecurringOccurrence(
     .bind(planId, date)
     .first<{ id: string }>();
   if (existing) throw new AdminAuthError(409, 'recurring_occurrence_date_conflict');
-  const destination = { lat: Number(plan.latitude), lng: Number(plan.longitude) };
-  if (!Number.isFinite(destination.lat) || !Number.isFinite(destination.lng)) {
-    throw new AdminAuthError(400, 'recurring_property_coordinates_missing');
+  const destination = await recurringDestination(env, plan, deps.geocode);
+  if (!destination) {
+    throw new AdminAuthError(400, 'recurring_property_location_missing');
   }
   const duration =
     occurrence.occurrence_date === plan.start_date
