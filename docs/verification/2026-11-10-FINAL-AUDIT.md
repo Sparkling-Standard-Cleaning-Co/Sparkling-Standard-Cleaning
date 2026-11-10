@@ -113,10 +113,15 @@ Categories: **A** genuine technical defect, **B** unfinished implementation,
 
 ## 7. Production release status
 
-The application-code release for this audit is recorded in
-`docs/verification/VERIFICATION.md` and the final reconciliation report.
-Cloudflare production, GitHub `main` and `production-safe`, and the local
-checkout must remain on the same verified tip.
+- **Application code:** `a48d3e5` on `main` and `production-safe`.
+- **Cloudflare Pages production deployment:** `65fb9eb3-efdf-48cb-9f60-6880cdcd19ef`
+  (source `a48d3e5`, branch `production-safe`, Active).
+- **GitHub Actions:** `validate` and `browser` both green on `main` and `production-safe`
+  (runs `42914568644` and `42914568562`).
+- **Migrations:** 31 applied; no new migration required.
+- The documentation closeout commit follows on the same branch with no application-code change.
+  Cloudflare production, GitHub `main`/`production-safe` and the local checkout remain on the
+  same verified application tree.
 
 ## 8. Recommended closure order
 

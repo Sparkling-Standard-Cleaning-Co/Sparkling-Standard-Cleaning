@@ -31,8 +31,11 @@ Full system-by-system evidence and the complete categorized pending inventory:
 
 **Final verification:** 839 unit tests (838 pass, 1 pre-existing skip),
 208 browser tests (all pass), `check` 0 errors (1 pre-existing hint), build,
-validation and smoke all passed. The final deployed SHA and Cloudflare
-deployment ID are recorded in the reconciliation report.
+validation and smoke all passed. **Application code `a48d3e5` is deployed in
+Cloudflare Pages deployment `65fb9eb3-efdf-48cb-9f60-6880cdcd19ef`**; GitHub
+`validate` and `browser` passed on both `main` and `production-safe` (runs
+`42914568644` and `42914568562`). The documentation closeout follows with no
+application-code change.
 
 ## Production release - 2026-11-10 repository reconciliation
 
