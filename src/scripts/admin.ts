@@ -62,6 +62,8 @@ const viewMeta: Record<string, [string, string]> = {
   finance: ['Invoices & Payments', 'Invoicing, payments, credits and reconciliation.'],
   gift: ['Gift Certificates', 'Existing production gift register.'],
   reports: ['Reports', 'Operational and financial reporting.'],
+  storage: ['Data & Storage', 'Database health, business-record counts, exports and photo retention.'],
+  promotions: ['Promotions & Discounts', 'Owner-controlled codes, schedules, limits and redemption reporting.'],
   pricing: ['Pricing & Estimator Control', 'Published prices, draft changes, simulations and version history.'],
   settings: ['Settings & Audit', 'Access, security, configuration and audit history.'],
 };
@@ -2140,6 +2142,204 @@ async function openDocumentRequest(id: string): Promise<void> {
     ${signatures.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Document</th><th>Version</th><th>Signer</th><th>Status</th><th>Signed</th><th>Actions</th></tr></thead><tbody>${signatures.map((signature) => `<tr><td>${esc(signature.title)}</td><td>${esc(signature.template_version)}</td><td>${esc(signature.signer_name)}</td><td><span class="admin-status">${esc(titleCase(signature.status))}</span></td><td>${esc(dateTime(signature.signed_at))}</td><td><div class="admin-actions"><a class="btn btn--ghost btn--small" href="/api/admin/documents?view=download&signatureId=${encodeURIComponent(String(signature.id))}">Download</a>${signature.status === 'awaiting_verification' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-verify" data-id="${esc(signature.id)}">Verify</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-reject" data-id="${esc(signature.id)}">Reject</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No signatures yet.</p>'}</div>`;
 }
 
+document.querySelector<HTMLElement>('[data-admin-view="storage"]')?.addEventListener('click', (event) => {
+  const exportKind = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-export]')?.dataset.adminExport;
+  if (exportKind) window.location.assign(`/api/admin/storage?export=${encodeURIComponent(exportKind)}`);
+});
+async function loadStorage(): Promise<void> {
+  const data = await api<{
+    database?: { bytes?: number | null; counts?: Record<string, number | null> };
+    storage?: { photos?: { configured?: boolean; sampledObjects?: number }; documents?: { configured?: boolean; sampledObjects?: number } };
+    settings?: Array<Record<string, unknown>>;
+    note?: string;
+  }>('/api/admin/storage');
+  const kpis = document.querySelector<HTMLElement>('[data-admin-storage-kpis]');
+  const counts = data.database?.counts ?? {};
+  if (kpis) {
+    kpis.innerHTML = [
+      ['D1 size', data.database?.bytes ? `${(Number(data.database.bytes) / 1024 / 1024).toFixed(2)} MB` : 'not reported'],
+      ['Customers', counts.customers ?? 0],
+      ['Properties', counts.properties ?? 0],
+      ['Appointments', counts.appointments ?? 0],
+      ['Invoices', counts.invoices ?? 0],
+      ['Document templates', counts.documents ?? 0],
+      ['Photo bucket objects (sampled)', data.storage?.photos?.sampledObjects ?? 0],
+      ['Document bucket objects (sampled)', data.storage?.documents?.sampledObjects ?? 0],
+    ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('');
+  }
+  const note = document.querySelector<HTMLElement>('[data-admin-storage-note]');
+  if (note) note.textContent = data.note ?? '';
+  const target = document.querySelector<HTMLElement>('[data-admin-storage-settings]');
+  if (target) {
+    target.innerHTML = (data.settings ?? []).length
+      ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Record</th><th>Value</th><th>Updated</th></tr></thead><tbody>${(data.settings ?? []).map((row) => `<tr><td>${esc(row.key)}</td><td><code>${esc(String(row.value_json ?? '').slice(0, 500))}</code></td><td>${esc(dateTime(row.updated_at))}</td></tr>`).join('')}</tbody></table></div>`
+      : '<p class="admin-muted">No backup or cleanup status has been recorded yet.</p>';
+  }
+  const status = document.querySelector<HTMLElement>('[data-admin-storage-status]');
+  if (status) status.textContent = `Last refreshed ${new Date().toLocaleString()}.`;
+}
+
+async function storageCleanup(dryRun: boolean): Promise<void> {
+  const status = document.querySelector<HTMLElement>('[data-admin-storage-status]');
+  if (status) status.textContent = dryRun ? 'Previewing eligible photos...' : 'Deleting eligible photos...';
+  try {
+    const result = await api<{ eligible?: number; deleted?: number; scanned?: number; dryRun?: boolean }>('/api/admin/storage', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'photo_cleanup', days: 30, dryRun }),
+    });
+    if (status) {
+      status.textContent = dryRun
+        ? `${result.eligible ?? 0} eligible photo object(s) older than 30 days; nothing deleted.`
+        : `${result.deleted ?? 0} eligible photo object(s) deleted safely.`;
+    }
+    await loadStorage();
+  } catch (error) {
+    if (status) status.textContent = friendly(error);
+  }
+}
+
+document.querySelector<HTMLElement>('[data-admin-view="storage"]')?.addEventListener('click', (event) => {
+  const action = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-action]')?.dataset.adminAction;
+  if (action === 'storage-refresh') void loadStorage().catch((error) => setAppError(friendly(error)));
+  if (action === 'storage-cleanup-preview') void storageCleanup(true);
+  if (action === 'storage-cleanup-run') {
+    if (window.confirm('Delete only eligible customer photos older than 30 days? Financial, legal, booking and agreement records are never touched.')) {
+      void storageCleanup(false);
+    }
+  }
+});
+async function loadPromotions(): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-admin-promotions]');
+  if (!target) return;
+  const data = await api<{ promotions?: Array<Record<string, unknown>> }>('/api/admin/promotions');
+  const promotions = data.promotions ?? [];
+  renderTable(target, ['Name', 'Code', 'Type', 'Discount', 'Services', 'Branches', 'Window', 'Used', 'Status', 'Actions'], promotions.map((promotion) => [
+    esc(promotion.name),
+    esc(promotion.code),
+    esc(titleCase(promotion.kind)),
+    promotion.kind === 'percent' ? `${esc(promotion.percent)}%` : money(promotion.valueCents),
+    esc((promotion.services as string[] | undefined)?.join(', ') || '-'),
+    esc((promotion.branches as string[] | undefined)?.join(', ') || '-'),
+    `${esc(dateTime(promotion.startsAt))} - ${esc(dateTime(promotion.expiresAt))}`,
+    `${esc(promotion.redeemedCount ?? 0)} / ${promotion.maxRedemptions ? esc(promotion.maxRedemptions) : 'unlimited'}`,
+    `<span class="admin-status">${esc(titleCase(promotion.displayStatus ?? promotion.status))}</span>`,
+    `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-promotion-edit="${esc(promotion.id)}">Edit</button>${promotion.status === 'active' ? `<button class="btn btn--ghost btn--small" type="button" data-promotion-status="${esc(promotion.id)}" data-status="disabled">Deactivate</button>` : `<button class="btn btn--ghost btn--small" type="button" data-promotion-status="${esc(promotion.id)}" data-status="active">Activate</button>`}<button class="btn btn--ghost btn--small" type="button" data-promotion-duplicate="${esc(promotion.id)}">Duplicate</button></div>`,
+  ]), 'No promotions yet. The Thanksgiving draft appears after migration 0032 is applied.');
+  (window as unknown as { __ssPromotions?: Array<Record<string, unknown>> }).__ssPromotions = promotions;
+}
+
+function promotionForm(): HTMLFormElement | null {
+  return document.querySelector<HTMLFormElement>('[data-promotion-form]');
+}
+
+function fillPromotionForm(promotion: Record<string, unknown>): void {
+  const form = promotionForm();
+  if (!form) return;
+  const set = (name: string, value: unknown): void => {
+    const field = form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null;
+    if (field) field.value = value === null || value === undefined ? '' : String(value);
+  };
+  set('id', promotion.id);
+  set('name', promotion.name);
+  set('code', promotion.code);
+  set('kind', promotion.kind);
+  set('value', promotion.kind === 'fixed' ? Number(promotion.valueCents ?? 0) / 100 : '');
+  set('percent', promotion.percent ?? '');
+  set('minPurchase', Number(promotion.minPurchaseCents ?? 0) / 100);
+  set('maxDiscount', Number(promotion.maxDiscountCents ?? 0) / 100);
+  set('startsAt', promotion.startsAt ? String(promotion.startsAt).slice(0, 16) : '');
+  set('expiresAt', promotion.expiresAt ? String(promotion.expiresAt).slice(0, 16) : '');
+  set('maxRedemptions', promotion.maxRedemptions ?? 0);
+  set('perCustomerLimit', promotion.perCustomerLimit ?? 1);
+  set('status', promotion.status ?? 'draft');
+  for (const box of form.querySelectorAll<HTMLInputElement>('input[name="services"]')) {
+    box.checked = Array.isArray(promotion.services) && promotion.services.includes(box.value);
+  }
+  for (const box of form.querySelectorAll<HTMLInputElement>('input[name="branches"]')) {
+    box.checked = Array.isArray(promotion.branches) && promotion.branches.includes(box.value);
+  }
+  for (const [name, value] of [['newCustomersOnly', promotion.newCustomersOnly], ['recurringOnly', promotion.recurringOnly], ['firstVisitOnly', promotion.firstVisitOnly], ['combinable', promotion.combinable]] as Array<[string, unknown]>) {
+    const box = form.elements.namedItem(name) as HTMLInputElement | null;
+    if (box) box.checked = Boolean(value);
+  }
+  form.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+document.querySelector<HTMLFormElement>('[data-promotion-form]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const data = new FormData(form);
+  const status = document.querySelector<HTMLElement>('[data-promotion-status]');
+  const services = [...form.querySelectorAll<HTMLInputElement>('input[name="services"]:checked')].map((box) => box.value);
+  const branches = [...form.querySelectorAll<HTMLInputElement>('input[name="branches"]:checked')].map((box) => box.value);
+  const iso = (value: FormDataEntryValue | null): string => {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    const parsed = new Date(raw);
+    return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : '';
+  };
+  const payload = {
+    action: data.get('id') ? 'update' : 'create',
+    id: String(data.get('id') ?? ''),
+    name: data.get('name'),
+    code: data.get('code'),
+    kind: data.get('kind'),
+    valueCents: Math.round(Number(data.get('value') ?? 0) * 100),
+    percent: Number(data.get('percent') ?? 0),
+    services,
+    branches,
+    minPurchaseCents: Math.round(Number(data.get('minPurchase') ?? 0) * 100),
+    maxDiscountCents: Math.round(Number(data.get('maxDiscount') ?? 0) * 100),
+    startsAt: iso(data.get('startsAt')),
+    expiresAt: iso(data.get('expiresAt')),
+    maxRedemptions: Number(data.get('maxRedemptions') ?? 0),
+    perCustomerLimit: Number(data.get('perCustomerLimit') ?? 1),
+    status: data.get('status'),
+    newCustomersOnly: data.get('newCustomersOnly') === 'on',
+    recurringOnly: data.get('recurringOnly') === 'on',
+    firstVisitOnly: data.get('firstVisitOnly') === 'on',
+    combinable: data.get('combinable') === 'on',
+  };
+  if (status) status.textContent = 'Saving...';
+  void api('/api/admin/promotions', { method: 'POST', body: JSON.stringify(payload) })
+    .then(() => {
+      if (status) status.textContent = 'Promotion saved. Drafts stay hidden from customers until activated.';
+      form.reset();
+      return loadPromotions();
+    })
+    .catch((error) => {
+      if (status) status.textContent = friendly(error);
+    });
+});
+
+document.querySelector<HTMLElement>('[data-admin-promotions]')?.addEventListener('click', (event) => {
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-promotion-edit], [data-promotion-status], [data-promotion-duplicate]');
+  if (!target) return;
+  const editId = target.dataset.promotionEdit;
+  const statusId = target.dataset.promotionStatus;
+  const duplicateId = target.dataset.promotionDuplicate;
+  const promotions = (window as unknown as { __ssPromotions?: Array<Record<string, unknown>> }).__ssPromotions ?? [];
+  if (editId) {
+    const promotion = promotions.find((entry) => String(entry.id) === editId);
+    if (promotion) fillPromotionForm(promotion);
+    return;
+  }
+  if (duplicateId) {
+    void api('/api/admin/promotions', { method: 'POST', body: JSON.stringify({ action: 'duplicate', id: duplicateId }) })
+      .then(() => loadPromotions())
+      .catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (statusId && target.dataset.status) {
+    void api('/api/admin/promotions', { method: 'POST', body: JSON.stringify({ action: 'status', id: statusId, status: target.dataset.status }) })
+      .then(() => loadPromotions())
+      .catch((error) => setAppError(friendly(error)));
+  }
+});
+
+document.querySelector<HTMLElement>('[data-promotion-reset]')?.addEventListener('click', () => {
+  document.querySelector<HTMLFormElement>('[data-promotion-form]')?.reset();
+});
 async function loadView(view: string): Promise<void> {
   const permission = navPermission[view];
   if (permission && !can(permission)) {
@@ -2168,6 +2368,8 @@ async function loadView(view: string): Promise<void> {
     if (view === 'finance') await loadFinance();
     if (view === 'gift') await loadGifts();
     if (view === 'reports') await loadReports();
+    if (view === 'storage') await loadStorage();
+    if (view === 'promotions') await loadPromotions();
     if (view === 'pricing') await loadPricingView();
     if (view === 'settings') await loadSettings();
   } catch (error) {

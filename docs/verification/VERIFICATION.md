@@ -1,5 +1,13 @@
 # Verification status
 
+## Admin enhancements - 2026-11-10 (promotions and data controls)
+
+Migration `0032` was applied to production D1 (74 application tables). The owner
+Promotions & Discounts screen, public promo-code validation, checkout discount
+and redemption lifecycle, and the Data & Storage tab were added. The Thanksgiving
+Deep Clean Special is seeded as a **draft** only. Full details and remaining
+limitations: [`docs/verification/2026-11-10-ADMIN-PROMOTIONS-DATA.md`](2026-11-10-ADMIN-PROMOTIONS-DATA.md).
+
 ## Final operational audit - 2026-11-10
 
 Full system-by-system evidence and the complete categorized pending inventory:

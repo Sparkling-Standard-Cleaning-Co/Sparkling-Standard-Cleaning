@@ -41,6 +41,7 @@ import { applyInvoiceCheckoutPayment } from '../../src/lib/admin/stripe-reconcil
 import { completeCheckoutSlotByAttempt, expireCheckoutSlotByAttempt } from '../../src/lib/payments/checkout-registry.ts';
 import { sendSigningEmail } from '../../src/lib/documents/service.ts';
 import { recordSavedCardSetup } from '../../src/lib/admin/stripe-billing.ts';
+import { redeemPromotionRedemption, releasePromotionRedemption } from '../../src/lib/promotions/service.ts';
 import {
   projectStripeDispute,
   projectStripeRefund,
@@ -494,6 +495,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           () => undefined,
         );
       }
+      if (env.DB && /^[a-f0-9]{64}$/i.test(attempt)) {
+        await releasePromotionRedemption(env.DB, attempt.toLowerCase()).catch(() => undefined);
+      }
       if (record && bucket && record.status !== 'completed' && record.status !== 'failed') {
         await writeLedgerJson(bucket, ledgerKey('checkouts', attempt.toLowerCase()), {
           ...record,
@@ -813,6 +817,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             ...(holdId ? { holdId } : {}),
             ...(quoteReference ? { quoteReference } : {}),
             ...(metadata.checkout_attempt ? { checkoutAttempt: metadata.checkout_attempt } : {}),
+            ...(metadata.promotion_code
+              ? { metadata: { promotion_code: metadata.promotion_code, promotion_discount_cents: metadata.promotion_discount_cents ?? '0' } }
+              : {}),
             giftAppliedCents: Number(metadata.gift_applied_cents) || 0,
             totalCents: Number(checkout?.amountCents) || amountCents || 0,
             customerName: customerName || '',
@@ -829,6 +836,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'd1_projection_failed');
           return json({ ok: false, error: 'd1_projection_failed' }, 500);
         }
+      }
+      if (env.DB && metadata.checkout_attempt) {
+        await redeemPromotionRedemption(
+          env.DB,
+          metadata.checkout_attempt,
+          String(session.id ?? ''),
+        ).catch(() => undefined);
       }
       await updateCheckoutRecord(env, metadata.checkout_attempt, session, booking);
       if (env.DB) {

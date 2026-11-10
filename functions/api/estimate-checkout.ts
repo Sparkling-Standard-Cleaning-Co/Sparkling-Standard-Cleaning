@@ -31,6 +31,12 @@ import { autoConfirmPaidBooking } from '../../src/lib/booking/auto-confirm.ts';
 import { projectGiftCleaningPayment } from '../../src/lib/payments/d1-projection.ts';
 import { resolveCheckoutStripeCustomer } from '../../src/lib/payments/stripe-customers.ts';
 import {
+  evaluatePromotionForQuote,
+  redeemPromotionRedemption,
+  releasePromotionRedemption,
+  reservePromotionRedemption,
+} from '../../src/lib/promotions/service.ts';
+import {
   PUBLIC_RATE_LIMITS,
   checkPublicRateLimit,
   clientIp,
@@ -123,6 +129,8 @@ interface CheckoutRecord {
   /** Durable D1 customer and the Stripe Customer linked to it. */
   customerId?: string;
   stripeCustomerId?: string;
+  /** Owner-managed discount applied to this checkout. */
+  promotion?: { id: string; code: string; discountCents: number; redemptionId?: string };
   sessionId?: string;
   sessionUrl?: string;
   /** Tax and itemized amounts captured when the verified session was created. */
@@ -963,6 +971,9 @@ async function fulfillGiftOnlyOrder(
     await deleteLedgerKey(bucket, key).catch(() => undefined);
     return json({ ok: false, error: 'gift_commit_failed' }, 502);
   }
+  if (env.DB && input.attempt) {
+    await redeemPromotionRedemption(env.DB, input.attempt, 'gift').catch(() => undefined);
+  }
   let bookingStatus: 'confirmed' | 'pending_owner_review' | undefined;
   let bookingEventId = '';
   let bookingReason = '';
@@ -1176,7 +1187,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
 
   const pricingConfig = await requestPricingConfig(env.DB);
-  const candidate =
+  let candidate =
     fields.request_type === 'facility_estimate'
       ? await verifyFacilityPayment(fields, env, pricingConfig)
       : await verifyResidentialPayment(fields, env, pricingConfig);
@@ -1229,6 +1240,72 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'stripe_customer_unavailable' }, 502);
   }
 
+  let dynamicPromotion: { id: string; code: string; discountCents: number; customerId: string | null; redemptionId?: string } | null = null;
+  const promotionCode = (fields.promotion_code ?? '').trim().toUpperCase();
+  if (promotionCode && !['SPARKLE15', 'SPARKLE100'].includes(promotionCode)) {
+    const evaluation = await evaluatePromotionForQuote(env.DB ?? null, {
+      code: promotionCode,
+      cleaningAmountCents: candidate.cleaningAmountCents,
+      serviceType: candidate.serviceType,
+      branchId: 'branch_pensacola',
+      frequency: fields.frequency ?? fields.ongoing_frequency ?? 'one_time',
+      quoteReference: candidate.reference,
+      holdId: fields.booking_hold_id ?? '',
+      hasExistingDiscount: candidate.receipt.lines.some((line) => line.kind === 'discount'),
+    });
+    if (!evaluation.ok || !evaluation.promotion || !evaluation.discountCents) {
+      return json({ ok: false, error: 'promotion_invalid', reason: evaluation.reason }, 409);
+    }
+    const discount = evaluation.discountCents;
+    const cleaningAfter = Math.max(0, candidate.cleaningAmountCents - discount);
+    const taxAfter = calculateServiceTax({
+      serviceType: candidate.serviceType,
+      state: fields.address_state ?? null,
+      zip: fields.zip ?? null,
+      taxableBase: cleaningAfter / 100,
+    });
+    if (!taxAfter.canCharge) {
+      return json({ ok: false, error: 'promotion_tax_review_required' }, 409);
+    }
+    const amountAfter = cents(cleaningAfter / 100 + (taxAfter.taxAmount ?? 0));
+    const receiptLines = [
+      ...candidate.receipt.lines,
+      {
+        label: `Promotion - ${evaluation.promotion.name}`,
+        amountCents: -discount,
+        kind: 'discount' as const,
+      },
+    ];
+    const reconciled = (() => {
+      const sum = receiptLines.reduce((total, line) => total + line.amountCents, 0);
+      const difference = cleaningAfter - sum;
+      return difference === 0
+        ? receiptLines
+        : [...receiptLines, { label: 'Adjustment', amountCents: difference, kind: difference < 0 ? ('discount' as const) : ('charge' as const) }];
+    })();
+    candidate = {
+      ...candidate,
+      cleaningAmountCents: cleaningAfter,
+      amountCents: amountAfter,
+      tax: taxAfter,
+      receipt: {
+        ...candidate.receipt,
+        lines: reconciled,
+        subtotalCents: cleaningAfter,
+        taxCents: cents(taxAfter.taxAmount ?? 0),
+        taxRatePercent: taxAfter.ratePercent,
+        taxJurisdiction: taxAfter.jurisdictionLabel,
+        totalCents: amountAfter,
+      },
+    };
+    dynamicPromotion = {
+      id: evaluation.promotion.id,
+      code: evaluation.promotion.code,
+      discountCents: discount,
+      customerId: (evaluation as { customerId?: string }).customerId ?? null,
+    };
+  }
+
   const totalCents = candidate.amountCents;
   const giftCode = (fields.gift_code ?? '').trim().toUpperCase();
   let giftAppliedCents = 0;
@@ -1270,6 +1347,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       fields.booking_hold_id ?? '',
       fields.booking_slot_start ?? '',
       fields.booking_slot_end ?? '',
+      promotionCode,
       giftCode,
       String(giftAppliedCents),
     ].join('|'),
@@ -1342,6 +1420,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     ...(stripeCustomer.stripeCustomerId
       ? { stripeCustomerId: stripeCustomer.stripeCustomerId }
       : {}),
+    ...(dynamicPromotion
+      ? { promotion: { id: dynamicPromotion.id, code: dynamicPromotion.code, discountCents: dynamicPromotion.discountCents } }
+      : {}),
     ...(candidate.quotedTotalCents !== null ? { quotedTotalCents: candidate.quotedTotalCents } : {}),
     tax: candidate.tax,
     photosOutstanding,
@@ -1361,6 +1442,26 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
     return json({ ok: false, error: 'checkout_in_progress' }, 409);
+  }
+
+  if (dynamicPromotion && env.DB) {
+    const reserved = await reservePromotionRedemption(env.DB, dynamicPromotion.id, {
+      code: dynamicPromotion.code,
+      customerId: dynamicPromotion.customerId,
+      checkoutAttempt: attemptFingerprint,
+      quoteReference: candidate.reference,
+      amountCents: dynamicPromotion.discountCents,
+    });
+    if (!reserved.ok) {
+      await deleteLedgerKey(bucket, key).catch(() => undefined);
+      if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
+      return json({ ok: false, error: 'promotion_invalid', reason: reserved.reason }, 409);
+    }
+    if (reserved.redemptionId) {
+      dynamicPromotion.redemptionId = reserved.redemptionId;
+      claim.promotion = { ...claim.promotion!, redemptionId: reserved.redemptionId };
+    }
+    await writeLedgerJson(bucket, key, claim).catch(() => undefined);
   }
 
   let gift:
@@ -1459,6 +1560,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       ),
     ),
   );
+  if (dynamicPromotion) {
+    body.set('metadata[promotion_code]', dynamicPromotion.code);
+    body.set('metadata[promotion_discount_cents]', String(dynamicPromotion.discountCents));
+  }
   if (stripeCustomer.stripeCustomerId) {
     body.set('customer', stripeCustomer.stripeCustomerId);
     body.set('customer_update[email]', 'auto');
@@ -1492,6 +1597,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         await releaseGiftReservation(giftLedger, gift.code, gift.reservationId).catch(
           () => undefined,
         );
+      }
+      if (env.DB && dynamicPromotion?.redemptionId) {
+        await releasePromotionRedemption(env.DB, attemptFingerprint).catch(() => undefined);
       }
       if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
       await deleteLedgerKey(bucket, key).catch(() => undefined);
@@ -1527,6 +1635,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           () => undefined,
         );
       }
+      if (env.DB && dynamicPromotion?.redemptionId) {
+        await releasePromotionRedemption(env.DB, attemptFingerprint).catch(() => undefined);
+      }
       console.error('[estimate-checkout] checkout_state_uncertain', { sessionId: data.id });
       return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
     }
@@ -1539,6 +1650,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             () => undefined,
           );
         }
+        if (env.DB && dynamicPromotion?.redemptionId) {
+          await releasePromotionRedemption(env.DB, attemptFingerprint).catch(() => undefined);
+        }
         await deleteLedgerKey(bucket, key).catch(() => undefined);
         return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
       }
@@ -1549,6 +1663,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       await releaseGiftReservation(giftLedger, gift.code, gift.reservationId).catch(
         () => undefined,
       );
+    }
+    if (env.DB && dynamicPromotion?.redemptionId) {
+      await releasePromotionRedemption(env.DB, attemptFingerprint).catch(() => undefined);
     }
     if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
     await deleteLedgerKey(bucket, key).catch(() => undefined);

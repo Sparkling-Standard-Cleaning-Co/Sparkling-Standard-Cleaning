@@ -599,6 +599,15 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           <div class="reservation-actions">
             <p class="reservation-actions__note" data-payment-note></p>
             <button class="btn btn--secondary btn--small" type="button" data-verify-address hidden>Verify Address to Pay Online</button>
+            <div class="field promo-code-field">
+              <label for="est-promo-code">Have a promo code? <span class="text-muted">(optional)</span></label>
+              <div class="admin-inline-form">
+                <input class="input" id="est-promo-code" name="promotion_code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" placeholder="THANKS75" data-promo-code />
+                <button class="btn btn--secondary btn--small" type="button" data-apply-promo>Apply</button>
+              </div>
+              <p class="small text-muted" data-promo-status role="status" aria-live="polite"></p>
+              <p class="small" data-promo-summary hidden></p>
+            </div>
             <div class="field gift-code-field" data-gift-field hidden>
               <label for="est-gift-code">Gift certificate code <span class="text-muted">(optional)</span></label>
               <input

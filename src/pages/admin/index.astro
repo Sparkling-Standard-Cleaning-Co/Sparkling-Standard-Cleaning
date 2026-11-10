@@ -1,4 +1,4 @@
-﻿---
+---
 import '../../styles/global.css';
 import '../../styles/admin.css';
 import {
@@ -121,6 +121,8 @@ import {
             <button type="button" data-admin-nav="finance">Invoices &amp; Payments</button>
             <button type="button" data-admin-nav="gift">Gift Certificates</button>
             <button type="button" data-admin-nav="reports">Reports</button>
+            <button type="button" data-admin-nav="storage">Data &amp; Storage</button>
+            <button type="button" data-admin-nav="promotions">Promotions &amp; Discounts</button>
             <button type="button" data-admin-nav="pricing">Pricing &amp; Estimator Control</button>
             <button type="button" data-admin-nav="settings">Settings &amp; Audit</button>
           </nav>
@@ -542,6 +544,80 @@ import {
             <div data-admin-reports></div>
           </section>
 
+          <section class="admin-view" data-admin-view="storage" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Data &amp; Storage</h2>
+              <p class="admin-muted">Owner-only health, business-record counts, safe exports and photo-retention controls. Provider byte totals require Cloudflare account analytics; no universal capacity percentage is invented.</p>
+              <div class="admin-grid" data-admin-storage-kpis></div>
+              <p class="small text-muted" data-admin-storage-note></p>
+              <div class="admin-actions" style="margin-top:1rem;">
+                <button class="btn btn--secondary btn--small" type="button" data-admin-action="storage-refresh">Refresh</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-cleanup-preview">Preview Photo Cleanup</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-cleanup-run">Delete Eligible Photos</button>
+              </div>
+              <p class="admin-status-message" data-admin-storage-status role="status" aria-live="polite"></p>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Business records export</h2>
+              <p class="admin-muted">CSV downloads contain business records only; never credentials, tokens or card data. Each export is owner-authenticated and audit-recorded.</p>
+              <div class="admin-actions">
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="customers">Customers CSV</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="properties">Properties CSV</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="appointments">Appointments CSV</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="invoices">Invoices CSV</button>
+              </div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Backup and cleanup status</h2>
+              <div data-admin-storage-settings></div>
+              <p class="admin-muted" style="margin-top:.75rem;">Encrypted D1/R2 off-site backup uses the private master archive and CLI; the encrypted D1 restore has been verified. Full R2 object archive requires owner-provided S3 credentials or an approved destination.</p>
+            </div>
+          </section>
+          <section class="admin-view" data-admin-view="promotions" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Promotions &amp; Discount Codes</h2>
+              <p class="admin-muted">Create and schedule owner-controlled discounts. Drafts never appear to customers. The Thanksgiving Deep Clean Special is preloaded as a draft for review; it is not active.</p>
+              <form class="admin-form admin-form--grid" data-promotion-form>
+                <input type="hidden" name="id" />
+                <label>Name <input name="name" required maxlength="200" /></label>
+                <label>Code <input name="code" required maxlength="40" placeholder="THANKS75" /></label>
+                <label>Type <select name="kind"><option value="fixed">Fixed dollar</option><option value="percent">Percentage</option></select></label>
+                <label>Amount (USD) <input name="value" type="number" min="0" step="0.01" /></label>
+                <label>Percent <input name="percent" type="number" min="1" max="100" step="1" /></label>
+                <label>Minimum eligible price (USD) <input name="minPurchase" type="number" min="0" step="0.01" value="0" /></label>
+                <label>Maximum discount (USD, 0 = no cap) <input name="maxDiscount" type="number" min="0" step="0.01" value="0" /></label>
+                <label>Starts <input name="startsAt" type="datetime-local" /></label>
+                <label>Expires <input name="expiresAt" type="datetime-local" /></label>
+                <label>Maximum redemptions (0 = unlimited) <input name="maxRedemptions" type="number" min="0" step="1" value="0" /></label>
+                <label>Per-customer limit <input name="perCustomerLimit" type="number" min="1" step="1" value="1" /></label>
+                <label>Status <select name="status"><option value="draft">Draft</option><option value="active">Active</option><option value="disabled">Disabled</option><option value="expired">Expired</option></select></label>
+                <fieldset class="field admin-field--wide"><legend>Eligible services</legend>
+                  <label><input type="checkbox" name="services" value="standard" /> Residential Cleaning</label>
+                  <label><input type="checkbox" name="services" value="deep" /> Deep Cleaning</label>
+                  <label><input type="checkbox" name="services" value="move_in_out" /> Move-in / Move-out</label>
+                  <label><input type="checkbox" name="services" value="str_turnover" /> STR Turnover</label>
+                  <label><input type="checkbox" name="services" value="commercial_cleaning" /> Commercial</label>
+                  <label><input type="checkbox" name="services" value="church_cleaning" /> Church</label>
+                </fieldset>
+                <fieldset class="field admin-field--wide"><legend>Eligible branches</legend>
+                  <label><input type="checkbox" name="branches" value="branch_pensacola" /> Pensacola</label>
+                  <label><input type="checkbox" name="branches" value="branch_tampa" /> Tampa Bay / Central Florida (inactive)</label>
+                </fieldset>
+                <fieldset class="field admin-field--wide"><legend>Restrictions</legend>
+                  <label><input type="checkbox" name="newCustomersOnly" /> New customers only</label>
+                  <label><input type="checkbox" name="recurringOnly" /> Recurring cleaning only</label>
+                  <label><input type="checkbox" name="firstVisitOnly" checked /> First visit only</label>
+                  <label><input type="checkbox" name="combinable" /> Combinable with other offers</label>
+                </fieldset>
+                <div class="admin-actions admin-field--wide"><button class="btn btn--primary btn--small" type="submit">Save Promotion</button><button class="btn btn--ghost btn--small" type="button" data-promotion-reset>Clear</button></div>
+              </form>
+              <p class="admin-status-message" data-promotion-status role="status" aria-live="polite"></p>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Promotion list</h2>
+              <div data-admin-promotions></div>
+            </div>
+          </section>
           <section class="admin-view" data-admin-view="pricing" hidden>
             <div class="admin-card">
               <h2 class="admin-section-title">Pricing &amp; Estimator Control</h2>

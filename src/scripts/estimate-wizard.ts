@@ -81,6 +81,8 @@ function storedPromoClaim(): string | null {
 }
 
 function claimedPromoCode(): string | null {
+  const typed = document.querySelector<HTMLInputElement>('[data-promo-code]')?.value.trim().toUpperCase();
+  if (typed) return typed;
   const code = configuredCampaignCode();
   if (!code) return null;
   try {
@@ -2577,6 +2579,65 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
       form.querySelector<HTMLButtonElement>('[data-address-resolve]')?.focus();
     });
+  });
+
+  form.querySelector<HTMLButtonElement>('[data-apply-promo]')?.addEventListener('click', async () => {
+    const input = form.querySelector<HTMLInputElement>('[data-promo-code]');
+    const status = form.querySelector<HTMLElement>('[data-promo-status]');
+    const summary = form.querySelector<HTMLElement>('[data-promo-summary]');
+    const code = input?.value.trim().toUpperCase() ?? '';
+    if (summary) {
+      summary.hidden = true;
+      summary.textContent = '';
+    }
+    if (!code) {
+      if (status) status.textContent = 'Enter a promo code.';
+      return;
+    }
+    if (!latestQuote || !currentServiceType()) {
+      if (status) status.textContent = 'Complete your estimate first, then apply the code.';
+      return;
+    }
+    if (status) status.textContent = 'Checking your code...';
+    try {
+      const response = await fetch('/api/promotion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          code,
+          cleaningAmountCents: Math.round(latestQuote.amount * 100),
+          serviceType: currentServiceType(),
+          branchId: 'branch_pensacola',
+          frequency: textValue('frequency') ?? 'one_time',
+          quoteReference: latestQuote.reference,
+          holdId: textValue('booking_hold_id') ?? '',
+          hasExistingDiscount: false,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        name?: string;
+        discountCents?: number;
+      };
+      if (!response.ok || !data.ok || !data.discountCents) {
+        if (status) {
+          status.textContent =
+            data.error === 'promotion_expired'
+              ? 'That code has expired.'
+              : 'That code is not available for this cleaning.';
+        }
+        return;
+      }
+      const adjusted = Math.max(0, latestQuote.amount - data.discountCents / 100);
+      if (status) status.textContent = `${data.name ?? code} applied.`;
+      if (summary) {
+        summary.hidden = false;
+        summary.textContent = `Discount: -$${(data.discountCents / 100).toFixed(2)} · Adjusted cleaning price before tax: $${adjusted.toFixed(2)}. Taxes and any gift certificate are applied at secure checkout.`;
+      }
+    } catch {
+      if (status) status.textContent = 'We could not check that code. Please try again.';
+    }
   });
 
   payNowButton?.addEventListener('click', () => {
