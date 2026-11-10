@@ -8,9 +8,10 @@ Last reviewed: **2026-11-10** (repository reconciliation and production release)
 
 **2026-11-10 corrections - these supersede any conflicting row below:**
 
-- Production release is **`bc53f55`** (Cloudflare Pages deployment
-  `7e7aa0d6-9756-4dca-b698-2f48a02baec5`; source `bc53f55`).
-- **`main`, `production-safe` and the local checkout are synchronized** at `bc53f55`.
+- Application code release is **`bc53f55`** (Cloudflare Pages deployment at code release
+  `7e7aa0d6-9756-4dca-b698-2f48a02baec5`; source `bc53f55`). The documentation closeout follows on
+  the same branch with no application-code change.
+- **`main`, `production-safe` and the local checkout are synchronized** on the reconciled tip.
 - Estimate-form delivery readiness is now runtime-driven. The false
   "Request delivery is not connected on this preview build" warning is gone;
   `/api/lead-readiness` reports `ready:true` with owner email, D1, customer email and photo

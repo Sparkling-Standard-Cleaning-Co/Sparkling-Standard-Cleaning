@@ -2,10 +2,12 @@
 
 ## Production release - 2026-11-10 repository reconciliation
 
-**Production code:** `bc53f55ab966d9c7905b900cf3741717b978998f` on **`main`** and
-**`production-safe`** (same tip). **Cloudflare Pages deployment:**
-`7e7aa0d6-9756-4dca-b698-2f48a02baec5` (source `bc53f55`, production branch `production-safe`,
-Active). The custom domain serves the new asset hashes.
+**Application code release:** `bc53f55ab966d9c7905b900cf3741717b978998f` (the documentation
+closeout commit follows on the same branch). **`main` and `production-safe` are synchronized**,
+and the local checkout is on `production-safe`. **Cloudflare Pages canonical deployment at code
+release:** `7e7aa0d6-9756-4dca-b698-2f48a02baec5` (source `bc53f55`, production branch
+`production-safe`, Active). The final closeout deployment contains no application-code change; the
+exact final deployment ID is recorded in the reconciliation report.
 
 **Branch reconciliation**
 
