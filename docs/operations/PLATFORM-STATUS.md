@@ -4,7 +4,26 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-10-30** (owner access, five-condition estimator and recovery release).
+Last reviewed: **2026-11-10** (repository reconciliation and production release).
+
+**2026-11-10 corrections - these supersede any conflicting row below:**
+
+- Production release is **`bc53f55`** (Cloudflare Pages deployment
+  `7e7aa0d6-9756-4dca-b698-2f48a02baec5`; source `bc53f55`).
+- **`main`, `production-safe` and the local checkout are synchronized** at `bc53f55`.
+- Estimate-form delivery readiness is now runtime-driven. The false
+  "Request delivery is not connected on this preview build" warning is gone;
+  `/api/lead-readiness` reports `ready:true` with owner email, D1, customer email and photo
+  storage available.
+- The prior live deployments `15128fd` and `875492a` were not GitHub commits. Their admin
+  recurring-duration/calendar-sync delta was recovered and is preserved in source.
+- **Google Calendar currently reports `auth_failed`.** All credentials are present; the OAuth
+  refresh exchange is failing. Owner must reauthorize with
+  `node scripts/google-calendar-auth.mjs` and update the Cloudflare secrets.
+- **`GOOGLE_CLIENT_SECRET` is stored as `plain_text` in Cloudflare** and was exposed to the
+  deployment-audit API. Rotate it and store the replacement as an encrypted secret.
+
+**2026-10-30 review:** owner access, five-condition estimator and recovery release.
 
 **2026-10-30 corrections — these supersede any conflicting row below:**
 

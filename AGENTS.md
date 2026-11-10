@@ -84,27 +84,31 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release:** **`7eab309`** is live on `production-safe` (Cloudflare Pages deployment
-  `71be4e9f-f1aa-432c-9681-fd5f8cb4e077`; source `7eab309`). It deploys:
-  - dynamic booking resources and qualifications (Hayli linked as the initial bookable resource),
-    employee invitations/auto-link and the server-enforced three-day employee board;
-  - non-destructive recurring scheduling with the daily `sparkling-standard-recurring` Worker
-    (`0 9 * * *`), conflict preservation, pause/resume/cancel and durable worker runs;
-  - document management and e-signature with private R2 storage, ordered bundles, consent,
-    immutable signatures and verification, plus the gates before payment and confirmation;
-  - the booking, estimator, admin, gift and employee systems from the prior release.
-  Migrations `0013`-`0020` are applied (20 migrations, 65 tables); the private documents bucket is
-  bound in production and preview. The prior release `69d5702` remains intact. Stripe live
-  administrative charging/refund gates remain disabled; document templates/bundles remain empty
-  pending owner upload and approval, so no customer agreement is activated. No real-money charge or
-  refund was performed.
+- **Current release (2026-11-10 reconciliation):** **`bc53f55`** is live on `production-safe`
+  (Cloudflare Pages deployment `7e7aa0d6-9756-4dca-b698-2f48a02baec5`; source `bc53f55`).
+  **`main`, `production-safe` and the local checkout are synchronized at `bc53f55`.**
+  - It preserves the full production-safe feature set: dynamic booking/staffing, recurring
+    scheduling and lifecycle, document management/signing, employee portal/timekeeping, CRM and
+    property profiles, financial ledger/Stripe reconciliation, owner pricing control and all four
+    estimator engines.
+  - It fixes estimate/contact form delivery readiness at runtime (`/api/lead-readiness`) so the
+    false "Request delivery is not connected on this preview build" warning no longer appears.
+  - It recovers the previously unpushed live admin delta (recurring duration control and calendar
+    sync labels) that existed only in Cloudflare deployments `15128fd`/`875492a`.
+  - Migrations `0001`-`0031` are applied (31 migrations, 72 application tables). No schema change
+    was required by this release. D1 was encrypted and restore-verified before release.
+  - Owner-only: Google Calendar currently returns `auth_failed` and needs OAuth reauthorization;
+    `GOOGLE_CLIENT_SECRET` must be rotated and stored as a secret (not `plain_text`).
+- **Prior release:** `7eab309` (deployment `71be4e9f-f1aa-432c-9681-fd5f8cb4e077`) delivered
+  dynamic booking resources, recurring scheduling, document/e-signature management and the
+  employee board. It remains represented in the current history.
 - **Canonical owner master:** `C:\Users\thoma\Downloads\Sparkling-Standard-Master\`. The active
   repository checkout is `01_WEBSITE_REPOSITORY`; the original Documents copy is preserved as a
   read-only pre-consolidation snapshot until the owner approves cleanup. Start at
   `00_START_HERE\START_HERE.html`.
 - **Owner local recovery state:** the owner sets her own password through the admin or employee
-  Forgot Password flow. Production D1 has 20 migrations, 65 tables (including Cloudflare internal
-  metadata), 0 foreign-key violations and 0 outstanding reset tokens.
+  Forgot Password flow. Production D1 has 31 migrations, 72 application tables plus Cloudflare
+  internal metadata, 0 foreign-key violations and 0 outstanding reset tokens.
 - **Prior Initiative 6.8:** live at `6e36c95` plus the HEIC test-stability fix `9fe8764` (Cloudflare Pages deployments `2a0d4f21-8eb8-49b0-b298-f086e3c7473b` and `4afab04f-9f97-47b5-bb2c-778aa7b6f745`; `validate`, `browser` and Cloudflare checks passed). It implements the three-page owner audit: prices stay hidden through every preliminary estimator step and are revealed at the final stage with a shared branded animation across all four engines; the owner-supplied **two-of-four** Competitive Pricing badge is installed; homepage service cards use one equal-height grid; KJV scripture is expanded through a shared component; and all transactional forms require an unchecked-by-default, server-verified terms acceptance with a private R2 record. The public Terms were expanded with Florida cancellation/gift research, condition/access, payment/refund, damage, safety, recurring, commercial/church, dispute and version rules. Gift certificates remain in **request mode** (sales disabled) because no owner-approved denominations/fulfillment activation were supplied; live calendar booking is **not connected**, so preferred dates remain requests and no fake availability is shown. No new cancellation/reassessment fee is active; owner and Florida counsel approval gates are documented in `docs/legal/TERMS-RESEARCH.md` and `docs/launch/OWNER-INPUT-REQUIRED.md`. No pricing mathematics changed.
 - **Prior Initiative 6.7:** live at `f111014`; checkout readiness now checks key, webhook secret/endpoint, notifier, ledger and mode; verified-only quotes, explicit price-change acceptance, SHA-256 checkout idempotency with R2 session reuse, durable webhook event claims, retryable notifications, safe cancellation/status pages and no duplicate lead on payment retry. Production `/api/estimate-checkout` is live mode with all readiness checks true. No live card charge or Stripe test-mode transaction was performed.
 - **Prior Initiative 6.6:** live at `0b907d4` (Cloudflare Pages deployment `26e3b9f8-7665-426f-8687-7f171588c865`); it completed the 13-page owner audit, approved homepage/Community Support/Deep Cleaning/Service Area copy, FL/AL state restriction, GPS loading, optional facility ZIP, centered facility intros, add-on bundles, and the original Pay Now/reservation path. Private legal records were organized in the master archive.

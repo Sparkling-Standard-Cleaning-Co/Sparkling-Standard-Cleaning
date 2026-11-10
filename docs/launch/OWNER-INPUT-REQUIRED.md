@@ -1,5 +1,23 @@
 # Owner input required
 
+> **2026-11-10 owner actions after the reconciliation release (`bc53f55`):**
+>
+> 1. **Reauthorize Google Calendar.** Production currently returns `auth_failed` from
+>    `/api/availability` and `/api/booking-status` even though every Google credential is present.
+>    Run `node scripts/google-calendar-auth.mjs`, complete the Google consent flow, and update the
+>    Cloudflare secrets with the new refresh token. Details:
+>    `docs/operations/GOOGLE-CALENDAR-SETUP.md`.
+> 2. **Rotate the Google OAuth client secret.** Cloudflare currently stores
+>    `GOOGLE_CLIENT_SECRET` as `plain_text`; the value was exposed to the deployment-audit API.
+>    Rotate it in Google Cloud Console, store the replacement as an encrypted Cloudflare secret,
+>    and re-run the calendar authorization if Google invalidates the old secret.
+> 3. **Google Calendar write verification (optional, one command).** After reauthorization, run
+>    `node scripts/booking-live-test.mjs`, paste `BOOKING_OWNER_TOKEN` at the hidden prompt, type
+>    `YES`, and confirm one synthetic event is created, verified and cancelled.
+>
+> The release itself is live and verified. No customer records, booked appointments, pricing or
+> financial history were changed by the reconciliation.
+
 > **2026-10-30 owner actions after the recovery release (`5525cd5`):**
 >
 > 1. **Set your own password.** Open <https://sparkling-standard.com/admin/>, choose **Forgot

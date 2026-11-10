@@ -1,5 +1,76 @@
 # Verification status
 
+## Production release - 2026-11-10 repository reconciliation
+
+**Production code:** `bc53f55ab966d9c7905b900cf3741717b978998f` on **`main`** and
+**`production-safe`** (same tip). **Cloudflare Pages deployment:**
+`7e7aa0d6-9756-4dca-b698-2f48a02baec5` (source `bc53f55`, production branch `production-safe`,
+Active). The custom domain serves the new asset hashes.
+
+**Branch reconciliation**
+
+- `origin/main` was 30 commits behind `origin/production-safe`; the local checkout was still
+  `main` at `99da1e2` (58 behind `origin/main`). No unpushed commit on any local branch contained
+  unique completed work: every local-only branch was patch-equivalent to the remote history except
+  the old `initiative-6.1-facility-pricing` branch, whose three commits were superseded by the
+  production-safe facility-pricing implementation.
+- Two live Cloudflare deployments (`15128fd`, `875492a`) were **not GitHub commits**. Their delta
+  versus `production-safe` was recovered by comparing the deployed bundles: one unpushed admin
+  enhancement (wrapped recurring-duration control plus calendar sync labels). It is now in source,
+  and the rebuilt admin JS/CSS hashes exactly match the prior live deployment
+  (`index...DXiy3Jqn.js`, `index.Bk1RNG0-.css`).
+- `main` and `production-safe` now point at the same final commit; the local checkout is on
+  `production-safe`.
+
+**Scope**
+
+- Runtime delivery readiness for Residential, STR, Commercial, Church and Contact forms:
+  `GET /api/lead-readiness` (plus the `GET /api/lead` alias) reports `owner_email`, `database`,
+  `customer_email`, `turnstile` and `photo_storage` booleans. A shared controller hides the warning
+  unless the server explicitly reports no delivery path. The false "Request delivery is not
+  connected on this preview build" message is gone.
+- Recovered the unpushed live recurring-duration/calendar-sync admin delta without regressing any
+  production-safe feature.
+- No pricing, booking, customer, payment, credential or legal-agreement data was changed. No live
+  card charge, refund or gift purchase was performed.
+
+**Backup and restore**
+
+- Encrypted D1 backup: `C:\Users\thoma\Documents\Sparkling-Standard-Master\backups\2026-11-10-reconciliation\d1-production-2026-11-10.sql.enc`
+  (AES-256-GCM; key stored separately in the private master archive). Plaintext SHA-256:
+  `985bd1e0624dafedb54850a33507793bce3cd4eedff4e3fbdcc95f97351740c2`.
+- Restore verification: **PASS** - 72 tables, SQLite integrity `ok`, 0 foreign-key violations.
+- R2 buckets verified: `sparkling-standard-documents` and `sparkling-standard-lead-photos`. No
+  object-level R2 archive was possible from this environment because Cloudflare exposes no object
+  listing API and no S3 credentials were available; R2 data is unchanged by this release.
+
+**Final verification (on the reconciled code)**
+
+| Check | Result |
+| --- | --- |
+| Unit suite | **824 tests: 823 passed, 1 pre-existing skip, 0 failed** |
+| Browser suite | **208 passed, 0 failed** |
+| Type check | `npm run check` 0 errors, 0 warnings, 1 pre-existing hint |
+| Build + validation + smoke | `npm run build`, `npm run validate`, `npm run smoke` all passed |
+| Migrations | 31 applied; no new migration required by this release |
+| Production forms | All four estimate engines + Contact return 200; warning absent; delivery node present |
+| Production readiness | `/api/lead`, `/api/lead-readiness`: `ready:true`, owner email, D1, customer email and photo storage true |
+| Production admin/employee/documents | `/admin/`, `/employee/`, `/document-sign/` return 200 |
+| Production D1 | 5 leads, all `delivery_status: sent`; no test data written |
+| Production admin bundle | `admin-duration` and calendar sync labels present; matches the prior live bundle |
+
+**Owner-only actions**
+
+1. **Google Calendar OAuth is failing** (`/api/availability` and `/api/booking-status` return
+   `auth_failed` although every credential is present). Reauthorize with
+   `node scripts/google-calendar-auth.mjs`, then update the Cloudflare secrets. This is a
+   credential/provider action, not an application-code defect.
+2. **Rotate the Google OAuth client secret and store it as a secret.** Cloudflare currently has
+   `GOOGLE_CLIENT_SECRET` as `plain_text`, and the value was exposed to the deployment-audit API.
+   Treat it as compromised, rotate it, and store the replacement as an encrypted secret.
+3. No live Stripe test-mode charge or paid webhook was performed; administrative charging/refunds
+   remain gated.
+
 ## Production release - 2026-11-07
 
 **Production code:** `a4f0b85` on `production-safe`. **Cloudflare Pages
