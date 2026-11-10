@@ -8,7 +8,6 @@
 // enabled = Tier A single preliminary price / Tier B range / Tier C personal
 // scope review; disabled = a professional scope-review experience with no
 // numbers in the UI, request, notification or server verification.
-import { isFormEnabled } from '../config/business';
 import { commercialTierConfig } from '../config/estimators/commercial';
 import { pricing } from '../config/pricing';
 import {
@@ -42,7 +41,6 @@ interface Props {
 }
 
 const { engine } = Astro.props;
-const configured = isFormEnabled();
 const church = engine === 'church';
 const discountPercent = pricing.churchDiscount.percent.value;
 const discountEnabled = pricing.churchDiscount.enabled.value;
@@ -120,14 +118,7 @@ const facilityStepDescriptions = church
     </p>
   </div>
 
-  {
-    !configured && (
-      <p class="form-status" data-state="info" style="display:block">
-        Request delivery is not connected on this preview build. This form shows the real request
-        experience; submissions in preview cannot be delivered.
-      </p>
-    )
-  }
+  <p class="form-status" data-delivery-warning role="status" hidden></p>
 
   <div class="error-summary" data-error-summary hidden role="alert" tabindex="-1">
     <p class="error-summary__title" data-error-summary-title>Please review these details before sending:</p>

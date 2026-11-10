@@ -912,6 +912,9 @@ function recurringReasonLabel(reason: string): string {
     beyond_window: 'date is beyond the booking window',
     resource_unavailable: 'assigned resource is unavailable',
     calendar_unavailable: 'Google Calendar is temporarily unavailable',
+    calendar_auth_failed: 'Google Calendar authentication failed',
+    calendar_write_pending: 'calendar write is pending a retry',
+    calendar_update_pending: 'calendar update is pending a retry',
     calendar_write_failed: 'Google Calendar write failed',
     calendar_update_failed: 'Google Calendar update failed',
     calendar_event_missing: 'calendar event is missing',
@@ -1008,7 +1011,7 @@ async function loadRecurring(): Promise<void> {
       esc(titleCase(plan.frequency)),
       writable ? `<select class="admin-select" data-recurring-window="${esc(plan.id)}"><option value="">Not scheduled</option><option value="morning"${plan.window === 'morning' ? ' selected' : ''}>Morning</option><option value="afternoon"${plan.window === 'afternoon' ? ' selected' : ''}>Afternoon</option></select>` : esc(plan.window ? titleCase(String(plan.window)) : 'Not scheduled'),
       writable ? `<input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(plan.start_time ?? '')}" data-recurring-start="${esc(plan.id)}" />` : esc(plan.start_time ?? '?'),
-      writable ? `<input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" />` : esc(plan.duration_minutes ? `${plan.duration_minutes} min` : '?'),
+      writable ? `<span class="admin-duration"><input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" aria-label="Duration in minutes" /><span class="admin-duration__unit" aria-hidden="true">min</span></span>` : esc(plan.duration_minutes ? `${plan.duration_minutes} min` : '?'),
       esc(money(plan.ongoing_price_cents)),
       esc(dateTime(plan.next_visit_date)),
       `<span class="admin-status">${esc(titleCase(plan.sync_status ?? 'pending'))}</span>${

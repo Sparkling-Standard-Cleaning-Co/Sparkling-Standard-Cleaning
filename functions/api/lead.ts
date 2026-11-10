@@ -32,6 +32,7 @@ import { taxPresentationForService } from '../../src/lib/estimate/tax.ts';
 import { calculateServiceTax } from '../../src/lib/tax/engine.ts';
 import type { Frequency } from '../../src/lib/estimate/types.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
+import { buildLeadReadiness } from '../../src/lib/forms/delivery-readiness.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
 import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
 import { schedulingConfig } from '../../src/config/scheduling.ts';
@@ -921,6 +922,19 @@ export async function onRequestPost(context: {
   });
 }
 
-export async function onRequestGet(): Promise<Response> {
-  return json({ ok: false, error: 'method_not_allowed' }, 405);
+export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
+  const readiness = buildLeadReadiness({
+    owner_email: Boolean(context.env.WEB3FORMS_ACCESS_KEY?.trim()),
+    database: Boolean(context.env.DB),
+    customer_email: Boolean(context.env.RESEND_API_KEY?.trim()),
+    turnstile: Boolean(context.env.TURNSTILE_SECRET_KEY?.trim()),
+    photo_storage: Boolean(context.env.PHOTOS_BUCKET),
+  });
+  return new Response(JSON.stringify(readiness), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
+  });
 }

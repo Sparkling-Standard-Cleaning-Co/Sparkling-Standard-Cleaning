@@ -1,4 +1,4 @@
-﻿import { test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { bookingConfig } from '../src/config/booking.ts';
@@ -28,17 +28,19 @@ const env = {
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-let nextDate = '';
+function futureDateOffset(daysAhead: number): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(Date.now() + daysAhead * 86_400_000));
+}
 function futureDate(): string {
-  if (!nextDate) {
-    nextDate = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Chicago',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date(Date.now() + 10 * 86_400_000));
-  }
-  return nextDate;
+  return futureDateOffset(10);
+}
+function futureDateNext(): string {
+  return futureDateOffset(11);
 }
 
 async function withFetch<T>(
@@ -242,9 +244,9 @@ test('owner confirmation revalidates the slot and writes one calendar event', as
   try {
     const bucket = new FakeLedger();
     const created = await createBookingHold(bucket, {
-      date: '2026-11-10',
-      start: '2026-11-10T15:00:00.000Z',
-      end: '2026-11-10T17:00:00.000Z',
+      date: futureDate(),
+      start: `${futureDate()}T15:00:00.000Z`,
+      end: `${futureDate()}T17:00:00.000Z`,
       durationMinutes: 120,
       destination: { lat: 30.4111, lng: -87.2164 },
       locationText: '100 S Baylen St, Pensacola, FL 32502',
@@ -297,9 +299,9 @@ test('booking admin is owner-token protected', async () => {
 test('owner cancellation deletes the calendar event and releases the hold', async () => {
   const bucket = new FakeLedger();
   const created = await createBookingHold(bucket, {
-    date: '2026-11-10',
-    start: '2026-11-10T15:00:00.000Z',
-    end: '2026-11-10T17:00:00.000Z',
+    date: futureDate(),
+    start: `${futureDate()}T15:00:00.000Z`,
+    end: `${futureDate()}T17:00:00.000Z`,
     durationMinutes: 120,
     destination: { lat: 30.4111, lng: -87.2164 },
     locationText: '100 S Baylen St, Pensacola, FL 32502',
@@ -358,9 +360,9 @@ test('an expired hold with a durable pending request can still be owner-confirme
   try {
     const bucket = new FakeLedger();
     const created = await createBookingHold(bucket, {
-      date: '2026-11-10',
-      start: '2026-11-10T15:00:00.000Z',
-      end: '2026-11-10T17:00:00.000Z',
+      date: futureDate(),
+      start: `${futureDate()}T15:00:00.000Z`,
+      end: `${futureDate()}T17:00:00.000Z`,
       durationMinutes: 120,
       destination: { lat: 30.4111, lng: -87.2164 },
       locationText: '100 S Baylen St, Pensacola, FL 32502',
@@ -417,9 +419,9 @@ test('the owner can reassign a confirmed booking to the bookable cleaner', async
   try {
     const bucket = new FakeLedger();
     const created = await createBookingHold(bucket, {
-      date: '2026-11-10',
-      start: '2026-11-10T15:00:00.000Z',
-      end: '2026-11-10T17:00:00.000Z',
+      date: futureDate(),
+      start: `${futureDate()}T15:00:00.000Z`,
+      end: `${futureDate()}T17:00:00.000Z`,
       durationMinutes: 120,
       destination: { lat: 30.4111, lng: -87.2164 },
       locationText: '100 S Baylen St, Pensacola, FL 32502',
@@ -486,9 +488,9 @@ test('the owner can reschedule a pending request and its confirmation slot', asy
   try {
     const bucket = new FakeLedger();
     const created = await createBookingHold(bucket, {
-      date: '2026-11-10',
-      start: '2026-11-10T15:00:00.000Z',
-      end: '2026-11-10T17:00:00.000Z',
+      date: futureDate(),
+      start: `${futureDate()}T15:00:00.000Z`,
+      end: `${futureDate()}T17:00:00.000Z`,
       durationMinutes: 120,
       destination: { lat: 30.4111, lng: -87.2164 },
       locationText: '100 S Baylen St, Pensacola, FL 32502',
@@ -518,9 +520,9 @@ test('the owner can reschedule a pending request and its confirmation slot', asy
           body: JSON.stringify({
             id: pending.id,
             action: 'reschedule',
-            date: '2026-11-11',
-            start: '2026-11-11T15:00:00.000Z',
-            end: '2026-11-11T17:00:00.000Z',
+            date: futureDateNext(),
+            start: `${futureDateNext()}T15:00:00.000Z`,
+            end: `${futureDateNext()}T17:00:00.000Z`,
           }),
         });
         const response = await bookingAdminPost({
@@ -531,8 +533,8 @@ test('the owner can reschedule a pending request and its confirmation slot', asy
       },
     );
     const stored = await getPendingBookingRequest(bucket, pending.id);
-    assert.equal(stored?.date, '2026-11-11');
-    assert.equal(stored?.start, '2026-11-11T15:00:00.000Z');
+    assert.equal(stored?.date, futureDateNext());
+    assert.equal(stored?.start, `${futureDateNext()}T15:00:00.000Z`);
     assert.deepEqual(stored?.resourceIds, ['hayli']);
     assert.equal(stored?.status, 'pending');
   } finally {

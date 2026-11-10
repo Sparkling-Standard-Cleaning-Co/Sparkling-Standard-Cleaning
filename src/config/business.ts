@@ -301,7 +301,11 @@ export const business = {
 
   // ── Forms ──────────────────────────────────────────────────────────────────
   forms: {
-    /** Web3Forms public (client-safe) access key. Empty = honest fallback UI. */
+    /**
+     * Optional Web3Forms public (client-safe) key for the static direct
+     * fallback only. Production delivery uses the server-side key through
+     * `/api/lead`; an empty value here does not mean production is offline.
+     */
     web3formsAccessKey: envFact(import.meta.env.PUBLIC_WEB3FORMS_ACCESS_KEY) ?? '',
     web3formsEndpoint: 'https://api.web3forms.com/submit',
     /**
@@ -312,6 +316,8 @@ export const business = {
      * public key is configured.
      */
     serverSubmitPath: '/api/lead',
+    /** Runtime-only delivery readiness probe (never exposes server secrets). */
+    readinessPath: '/api/lead-readiness',
     /**
      * Cloudflare Turnstile site key — public by design (it is rendered into
      * the page). The matching secret lives ONLY in the serverless function
@@ -356,10 +362,6 @@ export const business = {
 };
 
 // ── Convenience helpers (keep PENDING handling consistent everywhere) ────────
-
-export function isFormEnabled(): boolean {
-  return Boolean(business.forms.web3formsAccessKey) || business.forms.turnstileSiteKey !== '';
-}
 
 export function hasContactPhone(): boolean {
   return !isPending(business.phone);

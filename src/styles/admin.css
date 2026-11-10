@@ -115,6 +115,9 @@
 .admin-field--wide { grid-column: 1 / -1; }
 .admin-actions { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
 .admin-select { border: 1px solid #d8c8b7; border-radius: .45rem; padding: .4rem .5rem; font: inherit; background: #fff; max-width: 100%; }
+.admin-duration { display: flex; align-items: center; gap: .35rem; min-width: 7.25rem; }
+.admin-duration .input { width: 5.25rem; min-width: 5.25rem; height: 2.5rem; min-height: 2.5rem; padding: .4rem .5rem; text-align: right; }
+.admin-duration__unit { font-size: .72rem; font-weight: 600; color: var(--color-text-muted); white-space: nowrap; }
 .admin-detail-head { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
 .admin-definition { display: grid; grid-template-columns: minmax(7rem, .5fr) 1.5fr; gap: .35rem .8rem; font-size: .86rem; }
 .admin-definition dt { color: var(--color-text-muted); }

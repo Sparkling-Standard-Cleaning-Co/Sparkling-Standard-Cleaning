@@ -14,6 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { onRequestPost as leadPost, onRequestGet as leadGet } from '../functions/api/lead.ts';
+import { onRequestGet as readinessGet } from '../functions/api/lead-readiness.ts';
 import { onRequestPost as travelPost, onRequestGet as travelGet } from '../functions/api/travel.ts';
 import {
   onRequestPost as estimateCheckoutPost,
@@ -161,9 +162,68 @@ test('lead: provider failure is never reported as success', async () => {
   assert.deepEqual(await response.json(), { ok: false, error: 'provider_failed' });
 });
 
-test('lead: GET is method-not-allowed', async () => {
-  const response = await leadGet();
-  assert.equal(response.status, 405);
+test('lead: GET reports runtime delivery readiness without exposing secrets', async () => {
+  const response = await leadGet({
+    request: new Request('https://example.test/api/lead'),
+    env: {
+      WEB3FORMS_ACCESS_KEY: 'server-secret-value',
+      RESEND_API_KEY: 'resend-secret-value',
+      TURNSTILE_SECRET_KEY: 'turnstile-secret-value',
+      DB: {},
+      PHOTOS_BUCKET: {},
+    },
+  } as never);
+  assert.equal(response.status, 200);
+  const body = (await response.json()) as {
+    ok?: boolean;
+    ready?: boolean;
+    checks?: Record<string, boolean>;
+    version?: number;
+  };
+  assert.equal(body.ok, true);
+  assert.equal(body.ready, true);
+  assert.deepEqual(body.checks, {
+    owner_email: true,
+    database: true,
+    customer_email: true,
+    turnstile: true,
+    photo_storage: true,
+  });
+  assert.equal(body.version, 2);
+  assert.doesNotMatch(JSON.stringify(body), /server-secret-value|resend-secret-value|turnstile-secret-value/);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+});
+
+test('lead: optional capabilities never make a deliverable form look disconnected', async () => {
+  const response = await leadGet({
+    request: new Request('https://example.test/api/lead'),
+    env: { WEB3FORMS_ACCESS_KEY: 'owner-delivery-key' },
+  } as never);
+  const body = (await response.json()) as { ready?: boolean; checks?: Record<string, boolean> };
+  assert.equal(body.ready, true);
+  assert.equal(body.checks?.database, false);
+  assert.equal(body.checks?.customer_email, false);
+  assert.equal(body.checks?.photo_storage, false);
+});
+
+test('lead-readiness: the dedicated probe used by every form is secret-free', async () => {
+  const response = await readinessGet({
+    request: new Request('https://example.test/api/lead-readiness'),
+    env: {
+      WEB3FORMS_ACCESS_KEY: 'not-public',
+      RESEND_API_KEY: 'also-not-public',
+      TURNSTILE_SECRET_KEY: 'never-public',
+      DB: {},
+      PHOTOS_BUCKET: {},
+    },
+  } as never);
+  assert.equal(response.status, 200);
+  const body = (await response.json()) as { ok?: boolean; ready?: boolean; version?: number };
+  assert.equal(body.ok, true);
+  assert.equal(body.ready, true);
+  assert.equal(body.version, 2);
+  assert.doesNotMatch(JSON.stringify(body), /not-public|also-not-public|never-public/);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
 });
 
 // ── /api/lead → customer confirmation (Resend, mocked) ─────────────────────

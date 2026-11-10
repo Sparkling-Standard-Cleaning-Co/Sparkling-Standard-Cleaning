@@ -1,8 +1,7 @@
 ---
-import { business, contactPhone, isPending, isFormEnabled } from '../config/business';
+import { business, contactPhone, isPending } from '../config/business';
 import Icon from './Icon.astro';
 
-const configured = isFormEnabled();
 const phone = contactPhone();
 const hasEmail = !isPending(business.email);
 
@@ -14,14 +13,7 @@ const { class: className = '' } = Astro.props;
 ---
 
 <form class:list={['form-card', className]} data-lead-form data-variant="contact" action="#" method="post">
-  {
-    !configured && (
-      <p class="form-status" data-state="info" style="display:block">
-        Message delivery is not connected on this preview build. In an emergency-free world you would
-        call or text — and you still can:
-      </p>
-    )
-  }
+  <p class="form-status" data-delivery-warning role="status" hidden></p>
 
   <div class="field-row field-row--2">
     <div class="field">

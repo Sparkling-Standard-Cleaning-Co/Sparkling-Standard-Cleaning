@@ -21,13 +21,10 @@ import ResponseGuarantee from './ResponseGuarantee.astro';
 import EstimateReveal from './EstimateReveal.astro';
 import TermsAcceptance from './TermsAcceptance.astro';
 import BookingCalendar from './BookingCalendar.astro';
-import { isFormEnabled } from '../config/business';
 
-const configured = isFormEnabled();
 const addons = pricing.addons.items;
 const addonLabels = new Map(addons.map((addon) => [addon.id, addon.label]));
 const activeBundles = pricing.promotions.addonBundles.filter((bundle) => bundle.enabled);
-const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const phone = contactPhone();
 const email = isPending(business.email) ? null : business.email;
 const incentiveEnabled = pricing.addonIncentive.enabled.value;
@@ -75,14 +72,7 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
     </div>
 
     <div class="wizard__body">
-      {
-        !configured && (
-          <p class="form-status" data-state="info" style="display:block">
-            Request delivery is not connected on this preview build. The estimate and reservation
-            summary still work — sending this request in preview cannot deliver it{preview ? ' (preview mode)' : ''}.
-          </p>
-        )
-      }
+      <p class="form-status" data-delivery-warning role="status" hidden></p>
 
       <p class="estimate-engine-note" data-engine-note hidden></p>
 
