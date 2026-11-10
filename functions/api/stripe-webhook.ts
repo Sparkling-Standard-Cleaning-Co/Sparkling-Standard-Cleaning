@@ -817,6 +817,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             totalCents: Number(checkout?.amountCents) || amountCents || 0,
             customerName: customerName || '',
             customerEmail: customerEmail || '',
+            ...(session.customer ? { stripeCustomerId: String(session.customer) } : {}),
+            ...(metadata.customer_id ? { customerId: String(metadata.customer_id) } : {}),
             paidAt,
             duplicateBookingPayment,
           });

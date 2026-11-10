@@ -600,7 +600,7 @@ export async function signSigningRequest(
   db: D1Database,
   token: string,
   input: SignInput,
-): Promise<{ status: string; signedCount: number; requiredCount: number }> {
+): Promise<{ requestId: string; status: string; signedCount: number; requiredCount: number }> {
   const resolved = await getSigningRequestByToken(db, token);
   if (!resolved) throw new AdminAuthError(400, 'signing_link_invalid');
   const { request, requirements } = resolved;
@@ -690,7 +690,7 @@ export async function signSigningRequest(
     entityId: request.id,
     detail: `${signedCount}/${required.length}`,
   });
-  return { status, signedCount, requiredCount: required.length };
+  return { requestId: request.id, status, signedCount, requiredCount: required.length };
 }
 
 export async function rotateSigningRequestToken(

@@ -8,9 +8,10 @@ Last reviewed: **2026-11-10** (repository reconciliation and production release)
 
 **2026-11-10 corrections - these supersede any conflicting row below:**
 
-- Application code release is **`bc53f55`** (Cloudflare Pages deployment at code release
-  `7e7aa0d6-9756-4dca-b698-2f48a02baec5`; source `bc53f55`). The documentation closeout follows on
-  the same branch with no application-code change.
+- The reconciliation application code was **`bc53f55`** (Cloudflare Pages deployment
+  `7e7aa0d6-9756-4dca-b698-2f48a02baec5`). The final audit release follows on the same branch and
+  adds the durable Stripe Customer link, executed-document owner email and the R2 photo-retention
+  Worker.
 - **`main`, `production-safe` and the local checkout are synchronized** on the reconciled tip.
 - Estimate-form delivery readiness is now runtime-driven. The false
   "Request delivery is not connected on this preview build" warning is gone;
@@ -18,11 +19,18 @@ Last reviewed: **2026-11-10** (repository reconciliation and production release)
   storage available.
 - The prior live deployments `15128fd` and `875492a` were not GitHub commits. Their admin
   recurring-duration/calendar-sync delta was recovered and is preserved in source.
-- **Google Calendar currently reports `auth_failed`.** All credentials are present; the OAuth
-  refresh exchange is failing. Owner must reauthorize with
-  `node scripts/google-calendar-auth.mjs` and update the Cloudflare secrets.
-- **`GOOGLE_CLIENT_SECRET` is stored as `plain_text` in Cloudflare** and was exposed to the
-  deployment-audit API. Rotate it and store the replacement as an encrypted secret.
+- **Google Calendar is connected and working again.** `/api/booking-status` reports
+  `connected:true`, `eventReadOk:true`, `America/Chicago`; availability returns real slots. The
+  earlier `auth_failed` coincided with the expired Google Workspace trial and recovered when the
+  owner paid the subscription. Keep Workspace billing active; no credential rotation is required
+  now.
+- **`GOOGLE_CLIENT_SECRET` is stored as `plain_text` in Cloudflare.** It is visible to authorized
+  project readers and appeared in the authorized deployment-audit API response. It is not present
+  in public code, HTML or client bundles. Rotation is optional unless account access is shared or
+  audit logs are retained beyond the authorized owner.
+- **Final audit fixes:** public checkout now links/reuses a durable Stripe Customer; executed
+  agreements queue and email the owner with the executed copy; a daily R2 photo-retention Worker is
+  deployed and verified. See `docs/verification/2026-11-10-FINAL-AUDIT.md`.
 
 **2026-10-30 review:** owner access, five-condition estimator and recovery release.
 

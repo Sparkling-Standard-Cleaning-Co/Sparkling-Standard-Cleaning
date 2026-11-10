@@ -98,8 +98,13 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
     sync labels) that existed only in Cloudflare deployments `15128fd`/`875492a`.
   - Migrations `0001`-`0031` are applied (31 migrations, 72 application tables). No schema change
     was required by this release. D1 was encrypted and restore-verified before release.
-  - Owner-only: Google Calendar currently returns `auth_failed` and needs OAuth reauthorization;
-    `GOOGLE_CLIENT_SECRET` must be rotated and stored as a secret (not `plain_text`).
+  - **Final audit (2026-11-10):** Google Calendar is connected and working after the Workspace
+    billing restoration. Public checkout now links/reuses one durable Stripe Customer; executed
+    agreements queue and email the owner with the executed copy; a daily R2 photo-retention Worker
+    is deployed and production-verified. See `docs/verification/2026-11-10-FINAL-AUDIT.md`.
+  - Owner-only: controlled Stripe live/test verification, approved legal templates, branch
+    selector/backfill and Central Florida activation, optional recurring autopay terms. The Google
+    secret is `plain_text` in Cloudflare but not public; rotate only if access is shared.
 - **Prior release:** `7eab309` (deployment `71be4e9f-f1aa-432c-9681-fd5f8cb4e077`) delivered
   dynamic booking resources, recurring scheduling, document/e-signature management and the
   employee board. It remains represented in the current history.

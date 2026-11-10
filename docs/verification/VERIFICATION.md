@@ -1,5 +1,39 @@
 # Verification status
 
+## Final operational audit - 2026-11-10
+
+Full system-by-system evidence and the complete categorized pending inventory:
+[`docs/verification/2026-11-10-FINAL-AUDIT.md`](2026-11-10-FINAL-AUDIT.md).
+
+**Verified after this audit:**
+
+- **Google Calendar is working again.** `/api/booking-status` reports
+  `connected:true`, `eventReadOk:true`, timezone `America/Chicago`; availability
+  returns real slots. The earlier `auth_failed` coincided with the expired
+  Google Workspace trial. The billing restoration is the confirmed cause of the
+  recovery; the exact provider error is not independently recoverable from the
+  repository. No credential rotation was performed.
+- **Stripe Customer synchronization is now implemented.** Public checkout
+  resolves the D1 customer by quote/hold reference (never email alone), reuses
+  or creates exactly one Stripe Customer with deterministic idempotency, and the
+  webhook projects the same Stripe customer into D1. Unit tests cover reuse,
+  concurrent creation, legacy adoption, deletion recovery and guest handling.
+- **Executed agreements now email the owner.** The immutable executed copy is
+  generated first, queued in the durable outbox with a request+SHA idempotency
+  key, and sent to `owner@sparkling-standard.com` with the executed-copy
+  attachment. Provider failures remain queued for retry; duplicates are
+  suppressed; pending verification/countersignature suppresses premature email.
+- **Automatic photo retention is now running outside GitHub.** The daily
+  `sparkling-standard-photo-cleanup` Worker is deployed against the private R2
+  bucket. A production dry run scanned 22 `leads/` objects with 0 eligible;
+  the real run deleted 0. It can only match server-generated photo/sidecar keys.
+- The flaky estimate-UX browser wait was hardened after one GitHub-only failure.
+
+**Final verification:** 839 unit tests (838 pass, 1 pre-existing skip),
+208 browser tests (all pass), `check` 0 errors (1 pre-existing hint), build,
+validation and smoke all passed. The final deployed SHA and Cloudflare
+deployment ID are recorded in the reconciliation report.
+
 ## Production release - 2026-11-10 repository reconciliation
 
 **Application code release:** `bc53f55ab966d9c7905b900cf3741717b978998f` (the documentation
@@ -63,15 +97,16 @@ exact final deployment ID is recorded in the reconciliation report.
 
 **Owner-only actions**
 
-1. **Google Calendar OAuth is failing** (`/api/availability` and `/api/booking-status` return
-   `auth_failed` although every credential is present). Reauthorize with
-   `node scripts/google-calendar-auth.mjs`, then update the Cloudflare secrets. This is a
-   credential/provider action, not an application-code defect.
-2. **Rotate the Google OAuth client secret and store it as a secret.** Cloudflare currently has
-   `GOOGLE_CLIENT_SECRET` as `plain_text`, and the value was exposed to the deployment-audit API.
-   Treat it as compromised, rotate it, and store the replacement as an encrypted secret.
-3. No live Stripe test-mode charge or paid webhook was performed; administrative charging/refunds
-   remain gated.
+1. **Google Calendar is connected and working** after the Google Workspace payment. No
+   reauthorization or credential rotation is required now; keep Workspace billing active and
+   monitor it.
+2. **`GOOGLE_CLIENT_SECRET` is stored as `plain_text` in Cloudflare.** It is visible to authorized
+   project readers and appeared in the authorized deployment-audit API response used during the
+   reconciliation. It is not present in the repository, public HTML/client bundles or any public
+   endpoint. Rotation is optional unless account access is shared or audit logs are retained
+   beyond the authorized owner; if rotated, Calendar must be reauthorized.
+3. No live Stripe card charge or paid-webhook transaction has been performed; a controlled live
+   test remains the owner's decision.
 
 ## Production release - 2026-11-07
 

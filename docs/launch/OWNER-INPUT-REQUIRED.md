@@ -1,22 +1,28 @@
 # Owner input required
 
-> **2026-11-10 owner actions after the reconciliation release (`bc53f55`):**
+> **2026-11-10 final audit - owner actions:**
 >
-> 1. **Reauthorize Google Calendar.** Production currently returns `auth_failed` from
->    `/api/availability` and `/api/booking-status` even though every Google credential is present.
->    Run `node scripts/google-calendar-auth.mjs`, complete the Google consent flow, and update the
->    Cloudflare secrets with the new refresh token. Details:
->    `docs/operations/GOOGLE-CALENDAR-SETUP.md`.
-> 2. **Rotate the Google OAuth client secret.** Cloudflare currently stores
->    `GOOGLE_CLIENT_SECRET` as `plain_text`; the value was exposed to the deployment-audit API.
->    Rotate it in Google Cloud Console, store the replacement as an encrypted Cloudflare secret,
->    and re-run the calendar authorization if Google invalidates the old secret.
-> 3. **Google Calendar write verification (optional, one command).** After reauthorization, run
->    `node scripts/booking-live-test.mjs`, paste `BOOKING_OWNER_TOKEN` at the hidden prompt, type
->    `YES`, and confirm one synthetic event is created, verified and cancelled.
+> 1. **Google Calendar is connected and working again.** Calendar reads, availability and time zone
+>    are verified. The earlier `auth_failed` coincided with the expired Google Workspace trial and
+>    recovered after the owner paid the subscription. Keep Workspace billing active; no credential
+>    rotation is required now. The calendar **write** test remains optional:
+>    `node scripts/booking-live-test.mjs`.
+> 2. **Stripe live verification.** Account verification is complete and production checkout
+>    readiness is true. No live card charge has been performed. Authorize one controlled live (or
+>    test-mode) purchase and refund so the webhook, D1 payment, receipt and refund path are proven.
+> 3. **Legal agreements.** Supply final approved wording/templates before any agreement is
+>    activated. The signing system is implemented but production has no approved templates.
+> 4. **Branch selector / Central Florida.** Backend branch scoping exists, but the owner branch
+>    selector and legacy NULL-branch backfill are not complete. Tampa remains inactive until
+>    service area, staffing, calendar and pricing are approved.
+> 5. **Optional recurring autopay.** Public consent/saved-payment authorization is not implemented.
+>    It requires approved recurring-payment terms and a separate end-to-end test before activation.
+> 6. **`GOOGLE_CLIENT_SECRET` storage review.** It is `plain_text` in Cloudflare and visible to
+>    authorized project readers/audit API. It is not public. Rotate only if account access is shared
+>    or audit logs are retained beyond the authorized owner; rotating requires Calendar
+>    reauthorization.
 >
-> The release itself is live and verified. No customer records, booked appointments, pricing or
-> financial history were changed by the reconciliation.
+> No customer records, booked appointments, pricing or financial history were changed by the audit.
 
 > **2026-10-30 owner actions after the recovery release (`5525cd5`):**
 >

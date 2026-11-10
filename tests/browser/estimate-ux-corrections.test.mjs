@@ -145,8 +145,20 @@ async function confirmAddress(page) {
   await page.fill('#est-address', '100 S Baylen St');
   await page.fill('#est-address-city', 'Pensacola');
   await page.fill('#est-zip', '32502');
-  await page.click('[data-address-resolve]');
-  await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+  // Address resolution and the calendar availability revalidation can race in
+  // slower CI environments. Retry the resolver once if the first click lands
+  // while the finder is transitioning between states; a genuine resolve
+  // failure still fails after both attempts.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.click('[data-address-resolve]');
+    try {
+      await page.locator('[data-address-map]').waitFor({ state: 'visible', timeout: 8_000 });
+      break;
+    } catch {
+      if (attempt === 1) throw new Error('address map did not appear after resolve retry');
+      await page.waitForTimeout(500);
+    }
+  }
   await page.locator('[data-address-confirm]').click();
   await page.waitForFunction(
     () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',

@@ -8,6 +8,10 @@ import {
   signSigningRequest,
   type RequirementSnapshot,
 } from '../../src/lib/documents/service.ts';
+import {
+  processExecutedDocumentOutbox,
+  queueExecutedDocumentEmail,
+} from '../../src/lib/documents/notifications.ts';
 
 interface DocumentsBucket {
   get?: (key: string) => Promise<{
@@ -19,6 +23,10 @@ interface DocumentsBucket {
 
 interface Env extends AdminDbEnv {
   DOCUMENTS_BUCKET?: DocumentsBucket;
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
+  OWNER_NOTIFICATION_EMAIL?: string;
+  PUBLIC_SITE_URL?: string;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -135,6 +143,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       signatures,
       request: context.request,
     });
+    if (result.status === 'signed') {
+      await queueExecutedDocumentEmail(db, result.requestId).catch(() => undefined);
+      await processExecutedDocumentOutbox(db, context.env, {
+        requestId: result.requestId,
+      }).catch(() => undefined);
+    }
     return json({ ok: true, ...result });
   } catch (error) {
     return json(

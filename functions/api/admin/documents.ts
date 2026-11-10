@@ -24,6 +24,11 @@ import {
   verifySignature,
   type DocumentSubjectContext,
 } from '../../../src/lib/documents/service.ts';
+import {
+  executedDocumentEmailStatus,
+  processExecutedDocumentOutbox,
+  queueExecutedDocumentEmail,
+} from '../../../src/lib/documents/notifications.ts';
 
 interface DocumentsBucket {
   get?: (key: string) => Promise<{
@@ -42,6 +47,7 @@ interface Env extends AdminDbEnv {
   DOCUMENTS_BUCKET?: DocumentsBucket;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
+  OWNER_NOTIFICATION_EMAIL?: string;
   PUBLIC_SITE_URL?: string;
 }
 
@@ -133,7 +139,11 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       if (!details) return json({ ok: false, error: 'signing_request_not_found' }, 404);
       const request = (details.request ?? {}) as Record<string, unknown>;
       if (!branchAllowed(actor, request.branch_id)) return json({ ok: false, error: 'forbidden' }, 403);
-      return json({ ok: true, ...details });
+      return json({
+        ok: true,
+        ...details,
+        ownerEmail: await executedDocumentEmailStatus(db, String(request.id ?? '')),
+      });
     }
     if (view === 'executed') {
       const executed = await getExecutedCopy(db, url.searchParams.get('id') ?? '');
@@ -343,17 +353,38 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         requestId,
         text(body.name, 200) || actor.name,
       );
+      if (result.status === 'signed') {
+        await queueExecutedDocumentEmail(db, requestId).catch(() => undefined);
+        await processExecutedDocumentOutbox(db, context.env, { requestId }).catch(() => undefined);
+      }
       return json({ ok: true, ...result });
     }
     if (action === 'verify_signature' || action === 'reject_signature') {
+      const signatureId = text(body.signatureId, 100);
       await verifySignature(
         db,
         actor.id,
-        text(body.signatureId, 100),
+        signatureId,
         action === 'verify_signature',
         text(body.reason, 500),
       );
+      if (action === 'verify_signature') {
+        const signature = await getSignatureForDownload(db, signatureId);
+        const requestId = String(signature?.signing_request_id ?? '');
+        const details = requestId ? await getSigningRequestDetails(db, requestId) : null;
+        const request = (details?.request ?? {}) as Record<string, unknown>;
+        if (request.status === 'signed') {
+          await queueExecutedDocumentEmail(db, requestId).catch(() => undefined);
+          await processExecutedDocumentOutbox(db, context.env, { requestId }).catch(() => undefined);
+        }
+      }
       return json({ ok: true });
+    }
+    if (action === 'retry_executed_notifications') {
+      const result = await processExecutedDocumentOutbox(db, context.env, {
+        ...(text(body.requestId, 100) ? { requestId: text(body.requestId, 100) } : {}),
+      });
+      return json({ ok: true, ...result });
     }
     return json({ ok: false, error: 'invalid_action' }, 400);
   } catch (error) {

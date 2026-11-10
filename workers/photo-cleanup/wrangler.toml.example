@@ -1,0 +1,16 @@
+# Copy to wrangler.toml and deploy with:
+#   npx wrangler deploy --config wrangler.toml
+# CLEANUP_TOKEN is a secret for manual dry-runs:
+#   npx wrangler secret put CLEANUP_TOKEN --config wrangler.toml
+# Never commit a real secret or the production database id.
+
+name = "sparkling-standard-photo-cleanup"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+
+[triggers]
+crons = ["37 7 * * *"]
+
+[[r2_buckets]]
+binding = "PHOTOS_BUCKET"
+bucket_name = "sparkling-standard-lead-photos"

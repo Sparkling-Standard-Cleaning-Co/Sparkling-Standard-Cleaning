@@ -123,6 +123,7 @@ export interface ProjectedPaymentInput {
   amountCents: number;
   currency?: string;
   customerId?: string | null;
+  stripeCustomerId?: string;
   payerPartyId?: string | null;
   bookingRequestId?: string | null;
   appointmentId?: string | null;
@@ -162,7 +163,7 @@ export async function projectStripePayment(
         booking_request_id, gift_certificate_id, provider, status, amount_cents, currency,
         stripe_customer_id, stripe_payment_intent_id, stripe_charge_id, idempotency_key,
         received_at, metadata_json)
-       VALUES (?, NULL, ?, ?, NULL, ?, ?, ?, 'stripe', 'succeeded', ?, ?, NULL, ?, ?, ?, ?, ?)`,
+       VALUES (?, NULL, ?, ?, NULL, ?, ?, ?, 'stripe', 'succeeded', ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       paymentId,
@@ -173,6 +174,7 @@ export async function projectStripePayment(
       text(input.giftCertificateId, 100) || null,
       amount,
       currency,
+      text(input.stripeCustomerId, 200) || null,
       text(input.paymentIntentId, 200) || null,
       text(input.chargeId, 200) || null,
       idempotencyKey,
@@ -515,6 +517,9 @@ export interface EstimatePaymentProjectionInput {
   holdId?: string;
   quoteReference?: string;
   checkoutAttempt?: string;
+  /** Durable Stripe Customer linked at checkout (when available). */
+  stripeCustomerId?: string;
+  customerId?: string;
   giftAppliedCents?: number;
   totalCents?: number;
   customerName?: string;
@@ -570,6 +575,8 @@ export async function projectEstimatePayment(
       name: input.customerName ?? '',
       email: input.customerEmail ?? '',
       stableKey: input.sessionId,
+      ...(input.stripeCustomerId ? { stripeCustomerId: input.stripeCustomerId } : {}),
+      ...(input.customerId ? { customerId: input.customerId } : {}),
     });
     payerPartyId = party.id;
   }
@@ -579,7 +586,8 @@ export async function projectEstimatePayment(
     ...(input.paymentIntentId ? { paymentIntentId: input.paymentIntentId } : {}),
     amountCents: input.amountCents,
     ...(input.currency ? { currency: input.currency } : {}),
-    customerId: booking?.customer_id ?? null,
+    customerId: booking?.customer_id ?? input.customerId ?? null,
+    ...(input.stripeCustomerId ? { stripeCustomerId: input.stripeCustomerId } : {}),
     payerPartyId,
     bookingRequestId: booking?.id ?? null,
     appointmentId: appointment?.id ?? null,
@@ -596,6 +604,17 @@ export async function projectEstimatePayment(
       ...(input.metadata ?? {}),
     },
   });
+  const linkedCustomer = booking?.customer_id ?? input.customerId ?? null;
+  if (linkedCustomer && input.stripeCustomerId) {
+    await db
+      .prepare(
+        `UPDATE customers SET stripe_customer_id = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND (stripe_customer_id IS NULL OR stripe_customer_id = '')`,
+      )
+      .bind(input.stripeCustomerId, linkedCustomer)
+      .run()
+      .catch(() => undefined);
+  }
   return {
     paymentId: payment.paymentId,
     duplicate: payment.duplicate,

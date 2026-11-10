@@ -29,6 +29,7 @@ import { verifyFacilityQuote } from '../../src/lib/estimate/facility-verify.ts';
 import { requestPricingConfig } from '../../src/lib/pricing/server.ts';
 import { autoConfirmPaidBooking } from '../../src/lib/booking/auto-confirm.ts';
 import { projectGiftCleaningPayment } from '../../src/lib/payments/d1-projection.ts';
+import { resolveCheckoutStripeCustomer } from '../../src/lib/payments/stripe-customers.ts';
 import {
   PUBLIC_RATE_LIMITS,
   checkPublicRateLimit,
@@ -119,6 +120,9 @@ interface CheckoutRecord {
   reference: string;
   amountCents: number;
   serviceType: string;
+  /** Durable D1 customer and the Stripe Customer linked to it. */
+  customerId?: string;
+  stripeCustomerId?: string;
   sessionId?: string;
   sessionUrl?: string;
   /** Tax and itemized amounts captured when the verified session was created. */
@@ -1210,6 +1214,21 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (emailProblem) return json({ ok: false, error: emailProblem }, 400);
   const email = normalizeCustomerEmail(fields.email);
 
+  const stripeCustomer = await resolveCheckoutStripeCustomer(env.DB ?? null, env, {
+    reference: candidate.reference,
+    holdId: fields.booking_hold_id ?? '',
+    email,
+    name: fields.name ?? fields.organization ?? '',
+  }).catch((error) => {
+    console.error('[estimate-checkout] stripe_customer_failed', {
+      name: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  });
+  if (!stripeCustomer) {
+    return json({ ok: false, error: 'stripe_customer_unavailable' }, 502);
+  }
+
   const totalCents = candidate.amountCents;
   const giftCode = (fields.gift_code ?? '').trim().toUpperCase();
   let giftAppliedCents = 0;
@@ -1319,6 +1338,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     amountCents: candidate.amountCents,
     serviceType: candidate.serviceType,
     cleaningAmountCents: candidate.cleaningAmountCents,
+    ...(stripeCustomer.customerId ? { customerId: stripeCustomer.customerId } : {}),
+    ...(stripeCustomer.stripeCustomerId
+      ? { stripeCustomerId: stripeCustomer.stripeCustomerId }
+      : {}),
     ...(candidate.quotedTotalCents !== null ? { quotedTotalCents: candidate.quotedTotalCents } : {}),
     tax: candidate.tax,
     photosOutstanding,
@@ -1422,6 +1445,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('metadata[tax_rate_percent]', String(candidate.tax.ratePercent ?? ''));
   body.set('metadata[tax_jurisdiction]', candidate.tax.jurisdictionKey ?? '');
   if (fields.booking_hold_id) body.set('metadata[booking_hold_id]', fields.booking_hold_id);
+  if (stripeCustomer.customerId) body.set('metadata[customer_id]', stripeCustomer.customerId);
+  if (stripeCustomer.stripeCustomerId) {
+    body.set('metadata[stripe_customer_id]', stripeCustomer.stripeCustomerId);
+  }
   body.set('metadata[photos_outstanding]', photosOutstanding ? 'yes' : 'no');
   const holdExpiresAt = Date.parse(fields.booking_hold_expires_at ?? '');
   body.set(
@@ -1432,7 +1459,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       ),
     ),
   );
-  body.set('customer_email', email);
+  if (stripeCustomer.stripeCustomerId) {
+    body.set('customer', stripeCustomer.stripeCustomerId);
+    body.set('customer_update[email]', 'auto');
+  } else {
+    body.set('customer_email', email);
+  }
 
   try {
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {

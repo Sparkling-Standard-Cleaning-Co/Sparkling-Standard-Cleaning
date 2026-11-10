@@ -2115,7 +2115,10 @@ async function loadDocumentBundleItems(bundleId: string): Promise<void> {
 async function openDocumentRequest(id: string): Promise<void> {
   const target = document.querySelector<HTMLElement>('[data-document-request-detail]');
   if (!target) return;
-  const data = await api<{ request?: Record<string, unknown> | null }>(`/api/admin/documents?view=request&id=${encodeURIComponent(id)}`);
+  const data = await api<{
+    request?: Record<string, unknown> | null;
+    ownerEmail?: { status: string; attempts: number; lastError: string } | null;
+  }>(`/api/admin/documents?view=request&id=${encodeURIComponent(id)}`);
   const detail = data.request;
   if (!detail) {
     target.innerHTML = '<p class="admin-muted">That signing request could not be loaded.</p>';
@@ -2125,9 +2128,15 @@ async function openDocumentRequest(id: string): Promise<void> {
   const request = detail.request as Record<string, unknown>;
   const signatures = (detail.signatures as Array<Record<string, unknown>>) ?? [];
   const awaiting = signatures.some((signature) => signature.status === 'awaiting_verification');
+  const ownerEmail = data.ownerEmail;
+  const ownerEmailLabel = ownerEmail
+    ? `${titleCase(ownerEmail.status)}${ownerEmail.attempts ? ` (${ownerEmail.attempts} attempt${ownerEmail.attempts === 1 ? '' : 's'})` : ''}${ownerEmail.lastError ? ` - ${ownerEmail.lastError}` : ''}`
+    : request.executed_at
+      ? 'Pending first attempt'
+      : 'Not sent until fully executed';
   target.hidden = false;
-  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">Signing request ${esc(request.bundle_code)}</h2><div class="admin-actions">${request.executed_at ? `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=executed&id=${encodeURIComponent(id)}">Executed copy</a>` : ''}${awaiting ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-countersign" data-id="${esc(id)}">Countersign and verify</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-close">Close</button></div></div>
-    <dl class="admin-definition"><dt>Status</dt><dd>${esc(titleCase(request.status))}</dd><dt>Subject</dt><dd>${esc(request.subject_type)}</dd><dt>Branch</dt><dd>${esc(request.branch_id || '—')}</dd><dt>Bound signer</dt><dd>${esc(request.signer_email || 'not bound')}</dd><dt>Booking reference</dt><dd>${esc(request.booking_reference || '-')}</dd><dt>Countersigned</dt><dd>${request.counter_signed_at ? `${esc(request.counter_signature_name)} · ${esc(dateTime(request.counter_signed_at))}` : 'Not countersigned'}</dd><dt>Executed copy</dt><dd>${request.executed_at ? `${esc(dateTime(request.executed_at))} · SHA-256 ${esc(request.executed_sha256)}` : 'Not available until fully signed'}</dd></dl>
+  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">Signing request ${esc(request.bundle_code)}</h2><div class="admin-actions">${request.executed_at ? `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=executed&id=${encodeURIComponent(id)}">Executed copy</a>` : ''}${request.executed_at && ownerEmail?.status !== 'completed' ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-owner-email-retry" data-id="${esc(id)}">Retry owner email</button>` : ''}${awaiting ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-countersign" data-id="${esc(id)}">Countersign and verify</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-close">Close</button></div></div>
+    <dl class="admin-definition"><dt>Status</dt><dd>${esc(titleCase(request.status))}</dd><dt>Subject</dt><dd>${esc(request.subject_type)}</dd><dt>Branch</dt><dd>${esc(request.branch_id || '—')}</dd><dt>Bound signer</dt><dd>${esc(request.signer_email || 'not bound')}</dd><dt>Booking reference</dt><dd>${esc(request.booking_reference || '-')}</dd><dt>Countersigned</dt><dd>${request.counter_signed_at ? `${esc(request.counter_signature_name)} · ${esc(dateTime(request.counter_signed_at))}` : 'Not countersigned'}</dd><dt>Executed copy</dt><dd>${request.executed_at ? `${esc(dateTime(request.executed_at))} · SHA-256 ${esc(request.executed_sha256)}` : 'Not available until fully signed'}</dd><dt>Owner email</dt><dd>${esc(ownerEmailLabel)}</dd></dl>
     ${signatures.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Document</th><th>Version</th><th>Signer</th><th>Status</th><th>Signed</th><th>Actions</th></tr></thead><tbody>${signatures.map((signature) => `<tr><td>${esc(signature.title)}</td><td>${esc(signature.template_version)}</td><td>${esc(signature.signer_name)}</td><td><span class="admin-status">${esc(titleCase(signature.status))}</span></td><td>${esc(dateTime(signature.signed_at))}</td><td><div class="admin-actions"><a class="btn btn--ghost btn--small" href="/api/admin/documents?view=download&signatureId=${encodeURIComponent(String(signature.id))}">Download</a>${signature.status === 'awaiting_verification' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-verify" data-id="${esc(signature.id)}">Verify</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-reject" data-id="${esc(signature.id)}">Reject</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No signatures yet.</p>'}</div>`;
 }
 
@@ -2996,6 +3005,15 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'document-signature-verify') {
     void action('/api/admin/documents', { action: 'verify_signature', signatureId: id });
+  }
+  if (actionName === 'document-owner-email-retry') {
+    setAppError();
+    void api('/api/admin/documents', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'retry_executed_notifications', requestId: id }),
+    })
+      .then(() => openDocumentRequest(id))
+      .catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'document-countersign') {
     setAppError();
