@@ -53,9 +53,9 @@ Not implemented in this release:
 
 ## Production release
 
-- Application code: `f8d57c7`
-- Cloudflare Pages deployment: `1d521862-6a5d-42f1-92d0-4b0aeae84550`
-- GitHub `validate`/`browser`: green on `main` and `production-safe`
+- Application code: `2265fa6`
+- Cloudflare Pages deployment: `894430e4-a6c1-46dd-aeb6-1377ab8efe17`
+- GitHub `validate`/`browser`: green on `main` and `production-safe` (runs `42942647125` and `42942646975`)
 
 ## Verification
 
