@@ -3,7 +3,8 @@
 ## Estimator refinements and gift promotions - 2026-11-11
 
 Application code **`99db643`** is deployed in Cloudflare Pages production
-deployment `bef7159b-f0bf-4daf-b651-13c4852e7008` (source `99db643`); `main`
+deployment `bef7159b-f0bf-4daf-b651-13c4852e7008` (source `99db643`); the documentation
+closeout is `9efccb2` in deployment `eb3a396e-6b54-43f5-8970-fde1cb9cabcc`. `main`
 and `production-safe` are synchronized on the same commit. Migration `0034`
 adds the promotion scope and is applied to production D1. The owner promotions
 table now shows database, static, bundle and eligibility offers; cleaning

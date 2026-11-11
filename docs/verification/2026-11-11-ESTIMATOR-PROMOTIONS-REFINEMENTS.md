@@ -4,7 +4,11 @@
 
 - Application code: `99db643`
 - Branch: `production-safe` (with `main` synchronized on the same commit)
-- Cloudflare Pages production deployment: `bef7159b-f0bf-4daf-b651-13c4852e7008` (source `99db643`)
+- Cloudflare Pages production deployment: `bef7159b-f0bf-4daf-b651-13c4852e7008` (source `99db643`).
+- Documentation closeout: `9efccb2`, deployed as `eb3a396e-6b54-43f5-8970-fde1cb9cabcc` with no
+  application-code change.
+- GitHub `validate` (including the browser job) passed on both `main` and `production-safe`
+  (runs `43065361764` and `43065355063`).
 - Migration `0034_promotion_scope.sql` applied to production D1 before the code deployment.
 
 ## Implemented

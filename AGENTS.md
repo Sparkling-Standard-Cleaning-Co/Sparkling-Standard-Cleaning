@@ -86,7 +86,8 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
 - **Current release (2026-11-11 estimator refinements):** application code **`99db643`** is live
   (Cloudflare Pages production deployment `bef7159b-f0bf-4daf-b651-13c4852e7008`; source
-  `99db643`). `main` and `production-safe` are synchronized. Migration `0034` adds promotion
+  `99db643`; docs closeout `9efccb2` in deployment `eb3a396e-6b54-43f5-8970-fde1cb9cabcc`).
+  `main` and `production-safe` are synchronized. Migration `0034` adds promotion
   `scope` (`cleaning`/`gift`/`both`) and is applied to production D1. The owner promotions table
   lists database, static, bundle and eligibility offers; the estimator promo placeholder is
   neutral; the final appointment card reads **Your appointment for** with a **Reschedule** action;
