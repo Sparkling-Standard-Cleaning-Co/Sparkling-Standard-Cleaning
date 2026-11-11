@@ -49,8 +49,8 @@ class SqlStatement implements D1PreparedStatement {
     return { success: true, results: this.db.prepare(this.sql).all(...(this.values as never[])) as T[] };
   }
   async run(): Promise<D1Result> {
-    this.db.prepare(this.sql).run(...(this.values as never[]));
-    return { success: true };
+    const result = this.db.prepare(this.sql).run(...(this.values as never[]));
+    return { success: true, meta: { changes: Number(result.changes) } } as D1Result;
   }
 }
 
@@ -618,7 +618,7 @@ test('a facility payment without a server-confirmed street address is reservatio
   assert.equal(provider.postCount(), 0);
 });
 
-function validResidentialInput(serviceType: 'standard' | 'str_turnover') {
+function validResidentialInput(serviceType: 'standard' | 'str_turnover', options: { supportive?: boolean } = {}) {
   const isStr = serviceType === 'str_turnover';
   const input = {
     serviceType,
@@ -635,6 +635,7 @@ function validResidentialInput(serviceType: 'standard' | 'str_turnover') {
     zip: '32502',
     destinationConfirmed: true,
     pets: 'none' as const,
+    ...(options.supportive ? { supportiveEligible: true } : {}),
   };
   const context = {
     travel: {
@@ -665,6 +666,7 @@ function validResidentialInput(serviceType: 'standard' | 'str_turnover') {
   assert.ok(result.status === 'estimated' && amount !== null);
   return {
     amount,
+    result,
     fields: {
       request_type: 'reservation_request',
       estimate_status: 'estimated',
@@ -679,6 +681,7 @@ function validResidentialInput(serviceType: 'standard' | 'str_turnover') {
       condition: 'maintained',
       last_cleaned: 'within_month',
       pets: 'none',
+      ...(options.supportive ? { supportive_eligible: 'yes' } : {}),
       addon_ids: '',
       zip: '32502',
       service_address: '100 S Baylen St',
@@ -986,4 +989,173 @@ test('checkout accepts a confirmed property pin for structural payment eligibili
   assert.equal(response.status, 200);
   assert.equal(data.ok, true, 'the confirmed property pin passes structural checkout verification');
   assert.equal(provider.postCount(), 1, 'a server-priced checkout session is created');
+});
+
+﻿async function activeCheckoutPromotion(
+  db: TestD1,
+  input: { code: string; name: string; valueCents: number; minPurchaseCents?: number },
+): Promise<void> {
+  db.raw
+    .prepare(
+      `INSERT INTO promotions
+        (id, name, code, kind, value_cents, percent, services_json, branches_json,
+         min_purchase_cents, max_discount_cents, starts_at, expires_at, max_redemptions,
+         per_customer_limit, first_visit_only, combinable, status, scope)
+       VALUES (?, ?, ?, 'fixed', ?, 0, '["standard"]', '["branch_pensacola"]', ?, ?, '2026-01-01T00:00:00Z',
+               '2027-12-31T23:59:59Z', 100, 1, 1, 0, 'active', 'cleaning')
+       ON CONFLICT(code) DO UPDATE SET
+         name = excluded.name,
+         kind = 'fixed',
+         value_cents = excluded.value_cents,
+         percent = 0,
+         services_json = excluded.services_json,
+         branches_json = excluded.branches_json,
+         min_purchase_cents = excluded.min_purchase_cents,
+         max_discount_cents = excluded.max_discount_cents,
+         starts_at = excluded.starts_at,
+         expires_at = excluded.expires_at,
+         max_redemptions = excluded.max_redemptions,
+         per_customer_limit = 1,
+         first_visit_only = 1,
+         combinable = 0,
+         status = 'active',
+         scope = 'cleaning'`,
+    )
+    .run(
+      `promo_${input.code.toLowerCase()}`,
+      input.name,
+      input.code,
+      input.valueCents,
+      input.minPurchaseCents ?? 0,
+      input.valueCents,
+    );
+}
+
+test('the larger submitted promotion replaces a smaller automatic discount without stacking', async () => {
+  const ledger = new FakeLedger();
+  const db = checkoutDb();
+  await activeCheckoutPromotion(db, {
+    code: 'THANKS75',
+    name: 'Thanksgiving Deep Clean Special',
+    valueCents: 7500,
+    minPurchaseCents: 20000,
+  });
+  const env = { ...makeEnv(ledger), DB: db };
+  const provider = providerStub();
+  const { amount, result, fields: baseFields } = validResidentialInput('standard', { supportive: true });
+  const fields = withHold(baseFields, ledger);
+  const automaticCents = Math.round((result.pricing.discount?.amount ?? 0) * 100);
+  let unitAmount = '';
+  let promotionCode = '';
+  let receiptDiscount = '';
+
+  const response = await withFetch(
+    async (url, init) => {
+      if (String(url).includes('/v1/checkout/sessions') && !String(url).includes('/v1/checkout/sessions/')) {
+        const body = init?.body as URLSearchParams;
+        unitAmount = body.get('line_items[0][price_data][unit_amount]') ?? '';
+        promotionCode = body.get('metadata[promotion_code]') ?? '';
+        receiptDiscount = body.get('metadata[promotion_discount_cents]') ?? '';
+      }
+      return provider.stub(url, init);
+    },
+    () =>
+      onRequestPost({
+        request: jsonRequest({
+          fields: { ...fields, promotion_code: 'THANKS75' },
+          returnPath: '/estimate/residential/',
+        }),
+        env,
+      } as never),
+  );
+
+  assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
+  assert.equal(unitAmount, String(Math.round(amount * 100) + automaticCents - 7500));
+  assert.equal(promotionCode, 'THANKS75');
+  assert.equal(receiptDiscount, '7500');
+});
+
+test('a valid but smaller submitted promotion never removes the better automatic discount', async () => {
+  const ledger = new FakeLedger();
+  const db = checkoutDb();
+  await activeCheckoutPromotion(db, {
+    code: 'SMALL15',
+    name: 'Small synthetic promotion',
+    valueCents: 1500,
+  });
+  const env = { ...makeEnv(ledger), DB: db };
+  const provider = providerStub();
+  const { amount, fields: baseFields } = validResidentialInput('standard', { supportive: true });
+  const fields = withHold(baseFields, ledger);
+  let unitAmount = '';
+
+  const response = await withFetch(
+    async (url, init) => {
+      if (String(url).includes('/v1/checkout/sessions') && !String(url).includes('/v1/checkout/sessions/')) {
+        const body = init?.body as URLSearchParams;
+        unitAmount = body.get('line_items[0][price_data][unit_amount]') ?? '';
+        assert.equal(body.get('metadata[promotion_code]'), null, 'the smaller code is not applied');
+      }
+      return provider.stub(url, init);
+    },
+    () =>
+      onRequestPost({
+        request: jsonRequest({
+          fields: { ...fields, promotion_code: 'SMALL15' },
+          returnPath: '/estimate/residential/',
+        }),
+        env,
+      } as never),
+  );
+
+  assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
+  assert.equal(unitAmount, String(Math.round(amount * 100)));
+});
+
+test('a promotion is applied before gift-certificate value at checkout', async () => {
+  const ledger = new FakeLedger();
+  const db = checkoutDb();
+  await activeCheckoutPromotion(db, {
+    code: 'THANKS75',
+    name: 'Thanksgiving Deep Clean Special',
+    valueCents: 7500,
+    minPurchaseCents: 20000,
+  });
+  await activeGift(ledger, 10_000);
+  const env = { ...makeEnv(ledger), DB: db, WEB3FORMS_ENDPOINT: 'https://notify.test/submit' };
+  const provider = providerStub();
+  const { amount, result, fields: baseFields } = validResidentialInput('standard', { supportive: true });
+  const fields = withHold(baseFields, ledger);
+  const automaticCents = Math.round((result.pricing.discount?.amount ?? 0) * 100);
+  let unitAmount = '';
+  let giftApplied = '';
+
+  const response = await withFetch(
+    async (url, init) => {
+      if (String(url) === 'https://notify.test/submit') return jsonResponse({ success: true });
+      if (String(url).includes('/v1/checkout/sessions') && !String(url).includes('/v1/checkout/sessions/')) {
+        const body = init?.body as URLSearchParams;
+        unitAmount = body.get('line_items[0][price_data][unit_amount]') ?? '';
+        giftApplied = body.get('metadata[gift_applied_cents]') ?? '';
+      }
+      return provider.stub(url, init);
+    },
+    () =>
+      onRequestPost({
+        request: jsonRequest({
+          fields: {
+            ...fields,
+            promotion_code: 'THANKS75',
+            gift_code: 'SSGC-TEST-2345',
+            gift_apply_amount: '100',
+          },
+          returnPath: '/estimate/residential/',
+        }),
+        env,
+      } as never),
+  );
+
+  assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
+  assert.equal(giftApplied, '10000');
+  assert.equal(unitAmount, String(Math.round(amount * 100) + automaticCents - 7500 - 10_000));
 });

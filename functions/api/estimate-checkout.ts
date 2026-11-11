@@ -191,6 +191,9 @@ interface VerifiedCandidate {
   reference: string;
   serviceType: string;
   tax: ServiceTaxResult;
+  /** Automatic quote discount already included in cleaningAmountCents. */
+  automaticDiscountCents?: number;
+  automaticDiscountLabel?: string;
   receipt: {
     service: string;
     serviceLocation: string;
@@ -744,6 +747,12 @@ async function verifyFacilityPayment(
     reference,
     serviceType,
     tax,
+    ...(verification.discountAmount && verification.discountAmount > 0
+      ? {
+          automaticDiscountCents: cents(verification.discountAmount),
+          automaticDiscountLabel: verification.discountLabel ?? 'Automatic discount',
+        }
+      : {}),
     receipt: {
       service: serviceLabel(fields),
       serviceLocation: receiptLocation(fields),
@@ -822,6 +831,12 @@ async function verifyResidentialPayment(
     reference: await residentialReference(verification, fields, amountCents),
     serviceType,
     tax,
+    ...(verification.breakdown?.discount
+      ? {
+          automaticDiscountCents: cents(verification.breakdown.discount.amount),
+          automaticDiscountLabel: verification.breakdown.discount.label,
+        }
+      : {}),
     receipt: {
       service: serviceLabel(fields),
       serviceLocation: receiptLocation(fields),
@@ -1243,68 +1258,84 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   let dynamicPromotion: { id: string; code: string; discountCents: number; customerId: string | null; redemptionId?: string } | null = null;
   const promotionCode = (fields.promotion_code ?? '').trim().toUpperCase();
   if (promotionCode && !['SPARKLE15', 'SPARKLE100'].includes(promotionCode)) {
+    const automaticDiscountCents = candidate.automaticDiscountCents ?? 0;
+    const automaticDiscountLabel = candidate.automaticDiscountLabel ?? '';
+    const promotionBaseCents = candidate.cleaningAmountCents + automaticDiscountCents;
     const evaluation = await evaluatePromotionForQuote(env.DB ?? null, {
       code: promotionCode,
-      cleaningAmountCents: candidate.cleaningAmountCents,
+      cleaningAmountCents: promotionBaseCents,
       serviceType: candidate.serviceType,
       branchId: 'branch_pensacola',
       frequency: fields.frequency ?? fields.ongoing_frequency ?? 'one_time',
       quoteReference: candidate.reference,
       holdId: fields.booking_hold_id ?? '',
       serviceDate: fields.preferred_date ?? fields.booking_slot_start?.slice(0, 10) ?? '',
-      hasExistingDiscount: candidate.receipt.lines.some((line) => line.kind === 'discount'),
+      // Compare the submitted offer and the automatic offer independently. A
+      // valid but smaller code must never remove a better existing discount.
+      hasExistingDiscount: false,
     });
     if (!evaluation.ok || !evaluation.promotion || !evaluation.discountCents) {
       return json({ ok: false, error: 'promotion_invalid', reason: evaluation.reason }, 409);
     }
-    const discount = evaluation.discountCents;
-    const cleaningAfter = Math.max(0, candidate.cleaningAmountCents - discount);
-    const taxAfter = calculateServiceTax({
-      serviceType: candidate.serviceType,
-      state: fields.address_state ?? null,
-      zip: fields.zip ?? null,
-      taxableBase: cleaningAfter / 100,
-    });
-    if (!taxAfter.canCharge) {
-      return json({ ok: false, error: 'promotion_tax_review_required' }, 409);
+    if (evaluation.discountCents > automaticDiscountCents) {
+      const discount = evaluation.discountCents;
+      const cleaningAfter = Math.max(0, promotionBaseCents - discount);
+      const taxAfter = calculateServiceTax({
+        serviceType: candidate.serviceType,
+        state: fields.address_state ?? null,
+        zip: fields.zip ?? null,
+        taxableBase: cleaningAfter / 100,
+      });
+      if (!taxAfter.canCharge) {
+        return json({ ok: false, error: 'promotion_tax_review_required' }, 409);
+      }
+      const amountAfter = cents(cleaningAfter / 100 + (taxAfter.taxAmount ?? 0));
+      const receiptLines = [
+        ...candidate.receipt.lines.filter(
+          (line) =>
+            !(
+              line.kind === 'discount' &&
+              automaticDiscountLabel &&
+              line.label === automaticDiscountLabel
+            ),
+        ),
+        {
+          label: `Promotion - ${evaluation.promotion.name}`,
+          amountCents: -discount,
+          kind: 'discount' as const,
+        },
+      ];
+      const reconciled = (() => {
+        const sum = receiptLines.reduce((total, line) => total + line.amountCents, 0);
+        const difference = cleaningAfter - sum;
+        return difference === 0
+          ? receiptLines
+          : [...receiptLines, { label: 'Adjustment', amountCents: difference, kind: difference < 0 ? ('discount' as const) : ('charge' as const) }];
+      })();
+      candidate = {
+        ...candidate,
+        cleaningAmountCents: cleaningAfter,
+        amountCents: amountAfter,
+        tax: taxAfter,
+        automaticDiscountCents: discount,
+        automaticDiscountLabel: `Promotion - ${evaluation.promotion.name}`,
+        receipt: {
+          ...candidate.receipt,
+          lines: reconciled,
+          subtotalCents: cleaningAfter,
+          taxCents: cents(taxAfter.taxAmount ?? 0),
+          taxRatePercent: taxAfter.ratePercent,
+          taxJurisdiction: taxAfter.jurisdictionLabel,
+          totalCents: amountAfter,
+        },
+      };
+      dynamicPromotion = {
+        id: evaluation.promotion.id,
+        code: evaluation.promotion.code,
+        discountCents: discount,
+        customerId: (evaluation as { customerId?: string }).customerId ?? null,
+      };
     }
-    const amountAfter = cents(cleaningAfter / 100 + (taxAfter.taxAmount ?? 0));
-    const receiptLines = [
-      ...candidate.receipt.lines,
-      {
-        label: `Promotion - ${evaluation.promotion.name}`,
-        amountCents: -discount,
-        kind: 'discount' as const,
-      },
-    ];
-    const reconciled = (() => {
-      const sum = receiptLines.reduce((total, line) => total + line.amountCents, 0);
-      const difference = cleaningAfter - sum;
-      return difference === 0
-        ? receiptLines
-        : [...receiptLines, { label: 'Adjustment', amountCents: difference, kind: difference < 0 ? ('discount' as const) : ('charge' as const) }];
-    })();
-    candidate = {
-      ...candidate,
-      cleaningAmountCents: cleaningAfter,
-      amountCents: amountAfter,
-      tax: taxAfter,
-      receipt: {
-        ...candidate.receipt,
-        lines: reconciled,
-        subtotalCents: cleaningAfter,
-        taxCents: cents(taxAfter.taxAmount ?? 0),
-        taxRatePercent: taxAfter.ratePercent,
-        taxJurisdiction: taxAfter.jurisdictionLabel,
-        totalCents: amountAfter,
-      },
-    };
-    dynamicPromotion = {
-      id: evaluation.promotion.id,
-      code: evaluation.promotion.code,
-      discountCents: discount,
-      customerId: (evaluation as { customerId?: string }).customerId ?? null,
-    };
   }
 
   const totalCents = candidate.amountCents;

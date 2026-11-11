@@ -3114,6 +3114,47 @@ fieldset {
   text-align: left;
 }
 
+.summary-list__saving {
+  color: var(--color-rose-800);
+  background: color-mix(in srgb, var(--color-rose-100) 55%, transparent);
+  border-radius: var(--radius-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.summary-list__saving span:last-of-type {
+  color: var(--color-rose-800);
+  font-weight: var(--weight-bold);
+}
+
+.discount-code-group {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.discount-code-group__apply {
+  justify-self: start;
+}
+
+[data-discount-status][data-state='error'] {
+  color: var(--color-rose-700);
+}
+
+[data-discount-status][data-state='success'] {
+  color: var(--color-sage-700);
+}
+
+[data-discount-status][data-state='info'] {
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 640px) {
+  .discount-code-group__apply {
+    width: 100%;
+    justify-self: stretch;
+  }
+}
+
 .summary-list dt {
   color: var(--color-text-muted);
 }

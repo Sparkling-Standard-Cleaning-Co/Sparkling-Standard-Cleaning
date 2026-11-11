@@ -29,6 +29,11 @@ export interface ReceiptData {
   taxJurisdiction?: string | null;
   totalCents: number;
   paidCents: number;
+  /** Gift-certificate tender applied to this payment, if any. */
+  giftCents?: number;
+  giftCode?: string;
+  /** Card amount when part of the total was paid by gift certificate. */
+  cardPaidCents?: number;
   balanceCents: number;
   paymentStatus: 'paid' | 'partially_paid' | 'refunded' | 'unknown';
   stripeSessionId?: string;
@@ -111,6 +116,25 @@ export function buildReceipt(data: ReceiptData): BuiltReceipt {
         </tr>`
       : '';
 
+  const tenderRows =
+    data.giftCents && data.giftCents > 0
+      ? `<tr>
+          <td style="padding:6px 12px;font-size:14px;color:${PALETTE.inkSoft};text-align:right;">Gift certificate applied${data.giftCode ? ` (${escapeHtml(data.giftCode)})` : ''}</td>
+          <td style="padding:6px 12px;font-size:14px;color:${PALETTE.rose};text-align:right;white-space:nowrap;">${'\u2212'}${money(data.giftCents)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 12px;font-size:14px;color:${PALETTE.inkSoft};text-align:right;">Paid by card</td>
+          <td style="padding:6px 12px;font-size:14px;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${money(data.cardPaidCents ?? Math.max(0, data.paidCents - data.giftCents))}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 12px;font-size:14px;color:${PALETTE.inkSoft};text-align:right;">Total paid</td>
+          <td style="padding:6px 12px;font-size:14px;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${money(data.paidCents)}</td>
+        </tr>`
+      : `<tr>
+          <td style="padding:6px 12px;font-size:14px;color:${PALETTE.inkSoft};text-align:right;">Paid</td>
+          <td style="padding:6px 12px;font-size:14px;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${'\u2212'}${money(data.paidCents)}</td>
+        </tr>`;
+
   const locationBlock = data.serviceLocation
     ? `<p style="margin:14px 0 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${PALETTE.muted};">Service location</p>
        <p style="margin:0;font-size:14px;line-height:1.6;color:${PALETTE.inkSoft};">${escapeHtml(data.serviceLocation)}</p>`
@@ -168,10 +192,7 @@ export function buildReceipt(data: ReceiptData): BuiltReceipt {
             <td style="padding:12px 12px 4px;font-size:15px;font-weight:700;color:${PALETTE.ink};text-align:right;">Total</td>
             <td style="padding:12px 12px 4px;font-size:17px;font-weight:700;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${money(data.totalCents)}</td>
           </tr>
-          <tr>
-            <td style="padding:6px 12px;font-size:14px;color:${PALETTE.inkSoft};text-align:right;">Paid</td>
-            <td style="padding:6px 12px;font-size:14px;color:${PALETTE.ink};text-align:right;white-space:nowrap;">−${money(data.paidCents)}</td>
-          </tr>
+          ${tenderRows}
           ${balanceRow}
         </table>
 
@@ -199,7 +220,13 @@ export function buildReceipt(data: ReceiptData): BuiltReceipt {
     `Subtotal: ${money(data.subtotalCents)}`,
     ...(data.taxCents > 0 ? [`Sales tax: ${money(data.taxCents)}`] : []),
     `Total: ${money(data.totalCents)}`,
-    `Paid: ${money(data.paidCents)}`,
+    ...(data.giftCents && data.giftCents > 0
+      ? [
+          `Gift certificate applied: -${money(data.giftCents)}`,
+          `Paid by card: ${money(data.cardPaidCents ?? Math.max(0, data.paidCents - data.giftCents))}`,
+          `Total paid: ${money(data.paidCents)}`,
+        ]
+      : [`Paid: ${money(data.paidCents)}`]),
     ...(data.balanceCents > 0 ? [`Outstanding balance: ${money(data.balanceCents)}`] : []),
     '',
     data.notes ?? 'Payment received. Appointment confirmation is shown separately on the payment status page.',

@@ -50,13 +50,33 @@ function slotsFor(date) {
 }
 
 async function setupPage(options = {}) {
-  const context = await browser.newContext({ viewport: options.viewport ?? { width: 1280, height: 1000 } });
+  const context = await browser.newContext({
+    viewport: options.viewport ?? { width: 1280, height: 1000 },
+    ...(options.reducedMotion ? { reducedMotion: options.reducedMotion } : {}),
+  });
   const page = await context.newPage();
   await page.addInitScript(() => {
     localStorage.setItem('pcc-consent-v1', JSON.stringify({ analytics: false, ads: false, v: 1 }));
     localStorage.setItem('pcc-promo-state', JSON.stringify({ state: 'dismissed', at: new Date().toISOString() }));
     sessionStorage.setItem('pcc-promo-shown-session', '1');
   });
+  if (options.paymentReady) {
+    await page.route('**/api/estimate-checkout', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true, enabled: true, mode: 'live' }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 502,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false }),
+      });
+    });
+  }
   await page.route('**/api/geocode', async (route) => {
     const body = JSON.parse(route.request().postData() ?? '{}');
     if (body.action === 'suggest') {
@@ -231,8 +251,8 @@ test('Morning and Afternoon selections keep the exact time picker in view', asyn
   }
 });
 
-test('confirming the address does not jump the page and late resolution does not scroll', async () => {
-  const { context, page } = await setupPage();
+test('confirming the address lands on the next question instead of dropping below it', async () => {
+  const { context, page } = await setupPage({ viewport: { width: 390, height: 844 } });
   try {
     await selectDate(page);
     await page.click('[data-period="first"]');
@@ -243,47 +263,100 @@ test('confirming the address does not jump the page and late resolution does not
     await page.click('[data-address-resolve]');
     await page.locator('[data-address-map]').waitFor({ state: 'visible' });
     await page.locator('[data-address-confirm]').scrollIntoViewIfNeeded();
-    await delay(150);
-    const before = await page.evaluate(() => window.scrollY);
     await page.locator('[data-address-confirm]').click();
     await page.waitForFunction(
       () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
     );
     await delay(700);
-    const after = await page.evaluate(() => window.scrollY);
-    // Confirming swaps the taller manual form for the compact confirmed card.
-    // Chromium's scroll anchoring preserves the user's place with a small
-    // adjustment; a programmatic jump would move the page far more.
-    assert.ok(Math.abs(after - before) <= 80, `address confirmation kept the viewport (${before} -> ${after})`);
+    const position = await page.evaluate(() => {
+      const calendar = document.querySelector('[data-booking-calendar]');
+      const confirmed = document.querySelector('[data-address-confirmed]');
+      const header = document.querySelector('.site-header');
+      if (!calendar) return null;
+      return {
+        calendar: calendar.getBoundingClientRect().toJSON(),
+        confirmedVisible: confirmed instanceof HTMLElement ? !confirmed.hidden : false,
+        headerBottom: header?.getBoundingClientRect().bottom ?? 0,
+        viewport: window.innerHeight,
+        address: document.querySelector('#est-address')?.value ?? '',
+        scrollY: window.scrollY,
+      };
+    });
+    assert.ok(position, 'the availability section exists');
+    assert.match(position.address, /Baylen/i, 'the confirmed address is preserved');
+    assert.equal(position.confirmedVisible, true, 'the confirmed destination is shown');
+    assert.ok(position.calendar.top < position.viewport, 'the next question is not below the viewport');
+    assert.ok(position.calendar.bottom > 0, 'the next question is not entirely above the viewport');
+    assert.ok(
+      position.calendar.top >= position.headerBottom - 2,
+      'the next question starts below the sticky header',
+    );
   } finally {
     await context.close();
   }
 });
 
-test('entering the final step scrolls to the beginning of the estimate content once', async () => {
-  const { context, page } = await setupPage();
+﻿test('entering the final step frames the estimate reveal, then keeps it stable', async () => {
+  const { context, page } = await setupPage({ viewport: { width: 390, height: 844 } });
   try {
     await completeToFinalStep(page);
+    await page.locator('[data-estimate-reveal]').waitFor({ state: 'visible' });
     const position = await page.evaluate(() => {
-      const step = document.querySelector('.wizard__step[data-step="5"]');
-      const heading = step?.querySelector('.wizard__step-heading');
-      if (!step || !heading) return null;
+      const stage = document.querySelector('.estimate-reveal-stage');
+      const reveal = document.querySelector('[data-estimate-reveal]');
       const header = document.querySelector('.site-header');
-      const headerBottom = header?.getBoundingClientRect().bottom ?? 0;
-      return { stepTop: step.getBoundingClientRect().top, headingTop: heading.getBoundingClientRect().top, headerBottom, scrollY: window.scrollY };
+      if (!stage || !reveal) return null;
+      const stageRect = stage.getBoundingClientRect();
+      const revealRect = reveal.getBoundingClientRect();
+      return {
+        stageTop: stageRect.top,
+        revealTop: revealRect.top,
+        revealBottom: revealRect.bottom,
+        headerBottom: header?.getBoundingClientRect().bottom ?? 0,
+        viewport: window.innerHeight,
+      };
     });
     assert.ok(position);
-    assert.ok(position.stepTop >= position.headerBottom - 2, 'final step starts below the sticky header');
-    assert.ok(position.stepTop <= 260, 'final step starts near the top, not midway down the page');
+    assert.ok(position.stageTop >= position.headerBottom - 2, 'reveal starts below the sticky header');
+    assert.ok(position.stageTop <= 220, 'reveal starts near the top, not midway down the page');
+    assert.ok(position.revealTop < position.viewport, 'the five-second visual is visible');
+    assert.ok(position.revealBottom > 0, 'the five-second visual is not above the viewport');
+    await page.waitForFunction(
+      () => document.querySelector('[data-estimate-reveal]')?.hasAttribute('hidden') === true,
+      undefined,
+      { timeout: 7000 },
+    );
+    assert.equal(await page.locator('[data-reservation-summary]').isVisible(), true, 'the estimate is readable after the visual completes');
     const before = await page.evaluate(
-      () => document.querySelector('.wizard__step[data-step="5"]')?.getBoundingClientRect().top ?? 0,
+      () => document.querySelector('.estimate-reveal-stage')?.getBoundingClientRect().top ?? 0,
     );
     await page.locator('#est-terms').evaluate((element) => element.click());
     await delay(300);
     const after = await page.evaluate(
-      () => document.querySelector('.wizard__step[data-step="5"]')?.getBoundingClientRect().top ?? 0,
+      () => document.querySelector('.estimate-reveal-stage')?.getBoundingClientRect().top ?? 0,
     );
     assert.ok(Math.abs(after - before) <= 6, 'terms changes do not scroll the final step again');
+    await page.click('[data-appointment-edit]');
+    assert.equal(
+      await page.locator('.wizard__step[data-step="1"]').getAttribute('data-active'),
+      'true',
+      'Reschedule returns to step 1',
+    );
+    for (const step of [2, 3, 4, 5]) {
+      await page.click('[data-next]');
+      await page.waitForFunction(
+        (value) =>
+          document.querySelector(`.wizard__step[data-step="${value}"]`)?.getAttribute('data-active') ===
+          'true',
+        step,
+      );
+    }
+    assert.equal(
+      await page.locator('[data-estimate-reveal]').isVisible(),
+      false,
+      'returning to the final step does not replay the five-second visual',
+    );
+    assert.equal(await page.locator('[data-reservation-summary]').isVisible(), true);
   } finally {
     await context.close();
   }
@@ -450,6 +523,9 @@ test('the final appointment card uses the approved wording and Add-ons is always
     assert.doesNotMatch(cardText, /confirmed after our team reviews/i);
     assert.match((await page.locator('[data-appointment-edit]').innerText()).trim(), /Reschedule/i);
     await page.locator('[data-reservation-summary]').waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-estimate-reveal]')?.hasAttribute('hidden') === true,
+    );
     await page.waitForFunction(() =>
       document.querySelector('[data-price-breakdown]')?.textContent?.includes('Add-ons'),
     );
@@ -466,6 +542,255 @@ test('the final appointment card uses the approved wording and Add-ons is always
       'true',
       'Reschedule returns to date/time selection',
     );
+  } finally {
+    await context.close();
+  }
+});
+
+function moneyValue(text) {
+  return Number(String(text).replace(/[^0-9.]/g, '')) || 0;
+}
+
+async function applyDiscounts(page) {
+  await page.click('[data-apply-discounts]');
+}
+
+test('a valid promo updates the itemized total, highlights the saving and scrolls to it', async () => {
+  const { context, page } = await setupPage({ reducedMotion: 'reduce' });
+  try {
+    await completeToFinalStep(page);
+    await page.locator('[data-reservation-summary]').waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-estimate-reveal]')?.hasAttribute('hidden') === true,
+    );
+    await page.waitForFunction(() =>
+      (document.querySelector('[data-reservation-price]')?.innerText ?? '').trim().length > 0,
+    );
+    const before = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    await page.route('**/api/promotion', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          code: 'THANKS75',
+          name: 'Thanksgiving Deep Clean Special',
+          discountCents: 7500,
+        }),
+      });
+    });
+    await page.fill('#est-promo-code', 'THANKS75');
+    await applyDiscounts(page);
+    await page.waitForFunction(
+      () => document.querySelector('[data-discount-status]')?.textContent?.includes('THANKS75'),
+    );
+    const breakdown = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+    assert.match(breakdown, /THANKS75 promotion applied/);
+    assert.match(breakdown, /\$75\.00/);
+    assert.match(breakdown, /ESTIMATED TOTAL/);
+    const after = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    assert.equal(after, before - 75);
+    const status = (await page.locator('[data-discount-status]').innerText()).replace(/\s+/g, ' ');
+    assert.match(status, /you saved \$75\.00/i);
+    assert.doesNotMatch(status, /A valid code|not available|expired/i);
+    await delay(400);
+    const visible = await page.evaluate(() => {
+      const summary = document.querySelector('[data-reservation-summary]');
+      if (!summary) return null;
+      const rect = summary.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, viewport: window.innerHeight };
+    });
+    assert.ok(visible);
+    assert.ok(visible.top < visible.viewport, 'the updated breakdown is in view');
+    assert.ok(visible.bottom > 0, 'the updated breakdown is not above the viewport');
+  } finally {
+    await context.close();
+  }
+});
+
+test('an invalid promo stays at the field with a specific error and never changes the total', async () => {
+  const { context, page } = await setupPage({ reducedMotion: 'reduce' });
+  try {
+    await completeToFinalStep(page);
+    await page.locator('[data-reservation-summary]').waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-estimate-reveal]')?.hasAttribute('hidden') === true,
+    );
+    await page.waitForFunction(() =>
+      (document.querySelector('[data-reservation-price]')?.innerText ?? '').trim().length > 0,
+    );
+    const before = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    await page.route('**/api/promotion', async (route) => {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false, error: 'promotion_expired' }),
+      });
+    });
+    await page.fill('#est-promo-code', 'OLDPROMO');
+    await applyDiscounts(page);
+    await delay(500);
+    await page.waitForFunction(
+      () => document.querySelector('[data-discount-status]')?.textContent?.includes('expired'),
+    );
+    const after = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    assert.equal(after, before, 'the total is unchanged');
+    const status = (await page.locator('[data-discount-status]').innerText()).replace(/\s+/g, ' ');
+    assert.match(status, /expired/i);
+    const promoField = await page.locator('#est-promo-code').boundingBox();
+    const viewportHeight = await page.evaluate(() => window.innerHeight);
+    assert.ok(promoField && promoField.y < viewportHeight, 'the promo field remains in view');
+  } finally {
+    await context.close();
+  }
+});
+
+test('a smaller valid code never replaces a better applied offer', async () => {
+  const { context, page } = await setupPage({ reducedMotion: 'reduce' });
+  try {
+    await completeToFinalStep(page);
+    await page.locator('[data-reservation-summary]').waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-estimate-reveal]')?.hasAttribute('hidden') === true,
+    );
+    await page.route('**/api/promotion', async (route) => {
+      const body = JSON.parse(route.request().postData() ?? '{}');
+      const isSmall = String(body.code).toUpperCase() === 'SMALL15';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          isSmall
+            ? { ok: true, code: 'SMALL15', name: 'Small offer', discountCents: 1500 }
+            : { ok: true, code: 'THANKS75', name: 'Thanksgiving Deep Clean Special', discountCents: 7500 },
+        ),
+      });
+    });
+    await page.fill('#est-promo-code', 'THANKS75');
+    await applyDiscounts(page);
+    await page.waitForFunction(
+      () => document.querySelector('[data-discount-status]')?.textContent?.includes('THANKS75'),
+    );
+    const afterBetter = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    await page.fill('#est-promo-code', 'SMALL15');
+    await applyDiscounts(page);
+    await delay(500);
+    await page.waitForFunction(
+      () => document.querySelector('[data-discount-status]')?.textContent?.includes('existing THANKS75'),
+    );
+    const afterSmaller = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    assert.equal(afterSmaller, afterBetter, 'the better saving is retained');
+    const breakdown = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+    assert.match(breakdown, /THANKS75 promotion applied/);
+    assert.doesNotMatch(breakdown, /SMALL15/);
+  } finally {
+    await context.close();
+  }
+});
+
+test('promo and gift certificate apply together with the gift shown first and the amount due updated', async () => {
+  const { context, page } = await setupPage({ reducedMotion: 'reduce', paymentReady: true });
+  try {
+    await completeToFinalStep(page);
+    await page.locator('[data-reservation-summary]').waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-estimate-reveal]')?.hasAttribute('hidden') === true,
+    );
+    await page.waitForFunction(() =>
+      (document.querySelector('[data-reservation-price]')?.innerText ?? '').trim().length > 0,
+    );
+    const before = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    await page.route('**/api/promotion', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          code: 'THANKS75',
+          name: 'Thanksgiving Deep Clean Special',
+          discountCents: 7500,
+        }),
+      });
+    });
+    await page.route('**/api/gift-balance?code=*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          code: 'SSGC-TEST-2345',
+          status: 'active',
+          active: true,
+          valueCents: 10000,
+          redeemedCents: 0,
+          remainingCents: 5000,
+        }),
+      });
+    });
+    await page.locator('[data-pay-now]').waitFor({ state: 'visible' });
+    await page.locator('[data-gift-field]').waitFor({ state: 'visible' });
+    await page.fill('#est-promo-code', 'THANKS75');
+    await page.fill('#est-gift-code', 'SSGC-TEST-2345');
+    await applyDiscounts(page);
+    await page.waitForFunction(
+      () => document.querySelector('[data-discount-status]')?.textContent?.includes('Gift certificate applied'),
+    );
+    const rows = await page.locator('[data-price-breakdown] li').evaluateAll((items) =>
+      items.map((item) => item.innerText.replace(/\s+/g, ' ')),
+    );
+    const giftIndex = rows.findIndex((row) => /Gift certificate applied/.test(row));
+    const promoIndex = rows.findIndex((row) => /THANKS75 promotion applied/.test(row));
+    assert.ok(giftIndex >= 0 && promoIndex >= 0);
+    assert.ok(giftIndex < promoIndex, 'the gift line is presented before the promotion line');
+    assert.match(rows[giftIndex], /\$50\.00/);
+    assert.match(rows[promoIndex], /\$75\.00/);
+    assert.match(rows.join(' '), /AMOUNT DUE/);
+    const after = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    assert.equal(after, before - 75 - 50);
+    const status = (await page.locator('[data-discount-status]').innerText()).replace(/\s+/g, ' ');
+    assert.match(status, /THANKS75/);
+    assert.match(status, /Gift certificate applied/);
+    await page.fill('#est-gift-code', '');
+    await applyDiscounts(page);
+    await page.waitForFunction(() => {
+      const text = document.querySelector('[data-discount-status]')?.textContent ?? '';
+      return !text.includes('Checking') && text.includes('THANKS75 applied') && !text.includes('Gift certificate');
+    });
+    const rowsAfterRemoval = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+    assert.doesNotMatch(rowsAfterRemoval, /Gift certificate applied/);
+    const afterRemoval = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    assert.equal(afterRemoval, before - 75, 'removing the gift restores the amount due');
+  } finally {
+    await context.close();
+  }
+});
+
+test('small Android viewport also anchors address confirmation to availability', async () => {
+  const { context, page } = await setupPage({ viewport: { width: 360, height: 800 } });
+  try {
+    await selectDate(page);
+    await page.click('[data-period="first"]');
+    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
+    await page.fill('#est-address', '100 S Baylen St');
+    await page.fill('#est-address-city', 'Pensacola');
+    await page.fill('#est-zip', '32502');
+    await page.click('[data-address-resolve]');
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').scrollIntoViewIfNeeded();
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
+    await delay(1200);
+    const position = await page.evaluate(() => {
+      const calendar = document.querySelector('[data-booking-calendar]');
+      if (!calendar) return null;
+      const rect = calendar.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, viewport: window.innerHeight };
+    });
+    assert.ok(position);
+    assert.ok(position.top >= 0 && position.top < position.viewport);
+    assert.ok(position.bottom > 0);
   } finally {
     await context.close();
   }

@@ -75,3 +75,18 @@ test('a no-tax receipt omits the tax row and keeps the total', () => {
   assert.doesNotMatch(receipt.text, /Sales tax/);
   assert.match(receipt.text, /Total: \$140\.00/);
 });
+test('a gift-covered payment shows the gift tender separately from the card and never as a discount', () => {
+  const receipt = buildReceipt({
+    ...base,
+    totalCents: 15050,
+    paidCents: 15050,
+    giftCents: 5000,
+    giftCode: 'SSGC-TEST-2345',
+    cardPaidCents: 10050,
+  });
+  assert.match(receipt.text, /Gift certificate applied: -\$50\.00/);
+  assert.match(receipt.text, /Paid by card: \$100\.50/);
+  assert.match(receipt.text, /Total paid: \$150\.50/);
+  assert.doesNotMatch(receipt.text, /SPARKLE100: -\$50\.00/);
+  assert.match(receipt.html, /SSGC-TEST-2345/);
+});

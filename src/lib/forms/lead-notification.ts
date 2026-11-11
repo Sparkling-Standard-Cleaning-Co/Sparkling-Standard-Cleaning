@@ -360,7 +360,7 @@ function pricingLines(fields: Record<string, string>): Array<[string, string]> {
   // discount is honored on a booked job.
   const promotionSource = text(fields, 'promotion_source');
   if (promotionSource === 'campaign') {
-    const claimedCode = text(fields, 'promotion_code');
+    const claimedCode = text(fields, 'campaign_code') || text(fields, 'promotion_code');
     if (claimedCode) lines.push(['Pricing — Campaign claim', claimedCode.toUpperCase()]);
     lines.push([
       'Pricing — Campaign redemption',

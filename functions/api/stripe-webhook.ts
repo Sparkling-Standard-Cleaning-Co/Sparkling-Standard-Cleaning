@@ -427,6 +427,13 @@ async function deliverEstimateReceipt(
     taxJurisdiction: snapshot.taxJurisdiction,
     totalCents,
     paidCents,
+    ...(giftAppliedCents > 0
+      ? {
+          giftCents: giftAppliedCents,
+          giftCode: record?.gift?.code ?? '',
+          cardPaidCents: Math.max(0, paidCents - giftAppliedCents),
+        }
+      : {}),
     balanceCents: Math.max(0, totalCents - paidCents),
     paymentStatus: paidCents >= totalCents ? 'paid' : 'partially_paid',
     ...(session?.id ? { stripeSessionId: session.id } : {}),

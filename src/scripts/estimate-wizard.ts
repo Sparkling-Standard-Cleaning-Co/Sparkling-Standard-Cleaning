@@ -80,9 +80,7 @@ function storedPromoClaim(): string | null {
   return null;
 }
 
-function claimedPromoCode(): string | null {
-  const typed = document.querySelector<HTMLInputElement>('[data-promo-code]')?.value.trim().toUpperCase();
-  if (typed) return typed;
+function staticCampaignClaim(): string | null {
   const code = configuredCampaignCode();
   if (!code) return null;
   try {
@@ -154,9 +152,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const streetInputEl = form.querySelector<HTMLInputElement>('#est-address');
   let addressDetailsRevealed = false;
 
+  let scrollIntent = 0;
+
   function scrollToTopOf(element: HTMLElement, behavior: ScrollBehavior = 'smooth'): void {
+    scrollIntent += 1;
     const header = document.querySelector<HTMLElement>('.site-header, header');
-    const offset = (header?.getBoundingClientRect().height ?? 72) + 16;
+    const offset = (header?.getBoundingClientRect().height ?? 72) + 32;
     const top = Math.max(0, element.getBoundingClientRect().top + window.scrollY - offset);
     window.scrollTo({
       top,
@@ -318,6 +319,67 @@ function initEstimateWizard(form: HTMLFormElement): void {
   let estimateCompleted = false;
   let campaignAppliedTracked = false;
 
+  interface AppliedPromotion {
+    code: string;
+    label: string;
+    amountCents: number;
+  }
+  interface AppliedGift {
+    code: string;
+    availableCents: number;
+  }
+  let appliedPromotion: AppliedPromotion | null = null;
+  let appliedGift: AppliedGift | null = null;
+  let discountQuoteCents: number | null = null;
+
+  const estimateRevealStage = form.querySelector<HTMLElement>('.estimate-reveal-stage');
+
+  function automaticDiscountCents(): number {
+    const amount = latestResult?.pricing.discount?.amount ?? 0;
+    return Number.isFinite(amount) ? Math.max(0, Math.round(amount * 100)) : 0;
+  }
+
+  function winningPromotion(): AppliedPromotion | null {
+    if (!appliedPromotion) return null;
+    return appliedPromotion.amountCents > automaticDiscountCents() ? appliedPromotion : null;
+  }
+
+  function totalBeforeGiftCents(): number {
+    if (!latestQuote) return 0;
+    let total = Math.round(latestQuote.amount * 100);
+    const winner = winningPromotion();
+    if (winner) total += automaticDiscountCents() - winner.amountCents;
+    return Math.max(0, total);
+  }
+
+  function appliedGiftCents(): number {
+    if (!appliedGift) return 0;
+    return Math.min(totalBeforeGiftCents(), Math.max(0, appliedGift.availableCents));
+  }
+
+  function displayTotalCents(): number {
+    return Math.max(0, totalBeforeGiftCents() - appliedGiftCents());
+  }
+
+  function clearAppliedDiscounts(message = ''): void {
+    appliedPromotion = null;
+    appliedGift = null;
+    discountQuoteCents = null;
+    const discountStatus = form.querySelector<HTMLElement>('[data-discount-status]');
+    if (discountStatus) {
+      discountStatus.dataset.state = 'info';
+      discountStatus.textContent = message;
+    }
+  }
+
+  function discountQuoteChanged(): void {
+    const current = latestQuote ? Math.round(latestQuote.amount * 100) : null;
+    if ((appliedPromotion || appliedGift) && discountQuoteCents !== current) {
+      clearAppliedDiscounts('Your estimate changed. Apply your code again to refresh the savings.');
+    }
+  }
+
+
   // ── State helpers ─────────────────────────────────────────────────────────
   function radioValue(name: string): string | undefined {
     const checked = form.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`);
@@ -388,7 +450,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   function buildContext(): EstimateContext {
     const key = currentTravelKey();
     const routedForDestination = routed && routedKey === key ? routed : undefined;
-    const claimedCode = claimedPromoCode();
+    const claimedCode = staticCampaignClaim();
     return {
       travel: {
         ...(routedForDestination ? { routed: routedForDestination } : {}),
@@ -439,6 +501,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
             destinationConfirmed: location !== null,
           })
         : null;
+    discountQuoteChanged();
     renderResult(result);
     renderAddonPrices(result);
     renderExtrasSummary(result);
@@ -776,7 +839,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   /** Builds the reconciled price lines used by both the preview and summary. */
-  function priceLines(result: EstimateResult): Array<{ label: string; value: string; strong?: boolean; detail?: string }> {
+  function priceLines(result: EstimateResult): Array<{ label: string; value: string; strong?: boolean; detail?: string; emphasis?: 'saving' }> {
     const p = result.pricing;
     if (result.status === 'invalid' || p.subtotal <= 0) return [];
     const partial =
@@ -784,8 +847,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
       result.addons.some((addon) => addon.customQuote);
     if (result.status !== 'estimated' && !partial) return [];
     const tax = taxPresentationForService(radioValue('serviceType'));
-    const lines: Array<{ label: string; value: string; strong?: boolean; detail?: string }> = [];
+    const lines: Array<{ label: string; value: string; strong?: boolean; detail?: string; emphasis?: 'saving' }> = [];
     const firstVisit = Boolean(result.ongoing);
+    const winner = winningPromotion();
     if (p.minimumApplied) {
       lines.push({ label: 'Minimum visit price', value: formatUsd(p.basePrice) });
     } else {
@@ -811,7 +875,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         value: `${p.roundingAdjustment < 0 ? '\u2212' : '+'}${formatUsd(Math.abs(p.roundingAdjustment), { forceCents: true })}`,
       });
     }
-    if (p.discount) {
+    if (p.discount && !winner) {
       lines.push({
         label: p.discount.source === 'campaign' ? 'SPARKLE15 Discount' : p.discount.label,
         value: `\u2212${formatUsd(Math.abs(p.discount.amount), { forceCents: true })}`,
@@ -835,19 +899,41 @@ function initEstimateWizard(form: HTMLFormElement): void {
             ? 'Calculated after address verification'
             : '—',
     });
+    const giftCents = appliedGiftCents();
+    if (giftCents > 0 && appliedGift) {
+      lines.push({
+        label: 'Gift certificate applied',
+        value: `\u2212${formatUsd(giftCents / 100, { forceCents: true })}`,
+        detail: `${appliedGift.code} - available balance ${formatUsd(appliedGift.availableCents / 100, { forceCents: true })}.`,
+      });
+    }
+    if (winner) {
+      lines.push({
+        label: `${winner.code} promotion applied`,
+        value: `\u2212${formatUsd(winner.amountCents / 100, { forceCents: true })}`,
+        detail: `You saved ${formatUsd(winner.amountCents / 100, { forceCents: true })}.`,
+        emphasis: 'saving',
+      });
+    }
+    const totalCents = giftCents > 0 || winner ? displayTotalCents() : Math.round(p.subtotal * 100);
     lines.push({
       label: partial
-        ? 'BASE TOTAL — CUSTOM EXTRAS PENDING'
-        : firstVisit
-          ? 'FIRST VISIT TOTAL'
-          : 'ESTIMATED TOTAL',
-      value: formatUsd(p.subtotal, { forceCents: true }),
+        ? 'BASE TOTAL \u2014 CUSTOM EXTRAS PENDING'
+        : giftCents > 0
+          ? 'AMOUNT DUE'
+          : firstVisit
+            ? 'FIRST VISIT TOTAL'
+            : 'ESTIMATED TOTAL',
+      value: formatUsd(totalCents / 100, { forceCents: true }),
       strong: true,
+      ...(giftCents > 0 && totalCents === 0
+        ? { detail: 'Your gift certificate covers the full amount due.' }
+        : {}),
     });
     return lines;
   }
 
-  function fillLines(container: HTMLElement, lines: Array<{ label: string; value: string; strong?: boolean; detail?: string }>): void {
+  function fillLines(container: HTMLElement, lines: Array<{ label: string; value: string; strong?: boolean; detail?: string; emphasis?: 'saving' }>): void {
     container.innerHTML = '';
     for (const line of lines) {
       const item = document.createElement('li');
@@ -856,6 +942,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const detail = document.createElement(line.strong ? 'strong' : 'span');
       detail.textContent = line.value;
       item.append(term, detail);
+      if (line.emphasis === 'saving') item.classList.add('summary-list__saving');
       if (line.detail) {
         const note = document.createElement('span');
         note.className = 'summary-list__detail';
@@ -941,6 +1028,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   function payNowLabel(): string {
     if (acceptedPaymentAmount !== null) return `Pay ${formatUsd(acceptedPaymentAmount)} Securely`;
+    if (displayTotalCents() === 0 && appliedGift) return 'Reserve This Cleaning With Your Gift Certificate';
+    if (appliedGiftCents() > 0) return `Pay ${formatUsd(displayTotalCents() / 100)} and Reserve This Cleaning`;
     return paymentRetryAvailable
       ? 'Try Secure Payment Again'
       : 'Pay Now and Reserve This Cleaning';
@@ -958,7 +1047,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
     const eligible = paymentEnabled && !paymentBlocked && hasQuote && clientPaymentEligible();
     const canOfferVerification =
       hasQuote && paymentEnabled && !paymentBlocked && !addressConfirmed();
-    if (giftField) giftField.hidden = !eligible;
+    if (giftField) {
+      giftField.hidden = !eligible;
+      if (!eligible && appliedGift) {
+        appliedGift = null;
+        const giftInput = form.querySelector<HTMLInputElement>('[data-gift-code]');
+        if (giftInput) giftInput.value = '';
+      }
+    }
     if (payNowButton) {
       payNowButton.hidden = !eligible;
       if (!eligible) {
@@ -1009,7 +1105,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
   function maybeRevealEstimate(): void {
     if (!reservationSummary) return;
     if (currentStep !== steps.length || !latestQuote) {
-      finalRevealPlayed = false;
       cancelEstimateReveal(estimateReveal, reservationSummary);
       return;
     }
@@ -1089,9 +1184,19 @@ function initEstimateWizard(form: HTMLFormElement): void {
       summarySubmission.street.trim().length >= 5 &&
       summarySubmission.location.precision !== 'approximate' &&
       summarySubmission.location.precision !== 'street';
-    if (reservationPrice) reservationPrice.textContent = formatUsd(latestQuote.amount);
+    const payableCents = displayTotalCents();
+    const giftCents = appliedGiftCents();
+    if (reservationPrice) reservationPrice.textContent = formatUsd(payableCents / 100);
     if (reservationPriceSuffix) {
-      reservationPriceSuffix.textContent = result.ongoing ? 'First Visit' : '';
+      reservationPriceSuffix.textContent = giftCents > 0
+        ? payableCents === 0
+          ? 'Covered by gift certificate'
+          : 'Amount due after gift certificate'
+        : winningPromotion()
+          ? 'After promotion'
+          : result.ongoing
+            ? 'First Visit'
+            : '';
     }
     if (reservationOngoing) {
       if (result.ongoing) {
@@ -1273,9 +1378,30 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     // One scroll controller for every transition. The initial page load is
     // never moved; after navigating, the new step begins just below the sticky
-    // header. The final step starts at its own heading and summary graphic, not
-    // halfway through the payment controls.
-    scrollToTopOf(steps[currentStep - 1] ?? form, 'instant');
+    // header. The final step frames the estimate reveal when it is playing and
+    // otherwise starts at its heading. A second, layout-settled pass catches
+    // reactive content and mobile keyboard changes without competing handlers.
+    if (
+      document.activeElement instanceof HTMLElement &&
+      form.contains(document.activeElement) &&
+      document.activeElement.matches('input, select, textarea')
+    ) {
+      document.activeElement.blur();
+    }
+    const revealTarget =
+      currentStep === steps.length && estimateReveal && !estimateReveal.hidden
+        ? estimateRevealStage ?? estimateReveal
+        : null;
+    const scrollTarget = revealTarget ?? heading ?? steps[currentStep - 1] ?? form;
+    scrollToTopOf(scrollTarget, 'instant');
+    const settledIntent = scrollIntent;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (currentStep === next && scrollIntent === settledIntent) {
+          scrollToTopOf(scrollTarget, 'instant');
+        }
+      });
+    });
 
     // Scroll the horizontal step navigator internally (never the page) so the
     // active step stays visible on narrow screens.
@@ -1812,7 +1938,20 @@ function initEstimateWizard(form: HTMLFormElement): void {
       });
     },
     onConfirm: () => {
-      if (!addressVerificationPending) return;
+      if (!addressVerificationPending) {
+        // The address form collapses on confirmation. Re-anchor to the next
+        // question (availability) after the layout settles so scroll anchoring
+        // cannot leave the customer below the content they need.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const calendar = form.querySelector<HTMLElement>('[data-booking-calendar]');
+            const confirmed = form.querySelector<HTMLElement>('[data-address-confirmed]:not([hidden])');
+            const target = calendar ?? confirmed;
+            if (target) scrollToTopOf(target, 'smooth');
+          });
+        });
+        return;
+      }
       const exact = addressConfirmed();
       addressVerificationPending = false;
       addressReviewRequired = !exact;
@@ -1923,6 +2062,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
     travelLookupSeq += 1;
     latestResult = null;
     latestQuote = null;
+    clearAppliedDiscounts('');
+    const resetPromo = form.querySelector<HTMLInputElement>('[data-promo-code]');
+    const resetGift = form.querySelector<HTMLInputElement>('[data-gift-code]');
+    if (resetPromo) resetPromo.value = '';
+    if (resetGift) resetGift.value = '';
     finalRevealPlayed = false;
     cancelEstimateReveal(estimateReveal, reservationSummary);
     pendingPaymentFields = null;
@@ -2055,8 +2199,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
     // The claimed campaign code rides along as a CLAIM — the server recomputes
     // the discount itself and redemption eligibility is confirmed by the owner.
-    const claimedCode = claimedPromoCode();
-    if (claimedCode) fields.promotion_code = claimedCode;
+    const claimedCode = staticCampaignClaim();
+    if (claimedCode) fields.campaign_code = claimedCode;
+    const winningCode = winningPromotion();
+    if (winningCode) fields.promotion_code = winningCode.code;
     const holdId = textValue('booking_hold_id');
     const holdExpiry = textValue('booking_hold_expires_at');
     if (holdId && holdExpiry) {
@@ -2444,8 +2590,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     const payload = { service_type: fields.service_type, journey: 'residential' as const };
     recordConversion('cleaning_request_submit', payload);
-    if (fields.promotion_code) {
-      const code = configuredCampaignCode();
+    if (fields.promotion_code || fields.campaign_code) {
+      const code = fields.promotion_code || configuredCampaignCode();
       track('promotion_request_submit', {
         ...(code ? { code } : {}),
         ...(fields.service_type ? { service_type: fields.service_type } : {}),
@@ -2582,63 +2728,168 @@ function initEstimateWizard(form: HTMLFormElement): void {
     });
   });
 
-  form.querySelector<HTMLButtonElement>('[data-apply-promo]')?.addEventListener('click', async () => {
-    const input = form.querySelector<HTMLInputElement>('[data-promo-code]');
-    const status = form.querySelector<HTMLElement>('[data-promo-status]');
-    const summary = form.querySelector<HTMLElement>('[data-promo-summary]');
-    const code = input?.value.trim().toUpperCase() ?? '';
-    if (summary) {
-      summary.hidden = true;
-      summary.textContent = '';
-    }
-    if (!code) {
-      if (status) status.textContent = 'Enter a promo code.';
+  form.querySelector<HTMLButtonElement>('[data-apply-discounts]')?.addEventListener('click', async () => {
+    const promoInput = form.querySelector<HTMLInputElement>('[data-promo-code]');
+    const giftInput = form.querySelector<HTMLInputElement>('[data-gift-code]');
+    const discountStatus = form.querySelector<HTMLElement>('[data-discount-status]');
+    const applyButton = form.querySelector<HTMLButtonElement>('[data-apply-discounts]');
+    const promoCode = promoInput?.value.trim().toUpperCase() ?? '';
+    const giftCode = giftInput && !giftInput.closest<HTMLElement>('[hidden]') ? giftInput.value.trim().toUpperCase() : '';
+    if (!latestQuote || !currentServiceType() || !latestResult) {
+      if (discountStatus) {
+        discountStatus.dataset.state = 'error';
+        discountStatus.textContent = 'Complete your estimate first, then apply a code.';
+      }
       return;
     }
-    if (!latestQuote || !currentServiceType()) {
-      if (status) status.textContent = 'Complete your estimate first, then apply the code.';
+    if (!promoCode && !giftCode && !appliedPromotion && !appliedGift) {
+      if (discountStatus) {
+        discountStatus.dataset.state = 'error';
+        discountStatus.textContent = 'Enter a promo code or gift certificate code.';
+      }
       return;
     }
-    if (status) status.textContent = 'Checking your code...';
-    try {
-      const response = await fetch('/api/promotion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          code,
-          cleaningAmountCents: Math.round(latestQuote.amount * 100),
-          serviceType: currentServiceType(),
-          branchId: 'branch_pensacola',
-          frequency: textValue('frequency') ?? 'one_time',
-          quoteReference: latestQuote.reference,
-          holdId: textValue('booking_hold_id') ?? '',
-          serviceDate: textValue('preferredDate') ?? '',
-          hasExistingDiscount: false,
-        }),
-      });
-      const data = (await response.json().catch(() => ({}))) as {
-        ok?: boolean;
-        error?: string;
-        name?: string;
-        discountCents?: number;
-      };
-      if (!response.ok || !data.ok || !data.discountCents) {
-        if (status) {
-          status.textContent =
-            data.error === 'promotion_expired'
-              ? 'That code has expired.'
-              : 'That code is not available for this cleaning.';
+    if (applyButton) applyButton.disabled = true;
+    if (discountStatus) {
+      discountStatus.dataset.state = 'info';
+      discountStatus.textContent = 'Checking your savings...';
+    }
+    const errors: string[] = [];
+    let promoChanged = false;
+    let giftChanged = false;
+    let validLowerPromo = false;
+    if (!promoCode) {
+      if (appliedPromotion) {
+        appliedPromotion = null;
+        promoChanged = true;
+      }
+    } else {
+      try {
+        const response = await fetch('/api/promotion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            code: promoCode,
+            // Compare offers on the same pre-discount cleaning subtotal the
+            // server uses, so a smaller offer can never replace a better one.
+            cleaningAmountCents: Math.round(latestQuote.amount * 100) + automaticDiscountCents(),
+            serviceType: currentServiceType(),
+            branchId: 'branch_pensacola',
+            frequency: textValue('frequency') ?? 'one_time',
+            quoteReference: latestQuote.reference,
+            holdId: textValue('booking_hold_id') ?? '',
+            serviceDate: textValue('preferredDate') ?? '',
+            hasExistingDiscount: false,
+          }),
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+          code?: string;
+          name?: string;
+          discountCents?: number;
+        };
+        if (!response.ok || !data.ok || !data.name || !data.discountCents) {
+          const messages: Record<string, string> = {
+            promotion_expired: 'That promo code has expired.',
+            promotion_not_started: 'That promo code is not active yet.',
+            promotion_inactive: 'That promo code is not active.',
+            promotion_not_found: 'That promo code was not found.',
+            promotion_minimum_not_met: 'That code needs a larger cleaning subtotal.',
+            promotion_scope_ineligible: 'That code is not valid for this cleaning.',
+            promotion_booking_deadline_passed: 'That code can no longer be used for a new booking.',
+          };
+          errors.push(messages[data.error ?? ''] ?? 'That promo code is not available for this cleaning.');
+        } else {
+          const candidate: AppliedPromotion = {
+            code: data.code ?? promoCode,
+            label: data.name,
+            amountCents: data.discountCents,
+          };
+          const previousPromotion = appliedPromotion;
+          if (
+            !previousPromotion ||
+            candidate.code === previousPromotion.code ||
+            candidate.amountCents > previousPromotion.amountCents
+          ) {
+            appliedPromotion = candidate;
+            promoChanged = previousPromotion?.amountCents !== candidate.amountCents;
+          } else {
+            validLowerPromo = true;
+          }
         }
-        return;
+      } catch {
+        errors.push('We could not check that promo code. Please try again.');
       }
-      const adjusted = Math.max(0, latestQuote.amount - data.discountCents / 100);
-      if (status) status.textContent = `${data.name ?? code} applied.`;
-      if (summary) {
-        summary.hidden = false;
-        summary.textContent = `Discount: -$${(data.discountCents / 100).toFixed(2)} · Adjusted cleaning price before tax: $${adjusted.toFixed(2)}. Taxes and any gift certificate are applied at secure checkout.`;
+    }
+    if (!giftCode) {
+      if (appliedGift) {
+        appliedGift = null;
+        giftChanged = true;
       }
-    } catch {
-      if (status) status.textContent = 'We could not check that code. Please try again.';
+    } else {
+      try {
+        const response = await fetch(`/api/gift-balance?code=${encodeURIComponent(giftCode)}`, {
+          headers: { Accept: 'application/json' },
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+          code?: string;
+          status?: string;
+          remainingCents?: number;
+          active?: boolean;
+        };
+        if (!response.ok || !data.ok || data.active !== true || data.status !== 'active' || !data.remainingCents) {
+          const messages: Record<string, string> = {
+            invalid_code: 'That gift certificate code does not look right. Use the format SSGC-XXXX-XXXX.',
+            not_found: 'We could not find that gift certificate.',
+            ledger_not_configured: 'Gift certificate lookup is not available right now.',
+            rate_limited: 'Too many gift certificate checks. Please wait a moment and try again.',
+          };
+          errors.push(messages[data.error ?? ''] ?? 'That gift certificate is not available for this cleaning.');
+        } else {
+          appliedGift = { code: data.code ?? giftCode, availableCents: data.remainingCents };
+          giftChanged = true;
+        }
+      } catch {
+        errors.push('We could not check that gift certificate. Please try again.');
+      }
+    }
+    if (promoChanged || giftChanged) {
+      discountQuoteCents = Math.round(latestQuote.amount * 100);
+      renderReservationSummary(latestResult);
+    }
+    if (applyButton) applyButton.disabled = false;
+    const winner = winningPromotion();
+    const giftCents = appliedGiftCents();
+    let message = '';
+    if (winner) {
+      message = validLowerPromo
+        ? `Your existing ${winner.code} offer saves you more, so we kept it applied.`
+        : `${winner.code} applied - you saved ${formatUsd(winner.amountCents / 100, { forceCents: true })}.`;
+    } else if (appliedPromotion || validLowerPromo) {
+      message = 'A valid code was entered, but your existing offer saves you more, so we kept it applied.';
+    }
+    if (giftCents > 0) {
+      message = `${message ? `${message} ` : ''}Gift certificate applied - ${formatUsd(giftCents / 100, { forceCents: true })} toward this cleaning.`;
+    }
+    if (!message && (promoChanged || giftChanged)) message = 'Your discount choices were updated.';
+    if (discountStatus) {
+      discountStatus.dataset.state = errors.length > 0 ? 'error' : 'success';
+      discountStatus.textContent = errors.length > 0 ? errors.join(' ') : message;
+    }
+    if (errors.length > 0) {
+      (promoInput?.value.trim() ? promoInput : giftInput)?.focus({ preventScroll: true });
+      return;
+    }
+    if ((promoChanged || giftChanged) && currentStep === steps.length) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const target = reservationSummary ?? priceBreakdown;
+          if (target) scrollToTopOf(target, 'smooth');
+        });
+      });
     }
   });
 
@@ -2673,6 +2924,15 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return target instanceof HTMLInputElement && target.name === 'termsAccepted';
   }
 
+  function discountEntryChange(target: EventTarget | null): boolean {
+    // Code fields are applied explicitly with the shared Apply button. Typing
+    // must never recalculate, rerender or scroll the page mid-entry.
+    return (
+      target instanceof HTMLInputElement &&
+      (target.matches('[data-promo-code]') || target.matches('[data-gift-code]'))
+    );
+  }
+
   form.addEventListener('input', (event) => {
     if (!estimateStarted) {
       estimateStarted = true;
@@ -2695,7 +2955,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         }
       }
     }
-    if (consentOnlyChange(target)) return;
+    if (consentOnlyChange(target) || discountEntryChange(target)) return;
     syncConditionalFields();
     syncRevealGroups(false);
     recalc();
@@ -2724,7 +2984,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         }
       }
     }
-    if (consentOnlyChange(target)) return;
+    if (consentOnlyChange(target) || discountEntryChange(target)) return;
     syncConditionalFields();
     syncRevealGroups(false);
     recalc();

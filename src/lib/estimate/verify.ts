@@ -237,7 +237,7 @@ function buildEstimateContext(routed: RoutedTravelInfo | undefined, fields: Reco
       // The claimed campaign code is a customer assertion, not a proof: the
       // promotion engine re-checks the claim and every eligibility rule
       // itself, and redemption is confirmed by the owner at booking.
-      claimedCampaignCode: fields.promotion_code?.trim() || null,
+      claimedCampaignCode: fields.campaign_code?.trim() || fields.promotion_code?.trim() || null,
     },
   };
 }
