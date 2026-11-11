@@ -84,11 +84,11 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-10 final audit):** application code **`a48d3e5`** is live (Cloudflare
-  Pages deployment `65fb9eb3-efdf-48cb-9f60-6880cdcd19ef`; source `a48d3e5`). The documentation
-  closeout follows on the same branch with no application-code change. GitHub `validate` and
-  `browser` passed on both `main` and `production-safe`. **`main`, `production-safe` and the local
-  checkout are synchronized on the verified application tree.**
+- **Current release (2026-11-10 admin enhancements):** application code **`f8d57c7`** is live
+  (Cloudflare Pages deployment `1d521862-6a5d-42f1-92d0-4b0aeae84550`; source `f8d57c7`). The
+  documentation closeout follows on the same branch with no application-code change. GitHub
+  `validate` and `browser` passed on both `main` and `production-safe`. **`main`,
+  `production-safe` and the local checkout are synchronized on the verified application tree.**
   - It preserves the full production-safe feature set: dynamic booking/staffing, recurring
     scheduling and lifecycle, document management/signing, employee portal/timekeeping, CRM and
     property profiles, financial ledger/Stripe reconciliation, owner pricing control and all four
@@ -99,6 +99,10 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
     sync labels) that existed only in Cloudflare deployments `15128fd`/`875492a`.
   - Migrations `0001`-`0031` are applied (31 migrations, 72 application tables). No schema change
     was required by this release. D1 was encrypted and restore-verified before release.
+  - **Admin enhancements (2026-11-10):** owner Promotions & Discounts control center,
+    public promo-code validation, checkout discount/redemption lifecycle, Thanksgiving
+    THANKS75 draft and the Data & Storage dashboard with CSV exports and photo cleanup.
+    Migration 0032 is applied (32 migrations, 74 application tables).
   - **Final audit (2026-11-10):** Google Calendar is connected and working after the Workspace
     billing restoration. Public checkout now links/reuses one durable Stripe Customer; executed
     agreements queue and email the owner with the executed copy; a daily R2 photo-retention Worker

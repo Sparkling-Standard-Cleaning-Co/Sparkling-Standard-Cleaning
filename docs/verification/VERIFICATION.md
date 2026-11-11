@@ -2,11 +2,14 @@
 
 ## Admin enhancements - 2026-11-10 (promotions and data controls)
 
-Migration `0032` was applied to production D1 (74 application tables). The owner
-Promotions & Discounts screen, public promo-code validation, checkout discount
-and redemption lifecycle, and the Data & Storage tab were added. The Thanksgiving
-Deep Clean Special is seeded as a **draft** only. Full details and remaining
-limitations: [`docs/verification/2026-11-10-ADMIN-PROMOTIONS-DATA.md`](2026-11-10-ADMIN-PROMOTIONS-DATA.md).
+Application code **`f8d57c7`** is deployed in Cloudflare Pages deployment
+`1d521862-6a5d-42f1-92d0-4b0aeae84550` (source `f8d57c7`); GitHub `validate` and
+`browser` passed on both `main` and `production-safe`. Migration `0032` was
+applied to production D1 (74 application tables). The owner Promotions &
+Discounts screen, public promo-code validation, checkout discount and redemption
+lifecycle, and the Data & Storage tab were added. The Thanksgiving Deep Clean
+Special is seeded as a **draft** only. Full details and remaining limitations:
+[`docs/verification/2026-11-10-ADMIN-PROMOTIONS-DATA.md`](2026-11-10-ADMIN-PROMOTIONS-DATA.md).
 
 ## Final operational audit - 2026-11-10
 

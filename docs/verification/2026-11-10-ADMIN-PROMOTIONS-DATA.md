@@ -51,7 +51,19 @@ Not implemented in this release:
 - object-level R2 archive without S3 credentials/destination;
 - a general storage wipe (intentionally not provided).
 
-## Verification\n\n- Unit suite: 845 tests (844 pass, 1 pre-existing skip).\n- Browser suite: 208 pass.\n- Migration 0032 applied to production D1; post-migration encrypted backup restored with 74 tables, integrity ok, 0 foreign-key violations.\n\n## Still outstanding from the master directive
+## Production release
+
+- Application code: `f8d57c7`
+- Cloudflare Pages deployment: `1d521862-6a5d-42f1-92d0-4b0aeae84550`
+- GitHub `validate`/`browser`: green on `main` and `production-safe`
+
+## Verification
+
+- Unit suite: 845 tests (844 pass, 1 pre-existing skip).
+- Browser suite: 208 pass.
+- Migration 0032 applied to production D1; post-migration encrypted backup restored with 74 tables, integrity `ok`, 0 foreign-key violations.
+
+## Still outstanding from the master directive
 
 - Global admin branch selector and legacy NULL-branch backfill preview/approval.
 - Documents screen section redesign and Word document conversion.

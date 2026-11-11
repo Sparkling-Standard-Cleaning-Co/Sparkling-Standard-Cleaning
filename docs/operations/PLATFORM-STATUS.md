@@ -30,9 +30,10 @@ Last reviewed: **2026-11-10** (repository reconciliation and production release)
   audit logs are retained beyond the authorized owner.
 - **Final audit fixes:** public checkout now links/reuses a durable Stripe Customer; executed
   agreements queue and email the owner with the executed copy; a daily R2 photo-retention Worker is
-  deployed and verified. Application code **`a48d3e5`** is deployed in Cloudflare Pages deployment
-  `65fb9eb3-efdf-48cb-9f60-6880cdcd19ef`; GitHub `validate` and `browser` passed. See
-  `docs/verification/2026-11-10-FINAL-AUDIT.md`.
+  deployed and verified. Application code **`f8d57c7`** is deployed in Cloudflare Pages deployment
+  `1d521862-6a5d-42f1-92d0-4b0aeae84550`; migration 0032 (promotions/data controls) is applied and
+  GitHub `validate` and `browser` passed. See `docs/verification/2026-11-10-FINAL-AUDIT.md` and
+  `docs/verification/2026-11-10-ADMIN-PROMOTIONS-DATA.md`.
 
 **2026-10-30 review:** owner access, five-condition estimator and recovery release.
 
