@@ -84,18 +84,20 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-11 estimator refinements):** application code **`99db643`** is live
-  (Cloudflare Pages production deployment `bef7159b-f0bf-4daf-b651-13c4852e7008`; source
-  `99db643`; docs closeout `9efccb2` in deployment `eb3a396e-6b54-43f5-8970-fde1cb9cabcc`).
-  `main` and `production-safe` are synchronized. Migration `0034` adds promotion
-  `scope` (`cleaning`/`gift`/`both`) and is applied to production D1. The owner promotions table
-  lists database, static, bundle and eligibility offers; the estimator promo placeholder is
-  neutral; the final appointment card reads **Your appointment for** with a **Reschedule** action;
-  the final breakdown always shows an **Add-ons** row; and every wizard transition scrolls the
-  active step to the top. Gift certificates can use gift-scoped promotions that reduce only the
-  purchase price while preserving face value; cleaning promotions cannot discount gifts and vice
-  versa. THANKS75 remains active unchanged. Evidence:
-  `docs/verification/2026-11-11-ESTIMATOR-PROMOTIONS-REFINEMENTS.md`.
+- **Current release (2026-11-11 estimator scroll and checkout UX):** application code **`bad5d8f`**
+  is live (Cloudflare Pages production deployment `02f613a7-3a51-48bf-8bbd-9d82d3fca581`). `main` and
+  `production-safe` are synchronized. Address confirmation re-anchors to the availability
+  question, every step transition targets its heading with a guarded settled pass, and the
+  five-second final reveal is framed once per questionnaire. The final checkout has one
+  **Apply Discounts & Gift Certificates** action, automatically keeps the better non-stackable
+  offer, itemizes the saving/gift lines, updates the total and scrolls back to the breakdown.
+  Gift value remains payment tender after promotion and tax; cleaning promotions cannot
+  discount gifts and vice versa. THANKS75 remains active. Evidence:
+  `docs/verification/2026-11-11-ESTIMATOR-SCROLL-CHECKOUT.md`.
+- **Prior release (2026-11-11 estimator refinements):** application code **`99db643`** remains
+  represented in history (Cloudflare Pages deployment `bef7159b-f0bf-4daf-b651-13c4852e7008`).
+  Migration `0034` added promotion scope and is applied to production D1; the owner promotions
+  table lists database, static, bundle and eligibility offers.
 - **Prior release (2026-11-10 THANKS75 activation):** application code **`2265fa6`** was live
   (Cloudflare Pages deployment `894430e4-a6c1-46dd-aeb6-1377ab8efe17`; source `2265fa6`).
   Migrations 0032-0033 were applied; THANKS75 remains active with the approved $75 terms and

@@ -201,15 +201,25 @@ payment). Never store card numbers anywhere — Stripe holds only payment refere
 ## 7. Checkout gift redemption
 
 `POST /api/estimate-checkout` accepts the optional `gift_code` field from the residential, STR and
-facility payment forms. The server validates the code, active status and Central-Time activation,
-then durably reserves the available balance for up to 120 minutes. Only the remaining amount is sent to
-Stripe, with a minimum card remainder of $0.50. A fully gift-covered order creates no Stripe
-session: the server commits the reservation, records the order, emails the customer receipt and
-notifies the owner. `checkout.session.completed` commits a reservation after the card remainder is
-paid; `checkout.session.expired` releases it. Idempotency includes the gift reservation amount, and
-gift codes are stripped from the ordinary lead relay. Automated tests cover partial redemption,
-gift-only completion, unknown codes and webhook commit/release; no live redemption has been
-performed.
+facility payment forms. The estimate final step presents the promo and gift fields together with one
+**Apply Discounts & Gift Certificates** action; either code may be supplied alone, changed or
+removed. Applying a code checks availability only and never redeems value.
+
+The server validates the code, active status and Central-Time activation, then durably reserves the
+available balance for up to 120 minutes. Only the remaining amount is sent to Stripe, with a minimum
+card remainder of $0.50. A fully gift-covered order creates no Stripe session: the server commits the
+reservation, records the order, emails the customer receipt and notifies the owner.
+`checkout.session.completed` commits a reservation after the card remainder is paid;
+`checkout.session.expired` releases it. Idempotency includes the gift reservation amount, and gift
+codes are stripped from the ordinary lead relay. Automated tests cover partial redemption, gift-only
+completion, unknown codes and webhook commit/release; no live redemption has been performed.
+
+**Financial order with a promotion:** the winning eligible promotion reduces the authorized cleaning
+subtotal, applicable tax is calculated on that result, and gift value settles the amount payable. A
+gift certificate is payment tender, not a promotional discount; it never changes the certificate
+face value or the promotion's minimum-spend basis. The itemized estimate presents the gift line
+first and the promotion line second for the customer, while the backend keeps the financially
+correct order. The customer receipt separates gift tender, card amount and total paid.
 
 ## 8. Known gaps before live gift sales
 

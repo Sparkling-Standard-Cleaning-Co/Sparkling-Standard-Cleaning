@@ -65,12 +65,26 @@ https://sparkling-standard.com/estimate/payment-success/?session_id={CHECKOUT_SE
 
 ## Gift certificate redemption
 
-The final step accepts an optional gift-certificate code. The server validates it and reserves the
-available balance for up to 120 minutes; Stripe is charged only the remainder (minimum $0.50). A gift that
-covers the full total completes without a Stripe session: the reservation is committed, the order is
-recorded, the customer receipt is emailed and the owner is notified. A card remainder is committed
-by the paid webhook, while `checkout.session.expired` releases the reservation. The gift ledger uses
-`GIFT_LEDGER` when configured, otherwise `PAYMENT_LEDGER`.
+The final step accepts an optional gift-certificate code beside the promo-code field. A single
+**Apply Discounts & Gift Certificates** action validates both independently; either field may be
+left empty and an applied code can be removed by clearing that field and applying again.
+
+The server evaluates the submitted promotion and the quote's automatic discount independently and
+keeps only the larger valid non-stackable offer on the pre-discount cleaning subtotal. A valid but
+smaller code never removes the better offer. The applied promotion is shown as an itemized saving
+line; the page scrolls back to the updated breakdown.
+
+Gift value is **payment tender**, not promotional revenue reduction. The financial order is:
+eligible promotion reduces the authorized cleaning subtotal, tax is calculated on that result, then
+the gift balance is applied against the amount payable. The gift line is presented above the
+promotion line for the customer, but the underlying calculation order does not change. The server
+validates the certificate and reserves the available balance for up to 120 minutes; Stripe is
+charged only the remainder (minimum $0.50). A gift that covers the full total completes without a
+Stripe session: the reservation is committed, the order is recorded, the customer receipt is emailed
+and the owner is notified. A card remainder is committed by the paid webhook, while
+`checkout.session.expired` releases the reservation. The gift ledger uses `GIFT_LEDGER` when
+configured, otherwise `PAYMENT_LEDGER`. The customer receipt distinguishes gift tender, card amount
+and total paid.
 
 ## Automatic booking confirmation
 

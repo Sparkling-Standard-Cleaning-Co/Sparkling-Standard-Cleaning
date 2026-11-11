@@ -31,12 +31,19 @@ Last reviewed: **2026-11-10** (repository reconciliation and production release)
 - **Final audit fixes:** public checkout now links/reuses a durable Stripe Customer; executed
   agreements queue and email the owner with the executed copy; a daily R2 photo-retention Worker is
   deployed and verified.
-- **Estimator refinements (2026-11-11):** application code **`99db643`** is deployed in Cloudflare
-  Pages production deployment `bef7159b-f0bf-4daf-b651-13c4852e7008`; migration 0034 adds promotion
-  scope and THANKS75 remains active. Gift certificates accept gift-only promotions; cleaning
-  promotions cannot discount gifts. The estimator shows **Your appointment for** / **Reschedule**,
-  a permanent **Add-ons** row and consistent top-of-step scrolling. `main` and `production-safe` are
-  synchronized. GitHub `validate` and `browser` passed. See
+- **Estimator scrolling and checkout UX repair (2026-11-11):** application code **`bad5d8f`** is
+  deployed in Cloudflare Pages production deployment `02f613a7-3a51-48bf-8bbd-9d82d3fca581`; no migration was
+  required. Address confirmation re-anchors to availability; step transitions target their
+  headings with a guarded settled pass; the five-second reveal is framed once and does not replay.
+  The final checkout has one combined **Apply Discounts & Gift Certificates** action, automatic
+  best non-stackable offer selection, itemized saving/gift lines and a scroll back to the updated
+  breakdown. Gift value remains payment tender after promotion and tax. THANKS75 remains active.
+  `main` and `production-safe` are synchronized. See
+  `docs/verification/2026-11-11-ESTIMATOR-SCROLL-CHECKOUT.md`.
+- **Prior estimator refinements (2026-11-11):** application code **`99db643`** was deployed in
+  Cloudflare Pages production deployment `bef7159b-f0bf-4daf-b651-13c4852e7008`; migration 0034
+  added promotion scope and THANKS75 remained active. Gift certificates accept gift-only
+  promotions; cleaning promotions cannot discount gifts. See
   `docs/verification/2026-11-11-ESTIMATOR-PROMOTIONS-REFINEMENTS.md`,
   `docs/verification/2026-11-10-FINAL-AUDIT.md` and
   `docs/verification/2026-11-10-ADMIN-PROMOTIONS-DATA.md`.

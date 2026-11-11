@@ -1,5 +1,18 @@
 # Verification status
 
+## Estimator scrolling and checkout UX repair - 2026-11-11
+
+Application code **`bad5d8f`** is deployed in Cloudflare Pages production
+deployment `02f613a7-3a51-48bf-8bbd-9d82d3fca581`; `main` and `production-safe` are
+synchronized. Address confirmation now re-anchors to availability instead of
+dropping below it; every step transition targets its heading with a settled
+scroll pass; the five-second final reveal is framed once and never replays on
+return. The final checkout has one combined Apply button, a server-selected
+best non-stackable offer, itemized saving/gift lines, updated totals and a
+scroll back to the breakdown. Gift value remains payment tender after
+promotion and tax. Full evidence:
+[`docs/verification/2026-11-11-ESTIMATOR-SCROLL-CHECKOUT.md`](2026-11-11-ESTIMATOR-SCROLL-CHECKOUT.md).
+
 ## Estimator refinements and gift promotions - 2026-11-11
 
 Application code **`99db643`** is deployed in Cloudflare Pages production

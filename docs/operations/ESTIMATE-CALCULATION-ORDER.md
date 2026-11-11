@@ -35,6 +35,23 @@ recalculation, the owner notification and the customer receipt.
    ongoing rhythm uses maintained/within-month condition assumptions so the initial buildup
    penalty is not charged forever; size, rooms, add-ons and frequency still apply.
 
+## Checkout: submitted promotion versus gift tender
+
+1. The quote's automatic discount (campaign, eligibility, bundle or other single offer) is kept
+   separately from any code entered at checkout.
+2. The submitted database promotion and the automatic discount are evaluated independently against
+   the same pre-discount cleaning subtotal. Only the larger valid non-stackable offer is applied.
+   A valid but smaller submitted code is ignored and never removes the better offer.
+3. The winning promotion reduces the cleaning subtotal; applicable tax is calculated on that
+   amount.
+4. Stored gift value is applied after promotion and tax as payment tender, capped at the amount
+   payable and the certificate's available balance. It never reduces the certificate face value and
+   is never recorded as promotional revenue reduction.
+5. The customer sees the gift line first and the promotion line second for clarity, but the
+   customer-facing order does not change the financial order above.
+6. A fully gift-covered amount completes without a card charge; the gift ledger reservation is
+   committed exactly once. A card remainder is committed only by the verified paid webhook.
+
 ## Commercial and church
 
 1. Workload hours from the ISSA-based area + fixture model.
