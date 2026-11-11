@@ -2,12 +2,12 @@
 
 ## Release
 
-- Application code: `bad5d8f`
+- Application code: `4106d59`
 - Branch: `production-safe` (with `main` synchronized on the same commit)
-- Cloudflare Pages production deployment: `02f613a7-3a51-48bf-8bbd-9d82d3fca581`
-  (source `bad5d8f`).
+- Cloudflare Pages production deployment: `9ec1b492-0f02-401b-bc93-9af9e18d4151`
+  (source `4106d59`).
 - GitHub `validate` (including the browser job) passed on both `main` and
-  `production-safe` (runs `43082861407` and `43082857488`).
+  `production-safe` (runs `43099340165` and `43099337214`).
 - No migration and no database schema change.
 
 ## A. Scroll behavior

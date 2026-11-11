@@ -84,8 +84,8 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-11 estimator scroll and checkout UX):** application code **`bad5d8f`**
-  is live (Cloudflare Pages production deployment `02f613a7-3a51-48bf-8bbd-9d82d3fca581`). `main` and
+- **Current release (2026-11-11 estimator scroll and checkout UX):** application code **`4106d59`**
+  is live (Cloudflare Pages production deployment `9ec1b492-0f02-401b-bc93-9af9e18d4151`). `main` and
   `production-safe` are synchronized. Address confirmation re-anchors to the availability
   question, every step transition targets its heading with a guarded settled pass, and the
   five-second final reveal is framed once per questionnaire. The final checkout has one

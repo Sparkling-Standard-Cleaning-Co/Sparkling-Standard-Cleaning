@@ -31,8 +31,8 @@ Last reviewed: **2026-11-10** (repository reconciliation and production release)
 - **Final audit fixes:** public checkout now links/reuses a durable Stripe Customer; executed
   agreements queue and email the owner with the executed copy; a daily R2 photo-retention Worker is
   deployed and verified.
-- **Estimator scrolling and checkout UX repair (2026-11-11):** application code **`bad5d8f`** is
-  deployed in Cloudflare Pages production deployment `02f613a7-3a51-48bf-8bbd-9d82d3fca581`; no migration was
+- **Estimator scrolling and checkout UX repair (2026-11-11):** application code **`4106d59`** is
+  deployed in Cloudflare Pages production deployment `9ec1b492-0f02-401b-bc93-9af9e18d4151`; no migration was
   required. Address confirmation re-anchors to availability; step transitions target their
   headings with a guarded settled pass; the five-second reveal is framed once and does not replay.
   The final checkout has one combined **Apply Discounts & Gift Certificates** action, automatic
