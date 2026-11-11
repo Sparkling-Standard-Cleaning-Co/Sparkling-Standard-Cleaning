@@ -3114,6 +3114,10 @@ fieldset {
   text-align: left;
 }
 
+.summary-list__gift {
+  color: var(--color-rose-700);
+}
+
 .summary-list__saving {
   color: var(--color-rose-800);
   background: color-mix(in srgb, var(--color-rose-100) 55%, transparent);

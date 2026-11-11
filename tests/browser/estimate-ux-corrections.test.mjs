@@ -603,6 +603,9 @@ test('a valid promo updates the itemized total, highlights the saving and scroll
     assert.ok(visible);
     assert.ok(visible.top < visible.viewport, 'the updated breakdown is in view');
     assert.ok(visible.bottom > 0, 'the updated breakdown is not above the viewport');
+    const totalRow = await page.locator('[data-price-breakdown] li').last().boundingBox();
+    assert.ok(totalRow && totalRow.y < 844, 'the updated final total is visible');
+    assert.ok(totalRow && totalRow.y + totalRow.height > 0, 'the updated final total is not above the viewport');
   } finally {
     await context.close();
   }
@@ -750,6 +753,10 @@ test('promo and gift certificate apply together with the gift shown first and th
     const status = (await page.locator('[data-discount-status]').innerText()).replace(/\s+/g, ' ');
     assert.match(status, /THANKS75/);
     assert.match(status, /Gift certificate applied/);
+    await delay(500);
+    const totalRow = await page.locator('[data-price-breakdown] li').last().boundingBox();
+    assert.ok(totalRow && totalRow.y < 844, 'the combined amount due is visible');
+    assert.ok(totalRow && totalRow.y + totalRow.height > 0, 'the combined amount due is not above the viewport');
     await page.fill('#est-gift-code', '');
     await applyDiscounts(page);
     await page.waitForFunction(() => {

@@ -839,7 +839,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   /** Builds the reconciled price lines used by both the preview and summary. */
-  function priceLines(result: EstimateResult): Array<{ label: string; value: string; strong?: boolean; detail?: string; emphasis?: 'saving' }> {
+  function priceLines(result: EstimateResult): Array<{ label: string; value: string; strong?: boolean; detail?: string; emphasis?: 'saving' | 'tender' }> {
     const p = result.pricing;
     if (result.status === 'invalid' || p.subtotal <= 0) return [];
     const partial =
@@ -847,7 +847,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       result.addons.some((addon) => addon.customQuote);
     if (result.status !== 'estimated' && !partial) return [];
     const tax = taxPresentationForService(radioValue('serviceType'));
-    const lines: Array<{ label: string; value: string; strong?: boolean; detail?: string; emphasis?: 'saving' }> = [];
+    const lines: Array<{ label: string; value: string; strong?: boolean; detail?: string; emphasis?: 'saving' | 'tender' }> = [];
     const firstVisit = Boolean(result.ongoing);
     const winner = winningPromotion();
     if (p.minimumApplied) {
@@ -905,6 +905,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         label: 'Gift certificate applied',
         value: `\u2212${formatUsd(giftCents / 100, { forceCents: true })}`,
         detail: `${appliedGift.code} - available balance ${formatUsd(appliedGift.availableCents / 100, { forceCents: true })}.`,
+        emphasis: 'tender',
       });
     }
     if (winner) {
@@ -933,7 +934,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return lines;
   }
 
-  function fillLines(container: HTMLElement, lines: Array<{ label: string; value: string; strong?: boolean; detail?: string; emphasis?: 'saving' }>): void {
+  function fillLines(container: HTMLElement, lines: Array<{ label: string; value: string; strong?: boolean; detail?: string; emphasis?: 'saving' | 'tender' }>): void {
     container.innerHTML = '';
     for (const line of lines) {
       const item = document.createElement('li');
@@ -943,6 +944,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       detail.textContent = line.value;
       item.append(term, detail);
       if (line.emphasis === 'saving') item.classList.add('summary-list__saving');
+      if (line.emphasis === 'tender') item.classList.add('summary-list__gift');
       if (line.detail) {
         const note = document.createElement('span');
         note.className = 'summary-list__detail';
@@ -2886,7 +2888,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if ((promoChanged || giftChanged) && currentStep === steps.length) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const target = reservationSummary ?? priceBreakdown;
+          const reduction = priceBreakdown?.querySelector<HTMLElement>('.summary-list__gift, .summary-list__saving');
+          const target = reduction ?? priceBreakdown ?? reservationSummary;
           if (target) scrollToTopOf(target, 'smooth');
         });
       });
