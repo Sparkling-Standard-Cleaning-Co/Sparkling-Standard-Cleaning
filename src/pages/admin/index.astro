@@ -593,6 +593,7 @@ import {
                 <label>Maximum redemptions (0 = unlimited) <input name="maxRedemptions" type="number" min="0" step="1" value="0" /></label>
                 <label>Per-customer limit <input name="perCustomerLimit" type="number" min="1" step="1" value="1" /></label>
                 <label>Status <select name="status"><option value="draft">Draft</option><option value="active">Active</option><option value="disabled">Disabled</option><option value="expired">Expired</option></select></label>
+                <label>Applies to <select name="scope"><option value="cleaning">Cleaning only</option><option value="gift">Gift certificates only</option><option value="both">Cleaning and gifts</option></select></label>
                 <fieldset class="field admin-field--wide"><legend>Eligible services</legend>
                   <label><input type="checkbox" name="services" value="standard" /> Residential Cleaning</label>
                   <label><input type="checkbox" name="services" value="deep" /> Deep Cleaning</label>
@@ -600,6 +601,7 @@ import {
                   <label><input type="checkbox" name="services" value="str_turnover" /> STR Turnover</label>
                   <label><input type="checkbox" name="services" value="commercial_cleaning" /> Commercial</label>
                   <label><input type="checkbox" name="services" value="church_cleaning" /> Church</label>
+                  <label><input type="checkbox" name="services" value="gift_certificate" /> Gift certificate purchase</label>
                 </fieldset>
                 <fieldset class="field admin-field--wide"><legend>Eligible branches</legend>
                   <label><input type="checkbox" name="branches" value="branch_pensacola" /> Pensacola</label>

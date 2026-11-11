@@ -486,6 +486,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         .catch(() => undefined);
       return json({ ok: true, received: true, expired: true });
     }
+    if (expiredKind === 'gift_certificate' && env.DB && /^[a-f0-9]{64}$/i.test(attempt)) {
+      await releasePromotionRedemption(env.DB, attempt.toLowerCase()).catch(() => undefined);
+      return json({ ok: true, received: true, expired: true });
+    }
     if (expiredKind === 'estimate_payment' && /^[a-f0-9]{64}$/i.test(attempt)) {
       const record = await readCheckoutRecord(env, attempt);
       const bucket = paymentLedger(env);
@@ -590,6 +594,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       ? {
           gift: {
             valueUsd: giftValueUsd,
+            ...(metadata.gift_purchase_amount_usd
+              ? { purchaseAmountUsd: Number(metadata.gift_purchase_amount_usd) }
+              : {}),
+            ...(metadata.promotion_code ? { promotionCode: metadata.promotion_code } : {}),
+            ...(metadata.promotion_discount_cents
+              ? { promotionDiscountCents: Number(metadata.promotion_discount_cents) }
+              : {}),
             recipientName: (metadata.recipient_name ?? '').trim(),
             purchaserName: (metadata.purchaser_name ?? '').trim(),
             purchaserEmail: customerEmail,
@@ -984,6 +995,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       stripeSessionId: session.id ?? '',
       issuedAt: paidAt,
       ...(seed.gift.deliveryMethod ? { deliveryMethod: seed.gift.deliveryMethod } : {}),
+      ...(seed.gift.purchaseAmountUsd ? { purchaseAmountCents: Math.round(seed.gift.purchaseAmountUsd * 100) } : {}),
+      ...(seed.gift.promotionCode ? { promotionCode: seed.gift.promotionCode } : {}),
+      ...(seed.gift.promotionDiscountCents ? { promotionDiscountCents: seed.gift.promotionDiscountCents } : {}),
       deliveryStatus: 'pending',
       history: [],
     });
@@ -1092,6 +1106,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       )
       .run()
       .catch(() => undefined);
+  }
+  if (env.DB && metadata.promotion_code && metadata.checkout_attempt) {
+    await redeemPromotionRedemption(env.DB, metadata.checkout_attempt.toLowerCase(), session.id ?? '').catch(
+      () => undefined,
+    );
   }
   if (!purchaserDelivered || !recipientDelivered) {
     if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'customer_delivery_failed');

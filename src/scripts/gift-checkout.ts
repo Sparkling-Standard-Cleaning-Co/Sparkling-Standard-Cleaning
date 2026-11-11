@@ -14,6 +14,9 @@ if (form) {
   const customField = form.querySelector<HTMLElement>('[data-gift-custom-field]');
   const customValue = form.querySelector<HTMLInputElement>('[data-gift-custom-value]');
   const validFrom = form.querySelector<HTMLInputElement>('[data-gift-valid-from]');
+  const promoInput = form.querySelector<HTMLInputElement>('[data-gift-promo-code]');
+  const promoStatus = form.querySelector<HTMLElement>('[data-gift-promo-status]');
+  const promoSummary = form.querySelector<HTMLElement>('[data-gift-promo-summary]');
   let checkoutAttempt = crypto.randomUUID();
   form.addEventListener('input', () => {
     checkoutAttempt = crypto.randomUUID();
@@ -34,6 +37,68 @@ if (form) {
     );
   }
   syncCustomValue();
+  const giftFaceValueCents = (): number => {
+    const custom = denomination?.value === 'custom';
+    const raw = custom ? Number(customValue?.value ?? 0) : Number(denomination?.value ?? 0);
+    return Number.isFinite(raw) && raw > 0 ? Math.round(raw * 100) : 0;
+  };
+  form.querySelector<HTMLButtonElement>('[data-gift-promo-apply]')?.addEventListener('click', async () => {
+    const code = promoInput?.value.trim().toUpperCase() ?? '';
+    if (promoSummary) {
+      promoSummary.hidden = true;
+      promoSummary.textContent = '';
+    }
+    if (!code) {
+      if (promoStatus) promoStatus.textContent = 'Enter a promo code.';
+      return;
+    }
+    const face = giftFaceValueCents();
+    if (face <= 0) {
+      if (promoStatus) promoStatus.textContent = 'Choose a gift value first.';
+      return;
+    }
+    if (promoStatus) promoStatus.textContent = 'Checking your code...';
+    try {
+      const response = await fetch('/api/promotion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          code,
+          cleaningAmountCents: face,
+          serviceType: 'gift_certificate',
+          branchId: 'branch_pensacola',
+          frequency: 'one_time',
+          serviceDate: new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Chicago',
+          }).format(new Date()),
+          scope: 'gift',
+        }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        name?: string;
+        discountCents?: number;
+      };
+      if (!response.ok || !result.ok || !result.discountCents) {
+        if (promoStatus) {
+          promoStatus.textContent =
+            result.error === 'promotion_scope_ineligible'
+              ? 'That code is not valid for gift certificates.'
+              : 'That code is not available for this gift purchase.';
+        }
+        return;
+      }
+      const purchase = Math.max(0, face - result.discountCents) / 100;
+      if (promoStatus) promoStatus.textContent = `${result.name ?? code} applied.`;
+      if (promoSummary) {
+        promoSummary.hidden = false;
+        promoSummary.textContent = `Gift value remains $${(face / 100).toFixed(2)}. Purchase price: $${purchase.toFixed(2)} after a $${(result.discountCents / 100).toFixed(2)} discount.`;
+      }
+    } catch {
+      if (promoStatus) promoStatus.textContent = 'We could not check that code. Please try again.';
+    }
+  });
   const setStatus = (state: 'info' | 'error' | 'success', message: string): void => {
     if (!status) return;
     status.dataset.state = state;
@@ -64,6 +129,7 @@ if (form) {
       amountUsd: data.get('gift_custom_value')
         ? Number(data.get('gift_custom_value'))
         : undefined,
+      promoCode: String(data.get('promo_code') ?? '').trim().toUpperCase(),
       termsAccepted: data.get('termsAccepted') === 'yes',
       termsVersion: legalTerms.termsVersion,
       checkoutAttempt,
@@ -95,6 +161,7 @@ if (form) {
         checkout_state_uncertain: 'We could not safely register the checkout. No charge has been made; please try again.',
         ledger_not_configured: 'Secure gift checkout is not fully configured yet. Please contact us.',
         provider_failed: 'Secure checkout could not open. No charge has been made; please try again.',
+        promotion_invalid: 'That promo code is not valid for this gift purchase.',
       };
       setStatus(
         'error',

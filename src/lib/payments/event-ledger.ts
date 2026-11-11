@@ -36,6 +36,9 @@ export interface PaymentEventRecord {
   /** Gift details, only when kind is gift. */
   gift?: {
     valueUsd: number;
+    purchaseAmountUsd?: number;
+    promotionCode?: string;
+    promotionDiscountCents?: number;
     recipientName: string;
     purchaserName: string;
     purchaserEmail: string;

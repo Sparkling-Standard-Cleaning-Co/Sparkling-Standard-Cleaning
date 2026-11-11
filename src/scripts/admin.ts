@@ -2211,19 +2211,29 @@ document.querySelector<HTMLElement>('[data-admin-view="storage"]')?.addEventList
 async function loadPromotions(): Promise<void> {
   const target = document.querySelector<HTMLElement>('[data-admin-promotions]');
   if (!target) return;
-  const data = await api<{ promotions?: Array<Record<string, unknown>> }>('/api/admin/promotions');
-  const promotions = data.promotions ?? [];
-  renderTable(target, ['Name', 'Code', 'Type', 'Discount', 'Services', 'Branches', 'Window', 'Booking / service deadline', 'Used', 'Status', 'Actions'], promotions.map((promotion) => [
-    esc(promotion.name),
+  const data = await api<{
+    promotions?: Array<Record<string, unknown>>;
+    legacyPromotions?: Array<Record<string, unknown>>;
+  }>('/api/admin/promotions');
+  const promotions = [...(data.promotions ?? []), ...(data.legacyPromotions ?? [])];
+  renderTable(target, ['Name', 'Code', 'Type', 'Discount', 'Scope', 'Services', 'Branches', 'Window', 'Booking / service deadline', 'Used', 'Status', 'Actions'], promotions.map((promotion) => [
+    `<span>${esc(promotion.name)}</span>${promotion.source ? `<br /><span class="admin-muted">${esc(titleCase(promotion.source))}</span>` : ''}`,
     esc(promotion.code),
     esc(titleCase(promotion.kind)),
     promotion.kind === 'percent' ? `${esc(promotion.percent)}%` : money(promotion.valueCents),
+    esc(titleCase(promotion.scope ?? 'cleaning')),
     esc((promotion.services as string[] | undefined)?.join(', ') || '-'),
     esc((promotion.branches as string[] | undefined)?.join(', ') || '-'),
     `${esc(dateTime(promotion.startsAt))} - ${esc(dateTime(promotion.expiresAt))}`,
+    [
+      promotion.bookingDeadlineAt ? `Booking: ${esc(dateTime(promotion.bookingDeadlineAt))}` : '',
+      promotion.serviceDeadlineAt ? `Service: ${esc(dateTime(promotion.serviceDeadlineAt))}` : '',
+    ].filter(Boolean).join(' · ') || '-',
     `${esc(promotion.redeemedCount ?? 0)} / ${promotion.maxRedemptions ? esc(promotion.maxRedemptions) : 'unlimited'}`,
     `<span class="admin-status">${esc(titleCase(promotion.displayStatus ?? promotion.status))}</span>`,
-    `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-promotion-edit="${esc(promotion.id)}">Edit</button>${promotion.status === 'active' ? `<button class="btn btn--ghost btn--small" type="button" data-promotion-status="${esc(promotion.id)}" data-status="disabled">Deactivate</button>` : `<button class="btn btn--ghost btn--small" type="button" data-promotion-status="${esc(promotion.id)}" data-status="active">Activate</button>`}<button class="btn btn--ghost btn--small" type="button" data-promotion-duplicate="${esc(promotion.id)}">Duplicate</button></div>`,
+    promotion.editable === false
+      ? `<span class="admin-muted">${esc(promotion.note ?? 'Managed in code')}</span>`
+      : `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-promotion-edit="${esc(promotion.id)}">Edit</button>${promotion.status === 'active' ? `<button class="btn btn--ghost btn--small" type="button" data-promotion-status="${esc(promotion.id)}" data-status="disabled">Deactivate</button>` : `<button class="btn btn--ghost btn--small" type="button" data-promotion-status="${esc(promotion.id)}" data-status="active">Activate</button>`}<button class="btn btn--ghost btn--small" type="button" data-promotion-duplicate="${esc(promotion.id)}">Duplicate</button></div>`,
   ]), 'No promotions yet. The Thanksgiving draft appears after migration 0032 is applied.');
   (window as unknown as { __ssPromotions?: Array<Record<string, unknown>> }).__ssPromotions = promotions;
 }
@@ -2254,6 +2264,7 @@ function fillPromotionForm(promotion: Record<string, unknown>): void {
   set('maxRedemptions', promotion.maxRedemptions ?? 0);
   set('perCustomerLimit', promotion.perCustomerLimit ?? 1);
   set('status', promotion.status ?? 'draft');
+  set('scope', promotion.scope ?? 'cleaning');
   for (const box of form.querySelectorAll<HTMLInputElement>('input[name="services"]')) {
     box.checked = Array.isArray(promotion.services) && promotion.services.includes(box.value);
   }
@@ -2299,6 +2310,7 @@ document.querySelector<HTMLFormElement>('[data-promotion-form]')?.addEventListen
     maxRedemptions: Number(data.get('maxRedemptions') ?? 0),
     perCustomerLimit: Number(data.get('perCustomerLimit') ?? 1),
     status: data.get('status'),
+    scope: data.get('scope'),
     newCustomersOnly: data.get('newCustomersOnly') === 'on',
     recurringOnly: data.get('recurringOnly') === 'on',
     firstVisitOnly: data.get('firstVisitOnly') === 'on',

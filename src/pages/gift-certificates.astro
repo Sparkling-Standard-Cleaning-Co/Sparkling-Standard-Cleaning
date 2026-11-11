@@ -173,6 +173,15 @@ const sampleCode = 'SSGC-SAMP-LE42';
             />
           </div>
         )}
+        <div class="field" data-gift-promo-field>
+          <label for="gift-promo-code">Have a promo code? <span class="text-muted">(optional)</span></label>
+          <div class="field-row field-row--2">
+            <input class="input" id="gift-promo-code" name="promo_code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" placeholder="Enter promo code (optional)" data-gift-promo-code />
+            <button class="btn btn--secondary btn--small" type="button" data-gift-promo-apply>Apply</button>
+          </div>
+          <p class="small text-muted" data-gift-promo-status role="status" aria-live="polite"></p>
+          <p class="small" data-gift-promo-summary hidden></p>
+        </div>
         <div class="field-row field-row--2">
           <div class="field">
             <label for="gift-purchaser-name">Your name</label>

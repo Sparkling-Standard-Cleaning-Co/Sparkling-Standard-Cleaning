@@ -28,6 +28,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     quoteReference: String(body.quoteReference ?? ''),
     holdId: String(body.holdId ?? ''),
     serviceDate: String(body.serviceDate ?? ''),
+    scope: body.scope === 'gift' ? 'gift' : 'cleaning',
     hasExistingDiscount: body.hasExistingDiscount === true,
   });
   if (!result.ok) return json({ ok: false, error: result.reason }, 409);

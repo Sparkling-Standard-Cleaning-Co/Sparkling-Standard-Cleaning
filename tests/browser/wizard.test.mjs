@@ -391,15 +391,17 @@ test('step transitions keep the questionnaire in a stable viewport across widths
       await fillStepOne(page);
       assert.equal(await activeStep(page), 2, `${width}px: Next advances`);
       const top = await page.evaluate(
-        () => document.querySelector('[data-estimate-form]').getBoundingClientRect().top,
+        () =>
+          document.querySelector('.wizard__step[data-active="true"]')?.getBoundingClientRect().top ?? -999,
       );
-      assert.ok(top >= -2 && top <= 220, `${width}px: form visible after Next (top=${Math.round(top)})`);
+      assert.ok(top >= -2 && top <= 220, `${width}px: active step visible after Next (top=${Math.round(top)})`);
       await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
       await page.click('[data-back]');
       const backTop = await page.evaluate(
-        () => document.querySelector('[data-estimate-form]').getBoundingClientRect().top,
+        () =>
+          document.querySelector('.wizard__step[data-active="true"]')?.getBoundingClientRect().top ?? -999,
       );
-      assert.ok(backTop >= -2 && backTop <= 220, `${width}px: form visible after Back (top=${Math.round(backTop)})`);
+      assert.ok(backTop >= -2 && backTop <= 220, `${width}px: active step visible after Back (top=${Math.round(backTop)})`);
     } finally {
       await context.close();
     }

@@ -41,6 +41,10 @@ export interface GiftCertificateRecord {
   code: string;
   status: 'active' | 'fully_redeemed' | 'refunded' | 'void';
   valueCents: number;
+  /** Actual amount paid when a gift-specific promotion reduced the price. */
+  purchaseAmountCents?: number;
+  promotionCode?: string;
+  promotionDiscountCents?: number;
   redeemedCents: number;
   recipientName: string;
   purchaserName: string;

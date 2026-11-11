@@ -776,7 +776,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   /** Builds the reconciled price lines used by both the preview and summary. */
-  function priceLines(result: EstimateResult): Array<{ label: string; value: string; strong?: boolean }> {
+  function priceLines(result: EstimateResult): Array<{ label: string; value: string; strong?: boolean; detail?: string }> {
     const p = result.pricing;
     if (result.status === 'invalid' || p.subtotal <= 0) return [];
     const partial =
@@ -784,25 +784,32 @@ function initEstimateWizard(form: HTMLFormElement): void {
       result.addons.some((addon) => addon.customQuote);
     if (result.status !== 'estimated' && !partial) return [];
     const tax = taxPresentationForService(radioValue('serviceType'));
-    const lines: Array<{ label: string; value: string; strong?: boolean }> = [];
+    const lines: Array<{ label: string; value: string; strong?: boolean; detail?: string }> = [];
     const firstVisit = Boolean(result.ongoing);
     if (p.minimumApplied) {
       lines.push({ label: 'Minimum visit price', value: formatUsd(p.basePrice) });
-      if (p.selectedExtras.length > 0) lines.push({ label: 'Selected extras', value: 'Included' });
     } else {
       lines.push({
         label: firstVisit ? 'True Deep Cleaning Price' : 'Base cleaning',
         value: formatUsd(p.basePrice, { forceCents: true }),
       });
-      for (const extra of p.selectedExtras) {
-        lines.push({ label: extra.label, value: `+${formatUsd(extra.charge, { forceCents: true })}` });
-      }
-      if (p.roundingAdjustment !== 0) {
-        lines.push({
-          label: 'Rounded Down to Nearest $5',
-          value: `${p.roundingAdjustment < 0 ? '\u2212' : '+'}${formatUsd(Math.abs(p.roundingAdjustment), { forceCents: true })}`,
-        });
-      }
+    }
+    lines.push({
+      label: 'Add-ons',
+      value: formatUsd(p.extrasSubtotal, { forceCents: true }),
+      ...(p.selectedExtras.length > 0
+        ? {
+            detail: p.selectedExtras
+              .map((extra) => `${extra.label} ${formatUsd(extra.charge, { forceCents: true })}`)
+              .join(' - '),
+          }
+        : {}),
+    });
+    if (!p.minimumApplied && p.roundingAdjustment !== 0) {
+      lines.push({
+        label: 'Rounded Down to Nearest $5',
+        value: `${p.roundingAdjustment < 0 ? '\u2212' : '+'}${formatUsd(Math.abs(p.roundingAdjustment), { forceCents: true })}`,
+      });
     }
     if (p.discount) {
       lines.push({
@@ -840,7 +847,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return lines;
   }
 
-  function fillLines(container: HTMLElement, lines: Array<{ label: string; value: string; strong?: boolean }>): void {
+  function fillLines(container: HTMLElement, lines: Array<{ label: string; value: string; strong?: boolean; detail?: string }>): void {
     container.innerHTML = '';
     for (const line of lines) {
       const item = document.createElement('li');
@@ -849,6 +856,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const detail = document.createElement(line.strong ? 'strong' : 'span');
       detail.textContent = line.value;
       item.append(term, detail);
+      if (line.detail) {
+        const note = document.createElement('span');
+        note.className = 'summary-list__detail';
+        note.textContent = line.detail;
+        item.appendChild(note);
+      }
       container.appendChild(item);
     }
   }
@@ -1035,9 +1048,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         : 'Choose a date in step 1';
     }
     if (timeEl) {
-      timeEl.textContent = time
-        ? `Preferred start: ${time} — confirmed after our team reviews your request.`
-        : 'No specific start time selected — we will confirm one with you.';
+      timeEl.textContent = time || 'Time to be confirmed';
     }
   }
 
@@ -1260,21 +1271,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
       heading.focus({ preventScroll: true });
     }
 
-    // Steps 1-4 preserve a stable questionnaire viewport. The final step has
-    // its own controlled scroll so the customer lands at the beginning of the
-    // estimate content rather than midway down a long result page.
-    if (currentStep === steps.length) {
-      scrollToTopOf(steps[currentStep - 1] ?? form, 'instant');
-    } else {
-      const header = document.querySelector<HTMLElement>('.site-header');
-      const headerOffset =
-        header && window.getComputedStyle(header).display !== 'none' ? header.getBoundingClientRect().height : 0;
-      const comfortableTop = headerOffset + 12;
-      const rect = form.getBoundingClientRect();
-      if (rect.top < headerOffset + 4 || rect.top > window.innerHeight * 0.35) {
-        window.scrollTo({ top: Math.max(0, rect.top + window.scrollY - comfortableTop), behavior: 'instant' });
-      }
-    }
+    // One scroll controller for every transition. The initial page load is
+    // never moved; after navigating, the new step begins just below the sticky
+    // header. The final step starts at its own heading and summary graphic, not
+    // halfway through the payment controls.
+    scrollToTopOf(steps[currentStep - 1] ?? form, 'instant');
 
     // Scroll the horizontal step navigator internally (never the page) so the
     // active step stays visible on narrow screens.

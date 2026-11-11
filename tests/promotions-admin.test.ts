@@ -358,3 +358,55 @@ test('the 20-redemption cap is enforced under simultaneous reservations', async 
   assert.equal(results.filter((result) => result.ok).length, 20);
   assert.equal(results.filter((result) => !result.ok).length, 1);
 });
+
+
+test('cleaning promotions cannot discount gifts and gift promotions cannot discount cleaning', async () => {
+  const db = migratedDb();
+  const giftPromo = await active(db, {
+    name: 'Synthetic gift promotion',
+    code: 'GIFT10',
+    kind: 'percent',
+    percent: 10,
+    valueCents: 0,
+    services: ['gift_certificate'],
+    scope: 'gift',
+    minPurchaseCents: 0,
+  });
+  const giftEval = await evaluatePromotionForQuote(db, {
+    code: giftPromo.code,
+    cleaningAmountCents: 10000,
+    serviceType: 'gift_certificate',
+    branchId: 'branch_pensacola',
+    frequency: 'one_time',
+    quoteReference: '',
+    holdId: '',
+    serviceDate: '2026-11-20',
+    scope: 'gift',
+  });
+  assert.equal(giftEval.ok, true);
+  assert.equal(giftEval.discountCents, 1000);
+  const cleaningEval = await evaluatePromotionForQuote(db, {
+    ...quote,
+    code: giftPromo.code,
+    cleaningAmountCents: 30000,
+    serviceDate: '2026-11-20',
+  });
+  assert.equal(cleaningEval.ok, false);
+  assert.equal(cleaningEval.reason, 'promotion_scope_ineligible');
+  const thanks = (await listPromotions(db)).find((promotion) => promotion.code === 'THANKS75');
+  assert.ok(thanks);
+  await updatePromotion(db, 'admin_test', String(thanks.id), { status: 'active' });
+  const thanksGift = await evaluatePromotionForQuote(db, {
+    code: 'THANKS75',
+    cleaningAmountCents: 10000,
+    serviceType: 'gift_certificate',
+    branchId: 'branch_pensacola',
+    frequency: 'one_time',
+    quoteReference: '',
+    holdId: '',
+    serviceDate: '2026-11-20',
+    scope: 'gift',
+  });
+  assert.equal(thanksGift.ok, false);
+  assert.equal(thanksGift.reason, 'promotion_scope_ineligible');
+});

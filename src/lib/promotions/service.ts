@@ -28,6 +28,7 @@ export interface PromotionRecord {
   firstVisitOnly: boolean;
   combinable: boolean;
   status: PromotionStatus;
+  scope: 'cleaning' | 'gift' | 'both';
   termsVersion: string;
   createdAt: string;
   updatedAt: string;
@@ -95,6 +96,9 @@ function rowToRecord(row: Record<string, unknown>): PromotionRecord {
     status: ['draft', 'active', 'disabled', 'expired'].includes(String(row.status))
       ? (String(row.status) as PromotionStatus)
       : 'draft',
+    scope: ['cleaning', 'gift', 'both'].includes(String(row.scope))
+      ? (String(row.scope) as 'cleaning' | 'gift' | 'both')
+      : 'cleaning',
     termsVersion: String(row.terms_version ?? ''),
     createdAt: String(row.created_at ?? ''),
     updatedAt: String(row.updated_at ?? ''),
@@ -190,9 +194,9 @@ async function writePromotion(
        (id, name, code, kind, value_cents, percent, services_json, branches_json,
         min_purchase_cents, max_discount_cents, starts_at, expires_at, booking_deadline_at,
         service_deadline_at, max_redemptions, per_customer_limit, new_customers_only,
-        recurring_only, first_visit_only, combinable, status, terms_version,
+        recurring_only, first_visit_only, combinable, status, scope, terms_version,
         created_by_admin_user_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name, code = excluded.code, kind = excluded.kind,
          value_cents = excluded.value_cents, percent = excluded.percent,
@@ -207,7 +211,7 @@ async function writePromotion(
          new_customers_only = excluded.new_customers_only,
          recurring_only = excluded.recurring_only,
          first_visit_only = excluded.first_visit_only,
-         combinable = excluded.combinable, status = excluded.status,
+         combinable = excluded.combinable, status = excluded.status, scope = excluded.scope,
          terms_version = excluded.terms_version, updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
@@ -232,6 +236,7 @@ async function writePromotion(
       flag(input.firstVisitOnly) ? 1 : 0,
       flag(input.combinable) ? 1 : 0,
       status,
+      ['cleaning', 'gift', 'both'].includes(String(input.scope)) ? String(input.scope) : 'cleaning',
       text(input.termsVersion, 80) || '2026-11-10.promotions.v1',
       actorId,
     )
@@ -322,6 +327,7 @@ export interface PromotionQuoteInput {
   quoteReference: string;
   holdId: string;
   serviceDate?: string;
+  scope?: 'cleaning' | 'gift';
   hasExistingDiscount?: boolean;
 }
 
@@ -336,6 +342,10 @@ export async function evaluatePromotionForQuote(
   if (!row) return { ok: false, reason: 'promotion_not_found' };
   const promotion = rowToRecord(row);
   if (promotion.status !== 'active') return { ok: false, reason: 'promotion_inactive' };
+  const requestedScope = input.scope ?? 'cleaning';
+  if (promotion.scope !== 'both' && promotion.scope !== requestedScope) {
+    return { ok: false, reason: 'promotion_scope_ineligible' };
+  }
   const at = Date.now();
   if (promotion.startsAt && Date.parse(promotion.startsAt) > at) {
     return { ok: false, reason: 'promotion_not_started' };

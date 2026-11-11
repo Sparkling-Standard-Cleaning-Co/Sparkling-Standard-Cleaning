@@ -3098,11 +3098,20 @@ fieldset {
 
 .summary-list li {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-4);
   margin: 0;
   padding-bottom: var(--space-2);
   border-bottom: 1px dashed var(--color-border);
+}
+
+.summary-list__detail {
+  flex-basis: 100%;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  text-align: left;
 }
 
 .summary-list dt {

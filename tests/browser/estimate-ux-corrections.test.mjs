@@ -436,3 +436,34 @@ test('rapid date changes never let a stale availability response win', async () 
     await context.close();
   }
 });
+test('the final appointment card uses the approved wording and Add-ons is always visible', async () => {
+  const { context, page } = await setupPage();
+  try {
+    await completeToFinalStep(page);
+    const card = page.locator('[data-appointment-summary]');
+    const cardText = (await card.innerText()).replace(/\s+/g, ' ');
+    assert.match(cardText, /Your appointment for/i);
+    assert.doesNotMatch(cardText, /Preferred start/i);
+    assert.doesNotMatch(cardText, /confirmed after our team reviews/i);
+    assert.match((await page.locator('[data-appointment-edit]').innerText()).trim(), /Reschedule/i);
+    await page.locator('[data-reservation-summary]').waitFor({ state: 'visible' });
+    await page.waitForFunction(() =>
+      document.querySelector('[data-price-breakdown]')?.textContent?.includes('Add-ons'),
+    );
+    const breakdown = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+    assert.match(breakdown, /Add-ons/);
+    assert.match(breakdown, /\$0\.00/);
+    assert.equal(
+      await page.locator('#est-promo-code').getAttribute('placeholder'),
+      'Enter promo code (optional)',
+    );
+    await page.click('[data-appointment-edit]');
+    assert.equal(
+      await page.locator('.wizard__step[data-step="1"]').getAttribute('data-active'),
+      'true',
+      'Reschedule returns to date/time selection',
+    );
+  } finally {
+    await context.close();
+  }
+});

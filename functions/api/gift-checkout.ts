@@ -14,6 +14,8 @@
 
 import { giftCertificateConfig } from '../../src/config/gift-certificates.ts';
 import { legalTerms } from '../../src/config/legal.ts';
+import type { D1Database } from '../../src/lib/admin/d1.ts';
+import { evaluatePromotionForQuote, releasePromotionRedemption, reservePromotionRedemption } from '../../src/lib/promotions/service.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
 import { centralToday, isValidCalendarDate } from '../../src/lib/gift/activation.ts';
 import {
@@ -27,6 +29,7 @@ import {
 } from '../../src/lib/payments/ledger.ts';
 
 interface Env extends PaymentStorageEnv {
+  DB?: D1Database;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   PUBLIC_SITE_URL?: string;
@@ -148,6 +151,37 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
   const amount = resolveGiftAmount(payload.denominationUsd, payload.amountUsd);
   if (amount === null) return json({ ok: false, error: 'invalid_amount' }, 400);
+  const faceValueCents = Math.round(amount * 100);
+  const promoCode = cleanText(payload.promoCode, 40).toUpperCase();
+  let promotion: { id: string; code: string; discountCents: number; redemptionId?: string } | null = null;
+  let purchaseAmountCents = faceValueCents;
+  if (promoCode) {
+    if (!env.DB) return json({ ok: false, error: 'promotion_unavailable' }, 503);
+    const evaluation = await evaluatePromotionForQuote(env.DB, {
+      code: promoCode,
+      cleaningAmountCents: faceValueCents,
+      serviceType: 'gift_certificate',
+      branchId: 'branch_pensacola',
+      frequency: 'one_time',
+      quoteReference: '',
+      holdId: '',
+      serviceDate: centralToday(),
+      scope: 'gift',
+      hasExistingDiscount: false,
+    });
+    if (!evaluation.ok || !evaluation.promotion || !evaluation.discountCents) {
+      return json({ ok: false, error: 'promotion_invalid', reason: evaluation.reason }, 409);
+    }
+    purchaseAmountCents = Math.max(0, faceValueCents - evaluation.discountCents);
+    if (purchaseAmountCents < 50) {
+      return json({ ok: false, error: 'promotion_invalid', reason: 'purchase_below_minimum' }, 409);
+    }
+    promotion = {
+      id: evaluation.promotion.id,
+      code: evaluation.promotion.code,
+      discountCents: evaluation.discountCents,
+    };
+  }
   const checkoutAttempt = cleanText(payload.checkoutAttempt, 120);
   if (!checkoutAttempt) return json({ ok: false, error: 'invalid_request' }, 400);
   const attempt = await paymentHash(checkoutAttempt);
@@ -174,6 +208,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const claim = {
     status: 'creating',
     amount,
+    faceValueCents,
+    purchaseAmountCents,
+    ...(promotion ? { promotion } : {}),
     purchaserName,
     purchaserEmail,
     recipientName,
@@ -185,6 +222,21 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     createdAt: new Date().toISOString(),
   };
   const created = await createLedgerJson(bucket, key, claim);
+  let promotionRedemptionId: string | null = null;
+  if (created && promotion && env.DB) {
+    const reserved = await reservePromotionRedemption(env.DB, promotion.id, {
+      code: promotion.code,
+      customerId: null,
+      checkoutAttempt: attempt,
+      quoteReference: '',
+      amountCents: promotion.discountCents,
+    });
+    if (!reserved.ok) {
+      await writeLedgerJson(bucket, key, { ...claim, status: 'failed', lastError: 'promotion_unavailable' }).catch(() => undefined);
+      return json({ ok: false, error: 'promotion_invalid', reason: reserved.reason }, 409);
+    }
+    promotionRedemptionId = reserved.redemptionId ?? null;
+  }
   if (!created) {
     const raced = await readLedgerJson<{ status: string; url?: string }>(bucket, key).catch(() => null);
     if (raced?.value.status === 'open' && raced.value.url) {
@@ -201,7 +253,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('customer_email', purchaserEmail);
   body.set('line_items[0][quantity]', '1');
   body.set('line_items[0][price_data][currency]', 'usd');
-  body.set('line_items[0][price_data][unit_amount]', String(Math.round(amount * 100)));
+  body.set('line_items[0][price_data][unit_amount]', String(purchaseAmountCents));
   body.set('line_items[0][price_data][product_data][name]', `Sparkling Standard Gift Certificate — $${amount}`);
   body.set(
     'line_items[0][price_data][product_data][description]',
@@ -210,6 +262,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('metadata[checkout_kind]', 'gift_certificate');
   body.set('metadata[checkout_attempt]', attempt);
   body.set('metadata[gift_value_usd]', String(amount));
+  body.set('metadata[gift_purchase_amount_usd]', String(purchaseAmountCents / 100));
+  if (promotion) {
+    body.set('metadata[promotion_code]', promotion.code);
+    body.set('metadata[promotion_discount_cents]', String(promotion.discountCents));
+  }
   body.set('metadata[terms_version]', legalTerms.termsVersion);
   body.set('metadata[terms_accepted_at]', new Date().toISOString());
   body.set('metadata[recipient_name]', recipientName);
@@ -237,6 +294,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       error?: { message?: string };
     };
     if (!response.ok || !data.url || !data.id) {
+      if (env.DB && promotionRedemptionId) await releasePromotionRedemption(env.DB, attempt).catch(() => undefined);
       return json({ ok: false, error: 'provider_failed' }, 502);
     }
     const record = {
@@ -257,6 +315,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (!persisted) {
       await expireGiftSession(env, data.id);
+      if (env.DB && promotionRedemptionId) await releasePromotionRedemption(env.DB, attempt).catch(() => undefined);
       return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
     }
     return json({ ok: true, url: data.url });
