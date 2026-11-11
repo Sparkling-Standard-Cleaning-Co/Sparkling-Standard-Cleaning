@@ -9,6 +9,14 @@ recipient exactly as for any customer. The public configuration lives in
 the approved denominations and custom amounts through Stripe-hosted Checkout. The webhook issues
 and emails the certificate only after verified payment. A live purchase has not yet been run.
 
+**2026-11-11 gift promotions:** the purchase form accepts an optional promo code. Codes must be
+created in the owner Promotions & Discounts table with scope `gift` or `both`; cleaning promotions
+(including THANKS75, SPARKLE15 and SPARKLE100) are rejected by the server. A valid gift promotion
+reduces only the amount charged at checkout. The certificate face value remains the full selected
+amount, the recipient receives that full value, the discount is recorded in the gift ledger, and
+the promotion redemption is reserved at checkout, redeemed on the paid webhook and released on
+failure or session expiry. Migration `0034` provides the scope column.
+
 **2026-10-28 policy update (`2026-10-28.terms.v2`):** the public terms state that a purchased certificate does not expire
 and carries no post-sale service, dormancy, maintenance or cash-out fee (Fla. Stat. § 501.95).
 

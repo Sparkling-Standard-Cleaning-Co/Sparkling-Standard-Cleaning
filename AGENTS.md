@@ -84,13 +84,22 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-10 THANKS75 activation):** application code **`2265fa6`** is live
+- **Current release (2026-11-11 estimator refinements):** application code **`99db643`** is live
+  (Cloudflare Pages production deployment `bef7159b-f0bf-4daf-b651-13c4852e7008`; source
+  `99db643`). `main` and `production-safe` are synchronized. Migration `0034` adds promotion
+  `scope` (`cleaning`/`gift`/`both`) and is applied to production D1. The owner promotions table
+  lists database, static, bundle and eligibility offers; the estimator promo placeholder is
+  neutral; the final appointment card reads **Your appointment for** with a **Reschedule** action;
+  the final breakdown always shows an **Add-ons** row; and every wizard transition scrolls the
+  active step to the top. Gift certificates can use gift-scoped promotions that reduce only the
+  purchase price while preserving face value; cleaning promotions cannot discount gifts and vice
+  versa. THANKS75 remains active unchanged. Evidence:
+  `docs/verification/2026-11-11-ESTIMATOR-PROMOTIONS-REFINEMENTS.md`.
+- **Prior release (2026-11-10 THANKS75 activation):** application code **`2265fa6`** was live
   (Cloudflare Pages deployment `894430e4-a6c1-46dd-aeb6-1377ab8efe17`; source `2265fa6`).
-  Migrations 0032-0033 are applied; THANKS75 is active with the approved $75 terms and separate
-  booking/service deadlines. The documentation closeout follows on the same branch with no
-  application-code change. GitHub `validate` and `browser` passed on both `main` and
-  `production-safe`. **`main`, `production-safe` and the local checkout are synchronized on the
-  verified application tree.**
+  Migrations 0032-0033 were applied; THANKS75 remains active with the approved $75 terms and
+  separate booking/service deadlines. GitHub `validate` and `browser` passed on both `main` and
+  `production-safe`.
   - It preserves the full production-safe feature set: dynamic booking/staffing, recurring
     scheduling and lifecycle, document management/signing, employee portal/timekeeping, CRM and
     property profiles, financial ledger/Stripe reconciliation, owner pricing control and all four
@@ -213,9 +222,16 @@ Never publish unapproved promotional promises or activate binding pricing withou
   `pin_precision: 'street'` — the exact house number is never fabricated and travel stays preliminary.
 - The **promotion engine** (`src/lib/estimate/promotions.ts`) is pure and shared by the browser
   estimator and server verification: at most ONE promotion per quote, owner-gated, term-gated,
-  minimum-job floor enforced, specialty work excluded, customer-kind programs fail closed. All
-  shipped programs are disabled — never enable or publish one without the owner's written terms, the
-  `docs/launch/PROMOTION-PROPOSALS.md` review; the automatic effective-pricing version changes when the approved terms change.
+  minimum-job floor enforced, specialty work excluded, customer-kind programs fail closed. Prepared
+  static programs remain disabled until the owner approves written terms; THANKS75 is the active
+  owner-approved database promotion (see below). Never enable or publish one without the owner's
+  written terms, the `docs/launch/PROMOTION-PROPOSALS.md` review; the automatic effective-pricing
+  version changes when the approved terms change.
+- **Owner database promotions** (`src/lib/promotions/service.ts`, migrations 0032-0034) support
+  cleaning and gift scopes. THANKS75 remains active with its approved terms. A cleaning promotion
+  cannot discount a gift certificate; a gift promotion reduces only the purchase price and preserves
+  the certificate face value. The admin promotions table lists static, bundle and eligibility offers
+  as read-only inventory. See `docs/verification/2026-11-11-ESTIMATOR-PROMOTIONS-REFINEMENTS.md`.
 - Client-side JS is minimal, bundled by Astro from `src/scripts/` (no framework). The estimator
   computes in the browser so the instant estimate works on a fully static page. A browser price is
   a PROPOSAL: every priced reservation request is recalculated server-side

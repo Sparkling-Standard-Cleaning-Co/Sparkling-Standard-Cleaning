@@ -207,6 +207,9 @@ test('GPS resolves an exact address and saves it without a separate confirmation
     await startAddressStep(page);
     await page.click('[data-address-gps]');
     await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      () => /MAPLEWOOD LN/i.test(document.querySelector('#est-address')?.value ?? ''),
+    );
     assert.equal(reverseRequests.length, 1);
     assert.match(await page.inputValue('#est-address'), /MAPLEWOOD LN/i);
     assert.equal(await page.locator('[data-address-confirm]').count(), 1, 'map confirmation is shown');

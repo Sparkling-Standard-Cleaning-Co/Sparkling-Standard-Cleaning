@@ -9,8 +9,14 @@ Implemented:
 - Owner-only admin **Promotions & Discounts** screen: create, edit, duplicate,
   activate/deactivate, schedule, service/branch eligibility, fixed or percentage
   discounts, minimum purchase, maximum discount, redemption caps, per-customer
-  limits, new-customer/recurring/first-visit restrictions, combinability,
-  status and redemption/revenue reporting.
+  limits, new-customer/recurring/first-visit restrictions, combinability, status
+  and redemption/revenue reporting.
+- **2026-11-11 additions:** migration `0034` adds `scope` (`cleaning`, `gift`,
+  `both`). The table also lists the static SPARKLE15/SPARKLE100 programs, the
+  three add-on bundles and the Community Support and church eligibility
+  discounts as read-only inventory. Gift-certificate purchases can use
+  gift-scoped promotions; the face value is preserved and only the purchase
+  price is reduced.
 - Public **Have a promo code?** field on the residential/STR estimator final
   step with server validation through `POST /api/promotion`.
 - Checkout applies the discount server-side before tax, adds a receipt line,

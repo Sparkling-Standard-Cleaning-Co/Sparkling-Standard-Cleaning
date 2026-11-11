@@ -1,5 +1,19 @@
 # Verification status
 
+## Estimator refinements and gift promotions - 2026-11-11
+
+Application code **`99db643`** is deployed in Cloudflare Pages production
+deployment `bef7159b-f0bf-4daf-b651-13c4852e7008` (source `99db643`); `main`
+and `production-safe` are synchronized on the same commit. Migration `0034`
+adds the promotion scope and is applied to production D1. The owner promotions
+table now shows database, static, bundle and eligibility offers; cleaning
+promotions cannot discount gift certificates, and gift-specific promotions
+reduce only the purchase price while preserving face value. The estimator gained
+the neutral promo placeholder, the **Your appointment for** / **Reschedule**
+card, a permanent **Add-ons** breakdown row and consistent top-of-step scrolling.
+THANKS75 remains active unchanged. Full evidence:
+[`docs/verification/2026-11-11-ESTIMATOR-PROMOTIONS-REFINEMENTS.md`](2026-11-11-ESTIMATOR-PROMOTIONS-REFINEMENTS.md).
+
 ## Admin enhancements - 2026-11-10 (promotions and data controls)
 
 Application code **`2265fa6`** is deployed in Cloudflare Pages deployment
