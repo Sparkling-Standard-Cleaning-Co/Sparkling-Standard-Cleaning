@@ -59,9 +59,9 @@ Not implemented in this release:
 
 ## Verification
 
-- Unit suite: 845 tests (844 pass, 1 pre-existing skip).
+- Unit suite: 851 tests (850 pass, 1 pre-existing skip).
 - Browser suite: 208 pass.
-- Migration 0032 applied to production D1; post-migration encrypted backup restored with 74 tables, integrity `ok`, 0 foreign-key violations.
+- Migrations 0032 and 0033 applied to production D1; post-migration encrypted backup restored with 74 tables, integrity `ok`, 0 foreign-key violations.
 
 ## Still outstanding from the master directive
 
@@ -69,3 +69,70 @@ Not implemented in this release:
 - Documents screen section redesign and Word document conversion.
 - Customer-facing recurring autopay consent/SetupIntent flow.
 - Owner-approved legal templates and live Stripe/Calendar write verification.
+## THANKS75 activation - 2026-11-10
+
+**Status: ACTIVE.**
+
+| Setting | Value |
+| --- | --- |
+| Name | Thanksgiving Deep Clean Special |
+| Code | THANKS75 |
+| Discount | $75.00 fixed |
+| Branch | Pensacola |
+| Eligible service | Deep Cleaning only |
+| Minimum eligible subtotal | $200.00 before tax and before discount |
+| Maximum discount | $75.00 |
+| Total redemptions | 20 |
+| Per customer | 1 |
+| Combinability | Disabled |
+| Booking deadline | 2026-11-23 23:59:59 America/Chicago |
+| Service completion deadline | 2026-11-25 23:59:59 America/Chicago |
+| Recurring | First eligible cleaning only; never applied to future visits |
+| Terms version | `2026-11-10.thanks75.v1` |
+
+Deadline policy: a checkout reservation created before the booking deadline may
+finish payment afterward; the qualifying service date must still be on or before
+November 25. A completed refund/cancellation does not restore redemption
+capacity or reissue the discount; failed/abandoned checkouts release their
+reservation, and unredeemed reservations stop counting after two hours.
+
+### Financial review (read-only; base prices unchanged)
+
+Default single-cleaner model, using the owner-approved $25/hour solo rate, the
+22% operating-overhead allowance and $10 supplies:
+
+| Scenario | Price | After $75 | Labour hours | Contribution margin |
+| --- | --- | --- | --- | --- |
+| Lowest realistic deep clean | $310 | $235 | 5.67 | **+$31.55** |
+| Representative 3/2 deep clean | $365 | $290 | 6.72 | **+$48.20** |
+| Larger deep clean | $525 | $450 | 9.55 | **+$102.25** |
+
+A two-hired-cleaner crew at $22 + $18/hour produces a negative contribution on
+the lower two scenarios (about -$53.50 and -$52.60). **Operational guard:** do
+not assign two hired cleaners to a THANKS75 job; use the default solo cleaner or
+an owner-led crew where the owner's compensation is the remaining margin. This
+is a staffing control, not a change to the approved promotion terms.
+
+### Verification
+
+- Promotion exists exactly once and is active.
+- Live `POST /api/promotion` returns a $75 discount for a qualifying $300 deep
+  clean and rejects $199.99 with `promotion_minimum_not_met`.
+- Unit tests cover fixed/percentage arithmetic, minimum, branch, service,
+  stacking, booking/service deadlines, 20-cap concurrency, customer limit,
+  reservation release and public-response privacy.
+- The public estimator exposes the promo-code field and the false delivery
+  warning remains absent.
+- No base estimator price, fee, tax rate or wage assumption was changed.
+
+### Customer advertising facts
+
+- **$75 off** a qualifying **Deep Cleaning** in the **Pensacola** service area.
+- Code: **THANKS75**
+- Minimum eligible cleaning subtotal: **$200 before tax**.
+- Book by **November 23, 2026, 11:59:59 PM Central**.
+- Service must be completed by **November 25, 2026, 11:59:59 PM Central**.
+- One redemption per customer; 20 total; cannot combine with SPARKLE15,
+  SPARKLE100 or any other discount.
+- Booking URL: **https://sparkling-standard.com/estimate/residential/?service=deep**
+

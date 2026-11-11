@@ -19,6 +19,8 @@ export interface PromotionRecord {
   maxDiscountCents: number;
   startsAt: string | null;
   expiresAt: string | null;
+  bookingDeadlineAt: string | null;
+  serviceDeadlineAt: string | null;
   maxRedemptions: number;
   perCustomerLimit: number;
   newCustomersOnly: boolean;
@@ -82,6 +84,8 @@ function rowToRecord(row: Record<string, unknown>): PromotionRecord {
     maxDiscountCents: Number(row.max_discount_cents) || 0,
     startsAt: row.starts_at ? String(row.starts_at) : null,
     expiresAt: row.expires_at ? String(row.expires_at) : null,
+    bookingDeadlineAt: row.booking_deadline_at ? String(row.booking_deadline_at) : null,
+    serviceDeadlineAt: row.service_deadline_at ? String(row.service_deadline_at) : null,
     maxRedemptions: Number(row.max_redemptions) || 0,
     perCustomerLimit: Number(row.per_customer_limit) || 1,
     newCustomersOnly: Number(row.new_customers_only) === 1,
@@ -121,6 +125,9 @@ export function validatePromotionInput(input: Record<string, unknown>): {
   if (branches.length === 0) return { ok: false, error: 'promotion_branches_required' };
   if (input.startsAt && input.expiresAt && Date.parse(String(input.expiresAt)) <= Date.parse(String(input.startsAt))) {
     return { ok: false, error: 'promotion_dates_invalid' };
+  }
+  if (input.bookingDeadlineAt && input.serviceDeadlineAt && Date.parse(String(input.serviceDeadlineAt)) < Date.parse(String(input.bookingDeadlineAt))) {
+    return { ok: false, error: 'promotion_deadlines_invalid' };
   }
   return { ok: true };
 }
@@ -181,10 +188,11 @@ async function writePromotion(
     .prepare(
       `INSERT INTO promotions
        (id, name, code, kind, value_cents, percent, services_json, branches_json,
-        min_purchase_cents, max_discount_cents, starts_at, expires_at, max_redemptions,
-        per_customer_limit, new_customers_only, recurring_only, first_visit_only, combinable,
-        status, terms_version, created_by_admin_user_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        min_purchase_cents, max_discount_cents, starts_at, expires_at, booking_deadline_at,
+        service_deadline_at, max_redemptions, per_customer_limit, new_customers_only,
+        recurring_only, first_visit_only, combinable, status, terms_version,
+        created_by_admin_user_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name, code = excluded.code, kind = excluded.kind,
          value_cents = excluded.value_cents, percent = excluded.percent,
@@ -192,6 +200,8 @@ async function writePromotion(
          min_purchase_cents = excluded.min_purchase_cents,
          max_discount_cents = excluded.max_discount_cents,
          starts_at = excluded.starts_at, expires_at = excluded.expires_at,
+         booking_deadline_at = excluded.booking_deadline_at,
+         service_deadline_at = excluded.service_deadline_at,
          max_redemptions = excluded.max_redemptions,
          per_customer_limit = excluded.per_customer_limit,
          new_customers_only = excluded.new_customers_only,
@@ -213,6 +223,8 @@ async function writePromotion(
       integer(input.maxDiscountCents),
       input.startsAt ? String(input.startsAt) : null,
       input.expiresAt ? String(input.expiresAt) : null,
+      input.bookingDeadlineAt ? String(input.bookingDeadlineAt) : null,
+      input.serviceDeadlineAt ? String(input.serviceDeadlineAt) : null,
       integer(input.maxRedemptions),
       Math.max(1, integer(input.perCustomerLimit, 1)),
       flag(input.newCustomersOnly) ? 1 : 0,
@@ -309,6 +321,7 @@ export interface PromotionQuoteInput {
   frequency: string;
   quoteReference: string;
   holdId: string;
+  serviceDate?: string;
   hasExistingDiscount?: boolean;
 }
 
@@ -327,7 +340,21 @@ export async function evaluatePromotionForQuote(
   if (promotion.startsAt && Date.parse(promotion.startsAt) > at) {
     return { ok: false, reason: 'promotion_not_started' };
   }
-  if (promotion.expiresAt && Date.parse(promotion.expiresAt) < at) {
+  if (promotion.bookingDeadlineAt && Date.parse(promotion.bookingDeadlineAt) < at) {
+    return { ok: false, reason: 'promotion_booking_deadline_passed' };
+  }
+  if (!promotion.bookingDeadlineAt && promotion.expiresAt && Date.parse(promotion.expiresAt) < at) {
+    return { ok: false, reason: 'promotion_expired' };
+  }
+  if (promotion.serviceDeadlineAt) {
+    if (!input.serviceDate || !/^\d{4}-\d{2}-\d{2}$/.test(input.serviceDate)) {
+      return { ok: false, reason: 'promotion_service_date_required' };
+    }
+    const serviceEnd = Date.parse(input.serviceDate + 'T23:59:59-06:00');
+    if (!Number.isFinite(serviceEnd) || serviceEnd > Date.parse(promotion.serviceDeadlineAt)) {
+      return { ok: false, reason: 'promotion_service_deadline_exceeded' };
+    }
+  } else if (promotion.expiresAt && Date.parse(promotion.expiresAt) < at) {
     return { ok: false, reason: 'promotion_expired' };
   }
   if (!promotion.services.includes(input.serviceType)) {

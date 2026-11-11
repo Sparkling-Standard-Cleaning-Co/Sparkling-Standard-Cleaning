@@ -1251,6 +1251,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       frequency: fields.frequency ?? fields.ongoing_frequency ?? 'one_time',
       quoteReference: candidate.reference,
       holdId: fields.booking_hold_id ?? '',
+      serviceDate: fields.preferred_date ?? fields.booking_slot_start?.slice(0, 10) ?? '',
       hasExistingDiscount: candidate.receipt.lines.some((line) => line.kind === 'discount'),
     });
     if (!evaluation.ok || !evaluation.promotion || !evaluation.discountCents) {

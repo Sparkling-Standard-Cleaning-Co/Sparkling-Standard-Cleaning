@@ -2611,6 +2611,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
           frequency: textValue('frequency') ?? 'one_time',
           quoteReference: latestQuote.reference,
           holdId: textValue('booking_hold_id') ?? '',
+          serviceDate: textValue('preferredDate') ?? '',
           hasExistingDiscount: false,
         }),
       });

@@ -2213,7 +2213,7 @@ async function loadPromotions(): Promise<void> {
   if (!target) return;
   const data = await api<{ promotions?: Array<Record<string, unknown>> }>('/api/admin/promotions');
   const promotions = data.promotions ?? [];
-  renderTable(target, ['Name', 'Code', 'Type', 'Discount', 'Services', 'Branches', 'Window', 'Used', 'Status', 'Actions'], promotions.map((promotion) => [
+  renderTable(target, ['Name', 'Code', 'Type', 'Discount', 'Services', 'Branches', 'Window', 'Booking / service deadline', 'Used', 'Status', 'Actions'], promotions.map((promotion) => [
     esc(promotion.name),
     esc(promotion.code),
     esc(titleCase(promotion.kind)),
@@ -2249,6 +2249,8 @@ function fillPromotionForm(promotion: Record<string, unknown>): void {
   set('maxDiscount', Number(promotion.maxDiscountCents ?? 0) / 100);
   set('startsAt', promotion.startsAt ? String(promotion.startsAt).slice(0, 16) : '');
   set('expiresAt', promotion.expiresAt ? String(promotion.expiresAt).slice(0, 16) : '');
+  set('bookingDeadlineAt', promotion.bookingDeadlineAt ? String(promotion.bookingDeadlineAt).slice(0, 16) : '');
+  set('serviceDeadlineAt', promotion.serviceDeadlineAt ? String(promotion.serviceDeadlineAt).slice(0, 16) : '');
   set('maxRedemptions', promotion.maxRedemptions ?? 0);
   set('perCustomerLimit', promotion.perCustomerLimit ?? 1);
   set('status', promotion.status ?? 'draft');
@@ -2292,6 +2294,8 @@ document.querySelector<HTMLFormElement>('[data-promotion-form]')?.addEventListen
     maxDiscountCents: Math.round(Number(data.get('maxDiscount') ?? 0) * 100),
     startsAt: iso(data.get('startsAt')),
     expiresAt: iso(data.get('expiresAt')),
+    bookingDeadlineAt: iso(data.get('bookingDeadlineAt')),
+    serviceDeadlineAt: iso(data.get('serviceDeadlineAt')),
     maxRedemptions: Number(data.get('maxRedemptions') ?? 0),
     perCustomerLimit: Number(data.get('perCustomerLimit') ?? 1),
     status: data.get('status'),

@@ -27,6 +27,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     frequency: String(body.frequency ?? ''),
     quoteReference: String(body.quoteReference ?? ''),
     holdId: String(body.holdId ?? ''),
+    serviceDate: String(body.serviceDate ?? ''),
     hasExistingDiscount: body.hasExistingDiscount === true,
   });
   if (!result.ok) return json({ ok: false, error: result.reason }, 409);

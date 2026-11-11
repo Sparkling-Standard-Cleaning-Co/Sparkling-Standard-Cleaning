@@ -248,3 +248,113 @@ test('the public promotion endpoint returns only an eligible discount summary', 
   assert.equal(body.discountCents, 7500);
   assert.equal(body.promotion, undefined, 'internal promotion data is not exposed');
 });
+
+
+test('THANKS75 stores the approved settings and separate deadlines', async () => {
+  const db = migratedDb();
+  const promotions = await listPromotions(db);
+  const thanks = promotions.find((promotion) => promotion.code === 'THANKS75');
+  assert.ok(thanks);
+  assert.equal(thanks.valueCents, 7500);
+  assert.equal(thanks.minPurchaseCents, 20000);
+  assert.equal(thanks.maxRedemptions, 20);
+  assert.equal(thanks.perCustomerLimit, 1);
+  assert.equal(thanks.combinable, false);
+  assert.equal(thanks.bookingDeadlineAt, '2026-11-24T05:59:59Z');
+  assert.equal(thanks.serviceDeadlineAt, '2026-11-26T05:59:59Z');
+});
+
+test('THANKS75 accepts the final eligible evening and rejects the next service day', async () => {
+  const db = migratedDb();
+  seedCustomer(db);
+  const promotions = await listPromotions(db);
+  const thanks = promotions.find((promotion) => promotion.code === 'THANKS75');
+  assert.ok(thanks);
+  await updatePromotion(db, 'admin_test', String(thanks.id), { status: 'active' });
+  const accepted = await evaluatePromotionForQuote(db, {
+    ...quote,
+    code: 'THANKS75',
+    cleaningAmountCents: 20000,
+    serviceDate: '2026-11-25',
+  });
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.discountCents, 7500);
+  const rejected = await evaluatePromotionForQuote(db, {
+    ...quote,
+    code: 'THANKS75',
+    cleaningAmountCents: 20000,
+    serviceDate: '2026-11-26',
+  });
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.reason, 'promotion_service_deadline_exceeded');
+});
+
+test('the $200 minimum is inclusive before any discount', async () => {
+  const db = migratedDb();
+  seedCustomer(db);
+  const promotions = await listPromotions(db);
+  const thanks = promotions.find((promotion) => promotion.code === 'THANKS75');
+  assert.ok(thanks);
+  await updatePromotion(db, 'admin_test', String(thanks.id), { status: 'active' });
+  const accepted = await evaluatePromotionForQuote(db, {
+    ...quote,
+    code: 'THANKS75',
+    cleaningAmountCents: 20000,
+    serviceDate: '2026-11-20',
+  });
+  assert.equal(accepted.ok, true);
+  const rejected = await evaluatePromotionForQuote(db, {
+    ...quote,
+    code: 'THANKS75',
+    cleaningAmountCents: 19999,
+    serviceDate: '2026-11-20',
+  });
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.reason, 'promotion_minimum_not_met');
+});
+
+
+test('THANKS75 rejects standard, STR, Tampa and stacking', async () => {
+  const db = migratedDb();
+  seedCustomer(db);
+  const promotions = await listPromotions(db);
+  const thanks = promotions.find((promotion) => promotion.code === 'THANKS75');
+  assert.ok(thanks);
+  await updatePromotion(db, 'admin_test', String(thanks.id), { status: 'active' });
+  const base = { ...quote, code: 'THANKS75', cleaningAmountCents: 30000, serviceDate: '2026-11-20' };
+  assert.equal((await evaluatePromotionForQuote(db, { ...base, serviceType: 'standard' })).reason, 'promotion_service_ineligible');
+  assert.equal((await evaluatePromotionForQuote(db, { ...base, serviceType: 'str_turnover' })).reason, 'promotion_service_ineligible');
+  assert.equal((await evaluatePromotionForQuote(db, { ...base, branchId: 'branch_tampa' })).reason, 'promotion_branch_ineligible');
+  assert.equal((await evaluatePromotionForQuote(db, { ...base, hasExistingDiscount: true })).reason, 'promotion_not_combinable');
+});
+
+test('a passed booking deadline rejects even before the service deadline', async () => {
+  const db = migratedDb();
+  seedCustomer(db);
+  const promotion = await active(db, {
+    bookingDeadlineAt: '2020-01-01T00:00:00Z',
+    serviceDeadlineAt: '2099-01-01T00:00:00Z',
+    startsAt: '2019-01-01T00:00:00Z',
+  });
+  const result = await evaluatePromotionForQuote(db, { ...quote, code: promotion.code, serviceDate: '2026-11-20' });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'promotion_booking_deadline_passed');
+});
+
+test('the 20-redemption cap is enforced under simultaneous reservations', async () => {
+  const db = migratedDb();
+  seedCustomer(db);
+  const promotion = await active(db, { maxRedemptions: 20, perCustomerLimit: 0 });
+  const attempts = Array.from({ length: 21 }, (_, index) =>
+    reservePromotionRedemption(db, promotion.id, {
+      code: promotion.code,
+      customerId: null,
+      checkoutAttempt: index.toString(16).padStart(64, '0'),
+      quoteReference: 'SS-PROMO',
+      amountCents: 7500,
+    }),
+  );
+  const results = await Promise.all(attempts);
+  assert.equal(results.filter((result) => result.ok).length, 20);
+  assert.equal(results.filter((result) => !result.ok).length, 1);
+});
