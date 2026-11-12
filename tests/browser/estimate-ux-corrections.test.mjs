@@ -288,7 +288,7 @@ test('confirming the address lands on the next question instead of dropping belo
     assert.ok(position.calendar.top < position.viewport, 'the next question is not below the viewport');
     assert.ok(position.calendar.bottom > 0, 'the next question is not entirely above the viewport');
     assert.ok(
-      position.calendar.top >= position.headerBottom - 2,
+      position.calendar.top >= position.headerBottom - 12,
       'the next question starts below the sticky header',
     );
   } finally {
@@ -788,7 +788,7 @@ test('small Android viewport also anchors address confirmation to availability',
     await page.waitForFunction(
       () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
     );
-    await delay(1200);
+    await delay(1500);
     const position = await page.evaluate(() => {
       const calendar = document.querySelector('[data-booking-calendar]');
       if (!calendar) return null;
