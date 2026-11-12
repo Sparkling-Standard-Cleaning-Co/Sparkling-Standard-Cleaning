@@ -2,9 +2,11 @@
 
 ## Hayli age-reference removal - 2026-11-11
 
-All public references to Hayli's age, date of birth, youth and age-related
-marketing were removed from the About page, homepage founder band, founder
-config, SEO/OG metadata and rendered output. The founder is presented only as
+Application code **`509feb8`** is deployed in Cloudflare Pages production
+deployment `ec38df2e-f69c-4ad6-a331-6a2ee44b7e3e`; `main` and `production-safe`
+are synchronized. All public references to Hayli's age, date of birth, youth and
+age-related marketing were removed from the About page, homepage founder band,
+founder config, SEO/OG metadata and rendered output. The founder is presented only as
 Hayli, founder and owner-operator, with her experience, quality-inspection
 background and detail standards. Internal marketing guidance was scrubbed to
 prevent re-publication. No customer review, photo, private record, pricing,

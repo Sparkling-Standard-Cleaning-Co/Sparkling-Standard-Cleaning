@@ -68,6 +68,7 @@ have seeded future public copy:
 
 ## Release
 
-- Application code: `PENDING_CODE_SHA`
-- Final HEAD: recorded after commit
-- Cloudflare Pages production deployment: `PENDING_DEPLOYMENT_ID`
+- Application code: `509feb8`
+- Final HEAD: `509feb8` (docs and application in the same commit)
+- GitHub `validate`/browser passed on `main` and `production-safe` (runs `43266001104` and `43265996206`)
+- Cloudflare Pages production deployment: `ec38df2e-f69c-4ad6-a331-6a2ee44b7e3e`

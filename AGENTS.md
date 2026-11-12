@@ -84,9 +84,17 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-11 estimator scroll and checkout UX):** application code **`4106d59`**
-  is live (Cloudflare Pages production deployment `9ec1b492-0f02-401b-bc93-9af9e18d4151`). `main` and
-  `production-safe` are synchronized. Address confirmation re-anchors to the availability
+- **Current release (2026-11-11 founder age-reference removal):** application code **`509feb8`**
+  is live (Cloudflare Pages production deployment `ec38df2e-f69c-4ad6-a331-6a2ee44b7e3e`).
+  `main` and `production-safe` are synchronized. All public references to Hayli's age, date of
+  birth, youth or age-related marketing were removed from the About page, homepage founder band,
+  founder configuration, SEO/OG metadata and rendered output. Hayli is presented only as founder
+  and owner-operator. Internal marketing guidance was scrubbed to prevent re-publication. No
+  reviews, photos, private records, pricing, estimate, booking or payment logic changed. Evidence:
+  `docs/verification/2026-11-11-AGE-REFERENCE-REMOVAL.md`.
+- **Prior release (2026-11-11 estimator scroll and checkout UX):** application code **`4106d59`**
+  remains represented in history (Cloudflare Pages production deployment
+  `9ec1b492-0f02-401b-bc93-9af9e18d4151`). Address confirmation re-anchors to the availability
   question, every step transition targets its heading with a guarded settled pass, and the
   five-second final reveal is framed once per questionnaire. The final checkout has one
   **Apply Discounts & Gift Certificates** action, automatically keeps the better non-stackable
