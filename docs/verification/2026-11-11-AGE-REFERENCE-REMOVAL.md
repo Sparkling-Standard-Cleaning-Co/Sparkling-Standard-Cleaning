@@ -69,6 +69,6 @@ have seeded future public copy:
 ## Release
 
 - Application code: `509feb8`
-- Final HEAD: `509feb8` (docs and application in the same commit)
-- GitHub `validate`/browser passed on `main` and `production-safe` (runs `43266001104` and `43265996206`)
+- Final HEAD: `baac546` (test-only viewport-tolerance hardening after the content commit)
+- GitHub `validate`/browser passed on `main` and `production-safe` (final runs `43269838902` and `43269836381`)
 - Cloudflare Pages production deployment: `ec38df2e-f69c-4ad6-a331-6a2ee44b7e3e`
