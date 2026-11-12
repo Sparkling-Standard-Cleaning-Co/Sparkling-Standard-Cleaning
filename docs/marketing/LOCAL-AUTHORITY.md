@@ -90,10 +90,10 @@ this company and what is happening locally because of it."**
 
 **Verified story angles (only owner-approved facts; never embellish):**
 
-- **Founder story:** an 18-year-old college student who started the company to give customers the
-  detailed attention rushed cleaning does not allow (`src/config/business.ts` founder block).
-- **Family craft:** grew up around a grandmother who owned a cleaning business; worked in it, then
-  for established local companies, doing the work and inspecting quality.
+- **Founder story:** the founder started the company to give customers the detailed attention
+  rushed cleaning does not allow (`src/config/business.ts` founder block).
+- **Family craft:** learned the trade through a grandmother who owned a cleaning business; worked
+  in it, then for established local companies, doing the work and inspecting quality.
 - **The standard thesis:** she saw rushed production cleaning leave the small things undone — and
   built something better.
 - **Design trajectory:** studies interior design and plans to grow into related home services.
@@ -102,8 +102,8 @@ this company and what is happening locally because of it."**
 
 **Targets (evaluate, do not assume):** local newspapers and community publications; neighborhood
 publications and HOA newsletters; the local chamber and community organizations; local events and
-markets; entrepreneurship/student-business publications (the college angle); relevant local
-groups where rules allow genuine contribution.
+markets; entrepreneurship and local-business publications; relevant local groups where rules allow
+genuine contribution.
 
 **Pitch mechanics:**
 

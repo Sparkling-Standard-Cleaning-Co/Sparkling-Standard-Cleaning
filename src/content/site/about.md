@@ -1,17 +1,17 @@
 ---
 metaTitle: About Hayli | Sparkling Standard Cleaning
-metaDescription: Meet the founder of our Pensacola-area cleaning company — raised around a family cleaning business and building a company around detail instead of rush.
+metaDescription: Meet the founder of our Pensacola-area cleaning company — shaped by a family cleaning business and building a company around detail instead of rush.
 hero:
-  headline: Young entrepreneur.
+  headline: Founder-led.
   accent: Old-fashioned standards.
-  lead: The founder of this company is 18, studies interior design, and has spent years doing professional cleaning work. She built this business around one belief — that homes deserve more attention than a production schedule allows.
+  lead: Hayli is the founder and owner-operator of Sparkling Standard. Shaped by a family cleaning business, she worked directly with customers and inspected cleaning quality before building this company around one belief — that homes deserve more attention than a production schedule allows.
   ctaLabel: Get Instant Estimate
 sections:
   - id: story
     eyebrow: The story
-    heading: Raised in a cleaning family
+    heading: A family cleaning trade
     paragraphs:
-      - Cleaning isn't an idea she picked up recently — it's a family trade. Her grandmother owned a cleaning business, and she grew up around it, learning what real work looked like before she was old enough to be paid for it.
+      - Cleaning isn't an idea she picked up recently — it's a family trade. Her grandmother owned a cleaning business, and she learned the work firsthand alongside family, seeing what real standards looked like.
       - She worked with that family business, then went on to clean for established companies in the local area. In those roles she worked directly with customers every day, and customers responded to her — to the care she took, and to the way she treated their homes.
       - She also performed quality inspection of cleaning work, which changed how she sees every room. Once you've been the person checking the work, you can't unsee the details that get missed.
       - The frustration came from the pace. She was expected to move through homes quickly to reach the next job, and she believed the homes deserved more. That frustration is the reason this company exists.
@@ -27,7 +27,7 @@ sections:
     heading: Faith, family, and treating homes with respect
     paragraphs:
       - Faith shapes how the founder works — honestly, carefully, and with respect for the people and the homes she serves. Everyone is welcome here. Quality, respect and integrity are what matter, and every customer is treated the same way.
-      - "This is a family-rooted business: a young woman building something her family is proud of, one home at a time. That shows up as stewardship — treating your home the way she would want hers treated, and your trust as something earned, not assumed."
+      - "This is a family-rooted business: a founder building something her family is proud of, one home at a time. That shows up as stewardship — treating your home the way she would want hers treated, and your trust as something earned, not assumed."
   - id: vision
     eyebrow: Looking ahead
     heading: A home company, built one detail at a time

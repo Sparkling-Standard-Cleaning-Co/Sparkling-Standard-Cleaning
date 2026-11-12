@@ -1,5 +1,16 @@
 # Verification status
 
+## Hayli age-reference removal - 2026-11-11
+
+All public references to Hayli's age, date of birth, youth and age-related
+marketing were removed from the About page, homepage founder band, founder
+config, SEO/OG metadata and rendered output. The founder is presented only as
+Hayli, founder and owner-operator, with her experience, quality-inspection
+background and detail standards. Internal marketing guidance was scrubbed to
+prevent re-publication. No customer review, photo, private record, pricing,
+estimate, booking or payment logic was changed. Full audit:
+[`docs/verification/2026-11-11-AGE-REFERENCE-REMOVAL.md`](2026-11-11-AGE-REFERENCE-REMOVAL.md).
+
 ## Estimator scrolling and checkout UX repair - 2026-11-11
 
 Application code **`4106d59`** is deployed in Cloudflare Pages production

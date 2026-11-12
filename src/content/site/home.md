@@ -35,7 +35,7 @@ communityBand:
 founderBand:
   heading: The Woman Behind the Sparkle
   paragraphs:
-    - The founder of Sparkling Standard grew up around cleaning — from a grandmother who owned her own cleaning business to working alongside family, then building experience with established local cleaning companies. She coordinated directly with customers and inspected the quality of work firsthand, gaining an inside perspective on the industry.
+    - The founder of Sparkling Standard learned the trade through a family cleaning business — working alongside a grandmother who owned her own company, then building experience with established local cleaning companies. She coordinated directly with customers and inspected the quality of work firsthand, gaining an inside perspective on the industry.
     - Over time, she repeatedly saw speed and profit being prioritized over care and quality. Homeowners deserve better than that.
     - "Sparkling Standard exists for this reason: to create spaces so clean they amaze, where the small things are actually noticed. The fingerprints on the switch plate, the buildup behind the faucet, the spattered toothbrush holder nobody notices."
     - The founder of Sparkling Standard shapes her standards from hands-on experience, a firsthand understanding of where cleaning services can fall short, and her genuine passion for transforming untidy spaces into clean, polished sanctuaries.

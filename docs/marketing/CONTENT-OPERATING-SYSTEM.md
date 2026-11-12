@@ -38,7 +38,7 @@ placement's tracked link is in `WHERE-TO-PASTE-UTM-LINKS.md`.
 
 1. Detail-cleaning demonstrations (the toothbrush holder effect)
 2. Before/after transformations
-3. Founder journey — young entrepreneur, real standards
+3. Founder journey — experience, real standards
 4. House-care education (how to keep it clean between visits)
 5. STR turnover process (hosts love process content)
 6. Move-out cleaning walkthroughs

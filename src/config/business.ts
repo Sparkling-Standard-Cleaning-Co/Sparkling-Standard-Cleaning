@@ -112,8 +112,8 @@ export const business = {
      * certifications) that the owner has not supplied.
      */
     approvedBackground: [
-      'An 18-year-old college student who started the company to give customers the detailed attention rushed cleaning does not allow',
-      'Started in residential cleaning and grew up around a grandmother who owned a cleaning business',
+      'Built the company around detailed attention that rushed cleaning does not allow',
+      'Started in residential cleaning and learned the trade through a grandmother who owned a cleaning business',
       'Worked with that family cleaning business, then for established local cleaning companies',
       'Worked directly with customers through every clean',
       'Performed quality inspection of cleaning work',

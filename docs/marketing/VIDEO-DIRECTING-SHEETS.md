@@ -25,9 +25,9 @@ light, phone at eye level, close enough for clean audio.
 
 1. Hayli to camera, medium shot — who she is and what she does.
 2. B-roll: real detail work from an existing capture set (hands, close-ups).
-3. Hayli to camera — why she started (approved background: grew up around her grandmother's
-   cleaning business; worked for established local companies; saw rushed production cleaning leave
-   the small things undone; studies interior design).
+3. Hayli to camera — why she started (approved background: learned the trade through her
+   grandmother's cleaning business; worked for established local companies; saw rushed production
+   cleaning leave the small things undone; studies interior design).
 4. Closing line: what "Standards That Make Your Space Sparkle." means to her.
 
 **Suggested lines (adapt, do not add facts):**
