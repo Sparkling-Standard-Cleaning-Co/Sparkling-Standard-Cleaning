@@ -50,24 +50,39 @@ export interface InvoiceData {
   /** Tax row appears only when both a label and a rate are supplied. */
   taxLabel?: string;
   taxRatePercent?: number;
+  /** Exact tax amount (dollars) for stored invoices. Overrides rate calculation. */
+  taxAmount?: number;
+  discountLabel?: string;
+  /** Discount in dollars, applied before tax. */
+  discountAmount?: number;
+  /** Payments already received in dollars. */
+  amountPaid?: number;
+  /** Exact outstanding balance in dollars when the stored invoice is authoritative. */
+  balanceDue?: number;
   notes?: string;
   /** Commercial payment terms — unset renders an owner-completion placeholder. */
   paymentTerms?: string;
   /** Owner-approved payment methods (verified facts only). */
   paymentMethods?: string[];
+  /** Server-issued Stripe payment link, when one exists. */
+  paymentUrl?: string;
   contact: InvoiceContact;
 }
 
 export interface InvoiceTotals {
   subtotal: number;
+  discountAmount: number;
   taxAmount: number | null;
   totalDue: number;
+  paymentsReceived: number;
+  balanceDue: number;
 }
 
 export interface BuiltInvoice {
   html: string;
   text: string;
   totals: InvoiceTotals;
+  data: InvoiceData;
 }
 
 const PALETTE = {
@@ -124,17 +139,37 @@ export function computeInvoiceTotals(data: InvoiceData): InvoiceTotals {
   const subtotal = round2(
     data.lineItems.reduce((sum, item) => sum + round2(item.quantity * item.unitPrice), 0),
   );
+  const discountAmount = round2(
+    Math.max(0, Math.min(subtotal, Number.isFinite(data.discountAmount) ? (data.discountAmount as number) : 0)),
+  );
   const rate = data.taxRatePercent;
   const taxApplicable =
     Boolean(data.taxLabel && data.taxLabel.trim() !== '') &&
     typeof rate === 'number' &&
     Number.isFinite(rate) &&
     rate >= 0;
-  const taxAmount = taxApplicable ? round2((subtotal * (rate as number)) / 100) : null;
+  const fixedTax =
+    typeof data.taxAmount === 'number' && Number.isFinite(data.taxAmount) && data.taxAmount >= 0;
+  const taxAmount = fixedTax
+    ? round2(data.taxAmount as number)
+    : taxApplicable
+      ? round2(((subtotal - discountAmount) * (rate as number)) / 100)
+      : null;
+  const totalDue = round2(subtotal - discountAmount + (taxAmount ?? 0));
+  const paymentsReceived = round2(
+    Math.max(0, Number.isFinite(data.amountPaid) ? (data.amountPaid as number) : 0),
+  );
+  const balanceDue =
+    typeof data.balanceDue === 'number' && Number.isFinite(data.balanceDue)
+      ? round2(Math.max(0, data.balanceDue))
+      : round2(Math.max(0, totalDue - paymentsReceived));
   return {
     subtotal,
+    discountAmount,
     taxAmount,
-    totalDue: round2(subtotal + (taxAmount ?? 0)),
+    totalDue,
+    paymentsReceived,
+    balanceDue,
   };
 }
 
@@ -168,6 +203,15 @@ function buildHtml(data: InvoiceData, totals: InvoiceTotals): string {
     })
     .join('');
 
+  const discountRow =
+    totals.discountAmount > 0
+      ? `
+              <tr>
+                <td colspan="3" style="padding:8px 12px;font-size:14px;color:${PALETTE.inkSoft};text-align:right;">${escapeHtml(data.discountLabel || 'Discount')}</td>
+                <td style="padding:8px 12px;font-size:14px;color:${PALETTE.ink};text-align:right;white-space:nowrap;">-${formatMoney(totals.discountAmount)}</td>
+              </tr>`
+      : '';
+
   const taxRow =
     totals.taxAmount !== null
       ? `
@@ -177,9 +221,33 @@ function buildHtml(data: InvoiceData, totals: InvoiceTotals): string {
               </tr>`
       : '';
 
+  const totalRow = `
+              <tr>
+                <td colspan="3" style="padding:10px 12px 6px;font-size:15px;font-weight:700;color:${PALETTE.ink};text-align:right;">${totals.paymentsReceived > 0 ? 'Total' : 'Total due'}</td>
+                <td style="padding:10px 12px 6px;font-size:16px;font-weight:700;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${formatMoney(totals.totalDue)}</td>
+              </tr>`;
+
+  const paymentRows =
+    totals.paymentsReceived > 0
+      ? `
+              <tr>
+                <td colspan="3" style="padding:4px 12px;font-size:14px;color:${PALETTE.inkSoft};text-align:right;">Payments received</td>
+                <td style="padding:4px 12px;font-size:14px;color:${PALETTE.ink};text-align:right;white-space:nowrap;">-${formatMoney(totals.paymentsReceived)}</td>
+              </tr>
+              <tr>
+                <td colspan="3" style="padding:8px 12px 6px;font-size:15px;font-weight:700;color:${PALETTE.ink};text-align:right;">Balance due</td>
+                <td style="padding:8px 12px 6px;font-size:16px;font-weight:700;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${formatMoney(totals.balanceDue)}</td>
+              </tr>`
+      : '';
+
   const paymentMethods =
     data.paymentMethods && data.paymentMethods.length > 0
       ? `<p style="margin:6px 0 0;font-size:13px;line-height:1.6;color:${PALETTE.inkSoft};"><strong style="color:${PALETTE.ink};">Payment methods:</strong> ${escapeHtml(data.paymentMethods.join(' · '))}</p>`
+      : '';
+
+  const paymentLink =
+    data.paymentUrl && /^https:\/\//i.test(data.paymentUrl)
+      ? `<p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:${PALETTE.inkSoft};"><strong style="color:${PALETTE.ink};">Pay online:</strong> <a href="${escapeHtml(data.paymentUrl)}" style="color:${PALETTE.rose};">${escapeHtml(data.paymentUrl)}</a></p>`
       : '';
 
   const notes = data.notes
@@ -278,11 +346,7 @@ function buildHtml(data: InvoiceData, totals: InvoiceTotals): string {
                 <tr>
                   <td colspan="3" style="padding:10px 12px 4px;font-size:14px;color:${PALETTE.inkSoft};text-align:right;">Subtotal</td>
                   <td style="padding:10px 12px 4px;font-size:14px;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${formatMoney(totals.subtotal)}</td>
-                </tr>${taxRow}
-                <tr>
-                  <td colspan="3" style="padding:10px 12px 6px;font-size:15px;font-weight:700;color:${PALETTE.ink};text-align:right;">Total due</td>
-                  <td style="padding:10px 12px 6px;font-size:16px;font-weight:700;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${formatMoney(totals.totalDue)}</td>
-                </tr>
+                </tr>${discountRow}${taxRow}${totalRow}${paymentRows}
               </table>
 
               <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="margin:24px 0 0;border-top:1px solid ${PALETTE.border};">
@@ -293,6 +357,7 @@ function buildHtml(data: InvoiceData, totals: InvoiceTotals): string {
                       data.paymentTerms ? escapeHtml(data.paymentTerms) : escapeHtml(placeholder('Payment terms'))
                     }</p>
                     ${paymentMethods}
+                    ${paymentLink}
                   </td>
                 </tr>
                 ${
@@ -355,13 +420,25 @@ function buildText(data: InvoiceData, totals: InvoiceTotals): string {
   }
   lines.push('');
   lines.push(`Subtotal: ${formatMoney(totals.subtotal)}`);
+  if (totals.discountAmount > 0) {
+    lines.push(`${data.discountLabel || 'Discount'}: -${formatMoney(totals.discountAmount)}`);
+  }
   if (totals.taxAmount !== null) lines.push(`${data.taxLabel ?? 'Tax'}: ${formatMoney(totals.taxAmount)}`);
-  lines.push(`TOTAL DUE: ${formatMoney(totals.totalDue)}`);
+  if (totals.paymentsReceived > 0) {
+    lines.push(`TOTAL: ${formatMoney(totals.totalDue)}`);
+    lines.push(`PAYMENTS RECEIVED: -${formatMoney(totals.paymentsReceived)}`);
+    lines.push(`BALANCE DUE: ${formatMoney(totals.balanceDue)}`);
+  } else {
+    lines.push(`TOTAL DUE: ${formatMoney(totals.totalDue)}`);
+  }
   lines.push('');
   lines.push('PAYMENT TERMS');
   lines.push(data.paymentTerms || placeholder('Payment terms'));
   if (data.paymentMethods && data.paymentMethods.length > 0) {
     lines.push(`Payment methods: ${data.paymentMethods.join(' · ')}`);
+  }
+  if (data.paymentUrl && /^https:\/\//i.test(data.paymentUrl)) {
+    lines.push(`Pay online: ${data.paymentUrl}`);
   }
   if (data.notes) {
     lines.push('');
@@ -386,6 +463,7 @@ export function buildInvoice(data: InvoiceData): BuiltInvoice {
     html: buildHtml(data, totals),
     text: buildText(data, totals),
     totals,
+    data,
   };
 }
 

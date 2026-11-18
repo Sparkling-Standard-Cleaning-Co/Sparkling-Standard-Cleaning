@@ -160,6 +160,12 @@ function friendly(error: unknown): string {
     authorization_property_mismatch: 'The signed authorization is for a different property.',
     stripe_not_configured: 'Stripe is not configured.',
     invoice_not_payable: 'This invoice is not payable in its current state.',
+    invoice_not_sendable: 'Only open, partially paid or overdue invoices can be emailed.',
+    invoice_paid: 'This invoice has no outstanding balance.',
+    customer_email_missing: 'The customer has no email address on file.',
+    customer_email_invalid: 'The customer email address is not valid.',
+    invoice_email_failed: 'The invoice email could not be sent. Check the Resend configuration and try again.',
+    invoice_document_failed: 'The invoice PDF could not be generated.',
     customer_email_required: 'The customer needs an email address for a payment link.',
     reserved: 'This gift is reserved by an active booking.',
     redeemed: 'This gift has already been redeemed.',
@@ -1723,10 +1729,21 @@ async function openInvoice(invoiceId: string): Promise<void> {
   const invoice = data.invoice as Record<string, unknown>;
   const lines = (data.lines as Array<Record<string, unknown>>) ?? [];
   const payments = (data.payments as Array<Record<string, unknown>>) ?? [];
-  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(invoice.number)}</h2><span class="admin-status">${esc(titleCase(invoice.status))}</span></div><dl class="admin-definition"><dt>Customer</dt><dd>${esc([invoice.first_name, invoice.last_name].filter(Boolean).join(' '))}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Paid</dt><dd>${esc(money(invoice.amount_paid_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(dateTime(invoice.due_date))}</dd></dl><h3>Lines</h3>${lines.map((line) => `<div class="admin-record">${esc(line.description)} · ${esc(money(line.total_cents))}</div>`).join('') || '<p class="admin-muted">No lines.</p>'}<h3>Payments</h3>${payments.map((payment) => `<div class="admin-record">${esc(titleCase(payment.provider))} · ${esc(money(payment.amount_cents))} · ${esc(payment.status)} · ${esc(dateTime(payment.created_at))}<details class="admin-detail-toggle"><summary>Record refund</summary><form class="admin-form" data-form="refund"><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Refund amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="reason" /></label><button class="btn btn--secondary btn--small" type="submit">Record refund</button></form></details></div>`).join('') || '<p class="admin-muted">No payments.</p>'}${Number(invoice.balance_cents) > 0 ? `<form class="admin-form" data-form="payment"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Payment method <select name="provider"><option value="cash">Cash</option><option value="check">Check</option><option value="external">External</option></select></label><label>Amount <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Reference <input name="reference" /></label><button class="btn btn--primary btn--small" type="submit">Record payment</button></form>` : ''}<form class="admin-form" data-form="credit"><input type="hidden" name="customerId" value="${esc(invoice.customer_id)}" /><label>Customer credit amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="source" /></label><button class="btn btn--secondary btn--small" type="submit">Add credit</button></form></div>`;
+  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(invoice.number)}</h2><span class="admin-status">${esc(titleCase(invoice.status))}</span></div><dl class="admin-definition"><dt>Customer</dt><dd>${esc([invoice.first_name, invoice.last_name].filter(Boolean).join(' '))}</dd><dt>Email</dt><dd>${esc(invoice.customer_email || 'Not recorded')}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Paid</dt><dd>${esc(money(invoice.amount_paid_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(dateTime(invoice.due_date))}</dd></dl><h3>Lines</h3>${lines.map((line) => `<div class="admin-record">${esc(line.description)} · ${esc(money(line.total_cents))}</div>`).join('') || '<p class="admin-muted">No lines.</p>'}<h3>Payments</h3>${payments.map((payment) => `<div class="admin-record">${esc(titleCase(payment.provider))} · ${esc(money(payment.amount_cents))} · ${esc(payment.status)} · ${esc(dateTime(payment.created_at))}<details class="admin-detail-toggle"><summary>Record refund</summary><form class="admin-form" data-form="refund"><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Refund amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="reason" /></label><button class="btn btn--secondary btn--small" type="submit">Record refund</button></form></details></div>`).join('') || '<p class="admin-muted">No payments.</p>'}${Number(invoice.balance_cents) > 0 ? `<form class="admin-form" data-form="payment"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Payment method <select name="provider"><option value="cash">Cash</option><option value="check">Check</option><option value="external">External</option></select></label><label>Amount <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Reference <input name="reference" /></label><button class="btn btn--primary btn--small" type="submit">Record payment</button></form>` : ''}<form class="admin-form" data-form="credit"><input type="hidden" name="customerId" value="${esc(invoice.customer_id)}" /><label>Customer credit amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="source" /></label><button class="btn btn--secondary btn--small" type="submit">Add credit</button></form></div>`;
   const controls = document.querySelector<HTMLElement>('[data-admin-invoice-controls]');
   if (controls) {
-    controls.innerHTML = '';
+    controls.innerHTML = `<a class="btn btn--secondary btn--small" href="/api/admin/invoice-document?id=${encodeURIComponent(invoiceId)}">Download invoice PDF</a>`;
+    if (
+      can('finance.write') &&
+      invoice.customer_email &&
+      Number(invoice.balance_cents) > 0 &&
+      ['open', 'partially_paid', 'overdue'].includes(String(invoice.status))
+    ) {
+      controls.insertAdjacentHTML(
+        'beforeend',
+        `<button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-email" data-id="${esc(invoiceId)}">Email invoice PDF</button>`,
+      );
+    }
     if (can('finance.write') && !invoice.payment_url && Number(invoice.balance_cents) > 0) {
       controls.insertAdjacentHTML(
         'beforeend',
@@ -3260,6 +3277,16 @@ document.addEventListener('click', (event) => {
     setAppError();
     void api<{ url: string }>('/api/admin/finance', { method: 'POST', body: JSON.stringify({ action: 'payment_link', invoiceId: id }) })
       .then(() => openInvoice(id))
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'invoice-email') {
+    setAppError();
+    setSuccess();
+    void api<{ status: string }>('/api/admin/finance', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'email_invoice', invoiceId: id, idempotencyKey: crypto.randomUUID() }),
+    })
+      .then(() => setSuccess('Invoice emailed with its PDF attached.'))
       .catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'mfa-start') {

@@ -62,7 +62,14 @@ export async function getInvoice(
   const branch = scope(actor, 'i.branch_id');
   const invoice = await db
     .prepare(
-      `SELECT i.*, c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code
+      `SELECT i.*, c.first_name, c.last_name, c.company_name,
+              (SELECT value FROM customer_contacts
+               WHERE customer_contacts.customer_id = c.id AND customer_contacts.kind = 'email'
+               ORDER BY is_primary DESC, created_at ASC LIMIT 1) AS customer_email,
+              (SELECT value FROM customer_contacts
+               WHERE customer_contacts.customer_id = c.id AND customer_contacts.kind = 'phone'
+               ORDER BY is_primary DESC, created_at ASC LIMIT 1) AS customer_phone,
+              p.line1, p.line2, p.city, p.state, p.postal_code
        FROM invoices i JOIN customers c ON c.id = i.customer_id
        LEFT JOIN properties p ON p.id = i.property_id
        WHERE i.id = ? ${branch.sql} LIMIT 1`,

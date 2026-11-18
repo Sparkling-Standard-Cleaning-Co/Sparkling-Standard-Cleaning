@@ -174,9 +174,44 @@ async function openAdmin() {
   await page.route('**/api/admin/customers*', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, customers: [], properties: [] }) });
   });
+  const financePosts = [];
+  await page.route('**/api/admin/finance*', async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() === 'POST') {
+      financePosts.push(JSON.parse(route.request().postData() ?? '{}'));
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, status: 'sent' }) });
+      return;
+    }
+    if (url.searchParams.get('id')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          invoice: {
+            id: 'invoice_1', customer_id: 'cust_1', number: 'INV-20261118-ABC123', status: 'open',
+            issue_date: '2026-11-18', due_date: '2026-11-25', total_cents: 5750, amount_paid_cents: 1000,
+            balance_cents: 4750, first_name: 'Test', last_name: 'Customer', customer_email: 'customer@example.test',
+          },
+          lines: [{ id: 'line_1', description: 'Recurring cleaning', total_cents: 5000 }],
+          payments: [],
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        invoices: [{ id: 'invoice_1', number: 'INV-20261118-ABC123', first_name: 'Test', last_name: 'Customer', total_cents: 5750, balance_cents: 4750, due_date: '2026-11-25', status: 'open' }],
+        summary: { invoices: { total: 5750 }, payments: { total: 0 }, outstanding: { total: 4750 }, gifts: { balance: 0 } },
+      }),
+    });
+  });
   await page.goto(BASE + '/admin/', { waitUntil: 'load' });
   await page.locator('[data-admin-app]').waitFor({ state: 'visible' });
-  return { context, page, requestPosts };
+  return { context, page, requestPosts, financePosts };
 }
 
 test('the owner can open the timekeeping board and see hours and corrections', async () => {
@@ -236,6 +271,27 @@ test('a legacy request can be opened, reviewed and confirmed from the admin', as
     await detail.getByRole('button', { name: 'Accept / Confirm Booking' }).click();
     await page.waitForTimeout(400);
     assert.equal(requestPosts.some((post) => post.action === 'confirm'), true);
+    assert.equal(await page.locator('[data-admin-app-error]').innerText(), '');
+  } finally {
+    await context.close();
+  }
+});
+
+
+test('an invoice can be downloaded as PDF and emailed from the admin', async () => {
+  const { context, page, financePosts } = await openAdmin();
+  try {
+    await page.locator('[data-admin-nav="finance"]').click();
+    await page.locator('[data-admin-action="invoice-open"]').first().click();
+    await page.locator('[data-admin-invoice-controls]').waitFor({ state: 'visible' });
+    const controls = page.locator('[data-admin-invoice-controls]');
+    assert.match(await controls.innerText(), /Download invoice PDF/);
+    assert.match(await controls.innerText(), /Email invoice PDF/);
+    const download = await controls.getByRole('link', { name: 'Download invoice PDF' }).getAttribute('href');
+    assert.match(download, /\/api\/admin\/invoice-document\?id=invoice_1/);
+    await controls.getByRole('button', { name: 'Email invoice PDF' }).click();
+    await page.waitForFunction(() => document.querySelector('[data-admin-success]')?.textContent?.includes('Invoice emailed'));
+    assert.equal(financePosts.some((post) => post.action === 'email_invoice' && post.invoiceId === 'invoice_1'), true);
     assert.equal(await page.locator('[data-admin-app-error]').innerText(), '');
   } finally {
     await context.close();

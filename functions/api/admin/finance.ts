@@ -1,5 +1,5 @@
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
-import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import { verifyPassword } from '../../../src/lib/admin/auth.ts';
 import {
   applyCreditToInvoice,
@@ -14,8 +14,11 @@ import {
   updateInvoiceStatus,
 } from '../../../src/lib/admin/billing.ts';
 import { createInvoicePaymentLink, refundStripePayment, type StripeBillingEnv } from '../../../src/lib/admin/stripe-billing.ts';
+import { buildAdminInvoice } from '../../../src/lib/invoicing/admin-invoice.ts';
+import { buildInvoicePdf } from '../../../src/lib/invoicing/pdf.ts';
+import { sendInvoiceEmail, type InvoiceEmailEnv } from '../../../src/lib/invoicing/invoice-email.ts';
 
-interface Env extends AdminDbEnv, StripeBillingEnv {}
+interface Env extends AdminDbEnv, StripeBillingEnv, InvoiceEmailEnv {}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -79,6 +82,50 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'apply_credit') return json({ ok: true, ...(await applyCreditToInvoice(db, actor, body)) });
     if (action === 'payment_link') {
       return json({ ok: true, ...(await createInvoicePaymentLink(db, actor, String(body.invoiceId ?? ''), context.env)) });
+    }
+    if (action === 'email_invoice') {
+      const invoiceId = String(body.invoiceId ?? '');
+      const result = await getInvoice(db, actor, invoiceId);
+      if (!result) return json({ ok: false, error: 'invoice_not_found' }, 404);
+      const invoice = result.invoice as Record<string, unknown>;
+      if (!['open', 'partially_paid', 'overdue'].includes(String(invoice.status))) {
+        return json({ ok: false, error: 'invoice_not_sendable' }, 409);
+      }
+      if (Number(invoice.balance_cents) <= 0) return json({ ok: false, error: 'invoice_paid' }, 409);
+      const to = String(invoice.customer_email ?? '').trim();
+      if (!to) return json({ ok: false, error: 'customer_email_missing' }, 400);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+        return json({ ok: false, error: 'customer_email_invalid' }, 400);
+      }
+      if (!context.env.RESEND_API_KEY?.trim()) {
+        return json({ ok: false, error: 'email_not_configured' }, 503);
+      }
+      const document = buildAdminInvoice({
+        invoice,
+        lines: (result.lines as Array<Record<string, unknown>>) ?? [],
+      });
+      const pdf = buildInvoicePdf(document.data, document.totals);
+      const outcome = await sendInvoiceEmail({
+        to,
+        data: document.data,
+        totals: document.totals,
+        pdf,
+        env: context.env,
+        idempotencyKey:
+          String(body.idempotencyKey ?? '').trim() || `invoice-email-${invoiceId}-${crypto.randomUUID()}`,
+      });
+      await audit(db, {
+        actorUserId: actor.id,
+        action: outcome.status === 'sent' ? 'invoice.emailed' : 'invoice.email_failed',
+        entityType: 'invoice',
+        entityId: invoiceId,
+        detail: outcome.providerStatus ? `provider_${outcome.providerStatus}` : outcome.status,
+      }).catch(() => undefined);
+      if (outcome.status === 'sent') return json({ ok: true, status: 'sent' });
+      return json(
+        { ok: false, error: outcome.status === 'failed' ? 'invoice_email_failed' : 'email_not_configured' },
+        outcome.status === 'failed' ? 502 : 503,
+      );
     }
     if (action === 'stripe_refund') {
       const stored = await db.prepare('SELECT password_hash FROM admin_users WHERE id = ? LIMIT 1').bind(actor.id).first<{ password_hash: string }>();
