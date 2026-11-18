@@ -51,6 +51,11 @@ export interface BookingCalendarHandle {
   reset(): void;
 }
 
+export interface BookingCalendarHooks {
+  onDateSelected?: (target: HTMLElement) => void;
+  onTimesRevealed?: (target: HTMLElement) => void;
+}
+
 interface Slot {
   start: string;
   end: string;
@@ -134,6 +139,7 @@ function hour12(hour24: number): number {
 export function initBookingCalendar(
   root: HTMLElement,
   onChange?: (selection: BookingCalendarSelection | null) => void,
+  hooks: BookingCalendarHooks = {},
 ): BookingCalendarHandle | null {
   const timeZone = root.dataset.timezone || 'America/Chicago';
   const maxAdvance = Math.max(1, Number(root.dataset.maxAdvance) || 60);
@@ -141,6 +147,7 @@ export function initBookingCalendar(
   const monthEl = root.querySelector<HTMLElement>('[data-calendar-month]');
   const prevButton = root.querySelector<HTMLButtonElement>('[data-calendar-prev]');
   const nextButton = root.querySelector<HTMLButtonElement>('[data-calendar-next]');
+  const timesCard = root.querySelector<HTMLElement>('.booking-calendar__times-card');
   const periodEl = root.querySelector<HTMLElement>('[data-calendar-period]');
   const periodButtons = [...root.querySelectorAll<HTMLButtonElement>('[data-period]')];
   const picker = root.querySelector<HTMLElement>('[data-calendar-picker]');
@@ -199,10 +206,7 @@ export function initBookingCalendar(
       const rect = picker.getBoundingClientRect();
       const fullyVisible = rect.top >= offset && rect.bottom <= window.innerHeight - 16;
       if (fullyVisible) return;
-      window.scrollTo({
-        top: Math.max(0, rect.top + window.scrollY - offset),
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-      });
+      hooks.onTimesRevealed?.(picker);
     });
   }
   let monthDays = new Map<string, MonthDay>();
@@ -646,6 +650,7 @@ export function initBookingCalendar(
         renderCalendar();
         notify();
         void refreshTimes();
+        hooks.onDateSelected?.(timesCard ?? periodEl ?? root);
       });
       gridEl.appendChild(button);
     }

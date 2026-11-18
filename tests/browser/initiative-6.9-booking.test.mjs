@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { completeStepOne } from '../helpers/estimator-step-one.mjs';
 import { checkEstimateTerms } from './terms-ready.mjs';
 
 const PORT = 4506;
@@ -134,19 +135,7 @@ test('a real available slot becomes an expiring hold and travels with the reques
 
     await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
     await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner,.promo-popup{display:none!important}' });
-    await page.fill('#est-date', BOOKING_DATE);
-    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-    await page.click('[data-period="first"]');
-    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
-    await page.fill('#est-address', '100 S Baylen St');
-    await page.fill('#est-address-city', 'Pensacola');
-    await page.fill('#est-zip', '32502');
-    await page.click('[data-address-resolve]');
-    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
-    await page.locator('[data-address-confirm]').click();
-    await page.waitForFunction(
-      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
-    );
+    await completeStepOne(page, { date: BOOKING_DATE });
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',

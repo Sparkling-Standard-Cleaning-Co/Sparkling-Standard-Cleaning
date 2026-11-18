@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { chooseAppointment } from '../helpers/estimator-step-one.mjs';
 
 const PORT = 4402;
 const BASE = `http://localhost:${PORT}`;
@@ -135,10 +136,6 @@ test('the address field exposes combobox semantics and keyboard selection', asyn
     assert.equal(await field.getAttribute('aria-expanded'), 'false');
     assert.equal(await field.getAttribute('aria-controls'), 'est-address-suggestions');
 
-    const accessibilityDate = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
-    await page.fill('#est-date', accessibilityDate);
-    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-    await page.click('[data-period="first"]');
     await page.locator('[data-address-card]').waitFor({ state: 'visible' });
     await field.fill('100 S Baylen');
     await page.waitForSelector('#est-address-suggestions', { state: 'visible' });
@@ -162,10 +159,6 @@ test('the address field exposes combobox semantics and keyboard selection', asyn
 test('interactive controls have accessible names and no positive tabindex', async () => {
   const { context, page } = await openEstimate();
   try {
-    const interactiveDate = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
-    await page.fill('#est-date', interactiveDate);
-    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-    await page.click('[data-period="first"]');
     await page.locator('[data-address-card]').waitFor({ state: 'visible' });
     await page.fill('#est-address', '100 S Baylen');
     await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
@@ -215,15 +208,14 @@ test('the five-step navigator exposes state and locks future steps accessibly', 
     assert.equal(await page.locator('[data-step-jump="2"]').isDisabled(), true, 'future steps are disabled');
 
     const bookingDate = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10);
-    await page.fill('#est-date', bookingDate);
-    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-    await page.click('[data-period="first"]');
     await page.locator('[data-address-card]').waitFor({ state: 'visible' });
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32503');
     await page.click('[data-address-resolve]');
     await confirmMap(page);
+    await page.locator('[data-schedule-section]').waitFor({ state: 'visible' });
+    await chooseAppointment(page, bookingDate);
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',

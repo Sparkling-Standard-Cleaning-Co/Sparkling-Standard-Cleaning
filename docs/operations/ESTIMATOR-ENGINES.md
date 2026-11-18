@@ -28,18 +28,20 @@
 > confined to step 4. The underlying pricing mathematics, bundles, discounts, minimums, travel and
 > configuration versioning are unchanged.
 
-**Current five-step journey (updated 2026-10-30):** **When & Where → Service &
-Home → Condition & Frequency → Your Details → Extras & Payment**. Step 1
-progressively reveals the appointment calendar, period/time picker, address
-card, city/state/ZIP details and the interactive MapLibre/OpenFreeMap pin
-confirmation. The calendar uses a compact First Appointment (7:00–8:30 AM) /
-Afternoon Appointment (12:30–2:30 PM) hour-and-minute picker in 15-minute
-increments. Suggestions are strictly limited to Florida and Alabama, exact or
-street-only resolution happens in the background, and a ZIP fallback keeps an
-eligible request moving. A resolved address must be confirmed on the map. The
-preferred date/time is provisional until the real job duration is known; the
-final step revalidates the slot against the two-resource scheduler, converts it
-to a temporary hold, and offers real alternatives when needed.
+**Current five-step journey (updated 2026-11-17):** **When & Where → Service &
+Home → Condition & Frequency → Your Details → Extras & Payment**. Step 1 now
+begins with the service address. The address card, GPS/manual entry, MapLibre/
+OpenFreeMap pin confirmation and compact confirmed card must be completed before
+the appointment calendar unlocks. The calendar then uses a compact First
+Appointment (7:00–8:30 AM) / Afternoon Appointment (12:30–2:30 PM)
+hour-and-minute picker in 15-minute increments. Changing the address re-locks
+scheduling and clears the invalidated appointment. Suggestions are strictly
+limited to Florida and Alabama; remote/street-only resolution happens in the
+background, and an approximate ZIP-area result can be confirmed as such. An
+unconfirmed address cannot reach scheduling. The preferred date/time is
+provisional until the real job duration is known; the final step revalidates the
+slot against the two-resource scheduler, converts it to a temporary hold, and
+offers real alternatives when needed.
 
 **Five-condition selector (restored 2026-10-30):** Condition & Frequency uses the
 original customer-facing dropdown: **Maintained**, **Average**, **Needs

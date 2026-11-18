@@ -84,14 +84,20 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-11 founder age-reference removal):** application code **`509feb8`**
+- **Current release (2026-11-17 address-first scheduling):** application code **`PENDING_CODE_SHA`**
+  is live (Cloudflare Pages production deployment `PENDING_DEPLOYMENT_ID`). `main` and
+  `production-safe` are synchronized. Residential Step 1 now requires a confirmed service address
+  before the appointment calendar unlocks; changing the address re-locks scheduling and clears the
+  invalidated appointment. Date/time choices scroll to the next relevant control, and continuing
+  lands on the next step heading. The final five-second reveal is unchanged. Evidence:
+  `docs/verification/2026-11-17-ADDRESS-FIRST-SCHEDULING.md`.
+- **Prior release (2026-11-11 founder age-reference removal):** application code **`509feb8`**
   is live (Cloudflare Pages production deployment `ec38df2e-f69c-4ad6-a331-6a2ee44b7e3e`).
-  `main` and `production-safe` are synchronized. All public references to Hayli's age, date of
-  birth, youth or age-related marketing were removed from the About page, homepage founder band,
-  founder configuration, SEO/OG metadata and rendered output. Hayli is presented only as founder
-  and owner-operator. Internal marketing guidance was scrubbed to prevent re-publication. No
-  reviews, photos, private records, pricing, estimate, booking or payment logic changed. Evidence:
-  `docs/verification/2026-11-11-AGE-REFERENCE-REMOVAL.md`.
+  `main` and `production-safe` were synchronized at that release. All public references to Hayli's
+  age, date of birth, youth or age-related marketing were removed from the About page, homepage
+  founder band, founder configuration, SEO/OG metadata and rendered output. Hayli is presented only
+  as founder and owner-operator. Internal marketing guidance was scrubbed to prevent
+  re-publication. Evidence: `docs/verification/2026-11-11-AGE-REFERENCE-REMOVAL.md`.
 - **Prior release (2026-11-11 estimator scroll and checkout UX):** application code **`4106d59`**
   remains represented in history (Cloudflare Pages production deployment
   `9ec1b492-0f02-401b-bc93-9af9e18d4151`). Address confirmation re-anchors to the availability
@@ -579,16 +585,18 @@ collections are intentionally empty — not errors.
   automatically and the verified Google reviews link stays intact.
 - **Five-step estimator (owner priority UX directive; current 2026-10-29):** the residential and STR
   journey is exactly **When & Where → Service & Home → Condition & Frequency → Your Details →
-  Extras & Payment** (`src/lib/estimate/steps.ts`, `src/lib/estimate/engines.ts`). Step 1 is a
-  premium appointment calendar (`BookingCalendar.astro`, `booking-calendar.ts`) with a compact
-  First Appointment (7:00–8:30 AM) / Afternoon Appointment (12:30–2:30 PM) hour-and-minute picker.
-  It reveals progressively: calendar, then period/time, then the address card, then city/state/ZIP
-  after street entry. Reveals smooth-scroll unless reduced motion is active. The confirmed
-  MapLibre/OpenFreeMap pin remains required for a resolved address; there is no separate
-  address-verification page. The typed address is resolved in the background, city/state are
-  parsed defensively, street-only provider rows are labeled and never become a city, and a ZIP
-  fallback preserves an eligible request when exact geocoding fails. Suggestions are strictly
-  FL/AL only server-side (`functions/api/geocode.ts`, `suggestion-ranking.ts`). Condition &
+  Extras & Payment** (`src/lib/estimate/steps.ts`, `src/lib/estimate/engines.ts`). Step 1 now
+  collects and verifies the **service address first** (`address-finder.ts`): the address card,
+  GPS/manual entry, MapLibre/OpenFreeMap pin confirmation and the compact confirmed card are shown
+  before scheduling. Only after confirmation does the appointment calendar
+  (`BookingCalendar.astro`, `booking-calendar.ts`) unlock, with the compact First Appointment
+  (7:00–8:30 AM) / Afternoon Appointment (12:30–2:30 PM) hour-and-minute picker. Changing the
+  address re-locks scheduling and clears the invalidated appointment. The confirmed map pin remains
+  required for a resolved address; there is no separate address-verification page. The typed address
+  is resolved in the background, city/state are parsed defensively, street-only provider rows are
+  labeled and never become a city, and a ZIP-area fallback can be confirmed as approximate when exact
+  geocoding cannot pinpoint the property. Suggestions are strictly FL/AL only server-side
+  (`functions/api/geocode.ts`, `suggestion-ranking.ts`). Condition &
   Frequency uses the restored original five-condition dropdown: Maintained, Average, Needs
   Attention, Heavy Buildup and Severe. Severe keeps the personal-review gate. The legacy
   ten-level dirt guide remains only as a backward-compatible parser for historical records

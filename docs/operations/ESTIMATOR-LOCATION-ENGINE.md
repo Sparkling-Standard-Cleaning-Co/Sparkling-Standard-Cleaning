@@ -278,3 +278,21 @@ structure, manual address fields, FL/AL suggestion restriction and ZIP fallback 
 reverse-geocoded address fields populate before confirmation; a GPS location without a resolved
 street still confirms from its pin and never invents a house number. If the map preview itself
 fails to load, the confirmed coordinates remain usable and the customer can continue.
+## 2026-11-17 address-first scheduling (owner directive)
+
+The residential estimator Step 1 now verifies the service address before revealing or enabling the
+appointment calendar. The address card is the first question. GPS/manual entry, map/pin confirmation
+and the compact confirmed card must be completed before scheduling unlocks. If the address changes
+or is edited back to an unconfirmed state, the calendar is re-locked and the previously selected
+date/time is cleared.
+
+After confirmation, the page scrolls to the scheduling heading below the sticky header. Choosing a
+date scrolls to the available appointment windows; choosing a period reveals the exact time picker;
+choosing a time keeps the selected time and Continue in view. Continuing scrolls to the next step's
+primary heading. Back navigation returns to the active Step 1 address question. The final-step
+five-second reveal behavior is unchanged.
+
+An address that cannot be confirmed on the map cannot reach scheduling or proceed. The real geocode
+function still offers an approximate ZIP-area result when exact provider resolution fails; once the
+customer confirms that approximate pin/card, scheduling is available and the request remains
+honestly labeled as approximate.

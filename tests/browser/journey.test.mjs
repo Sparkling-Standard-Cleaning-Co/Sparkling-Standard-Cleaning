@@ -14,6 +14,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { chooseAppointment } from '../helpers/estimator-step-one.mjs';
 import { checkEstimateTerms } from './terms-ready.mjs';
 import { pricing, pricingValue } from '../../src/config/pricing.ts';
 import { calculateEstimate } from '../../src/lib/estimate/calculate.ts';
@@ -274,9 +275,6 @@ async function openEstimateWithPhotos(width, height, mode = 'success') {
 const isVisible = (page, selector) => page.locator(selector).isVisible();
 
 async function step1(page) {
-  await page.fill('#est-date', BOOKING_DATE);
-  await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-  await page.click('[data-period="first"]');
   await page.locator('[data-address-card]').waitFor({ state: 'visible' });
 }
 
@@ -294,6 +292,8 @@ async function confirmMapIfShown(page) {
     await page.waitForFunction(
       () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
     );
+    await page.locator('[data-schedule-section]').waitFor({ state: 'visible' });
+    await chooseAppointment(page, BOOKING_DATE);
   }
 }
 

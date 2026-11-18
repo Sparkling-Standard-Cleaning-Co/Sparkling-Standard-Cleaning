@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { completeStepOne, confirmAddressFirst, chooseAppointment } from '../helpers/estimator-step-one.mjs';
 
 const PORT = 4511;
 const BASE = `http://localhost:${PORT}`;
@@ -125,23 +126,10 @@ async function open(width = 1440, height = 1000) {
 }
 
 async function stepTwo(page) {
-  await page.fill('#est-date', BOOKING_DATE);
-  await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-  await page.click('[data-period="first"]');
-  await page.locator('[data-address-card]').waitFor({ state: 'visible' });
-  await page.fill('#est-address', '100 S Baylen St');
-  await page.fill('#est-address-city', 'Pensacola');
-  await page.fill('#est-zip', '32502');
-  await page.click('[data-address-resolve]');
-  await page.locator('[data-address-map]').waitFor({ state: 'visible' });
-  await page.locator('[data-address-confirm]').click();
-  await page.waitForFunction(
-    () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
-  );
+  await completeStepOne(page, { date: BOOKING_DATE });
   await page.click('[data-next]');
   await page.waitForFunction(() => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true');
 }
-
 async function reachCondition(page) {
   await stepTwo(page);
   await page.click('label.option:has(input[name="serviceType"][value="standard"])');
@@ -246,6 +234,7 @@ test('Community Support is one small checkbox linked to the terms', async () => 
 test('the time picker is compact and uses the two residential windows', async () => {
   const { context, page } = await open();
   try {
+    await confirmAddressFirst(page);
     await page.fill('#est-date', BOOKING_DATE);
     await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
     assert.equal(await page.locator('.booking-calendar__time').count(), 0, 'no large time-button list');
@@ -264,21 +253,21 @@ test('the time picker is compact and uses the two residential windows', async ()
   }
 });
 
-test('Step 1 presents the calendar first, then time, address and details', async () => {
+test('Step 1 presents the service address first, then scheduling', async () => {
   const { context, page } = await open();
   try {
-    assert.equal(await page.locator('[data-address-card]').isVisible(), false, 'address waits for a time');
-    assert.equal(await page.locator('[data-calendar-period]').isVisible(), true, 'window cards are always visible');
-    await page.fill('#est-date', BOOKING_DATE);
-    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-    assert.equal(await page.locator('[data-address-card]').isVisible(), false, 'address still waits for a time');
-    await page.click('[data-period="first"]');
-    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('[data-address-card]').isVisible(), true, 'address is the first question');
+    assert.equal(await page.locator('[data-schedule-section]').isVisible(), false, 'scheduling waits for the address');
+    assert.equal(await page.locator('[data-calendar-gate]').isVisible(), true, 'the scheduling gate is visible');
     assert.equal(await page.locator('[data-address-details]').isVisible(), false, 'city waits for a street');
     await page.fill('#est-address', '100 S Baylen St');
     await page.locator('[data-address-details]').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#est-address-city').isVisible(), true);
     assert.equal(await page.locator('#est-zip').isVisible(), true);
+    await confirmAddressFirst(page);
+    assert.equal(await page.locator('[data-schedule-section]').isVisible(), true, 'scheduling unlocks after verification');
+    assert.equal(await page.locator('[data-calendar-period]').isVisible(), true, 'window cards are visible after verification');
+    assert.equal(await page.locator('[data-address-confirmed]').isVisible(), true, 'the compact confirmed card is shown');
   } finally {
     await context.close();
   }
@@ -411,15 +400,12 @@ test('the removed review and address-saving copy is absent', async () => {
     const body = (await page.textContent('body')) ?? '';
     assert.doesNotMatch(body, /USING THE DETAILS YOU CONFIRMED/i);
     assert.doesNotMatch(body, /Saving your address so we can prepare/i);
-    await page.fill('#est-date', BOOKING_DATE);
-    await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-    await page.click('[data-period="first"]');
-    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
-    await page.fill('#est-address', '100 S Baylen St');
-    await page.fill('#est-address-city', 'Pensacola');
-    await page.fill('#est-zip', '32502');
+    await confirmAddressFirst(page);
+    await chooseAppointment(page, BOOKING_DATE);
     await page.click('[data-next]');
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+    );
     const after = (await page.textContent('body')) ?? '';
     assert.doesNotMatch(after, /Saving your address so we can prepare/i);
     assert.doesNotMatch(after, /USING THE DETAILS YOU CONFIRMED/i);

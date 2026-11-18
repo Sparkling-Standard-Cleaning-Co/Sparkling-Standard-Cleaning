@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { completeStepOne } from '../helpers/estimator-step-one.mjs';
 
 const PORT = 4513;
 const BASE = `http://localhost:${PORT}`;
@@ -186,9 +187,7 @@ async function confirmAddress(page) {
 }
 
 async function completeToFinalStep(page) {
-  await selectDate(page);
-  await page.click('[data-period="first"]');
-  await confirmAddress(page);
+  await completeStepOne(page, { date: BOOKING_DATE });
   await page.click('[data-next]');
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -221,6 +220,7 @@ function inViewport(rect, viewportHeight) {
 test('Morning and Afternoon selections keep the exact time picker in view', async () => {
   const { context, page } = await setupPage();
   try {
+    await confirmAddress(page);
     await selectDate(page);
     for (const period of ['first', 'afternoon']) {
       await page.click(`[data-period="${period}"]`);
@@ -254,19 +254,7 @@ test('Morning and Afternoon selections keep the exact time picker in view', asyn
 test('confirming the address lands on the next question instead of dropping below it', async () => {
   const { context, page } = await setupPage({ viewport: { width: 390, height: 844 } });
   try {
-    await selectDate(page);
-    await page.click('[data-period="first"]');
-    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
-    await page.fill('#est-address', '100 S Baylen St');
-    await page.fill('#est-address-city', 'Pensacola');
-    await page.fill('#est-zip', '32502');
-    await page.click('[data-address-resolve]');
-    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
-    await page.locator('[data-address-confirm]').scrollIntoViewIfNeeded();
-    await page.locator('[data-address-confirm]').click();
-    await page.waitForFunction(
-      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
-    );
+    await confirmAddress(page);
     await delay(700);
     const position = await page.evaluate(() => {
       const calendar = document.querySelector('[data-booking-calendar]');
@@ -438,25 +426,18 @@ test('availability shows loading feedback, clears it, and offers a working retry
     },
   });
   try {
-    await selectDate(page);
-    await page.click('[data-period="first"]');
-    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
-    await page.fill('#est-address', '100 S Baylen St');
-    await page.fill('#est-address-city', 'Pensacola');
-    await page.fill('#est-zip', '32502');
+    await confirmAddress(page);
+    await page.fill('#est-date', BOOKING_DATE);
     await page.waitForSelector('[data-calendar-loading]', { state: 'visible' });
     assert.match((await page.textContent('[data-calendar-loading]')) ?? '', /Checking available appointments/);
     release();
     await page.waitForSelector('[data-calendar-loading]', { state: 'hidden' });
     assert.equal(await page.locator('[data-calendar-loading]').isVisible(), false);
 
-    await confirmAddress(page);
-    await page.waitForFunction(() => document.querySelector('[data-calendar-loading]')?.hasAttribute('hidden') === true);
-
+    attempt = 2;
     await page.fill('#est-date', OTHER_DATE);
     await page.waitForSelector('[data-calendar-times-retry]', { state: 'visible' });
     assert.match((await page.textContent('[data-calendar-status]')) ?? '', /could not load available times/i);
-    attempt = 3;
     await page.click('[data-calendar-times-retry]');
     await page.waitForFunction(
       () => document.querySelector('[data-calendar-loading]')?.hasAttribute('hidden') === true,
@@ -493,9 +474,8 @@ test('rapid date changes never let a stale availability response win', async () 
     },
   });
   try {
-    await selectDate(page);
-    await page.click('[data-period="first"]');
     await confirmAddress(page);
+    await page.fill('#est-date', BOOKING_DATE);
     await page.waitForFunction(() => document.querySelector('[data-calendar-loading]')?.hasAttribute('hidden') === false);
     await page.fill('#est-date', OTHER_DATE);
     await page.waitForFunction(() => document.querySelector('[data-calendar-loading]')?.hasAttribute('hidden') === true);
@@ -775,20 +755,8 @@ test('promo and gift certificate apply together with the gift shown first and th
 test('small Android viewport also anchors address confirmation to availability', async () => {
   const { context, page } = await setupPage({ viewport: { width: 360, height: 800 } });
   try {
-    await selectDate(page);
-    await page.click('[data-period="first"]');
-    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
-    await page.fill('#est-address', '100 S Baylen St');
-    await page.fill('#est-address-city', 'Pensacola');
-    await page.fill('#est-zip', '32502');
-    await page.click('[data-address-resolve]');
-    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
-    await page.locator('[data-address-confirm]').scrollIntoViewIfNeeded();
-    await page.locator('[data-address-confirm]').click();
-    await page.waitForFunction(
-      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
-    );
-    await delay(1500);
+    await confirmAddress(page);
+    await delay(900);
     const position = await page.evaluate(() => {
       const calendar = document.querySelector('[data-booking-calendar]');
       if (!calendar) return null;

@@ -922,7 +922,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       setStatus(
         autoConfirm
           ? 'Enter your street address, city and ZIP to continue.'
-          : 'Enter your street address first, then press Find My Address.',
+          : 'Enter your street address first, then press Find Address on Map.',
         'error',
       );
       streetField.focus();
@@ -1255,6 +1255,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       if (confirmedCard) confirmedCard.hidden = true;
       openManualSection();
       setStatus('Edit the address or pick a different suggestion.', 'info');
+      emit();
       return;
     }
     invalidateManual();
@@ -1262,6 +1263,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     setStatus('Edit the address or pick a different suggestion.', 'info');
     streetField.focus();
     streetField.select();
+    emit();
   }
 
   // ── Event wiring ──────────────────────────────────────────────────────────

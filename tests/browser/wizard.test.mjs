@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { completeStepOne, confirmAddressFirst, chooseAppointment } from '../helpers/estimator-step-one.mjs';
 import { checkEstimateTerms } from './terms-ready.mjs';
 
 const PORT = 4399;
@@ -48,10 +49,31 @@ after(async () => {
 
 async function mockApis(page) {
   await page.route('**/api/geocode', async (route) => {
+    const body = JSON.parse(route.request().postData() ?? '{}');
+    if (body.action === 'suggest') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, suggestions: [] }),
+      });
+      return;
+    }
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ ok: true, suggestions: [] }),
+      body: JSON.stringify({
+        ok: true,
+        result: {
+          label: '100 S Baylen St, Pensacola, FL 32502',
+          lat: 30.4111,
+          lng: -87.2164,
+          zip: String(body.query ?? '').match(/\b(\d{5})\b/)?.[1] ?? '32502',
+          city: 'Pensacola',
+          state: 'FL',
+          source: 'mapmap',
+          precise: true,
+        },
+      }),
     });
   });
   await page.route('**/api/travel', async (route) => {
@@ -103,15 +125,8 @@ async function selectBookingDate(page, date = BOOKING_DATE) {
 }
 
 async function fillStepOne(page, zip = '32503') {
-  await selectBookingDate(page);
-  await page.click('[data-period="first"]');
-  await page.locator('[data-address-card]').waitFor({ state: 'visible' });
-  await page.fill('#est-address', '100 S Baylen St');
-  await page.fill('#est-address-city', 'Pensacola');
-  await page.fill('#est-zip', zip);
+  await completeStepOne(page, { zip, date: BOOKING_DATE });
   await page.click('[data-next]');
-  // Address resolution is intentionally automatic; wait for the wizard to
-  // finish its background lookup and advance.
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
   );
@@ -220,7 +235,8 @@ for (const [name, width, height] of [
         true,
         'STR-only fields hidden for standard',
       );
-      assert.equal(await isVisible(page, '[data-address-finder]'), false, 'address waits for the appointment time');
+      assert.equal(await isVisible(page, '[data-address-finder]'), true, 'address is the first question');
+      assert.equal(await isVisible(page, '[data-schedule-section]'), false, 'scheduling waits for the verified address');
 
       await fillStepOne(page);
       assert.equal(await activeStep(page), 2);
@@ -278,30 +294,32 @@ test('completed steps can be revisited from the navigator without losing answers
 
 // ── Validation blocks advancement ────────────────────────────────────────────
 
-test('step 1 requires a preferred date and a complete address before advancing', async () => {
+﻿test('step 1 requires a verified address before a preferred date and time', async () => {
   const { context, page } = await openWizard(390, 900);
   try {
     await page.click('[data-next]');
-    assert.equal(await activeStep(page), 1, 'stayed without a date or address');
-    assert.match(
-      (await page.locator('[data-error-for="est-date"]').textContent()) ?? '',
-      /preferred date/i,
-    );
-
-    await selectBookingDate(page);
-    await page.click('[data-period="first"]');
-    await page.locator('[data-address-card]').waitFor({ state: 'visible' });
-    await page.click('[data-next]');
-    assert.equal(await activeStep(page), 1, 'stayed without a street address');
-    assert.equal(await page.locator('#est-address').getAttribute('aria-invalid'), 'true');
+    assert.equal(await activeStep(page), 1, 'stayed without an address');
     assert.match(
       (await page.locator('[data-error-for="est-address"]').textContent()) ?? '',
       /Please enter your street address/i,
     );
+    assert.equal(await page.locator('[data-schedule-section]').isVisible(), false, 'scheduling stays locked');
 
     await page.fill('#est-address', '100 S Baylen St');
     await page.fill('#est-address-city', 'Pensacola');
     await page.fill('#est-zip', '32503');
+    await page.click('[data-next]');
+    assert.equal(await activeStep(page), 1, 'stayed without confirming the map location');
+    assert.match(
+      (await page.locator('[data-error-for="est-address"]').textContent()) ?? '',
+      /Confirm your service address/i,
+    );
+
+    await confirmAddressFirst(page, { zip: '32503' });
+    await page.click('[data-next]');
+    assert.equal(await activeStep(page), 1, 'stayed without a date and time');
+
+    await chooseAppointment(page, BOOKING_DATE);
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -390,17 +408,25 @@ test('step transitions keep the questionnaire in a stable viewport across widths
     try {
       await fillStepOne(page);
       assert.equal(await activeStep(page), 2, `${width}px: Next advances`);
-      const top = await page.evaluate(
-        () =>
-          document.querySelector('.wizard__step[data-active="true"]')?.getBoundingClientRect().top ?? -999,
-      );
+      const top = await page.evaluate(() => {
+        const step = document.querySelector('.wizard__step[data-active="true"]');
+        const target =
+          step?.getAttribute('data-step') === '1'
+            ? step.querySelector('[data-address-card]')
+            : step;
+        return target?.getBoundingClientRect().top ?? -999;
+      });
       assert.ok(top >= -2 && top <= 220, `${width}px: active step visible after Next (top=${Math.round(top)})`);
       await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
       await page.click('[data-back]');
-      const backTop = await page.evaluate(
-        () =>
-          document.querySelector('.wizard__step[data-active="true"]')?.getBoundingClientRect().top ?? -999,
-      );
+      const backTop = await page.evaluate(() => {
+        const step = document.querySelector('.wizard__step[data-active="true"]');
+        const target =
+          step?.getAttribute('data-step') === '1'
+            ? step.querySelector('[data-address-card]')
+            : step;
+        return target?.getBoundingClientRect().top ?? -999;
+      });
       assert.ok(backTop >= -2 && backTop <= 220, `${width}px: active step visible after Back (top=${Math.round(backTop)})`);
     } finally {
       await context.close();
@@ -551,6 +577,7 @@ test('the preferred date is bounded to the configured advance-reservation window
 
     // A date beyond the window is rejected with a clear message.
     const beyond = new Date(Date.parse(bounds.max) + 86_400_000).toISOString().slice(0, 10);
+    await confirmAddressFirst(page);
     await page.$eval('#est-date', (input, value) => {
       input.value = value;
       input.dispatchEvent(new Event('input', { bubbles: true }));

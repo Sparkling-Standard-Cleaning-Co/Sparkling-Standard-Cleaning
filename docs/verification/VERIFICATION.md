@@ -1,5 +1,16 @@
 # Verification status
 
+## Address-first scheduling and scroll correction - 2026-11-17
+
+Application code **`PENDING_CODE_SHA`** is deployed in Cloudflare Pages production
+deployment `PENDING_DEPLOYMENT_ID`. The residential Step 1 now verifies the
+service address before the appointment calendar is revealed; changing the
+address re-locks scheduling and clears the invalidated appointment. Date and
+time selection scroll to the times/picker, selected time plus Continue stay in
+view, Continue lands on the next step heading, and Back returns to the Step 1
+address question. The five-second final reveal is unchanged. Full evidence:
+[`docs/verification/2026-11-17-ADDRESS-FIRST-SCHEDULING.md`](2026-11-17-ADDRESS-FIRST-SCHEDULING.md).
+
 ## Hayli age-reference removal - 2026-11-11
 
 Application code **`509feb8`** is deployed in Cloudflare Pages production

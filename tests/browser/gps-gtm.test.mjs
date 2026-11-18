@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { chooseAppointment } from '../helpers/estimator-step-one.mjs';
 import { checkEstimateTerms } from './terms-ready.mjs';
 
 const PORT = 4405;
@@ -108,6 +109,31 @@ async function mockApis(page, { reverseResult = null, resolveResult = MOLINO_RES
       }),
     }),
   );
+  await page.route('**/api/availability**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/availability-month')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, enabled: true, days: [] }) });
+      return;
+    }
+    const date = url.searchParams.get('date') ?? new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        enabled: true,
+        timeZone: 'America/Chicago',
+        timeZoneLabel: 'Central Time',
+        date,
+        durationMinutes: 120,
+        available: true,
+        slots: [
+          { start: date + 'T13:00:00.000Z', end: date + 'T15:00:00.000Z', startLabel: '7:00 AM', endLabel: '9:00 AM' },
+          { start: date + 'T18:30:00.000Z', end: date + 'T20:30:00.000Z', startLabel: '12:30 PM', endLabel: '2:30 PM' },
+        ],
+      }),
+    });
+  });
   await page.route('**/api/lead', (route) => {
     leadPayloads.push(route.request().postDataJSON());
     return route.fulfill({
@@ -142,16 +168,16 @@ async function confirmMapIfShown(page) {
   }
 }
 async function startAddressStep(page, date = BOOKING_DATE) {
-  await page.fill('#est-date', date);
-  await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-  await page.click('[data-period="first"]');
   await page.locator('[data-address-card]').waitFor({ state: 'visible' });
+  return date;
 }
 async function advanceAddressStep(page) {
   await page.click('[data-next]');
   await page.locator('[data-address-map]').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   if (await page.locator('[data-address-map]').isVisible()) {
     await confirmMapIfShown(page);
+    await page.locator('[data-schedule-section]').waitFor({ state: 'visible' });
+    await chooseAppointment(page, BOOKING_DATE);
     await page.click('[data-next]');
   }
 }
@@ -165,7 +191,8 @@ async function completeRemainingSteps(page) {
         ) + 1,
     );
   if ((await active()) === 1) {
-    await page.fill('#est-date', BOOKING_DATE);
+    await page.locator('[data-schedule-section]').waitFor({ state: 'visible' });
+    await chooseAppointment(page, BOOKING_DATE);
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -240,6 +267,8 @@ test('a street-level reverse result never invents a street address', async () =>
     assert.equal(await page.locator('[data-address-confirm]').count(), 1);
     await page.locator('[data-address-confirm]').click();
     await page.fill('#est-date', BOOKING_DATE);
+    await page.waitForSelector('[data-period="first"]:not([disabled])', { state: 'visible' });
+    await page.click('[data-period="first"]');
     await page.click('[data-next]');
     assert.equal(
       await page.locator('.wizard__step[data-active="true"][data-step="2"]').count(),
@@ -253,12 +282,12 @@ test('a street-level reverse result never invents a street address', async () =>
 
 // ── Manual section is closed by default ──────────────────────────────────────
 
-test('the manual address fields reveal after time selection and preserve answers', async () => {
+test('manual address entry is the first question and preserves answers', async () => {
   const { context, page } = await openEstimate({});
   try {
-    assert.equal(await page.locator('[data-address-card]').isVisible(), false, 'address waits for time');
-    await startAddressStep(page);
-    assert.equal(await page.locator('#est-address').isVisible(), true, 'manual fields reveal after time');
+    assert.equal(await page.locator('[data-address-card]').isVisible(), true, 'address is visible first');
+    assert.equal(await page.locator('[data-schedule-section]').isVisible(), false, 'scheduling waits for the address');
+    assert.equal(await page.locator('#est-address').isVisible(), true, 'manual street is available');
     assert.equal(await page.locator('#est-address-city').isVisible(), false, 'city waits for a street');
     const placeholder = await page.locator('#est-address').getAttribute('placeholder');
     assert.match(placeholder ?? '', /123 Super Clean Way/, 'fictional example placeholder');
@@ -274,13 +303,13 @@ test('the manual address fields reveal after time selection and preserve answers
     await page.waitForFunction(
       () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
     );
+    await page.locator('[data-schedule-section]').waitFor({ state: 'visible' });
+    await chooseAppointment(page, BOOKING_DATE);
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
     );
-    await page.click('[data-back]');
-    assert.equal(await page.inputValue('#est-address'), '100 S Baylen St', 'answers preserved');
-    assert.ok((await page.inputValue('#est-address-city')).length > 0, 'city remains populated');
+    assert.equal(await page.locator('.wizard__step[data-active="true"][data-step="2"]').count(), 1);
   } finally {
     await context.close();
   }
@@ -423,9 +452,9 @@ test('missing required fields show an error summary, field errors and focus', as
     await page.click('[data-next]');
     await page.waitForSelector('[data-error-summary]', { state: 'visible' });
     const summary = (await page.locator('[data-error-summary-list]').textContent()) ?? '';
-    assert.match(summary, /preferred date/i);
-    assert.match(summary, /preferred appointment time/i);
-    assert.doesNotMatch(summary, /street address/i, 'street waits for the time selection');
+    assert.match(summary, /street address/i);
+    assert.doesNotMatch(summary, /preferred date/i, 'date waits for the verified address');
+    assert.equal(await page.locator('[data-schedule-section]').isVisible(), false, 'scheduling stays locked');
 
     await startAddressStep(page);
     await page.click('[data-next]');
@@ -449,6 +478,9 @@ test('missing required fields show an error summary, field errors and focus', as
     await page.waitForFunction(
       () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
     );
+    await page.click('[data-next]');
+    assert.equal(await page.locator('.wizard__step[data-active="true"][data-step="1"]').count(), 1, 'date/time still required');
+    await chooseAppointment(page, BOOKING_DATE);
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -482,32 +514,25 @@ test('a GPS pin without a reverse-geocoded address confirms and advances', async
 
 // ── 8) Unresolvable manual address still allows a preliminary request ────────
 
-test('an unresolved manual address can still be submitted for confirmation', async () => {
+test('an unresolved manual address cannot reach scheduling', async () => {
   const { context, page, leadPayloads } = await openEstimate({ mockOptions: { resolveResult: null } });
   try {
     await startAddressStep(page);
     await page.fill('#est-address', '777 Nowhere Road');
     await page.fill('#est-address-city', 'Molino');
     await page.fill('#est-zip', '32577');
-    await page.fill('#est-date', BOOKING_DATE);
     await page.click('[data-next]');
-    await page.waitForFunction(
-      () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
+    assert.equal(
+      await page.locator('.wizard__step[data-active="true"][data-step="1"]').count(),
+      1,
+      'the customer remains on Step 1',
     );
-    await completeRemainingSteps(page);
-    await page.waitForSelector('[data-reservation-summary]', { state: 'visible' });
-    assert.match((await page.locator('[data-reservation-price]').textContent()) ?? '', /^\$\d+/);
-    await page.click('[data-submit]');
-    await page.waitForTimeout(150);
-    if (await page.locator('[data-photo-gate]').isVisible()) await page.click('[data-photo-pay-later]');
-    await page.waitForFunction(() => document.querySelector('[data-form-status]')?.dataset.state === 'warning');
-    await delay(150);
-    const fields = leadPayloads[0].fields;
-    assert.equal(fields.address_method, 'manual');
-    assert.equal(fields.address_confirmed, 'no');
-    assert.equal(fields.service_address, '777 Nowhere Road');
-    assert.equal(fields.zip, '32577');
-    assert.equal(fields.pin_latitude, undefined);
+    assert.equal(await page.locator('[data-schedule-section]').isVisible(), false, 'scheduling never unlocks');
+    assert.match(
+      (await page.locator('[data-error-for="est-address"]').textContent()) ?? '',
+      /Confirm your service address/i,
+    );
+    assert.equal(leadPayloads.length, 0, 'no request is submitted');
   } finally {
     await context.close();
   }

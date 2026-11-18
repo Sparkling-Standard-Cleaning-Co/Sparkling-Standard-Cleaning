@@ -93,15 +93,15 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
         <ul class="estimate-flags" data-estimate-flags></ul>
       </div>
 
-      <!-- Step 1 — When & Where: premium calendar first, address below -->
+      <!-- Step 1 - When & Where: service address first, scheduling after verification -->
       <section class="wizard__step" data-step="1" data-active="true" aria-label={stepTitle(0)}>
         <h2 class="wizard__step-heading" data-step-title={0}>{stepTitle(0)}</h2>
-        <p class="wizard__step-lead">Let&rsquo;s find the perfect time for your cleaning.</p>
+        <p class="wizard__step-lead">First, where should we clean?</p>
         <p class="wizard__step-copy">
-          Choose your preferred date and time, then tell us where to clean.
+          Confirm your service address to see available appointment dates and times.
         </p>
 
-        <div class="address-card" data-address-finder data-address-card data-state="idle" data-method="manual" hidden>
+        <div class="address-card" data-address-finder data-address-card data-state="idle" data-method="manual">
           <div class="address-card__head">
             <h3 class="address-card__title">Where should we clean?</h3>
             <p class="address-card__copy">
@@ -202,7 +202,9 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
             </div>
 
             <div class="address-finder__actions">
-              <button type="button" data-address-resolve aria-hidden="true" tabindex="-1" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">Resolve address</button>
+              <button type="button" class="btn btn--secondary btn--small" data-address-resolve>
+                Find Address on Map
+              </button>
             </div>
             <p class="hint address-finder__status" data-address-status data-kind="" aria-live="polite"></p>
             </div>
@@ -237,11 +239,13 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </div>
         </div>
 
-        <div class="booking-calendar__availability-gate" data-calendar-gate hidden>
+        <div class="booking-calendar__availability-gate" data-calendar-gate>
           <p class="booking-calendar__gate-title">Enter your cleaning address to see available dates and times.</p>
           <p class="booking-calendar__gate-copy small">Availability is checked against the live cleaning calendar and travel time.</p>
         </div>
-        <BookingCalendar id="residential-calendar" />
+        <div class="scheduling-section" data-schedule-section hidden>
+          <BookingCalendar id="residential-calendar" />
+        </div>
       </section>
 
       <!-- Step 2 — Service & Home -->

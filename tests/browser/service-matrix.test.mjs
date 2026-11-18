@@ -123,9 +123,6 @@ async function openEstimate(width, height, path = '/estimate/residential/') {
 
 async function addressAndHome(page, { service = 'standard', beds } = {}) {
   const bookingDate = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-  await page.fill('#est-date', bookingDate);
-  await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-  await page.click('[data-period="first"]');
   await page.locator('[data-address-card]').waitFor({ state: 'visible' });
   await page.fill('#est-address', '100 S Baylen');
   await page.waitForSelector('#est-address-suggestions li', { state: 'visible' });
@@ -137,6 +134,10 @@ async function addressAndHome(page, { service = 'standard', beds } = {}) {
   await page.waitForFunction(
     () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
   );
+  await page.locator('[data-schedule-section]').waitFor({ state: 'visible' });
+  await page.fill('#est-date', bookingDate);
+  await page.waitForSelector('[data-period="first"]:not([disabled])', { state: 'visible' });
+  await page.click('[data-period="first"]');
   await page.click('[data-next]');
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',

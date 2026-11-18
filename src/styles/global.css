@@ -7274,13 +7274,15 @@ fieldset.input--invalid {
   .booking-calendar { margin-bottom: 5.5rem; }
 }
 
-/* Calendar-first Step 1 ordering */
+/* Address-first Step 1 ordering */
 .wizard__step[data-active="true"][data-step="1"] { display: flex; flex-direction: column; }
 .wizard__step[data-step="1"] > h2,
 .wizard__step[data-step="1"] > h3,
 .wizard__step[data-step="1"] > p { order: 0; }
-.wizard__step[data-step="1"] > .booking-calendar { order: 1; }
-.wizard__step[data-step="1"] > .address-card { order: 2; }
+.wizard__step[data-step="1"] > .address-card { order: 1; }
+.wizard__step[data-step="1"] > .booking-calendar__availability-gate { order: 2; }
+.wizard__step[data-step="1"] > [data-schedule-section] { order: 3; }
+.scheduling-section { margin-top: var(--space-4); }
 
 @media (max-width: 480px) {
   .wizard__nav [data-back],

@@ -145,8 +145,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const liveFlags = form.querySelector<HTMLElement>('[data-estimate-flags]');
   const status = form.querySelector<HTMLElement>('[data-form-status]');
   const addressCardEl = form.querySelector<HTMLElement>('[data-address-card]');
-  let addressCardRevealed = false;
   const calendarGateEl = form.querySelector<HTMLElement>('[data-calendar-gate]');
+  const scheduleSectionEl = form.querySelector<HTMLElement>('[data-schedule-section]');
   let calendarRootEl: HTMLElement | null = null;
   const addressDetailsEl = form.querySelector<HTMLElement>('[data-address-details]');
   const streetInputEl = form.querySelector<HTMLInputElement>('#est-address');
@@ -172,18 +172,55 @@ function initEstimateWizard(form: HTMLFormElement): void {
     requestAnimationFrame(() => scrollToTopOf(element));
   }
 
-  function revealAddressCard(): void {
-    if (!addressCardEl || addressCardRevealed) return;
-    addressCardEl.hidden = false;
-    addressCardRevealed = true;
-  }
-
   function revealAddressDetails(scroll: boolean): void {
     if (!addressDetailsEl || addressDetailsRevealed) return;
     if ((streetInputEl?.value.trim().length ?? 0) < 5) return;
     addressDetailsEl.hidden = false;
     addressDetailsRevealed = true;
     if (scroll) smoothReveal(addressDetailsEl);
+  }
+
+  function setSchedulingLocked(locked: boolean): void {
+    if (scheduleSectionEl) scheduleSectionEl.hidden = locked;
+    if (calendarGateEl) calendarGateEl.hidden = !locked;
+    calendarRootEl?.classList.toggle('is-awaiting-address', locked);
+    if (locked) bookingCalendar?.reset();
+  }
+
+  function revealScheduling(): void {
+    if (scheduleSectionEl) scheduleSectionEl.hidden = false;
+    if (calendarGateEl) calendarGateEl.hidden = true;
+    calendarRootEl?.classList.remove('is-awaiting-address');
+    const street = form.querySelector<HTMLElement>('#est-address');
+    const confirm = form.querySelector<HTMLElement>('[data-address-confirm]');
+    if (street) clearFieldError(street);
+    if (confirm) clearFieldError(confirm);
+  }
+
+  function revealTimeAndContinue(): void {
+    const label = form.querySelector<HTMLElement>('[data-calendar-selected-label]');
+    const next = form.querySelector<HTMLElement>('[data-next]');
+    if (!label || !next) return;
+    const header = document.querySelector<HTMLElement>('.site-header, header');
+    const offset = (header?.getBoundingClientRect().height ?? 72) + 16;
+    const bottomLimit = window.innerHeight - 16;
+    const labelRect = label.getBoundingClientRect();
+    const nextRect = next.getBoundingClientRect();
+    const labelVisible = labelRect.top >= offset && labelRect.bottom <= bottomLimit;
+    const nextVisible = nextRect.top >= offset && nextRect.bottom <= bottomLimit;
+    if (labelVisible && nextVisible) return;
+    const scrollTop = window.scrollY;
+    const labelTopTarget = labelRect.top + scrollTop - offset;
+    const nextBottomTarget = nextRect.bottom + scrollTop - bottomLimit;
+    const target = labelVisible
+      ? Math.min(Math.max(scrollTop, nextBottomTarget), labelTopTarget)
+      : Math.max(0, labelTopTarget);
+    if (Math.abs(target - scrollTop) <= 2) return;
+    scrollIntent += 1;
+    window.scrollTo({
+      top: target,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
   }
 
 
@@ -1371,11 +1408,18 @@ function initEstimateWizard(form: HTMLFormElement): void {
     recalc();
     if (!changed) return;
 
-    // Accessible focus management without scrolling the document.
+    // Accessible focus management without scrolling the document. On Step 1
+    // the relevant question is the service address, not the decorative step
+    // heading.
     const heading = steps[currentStep - 1]?.querySelector<HTMLElement>('.wizard__step-heading');
-    if (heading) {
-      heading.tabIndex = -1;
-      heading.focus({ preventScroll: true });
+    const stepOneHeading =
+      currentStep === 1
+        ? addressCardEl?.querySelector<HTMLElement>('.address-card__title') ?? addressCardEl
+        : null;
+    const focusTarget = stepOneHeading ?? heading;
+    if (focusTarget) {
+      focusTarget.tabIndex = -1;
+      focusTarget.focus({ preventScroll: true });
     }
 
     // One scroll controller for every transition. The initial page load is
@@ -1394,7 +1438,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
       currentStep === steps.length && estimateReveal && !estimateReveal.hidden
         ? estimateRevealStage ?? estimateReveal
         : null;
-    const scrollTarget = revealTarget ?? heading ?? steps[currentStep - 1] ?? form;
+    const stepOneTarget = currentStep === 1 ? addressCardEl ?? stepOneHeading : null;
+    const scrollTarget = revealTarget ?? stepOneTarget ?? heading ?? steps[currentStep - 1] ?? form;
     scrollToTopOf(scrollTarget, 'instant');
     const settledIntent = scrollIntent;
     requestAnimationFrame(() => {
@@ -1653,7 +1698,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
     }
 
-    if (step === 1) {
+    const locationReady = step !== 1 || submissionAddress().location !== null;
+
+    if (step === 1 && locationReady) {
       const calendar = form.querySelector<HTMLElement>('[data-booking-calendar]');
       const dateField = form.querySelector<HTMLInputElement>('#est-date');
       const preferredDate = textValue('preferredDate') ?? '';
@@ -1676,7 +1723,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
     }
 
-    if (step === 1) {
+    if (step === 1 && locationReady) {
       const booking = form.querySelector<HTMLElement>('[data-booking-calendar]');
       const selection = bookingCalendar?.selection();
       if (!selection?.timeLabel) {
@@ -1724,6 +1771,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
           if (gpsButton) {
             setFieldError(gpsButton, message);
             errors.push({ field: gpsButton, message });
+          }
+        } else {
+          const street = form.querySelector<HTMLElement>('#est-address');
+          if (street && submission.street.trim().length >= 5) {
+            const addressMessage =
+              'Confirm your service address on the map before choosing an appointment.';
+            setFieldError(street, addressMessage);
+            errors.push({ field: street, message: addressMessage });
           }
         }
       }
@@ -1920,6 +1975,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const previousKey = location ? locationKey(location.lat, location.lng) : null;
       location = next;
       const nextKey = next ? locationKey(next.lat, next.lng) : null;
+      const destinationChanged = previousKey !== nextKey;
+      if (destinationChanged) {
+        bookingCalendar?.reset();
+        if (!next) setSchedulingLocked(true);
+      }
       recalc();
       // Any address edit invalidates the previous route. Re-run the lookup
       // even when the coordinates are unchanged: a corrected ZIP or a
@@ -1940,15 +2000,17 @@ function initEstimateWizard(form: HTMLFormElement): void {
       });
     },
     onConfirm: () => {
+      revealScheduling();
       if (!addressVerificationPending) {
-        // The address form collapses on confirmation. Re-anchor to the next
-        // question (availability) after the layout settles so scroll anchoring
-        // cannot leave the customer below the content they need.
+        // The address form collapses on confirmation. Re-anchor directly to
+        // the scheduling heading so the customer lands on the next question,
+        // never top-of-page or below the calendar.
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            const calendar = form.querySelector<HTMLElement>('[data-booking-calendar]');
-            const confirmed = form.querySelector<HTMLElement>('[data-address-confirmed]:not([hidden])');
-            const target = calendar ?? confirmed;
+            const target =
+              calendarRootEl?.querySelector<HTMLElement>('.booking-calendar__intro') ??
+              calendarRootEl ??
+              form.querySelector<HTMLElement>('[data-address-confirmed]:not([hidden])');
             if (target) scrollToTopOf(target, 'smooth');
           });
         });
@@ -1974,17 +2036,35 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const calendarRoot = form.querySelector<HTMLElement>('[data-booking-calendar]');
   if (calendarRoot) {
     calendarRootEl = calendarRoot;
-    const calendar = initBookingCalendar(calendarRoot, () => {
-      if (bookingCalendar?.selection()?.timeLabel) revealAddressCard();
-      bookingFinalizedKey = '';
-      bookingFinalizeNote = '';
-      updateAppointmentSummary();
-      const alternatives = form.querySelector<HTMLElement>('[data-booking-alternatives]');
-      if (alternatives) {
-        alternatives.hidden = true;
-        alternatives.innerHTML = '';
-      }
-    });
+    const calendar = initBookingCalendar(
+      calendarRoot,
+      () => {
+        const selected = bookingCalendar?.selection();
+        bookingFinalizedKey = '';
+        bookingFinalizeNote = '';
+        updateAppointmentSummary();
+        const alternatives = form.querySelector<HTMLElement>('[data-booking-alternatives]');
+        if (alternatives) {
+          alternatives.hidden = true;
+          alternatives.innerHTML = '';
+        }
+        if (selected?.timeLabel) {
+          const intent = scrollIntent;
+          requestAnimationFrame(() => {
+            if (scrollIntent !== intent) return;
+            revealTimeAndContinue();
+          });
+        }
+      },
+      {
+        onDateSelected: (target) => {
+          scrollToTopOf(target, 'smooth');
+        },
+        onTimesRevealed: (target) => {
+          scrollToTopOf(target, 'smooth');
+        },
+      },
+    );
     bookingCalendar = calendar;
     if (calendar) {
       const bookingContext = submissionAddress();
@@ -1995,6 +2075,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         ...(bookingContext.zip ? { zip: bookingContext.zip } : {}),
       });
     }
+    setSchedulingLocked(!submissionAddress().location);
   }
   verifyAddressButton?.addEventListener('click', async () => {
     addressVerificationPending = true;
@@ -2044,11 +2125,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
     form.reset();
     addressFinder?.reset();
     bookingCalendar?.reset();
-    if (addressCardEl) addressCardEl.hidden = true;
-    addressCardRevealed = false;
+    if (addressCardEl) addressCardEl.hidden = false;
     if (addressDetailsEl) addressDetailsEl.hidden = true;
-    if (calendarGateEl) calendarGateEl.hidden = true;
-    calendarRootEl?.classList.remove('is-awaiting-address');
+    setSchedulingLocked(true);
     syncRevealGroups(false);
     addressDetailsRevealed = false;
     bookingFinalizedKey = '';

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { chooseAppointment } from '../helpers/estimator-step-one.mjs';
 
 const PORT = 4404;
 const BASE = `http://localhost:${PORT}`;
@@ -100,9 +101,6 @@ async function openEstimate(page) {
 }
 
 async function startAddressStep(page) {
-  await page.fill('#est-date', BOOKING_DATE);
-  await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-  await page.click('[data-period="first"]');
   await page.locator('[data-address-card]').waitFor({ state: 'visible' });
 }
 const addressFilled = async (page) => page.locator('[data-address-finder]').getAttribute('data-state');
@@ -145,6 +143,8 @@ test('a typed address opens the map and advances only after confirmation', async
     await page.click('[data-address-resolve]');
     await page.locator('[data-address-map]').waitFor({ state: 'visible' });
     await page.locator('[data-address-confirm]').click();
+    await page.locator('[data-schedule-section]').waitFor({ state: 'visible' });
+    await chooseAppointment(page, BOOKING_DATE);
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -160,11 +160,32 @@ test('a failed exact lookup keeps the typed address and uses the ZIP fallback', 
   const page = await context.newPage();
   try {
     await openEstimate(page);
-    await openWithMocks(page, { suggestions: [] });
+    await openWithMocks(page, {
+      suggestions: [],
+      resolve: {
+        label: 'Milton area (ZIP 32570)',
+        lat: 30.6324,
+        lng: -87.0397,
+        zip: '32570',
+        city: 'Milton',
+        state: 'FL',
+        source: 'census',
+        precise: false,
+        approximate: true,
+      },
+    });
     await startAddressStep(page);
     await page.fill('#est-address', '777 Nowhere Road');
     await page.fill('#est-address-city', 'Milton');
     await page.fill('#est-zip', '32570');
+    await page.click('[data-address-resolve]');
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.locator('[data-address-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
+    );
+    await page.locator('[data-schedule-section]').waitFor({ state: 'visible' });
+    await chooseAppointment(page, BOOKING_DATE);
     await page.click('[data-next]');
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',

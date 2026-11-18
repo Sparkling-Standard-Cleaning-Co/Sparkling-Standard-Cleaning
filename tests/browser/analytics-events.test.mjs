@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { completeStepOne } from '../helpers/estimator-step-one.mjs';
 
 const PORT = 4408;
 const BASE = `http://localhost:${PORT}`;
@@ -136,8 +137,7 @@ async function openEstimate(page) {
   await page.goto(BASE + '/estimate/residential/', { waitUntil: 'load' });
   await acceptAnalytics(page);
   await page.addStyleTag({ content: '.mobile-action-bar,.consent-banner,.promo-popup{display:none!important}' });
-  // The first real interaction starts the funnel (the preferred date).
-  await page.fill('#est-date', BOOKING_DATE);
+  // The first real interaction starts the funnel (the service address).
 }
 
 async function submitThroughPhotoGate(page) {
@@ -148,19 +148,7 @@ async function submitThroughPhotoGate(page) {
   }
 }
 async function fillAddressAndDetails(page) {
-  await page.fill('#est-date', BOOKING_DATE);
-  await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-  await page.click('[data-period="first"]');
-  await page.locator('[data-address-card]').waitFor({ state: 'visible' });
-  await page.fill('#est-address', '100 S Baylen St');
-  await page.fill('#est-address-city', 'Pensacola');
-  await page.fill('#est-zip', '32502');
-  await page.click('[data-address-resolve]');
-  await page.locator('[data-address-map]').waitFor({ state: 'visible' });
-  await page.locator('[data-address-confirm]').click();
-  await page.waitForFunction(
-    () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
-  );
+  await completeStepOne(page, { date: BOOKING_DATE });
   await page.click('[data-next]'); // when & where -> service & home
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
@@ -258,9 +246,8 @@ test('the estimator emits start, step and complete events, and a delivered reque
   const { leadPayloads } = await mockApis(page);
   try {
     await openEstimate(page);
-    await page.waitForFunction(() => (window.dataLayer ?? []).some((entry) => entry?.event === 'estimate_start'));
-
     await fillAddressAndDetails(page);
+    await page.waitForFunction(() => (window.dataLayer ?? []).some((entry) => entry?.event === 'estimate_start'));
     await page.waitForFunction(() => (window.dataLayer ?? []).some((entry) => entry?.event === 'estimate_complete'));
 
     const started = await eventPayload(page, 'estimate_start');
