@@ -993,21 +993,29 @@ test('checkout accepts a confirmed property pin for structural payment eligibili
 
 ﻿async function activeCheckoutPromotion(
   db: TestD1,
-  input: { code: string; name: string; valueCents: number; minPurchaseCents?: number },
+  input: {
+    code: string;
+    name: string;
+    valueCents: number;
+    percent?: number;
+    kind?: 'fixed' | 'percent';
+    supportiveStackable?: boolean;
+    minPurchaseCents?: number;
+  },
 ): Promise<void> {
   db.raw
     .prepare(
       `INSERT INTO promotions
         (id, name, code, kind, value_cents, percent, services_json, branches_json,
          min_purchase_cents, max_discount_cents, starts_at, expires_at, max_redemptions,
-         per_customer_limit, first_visit_only, combinable, status, scope)
-       VALUES (?, ?, ?, 'fixed', ?, 0, '["standard"]', '["branch_pensacola"]', ?, ?, '2026-01-01T00:00:00Z',
-               '2027-12-31T23:59:59Z', 100, 1, 1, 0, 'active', 'cleaning')
+         per_customer_limit, first_visit_only, combinable, status, scope, supportive_stackable)
+       VALUES (?, ?, ?, ?, ?, ?, '["standard"]', '["branch_pensacola"]', ?, ?, '2026-01-01T00:00:00Z',
+               '2027-12-31T23:59:59Z', 100, 1, 1, 0, 'active', 'cleaning', ?)
        ON CONFLICT(code) DO UPDATE SET
          name = excluded.name,
-         kind = 'fixed',
+         kind = excluded.kind,
          value_cents = excluded.value_cents,
-         percent = 0,
+         percent = excluded.percent,
          services_json = excluded.services_json,
          branches_json = excluded.branches_json,
          min_purchase_cents = excluded.min_purchase_cents,
@@ -1018,6 +1026,7 @@ test('checkout accepts a confirmed property pin for structural payment eligibili
          per_customer_limit = 1,
          first_visit_only = 1,
          combinable = 0,
+         supportive_stackable = excluded.supportive_stackable,
          status = 'active',
          scope = 'cleaning'`,
     )
@@ -1025,19 +1034,23 @@ test('checkout accepts a confirmed property pin for structural payment eligibili
       `promo_${input.code.toLowerCase()}`,
       input.name,
       input.code,
+      input.kind ?? 'fixed',
       input.valueCents,
+      input.percent ?? 0,
       input.minPurchaseCents ?? 0,
       input.valueCents,
+      input.supportiveStackable ? 1 : 0,
     );
 }
 
-test('the larger submitted promotion replaces a smaller automatic discount without stacking', async () => {
+test('an explicitly compatible promotion stacks with Community Support', async () => {
   const ledger = new FakeLedger();
   const db = checkoutDb();
   await activeCheckoutPromotion(db, {
     code: 'THANKS75',
     name: 'Thanksgiving Deep Clean Special',
     valueCents: 7500,
+    supportiveStackable: true,
     minPurchaseCents: 20000,
   });
   const env = { ...makeEnv(ledger), DB: db };
@@ -1070,9 +1083,54 @@ test('the larger submitted promotion replaces a smaller automatic discount witho
   );
 
   assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
-  assert.equal(unitAmount, String(Math.round(amount * 100) + automaticCents - 7500));
+  assert.equal(unitAmount, String(Math.round(amount * 100) - 7500));
   assert.equal(promotionCode, 'THANKS75');
   assert.equal(receiptDiscount, '7500');
+});
+
+test('FRIENDS15 never stacks with Community Support and replaces it only when larger', async () => {
+  const ledger = new FakeLedger();
+  const db = checkoutDb();
+  await activeCheckoutPromotion(db, {
+    code: 'FRIENDS15',
+    name: 'Friends',
+    valueCents: 0,
+    percent: 15,
+    kind: 'percent',
+    supportiveStackable: false,
+  });
+  const env = { ...makeEnv(ledger), DB: db };
+  const provider = providerStub();
+  const { amount, result, fields: baseFields } = validResidentialInput('standard', { supportive: true });
+  const fields = withHold(baseFields, ledger);
+  const automaticCents = Math.round((result.pricing.discount?.amount ?? 0) * 100);
+  const promotionBaseCents = Math.round(amount * 100) + automaticCents;
+  const expectedDiscount = Math.round((promotionBaseCents * 15) / 100);
+  let unitAmount = '';
+  let promotionCode = '';
+
+  const response = await withFetch(
+    async (url, init) => {
+      if (String(url).includes('/v1/checkout/sessions') && !String(url).includes('/v1/checkout/sessions/')) {
+        const body = init?.body as URLSearchParams;
+        unitAmount = body.get('line_items[0][price_data][unit_amount]') ?? '';
+        promotionCode = body.get('metadata[promotion_code]') ?? '';
+      }
+      return provider.stub(url, init);
+    },
+    () =>
+      onRequestPost({
+        request: jsonRequest({
+          fields: { ...fields, promotion_code: 'FRIENDS15' },
+          returnPath: '/estimate/residential/',
+        }),
+        env,
+      } as never),
+  );
+
+  assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
+  assert.equal(promotionCode, 'FRIENDS15');
+  assert.equal(unitAmount, String(promotionBaseCents - expectedDiscount));
 });
 
 test('a valid but smaller submitted promotion never removes the better automatic discount', async () => {
@@ -1119,6 +1177,7 @@ test('a promotion is applied before gift-certificate value at checkout', async (
     code: 'THANKS75',
     name: 'Thanksgiving Deep Clean Special',
     valueCents: 7500,
+    supportiveStackable: true,
     minPurchaseCents: 20000,
   });
   await activeGift(ledger, 10_000);
@@ -1157,5 +1216,5 @@ test('a promotion is applied before gift-certificate value at checkout', async (
 
   assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
   assert.equal(giftApplied, '10000');
-  assert.equal(unitAmount, String(Math.round(amount * 100) + automaticCents - 7500 - 10_000));
+  assert.equal(unitAmount, String(Math.round(amount * 100) - 7500 - 10_000));
 });

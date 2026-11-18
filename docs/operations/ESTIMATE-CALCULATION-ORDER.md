@@ -40,16 +40,21 @@ recalculation, the owner notification and the customer receipt.
 1. The quote's automatic discount (campaign, eligibility, bundle or other single offer) is kept
    separately from any code entered at checkout.
 2. The submitted database promotion and the automatic discount are evaluated independently against
-   the same pre-discount cleaning subtotal. Only the larger valid non-stackable offer is applied.
-   A valid but smaller submitted code is ignored and never removes the better offer.
-3. The winning promotion reduces the cleaning subtotal; applicable tax is calculated on that
+   the same pre-discount cleaning subtotal. The default is one valid non-stackable offer: a valid
+   but smaller submitted code is ignored and never removes the better offer.
+3. **Owner-controlled Community Support exception:** a promotion explicitly marked
+   "May stack with Community Support" (currently THANKS75) may coexist with the 10% Community
+   Support eligibility discount. Both apply to the pre-discount eligible cleaning subtotal, with
+   each offer's own minimum, cap, service, branch, date and redemption rules enforced. FRIENDS15 is
+   not compatible and the larger eligible benefit wins instead.
+4. The winning promotion(s) reduce the cleaning subtotal; applicable tax is calculated on that
    amount.
-4. Stored gift value is applied after promotion and tax as payment tender, capped at the amount
+5. Stored gift value is applied after promotion and tax as payment tender, capped at the amount
    payable and the certificate's available balance. It never reduces the certificate face value and
    is never recorded as promotional revenue reduction.
-5. The customer sees the gift line first and the promotion line second for clarity, but the
+6. The customer sees the gift line first and the promotion line second for clarity, but the
    customer-facing order does not change the financial order above.
-6. A fully gift-covered amount completes without a card charge; the gift ledger reservation is
+7. A fully gift-covered amount completes without a card charge; the gift ledger reservation is
    committed exactly once. A card remainder is committed only by the verified paid webhook.
 
 ## Commercial and church

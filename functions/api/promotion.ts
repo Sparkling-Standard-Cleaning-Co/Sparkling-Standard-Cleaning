@@ -36,6 +36,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     ok: true,
     code: result.promotion?.code,
     name: result.promotion?.name,
+    supportiveStackable: result.promotion?.supportiveStackable === true,
     discountCents: result.discountCents,
   });
 }

@@ -586,6 +586,106 @@ test('a valid promo updates the itemized total, highlights the saving and scroll
     const totalRow = await page.locator('[data-price-breakdown] li').last().boundingBox();
     assert.ok(totalRow && totalRow.y < 844, 'the updated final total is visible');
     assert.ok(totalRow && totalRow.y + totalRow.height > 0, 'the updated final total is not above the viewport');
+    assert.equal(await page.locator('[data-discount-applied]').isVisible(), true, 'the applied promo is named');
+    assert.match((await page.locator('[data-discount-applied]').innerText()).replace(/\s+/g, ' '), /THANKS75/);
+    await page.click('[data-promo-remove]');
+    await page.waitForFunction(
+      () => document.querySelector('[data-discount-status]')?.textContent?.includes('removed'),
+    );
+    assert.equal(await page.inputValue('#est-promo-code'), '', 'the code is cleared');
+    assert.equal(await page.locator('[data-discount-applied]').isVisible(), false);
+    const restored = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    assert.equal(restored, before, 'removing the code restores the prior total');
+    const afterRemoval = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+    assert.doesNotMatch(afterRemoval, /THANKS75 promotion applied/);
+  } finally {
+    await context.close();
+  }
+});
+
+test('Community Support and an explicitly compatible promo stack with separate itemized lines', async () => {
+  const { context, page } = await setupPage({ reducedMotion: 'reduce' });
+  try {
+    await completeToFinalStep(page);
+    await page.locator('[data-reservation-summary]').waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-estimate-reveal]')?.hasAttribute('hidden') === true,
+    );
+    await page.waitForFunction(() =>
+      (document.querySelector('[data-reservation-price]')?.innerText ?? '').trim().length > 0,
+    );
+    await page.check('[data-supportive-eligible]');
+    await page.waitForFunction(() =>
+      /Community Support discount/i.test(document.querySelector('[data-price-breakdown]')?.textContent ?? ''),
+    );
+    const communityTotal = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    await page.route('**/api/promotion', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          code: 'THANKS75',
+          name: 'Thanksgiving Deep Clean Special',
+          discountCents: 7500,
+          supportiveStackable: true,
+        }),
+      });
+    });
+    await page.fill('#est-promo-code', 'THANKS75');
+    await applyDiscounts(page);
+    await page.waitForFunction(
+      () => document.querySelector('[data-discount-status]')?.textContent?.includes('THANKS75'),
+    );
+    const breakdown = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+    assert.match(breakdown, /Community Support discount/i);
+    assert.match(breakdown, /THANKS75 promotion applied/);
+    const total = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    assert.equal(total, communityTotal - 75, 'both authorized reductions apply');
+  } finally {
+    await context.close();
+  }
+});
+
+test('FRIENDS15 never stacks with Community Support', async () => {
+  const { context, page } = await setupPage({ reducedMotion: 'reduce' });
+  try {
+    await completeToFinalStep(page);
+    await page.locator('[data-reservation-summary]').waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      () => document.querySelector('[data-estimate-reveal]')?.hasAttribute('hidden') === true,
+    );
+    await page.waitForFunction(() =>
+      (document.querySelector('[data-reservation-price]')?.innerText ?? '').trim().length > 0,
+    );
+    await page.check('[data-supportive-eligible]');
+    await page.waitForFunction(() =>
+      /Community Support discount/i.test(document.querySelector('[data-price-breakdown]')?.textContent ?? ''),
+    );
+    const communityTotal = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    await page.route('**/api/promotion', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          code: 'FRIENDS15',
+          name: 'Friends',
+          discountCents: 5000,
+          supportiveStackable: false,
+        }),
+      });
+    });
+    await page.fill('#est-promo-code', 'FRIENDS15');
+    await applyDiscounts(page);
+    await page.waitForFunction(
+      () => document.querySelector('[data-discount-status]')?.textContent?.includes('FRIENDS15'),
+    );
+    const breakdown = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+    assert.match(breakdown, /FRIENDS15 promotion applied/);
+    assert.doesNotMatch(breakdown, /Community Support discount/i);
+    const total = moneyValue(await page.locator('[data-reservation-price]').innerText());
+    assert.ok(total < communityTotal, 'the better offer replaces Community Support without stacking');
   } finally {
     await context.close();
   }

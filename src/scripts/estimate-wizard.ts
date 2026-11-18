@@ -360,6 +360,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     code: string;
     label: string;
     amountCents: number;
+    supportiveStackable: boolean;
   }
   interface AppliedGift {
     code: string;
@@ -376,8 +377,16 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return Number.isFinite(amount) ? Math.max(0, Math.round(amount * 100)) : 0;
   }
 
+  function stackingWithSupport(): boolean {
+    return (
+      appliedPromotion?.supportiveStackable === true &&
+      latestResult?.pricing.discount?.source === 'supportive'
+    );
+  }
+
   function winningPromotion(): AppliedPromotion | null {
     if (!appliedPromotion) return null;
+    if (stackingWithSupport()) return appliedPromotion;
     return appliedPromotion.amountCents > automaticDiscountCents() ? appliedPromotion : null;
   }
 
@@ -385,7 +394,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (!latestQuote) return 0;
     let total = Math.round(latestQuote.amount * 100);
     const winner = winningPromotion();
-    if (winner) total += automaticDiscountCents() - winner.amountCents;
+    if (winner) {
+      total = stackingWithSupport()
+        ? total - winner.amountCents
+        : total + automaticDiscountCents() - winner.amountCents;
+    }
     return Math.max(0, total);
   }
 
@@ -396,6 +409,18 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   function displayTotalCents(): number {
     return Math.max(0, totalBeforeGiftCents() - appliedGiftCents());
+  }
+
+  function syncAppliedPromotionControl(): void {
+    const row = form.querySelector<HTMLElement>('[data-discount-applied]');
+    const label = form.querySelector<HTMLElement>('[data-discount-applied-label]');
+    if (!row) return;
+    row.hidden = !appliedPromotion;
+    if (label) {
+      label.textContent = appliedPromotion
+        ? `${appliedPromotion.code} - ${formatUsd(appliedPromotion.amountCents / 100, { forceCents: true })} off`
+        : '';
+    }
   }
 
   function clearAppliedDiscounts(message = ''): void {
@@ -912,7 +937,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         value: `${p.roundingAdjustment < 0 ? '\u2212' : '+'}${formatUsd(Math.abs(p.roundingAdjustment), { forceCents: true })}`,
       });
     }
-    if (p.discount && !winner) {
+    if (p.discount && (!winner || stackingWithSupport())) {
       lines.push({
         label: p.discount.source === 'campaign' ? 'SPARKLE15 Discount' : p.discount.label,
         value: `\u2212${formatUsd(Math.abs(p.discount.amount), { forceCents: true })}`,
@@ -1188,6 +1213,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   function renderReservationSummary(result: EstimateResult): void {
     if (!reservationSummary) return;
+    syncAppliedPromotionControl();
     const hasQuote = result.status === 'estimated' && latestQuote !== null;
     syncPaymentAvailability(hasQuote);
     if (bookingCalendar) {
@@ -2869,6 +2895,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
           code?: string;
           name?: string;
           discountCents?: number;
+          supportiveStackable?: boolean;
         };
         if (!response.ok || !data.ok || !data.name || !data.discountCents) {
           const messages: Record<string, string> = {
@@ -2886,6 +2913,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
             code: data.code ?? promoCode,
             label: data.name,
             amountCents: data.discountCents,
+            supportiveStackable: data.supportiveStackable === true,
           };
           const previousPromotion = appliedPromotion;
           if (
@@ -2975,6 +3003,19 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
   });
 
+  form.querySelector<HTMLButtonElement>('[data-promo-remove]')?.addEventListener('click', () => {
+    if (!appliedPromotion) return;
+    const promoInput = form.querySelector<HTMLInputElement>('[data-promo-code]');
+    const discountStatus = form.querySelector<HTMLElement>('[data-discount-status]');
+    appliedPromotion = null;
+    discountQuoteCents = null;
+    if (promoInput) promoInput.value = '';
+    if (discountStatus) {
+      discountStatus.dataset.state = 'info';
+      discountStatus.textContent = 'Promo code removed.';
+    }
+    if (latestResult) renderReservationSummary(latestResult);
+  });
   payNowButton?.addEventListener('click', () => {
     if (photosOutstanding() && !photosDeferred) {
       showPhotoGate('final', 'pay_now');

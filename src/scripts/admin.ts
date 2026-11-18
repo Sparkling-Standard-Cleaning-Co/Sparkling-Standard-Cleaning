@@ -2271,7 +2271,7 @@ function fillPromotionForm(promotion: Record<string, unknown>): void {
   for (const box of form.querySelectorAll<HTMLInputElement>('input[name="branches"]')) {
     box.checked = Array.isArray(promotion.branches) && promotion.branches.includes(box.value);
   }
-  for (const [name, value] of [['newCustomersOnly', promotion.newCustomersOnly], ['recurringOnly', promotion.recurringOnly], ['firstVisitOnly', promotion.firstVisitOnly], ['combinable', promotion.combinable]] as Array<[string, unknown]>) {
+  for (const [name, value] of [['newCustomersOnly', promotion.newCustomersOnly], ['recurringOnly', promotion.recurringOnly], ['firstVisitOnly', promotion.firstVisitOnly], ['combinable', promotion.combinable], ['supportiveStackable', promotion.supportiveStackable]] as Array<[string, unknown]>) {
     const box = form.elements.namedItem(name) as HTMLInputElement | null;
     if (box) box.checked = Boolean(value);
   }
@@ -2315,6 +2315,7 @@ document.querySelector<HTMLFormElement>('[data-promotion-form]')?.addEventListen
     recurringOnly: data.get('recurringOnly') === 'on',
     firstVisitOnly: data.get('firstVisitOnly') === 'on',
     combinable: data.get('combinable') === 'on',
+    supportiveStackable: data.get('supportiveStackable') === 'on',
   };
   if (status) status.textContent = 'Saving...';
   void api('/api/admin/promotions', { method: 'POST', body: JSON.stringify(payload) })

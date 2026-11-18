@@ -67,12 +67,15 @@ https://sparkling-standard.com/estimate/payment-success/?session_id={CHECKOUT_SE
 
 The final step accepts an optional gift-certificate code beside the promo-code field. A single
 **Apply Discounts & Gift Certificates** action validates both independently; either field may be
-left empty and an applied code can be removed by clearing that field and applying again.
+left empty. An applied promo shows a visible **Remove** action that clears the code, restores the
+automatic quote discount and updates the itemized total without touching the appointment.
 
-The server evaluates the submitted promotion and the quote's automatic discount independently and
-keeps only the larger valid non-stackable offer on the pre-discount cleaning subtotal. A valid but
-smaller code never removes the better offer. The applied promotion is shown as an itemized saving
-line; the page scrolls back to the updated breakdown.
+The server evaluates the submitted promotion and the quote's automatic discount independently on
+the pre-discount cleaning subtotal. The default is the larger valid non-stackable offer. A
+promotion explicitly marked **May stack with Community Support** (currently THANKS75) may coexist
+with the 10% Community Support eligibility discount; FRIENDS15 does not stack and the better offer
+wins. A valid but smaller code never removes the better offer. The applied promotion is shown as an
+itemized saving line; the page scrolls back to the updated breakdown.
 
 Gift value is **payment tender**, not promotional revenue reduction. The financial order is:
 eligible promotion reduces the authorized cleaning subtotal, tax is calculated on that result, then

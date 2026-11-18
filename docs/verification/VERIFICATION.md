@@ -1,5 +1,14 @@
 # Verification status
 
+## Checkout discounts and promotion controls - 2026-11-18
+
+Application code **`PENDING_CODE_SHA`** is deployed in Cloudflare Pages production deployment
+`PENDING_DEPLOYMENT_ID`. Migration `0035` adds owner-controlled Community Support stacking.
+Promo codes now have a visible Remove action, THANKS75 can coexist with Community Support when
+explicitly enabled, and FRIENDS15 cannot stack with it. FRIENDS15 recurring-visit duration remains
+pending owner terms. Full detail:
+[`docs/verification/2026-11-18-CHECKOUT-DISCOUNTS.md`](2026-11-18-CHECKOUT-DISCOUNTS.md).
+
 ## Address-first scheduling and scroll correction - 2026-11-17
 
 Application code **`40d5a56`** is deployed in Cloudflare Pages production

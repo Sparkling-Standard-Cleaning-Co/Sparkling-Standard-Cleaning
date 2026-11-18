@@ -194,6 +194,7 @@ interface VerifiedCandidate {
   /** Automatic quote discount already included in cleaningAmountCents. */
   automaticDiscountCents?: number;
   automaticDiscountLabel?: string;
+  automaticDiscountSource?: string;
   receipt: {
     service: string;
     serviceLocation: string;
@@ -835,6 +836,9 @@ async function verifyResidentialPayment(
       ? {
           automaticDiscountCents: cents(verification.breakdown.discount.amount),
           automaticDiscountLabel: verification.breakdown.discount.label,
+          ...(verification.breakdown.discount.source
+            ? { automaticDiscountSource: verification.breakdown.discount.source }
+            : {}),
         }
       : {}),
     receipt: {
@@ -1277,9 +1281,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!evaluation.ok || !evaluation.promotion || !evaluation.discountCents) {
       return json({ ok: false, error: 'promotion_invalid', reason: evaluation.reason }, 409);
     }
-    if (evaluation.discountCents > automaticDiscountCents) {
+    const stacksWithSupportive =
+      candidate.automaticDiscountSource === 'supportive' && evaluation.promotion.supportiveStackable === true;
+    if (stacksWithSupportive || evaluation.discountCents > automaticDiscountCents) {
       const discount = evaluation.discountCents;
-      const cleaningAfter = Math.max(0, promotionBaseCents - discount);
+      const combinedDiscount = stacksWithSupportive ? automaticDiscountCents + discount : discount;
+      const cleaningAfter = Math.max(0, promotionBaseCents - combinedDiscount);
       const taxAfter = calculateServiceTax({
         serviceType: candidate.serviceType,
         state: fields.address_state ?? null,
@@ -1291,14 +1298,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       const amountAfter = cents(cleaningAfter / 100 + (taxAfter.taxAmount ?? 0));
       const receiptLines = [
-        ...candidate.receipt.lines.filter(
-          (line) =>
-            !(
-              line.kind === 'discount' &&
-              automaticDiscountLabel &&
-              line.label === automaticDiscountLabel
-            ),
-        ),
+        ...(stacksWithSupportive
+          ? candidate.receipt.lines
+          : candidate.receipt.lines.filter(
+              (line) =>
+                !(
+                  line.kind === 'discount' &&
+                  automaticDiscountLabel &&
+                  line.label === automaticDiscountLabel
+                ),
+            )),
         {
           label: `Promotion - ${evaluation.promotion.name}`,
           amountCents: -discount,
@@ -1317,8 +1326,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         cleaningAmountCents: cleaningAfter,
         amountCents: amountAfter,
         tax: taxAfter,
-        automaticDiscountCents: discount,
-        automaticDiscountLabel: `Promotion - ${evaluation.promotion.name}`,
+        automaticDiscountCents: combinedDiscount,
+        automaticDiscountLabel: stacksWithSupportive
+          ? automaticDiscountLabel
+          : `Promotion - ${evaluation.promotion.name}`,
+        ...(stacksWithSupportive ? { automaticDiscountSource: 'supportive+promotion' } : {}),
         receipt: {
           ...candidate.receipt,
           lines: reconciled,

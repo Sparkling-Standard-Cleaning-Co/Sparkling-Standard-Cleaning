@@ -244,11 +244,14 @@ Never publish unapproved promotional promises or activate binding pricing withou
   owner-approved database promotion (see below). Never enable or publish one without the owner's
   written terms, the `docs/launch/PROMOTION-PROPOSALS.md` review; the automatic effective-pricing
   version changes when the approved terms change.
-- **Owner database promotions** (`src/lib/promotions/service.ts`, migrations 0032-0034) support
+- **Owner database promotions** (`src/lib/promotions/service.ts`, migrations 0032-0035) support
   cleaning and gift scopes. THANKS75 remains active with its approved terms. A cleaning promotion
   cannot discount a gift certificate; a gift promotion reduces only the purchase price and preserves
-  the certificate face value. The admin promotions table lists static, bundle and eligibility offers
-  as read-only inventory. See `docs/verification/2026-11-11-ESTIMATOR-PROMOTIONS-REFINEMENTS.md`.
+  the certificate face value. A promotion explicitly marked **May stack with Community Support**
+  (currently THANKS75) may coexist with the 10% Community Support eligibility discount; FRIENDS15
+  must not stack and the better eligible offer wins. Applied promo codes have a visible Remove
+  action. The admin promotions table lists static, bundle and eligibility offers as read-only
+  inventory. See `docs/verification/2026-11-11-ESTIMATOR-PROMOTIONS-REFINEMENTS.md`.
 - Client-side JS is minimal, bundled by Astro from `src/scripts/` (no framework). The estimator
   computes in the browser so the instant estimate works on a fully static page. A browser price is
   a PROPOSAL: every priced reservation request is recalculated server-side
