@@ -84,9 +84,16 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-17 address-first scheduling):** application code **`40d5a56`**
-  is live (Cloudflare Pages production deployment `9ee042cb-5252-4d4a-b487-4fcc83237cdd`). `main` and
-  `production-safe` are synchronized. Residential Step 1 now requires a confirmed service address
+- **Current release (2026-11-18 checkout discounts):** application code **`3efa854`** is live
+  (Cloudflare Pages production deployment `d44b1ff1-5908-4303-b228-e119af83ffa0`). Migration
+  `0035` is applied. Applied promo codes now show a visible Remove action. A promotion explicitly
+  marked May stack with Community Support (currently THANKS75) may coexist with the 10% Community
+  Support discount; FRIENDS15 cannot stack and the better offer wins. FRIENDS15 recurring-visit
+  duration remains pending owner-approved terms. Evidence:
+  `docs/verification/2026-11-18-CHECKOUT-DISCOUNTS.md`.
+- **Prior release (2026-11-17 address-first scheduling):** application code **`40d5a56`**
+  remains represented in history (Cloudflare Pages production deployment
+  `9ee042cb-5252-4d4a-b487-4fcc83237cdd`). Residential Step 1 now requires a confirmed service address
   before the appointment calendar unlocks; changing the address re-locks scheduling and clears the
   invalidated appointment. Date/time choices scroll to the next relevant control, and continuing
   lands on the next step heading. The final five-second reveal is unchanged. Evidence:

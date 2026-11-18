@@ -2,8 +2,10 @@
 
 ## Release
 
-- Application code: `PENDING_CODE_SHA`
-- Cloudflare production deployment: `PENDING_DEPLOYMENT_ID`
+- Application code: `3efa854`
+- Final HEAD: `3efa854` (application and documentation closeout in the same commit)
+- GitHub `validate`/browser passed on `main` and `production-safe` (runs `44411889662` and `44411885010`)
+- Cloudflare production deployment: `d44b1ff1-5908-4303-b228-e119af83ffa0`
 - Migration `0035_promotion_supportive_stacking.sql` applied to production D1.
 
 ## Implemented
