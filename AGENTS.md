@@ -84,13 +84,20 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-18 checkout discounts):** application code **`3efa854`** is live
-  (Cloudflare Pages production deployment `d44b1ff1-5908-4303-b228-e119af83ffa0`). Migration
-  `0035` is applied. Applied promo codes now show a visible Remove action. A promotion explicitly
-  marked May stack with Community Support (currently THANKS75) may coexist with the 10% Community
-  Support discount; FRIENDS15 cannot stack and the better offer wins. FRIENDS15 recurring-visit
-  duration remains pending owner-approved terms. Evidence:
-  `docs/verification/2026-11-18-CHECKOUT-DISCOUNTS.md`.
+- **Current release (2026-11-18 invoice documents):** application code **`e9ea0f0`** is live
+  (Cloudflare Pages production deployment `cc93b287-0c40-4239-b7ee-657627f5d812`). The admin
+  invoice view generates a downloadable PDF and can email an open/partially paid/overdue invoice
+  with the PDF attached through the existing Resend configuration. Internal invoice notes are
+  excluded; customer email, itemized lines, discount, tax, payments received, balance, due date,
+  legal entity and any secure Stripe payment link are included. No migration and no live customer
+  email/charge was performed. Evidence: `docs/verification/2026-11-18-INVOICE-DOCUMENTS.md`.
+- **Prior release (2026-11-18 checkout discounts):** application code **`3efa854`** remains in
+  production history (Cloudflare Pages production deployment
+  `d44b1ff1-5908-4303-b228-e119af83ffa0`). Migration `0035` is applied. Applied promo codes show a
+  visible Remove action. A promotion explicitly marked May stack with Community Support (currently
+  THANKS75) may coexist with the 10% Community Support discount; FRIENDS15 cannot stack and the
+  better offer wins. FRIENDS15 recurring-visit duration remains pending owner-approved terms.
+  Evidence: `docs/verification/2026-11-18-CHECKOUT-DISCOUNTS.md`.
 - **Prior release (2026-11-17 address-first scheduling):** application code **`40d5a56`**
   remains represented in history (Cloudflare Pages production deployment
   `9ee042cb-5252-4d4a-b487-4fcc83237cdd`). Residential Step 1 now requires a confirmed service address
@@ -299,7 +306,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Promotions and Founding-10 (disabled) + three owner-approved add-on bundles | `src/lib/estimate/promotions.ts` + `src/config/estimators/pricing-values.ts` | `docs/launch/PROMOTION-PROPOSALS.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
 | Owner Pricing & Estimator Control (draft/publish/rollback, four-engine simulator) | `src/lib/pricing/` (`catalog.ts`, `snapshot.ts`, `store.ts`, `simulate.ts`), `functions/api/admin/pricing.ts`, `functions/api/pricing.ts`, `src/scripts/pricing-admin.ts`, migration `0026` | `docs/operations/PRICING-CONTROL-CENTER.md` |
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
-| Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` §4a |
+| Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `admin-invoice.ts`, `invoice-email.ts`, `pdf.ts`, `functions/api/admin/finance.ts`, `functions/api/admin/invoice-document.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` §4a |
 | Reservation window, statuses, ledger | `src/config/scheduling.ts` + `src/scripts/estimate-wizard.ts` | `docs/operations/RESERVATION-TRACKING.md` |
 | Gift certificates (sales live) | `src/config/gift-certificates.ts`, `src/lib/gift/`, `src/pages/gift-certificates/`, `src/pages/gift-admin.astro`, `functions/api/gift-checkout.ts`, `stripe-webhook.ts`, `gift-auth.ts`, `gift-admin.ts`, `gift-balance.ts`, `src/lib/gift/activation.ts`, `src/lib/admin/` | `docs/operations/GIFT-CERTIFICATES.md`, `docs/operations/R2-STORAGE-AND-BACKUP.md` |
 | Platform accounts, status, owner actions | `src/config/business.ts` `socials` + `src/components/SocialLinks.astro` | `docs/marketing/PLATFORM-REGISTER.md`, `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` |

@@ -1,5 +1,14 @@
 # Verification status
 
+## Invoice PDF and email delivery - 2026-11-18
+
+Application code **`e9ea0f0`** is deployed in Cloudflare Pages production deployment
+`cc93b287-0c40-4239-b7ee-657627f5d812`. The admin invoice view downloads a generated PDF and can
+email an open/partially paid/overdue invoice with that PDF attached through Resend. Internal notes
+are excluded; payments, balance and secure Stripe payment links are included. Draft, void and paid
+invoices cannot be emailed. No live customer invoice was sent. Full detail:
+[`docs/verification/2026-11-18-INVOICE-DOCUMENTS.md`](2026-11-18-INVOICE-DOCUMENTS.md).
+
 ## Checkout discounts and promotion controls - 2026-11-18
 
 Application code **`3efa854`** is deployed in Cloudflare Pages production deployment
