@@ -2,9 +2,10 @@
 
 ## Release
 
-- Application code: `PENDING_CODE_SHA`
-- Final HEAD: recorded after commit
-- Cloudflare Pages production deployment: `PENDING_DEPLOYMENT_ID`
+- Application code: `40d5a56`
+- Final HEAD: `40d5a56` (application and documentation closeout in the same commit)
+- GitHub `validate`/browser passed on `main` and `production-safe` (runs `44208802575` and `44208799540`)
+- Cloudflare Pages production deployment: `9ee042cb-5252-4d4a-b487-4fcc83237cdd`
 - No pricing, database, migration, payment, promotion or gift-certificate logic changed.
 
 ## Address first, scheduling second

@@ -84,8 +84,8 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-17 address-first scheduling):** application code **`PENDING_CODE_SHA`**
-  is live (Cloudflare Pages production deployment `PENDING_DEPLOYMENT_ID`). `main` and
+- **Current release (2026-11-17 address-first scheduling):** application code **`40d5a56`**
+  is live (Cloudflare Pages production deployment `9ee042cb-5252-4d4a-b487-4fcc83237cdd`). `main` and
   `production-safe` are synchronized. Residential Step 1 now requires a confirmed service address
   before the appointment calendar unlocks; changing the address re-locks scheduling and clears the
   invalidated appointment. Date/time choices scroll to the next relevant control, and continuing

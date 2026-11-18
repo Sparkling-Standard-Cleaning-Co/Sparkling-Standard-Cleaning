@@ -2,8 +2,8 @@
 
 ## Address-first scheduling and scroll correction - 2026-11-17
 
-Application code **`PENDING_CODE_SHA`** is deployed in Cloudflare Pages production
-deployment `PENDING_DEPLOYMENT_ID`. The residential Step 1 now verifies the
+Application code **`40d5a56`** is deployed in Cloudflare Pages production
+deployment `9ee042cb-5252-4d4a-b487-4fcc83237cdd`. The residential Step 1 now verifies the
 service address before the appointment calendar is revealed; changing the
 address re-locks scheduling and clears the invalidated appointment. Date and
 time selection scroll to the times/picker, selected time plus Continue stay in
