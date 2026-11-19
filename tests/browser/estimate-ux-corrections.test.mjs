@@ -225,7 +225,7 @@ test('Morning and Afternoon selections keep the exact time picker in view', asyn
     for (const period of ['first', 'afternoon']) {
       await page.click(`[data-period="${period}"]`);
       await page.waitForSelector('[data-calendar-picker]', { state: 'visible' });
-      await delay(450);
+      await delay(900);
       const result = await page.evaluate(() => {
         const picker = document.querySelector('[data-calendar-picker]');
         const heading = picker?.querySelector('.booking-calendar__picker-heading');

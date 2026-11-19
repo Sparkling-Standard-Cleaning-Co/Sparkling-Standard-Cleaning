@@ -235,6 +235,11 @@ import {
                     <option value="move_in_out">Move-in / move-out</option>
                   </select>
                 </label>
+                <label>Discounts &amp; Promotions
+                  <select name="promotionCode" data-manual-promotion>
+                    <option value="">No one-time promotion</option>
+                  </select>
+                </label>
                 <div class="admin-field--wide admin-form admin-form--grid" data-manual-residential>
                   <label>Property type <select name="propertyType">{PROPERTY_TYPE_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
                   <label>Square feet <input name="squareFeet" type="number" min={RESIDENTIAL_INPUT_LIMITS.squareFeet.min} max={RESIDENTIAL_INPUT_LIMITS.squareFeet.max} step={RESIDENTIAL_INPUT_LIMITS.squareFeet.step} data-manual-square-feet /></label>

@@ -575,3 +575,23 @@ test('FRIENDS15 applies to the manual residential quote without stacking an exis
   assert.ok((after.totalCents ?? 0) < (before.totalCents ?? 0));
   assert.equal(after.discountLabel, 'FRIENDS15');
 });
+
+
+test('a selected database promotion carries through the manual quote', async () => {
+  const { db, actor, env, quoteInput } = await fixture();
+  db.raw.prepare(
+    `UPDATE promotions SET name = 'Thanksgiving Special', kind = 'fixed', value_cents = 7500,
+       services_json = '["deep"]', branches_json = '["branch_pensacola"]', min_purchase_cents = 20000,
+       first_visit_only = 1, status = 'active', terms_version = '2026-11-10.thanks75.v1'
+     WHERE code = 'THANKS75'`,
+  ).run();
+  const quote = await quoteManualBooking(env, db, actor, {
+    ...quoteInput,
+    serviceType: 'deep',
+    date: '2026-11-20',
+    promotionCode: 'THANKS75',
+  });
+  assert.equal(quote.status, 'priced');
+  assert.equal(quote.discountLabel, 'Promotion - Thanksgiving Special');
+  assert.equal(quote.discountAmountCents, 7500);
+});

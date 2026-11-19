@@ -14,6 +14,7 @@ import { AdminAuthError, audit, type AdminActor } from './operations.ts';
 import { markBookingCommitment } from '../booking/commitments.ts';
 import { requestPricingConfig } from '../pricing/server.ts';
 import { activeEntitlementForCustomer, FRIENDS15_CODE } from '../promotions/entitlements.ts';
+import { evaluatePromotionForQuote } from '../promotions/service.ts';
 import { calculateEstimate, type EstimateContext } from '../estimate/calculate.ts';
 import {
   calculateFacilityPrice,
@@ -592,29 +593,56 @@ export async function quoteManualBooking(
   const amount = selectInstantAmount(estimate, config.instantQuote.selection.value, config);
   const priced = estimate.status === 'estimated' && amount !== null;
   const eligibleCleaningCents = Math.max(0, Math.round((estimate.pricing.basePrice + estimate.pricing.extrasSubtotal) * 100));
+  const selectedPromotionCode = (input.promotionCode ?? '').trim().toUpperCase();
+  const persistentSelected = Boolean(entitlement && selectedPromotionCode === entitlement.code);
+  const oneTimeSelected = Boolean(selectedPromotionCode && !persistentSelected);
+  let promotionDiscountCents = 0;
+  let promotionLabel = '';
+  if (priced && oneTimeSelected) {
+    if (estimate.pricing.discount) throw new AdminAuthError(409, 'promotion_not_combinable');
+    const evaluation = await evaluatePromotionForQuote(db, {
+      code: selectedPromotionCode,
+      cleaningAmountCents: eligibleCleaningCents,
+      serviceType: input.serviceType ?? 'standard',
+      branchId: context.branchId ?? 'branch_pensacola',
+      frequency: input.frequency ?? 'one_time',
+      quoteReference: reference,
+      holdId: '',
+      customerId,
+      ...(text(raw.date, 10) ? { serviceDate: text(raw.date, 10) } : {}),
+      hasExistingDiscount: false,
+    });
+    if (!evaluation.ok || !evaluation.discountCents) {
+      throw new AdminAuthError(409, evaluation.reason || 'promotion_ineligible');
+    }
+    promotionDiscountCents = evaluation.discountCents;
+    promotionLabel = evaluation.promotion?.name ? `Promotion - ${evaluation.promotion.name}` : selectedPromotionCode;
+  }
   const canApplyEntitlement = Boolean(
     priced &&
     entitlement &&
     !estimate.pricing.discount &&
-    !(input.promotionCode ?? '').trim(),
+    !oneTimeSelected,
   );
   const entitlementDiscountCents = canApplyEntitlement
     ? Math.max(0, Math.round((eligibleCleaningCents * (entitlement?.percent ?? 0)) / 100))
     : 0;
+  const appliedDiscountCents = entitlementDiscountCents > 0 ? entitlementDiscountCents : promotionDiscountCents;
+  const appliedDiscountLabel = entitlementDiscountCents > 0 ? 'FRIENDS15' : promotionLabel || null;
   const effectiveAmount = amount === null
     ? null
-    : Math.max(0, Math.round((amount * 100 - entitlementDiscountCents)) / 100);
-  const effectiveBreakdown = entitlementDiscountCents > 0
+    : Math.max(0, Math.round((amount * 100 - appliedDiscountCents)) / 100);
+  const effectiveBreakdown = appliedDiscountCents > 0
     ? {
         ...estimate.pricing,
         discount: {
-          id: entitlement?.id ?? 'friends15-entitlement',
-          source: 'entitlement',
-          percent: entitlement?.percent ?? 0,
-          amount: entitlementDiscountCents / 100,
-          label: 'FRIENDS15',
+          id: entitlementDiscountCents > 0 ? entitlement?.id ?? 'friends15-entitlement' : `promotion-${selectedPromotionCode}`,
+          source: entitlementDiscountCents > 0 ? 'entitlement' : 'promotion',
+          percent: entitlementDiscountCents > 0 ? entitlement?.percent ?? 0 : 0,
+          amount: appliedDiscountCents / 100,
+          label: appliedDiscountLabel ?? 'Discount',
         },
-        subtotal: Math.max(0, Math.round((estimate.pricing.subtotal * 100 - entitlementDiscountCents)) / 100),
+        subtotal: Math.max(0, Math.round((estimate.pricing.subtotal * 100 - appliedDiscountCents) / 100)),
       }
     : estimate.pricing;
   const durationMinutes = estimate.pricing.totalLaborHours > 0
@@ -632,8 +660,8 @@ export async function quoteManualBooking(
     totalCents: priced ? cents(effectiveAmount ?? amount ?? 0) : null,
     range: priced && estimate.low !== null && estimate.high !== null
       ? {
-          low: Math.max(0, estimate.low - entitlementDiscountCents / 100),
-          high: Math.max(0, estimate.high - entitlementDiscountCents / 100),
+          low: Math.max(0, estimate.low - appliedDiscountCents / 100),
+          high: Math.max(0, estimate.high - appliedDiscountCents / 100),
         }
       : null,
     laborHours: estimate.laborHours,
@@ -642,12 +670,12 @@ export async function quoteManualBooking(
     cleaningSubtotalCents: priced ? cents(estimate.pricing.basePrice) : null,
     travelAdjustmentCents: cents(estimate.pricing.travelAdjustment),
     extrasSubtotalCents: cents(estimate.pricing.extrasSubtotal),
-    discountAmountCents: entitlementDiscountCents > 0
-      ? entitlementDiscountCents
+    discountAmountCents: appliedDiscountCents > 0
+      ? appliedDiscountCents
       : estimate.pricing.discount
         ? cents(estimate.pricing.discount.amount)
         : null,
-    discountLabel: entitlementDiscountCents > 0 ? 'FRIENDS15' : estimate.pricing.discount?.label ?? null,
+    discountLabel: appliedDiscountLabel ?? estimate.pricing.discount?.label ?? null,
     ongoingPerVisitCents: estimate.ongoing
       ? cents(
           Math.max(
@@ -664,7 +692,7 @@ export async function quoteManualBooking(
       ? {
           code: entitlement.code,
           percent: entitlement.percent,
-          discountCents: entitlementDiscountCents,
+          discountCents: appliedDiscountCents,
           label: 'FRIENDS15',
         }
       : null,

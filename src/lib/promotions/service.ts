@@ -330,6 +330,7 @@ export interface PromotionQuoteInput {
   frequency: string;
   quoteReference: string;
   holdId: string;
+  customerId?: string;
   serviceDate?: string;
   scope?: 'cleaning' | 'gift';
   hasExistingDiscount?: boolean;
@@ -386,7 +387,7 @@ export async function evaluatePromotionForQuote(
   if ((input.cleaningAmountCents || 0) < promotion.minPurchaseCents) {
     return { ok: false, reason: 'promotion_minimum_not_met' };
   }
-  const customerId = await customerIdForQuote(db, input.quoteReference, input.holdId);
+  const customerId = input.customerId || await customerIdForQuote(db, input.quoteReference, input.holdId);
   if (promotion.newCustomersOnly) {
     if (!customerId) return { ok: false, reason: 'promotion_customer_required' };
     const prior = await db

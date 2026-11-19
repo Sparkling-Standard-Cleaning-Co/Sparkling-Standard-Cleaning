@@ -1352,6 +1352,7 @@ function manualPayload(): Record<string, unknown> {
     customerId: manualField<HTMLSelectElement>('customerId')?.value ?? '',
     propertyId: manualField<HTMLSelectElement>('propertyId')?.value ?? '',
     serviceType: engine === 'str' ? 'str_turnover' : manualField<HTMLSelectElement>('serviceType')?.value ?? 'standard',
+    promotionCode: manualField<HTMLSelectElement>('promotionCode')?.value || undefined,
     propertyType: manualField<HTMLSelectElement>('propertyType')?.value || undefined,
     squareFeet: manualNumber('squareFeet'),
     bedrooms: manualNumber('bedrooms'),
@@ -1711,6 +1712,22 @@ async function loadManualBooking(): Promise<void> {
         )}${customer.email ? ` — ${esc(customer.email)}` : ''}</option>`,
       );
     }
+  }
+  const promotionSelect = manualField<HTMLSelectElement>('promotionCode');
+  if (promotionSelect) {
+    const current = promotionSelect.value;
+    promotionSelect.innerHTML = '<option value="">No one-time promotion</option>';
+    const promotionData = await api<{ promotions?: Array<Record<string, unknown>> }>('/api/admin/promotions').catch(() => ({ promotions: [] }));
+    for (const promotion of promotionData.promotions ?? []) {
+      if (String(promotion.displayStatus ?? promotion.status) !== 'active') continue;
+      const discount = promotion.kind === 'percent' ? `${promotion.percent}%` : money(promotion.valueCents);
+      const services = Array.isArray(promotion.services) ? ` · ${promotion.services.join('/')}` : '';
+      promotionSelect.insertAdjacentHTML(
+        'beforeend',
+        `<option value="${esc(promotion.code)}">${esc(promotion.code)} — ${esc(promotion.name)} (${esc(discount)}${esc(services)})</option>`,
+      );
+    }
+    if (current) promotionSelect.value = current;
   }
   const dateField = manualField<HTMLInputElement>('date');
   if (dateField && !dateField.value) dateField.value = localToday(1);
