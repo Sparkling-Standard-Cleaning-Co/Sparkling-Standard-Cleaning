@@ -153,12 +153,12 @@ async function invoiceForRequest(
     : null;
   const invoice = existing
     ? { id: existing.id, number: existing.number, totalCents: total }
-    : await createInvoice(db, actor, {
+      : await createInvoice(db, actor, {
         customerId: String(row.customer_id),
         propertyId: row.property_id ?? undefined,
         appointmentId: row.appointment_id ?? undefined,
+        serviceCode: String(row.service_code ?? ''),
         issueDate: new Date().toISOString().slice(0, 10),
-        dueDate: new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10),
         lines: [
           {
             kind: 'service',

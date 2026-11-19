@@ -1822,3 +1822,31 @@ test('the recurring write gate fails closed and opens only when explicitly enabl
   assert.equal(((await open.json()) as { error?: string }).error, 'recurring_fields_required');
   assert.ok(actor);
 });
+
+
+test('invoice due dates follow residential immediate and commercial Net 15 policy', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const residential = await createCustomer(db, actor, {
+    firstName: 'Residential', lastName: 'Terms', email: 'residential-terms@example.test',
+  });
+  const commercial = await createCustomer(db, actor, {
+    firstName: 'Commercial', lastName: 'Terms', email: 'commercial-terms@example.test',
+  });
+  const residentialInvoice = await createInvoice(db, actor, {
+    customerId: residential.id,
+    serviceCode: 'residential-cleaning',
+    issueDate: '2026-12-01',
+    lines: [{ kind: 'service', description: 'Cleaning', quantity: 1, unitAmountCents: 18000, totalCents: 18000 }],
+  });
+  const commercialInvoice = await createInvoice(db, actor, {
+    customerId: commercial.id,
+    serviceCode: 'commercial-cleaning',
+    issueDate: '2026-12-01',
+    lines: [{ kind: 'service', description: 'Commercial cleaning', quantity: 1, unitAmountCents: 30000, totalCents: 30000 }],
+  });
+  const residentialRow = db.raw.prepare('SELECT due_date FROM invoices WHERE id = ?').get(residentialInvoice.id) as { due_date: string };
+  const commercialRow = db.raw.prepare('SELECT due_date FROM invoices WHERE id = ?').get(commercialInvoice.id) as { due_date: string };
+  assert.equal(residentialRow.due_date, '2026-12-01');
+  assert.equal(commercialRow.due_date, '2026-12-16');
+});

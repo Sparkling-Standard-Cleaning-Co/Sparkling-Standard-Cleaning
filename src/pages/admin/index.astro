@@ -533,9 +533,10 @@ import {
               <h2 class="admin-section-title">Create an invoice</h2>
               <form class="admin-form" data-admin-invoice-create>
                 <label>Customer <select name="customerId" data-admin-customer-options required></select></label>
+                <label>Service <select name="serviceCode"><option value="residential-cleaning">Residential cleaning — due immediately</option><option value="commercial-cleaning">Commercial cleaning — Net 15</option><option value="church-cleaning">Church cleaning — Net 15</option></select></label>
                 <label>Description <input name="description" required /></label>
                 <label>Amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label>
-                <label>Due date <input name="dueDate" type="date" required /></label>
+                <label>Due date (optional — residential defaults to issue date; commercial/church default to Net 15) <input name="dueDate" type="date" /></label>
                 <button class="btn btn--primary" type="submit">Create Invoice</button>
               </form>
             </div>

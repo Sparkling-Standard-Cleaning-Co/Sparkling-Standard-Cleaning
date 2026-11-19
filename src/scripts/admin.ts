@@ -3014,7 +3014,7 @@ for (const form of [
     }
     if (form.matches('[data-admin-invoice-create]')) {
       const amount = Number(data.get('amount'));
-      void action('/api/admin/finance', { action: 'create_invoice', customerId: data.get('customerId'), dueDate: data.get('dueDate'), lines: [{ kind: 'service', description: data.get('description'), quantity: 1, unitAmountCents: Math.round(amount * 100), totalCents: Math.round(amount * 100) }] });
+      void action('/api/admin/finance', { action: 'create_invoice', customerId: data.get('customerId'), serviceCode: data.get('serviceCode'), dueDate: data.get('dueDate'), lines: [{ kind: 'service', description: data.get('description'), quantity: 1, unitAmountCents: Math.round(amount * 100), totalCents: Math.round(amount * 100) }] });
     }
     if (form.matches('[data-admin-invite-create]')) {
       setAppError();

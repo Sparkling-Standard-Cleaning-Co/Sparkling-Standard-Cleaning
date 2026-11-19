@@ -25,6 +25,13 @@ function id(prefix: string): string {
   return `${prefix}_${crypto.randomUUID()}`;
 }
 
+function dueDateFor(issueDate: string, serviceCode: string): string {
+  if (!/(commercial|church)/i.test(serviceCode)) return issueDate;
+  const date = new Date(`${issueDate}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 15);
+  return date.toISOString().slice(0, 10);
+}
+
 function invoiceNumber(): string {
   const date = new Date();
   const stamp = date.toISOString().slice(0, 10).replaceAll('-', '');
@@ -111,7 +118,8 @@ export async function createInvoice(
   const lines = Array.isArray(input.lines) ? input.lines : [];
   if (lines.length === 0) throw new AdminAuthError(400, 'invoice_lines_required');
   const issueDate = text(input.issueDate, 10) || new Date().toISOString().slice(0, 10);
-  const dueDate = text(input.dueDate, 10) || issueDate;
+  const serviceCode = text(input.serviceCode, 80);
+  const dueDate = text(input.dueDate, 10) || dueDateFor(issueDate, serviceCode);
   let subtotal = 0;
   let discount = 0;
   let tax = 0;
