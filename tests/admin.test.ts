@@ -100,6 +100,8 @@ function migratedDb(): TestD1 {
     '0035_promotion_supportive_stacking.sql',
     '0036_customer_promotion_entitlements.sql',
     '0037_payment_receipts.sql',
+    '0038_document_packet_builder.sql',
+    '0039_quick_estimates.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -1892,4 +1894,131 @@ test('a paid invoice produces exactly one idempotent customer receipt', async ()
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+import { onRequestPost as financePost } from '../functions/api/admin/finance.ts';
+import { buildReceipt } from '../src/lib/payments/receipt.ts';
+import { loadInvoiceReceiptData } from '../src/lib/invoicing/invoice-receipt.ts';
+
+test('the invoice receipt is built from the persisted paid invoice and records delivery failure honestly', async () => {
+  const db = migratedDb();
+  const { owner, actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Receipt', lastName: 'Customer', email: 'receipt-phase-a@example.test',
+    addressLine1: '100 Receipt Street', city: 'Pensacola', postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    serviceCode: 'residential-cleaning',
+    issueDate: '2026-11-19',
+    lines: [
+      { kind: 'service', description: 'Residential cleaning', quantity: 1, unitAmountCents: 12000, totalCents: 12000 },
+      { kind: 'discount', description: 'FRIENDS15', quantity: 1, unitAmountCents: 1800, totalCents: 1800 },
+    ],
+  });
+  await recordPayment(db, actor, {
+    invoiceId: invoice.id, provider: 'cash', amount: 102, idempotencyKey: 'receipt-phase-a-payment',
+  });
+  const loaded = await loadInvoiceReceiptData(db, invoice.id);
+  assert.ok(loaded);
+  assert.equal(loaded.data.receiptNumber, `${invoice.number}-R1`);
+  assert.equal(loaded.data.customerEmail, 'receipt-phase-a@example.test');
+  assert.equal(loaded.data.totalCents, 10200);
+  assert.equal(loaded.data.paidCents, 10200);
+  assert.equal(loaded.data.balanceCents, 0);
+  assert.equal(loaded.data.paymentStatus, 'paid');
+  assert.ok(loaded.data.lines.some((line) => line.kind === 'discount'));
+  const built = buildReceipt(loaded.data);
+  assert.match(built.html, /Sparkling Standard Cleaning Co\./);
+  assert.match(built.html, /Standards That Sparkle\./);
+  assert.match(built.html, /receipt-phase-a@example\.test/);
+  assert.match(built.html, /Residential cleaning/);
+  assert.match(built.html, /FRIENDS15/);
+  assert.match(built.text, /Total: \$102\.00/);
+  assert.match(built.text, /Total paid|Paid: \$102\.00/);
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ error: 'synthetic rejection' }), { status: 422 })) as typeof fetch;
+  try {
+    const failed = await deliverInvoiceReceipt(db, { RESEND_API_KEY: 'test', RESEND_FROM_EMAIL: 'owner@example.test' }, {
+      invoiceId: invoice.id,
+      actorUserId: owner.id,
+      force: true,
+    });
+    assert.equal(failed.status, 'failed');
+    const row = db.raw.prepare('SELECT status, error_code FROM payment_receipts WHERE invoice_id = ?').get(invoice.id) as {
+      status: string; error_code: string;
+    };
+    assert.equal(row.status, 'failed');
+    assert.match(row.error_code, /provider_422|failed/);
+    const auditRow = db.raw
+      .prepare("SELECT action FROM admin_audit WHERE entity_id = ? AND action LIKE 'invoice.receipt_%' ORDER BY created_at DESC LIMIT 1")
+      .get(invoice.id) as { action: string };
+    assert.equal(auditRow.action, 'invoice.receipt_failed');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('resending an invoice receipt requires finance permission and matching branch access', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Branch', lastName: 'Customer', email: 'branch-receipt@example.test',
+    addressLine1: '200 Branch Street', city: 'Pensacola', postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    serviceCode: 'residential-cleaning',
+    issueDate: '2026-11-19',
+    lines: [{ kind: 'service', description: 'Residential cleaning', quantity: 1, unitAmountCents: 9000, totalCents: 9000 }],
+  });
+  await recordPayment(db, actor, {
+    invoiceId: invoice.id, provider: 'cash', amount: 90, idempotencyKey: 'branch-receipt-payment',
+  });
+  const managerId = 'admin_manager_receipt';
+  db.raw
+    .prepare(
+      `INSERT INTO admin_users (id, role_id, branch_id, email, password_hash, display_name, status)
+       VALUES (?, 'manager', 'branch_pensacola', 'manager-receipt@example.test', 'unused', 'Synthetic Manager', 'active')`,
+    )
+    .run(managerId);
+  const managerSession = await createOpsSession(db, managerId, request());
+  const managerResponse = await financePost({
+    request: new Request('https://example.test/api/admin/finance', {
+      method: 'POST',
+      headers: {
+        Cookie: `ss_ops=${managerSession.token}`,
+        'X-CSRF-Token': managerSession.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'resend_invoice_receipt', invoiceId: invoice.id }),
+    }),
+    env: { DB: db } as never,
+  });
+  assert.equal(managerResponse.status, 403);
+
+  const financeId = 'admin_finance_tampa';
+  db.raw
+    .prepare(
+      `INSERT INTO admin_users (id, role_id, branch_id, email, password_hash, display_name, status)
+       VALUES (?, 'finance', 'branch_tampa', 'finance-tampa@example.test', 'unused', 'Synthetic Finance', 'active')`,
+    )
+    .run(financeId);
+  const financeSession = await createOpsSession(db, financeId, request());
+  const financeResponse = await financePost({
+    request: new Request('https://example.test/api/admin/finance', {
+      method: 'POST',
+      headers: {
+        Cookie: `ss_ops=${financeSession.token}`,
+        'X-CSRF-Token': financeSession.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'resend_invoice_receipt', invoiceId: invoice.id }),
+    }),
+    env: { DB: db } as never,
+  });
+  assert.equal(financeResponse.status, 404);
+  const row = db.raw.prepare('SELECT COUNT(*) AS count FROM payment_receipts WHERE invoice_id = ?').get(invoice.id) as { count: number };
+  assert.equal(row.count, 0);
 });

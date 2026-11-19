@@ -108,10 +108,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       request: {
         id: request.id,
         bundleCode: request.bundle_code,
+        bundleName: String((request as Record<string, unknown>).packet_name ?? ''),
         bundleVersion: request.bundle_version,
         subjectType: request.subject_type,
         status: request.status,
         expiresAt: request.token_expires_at,
+        instructions: String((request as Record<string, unknown>).packet_instructions ?? ''),
       },
       documents: requirements.map((requirement) => {
         const item = publicRequirement(requirement, latest);

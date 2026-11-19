@@ -55,6 +55,7 @@ const viewMeta: Record<string, [string, string]> = {
   leads: ['Leads & Inquiries', 'Website inquiries, delivery status and follow-up.'],
   customers: ['Customers', 'Customer profiles, properties and history.'],
   'new-booking': ['New Booking', 'Create a one-time estimate and booking from a saved customer and property.'],
+  'quick-estimate': ['Quick Estimate', 'Price a phone inquiry with live promotions, then save or convert it to a booking.'],
   recurring: ['Recurring Plans', 'Recurring cleaning administration.'],
   jobs: ['Jobs & Team', 'Cleaning jobs, assignments and checklists.'],
   documents: ['Documents & Agreements', 'Owner-controlled templates, bundles and electronic signatures.'],
@@ -73,6 +74,7 @@ const navPermission: Record<string, string> = {
   leads: 'lead.read',
   customers: 'customer.read',
   'new-booking': 'booking.write',
+  'quick-estimate': 'booking.write',
   recurring: 'job.read',
   jobs: 'job.read',
   documents: 'job.read',
@@ -342,16 +344,18 @@ async function loadOverview(): Promise<void> {
   const kpis = document.querySelector<HTMLElement>('[data-admin-kpis]');
   if (kpis) {
     kpis.innerHTML = [
-      ['Customers', counts.customers ?? 0],
-      ['Open leads', counts.leads ?? 0],
+      ['Today\'s jobs', counts.todayJobs ?? 0],
+      ['Tomorrow', counts.tomorrowJobs ?? 0],
       ['Pending requests', counts.requests ?? 0],
-      ['Upcoming appointments', counts.upcomingAppointments ?? 0],
+      ['Unassigned jobs', counts.unassignedJobs ?? 0],
+      ['Open leads', counts.leads ?? 0],
+      ['Unsigned agreements', counts.unsignedAgreements ?? 0],
+      ['Outstanding invoices', counts.outstandingInvoices ?? 0],
+      ['Failed communications', counts.failedCommunications ?? 0],
+      ['Customers', counts.customers ?? 0],
       ['Active gifts', counts.activeGifts ?? 0],
-      ['Lead delivery failures', counts.failedLeadDeliveries ?? 0],
       ['Booking recovery', counts.failedCommitments ?? 0],
       ['Financial issues', counts.financialIssues ?? 0],
-      ['Failed emails', counts.failedNotifications ?? 0],
-      ['Failed payment events', counts.failedPaymentEvents ?? 0],
       ['Recurring failures', counts.failedWorkerRuns ?? 0],
     ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('');
   }
@@ -879,9 +883,14 @@ async function openCustomer(customerId: string): Promise<void> {
   const appointments = (data.appointments as Array<Record<string, unknown>>) ?? [];
   const invoices = (data.invoices as Array<Record<string, unknown>>) ?? [];
   const paymentAuthorizations = (data.paymentAuthorizations as Array<Record<string, unknown>>) ?? [];
-  const documentRequests = await api<{ requests?: Array<Record<string, unknown>> }>(
-    `/api/admin/documents?view=requests&customerId=${encodeURIComponent(customerId)}`,
-  ).then((result) => result.requests ?? []).catch(() => []);
+  const recurringPlans = (data.recurringPlans as Array<Record<string, unknown>>) ?? [];
+  const quickEstimates = (data.quickEstimates as Array<Record<string, unknown>>) ?? [];
+  const gifts = (data.gifts as Array<Record<string, unknown>>) ?? [];
+  const documentRequests = (data.signingRequests as Array<Record<string, unknown>> | undefined)?.length
+    ? (data.signingRequests as Array<Record<string, unknown>>)
+    : await api<{ requests?: Array<Record<string, unknown>> }>(
+        `/api/admin/documents?view=requests&customerId=${encodeURIComponent(customerId)}`,
+      ).then((result) => result.requests ?? []).catch(() => []);
   const benefitData = actor?.role === 'owner'
     ? await api<{ entitlements?: Array<Record<string, unknown>>; history?: Array<Record<string, unknown>> }>(
         `/api/admin/entitlements?customerId=${encodeURIComponent(customerId)}`,
@@ -901,8 +910,10 @@ async function openCustomer(customerId: string): Promise<void> {
     ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}${Number(property.is_primary) === 1 ? ' · Primary' : ''}</strong>${propertyProfileSummary(property)}<details class="admin-detail-toggle"><summary>Edit property</summary><form class="admin-form" style="max-width:none" data-form="property-update"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="propertyId" value="${esc(property.id)}" />${propertyFields(property)}<label>Status <select name="status"><option value="active"${property.status !== 'archived' ? ' selected' : ''}>Active</option><option value="archived"${property.status === 'archived' ? ' selected' : ''}>Archived</option></select></label><button class="btn btn--secondary btn--small" type="submit">Save property</button></form></details></div>`).join('') || '<p class="admin-muted">No properties.</p>'}
     <details class="admin-detail-toggle"><summary>Add a property</summary><form class="admin-form" style="max-width:none" data-form="property-add"><input type="hidden" name="customerId" value="${esc(customerId)}" />${propertyFields({})}<button class="btn btn--secondary btn--small" type="submit">Add property</button></form></details>
     ${benefitsHtml}
-    <h3>History</h3><div class="admin-history">${leads.length ? `<p><strong>Requests:</strong> ${leads.map((lead) => `${esc(lead.request_type)} (${esc(lead.status)})`).join(', ')}</p>` : ''}${estimates.length ? `<p><strong>Estimates:</strong> ${estimates.map((estimate) => `${esc(estimate.quote_reference)} (${money(estimate.total_cents)})`).join(', ')}</p>` : ''}${appointments.length ? `<p><strong>Appointments:</strong> ${appointments.map((appointment) => `${esc(appointment.reference)} (${esc(appointment.status)})`).join(', ')}</p>` : ''}${invoices.length ? `<p><strong>Invoices:</strong> ${invoices.map((invoice) => `${esc(invoice.number)} (${money(invoice.balance_cents)} balance)`).join(', ')}</p>` : ''}</div>
-    <h3>Documents &amp; agreements</h3>${documentRequests.length ? documentRequests.map((request) => `<div class="admin-record"><p><strong>${esc(request.bundle_code)}</strong> — ${esc(titleCase(request.status))}</p><p class="admin-muted">Signed ${esc(request.signed_count)} · Awaiting verification ${esc(request.awaiting_verification)} · ${esc(dateTime(request.created_at))}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded.</p>'}
+    <h3>History</h3><div class="admin-history">${leads.length ? `<p><strong>Requests:</strong> ${leads.map((lead) => `${esc(lead.request_type)} (${esc(lead.status)})`).join(', ')}</p>` : ''}${estimates.length ? `<p><strong>Estimates:</strong> ${estimates.map((estimate) => `${esc(estimate.quote_reference)} (${money(estimate.total_cents)})`).join(', ')}</p>` : ''}${appointments.length ? `<p><strong>Appointments:</strong> ${appointments.map((appointment) => `${esc(appointment.reference)} (${esc(appointment.status)})`).join(', ')}</p>` : ''}${recurringPlans.length ? `<p><strong>Recurring plans:</strong> ${recurringPlans.map((plan) => `${esc(titleCase(plan.frequency))} (${esc(plan.status)})`).join(', ')}</p>` : ''}${invoices.length ? `<p><strong>Invoices:</strong> ${invoices.map((invoice) => `${esc(invoice.number)} (${money(invoice.balance_cents)} balance)`).join(', ')}</p>` : ''}</div>
+    <h3>Quick Estimates</h3>${quickEstimates.length ? quickEstimates.map((estimate) => `<div class="admin-record"><p><strong>${esc(titleCase(estimate.engine))}</strong> · ${money(estimate.total_cents)} · ${esc(titleCase(estimate.status))}</p><p class="admin-muted">${esc(estimate.address_text || 'Address not recorded')} · ${esc(dateTime(estimate.created_at))}${estimate.converted_request_id ? ` · Converted to ${esc(estimate.converted_request_id)}` : ''}</p></div>`).join('') : '<p class="admin-muted">No Quick Estimates recorded.</p>'}
+    <h3>Gift certificates</h3>${gifts.length ? gifts.map((gift) => `<div class="admin-record"><p><strong>${esc(gift.code)}</strong> · ${esc(titleCase(gift.status))} · ${money(gift.balance_cents)} remaining</p><p class="admin-muted">${esc(titleCase(gift.role))} · ${money(gift.value_cents)} original value · ${esc(dateTime(gift.created_at))}</p></div>`).join('') : '<p class="admin-muted">No gift certificates for this customer.</p>'}
+    <h3>Documents &amp; agreements</h3>${documentRequests.length ? documentRequests.map((request) => `<div class="admin-record"><p><strong>${esc(request.packet_name || request.bundle_code)}</strong> — ${esc(titleCase(request.status))}</p><p class="admin-muted">Signed ${esc(request.signed_count)} · Awaiting verification ${esc(request.awaiting_verification)} · ${esc(dateTime(request.created_at))}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded.</p>'}
     <h3>Notes</h3>${notes.map((note) => `<div class="admin-record"><p>${esc(note.body)}</p><p class="admin-muted">${esc(dateTime(note.created_at))}</p></div>`).join('') || '<p class="admin-muted">No notes.</p>'}
     <form class="admin-form" data-form="note-add" style="max-width:none;"><input type="hidden" name="customerId" value="${esc(customerId)}" /><label>Add note <textarea name="body" rows="3" required></textarea></label><button class="btn btn--secondary btn--small" type="submit">Add note</button></form>
     <details class="admin-detail-toggle" data-customer-edit><summary>Edit customer</summary>${customerForm({ ...customer, email, phone })}</details>
@@ -1747,6 +1758,424 @@ async function loadManualBooking(): Promise<void> {
   await refreshManualCommitments();
 }
 
+interface QuickQuoteView {
+  status: string;
+  totalCents: number | null;
+  range: { low: number; high: number } | null;
+  laborHours: number | null;
+  durationMinutes: number | null;
+  cleaningSubtotalCents: number | null;
+  extrasSubtotalCents: number | null;
+  travelAdjustmentCents: number | null;
+  discountAmountCents: number | null;
+  discountLabel: string | null;
+  ongoingPerVisitCents: number | null;
+  ongoingFrequency: string | null;
+  pricingVersion: string;
+  serviceCode: string;
+  message: string | null;
+  entitlement: { code: string; percent: number; discountCents: number; label: string } | null;
+  travel?: { oneWayMiles: number | null; verified: boolean };
+}
+
+let quickEstimateId = '';
+let quickLastQuote: QuickQuoteView | null = null;
+
+function quickForm(): HTMLFormElement | null {
+  return document.querySelector<HTMLFormElement>('[data-quick-form]');
+}
+
+function quickField<T extends HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(name: string): T | null {
+  return quickForm()?.elements.namedItem(name) as T | null;
+}
+
+function quickValue(name: string): string {
+  return quickField<HTMLInputElement>(name)?.value.trim() ?? '';
+}
+
+function quickPayload(): Record<string, unknown> {
+  const addonIds = [...document.querySelectorAll<HTMLInputElement>('[data-quick-addon]:checked')].map((box) => box.value);
+  return {
+    ...(quickEstimateId ? { id: quickEstimateId } : {}),
+    customerId: quickValue('customerId'),
+    propertyId: quickValue('propertyId'),
+    branchId: quickValue('branchId'),
+    customerName: quickValue('customerName'),
+    customerEmail: quickValue('customerEmail'),
+    customerPhone: quickValue('customerPhone'),
+    addressLine1: quickValue('addressLine1'),
+    city: quickValue('city'),
+    state: quickValue('state'),
+    postalCode: quickValue('postalCode'),
+    serviceDate: quickValue('serviceDate'),
+    engine: quickValue('engine'),
+    serviceType: quickValue('serviceType'),
+    propertyType: quickValue('propertyType'),
+    squareFeet: quickValue('squareFeet'),
+    bedrooms: quickValue('bedrooms'),
+    fullBaths: quickValue('fullBaths'),
+    halfBaths: quickValue('halfBaths'),
+    beds: quickValue('beds'),
+    pets: quickValue('pets'),
+    condition: quickValue('condition'),
+    lastClean: quickValue('lastClean'),
+    frequency: quickValue('frequency'),
+    supportiveEligible: quickField<HTMLInputElement>('supportiveEligible')?.checked ?? false,
+    promotionCode: quickValue('promotionCode'),
+    addonIds,
+    notes: quickValue('notes'),
+    facility: {
+      facilityType: quickValue('facilityType'),
+      cleanableSqft: quickValue('cleanableSqft'),
+      restroomFixtures: quickValue('restroomFixtures'),
+      breakroom: quickValue('breakroom') === 'breakroom' || quickValue('breakroom') === 'kitchen',
+      condition: quickValue('facilityCondition'),
+      traffic: quickValue('traffic'),
+      flooring: quickValue('flooring'),
+      firstClean: quickField<HTMLInputElement>('firstClean')?.checked ?? false,
+      specialty: quickField<HTMLInputElement>('specialty')?.checked ?? false,
+      frequency: quickValue('facilityFrequency'),
+    },
+  };
+}
+
+function syncQuickEngine(): void {
+  const engine = quickValue('engine') || 'residential';
+  const facility = engine === 'commercial' || engine === 'church';
+  const residential = document.querySelector<HTMLElement>('[data-quick-residential]');
+  const facilityFields = document.querySelector<HTMLElement>('[data-quick-facility]');
+  if (residential) residential.hidden = facility;
+  if (facilityFields) facilityFields.hidden = !facility;
+  const service = quickField<HTMLSelectElement>('serviceType');
+  if (service) {
+    service.closest('label')?.toggleAttribute('hidden', facility);
+    if (facility) service.value = 'standard';
+  }
+  const note = document.querySelector<HTMLElement>('[data-quick-benefit-note]');
+  if (note) {
+    note.textContent = quickValue('customerId')
+      ? 'FRIENDS15 is applied automatically when this customer has an active account benefit. Community Support requires the eligibility checkbox.'
+      : 'FRIENDS15 requires the estimate to be assigned to an existing customer. Community Support is a self-attested eligibility discount. Gift certificates are applied as payment at checkout, not as a discount.';
+  }
+}
+
+function renderQuickOptionLists(): void {
+  const addonList = document.querySelector<HTMLElement>('[data-quick-addon-list]');
+  if (addonList && addonList.childElementCount === 0) {
+    addonList.innerHTML = pricing.addons.items
+      .map(
+        (addon) =>
+          `<label><input type="checkbox" data-quick-addon value="${esc(addon.id)}" /> ${esc(addon.label)}${
+            addon.customQuote ? ' <span class="admin-muted">(custom quote)</span>' : ''
+          }</label>`,
+      )
+      .join('');
+  }
+  const bundleList = document.querySelector<HTMLElement>('[data-quick-bundle-list]');
+  if (bundleList && bundleList.childElementCount === 0) {
+    const enabled = pricing.promotions.addonBundles.filter((bundle) => bundle.enabled);
+    bundleList.innerHTML = enabled.length
+      ? enabled
+          .map(
+            (bundle) =>
+              `<label><input type="checkbox" data-quick-bundle value="${esc(bundle.id)}" data-bundle-required="${esc(
+                bundle.requiredAddonIds.join(','),
+              )}" /> ${esc(bundle.label)}</label>`,
+          )
+          .join('')
+      : '<p class="admin-muted">No add-on bundles are enabled.</p>';
+  }
+}
+
+async function loadQuickCustomerOptions(): Promise<void> {
+  const select = quickField<HTMLSelectElement>('customerId');
+  if (!select) return;
+  const data = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?limit=200');
+  select.innerHTML = `<option value="">New inquiry</option>${(data.customers ?? [])
+    .map((customer) => `<option value="${esc(customer.id)}">${esc(
+      [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || 'Customer',
+    )}${customer.email ? ` - ${esc(customer.email)}` : ''}</option>`)
+    .join('')}`;
+}
+
+async function loadQuickProperties(customerId: string, selected = ''): Promise<void> {
+  const select = quickField<HTMLSelectElement>('propertyId');
+  if (!select) return;
+  if (!customerId) {
+    select.innerHTML = '<option value="">Choose a customer first</option>';
+    return;
+  }
+  const data = await api<{ properties?: Array<Record<string, unknown>> }>(
+    `/api/admin/bookings?view=context&customerId=${encodeURIComponent(customerId)}`,
+  );
+  select.innerHTML = `<option value="">No property selected</option>${(data.properties ?? [])
+    .map((property) => `<option value="${esc(property.id)}" ${String(property.id) === selected ? 'selected' : ''}>${esc(
+      property.label || property.line1 || 'Property',
+    )} - ${esc([property.line1, property.city].filter(Boolean).join(', '))}</option>`)
+    .join('')}`;
+}
+
+async function applyQuickCustomer(): Promise<void> {
+  const customerId = quickValue('customerId');
+  const select = quickField<HTMLSelectElement>('customerId');
+  const option = select?.selectedOptions[0];
+  const label = option?.textContent ?? '';
+  const email = label.includes(' - ') ? label.split(' - ').pop() ?? '' : '';
+  if (customerId) {
+    const name = label.split(' - ')[0] ?? '';
+    const nameField = quickField<HTMLInputElement>('customerName');
+    if (nameField && !nameField.value) nameField.value = name;
+    const emailField = quickField<HTMLInputElement>('customerEmail');
+    if (emailField && !emailField.value && email.includes('@')) emailField.value = email;
+    await loadQuickProperties(customerId);
+  } else {
+    await loadQuickProperties('');
+  }
+  syncQuickEngine();
+}
+
+function applyQuickProperty(): void {
+  const propertyId = quickValue('propertyId');
+  const select = quickField<HTMLSelectElement>('propertyId');
+  if (!propertyId || !select) return;
+  const option = select.selectedOptions[0];
+  const label = option?.textContent ?? '';
+  const [, address = ''] = label.split(' - ');
+  if (address) {
+    const line = address.split(',')[0]?.trim();
+    const city = address.split(',')[1]?.trim();
+    const lineField = quickField<HTMLInputElement>('addressLine1');
+    const cityField = quickField<HTMLInputElement>('city');
+    if (lineField && !lineField.value && line) lineField.value = line;
+    if (cityField && !cityField.value && city) cityField.value = city;
+  }
+}
+
+function renderQuickQuote(quote: QuickQuoteView): void {
+  const target = document.querySelector<HTMLElement>('[data-quick-result]');
+  if (!target) return;
+  if (quote.status !== 'priced') {
+    target.innerHTML = `<p class="admin-error">${esc(quote.message ?? 'This scope needs personal confirmation.')}</p>`;
+    return;
+  }
+  const rows: Array<[string, string]> = [];
+  if (quote.cleaningSubtotalCents !== null) rows.push(['Cleaning service', money(quote.cleaningSubtotalCents)]);
+  if (quote.extrasSubtotalCents) rows.push(['Extras', money(quote.extrasSubtotalCents)]);
+  if (quote.travelAdjustmentCents) rows.push(['Travel adjustment', money(quote.travelAdjustmentCents)]);
+  if (quote.discountAmountCents) rows.push([quote.discountLabel ?? 'Discount', `-${money(quote.discountAmountCents)}`]);
+  rows.push(['Estimated total', money(quote.totalCents)]);
+  if (quote.ongoingPerVisitCents !== null) {
+    rows.push([`Ongoing ${titleCase(quote.ongoingFrequency ?? 'visit')} visit`, money(quote.ongoingPerVisitCents)]);
+  }
+  target.innerHTML = `<div class="admin-card"><h3>${esc(money(quote.totalCents))} ${quote.range ? `<span class="admin-muted">(${esc(money(quote.range.low))} - ${esc(money(quote.range.high))})</span>` : ''}</h3><p class="admin-muted">Pricing version ${esc(quote.pricingVersion)} · ${quote.laborHours !== null ? `${esc(quote.laborHours)} labor hour(s)` : 'scope review'}${quote.travel?.oneWayMiles !== null && quote.travel?.oneWayMiles !== undefined ? ` · ${esc(quote.travel.oneWayMiles)} mi one way${quote.travel.verified ? ' verified' : ' preliminary'}` : ''}</p>${quote.entitlement ? `<p class="admin-muted">${esc(quote.entitlement.label)} ${esc(quote.entitlement.percent)}% account benefit applied.</p>` : ''}<div class="admin-table-scroll"><table class="admin-table"><tbody>${rows.map(([label, value]) => `<tr><td>${esc(label)}</td><td style="text-align:right">${esc(value)}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+
+async function quickCalculate(): Promise<QuickQuoteView | null> {
+  const target = document.querySelector<HTMLElement>('[data-quick-result]');
+  if (target) target.textContent = 'Calculating with the published pricing...';
+  try {
+    const result = await api<{ quote?: QuickQuoteView }>('/api/admin/quick-estimates', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'calculate', ...quickPayload() }),
+    });
+    const quote = result.quote ?? null;
+    quickLastQuote = quote;
+    if (quote) renderQuickQuote(quote);
+    return quote;
+  } catch (error) {
+    if (target) target.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
+    return null;
+  }
+}
+
+async function quickSave(status: 'saved' | 'draft'): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-quick-result]');
+  try {
+    const result = await api<{ id: string; status: string; quote: QuickQuoteView }>('/api/admin/quick-estimates', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'save', status, ...quickPayload() }),
+    });
+    quickEstimateId = result.id;
+    quickLastQuote = result.quote;
+    renderQuickQuote(result.quote);
+    if (target) target.insertAdjacentHTML('afterbegin', `<p class="admin-status-message" role="status">Estimate ${status === 'draft' ? 'draft' : ''} saved. Reference ${esc(result.id)}.</p>`);
+    await loadQuickList();
+  } catch (error) {
+    if (target) target.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
+  }
+}
+
+async function loadQuickList(status = '', q = ''): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-quick-list]');
+  if (!target) return;
+  const data = await api<{ estimates?: Array<Record<string, unknown>> }>(
+    `/api/admin/quick-estimates?view=list&status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}`,
+  );
+  renderTable(target, ['Updated', 'Customer', 'Service', 'Address', 'Total', 'Status', 'Actions'], (data.estimates ?? []).map((estimate) => [
+    esc(dateTime(estimate.updated_at)),
+    esc([estimate.customer_name, estimate.customer_email].filter(Boolean).join(' - ') || [estimate.first_name, estimate.last_name].filter(Boolean).join(' ') || 'Inquiry'),
+    esc(titleCase(estimate.engine ?? '')),
+    esc(estimate.address_text ?? ''),
+    money(estimate.total_cents),
+    `<span class="admin-status">${esc(titleCase(estimate.status ?? ''))}</span>`,
+    `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-quick-open="${esc(estimate.id)}">Open</button><a class="btn btn--ghost btn--small" href="/api/admin/quick-estimates?view=pdf&id=${encodeURIComponent(String(estimate.id))}">PDF</a>${estimate.status !== 'converted' && estimate.status !== 'discarded' ? `<button class="btn btn--ghost btn--small" type="button" data-quick-convert="${esc(estimate.id)}">Convert</button><button class="btn btn--ghost btn--small" type="button" data-quick-discard="${esc(estimate.id)}">Discard</button>` : ''}</div>`,
+  ]), 'No Quick Estimates yet.');
+}
+
+async function openQuickEstimate(id: string): Promise<void> {
+  const data = await api<{ estimate?: Record<string, unknown>; input?: Record<string, unknown>; quote?: QuickQuoteView }>(
+    `/api/admin/quick-estimates?view=open&id=${encodeURIComponent(id)}`,
+  );
+  const record = data.estimate;
+  const input = data.input;
+  if (!record || !input) return;
+  quickEstimateId = String(record.id);
+  const form = quickForm();
+  if (!form) return;
+  const set = (name: string, value: unknown): void => {
+    const field = form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+    if (field) field.value = value === null || value === undefined ? '' : String(value);
+  };
+  set('customerId', input.customerId ?? record.customer_id ?? '');
+  set('branchId', input.branchId ?? record.branch_id ?? 'branch_pensacola');
+  set('customerName', input.customerName ?? record.customer_name ?? '');
+  set('customerEmail', input.customerEmail ?? record.customer_email ?? '');
+  set('customerPhone', input.customerPhone ?? record.customer_phone ?? '');
+  set('addressLine1', input.addressLine1 ?? '');
+  set('city', input.city ?? '');
+  set('state', input.state ?? 'FL');
+  set('postalCode', input.postalCode ?? '');
+  set('serviceDate', input.serviceDate ?? '');
+  set('engine', input.engine ?? 'residential');
+  set('serviceType', input.serviceType ?? 'standard');
+  set('propertyType', input.propertyType ?? 'house');
+  set('squareFeet', input.squareFeet ?? '');
+  set('bedrooms', input.bedrooms ?? '');
+  set('fullBaths', input.fullBaths ?? '');
+  set('halfBaths', input.halfBaths ?? '');
+  set('beds', input.beds ?? '');
+  set('pets', input.pets ?? 'none');
+  set('condition', input.condition ?? 'maintained');
+  set('lastClean', input.lastClean ?? 'within_month');
+  set('frequency', input.frequency ?? 'one_time');
+  set('promotionCode', input.promotionCode ?? '');
+  set('notes', input.notes ?? '');
+  set('facilityType', (input.facility as Record<string, unknown> | undefined)?.facilityType ?? 'office');
+  set('cleanableSqft', (input.facility as Record<string, unknown> | undefined)?.cleanableSqft ?? '');
+  set('restroomFixtures', (input.facility as Record<string, unknown> | undefined)?.restroomFixtures ?? '');
+  set('facilityCondition', (input.facility as Record<string, unknown> | undefined)?.condition ?? 'average');
+  set('traffic', (input.facility as Record<string, unknown> | undefined)?.traffic ?? 'average');
+  set('flooring', (input.facility as Record<string, unknown> | undefined)?.flooring ?? 'mixed');
+  set('facilityFrequency', (input.facility as Record<string, unknown> | undefined)?.frequency ?? 'weekly');
+  const supportive = form.elements.namedItem('supportiveEligible') as HTMLInputElement | null;
+  if (supportive) supportive.checked = Boolean(input.supportiveEligible);
+  await loadQuickProperties(String(input.customerId ?? ''), String(input.propertyId ?? ''));
+  syncQuickEngine();
+  if (data.quote) {
+    quickLastQuote = data.quote;
+    renderQuickQuote(data.quote);
+  }
+  form.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+async function quickDiscard(): Promise<void> {
+  if (!quickEstimateId) throw new Error('Save the estimate before discarding it.');
+  if (!window.confirm('Discard this Quick Estimate? It stays in the audit record and is never hard-deleted.')) return;
+  await api('/api/admin/quick-estimates', { method: 'POST', body: JSON.stringify({ action: 'discard', id: quickEstimateId }) });
+  await loadQuickList();
+  quickEstimateId = '';
+  quickForm()?.reset();
+  const target = document.querySelector<HTMLElement>('[data-quick-result]');
+  if (target) target.innerHTML = '<p class="admin-muted">Estimate discarded.</p>';
+}
+
+async function quickDownloadPdf(): Promise<void> {
+  const headers = new Headers({ 'Content-Type': 'application/json', Accept: 'application/pdf' });
+  if (csrf) headers.set('X-CSRF-Token', csrf);
+  const response = await fetch('/api/admin/quick-estimates', {
+    method: 'POST',
+    headers,
+    credentials: 'same-origin',
+    body: JSON.stringify({ action: 'pdf', ...quickPayload() }),
+  });
+  if (!response.ok) {
+    const result = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(result.error ?? `HTTP ${response.status}`);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `quick-estimate-${quickEstimateId || 'draft'}.pdf`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+async function quickEmail(): Promise<void> {
+  if (!quickEstimateId) throw new Error('Save the estimate before emailing it.');
+  const result = await api<{ status?: string }>('/api/admin/quick-estimates', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'email',
+      id: quickEstimateId,
+      email: quickValue('customerEmail'),
+    }),
+  });
+  const target = document.querySelector<HTMLElement>('[data-quick-result]');
+  if (target) target.insertAdjacentHTML('afterbegin', `<p class="admin-status-message" role="status">${result.status === 'sent' ? 'Estimate emailed.' : 'Estimate email not sent.'}</p>`);
+}
+
+async function quickConvertTimes(): Promise<void> {
+  const form = document.querySelector<HTMLFormElement>('[data-quick-convert]');
+  const status = document.querySelector<HTMLElement>('[data-quick-convert-status]');
+  if (!form || !status) return;
+  const data = new FormData(form);
+  const date = String(data.get('date') ?? '');
+  const customerId = quickValue('customerId');
+  const propertyId = quickValue('propertyId');
+  if (!customerId || !propertyId) {
+    status.textContent = 'Assign the estimate to a customer and property before converting.';
+    return;
+  }
+  if (!date) {
+    status.textContent = 'Choose a date first.';
+    return;
+  }
+  status.textContent = 'Checking real availability...';
+  try {
+    const result = await api<{ availability?: { ok: boolean; reason?: string; slots: Array<{ start: string; end: string; label: string }> } }>(
+      `/api/admin/bookings?view=availability&customerId=${encodeURIComponent(customerId)}&propertyId=${encodeURIComponent(propertyId)}&date=${encodeURIComponent(date)}&durationMinutes=${encodeURIComponent(String(quickLastQuote?.durationMinutes ?? 120))}&crewSize=${encodeURIComponent(String(data.get('crewSize') ?? '1'))}`,
+    );
+    const availability = result.availability;
+    const select = form.elements.namedItem('start') as HTMLSelectElement | null;
+    if (!availability?.ok) {
+      status.textContent = `No availability: ${friendly(availability?.reason ?? 'unavailable')}`;
+      return;
+    }
+    if (select) {
+      select.innerHTML = `<option value="">Choose a time</option>${availability.slots.map((slot) => `<option value="${esc(slot.start)}" data-end="${esc(slot.end)}">${esc(slot.label)}</option>`).join('')}`;
+    }
+    status.textContent = `${availability.slots.length} real appointment time(s) available.`;
+  } catch (error) {
+    status.textContent = friendly(error);
+  }
+}
+
+async function loadQuickEstimate(): Promise<void> {
+  renderQuickOptionLists();
+  await loadQuickCustomerOptions();
+  const promotionSelect = quickField<HTMLSelectElement>('promotionCode');
+  if (promotionSelect) {
+    const data = await api<{ promotions?: Array<Record<string, unknown>> }>('/api/admin/promotions');
+    const active = (data.promotions ?? []).filter((promotion) =>
+      promotion.editable !== false && ['active'].includes(String(promotion.displayStatus ?? promotion.status ?? '')),
+    );
+    promotionSelect.innerHTML = `<option value="">Automatic eligible benefit</option>${active.map((promotion) => `<option value="${esc(promotion.code)}">${esc(promotion.name)} (${esc(promotion.code)})</option>`).join('')}`;
+  }
+  syncQuickEngine();
+  await loadQuickList();
+}
+
 async function loadJobs(): Promise<void> {
   const data = await api<{ jobs?: Array<Record<string, unknown>>; team?: Array<Record<string, unknown>> }>('/api/admin/operations?view=jobs');
   const team = data.team ?? [];
@@ -2126,7 +2555,29 @@ async function loadReports(): Promise<void> {
   if (!target) return;
   const sum = (rows: unknown) => Array.isArray(rows) ? rows.reduce((total, row) => total + Number((row as Record<string, number>).count ?? 0), 0) : 0;
   const customers = report.customers as Record<string, number> | undefined;
-  target.innerHTML = `<div class="admin-grid">${[['Active customers', customers?.active ?? 0], ['Archived customers', customers?.archived ?? 0], ['Leads', sum(report.leads)], ['Jobs', sum(report.appointments)], ['Recurring plans', sum(report.recurring)], ['Invoices', sum(report.invoices)]].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('')}</div><div class="admin-card" style="margin-top:1rem;"><h2 class="admin-section-title">Monthly collected revenue</h2><div data-admin-report-monthly></div></div><div class="admin-card" style="margin-top:1rem;"><h2 class="admin-section-title">Gift activity</h2><div class="admin-grid">${giftData.configured ? [['Issued', giftSummary.issuedCount ?? 0], ['Active', giftSummary.activeCount ?? 0], ['Outstanding', money(giftSummary.outstandingCents)], ['Redeemed', money(giftSummary.redeemedCents)]].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('') : '<p class="admin-muted">Gift storage is not configured.</p>'}</div></div><div class="admin-card" style="margin-top:1rem;"><h2 class="admin-section-title">Payment mix</h2><div data-admin-report-payments></div></div>`;
+  const financial = (report.financial ?? {}) as Record<string, number>;
+  target.innerHTML = `<div class="admin-grid">${[
+    ['Active customers', customers?.active ?? 0],
+    ['Archived customers', customers?.archived ?? 0],
+    ['Leads', sum(report.leads)],
+    ['Jobs', sum(report.appointments)],
+    ['Recurring plans', sum(report.recurring)],
+    ['Invoices', sum(report.invoices)],
+  ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('')}</div>
+  <div class="admin-card" style="margin-top:1rem;"><h2 class="admin-section-title">Revenue, by actual stage</h2>
+    <p class="admin-muted">Quoted work is not cash. Invoiced work is not collected. Each figure below is a separate accounting fact.</p>
+    <div class="admin-grid">${[
+      ['Open quoted estimates', money(financial.quotedCents)],
+      ['Invoiced (non-void)', money(financial.invoicedCents)],
+      ['Collected payments', money(financial.collectedCents)],
+      ['Outstanding balances', money(financial.outstandingCents)],
+      ['Discounts on invoices', money(financial.discountCents)],
+      ['Refunded', money(financial.refundedCents)],
+      ['Net collected', money(financial.netCollectedCents)],
+      ['Recurring monthly value', money(financial.recurringMonthlyCents)],
+    ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('')}</div>
+  </div>
+  <div class="admin-card" style="margin-top:1rem;"><h2 class="admin-section-title">Monthly collected revenue</h2><div data-admin-report-monthly></div></div><div class="admin-card" style="margin-top:1rem;"><h2 class="admin-section-title">Gift activity</h2><div class="admin-grid">${giftData.configured ? [['Issued', giftSummary.issuedCount ?? 0], ['Active', giftSummary.activeCount ?? 0], ['Outstanding', money(giftSummary.outstandingCents)], ['Redeemed', money(giftSummary.redeemedCents)]].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('') : '<p class="admin-muted">Gift storage is not configured.</p>'}</div></div><div class="admin-card" style="margin-top:1rem;"><h2 class="admin-section-title">Payment mix</h2><div data-admin-report-payments></div></div>`;
   const monthly = target.querySelector<HTMLElement>('[data-admin-report-monthly]');
   if (monthly) renderTable(monthly, ['Month', 'Payments', 'Collected'], ((report.monthly as Array<Record<string, unknown>>) ?? []).map((row) => [esc(row.month), esc(row.payment_count), esc(money(row.payment_cents))]), 'No payment history yet.');
   const payments = target.querySelector<HTMLElement>('[data-admin-report-payments]');
@@ -2182,24 +2633,38 @@ async function loadDocuments(): Promise<void> {
   const requests = requestData.requests ?? [];
   const templateTarget = document.querySelector<HTMLElement>('[data-admin-documents-templates]');
   if (templateTarget) {
-    renderTable(templateTarget, ['Title', 'Category', 'Version', 'Status', 'Actions'], templates.map((template) => [
-      esc(template.title),
-      esc(template.category),
-      esc(template.version),
-      `<span class="admin-status">${esc(titleCase(template.status))}</span>`,
-      `<div class="admin-actions">${template.status === 'draft' && actor?.role === 'owner' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-approve" data-id="${esc(template.id)}">Approve</button>` : ''}${template.status !== 'retired' && actor?.role === 'owner' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-retire" data-id="${esc(template.id)}">Retire</button>` : ''}</div>`,
-    ]), 'No document templates are configured yet.');
+    renderTable(templateTarget, ['Title', 'Category', 'Version', 'Legal review', 'Status', 'Actions'], templates.map((template) => {
+      const owner = actor?.role === 'owner';
+      const actions = [
+        template.status === 'draft' && owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-edit" data-id="${esc(template.id)}">Edit</button>` : '',
+        template.status === 'draft' && owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-approve" data-id="${esc(template.id)}">Approve</button>` : '',
+        owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-duplicate" data-id="${esc(template.id)}">Duplicate</button>` : '',
+        `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=template-download&id=${encodeURIComponent(String(template.id))}">Download</a>`,
+        `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-history" data-id="${esc(template.id)}">History</button>`,
+        template.status === 'retired' && owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-restore" data-id="${esc(template.id)}">Restore</button>` : '',
+        template.status !== 'retired' && owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-retire" data-id="${esc(template.id)}">Retire</button>` : '',
+      ].filter(Boolean).join('');
+      return [
+        esc(template.title),
+        esc(template.category),
+        esc(template.version),
+        esc(titleCase(template.legal_review_status ?? 'not_reviewed')),
+        `<span class="admin-status">${esc(titleCase(template.status))}</span>`,
+        `<div class="admin-actions">${actions}</div>`,
+      ];
+    }), 'No document templates are configured yet.');
   }
   const bundleTarget = document.querySelector<HTMLElement>('[data-admin-documents-bundles]');
   if (bundleTarget) {
-    renderTable(bundleTarget, ['Code', 'Name', 'Subject', 'Documents', 'Status', 'Actions'], bundles.map((bundle) => [
+    renderTable(bundleTarget, ['Code', 'Name', 'Purpose', 'Type', 'Documents', 'Status', 'Actions'], bundles.map((bundle) => [
       esc(bundle.code),
       esc(bundle.name),
-      esc(titleCase(bundle.subject_type)),
+      esc(titleCase(bundle.purpose ?? bundle.subject_type)),
+      esc(titleCase(bundle.packet_type ?? 'custom')),
       esc(bundle.document_count),
       `<span class="admin-status">${esc(titleCase(bundle.status))}</span>`,
-      `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-bundle-open" data-id="${esc(bundle.id)}">View documents</button>`,
-    ]), 'No document bundles are configured yet.');
+      `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-bundle-open" data-id="${esc(bundle.id)}">Manage documents</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-packet-preview" data-id="${esc(bundle.id)}">Preview</button>${actor?.role === 'owner' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-packet-duplicate" data-id="${esc(bundle.id)}">Duplicate</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="${bundle.status === 'active' ? 'document-packet-archive' : 'document-packet-restore'}" data-id="${esc(bundle.id)}">${bundle.status === 'active' ? 'Archive' : 'Restore'}</button>` : ''}</div>`,
+    ]), 'No document packets are configured yet.');
   }
   const requestTarget = document.querySelector<HTMLElement>('[data-admin-documents-requests]');
   if (requestTarget) {
@@ -2219,6 +2684,100 @@ async function loadDocuments(): Promise<void> {
   for (const select of document.querySelectorAll<HTMLSelectElement>('[data-document-bundle-options]')) {
     select.innerHTML = `<option value="">Choose a bundle</option>${bundles.map((bundle) => `<option value="${esc(bundle.id)}">${esc(bundle.name)}</option>`).join('')}`;
   }
+  for (const select of document.querySelectorAll<HTMLSelectElement>('[data-document-send-bundle]')) {
+    select.innerHTML = `<option value="">Automatic (service rules)</option>${bundles.filter((bundle) => bundle.status === 'active').map((bundle) => `<option value="${esc(bundle.id)}">${esc(bundle.name)} (${esc(bundle.code)})</option>`).join('')}`;
+  }
+  (window as unknown as { __ssDocuments?: Array<Record<string, unknown>> }).__ssDocuments = templates;
+  (window as unknown as { __ssPackets?: Array<Record<string, unknown>> }).__ssPackets = bundles;
+}
+
+function documentEditForm(): HTMLFormElement | null {
+  return document.querySelector<HTMLFormElement>('[data-document-template-edit]');
+}
+
+async function openTemplateEdit(templateId: string): Promise<void> {
+  const form = documentEditForm();
+  if (!form) return;
+  const data = await api<{ template?: Record<string, unknown> }>(
+    `/api/admin/documents?view=template&id=${encodeURIComponent(templateId)}`,
+  );
+  const template = data.template;
+  if (!template) {
+    setAppError('That template could not be loaded.');
+    return;
+  }
+  const set = (name: string, value: unknown): void => {
+    const field = form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+    if (field) field.value = value === null || value === undefined ? '' : String(value);
+  };
+  set('templateId', template.id);
+  set('title', template.title);
+  set('category', template.category);
+  set('version', template.version);
+  set('signerParty', template.signer_party);
+  set('familyKey', template.family_key);
+  set('effectiveDate', template.effective_date ? String(template.effective_date).slice(0, 10) : '');
+  set('legalReviewStatus', template.legal_review_status ?? 'not_reviewed');
+  set('contentText', template.content_text);
+  set('packetNotes', template.packet_notes);
+  const verification = form.elements.namedItem('requiresVerification') as HTMLInputElement | null;
+  if (verification) verification.checked = Number(template.requires_verification) === 1;
+  const countersignature = form.elements.namedItem('requiresCountersignature') as HTMLInputElement | null;
+  if (countersignature) countersignature.checked = Number(template.requires_countersignature) === 1;
+  form.hidden = false;
+  form.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+async function showTemplateHistory(templateId: string): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-document-template-result]');
+  if (!target) return;
+  const data = await api<{ history?: Array<Record<string, unknown>> }>(
+    `/api/admin/documents?view=history&entityType=document_template&id=${encodeURIComponent(templateId)}`,
+  );
+  const rows = data.history ?? [];
+  target.innerHTML = rows.length
+    ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>When</th><th>Action</th><th>Result</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${esc(dateTime(row.created_at))}</td><td>${esc(row.action)}</td><td>${Number(row.success) ? 'Success' : 'Failed'}</td></tr>`).join('')}</tbody></table></div>`
+    : '<p class="admin-muted">No audit history for this template yet.</p>';
+}
+
+function documentSendPayload(): Record<string, unknown> {
+  const form = document.querySelector<HTMLFormElement>('[data-document-send]');
+  const data = form ? new FormData(form) : new FormData();
+  return {
+    subjectType: String(data.get('subjectType') ?? 'customer'),
+    customerId: String(data.get('customerId') ?? ''),
+    teamMemberId: String(data.get('teamMemberId') ?? ''),
+    propertyId: String(data.get('propertyId') ?? ''),
+    serviceCode: String(data.get('serviceCode') ?? ''),
+    frequency: String(data.get('frequency') ?? ''),
+    bookingReference: String(data.get('bookingReference') ?? ''),
+    email: String(data.get('email') ?? ''),
+    bundleId: String(data.get('bundleId') ?? ''),
+    instructions: String(data.get('instructions') ?? ''),
+  };
+}
+
+async function previewDocumentPacket(bundleId = ''): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-document-preview-result]');
+  if (target) target.textContent = 'Building packet preview...';
+  try {
+    const payload = documentSendPayload();
+    if (bundleId) payload.bundleId = bundleId;
+    const result = await api<{ preview?: Record<string, unknown> }>('/api/admin/documents', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'preview_packet', ...payload }),
+    });
+    const preview = result.preview;
+    if (!target || !preview) {
+      if (target) target.textContent = 'No packet matched this context.';
+      return;
+    }
+    const requirements = (preview.requirements as Array<Record<string, unknown>>) ?? [];
+    const missing = (preview.missingVariables as string[]) ?? [];
+    target.innerHTML = `<div class="admin-card"><h3>${esc(preview.bundleName)}</h3><p class="admin-muted">${esc(preview.bundleCode)} v${esc(preview.bundleVersion)} · ${esc(preview.totalDocuments)} document(s), ${esc(preview.requiredDocuments)} required</p>${preview.instructions ? `<p>${esc(preview.instructions)}</p>` : ''}${missing.length ? `<p class="admin-error">Unresolved variables block sending: ${missing.map((key) => `<code>${esc(key)}</code>`).join(', ')}</p>` : '<p class="admin-status-message">All supported variables resolve for this context.</p>'}${requirements.length ? `<ol>${requirements.map((item) => `<li><strong>${esc(item.title)}</strong> v${esc(item.version)} · ${esc(titleCase(item.stage))} · ${Number(item.required) ? 'Required' : 'Optional'}${((item.missingVariables as string[] | undefined) ?? []).length ? ` · <span class="admin-error">missing ${esc(((item.missingVariables as string[] | undefined) ?? []).join(', '))}</span>` : ''}<details style="margin:.4rem 0"><summary>Preview document text</summary><pre style="white-space:pre-wrap;max-height:18rem;overflow:auto;font-size:.78rem">${esc(item.contentText || 'PDF document - open the template download to review.')}</pre></details></li>`).join('')}</ol>` : '<p class="admin-muted">This packet has no documents yet. Add owner-approved templates below.</p>'}</div>`;
+  } catch (error) {
+    if (target) target.textContent = friendly(error);
+  }
 }
 
 async function loadDocumentBundleItems(bundleId: string): Promise<void> {
@@ -2229,14 +2788,14 @@ async function loadDocumentBundleItems(bundleId: string): Promise<void> {
     return;
   }
   const data = await api<{ items?: Array<Record<string, unknown>> }>(`/api/admin/documents?view=items&bundleId=${encodeURIComponent(bundleId)}`);
-  renderTable(target, ['Order', 'Document', 'Version', 'Stage', 'Condition', 'Required', 'Actions'], (data.items ?? []).map((item) => [
+  renderTable(target, ['Order', 'Document', 'Version', 'Stage', 'Condition', 'Required', 'Actions'], (data.items ?? []).map((item, index, all) => [
     esc(item.sort_order),
     esc(item.title),
     esc(item.version),
     esc(titleCase(item.enforcement_stage)),
     esc([item.condition_key, item.condition_value].filter(Boolean).join(': ') || '—'),
     Number(item.required) ? 'Yes' : 'No',
-    `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-item-remove" data-id="${esc(item.template_id)}" data-bundle="${esc(bundleId)}">Remove</button>`,
+    `<div class="admin-actions">${index > 0 ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-item-move" data-dir="up" data-id="${esc(item.template_id)}" data-bundle="${esc(bundleId)}" data-stage="${esc(item.enforcement_stage)}" data-required="${Number(item.required) ? '1' : '0'}">Up</button>` : ''}${index < all.length - 1 ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-item-move" data-dir="down" data-id="${esc(item.template_id)}" data-bundle="${esc(bundleId)}" data-stage="${esc(item.enforcement_stage)}" data-required="${Number(item.required) ? '1' : '0'}">Down</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-item-remove" data-id="${esc(item.template_id)}" data-bundle="${esc(bundleId)}">Remove</button></div>`,
   ]), 'This bundle has no documents yet.');
 }
 
@@ -2504,6 +3063,7 @@ async function loadView(view: string): Promise<void> {
     if (view === 'leads') await loadLeads();
     if (view === 'customers') await loadCustomers();
     if (view === 'new-booking') await loadManualBooking();
+    if (view === 'quick-estimate') await loadQuickEstimate();
     if (view === 'recurring') await loadRecurring();
     if (view === 'jobs') await loadJobs();
     if (view === 'documents') await loadDocuments();
@@ -3088,11 +3648,47 @@ document.querySelector<HTMLFormElement>('[data-document-template-text]')?.addEve
       contentText: data.get('contentText'),
       requiresVerification: data.get('requiresVerification') === 'yes',
       requiresCountersignature: data.get('requiresCountersignature') === 'yes',
+      familyKey: data.get('familyKey'),
+      effectiveDate: data.get('effectiveDate'),
+      legalReviewStatus: data.get('legalReviewStatus'),
+      packetNotes: data.get('packetNotes'),
     }),
   }).then(() => {
     documentResult('Draft template saved. Approve it before it can be required.');
     return loadDocuments();
   }).catch((error) => documentResult(friendly(error), 'error'));
+});
+
+document.querySelector<HTMLFormElement>('[data-document-template-edit]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const data = new FormData(form);
+  void api('/api/admin/documents', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'update_draft_template',
+      templateId: data.get('templateId'),
+      title: data.get('title'),
+      category: data.get('category'),
+      version: data.get('version'),
+      signerParty: data.get('signerParty'),
+      contentText: data.get('contentText'),
+      effectiveDate: data.get('effectiveDate'),
+      legalReviewStatus: data.get('legalReviewStatus'),
+      packetNotes: data.get('packetNotes'),
+      requiresVerification: data.get('requiresVerification') === 'yes',
+      requiresCountersignature: data.get('requiresCountersignature') === 'yes',
+    }),
+  }).then(() => {
+    form.hidden = true;
+    documentResult('Draft template updated. Approved templates cannot be edited in place; duplicate them as a new version.');
+    return loadDocuments();
+  }).catch((error) => documentResult(friendly(error), 'error'));
+});
+
+document.querySelector<HTMLButtonElement>('[data-document-edit-cancel]')?.addEventListener('click', () => {
+  const form = documentEditForm();
+  if (form) form.hidden = true;
 });
 
 document.querySelector<HTMLFormElement>('[data-document-template-upload]')?.addEventListener('submit', (event) => {
@@ -3124,9 +3720,12 @@ document.querySelector<HTMLFormElement>('[data-document-bundle-create]')?.addEve
       name: data.get('name'),
       subjectType: data.get('subjectType'),
       serviceCategory: data.get('serviceCategory'),
+      purpose: data.get('purpose'),
+      packetType: data.get('packetType'),
+      instructions: data.get('instructions'),
     }),
   }).then(() => {
-    documentResult('Bundle created.');
+    documentResult('Packet created.');
     return loadDocuments();
   }).catch((error) => documentResult(friendly(error), 'error'));
 });
@@ -3153,6 +3752,10 @@ document.querySelector<HTMLFormElement>('[data-document-bundle-item]')?.addEvent
   }).catch((error) => documentResult(friendly(error), 'error'));
 });
 
+document.querySelector<HTMLButtonElement>('[data-document-preview]')?.addEventListener('click', () => {
+  void previewDocumentPacket().catch((error) => setAppError(friendly(error)));
+});
+
 document.querySelector<HTMLFormElement>('[data-document-send]')?.addEventListener('submit', (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget as HTMLFormElement);
@@ -3164,10 +3767,13 @@ document.querySelector<HTMLFormElement>('[data-document-send]')?.addEventListene
       subjectType: data.get('subjectType'),
       customerId: data.get('customerId'),
       teamMemberId: data.get('teamMemberId'),
+      propertyId: data.get('propertyId'),
       serviceCode: data.get('serviceCode'),
       frequency: data.get('frequency'),
       bookingReference: data.get('bookingReference'),
       email: data.get('email'),
+      bundleId: data.get('bundleId'),
+      instructions: data.get('instructions'),
     }),
   }).then((result) => {
     if (target) {
@@ -3328,7 +3934,66 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'document-approve') void action('/api/admin/documents', { action: 'approve_template', templateId: id });
   if (actionName === 'document-retire') void action('/api/admin/documents', { action: 'retire_template', templateId: id });
+  if (actionName === 'document-edit') void openTemplateEdit(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'document-history') void showTemplateHistory(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'document-duplicate') {
+    void api('/api/admin/documents', { method: 'POST', body: JSON.stringify({ action: 'duplicate_template', templateId: id }) })
+      .then(() => { documentResult('Template duplicated as a draft.'); return loadDocuments(); })
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'document-restore') {
+    void api('/api/admin/documents', { method: 'POST', body: JSON.stringify({ action: 'restore_template', templateId: id }) })
+      .then(() => { documentResult('Template restored to draft review.'); return loadDocuments(); })
+      .catch((error) => setAppError(friendly(error)));
+  }
   if (actionName === 'document-bundle-open') void loadDocumentBundleItems(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'document-packet-preview') void previewDocumentPacket(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'document-packet-duplicate') {
+    void api('/api/admin/documents', { method: 'POST', body: JSON.stringify({ action: 'duplicate_packet', bundleId: id }) })
+      .then(() => { documentResult('Packet duplicated.'); return loadDocuments(); })
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'document-packet-archive' || actionName === 'document-packet-restore') {
+    void api('/api/admin/documents', {
+      method: 'POST',
+      body: JSON.stringify({ action: actionName === 'document-packet-archive' ? 'archive_packet' : 'restore_packet', bundleId: id }),
+    }).then(() => { documentResult(actionName === 'document-packet-archive' ? 'Packet archived.' : 'Packet restored.'); return loadDocuments(); })
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'document-item-move') {
+    const bundleId = target.dataset.bundle ?? '';
+    const direction = target.dataset.dir === 'up' ? -1 : 1;
+    void api<{ items?: Array<Record<string, unknown>> }>(`/api/admin/documents?view=items&bundleId=${encodeURIComponent(bundleId)}`)
+      .then(async (data) => {
+        const items = data.items ?? [];
+        const index = items.findIndex((item) => String(item.template_id) === id);
+        const other = items[index + direction];
+        if (index < 0 || !other) return;
+        const currentOrder = Number(items[index]?.sort_order) || 0;
+        const otherOrder = Number(other.sort_order) || 0;
+        for (const [templateId, sortOrder, item] of [
+          [id, otherOrder, items[index]],
+          [String(other.template_id), currentOrder, other],
+        ] as Array<[string, number, Record<string, unknown>]>) {
+          await api('/api/admin/documents', {
+            method: 'POST',
+            body: JSON.stringify({
+              action: 'add_item',
+              bundleId,
+              templateId,
+              sortOrder,
+              enforcementStage: item.enforcement_stage,
+              conditionKey: item.condition_key,
+              conditionValue: item.condition_value,
+              perBooking: Number(item.per_booking) === 1,
+              required: Number(item.required) === 1,
+            }),
+          });
+        }
+        await loadDocumentBundleItems(bundleId);
+      })
+      .catch((error) => setAppError(friendly(error)));
+  }
   if (actionName === 'document-item-remove') {
     void action('/api/admin/documents', {
       action: 'remove_item',
@@ -3489,6 +4154,112 @@ document.addEventListener('click', (event) => {
       .then(() => refreshManualCommitments())
       .catch((error) => setAppError(friendly(error)));
   }
+});
+
+document.querySelector<HTMLFormElement>('[data-quick-form]')?.addEventListener('change', (event) => {
+  const target = event.target as HTMLElement | null;
+  if (target?.matches('[data-quick-engine]')) syncQuickEngine();
+  if (target?.matches('[data-quick-customer]')) void applyQuickCustomer().catch((error) => setAppError(friendly(error)));
+  if (target?.matches('[data-quick-property]')) applyQuickProperty();
+  if (target?.matches('[data-quick-bundle]')) {
+    const box = target as HTMLInputElement;
+    const required = (box.dataset.bundleRequired ?? '').split(',').filter(Boolean);
+    for (const addonId of required) {
+      const addon = document.querySelector<HTMLInputElement>(`[data-quick-addon][value="${CSS.escape(addonId)}"]`);
+      if (addon) addon.checked = box.checked;
+    }
+  }
+});
+
+document.querySelector<HTMLElement>('[data-admin-view="quick-estimate"]')?.addEventListener('click', (event) => {
+  const target = event.target as HTMLElement;
+  const actionButton = target.closest<HTMLElement>('[data-quick-action]');
+  if (actionButton) {
+    const action = actionButton.dataset.quickAction;
+    if (action === 'calculate') void quickCalculate();
+    if (action === 'save') void quickSave('saved');
+    if (action === 'save-draft') void quickSave('draft');
+    if (action === 'pdf') void quickDownloadPdf().catch((error) => setAppError(friendly(error)));
+    if (action === 'email') void quickEmail().catch((error) => setAppError(friendly(error)));
+    if (action === 'discard') void quickDiscard().catch((error) => setAppError(friendly(error)));
+    if (action === 'reset') {
+      quickEstimateId = '';
+      quickLastQuote = null;
+      quickForm()?.reset();
+      syncQuickEngine();
+      const result = document.querySelector<HTMLElement>('[data-quick-result]');
+      if (result) result.innerHTML = '';
+      const convertCard = document.querySelector<HTMLElement>('[data-quick-convert-card]');
+      if (convertCard) convertCard.hidden = true;
+    }
+    return;
+  }
+  const openButton = target.closest<HTMLElement>('[data-quick-open]');
+  if (openButton?.dataset.quickOpen) {
+    void openQuickEstimate(openButton.dataset.quickOpen).catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  const convertButton = target.closest<HTMLElement>('[data-quick-convert]');
+  if (convertButton?.dataset.quickConvert) {
+    const card = document.querySelector<HTMLElement>('[data-quick-convert-card]');
+    const form = document.querySelector<HTMLFormElement>('[data-quick-convert]');
+    if (card) card.hidden = false;
+    if (form) {
+      const idField = form.elements.namedItem('id') as HTMLInputElement | null;
+      if (idField) idField.value = convertButton.dataset.quickConvert;
+    }
+    void openQuickEstimate(convertButton.dataset.quickConvert).catch((error) => setAppError(friendly(error)));
+    card?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    return;
+  }
+  const discardButton = target.closest<HTMLElement>('[data-quick-discard]');
+  if (discardButton?.dataset.quickDiscard) {
+    if (!window.confirm('Discard this Quick Estimate? It remains in the audit record and is never hard-deleted.')) return;
+    void api('/api/admin/quick-estimates', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'discard', id: discardButton.dataset.quickDiscard }),
+    }).then(() => loadQuickList()).catch((error) => setAppError(friendly(error)));
+  }
+});
+
+document.querySelector<HTMLFormElement>('[data-quick-filter]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget as HTMLFormElement);
+  void loadQuickList(String(data.get('status') ?? ''), String(data.get('q') ?? '')).catch((error) => setAppError(friendly(error)));
+});
+
+document.querySelector<HTMLFormElement>('[data-quick-convert]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const data = new FormData(form);
+  const status = document.querySelector<HTMLElement>('[data-quick-convert-status]');
+  if (status) status.textContent = 'Revalidating the estimate and creating a pending booking...';
+  void api<{ reference?: string; requestId?: string }>('/api/admin/quick-estimates', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'convert',
+      id: data.get('id'),
+      customerId: quickValue('customerId'),
+      propertyId: quickValue('propertyId'),
+      date: data.get('date'),
+      start: data.get('start'),
+      crewSize: Number(data.get('crewSize') ?? 1),
+      notes: data.get('notes'),
+    }),
+  }).then((result) => {
+    if (status) status.textContent = `Pending booking ${result.reference ?? ''} created. Confirm it from Calendar & Requests after required documents are signed.`;
+    quickEstimateId = '';
+    return loadQuickList();
+  }).catch((error) => {
+    if (status) status.textContent = friendly(error);
+  });
+});
+
+document.querySelector<HTMLButtonElement>('[data-quick-convert-check]')?.addEventListener('click', () => {
+  void quickConvertTimes().catch((error) => {
+    const status = document.querySelector<HTMLElement>('[data-quick-convert-status]');
+    if (status) status.textContent = friendly(error);
+  });
 });
 
 void loadAuth();

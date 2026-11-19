@@ -1,5 +1,7 @@
 import { adminDb, type AdminDbEnv, type D1Database } from '../../../src/lib/admin/d1.ts';
 import { AdminAuthError, requireActor, type AdminActor } from '../../../src/lib/admin/operations.ts';
+import { bookingConfig } from '../../../src/config/booking.ts';
+import { zonedTimeToUtc } from '../../../src/lib/booking/time.ts';
 
 interface Env extends AdminDbEnv {}
 
@@ -32,8 +34,18 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const appointmentScope = scope(actor, 'branch_id');
     const giftScope = scope(actor, 'branch_id');
     const now = new Date().toISOString();
-    const today = now.slice(0, 10);
-    const [customers, leads, requests, appointments, gifts, failedLeads, recent, failedCommitments, financialIssues, failedNotifications, failedPaymentEvents, failedWorkerRuns] = await Promise.all([
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: bookingConfig.timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const tomorrow = new Date(Date.parse(`${today}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+    const todayStart = zonedTimeToUtc(today, '00:00', bookingConfig.timeZone);
+    const tomorrowStart = zonedTimeToUtc(tomorrow, '00:00', bookingConfig.timeZone);
+    const dayAfterTomorrow = new Date(Date.parse(`${tomorrow}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+    const dayAfterStart = zonedTimeToUtc(dayAfterTomorrow, '00:00', bookingConfig.timeZone);
+    const [customers, leads, requests, appointments, gifts, failedLeads, recent, failedCommitments, financialIssues, failedNotifications, failedPaymentEvents, failedWorkerRuns, todayJobs, tomorrowJobs, unassignedJobs, unsignedAgreements, outstandingInvoices, failedCommunications] = await Promise.all([
       count(db, "SELECT COUNT(*) AS count FROM customers WHERE status = 'active'" + customerScope.where, customerScope.bind),
       count(db, "SELECT COUNT(*) AS count FROM leads WHERE status IN ('new','contacted')" + leadScope.where, leadScope.bind),
       count(db, "SELECT COUNT(*) AS count FROM booking_requests WHERE status = 'pending'" + requestScope.where, requestScope.bind),
@@ -63,6 +75,43 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       count(db, "SELECT COUNT(*) AS count FROM booking_notifications WHERE status = 'failed'"),
       count(db, "SELECT COUNT(*) AS count FROM payment_events WHERE status IN ('failed','incomplete')"),
       count(db, "SELECT COUNT(*) AS count FROM recurring_worker_runs WHERE status = 'failed'"),
+      count(
+        db,
+        `SELECT COUNT(*) AS count FROM appointments
+         WHERE status IN ('pending','confirmed') AND start_at >= ? AND start_at < ?${appointmentScope.where}`,
+        [todayStart.toISOString(), tomorrowStart.toISOString(), ...appointmentScope.bind],
+      ),
+      count(
+        db,
+        `SELECT COUNT(*) AS count FROM appointments
+         WHERE status IN ('pending','confirmed') AND start_at >= ? AND start_at < ?${appointmentScope.where}`,
+        [tomorrowStart.toISOString(), dayAfterStart.toISOString(), ...appointmentScope.bind],
+      ),
+      count(
+        db,
+        `SELECT COUNT(*) AS count FROM appointments a
+         WHERE a.status IN ('pending','confirmed') AND a.start_at >= ?
+           AND NOT EXISTS (SELECT 1 FROM appointment_resources r WHERE r.appointment_id = a.id)${appointmentScope.where.replace('branch_id', 'a.branch_id')}`,
+        [now, ...appointmentScope.bind],
+      ),
+      count(
+        db,
+        "SELECT COUNT(*) AS count FROM signing_requests WHERE status IN ('pending','partially_signed')" + scope(actor, 'branch_id').where,
+        scope(actor, 'branch_id').bind,
+      ),
+      count(
+        db,
+        "SELECT COUNT(*) AS count FROM invoices WHERE balance_cents > 0 AND status IN ('open','partially_paid','overdue')" + scope(actor, 'branch_id').where,
+        scope(actor, 'branch_id').bind,
+      ),
+      count(
+        db,
+        `SELECT COUNT(*) AS count FROM (
+           SELECT id FROM booking_notifications WHERE status = 'failed'
+           UNION ALL SELECT id FROM leads WHERE delivery_status = 'failed'
+           UNION ALL SELECT id FROM payment_events WHERE status IN ('failed','incomplete')
+         )`,
+      ),
     ]);
     return json({
       ok: true,
@@ -79,6 +128,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         failedNotifications,
         failedPaymentEvents,
         failedWorkerRuns,
+        todayJobs,
+        tomorrowJobs,
+        unassignedJobs,
+        unsignedAgreements,
+        outstandingInvoices,
+        failedCommunications,
       },
       alerts: [
         ...(failedCommitments > 0
@@ -98,6 +153,15 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
           : []),
         ...(failedLeads > 0
           ? [{ kind: 'lead_delivery', severity: 'medium', message: `${failedLeads} lead notification(s) failed delivery.`, view: 'leads' }]
+          : []),
+        ...(unsignedAgreements > 0
+          ? [{ kind: 'unsigned_agreements', severity: 'medium', message: `${unsignedAgreements} agreement packet(s) are waiting for signature.`, view: 'documents' }]
+          : []),
+        ...(outstandingInvoices > 0
+          ? [{ kind: 'outstanding_invoices', severity: 'medium', message: `${outstandingInvoices} invoice(s) have an outstanding balance.`, view: 'finance' }]
+          : []),
+        ...(unassignedJobs > 0
+          ? [{ kind: 'unassigned_jobs', severity: 'medium', message: `${unassignedJobs} upcoming job(s) have no assigned cleaner.`, view: 'jobs' }]
           : []),
       ],
       today,

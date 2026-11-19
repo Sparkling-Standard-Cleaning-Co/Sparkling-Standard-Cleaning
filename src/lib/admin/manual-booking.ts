@@ -187,7 +187,7 @@ function engineIsFacility(engine: ManualEngine): boolean {
   return engine === 'commercial' || engine === 'church';
 }
 
-function normalizeInput(raw: Record<string, unknown>): ManualEstimateInput {
+export function normalizeInput(raw: Record<string, unknown>): ManualEstimateInput {
   const engine = text(raw.engine, 20) as ManualEngine;
   if (!['residential', 'str', 'commercial', 'church'].includes(engine)) {
     throw new AdminAuthError(400, 'manual_engine_invalid');
@@ -277,10 +277,13 @@ function savedPropertyCoordinates(property: Record<string, unknown>): { lat: num
   return isUsableLatLng(coordinates) ? coordinates : null;
 }
 
-async function propertyDestination(
+export type EstimateDestination = { lat: number; lng: number; source: ManualQuoteTravel['destinationSource'] } | null;
+
+/** Resolves a saved property or a typed address to a routable destination. */
+export async function addressDestination(
   env: ManualBookingEnv,
   property: Record<string, unknown>,
-): Promise<{ lat: number; lng: number; source: ManualQuoteTravel['destinationSource'] } | null> {
+): Promise<EstimateDestination> {
   const saved = savedPropertyCoordinates(property);
   if (saved) return { ...saved, source: 'property' };
   const address = [property.line1, property.line2, property.city, property.state, property.postal_code]
@@ -294,6 +297,13 @@ async function propertyDestination(
   const reference = zip ? zipReference[zip] : null;
   if (reference) return { lat: reference.lat, lng: reference.lng, source: 'zip_centroid' };
   return null;
+}
+
+async function propertyDestination(
+  env: ManualBookingEnv,
+  property: Record<string, unknown>,
+): Promise<EstimateDestination> {
+  return addressDestination(env, property);
 }
 
 async function travelFor(
@@ -478,25 +488,35 @@ async function documentRequirements(
  * Produces an itemized manual quote using the active published pricing. No
  * booking, hold, invoice, email or calendar event is created here.
  */
-export async function quoteManualBooking(
+interface PriceContext {
+  branchId: string;
+  customerId?: string;
+  propertyId?: string;
+  reference: string;
+  serviceDate?: string;
+}
+
+/**
+ * Shared server-side pricing for an owner-created estimate. Manual bookings and
+ * Quick Estimates both call this function, so the four engines, promotion
+ * rules, travel economics and service history rules can never diverge.
+ */
+export async function priceEstimateInput(
   env: ManualBookingEnv,
   db: D1Database,
-  actor: AdminActor,
-  raw: Record<string, unknown>,
-): Promise<ManualQuote> {
-  const input = normalizeInput(raw);
-  const customerId = text(raw.customerId, 100);
-  const propertyId = text(raw.propertyId, 100);
-  if (!customerId || !propertyId) throw new AdminAuthError(400, 'customer_property_required');
-  const context = await scopedCustomerProperty(db, actor, customerId, propertyId);
-  const entitlement = input.engine === 'residential' && ['standard', 'deep'].includes(input.serviceType ?? '')
-    ? await activeEntitlementForCustomer(db, customerId, FRIENDS15_CODE)
+  input: ManualEstimateInput,
+  destination: Awaited<ReturnType<typeof propertyDestination>>,
+  priceContext: PriceContext,
+  property: Record<string, unknown> = {},
+): Promise<Omit<ManualQuote, 'fields' | 'documentsRequired'>> {
+  const entitlement = input.engine === 'residential' &&
+    ['standard', 'deep'].includes(input.serviceType ?? '') &&
+    priceContext.customerId
+    ? await activeEntitlementForCustomer(db, priceContext.customerId, FRIENDS15_CODE)
     : null;
   const config = await requestPricingConfig(db);
-  const destination = await propertyDestination(env, context.property);
   const { travel, routed } = await travelFor(env, destination);
-  const reference = text(raw.reference, MAX_REFERENCE) || 'ADMIN-DRAFT';
-  const docs = await documentRequirements(db, input, context, reference);
+  const reference = priceContext.reference;
   const serviceCode = serviceCodeForEngine(input.engine, input.serviceType ?? 'standard');
   const base = {
     engine: input.engine,
@@ -505,7 +525,7 @@ export async function quoteManualBooking(
     pricingVersion: engineIsFacility(input.engine)
       ? config.commercialPricing.configVersion.value
       : config.instantQuote.configVersion.value,
-    documentsRequired: docs,
+    documentsRequired: [] as ManualQuote['documentsRequired'],
   };
 
   if (engineIsFacility(input.engine)) {
@@ -535,7 +555,7 @@ export async function quoteManualBooking(
     });
     const priced = price.priced && Number.isFinite(price.total);
     const totalCents = priced ? cents(price.total) : null;
-    const quoteWithoutFields = {
+    return {
       ...base,
       status: priced ? 'priced' as const : 'custom_confirmation_required' as const,
       totalCents,
@@ -556,16 +576,12 @@ export async function quoteManualBooking(
       message: priced ? null : 'This facility scope requires personal review.',
       entitlement: null,
     };
-    return {
-      ...quoteWithoutFields,
-      fields: snapshotFields(input, context, quoteWithoutFields),
-    };
   }
 
-  const draft = residentialDraft(input, context.property);
+  const draft = residentialDraft(input, property);
   const validation = validateEstimateInput(draft);
   if (!validation.ok) {
-    const invalidQuote = {
+    return {
       ...base,
       status: 'invalid' as const,
       totalCents: null,
@@ -584,10 +600,6 @@ export async function quoteManualBooking(
       message: validation.issues[0] ?? 'Complete the estimate inputs.',
       entitlement: null,
     };
-    return {
-      ...invalidQuote,
-      fields: snapshotFields(input, context, invalidQuote),
-    };
   }
   const estimate = calculateEstimate(draft, estimateContext(config, routed, input.promotionCode ?? ''));
   const amount = selectInstantAmount(estimate, config.instantQuote.selection.value, config);
@@ -604,12 +616,12 @@ export async function quoteManualBooking(
       code: selectedPromotionCode,
       cleaningAmountCents: eligibleCleaningCents,
       serviceType: input.serviceType ?? 'standard',
-      branchId: context.branchId ?? 'branch_pensacola',
+      branchId: priceContext.branchId || 'branch_pensacola',
       frequency: input.frequency ?? 'one_time',
       quoteReference: reference,
       holdId: '',
-      customerId,
-      ...(text(raw.date, 10) ? { serviceDate: text(raw.date, 10) } : {}),
+      customerId: priceContext.customerId ?? '',
+      ...(priceContext.serviceDate ? { serviceDate: priceContext.serviceDate } : {}),
       hasExistingDiscount: false,
     });
     if (!evaluation.ok || !evaluation.discountCents) {
@@ -654,7 +666,7 @@ export async function quoteManualBooking(
         ),
       )
     : null;
-  const quoteWithoutFields = {
+  return {
     ...base,
     status: priced ? 'priced' as const : 'custom_confirmation_required' as const,
     totalCents: priced ? cents(effectiveAmount ?? amount ?? 0) : null,
@@ -697,12 +709,39 @@ export async function quoteManualBooking(
         }
       : null,
   };
+}
+
+/**
+ * Produces an itemized manual quote using the active published pricing. No
+ * booking, hold, invoice, email or calendar event is created here.
+ */
+export async function quoteManualBooking(
+  env: ManualBookingEnv,
+  db: D1Database,
+  actor: AdminActor,
+  raw: Record<string, unknown>,
+): Promise<ManualQuote> {
+  const input = normalizeInput(raw);
+  const customerId = text(raw.customerId, 100);
+  const propertyId = text(raw.propertyId, 100);
+  if (!customerId || !propertyId) throw new AdminAuthError(400, 'customer_property_required');
+  const context = await scopedCustomerProperty(db, actor, customerId, propertyId);
+  const reference = text(raw.reference, MAX_REFERENCE) || 'ADMIN-DRAFT';
+  const docs = await documentRequirements(db, input, context, reference);
+  const destination = await propertyDestination(env, context.property);
+  const core = await priceEstimateInput(env, db, input, destination, {
+    branchId: context.branchId ?? actor.branchId ?? 'branch_pensacola',
+    customerId,
+    propertyId,
+    reference,
+    ...(text(raw.date, 10) ? { serviceDate: text(raw.date, 10) } : {}),
+  }, context.property);
+  const quoteWithoutFields = { ...core, documentsRequired: docs };
   return {
     ...quoteWithoutFields,
     fields: snapshotFields(input, context, quoteWithoutFields),
   };
 }
-
 function slotEnd(start: string, durationMinutes: number): string {
   return new Date(Date.parse(start) + durationMinutes * 60_000).toISOString();
 }

@@ -95,7 +95,7 @@ export async function getCustomer(
   if (!customer) return null;
   const canSeeNotes = actor.role === 'owner' || actor.role === 'manager';
   const canSeeFinance = actor.role === 'owner' || actor.permissions.includes('finance.read');
-  const [contacts, properties, notes, leads, estimates, appointments, recurring, invoices, paymentAuthorizations] = await Promise.all([
+  const [contacts, properties, notes, leads, estimates, appointments, recurring, invoices, paymentAuthorizations, signingRequests, gifts, quickEstimates] = await Promise.all([
     db.prepare('SELECT * FROM customer_contacts WHERE customer_id = ? ORDER BY is_primary DESC, created_at').bind(customerId).all(),
     db.prepare('SELECT * FROM properties WHERE customer_id = ? ORDER BY is_primary DESC, created_at').bind(customerId).all(),
     canSeeNotes
@@ -114,6 +114,21 @@ export async function getCustomer(
            WHERE pa.customer_id = ? ORDER BY pa.created_at DESC LIMIT 25`,
         ).bind(customerId).all()
       : Promise.resolve({ success: true, results: [] }),
+    db.prepare(
+      `SELECT id, bundle_code, packet_name, status, booking_reference, executed_at, created_at
+       FROM signing_requests WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+    ).bind(customerId).all(),
+    db.prepare(
+      `SELECT id, code, status, value_cents, balance_cents, valid_from_date, activates_at, created_at,
+              CASE WHEN purchaser_customer_id = ? THEN 'purchased' ELSE 'received' END AS role
+       FROM gift_certificates WHERE purchaser_customer_id = ? OR recipient_customer_id = ?
+       ORDER BY created_at DESC LIMIT 50`,
+    ).bind(customerId, customerId, customerId).all(),
+    db.prepare(
+      `SELECT id, status, engine, service_code, total_cents, ongoing_cents, address_text,
+              converted_request_id, created_at, updated_at
+       FROM quick_estimates WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+    ).bind(customerId).all(),
   ]);
   return {
     customer,
@@ -128,6 +143,9 @@ export async function getCustomer(
     recurringPlans: recurring.results ?? [],
     invoices: invoices.results ?? [],
     paymentAuthorizations: paymentAuthorizations.results ?? [],
+    signingRequests: signingRequests.results ?? [],
+    gifts: gifts.results ?? [],
+    quickEstimates: quickEstimates.results ?? [],
   };
 }
 

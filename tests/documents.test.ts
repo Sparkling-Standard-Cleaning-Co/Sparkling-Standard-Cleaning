@@ -653,3 +653,196 @@ test('signing requests bind the signer identity, carry branch ownership and prod
   const finalCopy = await getExecutedCopy(f.db, String(request.requestId));
   assert.match(finalCopy?.text ?? '', /Synthetic Owner/);
 });
+
+import {
+  duplicateBundle,
+  duplicateTemplate,
+  getTemplate,
+  previewPacket,
+  restoreTemplate,
+  retireTemplate,
+  templateHistory,
+  updateDraftTemplate,
+} from '../src/lib/documents/service.ts';
+
+test('a packet resolves supported variables, stores instructions and keeps the issued snapshot immutable', async () => {
+  const f = await fixture();
+  f.db.raw
+    .prepare("INSERT INTO customer_contacts (id, customer_id, kind, value, normalized_value, is_primary) VALUES ('ct_packet', ?, 'email', 'packet@example.test', 'packet@example.test', 1)")
+    .run(f.customerId);
+  const created = await createTemplate(f.db, f.owner.id, {
+    title: 'Packet Variable Agreement',
+    category: 'residential',
+    version: '1.0',
+    contentText:
+      'Customer: {{customer.first_name}} {{customer.last_name}}\nProperty: {{property.address}}\nBooking: {{booking.reference}}\nCompany: {{company.name}}',
+    familyKey: 'packet-variable-agreement',
+  });
+  await approveTemplate(f.db, f.owner.id, created.id);
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'packet.variable_test',
+    name: 'Residential one-time packet',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+    purpose: 'customer',
+    packetType: 'residential_one_time',
+    instructions: 'Please review every document before signing.',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId: created.id,
+    sortOrder: 0,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    frequency: 'one_time',
+    bookingReference: 'SS-20261201-PACKET',
+  };
+  const preview = await previewPacket(f.db, context, { bundleId: bundle.id });
+  assert.ok(preview);
+  assert.equal(preview.missingVariables.length, 0);
+  assert.equal(preview.instructions, 'Please review every document before signing.');
+  assert.equal(preview.requiredDocuments, 1);
+  const previewText = preview.requirements[0]?.contentText ?? '';
+  assert.match(previewText, /Customer: Synthetic Customer/);
+  assert.match(previewText, /1 Test Way, Pensacola, FL, 32502/);
+  assert.match(previewText, /Booking: SS-20261201-PACKET/);
+  assert.match(previewText, /Company: Sparkling Standard Cleaning Co\./);
+  assert.notEqual(preview.requirements[0]?.contentSha256, preview.requirements[0]?.templateSha256);
+
+  const request = await createSigningRequest(f.db, context, {
+    createdByAdminUserId: f.owner.id,
+    bundleId: bundle.id,
+    instructions: 'Bring access details to the appointment.',
+  });
+  assert.equal(request.required, true);
+  assert.equal(request.bundleName, 'Residential one-time packet');
+  assert.equal(request.instructions, 'Bring access details to the appointment.');
+  const stored = f.db.raw
+    .prepare('SELECT packet_instructions, packet_name, requirement_snapshot_json FROM signing_requests WHERE id = ?')
+    .get(String(request.requestId)) as { packet_instructions: string; packet_name: string; requirement_snapshot_json: string };
+  assert.equal(stored.packet_instructions, 'Bring access details to the appointment.');
+  assert.equal(stored.packet_name, 'Residential one-time packet');
+  const snapshot = JSON.parse(stored.requirement_snapshot_json) as Array<Record<string, unknown>>;
+  assert.match(String(snapshot[0]?.contentText), /Customer: Synthetic Customer/);
+  assert.match(String(snapshot[0]?.contentText), /SS-20261201-PACKET/);
+
+  await signSigningRequest(f.db, request.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'packet@example.test',
+    consent: true,
+    signatures: { [created.id]: { value: 'Synthetic Customer' } },
+    request: signingRequest(),
+  });
+  assert.equal((await evaluateDocumentGate(f.db, context, 'before_confirmation')).satisfied, true);
+
+  const nextVersion = await createTemplate(f.db, f.owner.id, {
+    title: 'Packet Variable Agreement',
+    category: 'residential',
+    version: '1.1',
+    contentText: 'Revised customer agreement for {{customer.first_name}}.',
+    familyKey: 'packet-variable-agreement',
+    supersedesTemplateId: created.id,
+  });
+  await approveTemplate(f.db, f.owner.id, nextVersion.id);
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId: nextVersion.id,
+    sortOrder: 0,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  await removeBundleItem(f.db, f.owner.id, bundle.id, created.id);
+  const afterRevision = await evaluateDocumentGate(f.db, context, 'before_confirmation');
+  assert.equal(afterRevision.satisfied, false);
+  assert.deepEqual(afterRevision.missing.map((item) => item.templateId), [nextVersion.id]);
+  const oldSignature = f.db.raw
+    .prepare('SELECT signed_content_text FROM document_signatures WHERE signing_request_id = ?')
+    .get(String(request.requestId)) as { signed_content_text: string };
+  assert.match(oldSignature.signed_content_text, /SS-20261201-PACKET/);
+});
+
+test('unresolved packet variables block sending and remain visible in preview', async () => {
+  const f = await fixture();
+  const created = await createTemplate(f.db, f.owner.id, {
+    title: 'Unknown Variable Agreement',
+    category: 'residential',
+    version: '1.0',
+    contentText: 'Hello {{customer.first_name}} {{customer.unknown_value}}.',
+  });
+  await approveTemplate(f.db, f.owner.id, created.id);
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'packet.unknown_variable',
+    name: 'Unknown variable packet',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id, templateId: created.id, required: true, enforcementStage: 'before_confirmation',
+  });
+  const context = { subjectType: 'customer' as const, customerId: f.customerId, bookingReference: 'SS-20261202-UNKNOWN' };
+  const preview = await previewPacket(f.db, context, { bundleId: bundle.id });
+  assert.deepEqual(preview?.missingVariables, ['customer.unknown_value']);
+  await assert.rejects(
+    () => createSigningRequest(f.db, context, { createdByAdminUserId: f.owner.id, bundleId: bundle.id }),
+    /document_variables_missing:customer\.unknown_value/,
+  );
+  assert.equal((f.db.raw.prepare('SELECT COUNT(*) AS n FROM signing_requests').get() as { n: number }).n, 0);
+});
+
+test('draft templates can be edited, duplicated and restored without changing approved content', async () => {
+  const f = await fixture();
+  const draft = await createTemplate(f.db, f.owner.id, {
+    title: 'Editable Draft', category: 'residential', version: '1.0', contentText: 'Original draft text.',
+  });
+  await updateDraftTemplate(f.db, f.owner.id, draft.id, {
+    title: 'Editable Draft', category: 'residential', version: '1.0',
+    contentText: 'Updated draft text for {{customer.first_name}}.', legalReviewStatus: 'owner_review_required',
+  });
+  const updated = await getTemplate(f.db, draft.id);
+  assert.equal(updated?.content_text, 'Updated draft text for {{customer.first_name}}.');
+  assert.equal(updated?.legal_review_status, 'owner_review_required');
+  await approveTemplate(f.db, f.owner.id, draft.id);
+  await assert.rejects(
+    () => updateDraftTemplate(f.db, f.owner.id, draft.id, { title: 'Changed', contentText: 'Changed.' }),
+    /template_not_editable/,
+  );
+  const copy = await duplicateTemplate(f.db, f.owner.id, draft.id, { title: 'Editable Draft', version: '1.1' });
+  const copied = await getTemplate(f.db, copy.id);
+  assert.equal(copied?.status, 'draft');
+  assert.equal(copied?.version, '1.1');
+  assert.match(String(copied?.content_text), /Updated draft text/);
+  await retireTemplate(f.db, f.owner.id, draft.id);
+  assert.equal((await getTemplate(f.db, draft.id))?.status, 'retired');
+  await restoreTemplate(f.db, f.owner.id, draft.id);
+  assert.equal((await getTemplate(f.db, draft.id))?.status, 'draft');
+  const history = await templateHistory(f.db, draft.id);
+  assert.ok(history.some((entry) => entry.action === 'documents.template_restored'));
+  assert.ok(history.some((entry) => entry.action === 'documents.template_draft_updated'));
+});
+
+test('a reusable packet can be duplicated with its documents and archived without deleting history', async () => {
+  const f = await fixture();
+  const t1 = await approvedTemplate(f.db, f.owner.id, 'Packet Document One');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'packet.copy_source', name: 'Copy source packet', subjectType: 'customer', instructions: 'Original instructions.',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id, templateId: t1, sortOrder: 2, required: true, enforcementStage: 'before_confirmation',
+  });
+  const copy = await duplicateBundle(f.db, f.owner.id, bundle.id, { name: 'Copied packet' });
+  const copiedBundle = f.db.raw.prepare('SELECT * FROM document_bundles WHERE id = ?').get(copy.id) as Record<string, unknown>;
+  assert.equal(copiedBundle.name, 'Copied packet');
+  assert.match(String(copiedBundle.code), /^packet\.copy_source\.copy/);
+  assert.equal(copiedBundle.instructions, 'Original instructions.');
+  const copiedItems = f.db.raw.prepare('SELECT template_id, sort_order FROM document_bundle_items WHERE bundle_id = ?').all(copy.id) as Array<Record<string, unknown>>;
+  assert.deepEqual(copiedItems.map((item) => ({ templateId: item.template_id, order: item.sort_order })), [{ templateId: t1, order: 2 }]);
+  const { updateBundle } = await import('../src/lib/documents/service.ts');
+  await updateBundle(f.db, f.owner.id, copy.id, { status: 'inactive' });
+  assert.equal((f.db.raw.prepare('SELECT status FROM document_bundles WHERE id = ?').get(copy.id) as { status: string }).status, 'inactive');
+  assert.equal((f.db.raw.prepare('SELECT COUNT(*) AS n FROM document_bundle_items WHERE bundle_id = ?').get(copy.id) as { n: number }).n, 1);
+});

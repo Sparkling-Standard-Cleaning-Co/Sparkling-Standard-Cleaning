@@ -2,7 +2,7 @@
 
 **Admin:** `/admin/` → **Documents & Agreements**
 **Public signing:** `/document-sign/?token=…`
-**Last verified:** 2026-11-01
+**Last verified:** 2026-11-19
 
 The owner controls document templates, bundles, enforcement stages and signing
 status from the existing admin console. Policy is stored in D1; changing a
@@ -68,6 +68,47 @@ drop a requirement).
 The server enforces every stage. A date selection or temporary hold is never a
 confirmed booking.
 
+## 3a. Packet builder (2026-11-19)
+
+The Documents & Agreements section is now a complete packet builder, not only a
+template list:
+
+- **Templates:** create text, upload PDF, edit a draft, duplicate as a new draft,
+  preview, download, view audit history, approve, retire and restore to draft.
+  Approved content is immutable; a change requires a new version.
+- **Packets:** create a reusable packet with a purpose, packet type and recipient
+  instructions; duplicate it with its documents; archive and restore it; reorder
+  documents; add or remove templates; preview the exact resolved packet.
+- **Supported variables:** `customer.first_name`, `customer.last_name`,
+  `customer.company_name`, `customer.email`, `customer.phone`,
+  `employee.name`, `employee.email`, `property.label`, `property.address`,
+  `booking.reference`, `service.code`, `service.frequency`,
+  `company.name`, `company.legal_name`, `company.slogan`, `company.phone`,
+  `company.email`, `company.website`, `document.version`, `document.date`.
+- **Fail closed on variables:** an unresolved variable in a required document
+  blocks sending. The preview lists every unresolved key. The signing page shows
+  the packet name and recipient instructions above the documents.
+- **Initial packet starters:** First-Time Customer, Residential One-Time,
+  Recurring Residential, Move-In/Move-Out, Commercial Client and Employee
+  Onboarding. Starters are templates only: `is_system = 1` packets are excluded
+  from automatic bundle resolution, so they cannot silently become a gate.
+  Duplicate a starter to make an editable, auto-resolvable packet.
+- **Smart suggestion:** a manual booking quote already reports its missing
+  requirements; the owner can send the matching packet from the booking result
+  without a new booking being created by the paperwork alone.
+- **Branch protection:** sending, previewing and resending a packet checks the
+  customer/employee branch unless the actor is the owner.
+- **Snapshots:** a signing request stores the resolved text, hash, template
+  version, packet name and instructions. Later template or packet edits cannot
+  rewrite the issued request. Gate matching uses template version plus the
+  subject identity; approved content is immutable by policy.
+
+### Template variables and hashes
+
+`src/lib/documents/service.ts` resolves variables at send/preview time. The
+resolved hash is stored in the requirement snapshot and the signature evidence.
+The original template hash is retained as `templateSha256`. Empty values are
+never silently removed from a legal document.
 ## 4. Admin workflow
 
 1. **Add a document template** — paste approved text or upload an approved PDF.
@@ -134,8 +175,9 @@ activation flags must remain off until then.
 ## 9. Provisioning
 
 - Apply migrations `0018_document_management_and_signing.sql`,
-  `0019_recurring_worker_runs.sql` and
-  `0023_document_signature_attempts.sql`.
+  `0019_recurring_worker_runs.sql`, `0023_document_signature_attempts.sql`,
+  `0031_document_execution_integrity.sql` and
+  `0038_document_packet_builder.sql`.
 - Add a private `DOCUMENTS_BUCKET` R2 binding for PDF uploads. Without it, text
   templates and signing still work; PDF upload returns
   `document_storage_not_configured`.

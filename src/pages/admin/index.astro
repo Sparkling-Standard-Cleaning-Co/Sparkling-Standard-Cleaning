@@ -114,6 +114,7 @@ import {
             <button type="button" data-admin-nav="leads">Leads &amp; Inquiries</button>
             <button type="button" data-admin-nav="customers">Customers</button>
             <button type="button" data-admin-nav="new-booking">New Booking</button>
+            <button type="button" data-admin-nav="quick-estimate">Quick Estimate</button>
             <button type="button" data-admin-nav="recurring">Recurring Plans</button>
             <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
             <button type="button" data-admin-nav="documents">Documents &amp; Agreements</button>
@@ -294,6 +295,97 @@ import {
             </div>
           </section>
 
+          <section class="admin-view" data-admin-view="quick-estimate" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Quick Estimate</h2>
+              <p class="admin-muted">
+                Price a phone or walk-in inquiry without creating a customer or booking. The shared
+                server estimator applies the published prices, travel, promotions, FRIENDS15 and
+                Community Support rules. Nothing is charged, emailed or booked unless you choose it.
+              </p>
+              <form class="admin-form admin-form--grid" data-quick-form style="max-width:none">
+                <label>Existing customer (optional) <select name="customerId" data-quick-customer><option value="">New inquiry</option></select></label>
+                <label>Property (optional) <select name="propertyId" data-quick-property><option value="">Choose a customer first</option></select></label>
+                <label>Branch <select name="branchId" data-quick-branch><option value="branch_pensacola">Pensacola</option><option value="branch_tampa">Tampa Bay / Central Florida</option></select></label>
+                <label>Contact name <input name="customerName" maxlength="200" /></label>
+                <label>Contact email <input name="customerEmail" type="email" maxlength="200" /></label>
+                <label>Contact phone <input name="customerPhone" maxlength="40" /></label>
+                <label class="admin-field--wide">Street address <input name="addressLine1" maxlength="200" placeholder="100 Main Street" /></label>
+                <label>City <input name="city" maxlength="120" /></label>
+                <label>State <select name="state"><option value="FL">Florida</option><option value="AL">Alabama</option></select></label>
+                <label>ZIP <input name="postalCode" inputmode="numeric" maxlength="10" required /></label>
+                <label>Service date (optional) <input name="serviceDate" type="date" /></label>
+                <label>Service <select name="engine" data-quick-engine><option value="residential">Residential cleaning</option><option value="str">Short-term rental turnover</option><option value="commercial">Commercial cleaning</option><option value="church">Church cleaning</option></select></label>
+                <label>Service type <select name="serviceType" data-quick-service><option value="standard">Residential maintenance</option><option value="deep">Deep cleaning</option><option value="move_in_out">Move-in / move-out</option></select></label>
+                <label>Frequency <select name="frequency">{FREQUENCY_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                <div class="admin-field--wide admin-form admin-form--grid" data-quick-residential>
+                  <label>Property type <select name="propertyType">{PROPERTY_TYPE_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Square feet <input name="squareFeet" type="number" min={RESIDENTIAL_INPUT_LIMITS.squareFeet.min} max={RESIDENTIAL_INPUT_LIMITS.squareFeet.max} step={RESIDENTIAL_INPUT_LIMITS.squareFeet.step} /></label>
+                  <label>Bedrooms <input name="bedrooms" type="number" min="0" max="12" /></label>
+                  <label>Full bathrooms <input name="fullBaths" type="number" min="0" max="12" /></label>
+                  <label>Half bathrooms <input name="halfBaths" type="number" min="0" max="12" /></label>
+                  <label>Beds to reset (STR) <input name="beds" type="number" min="1" max="30" /></label>
+                  <label>Pets <select name="pets">{PET_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Condition <select name="condition">{CONDITION_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Last professional clean <select name="lastClean">{LAST_CLEAN_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label class="admin-field--wide"><input type="checkbox" name="supportiveEligible" value="yes" /> Community Support eligibility (10% - client attestation only)</label>
+                </div>
+                <div class="admin-field--wide admin-form admin-form--grid" data-quick-facility hidden>
+                  <label>Facility type <select name="facilityType">{COMMERCIAL_FACILITY_TYPES.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Cleanable square feet <input name="cleanableSqft" type="number" min="100" max="200000" step="50" /></label>
+                  <label>Restroom fixtures <input name="restroomFixtures" type="number" min="0" max="40" step="1" /></label>
+                  <label>Breakroom / kitchen <select name="breakroom"><option value="none">None</option><option value="breakroom">Small breakroom</option><option value="kitchen">Full kitchen</option></select></label>
+                  <label>Condition <select name="facilityCondition">{FACILITY_CONDITION_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Traffic <select name="traffic">{TRAFFIC_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Flooring <select name="flooring">{FLOORING_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Visit frequency <select name="facilityFrequency">{FACILITY_FREQUENCY_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label><input type="checkbox" name="firstClean" value="yes" /> First clean / overdue reset</label>
+                  <label><input type="checkbox" name="specialty" value="yes" /> Specialty work requiring review</label>
+                </div>
+                <label>Promotion <select name="promotionCode" data-quick-promotion><option value="">Automatic eligible benefit</option></select></label>
+                <p class="admin-field--wide admin-muted" data-quick-benefit-note></p>
+                <fieldset class="admin-field--wide">
+                  <legend>Extras and bundles</legend>
+                  <div class="admin-form admin-form--grid" data-quick-addon-list></div>
+                  <div class="admin-form admin-form--grid" data-quick-bundle-list style="margin-top:.5rem;"></div>
+                </fieldset>
+                <label class="admin-field--wide">Internal notes <textarea name="notes" rows="2" maxlength="2000"></textarea></label>
+                <div class="admin-field--wide admin-actions">
+                  <button class="btn btn--primary btn--small" type="button" data-quick-action="calculate">Calculate</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-quick-action="save">Save</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-quick-action="save-draft">Save as draft</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-quick-action="pdf">Download PDF</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-quick-action="email">Email estimate</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-quick-action="discard">Discard</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-quick-action="reset">New estimate</button>
+                </div>
+                <div class="admin-field--wide" data-quick-result aria-live="polite"></div>
+              </form>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Saved Quick Estimates</h2>
+              <form class="admin-inline-form" data-quick-filter>
+                <label>Status <select name="status"><option value="">All</option><option value="saved">Saved</option><option value="draft">Draft</option><option value="converted">Converted</option><option value="discarded">Discarded</option></select></label>
+                <label>Search <input name="q" type="search" placeholder="Name, email, phone, address or reference" /></label>
+                <button class="btn btn--secondary btn--small" type="submit">Filter</button>
+              </form>
+              <div data-quick-list style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;" data-quick-convert-card hidden>
+              <h2 class="admin-section-title">Convert to booking</h2>
+              <p class="admin-muted">The estimate, promotion and travel are recalculated by the server before a pending booking is created.</p>
+              <form class="admin-form admin-form--grid" data-quick-convert>
+                <input type="hidden" name="id" />
+                <label>Date <input name="date" type="date" required /></label>
+                <label>Start time <select name="start" required><option value="">Choose a time</option></select></label>
+                <label>Crew size <select name="crewSize"><option value="1">One cleaner</option><option value="2">Two cleaners</option></select></label>
+                <label class="admin-field--wide">Notes <textarea name="notes" rows="2" maxlength="2000"></textarea></label>
+                <div class="admin-field--wide admin-actions"><button class="btn btn--ghost btn--small" type="button" data-quick-convert-check>Check available times</button><button class="btn btn--primary btn--small" type="submit">Convert to pending booking</button></div>
+                <p class="admin-field--wide admin-status-message" data-quick-convert-status role="status" aria-live="polite"></p>
+              </form>
+            </div>
+          </section>
+
           <section class="admin-view" data-admin-view="recurring" hidden>
             <div class="admin-card">
               <h2 class="admin-section-title">Recurring cleaning plans</h2>
@@ -377,7 +469,12 @@ import {
                   <label>Category <input name="category" maxlength="80" placeholder="residential, employee, commercial" /></label>
                   <label>Version <input name="version" value="1.0" maxlength="40" /></label>
                   <label>Signer <select name="signerParty"><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
+                  <label>Family key <input name="familyKey" maxlength="120" placeholder="residential-one-time" /></label>
+                  <label>Effective date <input name="effectiveDate" type="date" /></label>
+                  <label>Legal review <select name="legalReviewStatus"><option value="not_reviewed">Not reviewed</option><option value="owner_review_required">Owner review required</option><option value="owner_approved">Owner approved</option><option value="attorney_review_required">Attorney review required</option><option value="attorney_reviewed">Attorney reviewed</option></select></label>
                   <label>Agreement text <textarea name="contentText" rows="8" required maxlength="200000"></textarea></label>
+                  <p class="admin-muted">Supported variables: <code>&#123;&#123;customer.first_name&#125;&#125;</code>, <code>&#123;&#123;customer.last_name&#125;&#125;</code>, <code>&#123;&#123;customer.email&#125;&#125;</code>, <code>&#123;&#123;property.address&#125;&#125;</code>, <code>&#123;&#123;booking.reference&#125;&#125;</code>, <code>&#123;&#123;service.frequency&#125;&#125;</code>, <code>&#123;&#123;company.name&#125;&#125;</code>. Unresolved variables block sending.</p>
+                  <label>Packet notes <input name="packetNotes" maxlength="1000" placeholder="Internal review note" /></label>
                   <label><input type="checkbox" name="requiresVerification" value="yes" /> Requires owner/admin verification or countersignature</label>
                   <label><input type="checkbox" name="requiresCountersignature" value="yes" /> Requires an explicit owner countersignature</label>
                   <button class="btn btn--secondary btn--small" type="submit">Save draft template</button>
@@ -393,6 +490,22 @@ import {
                   <label><input type="checkbox" name="requiresCountersignature" value="yes" /> Requires an explicit owner countersignature</label>
                   <button class="btn btn--secondary btn--small" type="submit">Upload PDF template</button>
                 </form>
+                <form class="admin-form" data-document-template-edit hidden>
+                  <h3>Edit a draft template</h3>
+                  <input type="hidden" name="templateId" />
+                  <label>Title <input name="title" required maxlength="200" /></label>
+                  <label>Category <input name="category" maxlength="80" /></label>
+                  <label>Version <input name="version" maxlength="40" /></label>
+                  <label>Signer <select name="signerParty"><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
+                  <label>Family key <input name="familyKey" maxlength="120" readonly /></label>
+                  <label>Effective date <input name="effectiveDate" type="date" /></label>
+                  <label>Legal review <select name="legalReviewStatus"><option value="not_reviewed">Not reviewed</option><option value="owner_review_required">Owner review required</option><option value="owner_approved">Owner approved</option><option value="attorney_review_required">Attorney review required</option><option value="attorney_reviewed">Attorney reviewed</option></select></label>
+                  <label>Agreement text <textarea name="contentText" rows="10" maxlength="200000"></textarea></label>
+                  <label>Packet notes <input name="packetNotes" maxlength="1000" /></label>
+                  <label><input type="checkbox" name="requiresVerification" value="yes" /> Requires owner/admin verification or countersignature</label>
+                  <label><input type="checkbox" name="requiresCountersignature" value="yes" /> Requires an explicit owner countersignature</label>
+                  <div class="admin-actions"><button class="btn btn--primary btn--small" type="submit">Save draft changes</button><button class="btn btn--ghost btn--small" type="button" data-document-edit-cancel>Cancel</button></div>
+                </form>
               </div>
               <div data-document-template-result style="margin-top:.6rem;"></div>
             </div>
@@ -400,12 +513,15 @@ import {
               <h2 class="admin-section-title">Document bundles</h2>
               <p class="admin-muted">A bundle defines exactly which approved documents apply to a service, customer or employee group. Conditions are optional.</p>
               <div data-admin-documents-bundles></div>
-              <form class="admin-inline-form" data-document-bundle-create style="margin-top:1rem;">
-                <label>Code <input name="code" required placeholder="customer.residential" /></label>
-                <label>Name <input name="name" required placeholder="Residential cleaning documents" /></label>
+              <form class="admin-form admin-form--grid" data-document-bundle-create style="margin-top:1rem;">
+                <label>Code <input name="code" required placeholder="packet.residential_one_time" /></label>
+                <label>Name <input name="name" required placeholder="Residential one-time packet" /></label>
                 <label>Subject <select name="subjectType"><option value="customer">Customer</option><option value="employee">Employee</option></select></label>
+                <label>Purpose <select name="purpose"><option value="customer">Customer</option><option value="employee">Employee</option><option value="operational">Operational</option></select></label>
+                <label>Packet type <input name="packetType" placeholder="residential_one_time" maxlength="60" /></label>
                 <label>Service category <input name="serviceCategory" placeholder="residential" /></label>
-                <button class="btn btn--secondary btn--small" type="submit">Create bundle</button>
+                <label class="admin-field--wide">Recipient instructions <textarea name="instructions" rows="2" maxlength="2000" placeholder="Shown above the documents in the signing link."></textarea></label>
+                <div class="admin-field--wide"><button class="btn btn--secondary btn--small" type="submit">Create packet</button></div>
               </form>
               <form class="admin-inline-form" data-document-bundle-item style="margin-top:1rem;">
                 <label>Bundle <select name="bundleId" data-document-bundle-options required></select></label>
@@ -430,15 +546,19 @@ import {
               <h2 class="admin-section-title">Signing requests</h2>
               <p class="admin-muted">Send a secure single-purpose link to a customer or employee. Signed versions are immutable and retained privately.</p>
               <form class="admin-form admin-form--grid" data-document-send>
+                <label>Packet <select name="bundleId" data-document-send-bundle><option value="">Automatic (service rules)</option></select></label>
                 <label>Subject <select name="subjectType"><option value="customer">Customer</option><option value="employee">Employee</option></select></label>
                 <label>Customer ID <input name="customerId" placeholder="cust_..." /></label>
                 <label>Employee ID <input name="teamMemberId" placeholder="team_..." /></label>
+                <label>Property ID <input name="propertyId" placeholder="prop_..." /></label>
                 <label>Service code <input name="serviceCode" placeholder="residential-cleaning" /></label>
                 <label>Frequency <input name="frequency" placeholder="weekly" /></label>
                 <label>Booking reference <input name="bookingReference" placeholder="SS-..." /></label>
                 <label>Recipient email <input name="email" type="email" /></label>
-                <button class="btn btn--secondary btn--small" type="submit">Create signing link</button>
+                <label class="admin-field--wide">Additional instructions <textarea name="instructions" rows="2" maxlength="2000"></textarea></label>
+                <div class="admin-field--wide admin-actions"><button class="btn btn--ghost btn--small" type="button" data-document-preview>Preview packet</button><button class="btn btn--secondary btn--small" type="submit">Create signing link</button></div>
               </form>
+              <div data-document-preview-result style="margin-top:.6rem;"></div>
               <div data-document-send-result style="margin-top:.6rem;"></div>
               <div data-admin-documents-requests style="margin-top:1rem;"></div>
               <div data-document-request-detail style="margin-top:1rem;" hidden></div>

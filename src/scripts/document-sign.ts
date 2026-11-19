@@ -19,10 +19,12 @@ interface SigningPayload {
   request?: {
     id: string;
     bundleCode: string;
+    bundleName?: string;
     bundleVersion: number;
     subjectType: string;
     status: string;
     expiresAt: string;
+    instructions?: string;
   };
   documents?: SigningDocument[];
   signedTemplateIds?: string[];
@@ -70,7 +72,8 @@ function render(payload: SigningPayload): void {
     <form class="employee-form" data-sign-form>
       <div class="employee-card" style="box-shadow:none;padding:0;background:transparent">
         <h1 style="font-family:var(--font-display);font-size:1.25rem;margin:0 0 .4rem;color:#6d343c;">Documents to sign</h1>
-        <p class="employee-muted">Bundle ${esc(payload.request?.bundleCode)} · version ${esc(payload.request?.bundleVersion)}</p>
+        <p class="employee-muted">${esc(payload.request?.bundleName || payload.request?.bundleCode)} | version ${esc(payload.request?.bundleVersion)}</p>
+        ${payload.request?.instructions ? `<p class="employee-status" data-kind="ok" style="white-space:pre-wrap">${esc(payload.request.instructions)}</p>` : ''}
       </div>
       ${documents
         .map(

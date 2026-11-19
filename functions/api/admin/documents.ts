@@ -9,18 +9,26 @@ import {
   createSigningRequest,
   createTemplate,
   countersignSigningRequest,
+  documentSubjectBranch,
+  duplicateBundle,
+  duplicateTemplate,
   getExecutedCopy,
   getSignatureForDownload,
   getSigningRequestDetails,
+  getTemplate,
   listBundleItems,
   listBundles,
   listSigningRequests,
   listTemplates,
+  previewPacket,
   removeBundleItem,
+  restoreTemplate,
   retireTemplate,
   rotateSigningRequestToken,
   sendSigningEmail,
+  templateHistory,
   updateBundle,
+  updateDraftTemplate,
   verifySignature,
   type DocumentSubjectContext,
 } from '../../../src/lib/documents/service.ts';
@@ -117,7 +125,69 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const url = new URL(context.request.url);
     const view = url.searchParams.get('view') ?? 'templates';
     if (view === 'templates') return json({ ok: true, templates: await listTemplates(db) });
+    if (view === 'template') {
+      const template = await getTemplate(db, url.searchParams.get('id') ?? '');
+      if (!template) return json({ ok: false, error: 'template_not_found' }, 404);
+      return json({ ok: true, template });
+    }
+    if (view === 'template-download') {
+      const template = await getTemplate(db, url.searchParams.get('id') ?? '');
+      if (!template) return json({ ok: false, error: 'template_not_found' }, 404);
+      const key = String(template.r2_key ?? '');
+      if (key && context.env.DOCUMENTS_BUCKET?.get) {
+        const object = await context.env.DOCUMENTS_BUCKET.get(key);
+        if (object) {
+          const body = object.body ?? (object.arrayBuffer ? await object.arrayBuffer() : null);
+          if (body) {
+            return new Response(body as BodyInit, {
+              headers: {
+                'Content-Type': object.httpMetadata?.contentType || 'application/pdf',
+                'Content-Disposition': `attachment; filename="${String(template.title ?? 'document').replace(/[^a-zA-Z0-9._-]/g, '_')}.pdf"`,
+                'Cache-Control': 'private, no-store',
+                'X-Content-Type-Options': 'nosniff',
+              },
+            });
+          }
+        }
+      }
+      const content = String(template.content_text ?? '');
+      if (!content) return json({ ok: false, error: 'document_unavailable' }, 404);
+      return new Response(content, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${String(template.title ?? 'document').replace(/[^a-zA-Z0-9._-]/g, '_')}.txt"`,
+          'Cache-Control': 'private, no-store',
+        },
+      });
+    }
+    if (view === 'history') {
+      const entityType = url.searchParams.get('entityType') ?? 'document_template';
+      const entityId = url.searchParams.get('id') ?? '';
+      if (entityType !== 'document_template' || !entityId) {
+        return json({ ok: false, error: 'invalid_history_request' }, 400);
+      }
+      return json({ ok: true, history: await templateHistory(db, entityId) });
+    }
     if (view === 'bundles') return json({ ok: true, bundles: await listBundles(db) });
+    if (view === 'preview') {
+      const documentContext = contextFrom({
+        subjectType: url.searchParams.get('subjectType') ?? 'customer',
+        ...(url.searchParams.get('customerId') ? { customerId: url.searchParams.get('customerId') } : {}),
+        ...(url.searchParams.get('teamMemberId') ? { teamMemberId: url.searchParams.get('teamMemberId') } : {}),
+        ...(url.searchParams.get('propertyId') ? { propertyId: url.searchParams.get('propertyId') } : {}),
+        ...(url.searchParams.get('serviceCode') ? { serviceCode: url.searchParams.get('serviceCode') } : {}),
+        ...(url.searchParams.get('frequency') ? { frequency: url.searchParams.get('frequency') } : {}),
+        ...(url.searchParams.get('bookingReference') ? { bookingReference: url.searchParams.get('bookingReference') } : {}),
+      });
+      if (!branchAllowed(actor, await documentSubjectBranch(db, documentContext))) {
+        return json({ ok: false, error: 'forbidden' }, 403);
+      }
+      const preview = await previewPacket(db, documentContext, {
+        ...(url.searchParams.get('bundleId') ? { bundleId: url.searchParams.get('bundleId')! } : {}),
+      });
+      if (!preview) return json({ ok: false, error: 'packet_not_found' }, 404);
+      return json({ ok: true, preview });
+    }
     if (view === 'items') {
       return json({ ok: true, items: await listBundleItems(db, url.searchParams.get('bundleId') ?? '') });
     }
@@ -244,6 +314,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         signerParty: body.signerParty === 'employee' ? 'employee' : body.signerParty === 'both' ? 'both' : 'customer',
         requiresCountersignature: checked(body.requiresCountersignature),
         requiresVerification: checked(body.requiresVerification),
+        familyKey: text(body.familyKey, 120),
+        effectiveDate: text(body.effectiveDate, 10),
+        legalReviewStatus: text(body.legalReviewStatus, 40),
+        packetNotes: text(body.packetNotes, 1000),
       });
       return json({ ok: true, ...created });
     }
@@ -260,8 +334,43 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           signerParty: body.signerParty === 'employee' ? 'employee' : body.signerParty === 'both' ? 'both' : 'customer',
           requiresCountersignature: body.requiresCountersignature === true,
           requiresVerification: body.requiresVerification === true,
+          familyKey: text(body.familyKey, 120),
+          effectiveDate: text(body.effectiveDate, 10),
+          legalReviewStatus: text(body.legalReviewStatus, 40),
+          packetNotes: text(body.packetNotes, 1000),
         })),
       });
+    }
+    if (action === 'update_draft_template') {
+      ownerOnly(actor);
+      await updateDraftTemplate(db, actor.id, text(body.templateId, 100), {
+        title: text(body.title, 200),
+        category: text(body.category, 80),
+        version: text(body.version, 40),
+        contentText: text(body.contentText, 200_000),
+        signerParty: body.signerParty === 'employee' ? 'employee' : body.signerParty === 'both' ? 'both' : 'customer',
+        requiresCountersignature: checked(body.requiresCountersignature),
+        requiresVerification: checked(body.requiresVerification),
+        effectiveDate: text(body.effectiveDate, 10),
+        legalReviewStatus: text(body.legalReviewStatus, 40),
+        packetNotes: text(body.packetNotes, 1000),
+      });
+      return json({ ok: true });
+    }
+    if (action === 'duplicate_template') {
+      ownerOnly(actor);
+      return json({
+        ok: true,
+        ...(await duplicateTemplate(db, actor.id, text(body.templateId, 100), {
+          ...(text(body.title, 200) ? { title: text(body.title, 200) } : {}),
+          ...(text(body.version, 40) ? { version: text(body.version, 40) } : {}),
+        })),
+      });
+    }
+    if (action === 'restore_template') {
+      ownerOnly(actor);
+      await restoreTemplate(db, actor.id, text(body.templateId, 100));
+      return json({ ok: true });
     }
     if (action === 'approve_template') {
       ownerOnly(actor);
@@ -282,6 +391,35 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       await updateBundle(db, actor.id, text(body.bundleId, 100), body);
       return json({ ok: true });
     }
+    if (action === 'duplicate_packet') {
+      ownerOnly(actor);
+      return json({
+        ok: true,
+        ...(await duplicateBundle(db, actor.id, text(body.bundleId, 100), {
+          ...(text(body.name, 160) ? { name: text(body.name, 160) } : {}),
+          ...(text(body.code, 80) ? { code: text(body.code, 80) } : {}),
+        })),
+      });
+    }
+    if (action === 'archive_packet' || action === 'restore_packet') {
+      ownerOnly(actor);
+      await updateBundle(db, actor.id, text(body.bundleId, 100), {
+        status: action === 'archive_packet' ? 'inactive' : 'active',
+      });
+      return json({ ok: true });
+    }
+    if (action === 'preview_packet') {
+      const documentContext = contextFrom(body);
+      if (!branchAllowed(actor, await documentSubjectBranch(db, documentContext))) {
+        return json({ ok: false, error: 'forbidden' }, 403);
+      }
+      const preview = await previewPacket(db, documentContext, {
+        ...(text(body.bundleId, 100) ? { bundleId: text(body.bundleId, 100) } : {}),
+        ...(text(body.instructions, 2000) ? { instructions: text(body.instructions, 2000) } : {}),
+      });
+      if (!preview) return json({ ok: false, error: 'packet_not_found' }, 404);
+      return json({ ok: true, preview });
+    }
     if (action === 'add_item') {
       ownerOnly(actor);
       await addBundleItem(db, actor.id, body);
@@ -294,11 +432,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (action === 'send_request') {
       const documentContext = contextFrom(body);
+      if (!branchAllowed(actor, await documentSubjectBranch(db, documentContext))) {
+        return json({ ok: false, error: 'forbidden' }, 403);
+      }
       const created = await createSigningRequest(db, documentContext, {
         createdByAdminUserId: actor.id,
+        ...(text(body.bundleId, 100) ? { bundleId: text(body.bundleId, 100) } : {}),
+        ...(text(body.instructions, 2000) ? { instructions: text(body.instructions, 2000) } : {}),
       });
       if (!created.required || !created.token) {
-        return json({ ok: true, required: false, message: 'No active required documents for this context.' });
+        return json({ ok: true, required: false, message: 'No active required documents in this packet.' });
       }
       const recipient = text(body.email, 200);
       const emailSent = recipient
@@ -317,12 +460,21 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         token: created.token,
         expiresAt: created.expiresAt,
         bundleCode: created.bundleCode,
+        bundleName: created.bundleName,
+        instructions: created.instructions,
         emailSent,
         signingUrl: `/document-sign/?token=${encodeURIComponent(created.token)}`,
       });
     }
     if (action === 'resend_request') {
-      const rotated = await rotateSigningRequestToken(db, actor.id, text(body.requestId, 100));
+      const requestId = text(body.requestId, 100);
+      const existingDetails = await getSigningRequestDetails(db, requestId);
+      if (!existingDetails) return json({ ok: false, error: 'signing_request_not_found' }, 404);
+      const existingRequest = (existingDetails.request ?? {}) as Record<string, unknown>;
+      if (!branchAllowed(actor, existingRequest.branch_id)) {
+        return json({ ok: false, error: 'forbidden' }, 403);
+      }
+      const rotated = await rotateSigningRequestToken(db, actor.id, requestId);
       const recipient = text(body.email, 200) || rotated.email;
       const emailSent = recipient
         ? await sendSigningEmail(
