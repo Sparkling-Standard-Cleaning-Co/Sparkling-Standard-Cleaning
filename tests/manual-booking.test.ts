@@ -15,6 +15,11 @@ import {
 } from '../src/lib/admin/manual-booking.ts';
 import type { AvailabilityInput, AvailabilityServiceResult } from '../src/lib/booking/service.ts';
 import { onRequestPost as bookingsPost } from '../functions/api/admin/bookings.ts';
+import {
+  activeEntitlementForCustomer,
+  applyCustomerEntitlement,
+  removeCustomerEntitlement,
+} from '../src/lib/promotions/entitlements.ts';
 
 class SqlStatement implements D1PreparedStatement {
   private values: unknown[] = [];
@@ -503,4 +508,70 @@ test('a routing-provider failure never becomes a fabricated mileage', async () =
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+
+async function seedFriends15(db: TestD1): Promise<void> {
+  db.raw.prepare(
+    `INSERT INTO promotions
+     (id, name, code, kind, percent, services_json, branches_json, status, terms_version)
+     VALUES ('promo_friends15', 'Friends', 'FRIENDS15', 'percent', 15, '["standard","deep"]',
+             '["branch_pensacola"]', 'active', '2026-11-19.friends15.v1')`,
+  ).run();
+}
+
+test('FRIENDS15 persistent benefit applies once, survives reapply and restores plan price on removal', async () => {
+  const { db, actor } = await fixture();
+  await seedFriends15(db);
+  db.raw.prepare(
+    `INSERT INTO recurring_plans
+     (id, customer_id, property_id, branch_id, service_code, frequency, status, ongoing_price_cents,
+      start_date, next_visit_date, window, start_time, duration_minutes, crew_size, first_duration_minutes)
+     VALUES ('rec_benefit', 'cust_manual', 'prop_manual', 'branch_pensacola', 'residential-cleaning',
+             'biweekly', 'active', 12000, '2026-12-01', '2026-12-01', 'morning', '08:00', 270, 1, 270)`,
+  ).run();
+  const applied = await applyCustomerEntitlement(db, actor, {
+    customerId: 'cust_manual',
+    code: 'FRIENDS15',
+    previewToken: 'confirmed',
+  });
+  assert.equal(applied.entitlement.status, 'active');
+  assert.equal(applied.appliedPlans, 1);
+  const plan = db.raw.prepare('SELECT ongoing_price_cents, base_ongoing_price_cents, entitlement_id FROM recurring_plans WHERE id = ?').get('rec_benefit') as Record<string, unknown>;
+  assert.equal(plan.ongoing_price_cents, 10200);
+  assert.equal(plan.base_ongoing_price_cents, 12000);
+  assert.equal(Boolean(plan.entitlement_id), true);
+  const again = await applyCustomerEntitlement(db, actor, {
+    customerId: 'cust_manual',
+    code: 'FRIENDS15',
+    previewToken: 'confirmed',
+  });
+  assert.equal((db.raw.prepare('SELECT COUNT(*) AS count FROM customer_promotion_entitlements').get() as { count: number }).count, 1);
+  assert.equal(again.appliedPlans, 0);
+  assert.equal((await activeEntitlementForCustomer(db, 'cust_manual', 'FRIENDS15'))?.status, 'active');
+  const removed = await removeCustomerEntitlement(db, actor, {
+    customerId: 'cust_manual',
+    entitlementId: applied.entitlement.id,
+  });
+  assert.equal(removed.removed, true);
+  assert.equal(removed.restoredPlans, 1);
+  const restored = db.raw.prepare('SELECT ongoing_price_cents, entitlement_id FROM recurring_plans WHERE id = ?').get('rec_benefit') as Record<string, unknown>;
+  assert.equal(restored.ongoing_price_cents, 12000);
+  assert.equal(restored.entitlement_id, null);
+});
+
+test('FRIENDS15 applies to the manual residential quote without stacking an existing discount', async () => {
+  const { db, actor, env, quoteInput } = await fixture();
+  await seedFriends15(db);
+  const before = await quoteManualBooking(env, db, actor, quoteInput);
+  await applyCustomerEntitlement(db, actor, {
+    customerId: 'cust_manual',
+    code: 'FRIENDS15',
+    previewToken: 'confirmed',
+  });
+  const after = await quoteManualBooking(env, db, actor, quoteInput);
+  assert.equal(after.entitlement?.code, 'FRIENDS15');
+  assert.ok((after.entitlement?.discountCents ?? 0) > 0);
+  assert.ok((after.totalCents ?? 0) < (before.totalCents ?? 0));
+  assert.equal(after.discountLabel, 'FRIENDS15');
 });

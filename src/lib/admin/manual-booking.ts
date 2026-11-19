@@ -1,4 +1,4 @@
-﻿// Admin manual estimate and one-time booking creator (BOOK-09).
+// Admin manual estimate and one-time booking creator (BOOK-09).
 //
 // This module is the single server-side path for an owner-created booking. It
 // deliberately reuses the SAME calculators, pricing snapshot, availability
@@ -13,6 +13,7 @@ import type { D1Database, D1PreparedStatement } from './d1.ts';
 import { AdminAuthError, audit, type AdminActor } from './operations.ts';
 import { markBookingCommitment } from '../booking/commitments.ts';
 import { requestPricingConfig } from '../pricing/server.ts';
+import { activeEntitlementForCustomer, FRIENDS15_CODE } from '../promotions/entitlements.ts';
 import { calculateEstimate, type EstimateContext } from '../estimate/calculate.ts';
 import {
   calculateFacilityPrice,
@@ -116,6 +117,7 @@ export interface ManualQuote {
   serviceCode: string;
   travel: ManualQuoteTravel;
   message: string | null;
+  entitlement: { code: string; percent: number; discountCents: number; label: string } | null;
   fields: Record<string, string>;
   documentsRequired: Array<{ templateId: string; title: string; stage: string }>;
 }
@@ -486,6 +488,9 @@ export async function quoteManualBooking(
   const propertyId = text(raw.propertyId, 100);
   if (!customerId || !propertyId) throw new AdminAuthError(400, 'customer_property_required');
   const context = await scopedCustomerProperty(db, actor, customerId, propertyId);
+  const entitlement = input.engine === 'residential' && ['standard', 'deep'].includes(input.serviceType ?? '')
+    ? await activeEntitlementForCustomer(db, customerId, FRIENDS15_CODE)
+    : null;
   const config = await requestPricingConfig(db);
   const destination = await propertyDestination(env, context.property);
   const { travel, routed } = await travelFor(env, destination);
@@ -548,6 +553,7 @@ export async function quoteManualBooking(
       ongoingFrequency: null,
       tier: workload.tier,
       message: priced ? null : 'This facility scope requires personal review.',
+      entitlement: null,
     };
     return {
       ...quoteWithoutFields,
@@ -575,6 +581,7 @@ export async function quoteManualBooking(
       ongoingFrequency: null,
       tier: null,
       message: validation.issues[0] ?? 'Complete the estimate inputs.',
+      entitlement: null,
     };
     return {
       ...invalidQuote,
@@ -584,6 +591,32 @@ export async function quoteManualBooking(
   const estimate = calculateEstimate(draft, estimateContext(config, routed, input.promotionCode ?? ''));
   const amount = selectInstantAmount(estimate, config.instantQuote.selection.value, config);
   const priced = estimate.status === 'estimated' && amount !== null;
+  const eligibleCleaningCents = Math.max(0, Math.round((estimate.pricing.basePrice + estimate.pricing.extrasSubtotal) * 100));
+  const canApplyEntitlement = Boolean(
+    priced &&
+    entitlement &&
+    !estimate.pricing.discount &&
+    !(input.promotionCode ?? '').trim(),
+  );
+  const entitlementDiscountCents = canApplyEntitlement
+    ? Math.max(0, Math.round((eligibleCleaningCents * (entitlement?.percent ?? 0)) / 100))
+    : 0;
+  const effectiveAmount = amount === null
+    ? null
+    : Math.max(0, Math.round((amount * 100 - entitlementDiscountCents)) / 100);
+  const effectiveBreakdown = entitlementDiscountCents > 0
+    ? {
+        ...estimate.pricing,
+        discount: {
+          id: entitlement?.id ?? 'friends15-entitlement',
+          source: 'entitlement',
+          percent: entitlement?.percent ?? 0,
+          amount: entitlementDiscountCents / 100,
+          label: 'FRIENDS15',
+        },
+        subtotal: Math.max(0, Math.round((estimate.pricing.subtotal * 100 - entitlementDiscountCents)) / 100),
+      }
+    : estimate.pricing;
   const durationMinutes = estimate.pricing.totalLaborHours > 0
     ? Math.min(
         bookingConfig.maximumJobMinutes,
@@ -596,22 +629,45 @@ export async function quoteManualBooking(
   const quoteWithoutFields = {
     ...base,
     status: priced ? 'priced' as const : 'custom_confirmation_required' as const,
-    totalCents: priced ? cents(amount) : null,
+    totalCents: priced ? cents(effectiveAmount ?? amount ?? 0) : null,
     range: priced && estimate.low !== null && estimate.high !== null
-      ? { low: estimate.low, high: estimate.high }
+      ? {
+          low: Math.max(0, estimate.low - entitlementDiscountCents / 100),
+          high: Math.max(0, estimate.high - entitlementDiscountCents / 100),
+        }
       : null,
     laborHours: estimate.laborHours,
     durationMinutes,
-    breakdown: estimate.pricing,
+    breakdown: effectiveBreakdown,
     cleaningSubtotalCents: priced ? cents(estimate.pricing.basePrice) : null,
     travelAdjustmentCents: cents(estimate.pricing.travelAdjustment),
     extrasSubtotalCents: cents(estimate.pricing.extrasSubtotal),
-    discountAmountCents: estimate.pricing.discount ? cents(estimate.pricing.discount.amount) : null,
-    discountLabel: estimate.pricing.discount?.label ?? null,
-    ongoingPerVisitCents: estimate.ongoing ? cents(estimate.ongoing.perVisitPrice) : null,
+    discountAmountCents: entitlementDiscountCents > 0
+      ? entitlementDiscountCents
+      : estimate.pricing.discount
+        ? cents(estimate.pricing.discount.amount)
+        : null,
+    discountLabel: entitlementDiscountCents > 0 ? 'FRIENDS15' : estimate.pricing.discount?.label ?? null,
+    ongoingPerVisitCents: estimate.ongoing
+      ? cents(
+          Math.max(
+            0,
+            estimate.ongoing.perVisitPrice *
+              (1 - (entitlementDiscountCents > 0 ? (entitlement?.percent ?? 0) / 100 : 0)),
+          ),
+        )
+      : null,
     ongoingFrequency: estimate.ongoing?.frequency ?? null,
     tier: null,
     message: priced ? null : estimate.message ?? 'This scope requires personal confirmation.',
+    entitlement: entitlement
+      ? {
+          code: entitlement.code,
+          percent: entitlement.percent,
+          discountCents: entitlementDiscountCents,
+          label: 'FRIENDS15',
+        }
+      : null,
   };
   return {
     ...quoteWithoutFields,

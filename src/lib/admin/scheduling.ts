@@ -1,5 +1,6 @@
 import type { AdminActor } from './operations.ts';
 import { AdminAuthError, audit } from './operations.ts';
+import { activeEntitlementForCustomer, FRIENDS15_CODE } from '../promotions/entitlements.ts';
 import type { D1Database } from './d1.ts';
 import { bookingConfig } from '../../config/booking.ts';
 import { defaultActiveBranch } from './branches.ts';
@@ -422,15 +423,21 @@ export async function createRecurring(
   if (!['weekly', 'biweekly', 'monthly'].includes(frequency)) throw new AdminAuthError(400, 'frequency_invalid');
   const branchId = branchFor(actor, input.branchId) ?? ownership.primary_branch_id;
   const id = uuid('rec');
-  const price = Math.max(0, Math.round(Number(input.ongoingPrice) * 100) || 0);
+  const basePrice = Math.max(0, Math.round(Number(input.ongoingPrice) * 100) || 0);
+  const entitlement = await activeEntitlementForCustomer(db, customerId, FRIENDS15_CODE);
+  const price = entitlement
+    ? Math.max(0, Math.round(basePrice * (100 - entitlement.percent) / 100))
+    : basePrice;
   const schedule = recurringSchedule(input);
   await db
     .prepare(
       `INSERT INTO recurring_plans
-       (id, customer_id, property_id, branch_id, service_code, frequency, status, ongoing_price_cents, start_date, next_visit_date, terms_version, window, start_time, duration_minutes, crew_size, first_duration_minutes)
-       VALUES (?, ?, ?, ?, 'residential-cleaning', ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, customer_id, property_id, branch_id, service_code, frequency, status, ongoing_price_cents,
+        base_ongoing_price_cents, entitlement_id, start_date, next_visit_date, terms_version, window,
+        start_time, duration_minutes, crew_size, first_duration_minutes)
+       VALUES (?, ?, ?, ?, 'residential-cleaning', ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, customerId, propertyId, branchId, frequency, price, startDate, startDate, text(input.termsVersion, 80) || 'admin.v1', schedule.window, schedule.startTime, schedule.duration, schedule.crewSize, Number(input.firstDurationMinutes) > 0 ? Math.round(Number(input.firstDurationMinutes)) : schedule.duration)
+    .bind(id, customerId, propertyId, branchId, frequency, price, basePrice, entitlement?.id ?? null, startDate, startDate, text(input.termsVersion, 80) || 'admin.v1', schedule.window, schedule.startTime, schedule.duration, schedule.crewSize, Number(input.firstDurationMinutes) > 0 ? Math.round(Number(input.firstDurationMinutes)) : schedule.duration)
     .run();
   await audit(db, { actorUserId: actor.id, action: 'recurring.created', entityType: 'recurring_plan', entityId: id });
   return { id };

@@ -166,6 +166,10 @@ function friendly(error: unknown): string {
     customer_email_invalid: 'The customer email address is not valid.',
     invoice_email_failed: 'The invoice email could not be sent. Check the Resend configuration and try again.',
     invoice_document_failed: 'The invoice PDF could not be generated.',
+    entitlement_preview_required: 'Preview the benefit before applying it.',
+    entitlement_not_found: 'That benefit could not be found.',
+    promotion_inactive: 'That promotion is not active.',
+    promotion_not_percent: 'This persistent benefit requires a percentage promotion.',
     customer_email_required: 'The customer needs an email address for a payment link.',
     reserved: 'This gift is reserved by an active booking.',
     redeemed: 'This gift has already been redeemed.',
@@ -874,6 +878,15 @@ async function openCustomer(customerId: string): Promise<void> {
   const documentRequests = await api<{ requests?: Array<Record<string, unknown>> }>(
     `/api/admin/documents?view=requests&customerId=${encodeURIComponent(customerId)}`,
   ).then((result) => result.requests ?? []).catch(() => []);
+  const benefitData = actor?.role === 'owner'
+    ? await api<{ entitlements?: Array<Record<string, unknown>>; history?: Array<Record<string, unknown>> }>(
+        `/api/admin/entitlements?customerId=${encodeURIComponent(customerId)}`,
+      ).catch(() => ({ entitlements: [], history: [] }))
+    : { entitlements: [], history: [] };
+  const activeBenefit = (benefitData.entitlements ?? []).find((entry) => entry.status === 'active');
+  const benefitsHtml = actor?.role === 'owner'
+    ? `<div class="admin-card" style="margin-top:1rem"><div class="admin-detail-head"><h3>Discounts &amp; Benefits</h3>${activeBenefit ? `<span class="admin-status">${esc(activeBenefit.code)} active · ${esc(activeBenefit.percent)}%</span>` : '<span class="admin-muted">No persistent benefit</span>'}</div><p class="admin-muted">Persistent benefits survive rebooking and recurring-plan regeneration. They never stack with Community Care.</p>${activeBenefit ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="benefit-remove" data-id="${esc(customerId)}" data-benefit-id="${esc(activeBenefit.id)}">Remove ${esc(activeBenefit.code)}</button></div>` : `<button class="btn btn--secondary btn--small" type="button" data-admin-action="benefit-preview" data-id="${esc(customerId)}" data-code="FRIENDS15">Preview FRIENDS15</button>`}<div data-customer-benefit-preview></div><h4>Benefit history</h4>${(benefitData.history ?? []).length ? (benefitData.history ?? []).slice(0, 10).map((entry) => `<div class="admin-record">${esc(entry.code)} · ${esc(titleCase(entry.action))} · ${esc(dateTime(entry.created_at))}</div>`).join('') : '<p class="admin-muted">No benefit history.</p>'}</div>`
+    : '';
   const email = contacts.find((contact) => contact.kind === 'email')?.value ?? customer.email ?? '';
   const phone = contacts.find((contact) => contact.kind === 'phone')?.value ?? customer.phone ?? '';
   detail.hidden = false;
@@ -883,6 +896,7 @@ async function openCustomer(customerId: string): Promise<void> {
     <h3>Properties</h3>
     ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}${Number(property.is_primary) === 1 ? ' · Primary' : ''}</strong>${propertyProfileSummary(property)}<details class="admin-detail-toggle"><summary>Edit property</summary><form class="admin-form" style="max-width:none" data-form="property-update"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="propertyId" value="${esc(property.id)}" />${propertyFields(property)}<label>Status <select name="status"><option value="active"${property.status !== 'archived' ? ' selected' : ''}>Active</option><option value="archived"${property.status === 'archived' ? ' selected' : ''}>Archived</option></select></label><button class="btn btn--secondary btn--small" type="submit">Save property</button></form></details></div>`).join('') || '<p class="admin-muted">No properties.</p>'}
     <details class="admin-detail-toggle"><summary>Add a property</summary><form class="admin-form" style="max-width:none" data-form="property-add"><input type="hidden" name="customerId" value="${esc(customerId)}" />${propertyFields({})}<button class="btn btn--secondary btn--small" type="submit">Add property</button></form></details>
+    ${benefitsHtml}
     <h3>History</h3><div class="admin-history">${leads.length ? `<p><strong>Requests:</strong> ${leads.map((lead) => `${esc(lead.request_type)} (${esc(lead.status)})`).join(', ')}</p>` : ''}${estimates.length ? `<p><strong>Estimates:</strong> ${estimates.map((estimate) => `${esc(estimate.quote_reference)} (${money(estimate.total_cents)})`).join(', ')}</p>` : ''}${appointments.length ? `<p><strong>Appointments:</strong> ${appointments.map((appointment) => `${esc(appointment.reference)} (${esc(appointment.status)})`).join(', ')}</p>` : ''}${invoices.length ? `<p><strong>Invoices:</strong> ${invoices.map((invoice) => `${esc(invoice.number)} (${money(invoice.balance_cents)} balance)`).join(', ')}</p>` : ''}</div>
     <h3>Documents &amp; agreements</h3>${documentRequests.length ? documentRequests.map((request) => `<div class="admin-record"><p><strong>${esc(request.bundle_code)}</strong> — ${esc(titleCase(request.status))}</p><p class="admin-muted">Signed ${esc(request.signed_count)} · Awaiting verification ${esc(request.awaiting_verification)} · ${esc(dateTime(request.created_at))}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded.</p>'}
     <h3>Notes</h3>${notes.map((note) => `<div class="admin-record"><p>${esc(note.body)}</p><p class="admin-muted">${esc(dateTime(note.created_at))}</p></div>`).join('') || '<p class="admin-muted">No notes.</p>'}
@@ -901,6 +915,64 @@ async function openCustomer(customerId: string): Promise<void> {
   if (paymentAuthorizations.length > 0) {
     const rows = paymentAuthorizations.map((authorization) => `<div class="admin-record"><strong>${esc(titleCase(authorization.status))}</strong> · ${esc(money(authorization.max_amount_cents))} max · signed ${esc(dateTime(authorization.signed_at))}<p class="admin-muted">SHA-256 ${esc(authorization.sha256)}</p><details class="admin-detail-toggle"><summary>View signed authorization</summary><pre style="white-space:pre-wrap">${esc(authorization.signed_content_text)}</pre></details></div>`).join('');
     detail.insertAdjacentHTML('beforeend', `<div class="admin-card" style="margin-top:1rem;"><h3>Signed payment authorizations</h3>${rows}</div>`);
+  }
+}
+
+async function previewCustomerBenefit(customerId: string, code: string): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-customer-benefit-preview]');
+  if (!target) return;
+  target.innerHTML = '<p class="admin-muted">Loading benefit preview…</p>';
+  try {
+    const result = await api<{ preview: Record<string, unknown> }>(
+      `/api/admin/entitlements?view=preview&customerId=${encodeURIComponent(customerId)}&code=${encodeURIComponent(code)}`,
+    );
+    const preview = result.preview;
+    const plans = (preview.recurringPlans as Array<Record<string, unknown>>) ?? [];
+    const appointments = (preview.appointments as Array<Record<string, unknown>>) ?? [];
+    const invoices = (preview.invoices as Array<Record<string, unknown>>) ?? [];
+    const warnings = (preview.warnings as string[]) ?? [];
+    target.innerHTML = `<div class="admin-card" style="margin-top:1rem;background:var(--color-surface-alt);">
+      <h4>${esc(preview.code)} preview — ${esc(preview.percent)}%</h4>
+      ${warnings.map((warning) => `<p class="admin-error">${esc(warning)}</p>`).join('')}
+      <h4>Recurring plans</h4>${plans.length ? plans.map((plan) => `<div class="admin-record">${esc(plan.frequency)} · ${esc(money(plan.currentPriceCents))} → ${esc(money(plan.discountedPriceCents))} per visit · ${esc(plan.futureAppointments)} future appointment(s)${plan.willApply ? '' : ' · already applied'}</div>`).join('') : '<p class="admin-muted">No active recurring plan.</p>'}
+      <h4>Upcoming unpaid appointments</h4>${appointments.length ? appointments.map((appointment) => `<div class="admin-record">${esc(appointment.reference)} · ${esc(dateTime(appointment.startAt))} · ${esc(appointment.status)}</div>`).join('') : '<p class="admin-muted">No upcoming pending/confirmed appointments.</p>'}
+      <h4>Issued invoices</h4>${invoices.length ? invoices.map((invoice) => `<div class="admin-record">${esc(invoice.number)} · ${esc(money(invoice.balanceCents))} balance · ${esc(invoice.action === 'apply' ? 'safe automatic discount' : invoice.action === 'excluded' ? 'historical / excluded' : 'manual adjustment required')}<p class="admin-muted">${esc(invoice.reason)}</p></div>`).join('') : '<p class="admin-muted">No appointment-linked invoices.</p>'}
+      <p class="admin-muted">This preview does not modify records. Applying updates active plan prices and only safe open/unpaid invoices; other invoices require manual adjustment.</p>
+      <button class="btn btn--primary btn--small" type="button" data-admin-action="benefit-apply" data-id="${esc(customerId)}" data-code="${esc(preview.code)}">Apply ${esc(preview.code)}</button>
+    </div>`;
+  } catch (error) {
+    target.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
+  }
+}
+
+async function applyCustomerBenefit(customerId: string, code: string): Promise<void> {
+  setAppError();
+  setSuccess();
+  try {
+    const result = await api<{ appliedPlans: number; appliedInvoices: number }>('/api/admin/entitlements', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'apply', customerId, code, previewToken: 'confirmed' }),
+    });
+    await openCustomer(customerId);
+    setSuccess(`Benefit applied. ${result.appliedPlans} recurring plan(s) and ${result.appliedInvoices} invoice(s) updated.`);
+  } catch (error) {
+    setAppError(friendly(error));
+  }
+}
+
+async function removeCustomerBenefit(customerId: string, entitlementId: string): Promise<void> {
+  if (!window.confirm('Remove this persistent benefit? Active recurring plans will return to their normal price. Issued invoices are not rewritten.')) return;
+  setAppError();
+  setSuccess();
+  try {
+    const result = await api<{ removed: boolean; restoredPlans: number }>('/api/admin/entitlements', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'remove', customerId, entitlementId }),
+    });
+    await openCustomer(customerId);
+    setSuccess(`Benefit removed. ${result.restoredPlans} recurring plan(s) restored to normal pricing.`);
+  } catch (error) {
+    setAppError(friendly(error));
   }
 }
 
@@ -3149,6 +3221,9 @@ document.addEventListener('click', (event) => {
   if (actionName === 'customer-edit') { document.querySelector<HTMLDetailsElement>('[data-customer-edit]')?.setAttribute('open', ''); }
   if (actionName === 'request-close') { const detail = document.querySelector<HTMLElement>('[data-admin-request-detail]'); if (detail) { detail.hidden = true; detail.innerHTML = ''; } }
   if (actionName === 'customer-open') void openCustomer(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'benefit-preview') void previewCustomerBenefit(id, target.dataset.code ?? 'FRIENDS15');
+  if (actionName === 'benefit-apply') void applyCustomerBenefit(id, target.dataset.code ?? 'FRIENDS15');
+  if (actionName === 'benefit-remove') void removeCustomerBenefit(id, target.dataset.benefitId ?? '');
   if (actionName === 'customer-create') renderCustomerCreate();
   if (actionName === 'lead-save') {
     const select = document.querySelector<HTMLSelectElement>(`[data-lead-status="${CSS.escape(id)}"]`);

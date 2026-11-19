@@ -94,6 +94,11 @@ function migratedDb(): TestD1 {
     '0029_booking_commitments.sql',
     '0030_booking_payment_claims.sql',
     '0031_document_execution_integrity.sql',
+    '0032_promotions_and_redemptions.sql',
+    '0033_promotion_deadlines.sql',
+    '0034_promotion_scope.sql',
+    '0035_promotion_supportive_stacking.sql',
+    '0036_customer_promotion_entitlements.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
