@@ -1,5 +1,9 @@
 # Verification status
 
+## Invoice payment terms - 2026-11-19
+
+Application code **`7e85818`** is deployed in Cloudflare Pages production deployment `db47fe16-c166-4001-b6d2-72bbe9ee12fc`. Residential invoices default to the issue date (due immediately); commercial/church invoices default to Net 15; explicit due dates override. The admin invoice form selects the service type. No existing invoice or payment was modified. Full detail: [`docs/verification/2026-11-19-INVOICE-TERMS.md`](2026-11-19-INVOICE-TERMS.md).
+
 ## FRIENDS15 persistent benefit - 2026-11-19
 
 Application code **`45dd3a2`** is deployed in Cloudflare Pages production deployment `7317b104-14f4-4e49-9082-6f8e0bd1e94b`. Migration `0036` adds persistent customer promotional entitlements, owner-only preview/apply/remove, recurring-plan price application/restoration, manual-quote application, safe invoice adjustment and audit history. No customer benefit was assigned during release. Full detail: [`docs/verification/2026-11-19-FRIENDS15-PERSISTENT-BENEFIT.md`](2026-11-19-FRIENDS15-PERSISTENT-BENEFIT.md).
