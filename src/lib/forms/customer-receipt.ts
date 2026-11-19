@@ -22,6 +22,7 @@ export type ReceiptEmailStatus =
 export interface ReceiptEmailOutcome {
   status: ReceiptEmailStatus;
   providerStatus?: number;
+  providerMessageId?: string;
 }
 
 const DEFAULT_FROM = 'Sparkling Standard <notifications@sparkling-standard.com>';
@@ -58,7 +59,10 @@ export async function sendCustomerReceipt(
       }),
       signal: AbortSignal.timeout(10_000),
     });
-    if (response.ok) return { status: 'sent' };
+    if (response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { id?: string };
+      return { status: 'sent', ...(payload.id ? { providerMessageId: payload.id } : {}) };
+    }
     return { status: 'failed', providerStatus: response.status };
   } catch {
     return { status: 'failed' };

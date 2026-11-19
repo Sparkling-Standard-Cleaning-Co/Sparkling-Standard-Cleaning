@@ -17,6 +17,7 @@ import { createInvoicePaymentLink, refundStripePayment, type StripeBillingEnv } 
 import { buildAdminInvoice } from '../../../src/lib/invoicing/admin-invoice.ts';
 import { buildInvoicePdf } from '../../../src/lib/invoicing/pdf.ts';
 import { buildInvoiceEmail, sendInvoiceEmail, type InvoiceEmailEnv } from '../../../src/lib/invoicing/invoice-email.ts';
+import { deliverInvoiceReceipt } from '../../../src/lib/invoicing/invoice-receipt.ts';
 
 interface Env extends AdminDbEnv, StripeBillingEnv, InvoiceEmailEnv {}
 
@@ -82,6 +83,21 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'apply_credit') return json({ ok: true, ...(await applyCreditToInvoice(db, actor, body)) });
     if (action === 'payment_link') {
       return json({ ok: true, ...(await createInvoicePaymentLink(db, actor, String(body.invoiceId ?? ''), context.env)) });
+    }
+    if (action === 'resend_invoice_receipt') {
+      const invoiceId = String(body.invoiceId ?? '');
+      const result = await getInvoice(db, actor, invoiceId);
+      if (!result) return json({ ok: false, error: 'invoice_not_found' }, 404);
+      const invoice = result.invoice as Record<string, unknown>;
+      if (String(invoice.status) !== 'paid') {
+        return json({ ok: false, error: 'invoice_not_paid' }, 409);
+      }
+      const receipt = await deliverInvoiceReceipt(db, context.env, {
+        invoiceId,
+        actorUserId: actor.id,
+        force: true,
+      });
+      return json({ ok: receipt.status === 'sent', receipt: receipt.status });
     }
     if (action === 'preview_invoice_email') {
       const invoiceId = String(body.invoiceId ?? '');

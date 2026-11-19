@@ -99,6 +99,7 @@ function migratedDb(): TestD1 {
     '0034_promotion_scope.sql',
     '0035_promotion_supportive_stacking.sql',
     '0036_customer_promotion_entitlements.sql',
+    '0037_payment_receipts.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
@@ -402,6 +403,7 @@ import {
   recordPayment,
   recordRefund,
 } from '../src/lib/admin/billing.ts';
+import { deliverInvoiceReceipt } from '../src/lib/invoicing/invoice-receipt.ts';
 import {
   beginRefund,
   completeRefund,
@@ -1849,4 +1851,45 @@ test('invoice due dates follow residential immediate and commercial Net 15 polic
   const commercialRow = db.raw.prepare('SELECT due_date FROM invoices WHERE id = ?').get(commercialInvoice.id) as { due_date: string };
   assert.equal(residentialRow.due_date, '2026-12-01');
   assert.equal(commercialRow.due_date, '2026-12-16');
+});
+
+
+test('a paid invoice produces exactly one idempotent customer receipt', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Receipt', lastName: 'Customer', email: 'receipt@example.test',
+    addressLine1: '100 Receipt Street', city: 'Pensacola', postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    serviceCode: 'residential-cleaning',
+    issueDate: '2026-11-19',
+    lines: [{ kind: 'service', description: 'Residential cleaning', quantity: 1, unitAmountCents: 10000, totalCents: 10000 }],
+  });
+  await recordPayment(db, actor, {
+    invoiceId: invoice.id, provider: 'cash', amount: 100, idempotencyKey: 'receipt-payment-1',
+  });
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ id: 'email_receipt_1' }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const first = await deliverInvoiceReceipt(db, { RESEND_API_KEY: 'test' }, { invoiceId: invoice.id });
+    assert.equal(first.status, 'sent');
+    const duplicate = await deliverInvoiceReceipt(db, { RESEND_API_KEY: 'test' }, { invoiceId: invoice.id });
+    assert.equal(duplicate.status, 'sent');
+    assert.equal(calls, 1);
+    const rows = db.raw.prepare('SELECT status, provider_message_id FROM payment_receipts WHERE invoice_id = ?').all(invoice.id) as Array<Record<string, unknown>>;
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]?.status, 'sent');
+    assert.equal(rows[0]?.provider_message_id, 'email_receipt_1');
+    const resent = await deliverInvoiceReceipt(db, { RESEND_API_KEY: 'test' }, { invoiceId: invoice.id, force: true });
+    assert.equal(resent.status, 'sent');
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

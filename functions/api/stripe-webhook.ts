@@ -38,6 +38,7 @@ import { autoConfirmPaidBooking } from '../../src/lib/booking/auto-confirm.ts';
 import type { BookingEnv } from '../../src/lib/booking/service.ts';
 import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { applyInvoiceCheckoutPayment } from '../../src/lib/admin/stripe-reconcile.ts';
+import { deliverInvoiceReceipt } from '../../src/lib/invoicing/invoice-receipt.ts';
 import { completeCheckoutSlotByAttempt, expireCheckoutSlotByAttempt } from '../../src/lib/payments/checkout-registry.ts';
 import { sendSigningEmail } from '../../src/lib/documents/service.ts';
 import { recordSavedCardSetup } from '../../src/lib/admin/stripe-billing.ts';
@@ -564,7 +565,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         ...(session.amount_total ? { amount_total: session.amount_total } : {}),
         metadata,
       });
-      return json({ ok: true, received: true, invoice: result });
+      const receipt = await deliverInvoiceReceipt(env.DB, env, { invoiceId: result.invoiceId }).catch(() => ({
+        status: "failed" as const,
+      }));
+      return json({ ok: true, received: true, invoice: result, receipt: receipt.status });
     } catch {
       return json({ ok: false, error: 'invoice_payment_reconciliation_failed' }, 500);
     }

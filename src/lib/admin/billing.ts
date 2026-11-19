@@ -84,13 +84,14 @@ export async function getInvoice(
     .bind(invoiceId, ...branch.bind)
     .first();
   if (!invoice) return null;
-  const [lines, payments, refunds, credits] = await Promise.all([
+  const [lines, payments, refunds, credits, receipts] = await Promise.all([
     db.prepare('SELECT * FROM invoice_lines WHERE invoice_id = ? ORDER BY sort_order').bind(invoiceId).all(),
     db.prepare('SELECT id, provider, status, amount_cents, received_at, created_at FROM payments WHERE invoice_id = ? ORDER BY created_at DESC').bind(invoiceId).all(),
     db.prepare('SELECT r.* FROM refunds r JOIN payments p ON p.id = r.payment_id WHERE p.invoice_id = ? ORDER BY r.created_at DESC').bind(invoiceId).all(),
     db.prepare('SELECT * FROM credits WHERE customer_id = ? ORDER BY created_at DESC').bind(invoice.customer_id).all(),
+    db.prepare('SELECT * FROM payment_receipts WHERE invoice_id = ? ORDER BY created_at DESC LIMIT 10').bind(invoiceId).all(),
   ]);
-  return { invoice, lines: lines.results ?? [], payments: payments.results ?? [], refunds: refunds.results ?? [], credits: credits.results ?? [] };
+  return { invoice, lines: lines.results ?? [], payments: payments.results ?? [], refunds: refunds.results ?? [], credits: credits.results ?? [], receipts: receipts.results ?? [] };
 }
 
 export async function createInvoice(

@@ -154,8 +154,9 @@ export function buildReceipt(data: ReceiptData): BuiltReceipt {
   <div style="background:${PALETTE.cream};padding:28px 12px;">
     <table role="presentation" width="680" align="center" cellpadding="0" cellspacing="0" style="max-width:680px;background:${PALETTE.card};border:1px solid ${PALETTE.border};border-radius:14px;padding:34px 38px;">
       <tr><td>
-        <p style="margin:0 0 2px;font-family:Georgia,'Times New Roman',serif;font-size:23px;font-weight:700;color:${PALETTE.ink};">Sparkling <span style="letter-spacing:.12em;">STANDARD</span></p>
-        <p style="margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.champagne};">Standards That Make Your Space Sparkle.</p>
+        <img src="https://sparkling-standard.com/brand/icon-192.png" width="64" height="64" alt="Sparkling Standard" style="display:block;margin:0 0 12px;border:0;" />
+        <p style="margin:0 0 2px;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;color:${PALETTE.ink};">Sparkling Standard Cleaning Co.</p>
+        <p style="margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.champagne};">Standards That Sparkle.</p>
         <p style="margin:22px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:20px;color:${PALETTE.ink};">Payment receipt</p>
         <p style="margin:4px 0 0;font-size:13px;color:${PALETTE.muted};">${escapeHtml(formatDate(data.paidAt))}</p>
 
@@ -205,7 +206,7 @@ export function buildReceipt(data: ReceiptData): BuiltReceipt {
 </html>`;
 
   const textLines = [
-    'SPARKLING STANDARD — PAYMENT RECEIPT',
+    'SPARKLING STANDARD CLEANING CO. — PAYMENT RECEIPT',
     `Receipt: ${data.receiptNumber}`,
     `Paid: ${formatDate(data.paidAt)}`,
     `Service: ${data.service}`,
@@ -234,7 +235,7 @@ export function buildReceipt(data: ReceiptData): BuiltReceipt {
   ];
 
   return {
-    subject: `Your Sparkling Standard receipt — ${data.reference}`,
+    subject: `Your Sparkling Standard Cleaning Co. receipt - ${data.reference}`,
     html,
     text: textLines.join('\n'),
   };

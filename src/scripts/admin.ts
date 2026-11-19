@@ -169,6 +169,7 @@ function friendly(error: unknown): string {
     payment_link_failed: 'The secure Stripe payment link could not be created. No email was sent.',
     invoice_session_unverified: 'The existing Stripe session could not be verified. Try again.',
     invoice_payment_processing: 'A Stripe payment is already processing for this invoice.',
+    invoice_not_paid: 'Only a paid invoice can produce a payment receipt.',
     entitlement_preview_required: 'Preview the benefit before applying it.',
     entitlement_not_found: 'That benefit could not be found.',
     promotion_inactive: 'That promotion is not active.',
@@ -1821,10 +1822,18 @@ async function openInvoice(invoiceId: string): Promise<void> {
   const invoice = data.invoice as Record<string, unknown>;
   const lines = (data.lines as Array<Record<string, unknown>>) ?? [];
   const payments = (data.payments as Array<Record<string, unknown>>) ?? [];
+  const receipts = (data.receipts as Array<Record<string, unknown>>) ?? [];
   target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(invoice.number)}</h2><span class="admin-status">${esc(titleCase(invoice.status))}</span></div><dl class="admin-definition"><dt>Customer</dt><dd>${esc([invoice.first_name, invoice.last_name].filter(Boolean).join(' '))}</dd><dt>Email</dt><dd>${esc(invoice.customer_email || 'Not recorded')}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Paid</dt><dd>${esc(money(invoice.amount_paid_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(dateTime(invoice.due_date))}</dd></dl><h3>Lines</h3>${lines.map((line) => `<div class="admin-record">${esc(line.description)} · ${esc(money(line.total_cents))}</div>`).join('') || '<p class="admin-muted">No lines.</p>'}<h3>Payments</h3>${payments.map((payment) => `<div class="admin-record">${esc(titleCase(payment.provider))} · ${esc(money(payment.amount_cents))} · ${esc(payment.status)} · ${esc(dateTime(payment.created_at))}<details class="admin-detail-toggle"><summary>Record refund</summary><form class="admin-form" data-form="refund"><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Refund amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="reason" /></label><button class="btn btn--secondary btn--small" type="submit">Record refund</button></form></details></div>`).join('') || '<p class="admin-muted">No payments.</p>'}${Number(invoice.balance_cents) > 0 ? `<form class="admin-form" data-form="payment"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Payment method <select name="provider"><option value="cash">Cash</option><option value="check">Check</option><option value="external">External</option></select></label><label>Amount <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Reference <input name="reference" /></label><button class="btn btn--primary btn--small" type="submit">Record payment</button></form>` : ''}<form class="admin-form" data-form="credit"><input type="hidden" name="customerId" value="${esc(invoice.customer_id)}" /><label>Customer credit amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="source" /></label><button class="btn btn--secondary btn--small" type="submit">Add credit</button></form></div>`;
   const controls = document.querySelector<HTMLElement>('[data-admin-invoice-controls]');
   if (controls) {
     controls.innerHTML = `<a class="btn btn--secondary btn--small" href="/api/admin/invoice-document?id=${encodeURIComponent(invoiceId)}">Download invoice PDF</a>`;
+    if (String(invoice.status) === 'paid' && can('finance.write')) {
+      const latestReceipt = receipts[0];
+      controls.insertAdjacentHTML(
+        'beforeend',
+        `<p class="admin-muted">Payment receipt: ${esc(latestReceipt ? `${titleCase(latestReceipt.status)} · ${dateTime(latestReceipt.sent_at || latestReceipt.updated_at)}` : 'not sent')}</p><button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-receipt-resend" data-id="${esc(invoiceId)}">Resend payment receipt</button>`,
+      );
+    }
     if (
       can('finance.write') &&
       invoice.customer_email &&
@@ -3380,6 +3389,19 @@ document.addEventListener('click', (event) => {
     setAppError();
     void api<{ url: string }>('/api/admin/finance', { method: 'POST', body: JSON.stringify({ action: 'payment_link', invoiceId: id }) })
       .then(() => openInvoice(id))
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'invoice-receipt-resend') {
+    setAppError();
+    setSuccess();
+    void api<{ receipt: string }>('/api/admin/finance', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'resend_invoice_receipt', invoiceId: id }),
+    })
+      .then((result) => {
+        if (result.receipt === 'sent') setSuccess('Payment receipt resent.');
+        else setAppError('The payment receipt could not be sent. Check Resend configuration.');
+      })
       .catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'invoice-email-preview') {
