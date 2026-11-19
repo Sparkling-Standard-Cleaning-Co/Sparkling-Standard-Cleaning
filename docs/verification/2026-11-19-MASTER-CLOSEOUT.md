@@ -173,7 +173,7 @@ It confirms no real customer, charge or email is touched.
 | Check | Result |
 | --- | --- |
 | `npm run check` | 0 errors, 0 warnings, 2 pre-existing hints |
-| `npm test` | 895 tests, 894 pass, 1 pre-existing skip, 0 fail |
+| `npm test` | 896 tests, 895 pass, 1 pre-existing skip, 0 fail |
 | `npm run test:browser` | 223 tests, 223 pass, 0 fail |
 | `npm run build` | pass |
 | `npm run validate` | pass (2191 links, 35 pages, SEO, registry, QR, GTM, checklist leak) |
@@ -192,8 +192,12 @@ New additive migrations:
 - `0039_quick_estimates.sql`
 
 They must be applied to production D1 before the new admin features are used.
-The code fails closed without them (missing tables produce an API error, not a
-silent partial write). No destructive migration is included.
+The code fails closed without them for the new features. Existing document
+gates, signing, customer profiles and checkout were made backward compatible:
+`tests/rollout-compatibility.test.ts` applies only migrations through `0037`,
+then creates a template, packet and signing request, signs it, satisfies the
+document gate and opens the customer workspace without error. No destructive
+migration is included.
 
 Application code commit 054d395 was pushed to `production-safe`. GitHub Actions `validate` and
 `browser` both passed. The static admin page was verified live at

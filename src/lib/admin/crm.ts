@@ -115,7 +115,7 @@ export async function getCustomer(
         ).bind(customerId).all()
       : Promise.resolve({ success: true, results: [] }),
     db.prepare(
-      `SELECT id, bundle_code, packet_name, status, booking_reference, executed_at, created_at
+      `SELECT id, bundle_code, status, booking_reference, executed_at, created_at
        FROM signing_requests WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
     ).bind(customerId).all(),
     db.prepare(
@@ -128,7 +128,7 @@ export async function getCustomer(
       `SELECT id, status, engine, service_code, total_cents, ongoing_cents, address_text,
               converted_request_id, created_at, updated_at
        FROM quick_estimates WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
-    ).bind(customerId).all(),
+    ).bind(customerId).all().catch(() => ({ success: true, results: [] })),
   ]);
   return {
     customer,

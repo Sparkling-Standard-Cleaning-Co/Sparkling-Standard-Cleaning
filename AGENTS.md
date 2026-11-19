@@ -94,8 +94,8 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   FRIENDS15/Community Support/database promotions and conversion to a pending booking, dashboard
   and financial-reporting improvements, a unified customer workspace, encrypted off-site backup
   and restore tooling, branded legal drafts (not attorney-approved), and a synthetic end-to-end
-  acceptance test. CI `validate` and `browser` passed on `production-safe`; local suite 895 tests
-  (894 pass, 1 pre-existing skip) and 223 browser tests pass. No live charge, refund, customer
+  acceptance test. CI `validate` and `browser` passed on `production-safe`; local suite 896 tests
+  (895 pass, 1 pre-existing skip) and 223 browser tests pass. No live charge, refund, customer
   email, legal execution or production customer record change was performed. Evidence:
   `docs/verification/2026-11-19-MASTER-CLOSEOUT.md`.
 - **Prior release (2026-11-19 invoice payment receipts):** application code **`85d5178`** remains in

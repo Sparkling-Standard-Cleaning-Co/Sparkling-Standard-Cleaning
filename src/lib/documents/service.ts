@@ -308,24 +308,30 @@ export async function resolveBundle(
           ...(service === 'move_in_out' ? ['customer.residential'] : []),
         ];
   for (const code of [...new Set(candidates)]) {
-    const row = await db
+    const rows = await db
       .prepare(
         `SELECT * FROM document_bundles
-         WHERE code = ? AND subject_type = ? AND status = 'active' AND is_system = 0 LIMIT 1`,
+         WHERE code = ? AND subject_type = ? AND status = 'active' LIMIT 1`,
       )
       .bind(code, subject)
-      .first<Record<string, unknown>>();
+      .all<Record<string, unknown>>();
+    const row = (rows.results ?? []).find((entry) => Number(entry.is_system) !== 1);
     if (row) return row;
   }
-  const fallback = await db
+  const fallbackRows = await db
     .prepare(
       `SELECT * FROM document_bundles
-       WHERE subject_type = ? AND service_category = ? AND status = 'active' AND is_system = 0
-       ORDER BY created_at LIMIT 1`,
+       WHERE subject_type = ? AND service_category = ? AND status = 'active'
+       ORDER BY created_at`,
     )
     .bind(subject, service)
-    .first<Record<string, unknown>>();
-  return fallback ?? null;
+    .all<Record<string, unknown>>();
+  return (fallbackRows.results ?? []).find((entry) => Number(entry.is_system) !== 1) ?? null;
+}
+
+function missingColumn(error: unknown, column: string): boolean {
+  const message = String((error as Error)?.message ?? error);
+  return new RegExp(`no such column|has no column named`, 'i').test(message) && message.includes(column);
 }
 
 export async function activeRequirements(
@@ -691,39 +697,53 @@ export async function createSigningRequest(
   const id = `signreq_${crypto.randomUUID()}`;
   const token = randomToken(32);
   const expiresAt = new Date(Date.now() + SIGNING_TOKEN_TTL_MS).toISOString();
-  await db
-    .prepare(
-      `INSERT INTO signing_requests
-       (id, bundle_id, bundle_code, bundle_version, subject_type, customer_id, team_member_id,
-        property_id, booking_request_id, appointment_id, recurring_plan_id, booking_reference,
-        service_code, status, requirement_snapshot_json, token_hash, token_expires_at,
-        created_by_admin_user_id, branch_id, signer_email, packet_instructions, packet_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      String(bundle.id),
-      String(bundle.code),
-      Number(bundle.version) || 1,
-      context.subjectType,
-      context.customerId ?? null,
-      context.teamMemberId ?? null,
-      context.propertyId ?? null,
-      context.bookingRequestId ?? null,
-      context.appointmentId ?? null,
-      context.recurringPlanId ?? null,
-      text(context.bookingReference, 120),
-      text(context.serviceCode, 80),
-      JSON.stringify(snapshot),
-      await hashToken(token),
-      expiresAt,
-      options.createdByAdminUserId ?? null,
-      identity.branchId,
-      identity.signerEmail,
-      instructions,
-      text(bundle.name, 200),
-    )
-    .run();
+  const coreBinds = [
+    id,
+    String(bundle.id),
+    String(bundle.code),
+    Number(bundle.version) || 1,
+    context.subjectType,
+    context.customerId ?? null,
+    context.teamMemberId ?? null,
+    context.propertyId ?? null,
+    context.bookingRequestId ?? null,
+    context.appointmentId ?? null,
+    context.recurringPlanId ?? null,
+    text(context.bookingReference, 120),
+    text(context.serviceCode, 80),
+    JSON.stringify(snapshot),
+    await hashToken(token),
+    expiresAt,
+    options.createdByAdminUserId ?? null,
+    identity.branchId,
+    identity.signerEmail,
+  ];
+  try {
+    await db
+      .prepare(
+        `INSERT INTO signing_requests
+         (id, bundle_id, bundle_code, bundle_version, subject_type, customer_id, team_member_id,
+          property_id, booking_request_id, appointment_id, recurring_plan_id, booking_reference,
+          service_code, status, requirement_snapshot_json, token_hash, token_expires_at,
+          created_by_admin_user_id, branch_id, signer_email, packet_instructions, packet_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(...coreBinds, instructions, text(bundle.name, 200))
+      .run();
+  } catch (error) {
+    if (!missingColumn(error, 'packet_instructions')) throw error;
+    await db
+      .prepare(
+        `INSERT INTO signing_requests
+         (id, bundle_id, bundle_code, bundle_version, subject_type, customer_id, team_member_id,
+          property_id, booking_request_id, appointment_id, recurring_plan_id, booking_reference,
+          service_code, status, requirement_snapshot_json, token_hash, token_expires_at,
+          created_by_admin_user_id, branch_id, signer_email)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(...coreBinds)
+      .run();
+  }
   await audit(db, {
     actorUserId: options.createdByAdminUserId ?? null,
     action: 'documents.signing_request_created',
@@ -1066,34 +1086,50 @@ export async function createTemplate(
     text(input.familyKey, 120).toLowerCase().replace(/[^a-z0-9._-]+/g, '-') ||
     title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 100) ||
     id;
-  await db
-    .prepare(
-      `INSERT INTO document_templates
-       (id, title, category, version, status, source_kind, content_text, content_sha256, r2_key,
-        signer_party, requires_countersignature, requires_verification, created_by_admin_user_id,
-        family_key, effective_date, legal_review_status, packet_notes, supersedes_template_id)
-       VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      title,
-      text(input.category, 80) || 'general',
-      text(input.version, 40) || '1.0',
-      sourceKind,
-      contentText,
-      contentSha256,
-      text(input.r2Key, 500),
-      input.signerParty ?? 'customer',
-      input.requiresCountersignature ? 1 : 0,
-      input.requiresVerification ? 1 : 0,
-      actorUserId,
-      familyKey,
-      text(input.effectiveDate, 10),
-      legalReviewStatus,
-      text(input.packetNotes, 1000),
-      text(input.supersedesTemplateId, 100) || null,
-    )
-    .run();
+  const coreValues = [
+    id,
+    title,
+    text(input.category, 80) || 'general',
+    text(input.version, 40) || '1.0',
+    sourceKind,
+    contentText,
+    contentSha256,
+    text(input.r2Key, 500),
+    input.signerParty ?? 'customer',
+    input.requiresCountersignature ? 1 : 0,
+    input.requiresVerification ? 1 : 0,
+    actorUserId,
+  ];
+  try {
+    await db
+      .prepare(
+        `INSERT INTO document_templates
+         (id, title, category, version, status, source_kind, content_text, content_sha256, r2_key,
+          signer_party, requires_countersignature, requires_verification, created_by_admin_user_id,
+          family_key, effective_date, legal_review_status, packet_notes, supersedes_template_id)
+         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        ...coreValues,
+        familyKey,
+        text(input.effectiveDate, 10),
+        legalReviewStatus,
+        text(input.packetNotes, 1000),
+        text(input.supersedesTemplateId, 100) || null,
+      )
+      .run();
+  } catch (error) {
+    if (!missingColumn(error, 'family_key')) throw error;
+    await db
+      .prepare(
+        `INSERT INTO document_templates
+         (id, title, category, version, status, source_kind, content_text, content_sha256, r2_key,
+          signer_party, requires_countersignature, requires_verification, created_by_admin_user_id)
+         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(...coreValues)
+      .run();
+  }
   await audit(db, {
     actorUserId,
     action: 'documents.template_created',
@@ -1264,12 +1300,23 @@ export async function restoreTemplate(
   actorUserId: string,
   templateId: string,
 ): Promise<void> {
-  const result = await db
-    .prepare(
-      "UPDATE document_templates SET status = 'draft', archived_at = NULL, restored_at = ?, updated_at = ? WHERE id = ? AND status = 'retired'",
-    )
-    .bind(now(), now(), templateId)
-    .run();
+  let result;
+  try {
+    result = await db
+      .prepare(
+        "UPDATE document_templates SET status = 'draft', archived_at = NULL, restored_at = ?, updated_at = ? WHERE id = ? AND status = 'retired'",
+      )
+      .bind(now(), now(), templateId)
+      .run();
+  } catch (error) {
+    if (!missingColumn(error, 'restored_at')) throw error;
+    result = await db
+      .prepare(
+        "UPDATE document_templates SET status = 'draft', archived_at = NULL, updated_at = ? WHERE id = ? AND status = 'retired'",
+      )
+      .bind(now(), templateId)
+      .run();
+  }
   if (!result.success) throw new AdminAuthError(400, 'document_restore_failed');
   await audit(db, {
     actorUserId,
@@ -1316,26 +1363,46 @@ export async function createBundle(
   const purpose = ['customer', 'employee', 'operational'].includes(String(input.purpose))
     ? String(input.purpose)
     : subjectType;
-  await db
-    .prepare(
-      `INSERT INTO document_bundles
-       (id, code, name, description, service_category, subject_type, status, version,
-        created_by_admin_user_id, purpose, packet_type, instructions)
-       VALUES (?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      code,
-      name,
-      text(input.description, 500),
-      text(input.serviceCategory, 60) || 'general',
-      subjectType,
-      actorUserId,
-      purpose,
-      text(input.packetType, 60).toLowerCase().replace(/[^a-z0-9._-]+/g, '_') || 'custom',
-      text(input.instructions, 2000),
-    )
-    .run();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO document_bundles
+         (id, code, name, description, service_category, subject_type, status, version,
+          created_by_admin_user_id, purpose, packet_type, instructions)
+         VALUES (?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?, ?)`,
+      )
+      .bind(
+        id,
+        code,
+        name,
+        text(input.description, 500),
+        text(input.serviceCategory, 60) || 'general',
+        subjectType,
+        actorUserId,
+        purpose,
+        text(input.packetType, 60).toLowerCase().replace(/[^a-z0-9._-]+/g, '_') || 'custom',
+        text(input.instructions, 2000),
+      )
+      .run();
+  } catch (error) {
+    if (!missingColumn(error, 'purpose')) throw error;
+    await db
+      .prepare(
+        `INSERT INTO document_bundles
+         (id, code, name, description, service_category, subject_type, status, version, created_by_admin_user_id)
+         VALUES (?, ?, ?, ?, ?, ?, 'active', 1, ?)`,
+      )
+      .bind(
+        id,
+        code,
+        name,
+        text(input.description, 500),
+        text(input.serviceCategory, 60) || 'general',
+        subjectType,
+        actorUserId,
+      )
+      .run();
+  }
   await audit(db, {
     actorUserId,
     action: 'documents.bundle_created',
@@ -1357,28 +1424,47 @@ export async function updateBundle(
     .bind(bundleId)
     .first<Record<string, unknown>>();
   if (!bundle) throw new AdminAuthError(404, 'bundle_not_found');
-  await db
-    .prepare(
-      `UPDATE document_bundles
-       SET name = ?, description = ?, service_category = ?, status = ?, version = version + 1,
-           purpose = ?, packet_type = ?, instructions = ?, archived_at = ?, updated_at = ?
-       WHERE id = ?`,
-    )
-    .bind(
-      text(input.name, 160) || bundle.name,
-      input.description === undefined ? bundle.description : text(input.description, 500),
-      text(input.serviceCategory, 60) || bundle.service_category,
-      input.status === 'inactive' ? 'inactive' : 'active',
-      ['customer', 'employee', 'operational'].includes(String(input.purpose))
-        ? String(input.purpose)
-        : bundle.purpose ?? bundle.subject_type,
-      text(input.packetType, 60) || (bundle.packet_type ?? 'custom'),
-      input.instructions === undefined ? bundle.instructions ?? '' : text(input.instructions, 2000),
-      input.status === 'inactive' ? now() : null,
-      now(),
-      bundleId,
-    )
-    .run();
+  try {
+    await db
+      .prepare(
+        `UPDATE document_bundles
+         SET name = ?, description = ?, service_category = ?, status = ?, version = version + 1,
+             purpose = ?, packet_type = ?, instructions = ?, archived_at = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .bind(
+        text(input.name, 160) || bundle.name,
+        input.description === undefined ? bundle.description : text(input.description, 500),
+        text(input.serviceCategory, 60) || bundle.service_category,
+        input.status === 'inactive' ? 'inactive' : 'active',
+        ['customer', 'employee', 'operational'].includes(String(input.purpose))
+          ? String(input.purpose)
+          : bundle.purpose ?? bundle.subject_type,
+        text(input.packetType, 60) || (bundle.packet_type ?? 'custom'),
+        input.instructions === undefined ? bundle.instructions ?? '' : text(input.instructions, 2000),
+        input.status === 'inactive' ? now() : null,
+        now(),
+        bundleId,
+      )
+      .run();
+  } catch (error) {
+    if (!missingColumn(error, 'purpose')) throw error;
+    await db
+      .prepare(
+        `UPDATE document_bundles
+         SET name = ?, description = ?, service_category = ?, status = ?, version = version + 1, updated_at = ?
+         WHERE id = ?`,
+      )
+      .bind(
+        text(input.name, 160) || bundle.name,
+        input.description === undefined ? bundle.description : text(input.description, 500),
+        text(input.serviceCategory, 60) || bundle.service_category,
+        input.status === 'inactive' ? 'inactive' : 'active',
+        now(),
+        bundleId,
+      )
+      .run();
+  }
   await audit(db, {
     actorUserId,
     action: 'documents.bundle_updated',
@@ -1537,16 +1623,28 @@ export async function removeBundleItem(
 }
 
 export async function listTemplates(db: D1Database): Promise<Array<Record<string, unknown>>> {
-  const rows = await db
-    .prepare(
-      `SELECT id, title, category, version, status, source_kind, content_sha256, signer_party,
-              requires_countersignature, requires_verification, approved_at, archived_at, created_at,
-              family_key, effective_date, legal_review_status, supersedes_template_id, restored_at,
-              packet_notes
-       FROM document_templates ORDER BY category, title, created_at DESC`,
-    )
-    .all();
-  return rows.results ?? [];
+  try {
+    const rows = await db
+      .prepare(
+        `SELECT id, title, category, version, status, source_kind, content_sha256, signer_party,
+                requires_countersignature, requires_verification, approved_at, archived_at, created_at,
+                family_key, effective_date, legal_review_status, supersedes_template_id, restored_at,
+                packet_notes
+         FROM document_templates ORDER BY category, title, created_at DESC`,
+      )
+      .all();
+    return rows.results ?? [];
+  } catch (error) {
+    if (!missingColumn(error, 'family_key')) throw error;
+    const rows = await db
+      .prepare(
+        `SELECT id, title, category, version, status, source_kind, content_sha256, signer_party,
+                requires_countersignature, requires_verification, approved_at, archived_at, created_at
+         FROM document_templates ORDER BY category, title, created_at DESC`,
+      )
+      .all();
+    return rows.results ?? [];
+  }
 }
 
 export async function listBundles(db: D1Database): Promise<Array<Record<string, unknown>>> {
