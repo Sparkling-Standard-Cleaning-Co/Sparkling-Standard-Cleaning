@@ -84,11 +84,25 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-19 invoice payment receipts):** application code **`85d5178`** is live
-  (Cloudflare Pages production deployment `c70d8b1d-2a1a-4b59-b9e6-b44f663d8351`). Migration `0037` adds
-  idempotent invoice receipt delivery. The invoice-payment webhook now sends one branded itemized
-  receipt after verified payment, records Resend status and exposes an owner resend action. No live
-  receipt was sent during verification. Evidence:
+- **Current release (2026-11-19 master production closeout):** application code **`054d395`** is
+  live on `production-safe` (the static admin page was verified live at
+  `https://sparkling-standard.com/admin/` with the Quick Estimate and packet markup present;
+  Cloudflare deployment ID is dashboard-only and was not retrievable from the repository).
+  Migrations `0038` (document packet builder) and `0039` (Quick Estimate) are additive and must be
+  applied to production D1 before the new admin features are used. This release adds the document
+  packet builder with variable resolution and fail-closed sending, the admin Quick Estimate with
+  FRIENDS15/Community Support/database promotions and conversion to a pending booking, dashboard
+  and financial-reporting improvements, a unified customer workspace, encrypted off-site backup
+  and restore tooling, branded legal drafts (not attorney-approved), and a synthetic end-to-end
+  acceptance test. CI `validate` and `browser` passed on `production-safe`; local suite 895 tests
+  (894 pass, 1 pre-existing skip) and 223 browser tests pass. No live charge, refund, customer
+  email, legal execution or production customer record change was performed. Evidence:
+  `docs/verification/2026-11-19-MASTER-CLOSEOUT.md`.
+- **Prior release (2026-11-19 invoice payment receipts):** application code **`85d5178`** remains in
+  production history (Cloudflare Pages production deployment `c70d8b1d-2a1a-4b59-b9e6-b44f663d8351`).
+  Migration `0037` adds idempotent invoice receipt delivery. The invoice-payment webhook sends one
+  branded itemized receipt after verified payment, records Resend status and exposes an owner resend
+  action. No live receipt was sent during verification. Evidence:
   `docs/verification/2026-11-19-INVOICE-RECEIPTS.md`.
 - **Prior release (2026-11-19 invoice payment link):** application code **`e324f0b`** remains in production history
   (Cloudflare Pages production deployment `1c8ef822-9864-4cb7-b4ff-25711d3983bc`). Invoice billing gate
@@ -350,6 +364,10 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | SEO, structured data, sitemap, robots, page ownership | `src/components/BaseHead.astro`, `src/lib/schema.ts`, page files | `docs/seo/SEO-STRATEGY.md`, `docs/operations/SEARCH-CONSOLE-SETUP.md` |
 | Analytics, consent, event taxonomy, attribution | `src/scripts/consent-controller.ts`, `src/lib/analytics/`, `src/lib/attribution.ts` | `docs/analytics/ANALYTICS-SETUP.md`, `docs/analytics/GTM-CONTAINER-SETUP.md` |
 | Visual design, tokens, images, icons, OG image | `src/styles/`, `public/brand/`, `src/assets/images/` | `docs/design/DESIGN-SYSTEM.md`, `docs/design/IMAGE-GUIDE.md`, `docs/design/IMAGE-SOURCE-REGISTER.md` |
+| Document packet builder, variables and template lifecycle | `src/lib/documents/service.ts`, `functions/api/admin/documents.ts`, migration `0038`, `src/pages/admin/index.astro` | `docs/operations/DOCUMENT-MANAGEMENT.md` |
+| Admin Quick Estimate and promotions | `src/lib/admin/quick-estimate.ts`, `quick-estimate-document.ts`, `functions/api/admin/quick-estimates.ts`, migration `0039` | `docs/operations/QUICK-ESTIMATE.md` |
+| Branded legal templates, register and renderer | `docs/legal/`, `scripts/render-legal-docs.mjs`, `docs/brand/LOGO-AUTHORITY.md` | `docs/legal/LEGAL-DOCUMENT-REGISTER.md` |
+| Encrypted off-site backup and restore | `scripts/backup/`, `.github/workflows/backup.yml` | `docs/operations/OFFSITE-BACKUPS.md` |
 | Customer CRM and complete property profiles | src/lib/admin/crm.ts, src/lib/admin/property-profile.ts, unctions/api/admin/customers.ts, src/scripts/admin.ts, migration  028 | docs/verification/VERIFICATION.md |
 | Customer photo intake (private R2, metadata stripping, owner links, retention) | `functions/api/photo-upload.ts`, `photo-view.ts`, `photo-cleanup.ts`, `src/lib/photos.ts`, `src/lib/photo-files.ts`, `src/scripts/photo-uploads.ts`, `src/components/PhotoUploadSection.astro` | `docs/operations/PHOTO-UPLOADS.md` |`n| Photo privacy rules (marketing/field photography) | `docs/privacy/PHOTO-PRIVACY-SOP.md` |
 | UTM links and QR assets | `src/config/marketing-links.ts` | `docs/marketing/UTM-MASTER-LINKS.md`, `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md` |

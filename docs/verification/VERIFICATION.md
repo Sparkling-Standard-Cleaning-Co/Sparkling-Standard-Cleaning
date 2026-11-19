@@ -1,5 +1,9 @@
 # Verification status
 
+## Master production closeout - 2026-11-19
+
+Application code **`054d395`** is live on `production-safe`; the static admin page was verified at `https://sparkling-standard.com/admin/` with the Quick Estimate and packet markup present. Cloudflare Pages deployment IDs are dashboard-only and were not retrievable without account credentials. Migrations `0038` and `0039` are additive and still require an owner/dashboard step before the new admin features are used. CI `validate` and `browser` passed; local suite 895 tests (894 pass, 1 pre-existing skip) and 223 browser tests passed. No live charge, refund, customer email, legal execution or production customer record change was performed. Full detail: [`2026-11-19-MASTER-CLOSEOUT.md`](2026-11-19-MASTER-CLOSEOUT.md).
+
 ## Invoice payment receipts - 2026-11-19
 
 Application code **`85d5178`** is deployed in Cloudflare Pages production deployment `c70d8b1d-2a1a-4b59-b9e6-b44f663d8351`. Migration `0037` adds idempotent invoice receipt delivery. The invoice-payment webhook now sends one branded itemized receipt after verified payment, records Resend status and exposes an owner resend action. No live receipt was sent during verification. Full detail: [`docs/verification/2026-11-19-INVOICE-RECEIPTS.md`](2026-11-19-INVOICE-RECEIPTS.md).
