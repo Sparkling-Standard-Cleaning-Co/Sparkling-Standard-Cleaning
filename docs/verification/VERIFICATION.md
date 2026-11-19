@@ -1,5 +1,9 @@
 # Verification status
 
+## FRIENDS15 persistent benefit - 2026-11-19
+
+Application code **`45dd3a2`** is deployed in Cloudflare Pages production deployment `7317b104-14f4-4e49-9082-6f8e0bd1e94b`. Migration `0036` adds persistent customer promotional entitlements, owner-only preview/apply/remove, recurring-plan price application/restoration, manual-quote application, safe invoice adjustment and audit history. No customer benefit was assigned during release. Full detail: [`docs/verification/2026-11-19-FRIENDS15-PERSISTENT-BENEFIT.md`](2026-11-19-FRIENDS15-PERSISTENT-BENEFIT.md).
+
 ## Property routing repair - 2026-11-18
 
 Application code **`01a5601`** is deployed in Cloudflare Pages production deployment
