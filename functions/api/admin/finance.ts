@@ -16,7 +16,7 @@ import {
 import { createInvoicePaymentLink, refundStripePayment, type StripeBillingEnv } from '../../../src/lib/admin/stripe-billing.ts';
 import { buildAdminInvoice } from '../../../src/lib/invoicing/admin-invoice.ts';
 import { buildInvoicePdf } from '../../../src/lib/invoicing/pdf.ts';
-import { sendInvoiceEmail, type InvoiceEmailEnv } from '../../../src/lib/invoicing/invoice-email.ts';
+import { buildInvoiceEmail, sendInvoiceEmail, type InvoiceEmailEnv } from '../../../src/lib/invoicing/invoice-email.ts';
 
 interface Env extends AdminDbEnv, StripeBillingEnv, InvoiceEmailEnv {}
 
@@ -83,11 +83,29 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'payment_link') {
       return json({ ok: true, ...(await createInvoicePaymentLink(db, actor, String(body.invoiceId ?? ''), context.env)) });
     }
-    if (action === 'email_invoice') {
+    if (action === 'preview_invoice_email') {
       const invoiceId = String(body.invoiceId ?? '');
       const result = await getInvoice(db, actor, invoiceId);
       if (!result) return json({ ok: false, error: 'invoice_not_found' }, 404);
       const invoice = result.invoice as Record<string, unknown>;
+      const document = buildAdminInvoice({
+        invoice,
+        lines: (result.lines as Array<Record<string, unknown>>) ?? [],
+      });
+      const email = buildInvoiceEmail(document.data, document.totals);
+      return json({
+        ok: true,
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+        hasPaymentLink: Boolean(invoice.payment_url),
+      });
+    }
+    if (action === 'email_invoice') {
+      const invoiceId = String(body.invoiceId ?? '');
+      let result = await getInvoice(db, actor, invoiceId);
+      if (!result) return json({ ok: false, error: 'invoice_not_found' }, 404);
+      let invoice = result.invoice as Record<string, unknown>;
       if (!['open', 'partially_paid', 'overdue'].includes(String(invoice.status))) {
         return json({ ok: false, error: 'invoice_not_sendable' }, 409);
       }
@@ -99,6 +117,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       if (!context.env.RESEND_API_KEY?.trim()) {
         return json({ ok: false, error: 'email_not_configured' }, 503);
+      }
+      if (body.includePaymentLink === true) {
+        try {
+          await createInvoicePaymentLink(db, actor, invoiceId, context.env);
+          result = await getInvoice(db, actor, invoiceId);
+          if (!result) return json({ ok: false, error: 'invoice_not_found' }, 404);
+          invoice = result.invoice as Record<string, unknown>;
+        } catch (error) {
+          return json(
+            { ok: false, error: error instanceof AdminAuthError ? error.code : 'payment_link_failed' },
+            error instanceof AdminAuthError ? error.status : 502,
+          );
+        }
       }
       const document = buildAdminInvoice({
         invoice,

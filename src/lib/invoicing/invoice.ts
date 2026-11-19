@@ -10,8 +10,6 @@
 //  - totals are arithmetic on the supplied line items, rounded to cents;
 //  - all values are HTML-escaped.
 
-import { brandWords } from '../../config/brand.ts';
-
 export interface InvoiceLineItem {
   description: string;
   quantity: number;
@@ -285,8 +283,8 @@ function buildHtml(data: InvoiceData, totals: InvoiceTotals): string {
           <table role="presentation" width="640" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:top;">
-                    <p style="margin:0 0 2px;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;color:${PALETTE.ink};">Sparkling <span style="letter-spacing:.12em;">STANDARD</span></p>
-                    <p style="margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.champagneText};">${brandWords.tagline}</p>
+                    <p style="margin:0 0 2px;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:700;color:${PALETTE.ink};">Sparkling Standard Cleaning Co.</p>
+                    <p style="margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.champagneText};">Standards That Sparkle.</p>
                   </td>
                   <td style="vertical-align:top;text-align:right;">
                     <p style="margin:0;font-size:26px;font-weight:700;letter-spacing:.04em;color:${PALETTE.ink};">INVOICE</p>

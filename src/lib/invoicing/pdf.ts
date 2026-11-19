@@ -79,9 +79,9 @@ export function buildInvoicePdf(data: InvoiceData, totals: InvoiceTotals): Uint8
 
   const beginPage = (continued = false): void => {
     if (content) pages.push(content);
-    content = text('Sparkling STANDARD', LEFT, 754, 20, true, INK);
+    content = text('Sparkling Standard Cleaning Co.', LEFT, 754, 16, true, INK);
     content += rightText('INVOICE', RIGHT, 752, 24, true, INK);
-    content += text('Standards That Make Your Space Sparkle.', LEFT, 736, 8, false, ROSE);
+    content += text('Standards That Sparkle.', LEFT, 736, 8, false, ROSE);
     content += rule(727);
     if (continued) {
       content += text(`${data.invoiceNumber} — continued`, LEFT, 704, 9, false, MUTED);

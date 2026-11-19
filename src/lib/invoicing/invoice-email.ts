@@ -35,20 +35,21 @@ export function buildInvoiceEmail(
   const balance = formatMoney(totals.balanceDue);
   const payLink =
     data.paymentUrl && /^https:\/\//i.test(data.paymentUrl)
-      ? `<p style="margin:0 0 18px;"><a href="${escapeHtml(data.paymentUrl)}" style="display:inline-block;background:#b15a6f;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:600;">Pay ${escapeHtml(balance)} online</a></p>
+      ? `<p style="margin:0 0 18px;"><a href="${escapeHtml(data.paymentUrl)}" style="display:inline-block;background:#b15a6f;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:600;">Pay Invoice Securely</a></p>
          <p style="margin:0 0 18px;font-size:13px;color:#6f5f57;">Or copy this secure link: <a href="${escapeHtml(data.paymentUrl)}" style="color:#93475b;">${escapeHtml(data.paymentUrl)}</a></p>`
       : '';
   const html = `<!doctype html>
 <html lang="en"><body style="margin:0;padding:0;background:#f9f3ed;font-family:'Helvetica Neue',Arial,sans-serif;color:#302429;">
   <div style="padding:28px 12px;">
     <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e4d5c7;border-radius:10px;padding:30px;">
-      <p style="margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;">Sparkling <span style="letter-spacing:.12em;">STANDARD</span></p>
-      <p style="margin:0 0 24px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#6d5426;">Standards That Make Your Space Sparkle.</p>
+      <img src="https://sparkling-standard.com/brand/icon-192.png" width="64" height="64" alt="Sparkling Standard" style="display:block;margin:0 0 12px;border:0;" />
+      <p style="margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;font-size:21px;font-weight:700;">Sparkling Standard Cleaning Co.</p>
+      <p style="margin:0 0 24px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#6d5426;">Standards That Sparkle.</p>
       <p style="margin:0 0 14px;font-size:15px;">Hello ${escapeHtml(data.billedTo.contact || data.billedTo.company)},</p>
       <p style="margin:0 0 18px;font-size:15px;line-height:1.65;">Your invoice <strong>${escapeHtml(data.invoiceNumber)}</strong> is attached as a PDF. The balance due is <strong>${escapeHtml(balance)}</strong>, due ${escapeHtml(due)}.</p>
       ${payLink}
       <p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:#4a3b40;">${escapeHtml(data.paymentTerms || 'Please reply to this email with any questions.')}</p>
-      <p style="margin:0;font-size:14px;line-height:1.65;color:#4a3b40;">Thank you for your business.<br>${escapeHtml(data.contact.name)}</p>
+      <p style="margin:0;font-size:14px;line-height:1.65;color:#4a3b40;">Thank you for choosing Sparkling Standard Cleaning Co.! We appreciate the opportunity to care for your home and look forward to delivering Standards That Sparkle.</p>
       <p style="margin:22px 0 0;padding-top:14px;border-top:1px solid #e4d5c7;font-size:12px;line-height:1.6;color:#8c7a70;">${escapeHtml(data.contact.phone)} · ${escapeHtml(data.contact.email)} · ${escapeHtml(data.contact.website)}</p>
     </div>
   </div>
@@ -63,7 +64,7 @@ export function buildInvoiceEmail(
     '',
     data.paymentTerms || 'Please reply to this email with any questions.',
     '',
-    'Thank you for your business.',
+    'Thank you for choosing Sparkling Standard Cleaning Co.! We appreciate the opportunity to care for your home and look forward to delivering Standards That Sparkle.',
     data.contact.name,
     `${data.contact.phone} · ${data.contact.email} · ${data.contact.website}`,
   ].join('\n');

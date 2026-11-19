@@ -77,7 +77,7 @@ test('the generated PDF is a real PDF and contains the invoice identity', () => 
   assert.equal(new TextDecoder().decode(pdf.subarray(0, 8)), '%PDF-1.4');
   const body = new TextDecoder().decode(pdf);
   assert.match(body, /INV-20261118-ABC123/);
-  assert.match(body, /Sparkling STANDARD/);
+  assert.match(body, /Sparkling Standard Cleaning Co\./);
   assert.match(body, /Balance due/);
 });
 
@@ -108,7 +108,8 @@ test('the invoice email carries the balance, payment link and no internal notes'
   const email = buildInvoiceEmail(document.data, document.totals);
   assert.match(email.subject, /INV-20261118-ABC123/);
   assert.match(email.subject, /\$47\.50/);
-  assert.match(email.html, /Pay \$47\.50 online/);
+  assert.match(email.html, /Pay Invoice Securely/);
+  assert.match(email.html, /Standards That Sparkle\./);
   assert.match(email.text, /Balance due: \$47\.50/);
   assert.match(email.text, /checkout\.stripe\.com/);
   assert.doesNotMatch(email.text, /INTERNAL ONLY/);

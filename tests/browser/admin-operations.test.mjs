@@ -286,7 +286,9 @@ test('an invoice can be downloaded as PDF and emailed from the admin', async () 
     await page.locator('[data-admin-invoice-controls]').waitFor({ state: 'visible' });
     const controls = page.locator('[data-admin-invoice-controls]');
     assert.match(await controls.innerText(), /Download invoice PDF/);
-    assert.match(await controls.innerText(), /Email invoice PDF/);
+    assert.match(await controls.innerText(), /Email Invoice \+ Payment Link/);
+    assert.match(await controls.innerText(), /Preview invoice email/);
+    assert.match(await controls.innerText(), /Email invoice PDF only/);
     const download = await controls.getByRole('link', { name: 'Download invoice PDF' }).getAttribute('href');
     assert.match(download, /\/api\/admin\/invoice-document\?id=invoice_1/);
     await controls.getByRole('button', { name: 'Email invoice PDF' }).click();

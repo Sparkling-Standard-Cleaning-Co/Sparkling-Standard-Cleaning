@@ -166,6 +166,9 @@ function friendly(error: unknown): string {
     customer_email_invalid: 'The customer email address is not valid.',
     invoice_email_failed: 'The invoice email could not be sent. Check the Resend configuration and try again.',
     invoice_document_failed: 'The invoice PDF could not be generated.',
+    payment_link_failed: 'The secure Stripe payment link could not be created. No email was sent.',
+    invoice_session_unverified: 'The existing Stripe session could not be verified. Try again.',
+    invoice_payment_processing: 'A Stripe payment is already processing for this invoice.',
     entitlement_preview_required: 'Preview the benefit before applying it.',
     entitlement_not_found: 'That benefit could not be found.',
     promotion_inactive: 'That promotion is not active.',
@@ -1830,7 +1833,15 @@ async function openInvoice(invoiceId: string): Promise<void> {
     ) {
       controls.insertAdjacentHTML(
         'beforeend',
-        `<button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-email" data-id="${esc(invoiceId)}">Email invoice PDF</button>`,
+        `<button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-email-preview" data-id="${esc(invoiceId)}">Preview invoice email</button>`,
+      );
+      controls.insertAdjacentHTML(
+        'beforeend',
+        `<button class="btn btn--primary btn--small" type="button" data-admin-action="invoice-email-link" data-id="${esc(invoiceId)}">Email Invoice + Payment Link</button>`,
+      );
+      controls.insertAdjacentHTML(
+        'beforeend',
+        `<button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-email" data-id="${esc(invoiceId)}">Email invoice PDF only</button>`,
       );
     }
     if (can('finance.write') && !invoice.payment_url && Number(invoice.balance_cents) > 0) {
@@ -3369,6 +3380,37 @@ document.addEventListener('click', (event) => {
     setAppError();
     void api<{ url: string }>('/api/admin/finance', { method: 'POST', body: JSON.stringify({ action: 'payment_link', invoiceId: id }) })
       .then(() => openInvoice(id))
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'invoice-email-preview') {
+    setAppError();
+    void api<{ html: string; hasPaymentLink: boolean }>('/api/admin/finance', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'preview_invoice_email', invoiceId: id }),
+    })
+      .then((result) => {
+        const preview = window.open('', '_blank');
+        if (!preview) {
+          setAppError('The preview window was blocked. Allow pop-ups and try again.');
+          return;
+        }
+        const banner = result.hasPaymentLink
+          ? ''
+          : '<div style="font-family:Arial,sans-serif;background:#fff3cd;color:#5c4300;padding:12px 16px;text-align:center;font-size:14px;">No payment link exists yet. The combined send action will create one before sending.</div>';
+        preview.document.open();
+        preview.document.write(result.html.replace('</body>', `${banner}</body>`));
+        preview.document.close();
+      })
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'invoice-email-link') {
+    setAppError();
+    setSuccess();
+    void api<{ status: string }>('/api/admin/finance', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'email_invoice', invoiceId: id, includePaymentLink: true, idempotencyKey: crypto.randomUUID() }),
+    })
+      .then(() => setSuccess('Invoice emailed with its PDF and secure payment link.'))
       .catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'invoice-email') {
