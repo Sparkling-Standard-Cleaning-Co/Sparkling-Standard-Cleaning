@@ -131,8 +131,8 @@ export function buildReceipt(data: ReceiptData): BuiltReceipt {
           <td style="padding:6px 12px;font-size:14px;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${money(data.paidCents)}</td>
         </tr>`
       : `<tr>
-          <td style="padding:6px 12px;font-size:14px;color:${PALETTE.inkSoft};text-align:right;">Paid</td>
-          <td style="padding:6px 12px;font-size:14px;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${'\u2212'}${money(data.paidCents)}</td>
+          <td style="padding:6px 12px;font-size:14px;color:${PALETTE.inkSoft};text-align:right;">Total paid</td>
+          <td style="padding:6px 12px;font-size:14px;font-weight:700;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${money(data.paidCents)}</td>
         </tr>`;
 
   const locationBlock = data.serviceLocation
