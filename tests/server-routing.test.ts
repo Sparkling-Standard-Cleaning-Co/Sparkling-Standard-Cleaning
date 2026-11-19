@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveRoute } from '../src/lib/travel/server-routing.ts';
+import { isUsableLatLng, parseLatLng, resolveRoute } from '../src/lib/travel/server-routing.ts';
 
 test('a provider-verified zero-distance route stays verified', async () => {
   const original = globalThis.fetch;
@@ -14,4 +14,21 @@ test('a provider-verified zero-distance route stays verified', async () => {
   } finally {
     globalThis.fetch = original;
   }
+});
+
+
+test('the missing-coordinate sentinel is never a usable destination', () => {
+  assert.equal(isUsableLatLng(null), false);
+  assert.equal(isUsableLatLng({ lat: 0, lng: 0 }), false);
+  assert.equal(isUsableLatLng({ lat: Number.NaN, lng: -87.2 }), false);
+  assert.equal(isUsableLatLng({ lat: 30.68, lng: -87.19 }), true);
+  assert.equal(parseLatLng('0,0'), null);
+  assert.equal(parseLatLng('30.68,-87.19')?.lat, 30.68);
+});
+
+test('resolveRoute refuses invalid coordinates instead of fabricating mileage', async () => {
+  await assert.rejects(
+    () => resolveRoute({}, { lat: 30.5, lng: -87.3 }, { lat: 0, lng: 0 }),
+    /invalid_route_coordinates/,
+  );
 });

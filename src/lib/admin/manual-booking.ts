@@ -46,6 +46,7 @@ import { resolveAddress, type GeocodeEnv } from '../location/server-geocode.ts';
 import {
   configuredReferenceGasPrice,
   gulfCoastGasPrice,
+  isUsableLatLng,
   parseLatLng,
   resolveRoute,
   type RoutingEnv,
@@ -260,15 +261,25 @@ async function scopedCustomerProperty(
   };
 }
 
+function savedPropertyCoordinates(property: Record<string, unknown>): { lat: number; lng: number } | null {
+  const rawLat = property.latitude;
+  const rawLng = property.longitude;
+  if (rawLat === null || rawLat === undefined || rawLng === null || rawLng === undefined) return null;
+  if (typeof rawLat === 'string' && rawLat.trim() === '') return null;
+  if (typeof rawLng === 'string' && rawLng.trim() === '') return null;
+  const lat = Number(rawLat);
+  const lng = Number(rawLng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const coordinates = { lat, lng };
+  return isUsableLatLng(coordinates) ? coordinates : null;
+}
+
 async function propertyDestination(
   env: ManualBookingEnv,
   property: Record<string, unknown>,
 ): Promise<{ lat: number; lng: number; source: ManualQuoteTravel['destinationSource'] } | null> {
-  const savedLat = Number(property.latitude);
-  const savedLng = Number(property.longitude);
-  if (Number.isFinite(savedLat) && Number.isFinite(savedLng) && Math.abs(savedLat) <= 90 && Math.abs(savedLng) <= 180) {
-    return { lat: savedLat, lng: savedLng, source: 'property' };
-  }
+  const saved = savedPropertyCoordinates(property);
+  if (saved) return { ...saved, source: 'property' };
   const address = [property.line1, property.line2, property.city, property.state, property.postal_code]
     .filter((value) => typeof value === 'string' && value.trim().length >= 2)
     .join(', ');
@@ -299,6 +310,16 @@ async function travelFor(
   if (!origin) return { travel: fallback, routed: undefined };
   const route = await resolveRoute(env, origin, destination).catch(() => null);
   if (!route) return { travel: fallback, routed: undefined };
+  if (route.method !== 'route' || route.verified !== true) {
+    return {
+      travel: {
+        ...fallback,
+        provider: route.provider,
+        destinationSource: destination.source,
+      },
+      routed: undefined,
+    };
+  }
   const gas = await gulfCoastGasPrice(
     env.EIA_API_KEY?.trim(),
     configuredReferenceGasPrice(env),

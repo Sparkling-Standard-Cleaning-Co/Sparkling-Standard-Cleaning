@@ -27,12 +27,23 @@ export interface LatLng {
   lng: number;
 }
 
+export function isUsableLatLng(value: LatLng | null | undefined): boolean {
+  if (!value) return false;
+  if (!Number.isFinite(value.lat) || !Number.isFinite(value.lng)) return false;
+  if (value.lat < -90 || value.lat > 90 || value.lng < -180 || value.lng > 180) return false;
+  // (0, 0) is the classic missing-coordinate sentinel and is not a service
+  // destination. It must never become a 7,000-mile route.
+  if (Math.abs(value.lat) < 0.000001 && Math.abs(value.lng) < 0.000001) return false;
+  return true;
+}
+
 export function parseLatLng(value: string | undefined | null): LatLng | null {
   if (!value) return null;
   const [lat, lng] = value.split(',').map((part) => Number(part.trim()));
   if (lat === undefined || lng === undefined || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-  return { lat, lng };
+  const parsed = { lat, lng };
+  return isUsableLatLng(parsed) ? parsed : null;
 }
 
 export function straightLineMiles(a: LatLng, b: LatLng): number {
@@ -65,6 +76,9 @@ export async function resolveRoute(
   origin: LatLng,
   destination: LatLng,
 ): Promise<ServerRoute> {
+  if (!isUsableLatLng(origin) || !isUsableLatLng(destination)) {
+    throw new Error('invalid_route_coordinates');
+  }
   const googleKey = env.GOOGLE_MAPS_SERVER_API_KEY?.trim();
   const apiKey = env.ROUTES_API_KEY?.trim();
   // Paid providers are explicitly disabled for this deployment: only MapMap

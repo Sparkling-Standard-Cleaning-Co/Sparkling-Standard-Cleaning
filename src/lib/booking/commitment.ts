@@ -33,6 +33,19 @@ import {
 } from './requests.ts';
 import { writeLedgerJson } from '../payments/ledger.ts';
 import { syncRecurringPlan, occurrenceDate } from '../admin/recurring-schedule.ts';
+import { isUsableLatLng } from '../travel/server-routing.ts';
+
+function storedCoordinates(latValue: unknown, lngValue: unknown): { lat: number; lng: number } | null {
+  if (typeof latValue !== 'string' && typeof latValue !== 'number') return null;
+  if (typeof lngValue !== 'string' && typeof lngValue !== 'number') return null;
+  if (typeof latValue === 'string' && latValue.trim() === '') return null;
+  if (typeof lngValue === 'string' && lngValue.trim() === '') return null;
+  const lat = Number(latValue);
+  const lng = Number(lngValue);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const coordinates = { lat, lng };
+  return isUsableLatLng(coordinates) ? coordinates : null;
+}
 
 export interface CommitmentDependencies {
   availability: typeof availabilityForDate;
@@ -177,8 +190,7 @@ async function ensureCustomerAndProperty(
       .first<{ id: string }>();
     propertyId = existing?.id ?? `prop_${crypto.randomUUID()}`;
     if (!existing) {
-      const lat = Number(fields.pin_latitude);
-      const lng = Number(fields.pin_longitude);
+      const coordinates = storedCoordinates(fields.pin_latitude, fields.pin_longitude);
       await db
         .prepare(
           `INSERT INTO properties
@@ -193,8 +205,8 @@ async function ensureCustomerAndProperty(
           text(fields.address_city, 120),
           text(fields.address_state, 2) || 'FL',
           zip,
-          Number.isFinite(lat) ? lat : null,
-          Number.isFinite(lng) ? lng : null,
+          coordinates?.lat ?? null,
+          coordinates?.lng ?? null,
           text(fields.pin_precision, 20) || 'exact',
         )
         .run();
@@ -320,7 +332,7 @@ export async function commitConfirmedBooking(
     lat: Number(fields.pin_latitude),
     lng: Number(fields.pin_longitude),
   };
-  if (!Number.isFinite(destination.lat) || !Number.isFinite(destination.lng)) {
+  if (!isUsableLatLng(destination)) {
     return { ok: false, reason: 'destination_missing' };
   }
   const crewSize = Math.max(1, hold?.crewSize ?? hold?.resourceIds?.length ?? 1);

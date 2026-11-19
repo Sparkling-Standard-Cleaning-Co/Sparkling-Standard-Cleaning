@@ -2,6 +2,19 @@ import type { D1Database } from './d1.ts';
 import { hashToken } from './auth.ts';
 import { zonedTimeToUtc } from '../booking/time.ts';
 import { bookingConfig } from '../../config/booking.ts';
+import { isUsableLatLng } from '../travel/server-routing.ts';
+
+function storedCoordinates(latValue: unknown, lngValue: unknown): { lat: number; lng: number } | null {
+  if (typeof latValue !== 'string' && typeof latValue !== 'number') return null;
+  if (typeof lngValue !== 'string' && typeof lngValue !== 'number') return null;
+  if (typeof latValue === 'string' && latValue.trim() === '') return null;
+  if (typeof lngValue === 'string' && lngValue.trim() === '') return null;
+  const lat = Number(latValue);
+  const lng = Number(lngValue);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const coordinates = { lat, lng };
+  return isUsableLatLng(coordinates) ? coordinates : null;
+}
 
 function splitName(name: string): { first: string; last: string } {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -119,8 +132,7 @@ export async function persistLeadSubmission(
       .first<{ id: string }>();
     propertyId = existingProperty?.id ?? `prop_${crypto.randomUUID()}`;
     if (!existingProperty) {
-      const lat = Number(fields.pin_latitude);
-      const lng = Number(fields.pin_longitude);
+      const coordinates = storedCoordinates(fields.pin_latitude, fields.pin_longitude);
       await db
         .prepare(
           `INSERT INTO properties
@@ -136,8 +148,8 @@ export async function persistLeadSubmission(
           fields.address_city ?? '',
           fields.address_state ?? 'FL',
           fields.zip ?? '',
-          Number.isFinite(lat) ? lat : null,
-          Number.isFinite(lng) ? lng : null,
+          coordinates?.lat ?? null,
+          coordinates?.lng ?? null,
           fields.pin_precision ?? 'exact',
         )
         .run();

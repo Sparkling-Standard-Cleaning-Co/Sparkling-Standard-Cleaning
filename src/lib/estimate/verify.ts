@@ -26,6 +26,7 @@ import type { EstimateInputDraft, PricingBreakdown, RoutedTravelInfo } from './t
 import {
   configuredReferenceGasPrice,
   gulfCoastGasPrice,
+  isUsableLatLng,
   parseLatLng,
   resolveRoute,
   type RoutingEnv,
@@ -143,7 +144,8 @@ function parseSubmittedPin(fields: Record<string, string>): { lat: number; lng: 
   const lng = Number(fields.pin_longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-  return { lat, lng };
+  const pin = { lat, lng };
+  return isUsableLatLng(pin) ? pin : null;
 }
 
 function numberFrom(fields: Record<string, string>, key: string): number | undefined {

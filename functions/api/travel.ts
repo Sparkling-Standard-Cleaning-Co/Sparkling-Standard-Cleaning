@@ -1,4 +1,4 @@
-﻿// POST /api/travel — serverless travel lookup (Cloudflare Pages Functions).
+// POST /api/travel — serverless travel lookup (Cloudflare Pages Functions).
 //
 // Accepts either a ZIP code (preliminary ZIP-centroid destination) or
 // confirmed destination coordinates (the customer-confirmed map pin). Returns
@@ -41,6 +41,7 @@ import { travelConfig } from '../../src/config/estimators/travel.ts';
 import {
   configuredReferenceGasPrice,
   gulfCoastGasPrice,
+  isUsableLatLng,
   parseLatLng,
   resolveRoute,
   type LatLng,
@@ -118,7 +119,8 @@ function validCoordinates(lat: unknown, lng: unknown): LatLng | null {
   if (typeof lat !== 'number' || typeof lng !== 'number') return null;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-  return { lat, lng };
+  const parsed = { lat, lng };
+  return isUsableLatLng(parsed) ? parsed : null;
 }
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
@@ -177,7 +179,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
 
   const reference = configuredReferenceGasPrice(env);
-  const distance = await resolveRoute(env, origin, destination);
+  const distance = await resolveRoute(env, origin, destination).catch(() => null);
+  if (!distance) return json({ ok: false, error: 'invalid_coordinates' }, 400);
   const gas = await gulfCoastGasPrice(env.EIA_API_KEY?.trim(), reference);
 
   const payload: RoutePayload = {
