@@ -1,5 +1,15 @@
 # Verification status
 
+## Property routing repair - 2026-11-18
+
+Application code **`01a5601`** is deployed in Cloudflare Pages production deployment
+`90cf1513-9a7a-4165-bed2-41c7ba69f7c8`. A saved property with null coordinates was being converted
+to `(0,0)` and routed as 7,151 miles one way. The manual booking path now geocodes null/zero saved
+coordinates, rejects the sentinel at the route boundary, and uses only verified routes for mileage.
+The affected active property was repaired through an audited reversible D1 update; its verified
+route is 16.4 miles / 24 minutes. Full detail:
+[`docs/verification/2026-11-18-PROPERTY-ROUTING-INCIDENT.md`](2026-11-18-PROPERTY-ROUTING-INCIDENT.md).
+
 ## Invoice PDF and email delivery - 2026-11-18
 
 Application code **`e9ea0f0`** is deployed in Cloudflare Pages production deployment

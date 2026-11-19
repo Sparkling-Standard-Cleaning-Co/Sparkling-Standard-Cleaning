@@ -84,13 +84,20 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-18 invoice documents):** application code **`e9ea0f0`** is live
-  (Cloudflare Pages production deployment `cc93b287-0c40-4239-b7ee-657627f5d812`). The admin
-  invoice view generates a downloadable PDF and can email an open/partially paid/overdue invoice
-  with the PDF attached through the existing Resend configuration. Internal invoice notes are
-  excluded; customer email, itemized lines, discount, tax, payments received, balance, due date,
-  legal entity and any secure Stripe payment link are included. No migration and no live customer
-  email/charge was performed. Evidence: `docs/verification/2026-11-18-INVOICE-DOCUMENTS.md`.
+- **Current release (2026-11-18 routing repair):** application code **`01a5601`** is live
+  (Cloudflare Pages production deployment `90cf1513-9a7a-4165-bed2-41c7ba69f7c8`). Saved properties
+  with missing coordinates are geocoded instead of being treated as `(0,0)`; the public travel
+  endpoint and server route resolver reject the missing-coordinate sentinel. The affected Milton
+  property was repaired with an exact geocode and an audited reversible D1 change. Its verified
+  route is 16.4 miles one way. Evidence: `docs/verification/2026-11-18-PROPERTY-ROUTING-INCIDENT.md`.
+- **Prior release (2026-11-18 invoice documents):** application code **`e9ea0f0`** remains in
+  production history (Cloudflare Pages production deployment
+  `cc93b287-0c40-4239-b7ee-657627f5d812`). The admin invoice view generates a downloadable PDF and
+  can email an open/partially paid/overdue invoice with the PDF attached through the existing
+  Resend configuration. Internal invoice notes are excluded; customer email, itemized lines,
+  discount, tax, payments received, balance, due date, legal entity and any secure Stripe payment
+  link are included. No migration and no live customer email/charge was performed. Evidence:
+  `docs/verification/2026-11-18-INVOICE-DOCUMENTS.md`.
 - **Prior release (2026-11-18 checkout discounts):** application code **`3efa854`** remains in
   production history (Cloudflare Pages production deployment
   `d44b1ff1-5908-4303-b228-e119af83ffa0`). Migration `0035` is applied. Applied promo codes show a

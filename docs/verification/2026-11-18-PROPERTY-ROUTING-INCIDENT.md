@@ -62,8 +62,23 @@ Audit record: `property.coordinates_repaired` in `admin_audit`.
 - The defect affected the **admin manual booking** path for properties with null coordinates.
 - It did not alter the stored customer address.
 - It could have caused manual estimates to require review unnecessarily and could have blocked
-  “Generate Estimate and Check Times” / availability for affected properties.
+  "Generate Estimate and Check Times" / availability for affected properties.
 - It did not create charges, payments, invoices or appointments by itself.
 - Public estimates that used a confirmed pin or resolved address were not affected by this null
   property record.
 - Legitimate distant addresses still receive review warnings.
+
+## Release and verification
+
+- Fix commit: `01a5601`
+- Cloudflare Pages production deployment: `90cf1513-9a7a-4165-bed2-41c7ba69f7c8`
+- GitHub validation passed on `main` and `production-safe`.
+- Unit suite: 870 tests (869 pass, 1 pre-existing skip).
+- Browser suite: 221 pass.
+- Production `POST /api/travel` with `(0,0)` now returns **400 invalid_request**.
+- Production route for the corrected property: **16.4 miles / 24 minutes**, method `route`, verified
+  `true`.
+- The admin quote and availability tests both resolve the saved property to a local geocoded point;
+  availability remains subject to actual capacity.
+- D1 repair audit: `property.coordinates_repaired`; the prior values are recorded in the audit
+  detail and the record is reversible.

@@ -453,6 +453,17 @@ test('null and 0,0 saved coordinates are geocoded, never routed from 0,0', async
       assert.equal(quote.travel.oneWayMiles, 16.4);
       assert.notEqual(quote.travel.oneWayMiles, 7151);
     }
+    const calls: AvailabilityInput[] = [];
+    const available = await manualAvailability(
+      routingEnv,
+      db,
+      actor,
+      { customerId: 'cust_manual', propertyId: 'prop_manual', date: '2026-12-15', durationMinutes: 120, crewSize: 1 },
+      { availability: slotAvailability(calls) },
+    );
+    assert.equal(available.ok, true);
+    assert.equal(calls[0]?.destination.lat, 30.4213);
+    assert.equal(calls[0]?.destination.lng, -87.2169);
   } finally {
     globalThis.fetch = originalFetch;
   }
