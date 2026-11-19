@@ -1,7 +1,7 @@
 # Initiative 6.9 verification evidence
 
 **Status:** deployed. Google Calendar booking is **active** with owner approval; gift sales remain disabled.
-**Cloudflare Pages:** c84e974f-5e11-4ed3-9e4c-a723e29f58fd; GitHub alidate, rowser and Cloudflare checks passed. Live status: all five Google/owner secrets present, OAuth connected to **Sparkling Standard - Bookings**, timezone America/Chicago, event read okay.
+**Cloudflare Pages:** c84e974f-5e11-4ed3-9e4c-a723e29f58fd; GitHub validate, browser and Cloudflare checks passed. Live status: all five Google/owner secrets present, OAuth connected to **Sparkling Standard - Bookings**, timezone America/Chicago, event read okay.
 Cloudflare checks passed.
 **Production baseline at start:** Initiative 6.10, `07360b7`.
 **Initiative 6.10 was preserved:** 12 Follow Us profiles, URLs, structured data and marketing docs.

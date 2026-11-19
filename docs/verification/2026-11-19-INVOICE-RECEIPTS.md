@@ -62,7 +62,7 @@ refund or new payment.
 3. Click **Resend payment receipt** to deliver the historical receipt.
 4. Keep Stripe-native receipt emails disabled for invoice Checkout while the app receipt is active.
 
-## Phase A closeout — 2026-11-19
+## Phase A closeout - 2026-11-19
 
 Verified against the implementation and automated tests:
 

@@ -1024,7 +1024,7 @@ delivery with valid-from activation); Cloudflare Pages deployment
 **Not yet live-tested:** Hayli's first-run password setup, backup-email delivery/verification,
 password recovery, live Stripe gift purchase/refund, and the GitHub scheduled-delivery trigger.
 No customer data, password, token or payment secret is recorded in this verification.
-## Verified G�� 2026-10-28 Google Calendar booking activation
+## Verified - 2026-10-28 Google Calendar booking activation
 
 **Code:** `fcbbd98`; Cloudflare Pages deployment `6afb9c46-d22b-47cc-b8e9-620127a5154e`. Durable pending requests now survive hold expiry; a submitted appointment remains non-guaranteed until owner confirmation.
 GitHub `validate`, `browser` and Cloudflare checks passed.
@@ -1040,7 +1040,7 @@ GitHub `validate`, `browser` and Cloudflare checks passed.
 - Live screenshots: `docs/verification/6.9/live-booking-available-desktop.png`,
   `live-booking-hold-desktop.png`, `live-booking-available-mobile.png`.
 
-Current settings are active: one crew, 8:00 a.m.G��6:00 p.m. Central, seven days, 24-hour notice,
+Current settings are active: one crew, 8:00 a.m. - 6:00 p.m. Central, seven days, 24-hour notice,
 15-minute buffers, 20-minute holds, `owner_approval`, `autoConfirmAllowed:false`.
 
 **Pending request fix:** a submitted reservation now becomes a durable pending owner-review request separate from the 20-minute hold; it remains after hold expiry, does not block capacity, and confirmation revalidates the slot plus checks for an existing Sparkling event.\n\n**Not yet live-tested:** owner confirmation and Google Calendar event creation/cancellation. The
@@ -1059,7 +1059,7 @@ real jobs with full addresses before availability reflects live work.
 | Owner confirmation | implemented, mock-tested; live test pending private token |
 
 
-## Verified G�� 2026-10-28 Initiative 6.9 deployment
+## Verified - 2026-10-28 Initiative 6.9 deployment
 
 **Release:** `4e28788`; Cloudflare Pages deployment `7f8a172c-18a9-43d0-9a4e-382094ba211d`.
 GitHub `validate`, `browser` and Cloudflare Pages checks passed. Initiative 6.10 social
@@ -1098,7 +1098,7 @@ were not supplied; Stripe test-mode credentials were not available; no live paym
 or gift fulfillment was exercised. The deployed code does not advertise unavailable functionality.
 
 
-## Verified G�� 2026-10-28 Initiative 6.10 social platform activation
+## Verified - 2026-10-28 Initiative 6.10 social platform activation
 
 **Release:** `eb8b2bc`; Cloudflare Pages deployment `95b29d45-33fa-4fdf-a695-c058b53bdae2`.
 GitHub `validate`, `browser` and Cloudflare Pages checks passed. Local work from Initiative 6.9
@@ -1121,7 +1121,7 @@ not placement-confirmed; the existing eight placements are unchanged.
 | Visual evidence | `docs/verification/6.10/` local and production desktop/mobile captures |
 
 
-## Verified G�� 2026-10-27 Initiative 6.8 production deployment
+## Verified - 2026-10-27 Initiative 6.8 production deployment
 
 **Audit:** `Aaron ss website audit.docx` (three pages, annotated screenshots).
 **Start baseline:** `820ad19`; the verified 6.7 payment work was integrated first as `f111014`.
@@ -1194,7 +1194,7 @@ Known residuals at this checkpoint:
 - Deployment and production checks are recorded in the release closeout after the push.
 
 
-## Verified G�� 2026-10-27 Initiative 6.7 payment reliability (local, pending deployment)
+## Verified - 2026-10-27 Initiative 6.7 payment reliability (local, pending deployment)
 
 **Baseline:** `820ad19`. The working tree contains the 6.7 payment-reliability changes; they are
 not reset or overwritten by Initiative 6.8. Local verification after the final retry/cancellation
@@ -1220,7 +1220,7 @@ Stripe test-mode transaction was performed.
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
-## Verified G�� 2026-10-27 Initiative 6.6 production deployment
+## Verified - 2026-10-27 Initiative 6.6 production deployment
 
 **Live branch/commit:** `main` at `0b907d4`. **Cloudflare Pages deployment:**
 `26e3b9f8-7665-426f-8687-7f171588c865`. GitHub `validate`, `browser` and Cloudflare
@@ -1271,7 +1271,7 @@ checkout before claiming live online payment. No live card charge or live lead s
 GTM Version 5 church/promotion event receipt still needs DebugView/Realtime confirmation. The
 private legal archive is outside Git.
 
-## Verified G�� 2026-10-26 Initiative 6.5 production deployment
+## Verified - 2026-10-26 Initiative 6.5 production deployment
 
 **Live branch/commit:** `main` at `298c1df` (code release; documentation closeout follows).
 **Cloudflare Pages deployment:** `f9b4f61a-58d1-4ff3-8535-c375af8789fc`. GitHub `validate`,
@@ -1317,7 +1317,7 @@ completes. GitHub `browser` is the regression gate for that class of issue. GTM 
 church/promotion event receipt still needs DebugView/Realtime confirmation; no live lead-email
 submission was made for this release; production R2 signed-link retrieval was not independently
 tested locally. The documentation closeout commit follows this code release.
-## Verified G�� 2026-10-25 Initiative 6.4 production deployment
+## Verified - 2026-10-25 Initiative 6.4 production deployment
 
 **Live branch/commit:** `main` at `685031d` (code release; documentation closeout follows).
 **Cloudflare Pages deployment:** `f9dea1a0-5b55-4cd8-b09e-18efae73c68a`. GitHub `validate`,
@@ -1365,7 +1365,7 @@ confirmation; production R2 signed-link retrieval was not independently tested l
 lead-email submission was made for this release (the owner photo inbox path remains owner-confirmed).
 The documentation closeout commit follows this code release.
 
-## Verified G�� 2026-10-25 Initiative 6.3 production deployment
+## Verified - 2026-10-25 Initiative 6.3 production deployment
 
 **Live branch/commit:** `main` at `911b5aa` (code release; documentation closeout follows).
 **Cloudflare Pages deployment:** `1b1a854c-4cec-433b-b02d-0daefa012101`. GitHub `validate`,
@@ -1413,7 +1413,7 @@ did not reprice the company.
 confirmation; production R2 signed-link retrieval was not independently tested locally. The owner's
 local master directory is outside Git and is intentionally not deployed. Pricing is unchanged.
 
-## Verified G�� 2026-10-25 audit-correction production deployment
+## Verified - 2026-10-25 audit-correction production deployment
 
 **Live branch/commit:** `main` at `13fa860` (preceded by `3abf2a9`). **Cloudflare Pages
 deployment:** `29c28a52-9669-43e5-9f65-72890d4cc4e8`. GitHub `validate`, `browser` and Cloudflare
@@ -1454,7 +1454,7 @@ attachment delivery were not changed.
 | Live reachability | `node scripts/live-check.mjs https://sparkling-standard.com` passed with 0 warnings |
 | Owner photo inbox | **Owner-confirmed**: actual customer-photo attachments reach the business inbox (2026-10-25) |
 
-## Verified G�� 2026-10-25 Initiative 6.2 production deployment
+## Verified - 2026-10-25 Initiative 6.2 production deployment
 
 **Live branch/commit:** `main` at `e635d7f` (fast-forwarded from `af46db4`; previous 6.2 commits
 `5919cbc` and `f3ed6f7`). **Cloudflare Pages deployment:** `877a241a-863b-423b-875b-1284182dcd39`
