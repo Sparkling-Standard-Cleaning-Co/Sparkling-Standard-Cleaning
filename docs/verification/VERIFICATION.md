@@ -1,5 +1,9 @@
 # Verification status
 
+## Admin promotion selection - 2026-11-19
+
+Application code **`4f70ea3`** is deployed in Cloudflare Pages production deployment `485aa2f2-9218-4e8e-b3f0-d5ec07b26018`. New Booking loads active database promotions and applies the chosen code through the shared server eligibility rules; the account-level FRIENDS15 benefit remains automatic unless a one-time promotion is selected. No live customer quote or charge was created. Full detail: [`docs/verification/2026-11-19-ADMIN-PROMOTION-SELECTION.md`](2026-11-19-ADMIN-PROMOTION-SELECTION.md).
+
 ## Invoice payment terms - 2026-11-19
 
 Application code **`7e85818`** is deployed in Cloudflare Pages production deployment `db47fe16-c166-4001-b6d2-72bbe9ee12fc`. Residential invoices default to the issue date (due immediately); commercial/church invoices default to Net 15; explicit due dates override. The admin invoice form selects the service type. No existing invoice or payment was modified. Full detail: [`docs/verification/2026-11-19-INVOICE-TERMS.md`](2026-11-19-INVOICE-TERMS.md).

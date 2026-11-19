@@ -84,7 +84,12 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-19 invoice payment terms):** application code **`7e85818`** is live
+- **Current release (2026-11-19 admin promotion selection):** application code **`4f70ea3`** is live
+  (Cloudflare Pages production deployment `485aa2f2-9218-4e8e-b3f0-d5ec07b26018`). New Booking now has a
+  database-driven promotion selector; the chosen code is evaluated by the shared server rules and carried
+  through the manual estimate and booking. Persistent FRIENDS15 remains account-level. Evidence:
+  `docs/verification/2026-11-19-ADMIN-PROMOTION-SELECTION.md`.
+- **Prior release (2026-11-19 invoice payment terms):** application code **`7e85818`** remains in production history
   (Cloudflare Pages production deployment `db47fe16-c166-4001-b6d2-72bbe9ee12fc`). Residential invoice
   defaults are due immediately; commercial/church defaults are Net 15; an explicit due date overrides.
   The admin invoice form now selects the service type. Evidence:
