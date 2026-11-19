@@ -1,5 +1,9 @@
 # Verification status
 
+## Invoice payment receipts - 2026-11-19
+
+Application code **`85d5178`** is deployed in Cloudflare Pages production deployment `c70d8b1d-2a1a-4b59-b9e6-b44f663d8351`. Migration `0037` adds idempotent invoice receipt delivery. The invoice-payment webhook now sends one branded itemized receipt after verified payment, records Resend status and exposes an owner resend action. No live receipt was sent during verification. Full detail: [`docs/verification/2026-11-19-INVOICE-RECEIPTS.md`](2026-11-19-INVOICE-RECEIPTS.md).
+
 ## Invoice payment link - 2026-11-19
 
 Application code **`e324f0b`** is deployed in Cloudflare Pages production deployment `1c8ef822-9864-4cb7-b4ff-25711d3983bc`. The production billing gate is enabled. Admin can preview an invoice email and create/reuse the exact-balance Stripe Checkout Session, then email the PDF plus secure link; failed link creation sends no email. No live link, charge or refund was created. Invoice branding uses Sparkling Standard Cleaning Co. and Standards That Sparkle. Full detail: [`docs/verification/2026-11-19-INVOICE-PAYMENT-LINK.md`](2026-11-19-INVOICE-PAYMENT-LINK.md).

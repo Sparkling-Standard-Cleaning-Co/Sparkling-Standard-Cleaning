@@ -84,7 +84,13 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-19 invoice payment link):** application code **`e324f0b`** is live
+- **Current release (2026-11-19 invoice payment receipts):** application code **`85d5178`** is live
+  (Cloudflare Pages production deployment `c70d8b1d-2a1a-4b59-b9e6-b44f663d8351`). Migration `0037` adds
+  idempotent invoice receipt delivery. The invoice-payment webhook now sends one branded itemized
+  receipt after verified payment, records Resend status and exposes an owner resend action. No live
+  receipt was sent during verification. Evidence:
+  `docs/verification/2026-11-19-INVOICE-RECEIPTS.md`.
+- **Prior release (2026-11-19 invoice payment link):** application code **`e324f0b`** remains in production history
   (Cloudflare Pages production deployment `1c8ef822-9864-4cb7-b4ff-25711d3983bc`). Invoice billing gate
   is enabled in production. Admin can preview an invoice email, create/reuse the exact-balance Stripe
   Checkout Session and email the PDF plus secure payment link. Invoice branding uses the approved
