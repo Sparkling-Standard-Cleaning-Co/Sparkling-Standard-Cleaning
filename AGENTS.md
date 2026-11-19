@@ -84,7 +84,13 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-19 admin promotion selection):** application code **`4f70ea3`** is live
+- **Current release (2026-11-19 invoice payment link):** application code **`e324f0b`** is live
+  (Cloudflare Pages production deployment `1c8ef822-9864-4cb7-b4ff-25711d3983bc`). Invoice billing gate
+  is enabled in production. Admin can preview an invoice email, create/reuse the exact-balance Stripe
+  Checkout Session and email the PDF plus secure payment link. Invoice branding uses the approved
+  company name and slogan. No live link, charge or refund was created during verification. Evidence:
+  `docs/verification/2026-11-19-INVOICE-PAYMENT-LINK.md`.
+- **Prior release (2026-11-19 admin promotion selection):** application code **`4f70ea3`** remains in production history
   (Cloudflare Pages production deployment `485aa2f2-9218-4e8e-b3f0-d5ec07b26018`). New Booking now has a
   database-driven promotion selector; the chosen code is evaluated by the shared server rules and carried
   through the manual estimate and booking. Persistent FRIENDS15 remains account-level. Evidence:

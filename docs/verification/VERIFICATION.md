@@ -1,5 +1,9 @@
 # Verification status
 
+## Invoice payment link - 2026-11-19
+
+Application code **`e324f0b`** is deployed in Cloudflare Pages production deployment `1c8ef822-9864-4cb7-b4ff-25711d3983bc`. The production billing gate is enabled. Admin can preview an invoice email and create/reuse the exact-balance Stripe Checkout Session, then email the PDF plus secure link; failed link creation sends no email. No live link, charge or refund was created. Invoice branding uses Sparkling Standard Cleaning Co. and Standards That Sparkle. Full detail: [`docs/verification/2026-11-19-INVOICE-PAYMENT-LINK.md`](2026-11-19-INVOICE-PAYMENT-LINK.md).
+
 ## Admin promotion selection - 2026-11-19
 
 Application code **`4f70ea3`** is deployed in Cloudflare Pages production deployment `485aa2f2-9218-4e8e-b3f0-d5ec07b26018`. New Booking loads active database promotions and applies the chosen code through the shared server eligibility rules; the account-level FRIENDS15 benefit remains automatic unless a one-time promotion is selected. No live customer quote or charge was created. Full detail: [`docs/verification/2026-11-19-ADMIN-PROMOTION-SELECTION.md`](2026-11-19-ADMIN-PROMOTION-SELECTION.md).
