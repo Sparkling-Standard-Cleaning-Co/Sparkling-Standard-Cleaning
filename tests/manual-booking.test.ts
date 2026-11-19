@@ -468,3 +468,39 @@ test('null and 0,0 saved coordinates are geocoded, never routed from 0,0', async
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test('a routing-provider failure never becomes a fabricated mileage', async () => {
+  const { db, actor, env, quoteInput } = await fixture();
+  db.raw.prepare('UPDATE properties SET latitude = NULL, longitude = NULL WHERE id = ?').run('prop_manual');
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.includes('/geocode')) {
+      return new Response(JSON.stringify({
+        features: [{
+          geometry: { coordinates: [-87.2169, 30.4213] },
+          properties: {
+            housenumber: '100', street: 'Test Street', city: 'Cantonment',
+            state: 'FL', postcode: '32533', label: '100 Test Street, Cantonment, FL 32533',
+          },
+        }],
+      }), { status: 200 });
+    }
+    return new Response('{}', { status: 503 });
+  }) as typeof fetch;
+  try {
+    const quote = await quoteManualBooking({
+      ...env,
+      TRAVEL_ORIGIN: '30.4213,-87.2169',
+      ROUTES_PROVIDER: 'mapmap',
+      ROUTES_API_KEY: 'test',
+      MAPMAP_BASE: 'https://example.invalid',
+    }, db, actor, quoteInput);
+    assert.equal(quote.travel.destinationSource, 'address_geocode');
+    assert.equal(quote.travel.oneWayMiles, null);
+    assert.equal(quote.travel.verified, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

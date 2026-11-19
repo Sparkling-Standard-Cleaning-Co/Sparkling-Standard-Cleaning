@@ -73,7 +73,7 @@ Audit record: `property.coordinates_repaired` in `admin_audit`.
 - Fix commit: `01a5601`
 - Cloudflare Pages production deployment: `90cf1513-9a7a-4165-bed2-41c7ba69f7c8`
 - GitHub validation passed on `main` and `production-safe`.
-- Unit suite: 870 tests (869 pass, 1 pre-existing skip).
+- Unit suite: 871 tests (870 pass, 1 pre-existing skip).
 - Browser suite: 221 pass.
 - Production `POST /api/travel` with `(0,0)` now returns **400 invalid_request**.
 - Production route for the corrected property: **16.4 miles / 24 minutes**, method `route`, verified
