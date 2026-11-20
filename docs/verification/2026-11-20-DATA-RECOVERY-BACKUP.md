@@ -60,7 +60,9 @@
 
 ## Tampa Bay
 
-- Independent Tampa pricing-version space is prepared; publishing Tampa pricing remains internal until owner review.
+- Tampa pricing version 1 (`pricing_c34908dd-dcbc-42c7-8a2e-e007f6d1a4bb`) is published internally at the Pensacola/source parity fingerprint `2026-10-25.engine-calibration-supportive-tax.v1.49705bdc08ec90b4`.
+- Pensacola remains on the same source baseline; Tampa publication does not change Pensacola.
+- Public Tampa pricing still returns 404 because the branch is not bookable.
 - Full booking activation remains blocked by missing branch-aware public estimator, branch-specific travel origin and scheduling path. A decorative activation switch was not added.
 - Tampa inquiry page remains live and noindex; inquiries create Tampa leads, not bookings.
 

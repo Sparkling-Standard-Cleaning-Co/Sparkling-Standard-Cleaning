@@ -94,9 +94,10 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   consistent 35rem cards with a controlled overflow/read-full-review dialog, Dennis's two real
   couch photographs, Laura's real shower photograph and collapsed Laura paragraph spacing. Bob,
   Amanda and Elizabeth remain excluded. Follow Us is twelve transparent 44px marks; the footer
-  service-area paragraph remains removed. Tampa has independent pricing-version space ready for
-  owner configuration, but full booking activation remains blocked by the missing branch-aware
-  public estimator/travel/scheduling path. A new encrypted full backup covers D1, application R2
+  service-area paragraph remains removed. Tampa pricing version 1 is internally published at the Pensacola/source parity fingerprint
+  `2026-10-25.engine-calibration-supportive-tax.v1.49705bdc08ec90b4`; Pensacola remains
+  unaffected. Full booking activation remains blocked by the missing branch-aware public
+  estimator/travel/scheduling path. A new encrypted full backup covers D1, application R2
   (88 objects) and the master workspace; parts were uploaded to private R2, downloaded, rejoined
   and verified, and an independent OneDrive copy was created and checksum-verified locally.
   CI `validate` and `browser` pass; local suite **907 tests (906 pass, 1 pre-existing skip)** and

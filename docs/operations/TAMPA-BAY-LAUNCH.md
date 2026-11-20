@@ -91,3 +91,11 @@ staffing now. Full booking activation requires a branch-aware estimator/travel
 and scheduling implementation; a decorative ON switch would violate the
 no-misleading-availability rule. This is reported as a genuine blocker, not
 silently bypassed.
+
+## Initialized Tampa price book
+
+- Pricing version ID: `pricing_c34908dd-dcbc-42c7-8a2e-e007f6d1a4bb`.
+- Branch: `branch_tampa`, version 1, status `published` (internal).
+- Fingerprint: `2026-10-25.engine-calibration-supportive-tax.v1.49705bdc08ec90b4`.
+- Initial values match the Pensacola/source baseline; Pensacola has no separate published version and remains on the same source baseline.
+- Public `/api/pricing?branch=branch_tampa` still returns 404 because Tampa is not bookable.
