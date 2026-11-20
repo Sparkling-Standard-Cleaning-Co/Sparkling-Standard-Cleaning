@@ -1,4 +1,4 @@
-import { adminDb, type AdminDbEnv, type D1Database } from '../../../src/lib/admin/d1.ts';
+﻿import { adminDb, type AdminDbEnv, type D1Database } from '../../../src/lib/admin/d1.ts';
 import {
   AdminAuthError,
   authenticate,
@@ -14,6 +14,8 @@ import {
   setupRequired,
 } from '../../../src/lib/admin/operations.ts';
 import { constantTimeEqual, hashToken } from '../../../src/lib/admin/auth.ts';
+import { branchViewCookie, requestedBranchView } from '../../../src/lib/admin/branch-view.ts';
+import { branchConfig } from '../../../src/config/branches.ts';
 import { createMfaChallenge, verifyMfaChallenge } from '../../../src/lib/admin/mfa.ts';
 import {
   acceptInvite,
@@ -91,6 +93,8 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
             name: actor.name,
             role: actor.role,
             branchId: actor.branchId,
+            canSelectBranch: actor.role === 'owner',
+            branchView: requestedBranchView(context.request),
             permissions: actor.permissions,
             mfaEnabled: actor.mfaEnabled,
           }
@@ -331,6 +335,27 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return (await sessionFor(actor.id)) ?? json({ ok: false, error: 'login_failed' }, 500);
   }
 
+
+  if (action === 'branch_view') {
+    const actor = await readOpsActor(db, context.request);
+    if (!actor || actor.role !== 'owner') return json({ ok: false, error: 'forbidden' }, 403);
+    try {
+      requireCsrf(context.request, actor);
+    } catch (error) {
+      return json({ ok: false, error: (error as AdminAuthError).code }, 403);
+    }
+    const requested = safeText(payload.branchView, 80);
+    if (requested !== 'all' && !branchConfig(requested)) {
+      return json({ ok: false, error: 'branch_invalid' }, 400);
+    }
+    const value = requested === 'all' ? null : requested;
+    await auditFromRequest(db, context.request, actor, 'admin.branch_view_changed');
+    return json(
+      { ok: true, branchView: value },
+      200,
+      { 'Set-Cookie': branchViewCookie(value, context.request) },
+    );
+  }
   if (action === 'logout') {
     const actor = await readOpsActor(db, context.request);
     if (!actor) return json({ ok: true }, 200, { 'Set-Cookie': expiredSessionCookie(context.request) });

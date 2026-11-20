@@ -102,6 +102,7 @@ function migratedDb(): TestD1 {
     '0037_payment_receipts.sql',
     '0038_document_packet_builder.sql',
     '0039_quick_estimates.sql',
+    '0040_branch_topology.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }

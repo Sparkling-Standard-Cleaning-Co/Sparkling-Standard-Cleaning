@@ -125,6 +125,7 @@ import {
             <button type="button" data-admin-nav="storage">Data &amp; Storage</button>
             <button type="button" data-admin-nav="promotions">Promotions &amp; Discounts</button>
             <button type="button" data-admin-nav="pricing">Pricing &amp; Estimator Control</button>
+            <button type="button" data-admin-nav="branches">Branches &amp; Launch</button>
             <button type="button" data-admin-nav="settings">Settings &amp; Audit</button>
           </nav>
           <div class="admin-sidebar__meta">
@@ -139,7 +140,16 @@ import {
               <h1 class="admin-title" data-admin-view-title>Overview</h1>
               <p class="admin-sub" data-admin-view-sub>Live cleaning-company operations.</p>
             </div>
-            <span class="admin-status" data-admin-role></span>
+            <div class="admin-topbar__actions">
+              <label class="admin-branch-view" data-admin-branch-view-wrap hidden>Branch view
+                <select data-admin-branch-view>
+                  <option value="all">All branches</option>
+                  <option value="branch_pensacola">Pensacola</option>
+                  <option value="branch_tampa">Tampa Bay (prelaunch)</option>
+                </select>
+              </label>
+              <span class="admin-status" data-admin-role></span>
+            </div>
           </header>
           <p class="admin-error" data-admin-app-error role="alert"></p>
 
@@ -784,10 +794,12 @@ import {
               <h2 class="admin-section-title">Pricing &amp; Estimator Control</h2>
               <p class="admin-muted">
                 Change the pricing used by the residential, STR, commercial and church estimators.
-                Edits stay in a draft until you publish them. Publishing creates a new version and
-                new estimates use it immediately; historical quotes and payments keep the price they
-                were created with.
+                Each branch has an independent immutable price book. Pensacola is live; Tampa Bay
+                remains draft/prelaunch and cannot publish until its launch checks pass.
               </p>
+              <label class="admin-inline-field">Pricing branch
+                <select data-pricing-branch></select>
+              </label>
               <div data-pricing-status>
                 <p class="admin-muted">Loading pricing configuration…</p>
               </div>
@@ -823,6 +835,106 @@ import {
               <p class="admin-muted">Published versions are immutable. Restoring an older version creates a new version, so nothing is erased.</p>
               <div data-pricing-history></div>
             </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="branches" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Branches &amp; Launch Control</h2>
+              <p class="admin-muted">
+                One legal entity, independent operating branches. Pensacola is live. Tampa Bay is
+                prelaunch and cannot publish public pricing or accept bookings until every launch
+                prerequisite is complete and the owner explicitly advances it.
+              </p>
+              <label>Branch
+                <select data-branch-select></select>
+              </label>
+              <p class="admin-status-message" data-branch-status role="status" aria-live="polite"></p>
+            </div>
+            <form class="admin-form admin-card" data-branch-form style="margin-top:1rem;max-width:none;">
+              <h2 class="admin-section-title">Branch setup</h2>
+              <div class="admin-grid">
+                <label>Lifecycle
+                  <select name="lifecycle" required>
+                    <option value="draft">Draft</option>
+                    <option value="setup">Setup</option>
+                    <option value="internally_testable">Internally testable</option>
+                    <option value="approved_to_launch">Approved to launch</option>
+                    <option value="live">Live</option>
+                    <option value="paused">Paused</option>
+                    <option value="retired">Retired</option>
+                  </select>
+                </label>
+                <label>Public name <input name="publicName" required maxlength="120" /></label>
+                <label>Public URL slug <input name="publicSlug" required maxlength="80" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></label>
+                <label>Region label <input name="regionLabel" maxlength="200" /></label>
+                <label>Time zone <input name="timezone" maxlength="80" /></label>
+                <label>Public phone <input name="publicPhone" maxlength="40" /></label>
+                <label>Public email <input name="publicEmail" type="email" maxlength="200" /></label>
+                <label>Hours label <input name="hoursLabel" maxlength="200" /></label>
+                <label>Google Business Profile status
+                  <select name="gbpStatus">
+                    <option value="not_created">Not created</option>
+                    <option value="eligibility_review">Eligibility review</option>
+                    <option value="prepared">Prepared</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="verified">Verified</option>
+                    <option value="paused">Paused</option>
+                  </select>
+                </label>
+                <label>Google Business Profile URL <input name="gbpUrl" type="url" maxlength="500" /></label>
+              </div>
+              <fieldset class="admin-field--wide">
+                <legend>Service availability</legend>
+                <div class="admin-grid">
+                  <label>Residential
+                    <select name="serviceResidential">
+                      <option value="disabled">Disabled</option>
+                      <option value="request_only">Request only</option>
+                      <option value="estimate_enabled">Estimate enabled</option>
+                      <option value="bookable">Bookable</option>
+                    </select>
+                  </label>
+                  <label>STR
+                    <select name="serviceStr">
+                      <option value="disabled">Disabled</option>
+                      <option value="request_only">Request only</option>
+                      <option value="estimate_enabled">Estimate enabled</option>
+                      <option value="bookable">Bookable</option>
+                    </select>
+                  </label>
+                  <label>Commercial
+                    <select name="serviceCommercial">
+                      <option value="disabled">Disabled</option>
+                      <option value="request_only">Request only</option>
+                      <option value="estimate_enabled">Estimate enabled</option>
+                      <option value="bookable">Bookable</option>
+                    </select>
+                  </label>
+                  <label>Church
+                    <select name="serviceChurch">
+                      <option value="disabled">Disabled</option>
+                      <option value="request_only">Request only</option>
+                      <option value="estimate_enabled">Estimate enabled</option>
+                      <option value="bookable">Bookable</option>
+                    </select>
+                  </label>
+                </div>
+              </fieldset>
+              <label>Service-area ZIPs (comma or line separated)
+                <textarea name="serviceAreaZips" rows="6" placeholder="32501, 32502, 32503"></textarea>
+              </label>
+              <fieldset class="admin-field--wide"><legend>Service states</legend>
+                <label><input type="checkbox" name="serviceStateFL" /> Florida</label>
+                <label><input type="checkbox" name="serviceStateAL" /> Alabama</label>
+              </fieldset>
+              <label>Launch note <textarea name="launchNote" rows="4" maxlength="1000"></textarea></label>
+              <label>Change note <input name="note" maxlength="500" placeholder="Why this setup changed" /></label>
+              <div class="admin-actions">
+                <button class="btn btn--primary" type="submit">Save branch setup</button>
+                <button class="btn btn--ghost btn--small" type="button" data-branch-refresh>Refresh</button>
+              </div>
+              <p class="admin-status-message" data-branch-form-status role="status" aria-live="polite"></p>
+            </form>
           </section>
 
           <section class="admin-view" data-admin-view="settings" hidden>

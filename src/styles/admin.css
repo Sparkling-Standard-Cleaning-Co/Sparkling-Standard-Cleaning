@@ -208,3 +208,28 @@
 @media (max-width: 40rem) {
   .admin-address-grid { grid-template-columns: 1fr; }
 }
+
+.admin-topbar__actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; justify-content: flex-end; }
+.admin-branch-view { display: flex; align-items: center; gap: .45rem; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--color-text-muted); }
+.admin-branch-view select { min-height: 2.2rem; border: 1px solid #d9c8b6; border-radius: .5rem; background: #fffdfa; padding: .25rem .5rem; font-size: .82rem; color: var(--color-text); }
+@media (max-width: 720px) {
+  .admin-topbar { align-items: flex-start; }
+  .admin-topbar__actions { align-items: flex-end; }
+}
+
+.admin-branch-view[hidden] { display: none !important; }
+
+.admin-form select,
+.admin-form input,
+.admin-form textarea { box-sizing: border-box; max-width: 100%; }
+.admin-workspace,
+.admin-view,
+.admin-card,
+.admin-form { min-width: 0; }
+
+.admin-form .admin-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
+.admin-form .admin-grid > *,
+.admin-form label { min-width: 0; }
+.admin-form select,
+.admin-form input:not([type="checkbox"]):not([type="radio"]),
+.admin-form textarea { width: 100%; }

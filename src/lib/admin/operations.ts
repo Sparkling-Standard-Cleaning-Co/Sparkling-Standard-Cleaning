@@ -1,4 +1,4 @@
-import {
+﻿import {
   hashPassword,
   hashToken,
   passwordProblem,
@@ -6,6 +6,7 @@ import {
   verifyPassword,
 } from './auth.ts';
 import type { D1Database } from './d1.ts';
+import { requestedBranchView } from './branch-view.ts';
 
 export const OPS_COOKIE = 'ss_ops';
 export const OPS_SESSION_SECONDS = 8 * 60 * 60;
@@ -197,7 +198,7 @@ export async function readOpsActor(db: D1Database, request: Request): Promise<Ad
     email: row.email,
     name: row.display_name,
     role: row.role_id,
-    branchId: row.branch_id ?? null,
+    branchId: row.branch_id ?? (row.role_id === 'owner' ? requestedBranchView(request) : null),
     csrf: row.csrf_token,
     permissions,
     mfaEnabled: Number(row.mfa_enabled) === 1,

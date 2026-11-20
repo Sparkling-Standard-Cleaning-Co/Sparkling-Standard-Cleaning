@@ -16,6 +16,7 @@ import type { PricingSnapshot } from '../lib/pricing/snapshot';
 
 interface VersionPayload {
   id: string;
+  branchId: string;
   version: number;
   status: 'draft' | 'published' | 'archived';
   fingerprint: string;
@@ -47,11 +48,20 @@ interface VersionSummary {
 
 interface LoadResponse {
   ok: boolean;
+  branchId: string;
+  branches: BranchOption[];
   published: VersionPayload | null;
   draft: VersionPayload | null;
   versions: VersionSummary[];
   baseline: { fingerprint: string; summary: { changedValues: number; totalValues: number }; snapshot: PricingSnapshot };
   catalog: PricingCatalogEntry[];
+}
+
+interface BranchOption {
+  id: string;
+  name: string;
+  lifecycle: string;
+  publishedPricingAllowed: boolean;
 }
 
 interface SimulatorPrice {
@@ -92,6 +102,8 @@ interface SimulatorComparison {
 
 interface PricingState {
   loaded: boolean;
+  branchId: string;
+  branches: BranchOption[];
   loading: boolean;
   dirty: boolean;
   published: VersionPayload | null;
@@ -106,6 +118,8 @@ interface PricingState {
 
 const state: PricingState = {
   loaded: false,
+  branchId: 'branch_pensacola',
+  branches: [],
   loading: false,
   dirty: false,
   published: null,
@@ -181,7 +195,7 @@ async function postPricing(body: Record<string, unknown>): Promise<Record<string
   const csrf = await csrfToken();
   return api('/api/admin/pricing', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ branchId: state.branchId, ...body }),
     headers: { 'X-CSRF-Token': csrf },
   });
 }
@@ -664,7 +678,20 @@ function renderHistory(): void {
   </table></div>`;
 }
 
+function renderBranchSelect(): void {
+  const select = document.querySelector<HTMLSelectElement>('[data-pricing-branch]');
+  if (!select || state.branches.length === 0) return;
+  select.innerHTML = state.branches
+    .map(
+      (branch) =>
+        `<option value="${esc(branch.id)}">${esc(branch.name)} - ${esc(branch.lifecycle)}${branch.publishedPricingAllowed ? '' : ' (pricing locked)'}</option>`,
+    )
+    .join('');
+  select.value = state.branchId;
+}
+
 function renderAll(): void {
+  renderBranchSelect();
   renderStatus();
   renderEditor();
   renderHistory();
@@ -679,7 +706,9 @@ async function refresh(force = false): Promise<void> {
   }
   state.loading = true;
   try {
-    const data = (await api('/api/admin/pricing')) as unknown as LoadResponse;
+    const data = (await api('/api/admin/pricing?branch=' + encodeURIComponent(state.branchId))) as unknown as LoadResponse;
+    state.branchId = data.branchId ?? state.branchId;
+    state.branches = data.branches ?? state.branches;
     state.published = data.published;
     state.draft = data.draft;
     state.versions = data.versions ?? [];
@@ -775,6 +804,17 @@ async function restoreVersion(id: string): Promise<void> {
 function bindActions(): void {
   if (eventsBound) return;
   eventsBound = true;
+  document.querySelector<HTMLSelectElement>('[data-pricing-branch]')?.addEventListener('change', (event) => {
+    const select = event.currentTarget as HTMLSelectElement;
+    if (state.dirty && !window.confirm('You have unsaved price changes. Switch branches and discard them?')) {
+      select.value = state.branchId;
+      return;
+    }
+    state.branchId = select.value;
+    state.loaded = false;
+    state.dirty = false;
+    void refresh(true);
+  });
   document.addEventListener('click', (event) => {
     const target = event.target as HTMLElement | null;
     if (!target) return;

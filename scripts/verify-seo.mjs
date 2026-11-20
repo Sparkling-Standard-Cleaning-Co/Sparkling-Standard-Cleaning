@@ -74,6 +74,8 @@ const NOINDEX_PAGES = new Set([
   '/invoice-payment/',
   '/payment-authorization/index.html',
   '/payment-authorization/',
+  '/locations/tampa-bay/index.html',
+  '/locations/tampa-bay/',
 ]);
 
 for (const file of htmlFiles) {

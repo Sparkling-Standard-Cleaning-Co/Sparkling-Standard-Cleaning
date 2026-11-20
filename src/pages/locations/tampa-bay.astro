@@ -1,0 +1,40 @@
+﻿---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { branchConfig, BRANCH_TAMPA } from '../../config/branches';
+
+const branch = branchConfig(BRANCH_TAMPA)!;
+---
+
+<BaseLayout
+  title="Tampa Bay Cleaning Service | Prelaunch"
+  description="Sparkling Standard is preparing a Tampa Bay operating branch. This page is informational only; online booking and payment are not yet available."
+  noindex={true}
+>
+  <section class="section section--tight">
+    <div class="container container--narrow">
+      <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Tampa Bay', path: '/locations/tampa-bay/' }]} />
+      <p class="eyebrow mt-4">Tampa Bay prelaunch</p>
+      <h1>We are preparing Tampa Bay the right way.</h1>
+      <p class="lead">
+        Sparkling Standard is one company with a live Pensacola branch. A Tampa Bay branch is in
+        setup, not open for online booking or payment. We will only publish local pricing,
+        availability and a local Google Business Profile when real staffing, licensing, insurance,
+        tax and service capacity are in place.
+      </p>
+      <div class="admin-card" style="margin-top:1.5rem;">
+        <h2 class="card__title">What this means today</h2>
+        <ul class="checklist mt-4">
+          <li>No Tampa Bay online estimate, booking or payment is active.</li>
+          <li>No Tampa Bay local phone number or Google Business Profile is being claimed yet.</li>
+          <li>Commercial and church inquiries can be recorded for planning, but no service date is promised.</li>
+        </ul>
+      </div>
+      <div class="hero__actions mt-4">
+        <a class="btn btn--primary" href="/contact/?branch=tampa-bay">Register Interest</a>
+        <a class="btn btn--secondary" href="/locations/pensacola/">Visit Pensacola Operations</a>
+      </div>
+      <p class="small text-muted mt-4">{branch.launchNote}</p>
+    </div>
+  </section>
+</BaseLayout>

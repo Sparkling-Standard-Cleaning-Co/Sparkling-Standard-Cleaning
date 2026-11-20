@@ -1,7 +1,7 @@
-import { defineConfig } from 'astro/config';
+﻿import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Site configuration.
 //
 // The production domain is owner-confirmed (October 2026). PUBLIC_SITE_URL
@@ -10,7 +10,7 @@ import sitemap from '@astrojs/sitemap';
 // without environment setup. Preview deployments must set
 // PUBLIC_PREVIEW_MODE=true so nothing is indexed. See docs/DEPLOYMENT.md and
 // docs/launch/OWNER-INPUT-REQUIRED.md.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const site = process.env.PUBLIC_SITE_URL || 'https://sparkling-standard.com';
 
 export default defineConfig({
@@ -32,7 +32,8 @@ export default defineConfig({
         !page.includes('/employee') &&
         !page.includes('/document-sign') &&
         !page.includes('/gift-certificates/success') &&
-        !page.includes('/gift-certificates/redeem'),
+        !page.includes('/gift-certificates/redeem') &&
+        !page.includes('/locations/tampa-bay'),
     }),
   ],
 });

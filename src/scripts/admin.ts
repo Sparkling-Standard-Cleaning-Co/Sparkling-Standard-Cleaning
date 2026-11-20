@@ -5,6 +5,7 @@ import {
   passwordProblem,
 } from '../lib/password-policy.ts';
 import { loadPricingView } from './pricing-admin';
+import { loadBranchView } from './admin-branches';
 import './admin-address-autocomplete';
 import { PET_OPTIONS, PROPERTY_TYPE_OPTIONS, RESIDENTIAL_INPUT_LIMITS } from '../config/estimators/input-definitions';
 import { pricing } from '../config/pricing';
@@ -15,6 +16,7 @@ interface AdminActor {
   name: string;
   role: string;
   branchId: string | null;
+  canSelectBranch?: boolean;
   permissions: string[];
   mfaEnabled: boolean;
 }
@@ -38,6 +40,8 @@ const errorEl = document.querySelector<HTMLElement>('[data-admin-error]');
 const appError = document.querySelector<HTMLElement>('[data-admin-app-error]');
 const userEl = document.querySelector<HTMLElement>('[data-admin-user]');
 const roleEl = document.querySelector<HTMLElement>('[data-admin-role]');
+const branchViewWrap = document.querySelector<HTMLElement>('[data-admin-branch-view-wrap]');
+const branchViewSelect = document.querySelector<HTMLSelectElement>('[data-admin-branch-view]');
 const titleEl = document.querySelector<HTMLElement>('[data-admin-view-title]');
 const subEl = document.querySelector<HTMLElement>('[data-admin-view-sub]');
 const navButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-admin-nav]')];
@@ -49,6 +53,16 @@ let mfaChallenge = '';
 let currentView = 'overview';
 let inviteToken = '';
 let resetToken = '';
+
+branchViewSelect?.addEventListener('change', () => {
+  const value = branchViewSelect.value;
+  void fetch('/api/admin/auth', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+    body: JSON.stringify({ action: 'branch_view', branchView: value }),
+  }).then((response) => { if (response.ok) window.location.reload(); });
+});
 
 const viewMeta: Record<string, [string, string]> = {
   overview: ['Overview', 'Live cleaning-company operations.'],
@@ -67,6 +81,7 @@ const viewMeta: Record<string, [string, string]> = {
   storage: ['Data & Storage', 'Database health, business-record counts, exports and photo retention.'],
   promotions: ['Promotions & Discounts', 'Owner-controlled codes, schedules, limits and redemption reporting.'],
   pricing: ['Pricing & Estimator Control', 'Published prices, draft changes, simulations and version history.'],
+  branches: ['Branches & Launch', 'Pensacola live operations and Tampa Bay prelaunch readiness.'],
   settings: ['Settings & Audit', 'Access, security, configuration and audit history.'],
 };
 
@@ -84,6 +99,7 @@ const navPermission: Record<string, string> = {
   gift: 'finance.read',
   reports: 'finance.read',
   pricing: 'settings.write',
+  branches: 'settings.write',
 };
 
 function esc(value: unknown): string {
@@ -247,6 +263,10 @@ function showApp(nextActor: AdminActor): void {
   setAppError();
   if (userEl) userEl.textContent = `${nextActor.name} · ${nextActor.role}`;
   if (roleEl) roleEl.textContent = nextActor.role;
+  if (nextActor.canSelectBranch && branchViewWrap && branchViewSelect) {
+    branchViewWrap.hidden = false;
+    branchViewSelect.value = nextActor.branchId ?? 'all';
+  }
   for (const button of navButtons) {
     const permission = navPermission[button.dataset.adminNav ?? ''];
     button.hidden = Boolean(permission && !can(permission));
@@ -3110,6 +3130,7 @@ async function loadView(view: string): Promise<void> {
     if (view === 'storage') await loadStorage();
     if (view === 'promotions') await loadPromotions();
     if (view === 'pricing') await loadPricingView();
+    if (view === 'branches') await loadBranchView();
     if (view === 'settings') await loadSettings();
   } catch (error) {
     setAppError(friendly(error));

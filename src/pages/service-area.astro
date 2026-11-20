@@ -1,4 +1,4 @@
----
+﻿---
 import { getEntry } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
@@ -30,6 +30,10 @@ const schema = [
           {data.hero.accent && <span class="hero__accent">{data.hero.accent}</span>}
         </h1>
         <p class="lead">{data.hero.lead}</p>
+        <p class="small text-muted">
+          <a href="/locations/pensacola/">Pensacola operating branch</a> &middot;
+          <a href="/locations/tampa-bay/">Tampa Bay prelaunch</a>
+        </p>
       </div>
     </div>
   </section>

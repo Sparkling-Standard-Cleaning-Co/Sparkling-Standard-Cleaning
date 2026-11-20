@@ -9,6 +9,7 @@ import type { D1Database } from '../admin/d1.ts';
 import { buildPricingConfig, pricing, type PricingConfig } from '../../config/pricing.ts';
 import { getPublishedPricing } from './store.ts';
 import { sourcePricingSnapshot } from './snapshot.ts';
+import { BRANCH_PENSACOLA } from '../../config/branches.ts';
 
 /**
  * Loads the published snapshot from D1. A missing database/row or a corrupt
@@ -17,10 +18,13 @@ import { sourcePricingSnapshot } from './snapshot.ts';
  * published version, producing a preliminary/mismatch verdict rather than
  * trusting an unverified price.
  */
-export async function requestPricingConfig(db?: D1Database | null): Promise<PricingConfig> {
+export async function requestPricingConfig(
+  db?: D1Database | null,
+  branchId: string = BRANCH_PENSACOLA,
+): Promise<PricingConfig> {
   if (db) {
     try {
-      const published = await getPublishedPricing(db);
+      const published = await getPublishedPricing(db, branchId);
       if (published) {
         return buildPricingConfig(published.snapshot.owner, published.snapshot.travel);
       }

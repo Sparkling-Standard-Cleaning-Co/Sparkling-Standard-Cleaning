@@ -13,6 +13,7 @@ const { class: className = '' } = Astro.props;
 ---
 
 <form class:list={['form-card', className]} data-lead-form data-variant="contact" action="#" method="post">
+  <input type="hidden" name="branch_id" value="" data-branch-context />
   <p class="form-status" data-delivery-warning role="status" hidden></p>
 
   <div class="field-row field-row--2">
@@ -98,4 +99,10 @@ const { class: className = '' } = Astro.props;
 
 <script>
   import '../scripts/lead-forms';
+
+  const branch = new URLSearchParams(window.location.search).get('branch');
+  if (branch === 'tampa-bay') {
+    const input = document.querySelector<HTMLInputElement>('[data-branch-context]');
+    if (input) input.value = 'branch_tampa';
+  }
 </script>

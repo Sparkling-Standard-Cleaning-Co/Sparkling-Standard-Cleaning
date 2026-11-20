@@ -1,8 +1,9 @@
-import type { D1Database } from './d1.ts';
+﻿import type { D1Database } from './d1.ts';
 import { hashToken } from './auth.ts';
 import { zonedTimeToUtc } from '../booking/time.ts';
 import { bookingConfig } from '../../config/booking.ts';
 import { isUsableLatLng } from '../travel/server-routing.ts';
+import { resolveServiceBranch } from '../branches/registry.ts';
 
 function storedCoordinates(latValue: unknown, lngValue: unknown): { lat: number; lng: number } | null {
   if (typeof latValue !== 'string' && typeof latValue !== 'number') return null;
@@ -53,6 +54,13 @@ export async function persistLeadSubmission(
   const organization = (fields.organization ?? '').trim();
   if (!email && !phone) return null;
 
+  const branch = await resolveServiceBranch(db, {
+    requestedBranchId: (fields.branch_id ?? '').trim() || null,
+    zip: fields.zip ?? null,
+    state: fields.address_state ?? null,
+  });
+  const branchId = branch.id;
+
   const idempotencyKey =
     (fields.quote_reference ?? '').trim() ||
     `lead_${await hashToken(`${email}|${phone}|${requestType}|${fields.preferred_date ?? ''}|${fields.quote_reference ?? ''}`)}`;
@@ -92,9 +100,9 @@ export async function persistLeadSubmission(
       .prepare(
         `INSERT INTO customers
          (id, primary_branch_id, first_name, last_name, company_name, status, source)
-         VALUES (?, 'branch_pensacola', ?, ?, ?, 'active', ?)`,
+         VALUES (?, ?, ?, ?, ?, 'active', ?)`,
       )
-      .bind(customerId, nameParts.first, nameParts.last, organization, fields.first_utm_source ?? 'website')
+      .bind(customerId, branchId, nameParts.first, nameParts.last, organization, fields.first_utm_source ?? 'website')
       .run();
   }
 
@@ -138,11 +146,12 @@ export async function persistLeadSubmission(
           `INSERT INTO properties
            (id, customer_id, branch_id, label, line1, line2, city, state, postal_code,
             latitude, longitude, precision, is_primary, status)
-           VALUES (?, ?, 'branch_pensacola', 'Service property', ?, ?, ?, ?, ?, ?, ?, ?, 1, 'active')`,
+           VALUES (?, ?, ?, 'Service property', ?, ?, ?, ?, ?, ?, ?, ?, 1, 'active')`,
         )
         .bind(
           propertyId,
           customerId,
+          branchId,
           line1,
           fields.address_unit ?? '',
           fields.address_city ?? '',
@@ -196,11 +205,12 @@ export async function persistLeadSubmission(
         `INSERT OR IGNORE INTO booking_requests
          (id, hold_id, branch_id, customer_id, property_id, status, quote_reference, requested_date,
           start_at, end_at, duration_minutes, payload_json)
-         VALUES (?, ?, 'branch_pensacola', ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         requestId,
         holdId,
+        branchId,
         customerId,
         propertyId,
         fields.quote_reference ?? '',
@@ -241,10 +251,11 @@ export async function persistLeadSubmission(
       `INSERT INTO leads
        (id, branch_id, customer_id, property_id, request_type, status, source, quote_reference,
         payload_json, delivery_status, outstanding_requirement, idempotency_key)
-       VALUES (?, 'branch_pensacola', ?, ?, ?, 'new', ?, ?, ?, 'pending', ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, 'new', ?, ?, ?, 'pending', ?, ?)`,
     )
     .bind(
       leadId,
+      branchId,
       customerId,
       propertyId,
       requestType,
@@ -264,12 +275,13 @@ export async function persistLeadSubmission(
           `INSERT OR IGNORE INTO estimates
            (id, customer_id, property_id, branch_id, service_code, status, source,
             quote_reference, input_snapshot_json, total_cents, created_at, updated_at)
-           VALUES (?, ?, ?, 'branch_pensacola', ?, 'quoted', 'website', ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, 'quoted', 'website', ?, ?, ?, ?, ?)`,
         )
         .bind(
           `est_${await hashToken(`${fields.quote_reference}|${customerId}`)}`.slice(0, 80),
           customerId,
           propertyId,
+          branchId,
           serviceCode(requestType, fields),
           fields.quote_reference,
           JSON.stringify(fields),

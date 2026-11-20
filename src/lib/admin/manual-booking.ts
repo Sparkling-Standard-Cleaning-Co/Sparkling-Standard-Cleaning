@@ -1,4 +1,4 @@
-// Admin manual estimate and one-time booking creator (BOOK-09).
+﻿// Admin manual estimate and one-time booking creator (BOOK-09).
 //
 // This module is the single server-side path for an owner-created booking. It
 // deliberately reuses the SAME calculators, pricing snapshot, availability
@@ -514,7 +514,7 @@ export async function priceEstimateInput(
     priceContext.customerId
     ? await activeEntitlementForCustomer(db, priceContext.customerId, FRIENDS15_CODE)
     : null;
-  const config = await requestPricingConfig(db);
+  const config = await requestPricingConfig(db, priceContext.branchId ?? undefined);
   const { travel, routed } = await travelFor(env, destination);
   const reference = priceContext.reference;
   const serviceCode = serviceCodeForEngine(input.engine, input.serviceType ?? 'standard');

@@ -1,0 +1,97 @@
+﻿---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import { branchConfig, BRANCH_PENSACOLA } from '../../config/branches';
+import { breadcrumbNode } from '../../lib/schema';
+
+const branch = branchConfig(BRANCH_PENSACOLA)!;
+const site = Astro.site ?? new URL('https://sparkling-standard.com');
+const schema = [
+  breadcrumbNode(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Locations', path: '/locations/pensacola/' },
+    { name: 'Pensacola', path: '/locations/pensacola/' },
+  ]),
+  {
+    '@context': 'https://schema.org',
+    '@type': 'LocalBusiness',
+    name: 'Sparkling Standard Cleaning Co.',
+    url: new URL('/locations/pensacola/', site).toString(),
+    telephone: branch.publicPhone,
+    email: branch.publicEmail,
+    areaServed: branch.serviceAreaZips.map((zip) => ({ '@type': 'PostalAddress', postalCode: zip, addressCountry: 'US' })),
+    parentOrganization: { '@type': 'Organization', name: 'Sparkling Standard LLC' },
+  },
+];
+---
+
+<BaseLayout
+  title="Pensacola Cleaning Service | Sparkling Standard Cleaning Co."
+  description="Owner-operated residential, commercial and church cleaning based in Cantonment and serving Pensacola and surrounding communities. Request a verified estimate."
+  schema={schema}
+>
+  <section class="section section--tight">
+    <div class="container container--narrow">
+      <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Pensacola', path: '/locations/pensacola/' }]} />
+      <p class="eyebrow mt-4">Pensacola operating branch</p>
+      <h1>Cleaning standards for Pensacola homes and businesses.</h1>
+      <p class="lead">
+        Sparkling Standard is owner-operated from Cantonment. Pensacola is our live operating
+        branch for recurring residential cleaning, deep and move-out cleaning, short-term rental
+        turnovers, commercial spaces and churches.
+      </p>
+      <div class="hero__actions mt-4">
+        <a class="btn btn--primary" href="/estimate/residential/">Build My Estimate</a>
+        <a class="btn btn--secondary" href="/contact/">Ask a Question</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="container grid grid--3">
+      <div class="card">
+        <h2 class="card__title">Residential cleaning</h2>
+        <p class="card__text">Recurring maintenance, deep cleaning and move-in/move-out cleaning with a documented first-visit standard for new recurring arrangements.</p>
+        <a class="text-link" href="/recurring-cleaning/">Explore residential cleaning</a>
+      </div>
+      <div class="card">
+        <h2 class="card__title">Commercial &amp; church</h2>
+        <p class="card__text">Offices, retail, salons, gyms and churches receive a walkthrough-based scope with provisional Tier A/B pricing or a personal Tier C review.</p>
+        <a class="text-link" href="/commercial-cleaning/">Commercial cleaning</a>
+      </div>
+      <div class="card">
+        <h2 class="card__title">STR turnovers</h2>
+        <p class="card__text">Turnover cleaning for hosted short-term rentals, with check-out and check-in timing captured in the request.</p>
+        <a class="text-link" href="/short-term-rental-cleaning/">STR cleaning</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container container--narrow">
+      <p class="eyebrow">Coverage</p>
+      <h2>Pensacola and surrounding communities</h2>
+      <p>
+        We serve Pensacola, Cantonment and surrounding communities within about an hour of our
+        private operating origin, with select nearby service into Alabama. Coverage is confirmed
+        against the actual service address before a quote is verified.
+      </p>
+      <p class="small text-muted">
+        Published hours: {branch.hoursLabel}. Contact: {branch.publicPhone} · {branch.publicEmail}.
+      </p>
+      <a class="text-link" href="/service-area/">See the full service area</a>
+    </div>
+  </section>
+
+  <div class="container section section--tight">
+    <CtaBand
+      title="Ready for a straightforward cleaning estimate?"
+      text="Answer a few questions about the property. We verify the service address and recalculate the price on our server before treating it as a real quote."
+      primaryLabel="Start My Estimate"
+      primaryHref="/estimate/residential/"
+      secondaryLabel="Contact Us"
+      secondaryHref="/contact/"
+    />
+  </div>
+</BaseLayout>

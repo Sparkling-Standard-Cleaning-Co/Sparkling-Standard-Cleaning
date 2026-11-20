@@ -60,6 +60,7 @@ import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.t
 import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { persistLeadSubmission, updateLeadDelivery } from '../../src/lib/admin/lead-persistence.ts';
 import { requestPricingConfig } from '../../src/lib/pricing/server.ts';
+import { resolveServiceBranch } from '../../src/lib/branches/registry.ts';
 import {
   PUBLIC_RATE_LIMITS,
   checkPublicRateLimit,
@@ -375,6 +376,15 @@ export async function onRequestPost(context: {
     'residential_estimate',
     'facility_estimate',
   ]).has(clean.request_type ?? '');
+  const branch = await resolveServiceBranch(env.DB ?? null, {
+    requestedBranchId: clean.branch_id ?? null,
+    zip: clean.zip ?? null,
+    state: clean.address_state ?? null,
+  });
+  clean.branch_id = branch.id;
+  if (transactionalRequest && !branch.bookable) {
+    return json({ ok: false, error: 'branch_not_available' }, 409);
+  }
   if (transactionalRequest) {
     if (clean.terms_accepted !== 'yes') {
       return json({ ok: false, error: 'terms_required' }, 400);
