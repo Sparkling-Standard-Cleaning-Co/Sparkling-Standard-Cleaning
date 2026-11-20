@@ -84,22 +84,28 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-19 production activation and admin address autocomplete):** application code **`019fad6`** is
-  live on `production-safe` (Cloudflare Pages production deployment `f890914f-32fc-4691-9557-009214a9e380`).
-  Migrations `0038` (document packet builder) and `0039` (Quick Estimate) are applied to production
-  D1 and verified; existing customer/appointment/invoice/payment counts match the pre-migration
-  backup. Google Places (New) address autocomplete is live in the admin address fields; the
-  production endpoint returned real Google predictions/details for a synthetic Pensacola address.
-  Quick Estimate calculation and branded PDF generation were exercised against production without
-  creating business records. Encrypted D1 and 2.5 GB master-workspace backups were created,
-  uploaded to the private `sparkling-standard-backups` R2 bucket, downloaded, rejoined and
-  restore-verified. This release also includes the document packet builder, unified customer
-  workspace, financial-reporting improvements, branded legal drafts (not attorney-approved), and
-  the synthetic end-to-end acceptance test. CI `validate` and `browser` passed on
-  `production-safe`; local suite 902 tests (901 pass, 1 pre-existing skip) and 225 browser tests
-  pass. No live charge, refund, customer email, legal execution or production customer record
-  change was performed. Evidence:
-  `docs/verification/2026-11-19-PRODUCTION-ACTIVATION.md`.
+- **Current release (2026-11-20 two-branch foundation, verified reviews and Follow Us refinement):**
+  application code **`d70e656`** is live on `production-safe` (Cloudflare Pages production
+  deployment `f43f0984-9614-41f7-a23d-6761172e764d`). Migration `0040` (branch lifecycle,
+  branch-scoped immutable pricing and branch config versions) is applied to production D1 and
+  verified; `0038`/`0039` remain applied. Pensacola is live; Tampa Bay is setup/prelaunch and
+  cannot publish pricing or accept bookings. The owner has All/Pensacola/Tampa branch view,
+  Branches & Launch setup and per-branch pricing control; the B2B commercial/church launchpad is
+  in the Windows master workspace. The homepage now shows seven verified Google reviews
+  (Christina, Richard, Laura, Dennis, Amanda, Elizabeth, Rob & Christi) with the owner-supplied
+  5.0 / 10 profile total stated separately; Bob is excluded and K V / S Ismail remain unverified
+  because Google hides their full text from signed-out viewers. The footer Follow Us section is
+  a boxless integrated row of twelve official marks on transparent 44px targets. CI
+  `validate` and `browser` pass; local suite 906 tests (905 pass, 1 pre-existing skip) and 226
+  browser tests pass. No live charge, refund, customer email, legal execution or production
+  customer record change was performed. Evidence:
+  `docs/verification/2026-11-20-TWO-BRANCH-B2B.md` and
+  `docs/verification/2026-11-20-REVIEWS-FOOTER.md`.
+- **Prior release (2026-11-19 production activation and admin address autocomplete):** application
+  code **`019fad6`** remains in production history (Cloudflare Pages deployment
+  `f890914f-32fc-4691-9557-009214a9e380`). It applied migrations `0038`/`0039`, added Google
+  Places admin address autocomplete, Quick Estimate PDF verification and encrypted D1/master
+  backups. Evidence: `docs/verification/2026-11-19-PRODUCTION-ACTIVATION.md`.
 - **Prior release (2026-11-19 invoice payment receipts):** application code **`85d5178`** remains in
   production history (Cloudflare Pages production deployment `c70d8b1d-2a1a-4b59-b9e6-b44f663d8351`).
   Migration `0037` adds idempotent invoice receipt delivery. The invoice-payment webhook sends one

@@ -81,3 +81,15 @@
 - Obtain counsel/owner approval for legal templates.
 - Perform an authenticated owner walkthrough of branch switching, Quick
   Estimate and packet signing.
+
+## Production deployment
+
+- Application code: `d70e656`.
+- Cloudflare Pages production deployment: `f43f0984-9614-41f7-a23d-6761172e764d`.
+- Migration `0040` was applied to production D1 after the verified pre-migration
+  backup and before this deployment.
+- Live checks: `/locations/pensacola/` returns 200 and is in the sitemap;
+  `/locations/tampa-bay/` returns 200 with `noindex, nofollow` and is absent
+  from the sitemap; unauthenticated `/api/admin/branches` returns 401;
+  `/api/pricing?branch=branch_tampa` returns 404.
+- CI `validate` and `browser` pass.

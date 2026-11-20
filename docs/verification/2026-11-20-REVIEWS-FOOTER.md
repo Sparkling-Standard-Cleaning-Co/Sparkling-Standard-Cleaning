@@ -92,3 +92,26 @@ the same shared component.
 K V and S Ismail exact review text is still required to reach the expected 9
 displayed reviews. Bob remains intentionally excluded. No review text was
 fabricated.
+
+## Production deployment
+
+- Application code: `d70e656`.
+- Cloudflare Pages production deployment: `f43f0984-9614-41f7-a23d-6761172e764d`.
+- CI `validate` and `browser`: pass.
+
+Live verification at https://sparkling-standard.com:
+
+- 7 review cards render in the order Christina, Richard, Laura, Dennis, Amanda,
+  Elizabeth, Rob & Christi.
+- The summary reads 5.0 average on Google from 10 reviews, and the note states
+  that 7 verified reviews are shown and the carousel is not a complete copy.
+- Bob, K V and S Ismail are absent from the rendered review section.
+- 12 Follow Us links render with the verified registry URLs.
+- Every social target is 44 x 44 px with transparent background, 0px border
+  and 0px radius.
+- Commercial, church, residential-estimator, Pensacola-location and Tampa
+  prelaunch pages each return 200 with exactly one Follow Us section and 12
+  social links.
+- Tampa Bay remains `noindex, nofollow` and is absent from the sitemap.
+- Screenshots: `live-reviews-desktop.png`, `live-reviews-mobile.png`,
+  `live-footer-desktop.png`, `live-footer-mobile.png`.
