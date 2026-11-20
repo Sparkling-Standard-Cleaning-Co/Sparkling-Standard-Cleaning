@@ -127,19 +127,28 @@ test('stars are centered in authentic Google gold and reviewer names sit at the 
   }
 });
 
-test('short and long review cards size to their content without clipping', async () => {
+test('cards share a consistent height and long reviews open accessible full text', async () => {
   const { context, page } = await open(1280);
   try {
     await page.waitForFunction(() => document.querySelector('[data-review-carousel]')?.dataset.enhanced === 'true');
     const card = (author) =>
       page.locator('[data-review-card]', { has: page.locator('footer strong', { hasText: author }) });
-    const richardHeight = await card('Richard').evaluate((el) => el.offsetHeight);
-    const robHeight = await card('Rob & Christi Moore').evaluate((el) => el.offsetHeight);
-    assert.ok(richardHeight < robHeight, 'short cards stay compact instead of stretching to the longest review');
-    const clipped = await page.locator('[data-review-card]').evaluateAll((nodes) =>
-      nodes.filter((node) => node.scrollHeight > node.clientHeight + 1).length,
-    );
-    assert.equal(clipped, 0, 'no card clips its content');
+    const heights = await page.locator('[data-review-card]').evaluateAll((nodes) => nodes.filter((node) => node.getClientRects().length > 0).map((node) => node.offsetHeight));
+    assert.equal(new Set(heights).size, 1, 'all cards share a consistent height');
+
+    await page.locator('[data-review-dot][data-index="4"]').click();
+    await page.waitForTimeout(500);
+    const active = page.locator('[data-review-card][aria-current="true"]');
+    assert.equal((await active.locator('footer strong').innerText()).trim(), 'K V');
+    const expand = active.locator('[data-review-expand]');
+    assert.equal(await expand.isVisible(), true, 'long review exposes full-text control');
+    await expand.click();
+    const dialog = page.locator('[data-review-dialog]');
+    assert.equal(await dialog.isVisible(), true, 'full review dialog opens');
+    assert.match(await dialog.innerText(), /I recently hired Sparkling Standard for a deep clean/);
+    await page.keyboard.press('Escape');
+    assert.equal(await dialog.isVisible(), false, 'dialog closes with Escape');
+    assert.equal(await card('Dennis D').locator('.review-carousel__photos img').count(), 2);
   } finally {
     await context.close();
   }

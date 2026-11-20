@@ -74,6 +74,8 @@ const paragraphsOf = (quote: string): string[] =>
                 class="review-carousel__card"
                 data-review-card
                 data-index={String(index)}
+                data-review-author={review.data.author}
+                data-review-context={review.data.context ?? ''}
                 role="group"
                 aria-roledescription="slide"
                 aria-label={`Review ${index + 1} of ${total}${review.data.author ? ` — ${review.data.author}` : ''}`}
@@ -102,7 +104,7 @@ const paragraphsOf = (quote: string): string[] =>
                   </span>
                 </div>
 
-                <div class="review-carousel__quote">
+                <div class="review-carousel__quote" data-review-quote>
                   {paragraphs.map((paragraph, paragraphIndex) => (
                     <p>
                       {paragraphIndex === 0 ? '“' : ''}
@@ -128,6 +130,8 @@ const paragraphsOf = (quote: string): string[] =>
                     })}
                   </div>
                 )}
+
+                <button type="button" class="review-carousel__expand" data-review-expand hidden>Read full review</button>
 
                 <footer class="review-carousel__footer">
                   <strong>{review.data.author}</strong>
@@ -162,6 +166,16 @@ const paragraphsOf = (quote: string): string[] =>
         </div>
         <p class="visually-hidden" aria-live="polite" data-review-status></p>
       </div>
+
+      <dialog class="review-dialog" data-review-dialog aria-labelledby="review-dialog-heading">
+        <div class="review-dialog__panel">
+          <button type="button" class="review-dialog__close" data-review-dialog-close aria-label="Close full review">&times;</button>
+          <p class="eyebrow">Google review</p>
+          <h3 id="review-dialog-heading" data-review-dialog-author></h3>
+          <p class="review-dialog__context" data-review-dialog-context></p>
+          <div class="review-dialog__body" data-review-dialog-body></div>
+        </div>
+      </dialog>
 
       {profileUrl && (
         <div class="container">
@@ -225,8 +239,42 @@ const paragraphsOf = (quote: string): string[] =>
     const next = root.querySelector<HTMLButtonElement>('[data-review-next]');
     const dots = [...root.querySelectorAll<HTMLButtonElement>('[data-review-dot]')];
     const status = root.querySelector<HTMLElement>('[data-review-status]');
+    const dialog = document.querySelector<HTMLDialogElement>('[data-review-dialog]');
+    const dialogAuthor = document.querySelector<HTMLElement>('[data-review-dialog-author]');
+    const dialogContext = document.querySelector<HTMLElement>('[data-review-dialog-context]');
+    const dialogBody = document.querySelector<HTMLElement>('[data-review-dialog-body]');
+    const dialogClose = document.querySelector<HTMLButtonElement>('[data-review-dialog-close]');
     const total = cards.length;
     let active = 0;
+    let lastExpand: HTMLButtonElement | null = null;
+
+    const measure = (): void => {
+      for (const card of cards) {
+        const quote = card.querySelector<HTMLElement>('[data-review-quote]');
+        const expand = card.querySelector<HTMLButtonElement>('[data-review-expand]');
+        if (!quote || !expand) continue;
+        const clamped = quote.scrollHeight > quote.clientHeight + 2;
+        card.dataset.clamped = clamped ? 'true' : 'false';
+        expand.hidden = !clamped;
+      }
+    };
+
+    const openReview = (card: HTMLElement, trigger: HTMLButtonElement): void => {
+      const quote = card.querySelector<HTMLElement>('[data-review-quote]');
+      if (!dialog || !dialogAuthor || !dialogContext || !dialogBody || !quote) return;
+      dialogAuthor.textContent = card.dataset.reviewAuthor ?? '';
+      dialogContext.textContent = card.dataset.reviewContext ?? '';
+      dialogBody.replaceChildren(...[...quote.querySelectorAll('p')].map((paragraph) => paragraph.cloneNode(true)));
+      lastExpand = trigger;
+      dialog.showModal();
+      dialogClose?.focus();
+    };
+
+    dialogClose?.addEventListener('click', () => dialog?.close());
+    dialog?.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog?.addEventListener('close', () => lastExpand?.focus());
 
     const offsetOf = (index: number): number => {
       let distance = (index - active + total) % total;
@@ -264,6 +312,10 @@ const paragraphsOf = (quote: string): string[] =>
       });
     }
     for (const card of cards) {
+      card.querySelector<HTMLButtonElement>('[data-review-expand]')?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        openReview(card, event.currentTarget as HTMLButtonElement);
+      });
       card.addEventListener('click', () => {
         const index = Number(card.dataset.index ?? '0');
         if (index !== active) {
@@ -318,5 +370,11 @@ const paragraphsOf = (quote: string): string[] =>
     update(false);
     root.tabIndex = -1;
     root.dataset.enhanced = 'true';
+    window.addEventListener('resize', measure, { passive: true });
+    window.requestAnimationFrame(() => {
+      measure();
+      window.requestAnimationFrame(measure);
+    });
+    window.setTimeout(measure, 700);
   }
 </script>

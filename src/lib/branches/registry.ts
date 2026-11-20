@@ -76,7 +76,7 @@ export function branchRowToConfig(row: BranchRow): BranchPublicConfig | null {
     indexable: base.indexable && live,
     bookable: base.bookable && live,
     paymentsEnabled: base.paymentsEnabled && live,
-    publishedPricingAllowed: base.publishedPricingAllowed && live,
+    publishedPricingAllowed: base.publishedPricingAllowed,
     services,
     capabilities: base.capabilities,
     serviceAreaZips: zips,

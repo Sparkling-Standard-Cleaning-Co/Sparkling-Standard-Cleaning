@@ -199,3 +199,25 @@ archives unrecoverable.
 - Scheduled GitHub workflow: needs the GitHub secrets plus the R2 S3 token.
 - A truly independent secondary destination outside the Cloudflare account: the
   owner must choose and provision it.
+
+## Actual activation - 2026-11-20
+
+- New encrypted full archive: 1,913 files, **2,574,394,734 plaintext bytes**,
+  SHA-256 `d37e8046468c43df4f3bbbca52832b1bbd08597f28eb0eaa04113a42a8074d13`.
+- D1: 80 tables, integrity `ok`.
+- Split into 10 encrypted parts, uploaded to private R2, downloaded again,
+  rejoined and verified.
+- Application R2 objects are now covered: 88 objects (documents 0, lead photos
+  88) downloaded through the Cloudflare API, encrypted, uploaded, downloaded and
+  restore-verified. Archive SHA-256
+  `379eafe327140d066670edfa1dc57b396e4c46c55316b798ea43f5000037e2b9`.
+- Independent copy: `%USERPROFILE%\OneDrive\Sparkling Standard Backups\2026-11-20`
+  with all 10 master parts and the R2 application archive. Local checksums match;
+  cloud synchronization must be confirmed in OneDrive.
+- The R2 app-object downloader is `scripts/backup/r2-app-objects.mjs` and uses a
+  least-privilege Cloudflare API token. Usage:
+  `CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... npm run backup:r2-app -- --out <dir>`.
+
+Still owner-dependent: password-manager/key custody, OneDrive cloud-sync
+confirmation, GitHub Actions secrets/schedule and any second independent
+provider beyond OneDrive.

@@ -63,7 +63,8 @@
     "backup:r2": "node scripts/backup/r2-archive.mjs",
     "backup:split": "node scripts/backup/split.mjs",
     "backup:join": "node scripts/backup/join.mjs",
-    "legal:render": "node scripts/render-legal-docs.mjs"
+    "legal:render": "node scripts/render-legal-docs.mjs",
+    "backup:r2-app": "node scripts/backup/r2-app-objects.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.4.0",

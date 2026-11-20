@@ -31,13 +31,20 @@ optimized as local WebP assets:
 
 No stock, AI-generated or third-party substitutes were used.
 
+## Laura paragraph spacing
+
+Laura's review had five unnecessary blank lines between short sentences. They were
+collapsed into one paragraph without changing any words or punctuation, while
+preserving her photograph.
+
 ## Carousel presentation
 
-- Cards now size to their content instead of stretching every short review to
-  the height of the longest.
-- Hidden cards beyond the active neighbours no longer reserve stage height; on
-  phones only the active card is in layout, eliminating the large blank area
-  above short reviews.
+- All desktop cards share a consistent 35rem height; mobile uses one 33rem card.
+- Quotes that exceed the available reading area fade and expose an accessible
+  **Read full review** dialog with the complete text.
+- Hidden cards beyond the active neighbours do not reserve stage height.
+- Short reviews are centered in the reading area; long reviews are controlled
+  without clipping the only copy of the text.
 - Photos render in a responsive card grid with lazy loading and descriptive
   alt text.
 - Existing arrows, dots, swipe, arrow-key navigation, live announcements,

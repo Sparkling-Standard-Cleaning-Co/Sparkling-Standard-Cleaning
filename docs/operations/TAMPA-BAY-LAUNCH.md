@@ -67,3 +67,27 @@ clearly says the request is not a confirmed appointment.
 
 No Tampa service date, price, address, local phone, GBP, staff count or
 credential is invented by this page or the inquiry workflow.
+
+## Pricing preparation
+
+Tampa has its own immutable `pricing_versions.branch_id` space and may be
+published internally before public launch without changing Pensacola. The first
+Tampa draft should be created from the current Pensacola/source baseline in
+Pricing & Estimator Control, reviewed, and published. Public `/api/pricing` still
+refuses Tampa until the branch is bookable.
+
+## Booking-activation blockers
+
+A public booking toggle cannot be honestly enabled by this static site alone.
+The remaining code-level blockers are:
+
+- Tampa has no branch-specific public estimator route using Tampa travel origin.
+- The server travel engine currently reads one global `TRAVEL_ORIGIN`.
+- Public booking/scheduling/confirmation still assumes the Pensacola branch.
+- Static Tampa SEO/indexing cannot be flipped at runtime without a deployment or edge-rendered page.
+
+The owner/admin can prepare Tampa pricing, service territory, inquiry routing and
+staffing now. Full booking activation requires a branch-aware estimator/travel
+and scheduling implementation; a decorative ON switch would violate the
+no-misleading-availability rule. This is reported as a genuine blocker, not
+silently bypassed.

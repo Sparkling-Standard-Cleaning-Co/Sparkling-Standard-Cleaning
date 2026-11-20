@@ -129,7 +129,7 @@ export const branchConfigs: Readonly<Record<BranchId, BranchPublicConfig>> = {
     indexable: false,
     bookable: false,
     paymentsEnabled: false,
-    publishedPricingAllowed: false,
+    publishedPricingAllowed: true,
     services: {
       residential: 'request_only',
       str: 'disabled',
