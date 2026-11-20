@@ -58,7 +58,7 @@ Cloudflare environment value), then run `npm run verify` and `npm run validate:p
 | Item | Value |
 | --- | --- |
 | Registered legal name | **Sparkling Standard LLC**; public brand **Sparkling Standard** — owner-confirmed 2026-10-21; Florida Articles certificate dated 2026-10-21 filed in the private master legal archive |
-| Official slogan | **Standards That Make Your Space Sparkle.** |
+| Official slogan | **Standards That Sparkle.** |
 | Final domain | **https://sparkling-standard.com** — in `src/config/business.ts` + `astro.config.mjs` default |
 | Public phone | **(850) 426-8479** — in `src/config/business.ts` (owner-corrected 2026-10-02; the earlier `(850) 246-8479` was a typo) |
 | Public email | **owner@sparkling-standard.com** — in `src/config/business.ts` |

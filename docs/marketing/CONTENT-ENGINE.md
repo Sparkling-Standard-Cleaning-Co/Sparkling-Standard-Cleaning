@@ -6,9 +6,9 @@ the 90-day command system. It extends `CONTENT-OPERATING-SYSTEM.md` (channel rol
 `CONTENT-PRODUCTION-SYSTEM.md` (production workflow and the proposed four-week plan) — it does not
 replace them.
 
-## 1. The brand line: "Standards That Make Your Space Sparkle."
+## 1. The brand line: "Standards That Sparkle."
 
-The owner-approved slogan is **"Standards That Make Your Space Sparkle."** Use it as the closing anchor for a
+The owner-approved slogan is **"Standards That Sparkle."** Use it as the closing anchor for a
 piece, then let the real work demonstrate the promise. It supports transformation, process, quality,
 consistency, care and customer experience — never price, discounts or urgency.
 
