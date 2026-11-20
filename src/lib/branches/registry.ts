@@ -150,18 +150,13 @@ export async function resolveServiceBranch(
     if (branch) return branch;
   }
   const zip = normalizeZip(input.zip ?? null);
-  if (zip) {
-    const reference = zipReferenceFor(zip);
-    if (reference) {
-      const pensacola = await effectiveBranch(db, BRANCH_PENSACOLA);
-      if (pensacola) return pensacola;
-    }
-  }
+  const pensacola = await effectiveBranch(db, BRANCH_PENSACOLA);
+  const tampa = await effectiveBranch(db, BRANCH_TAMPA);
+  if (zip && zipReferenceFor(zip) && pensacola) return pensacola;
+  if (zip && tampa?.serviceAreaZips.includes(zip)) return tampa;
   const state = (input.state ?? '').trim().toUpperCase();
-  if ((state === 'FL' || state === 'AL') && (await effectiveBranch(db, BRANCH_PENSACOLA))) {
-    return (await effectiveBranch(db, BRANCH_PENSACOLA)) as BranchPublicConfig;
-  }
-  return (await effectiveBranch(db, BRANCH_PENSACOLA)) ?? branchConfigs[BRANCH_PENSACOLA];
+  if ((state === 'FL' || state === 'AL') && pensacola) return pensacola;
+  return pensacola ?? branchConfigs[BRANCH_PENSACOLA];
 }
 
 export function branchPublicPayload(branch: BranchPublicConfig): Record<string, unknown> {
@@ -175,6 +170,8 @@ export function branchPublicPayload(branch: BranchPublicConfig): Record<string, 
     bookable: branch.bookable,
     paymentsEnabled: branch.paymentsEnabled,
     services: branch.services,
+    serviceCounties: branch.serviceCounties,
+    travelLimitMiles: branch.travelLimitMiles,
     capabilities: branch.capabilities,
     hours: branch.hoursLabel,
     phone: branch.publicPhone,

@@ -452,6 +452,27 @@ required**, **whether a rebuild/regenerate step is needed**, and **what could br
 - Analytics configuration → `docs/analytics/ANALYTICS-SETUP.md`.
 - Operational settings and integrations → `docs/operations/`.
 
+## Execution reliability and production diagnosis
+
+The recurring failure mode in this project is not a lack of requirements; it is
+stopping at the first documented gate, incomplete admin workflow or report. Apply
+these rules before declaring work complete or blocked:
+
+- Inspect existing code, schema, admin screens and **local data** before proposing a new system or concluding data is missing.
+- Trace a production failure through the actual record, endpoint, gate and provider response. Quote the observed reason.
+- Distinguish missing configuration, missing implementation, owner-only action and a genuine external blocker.
+- If an owner-facing capability is described as usable, complete the admin screen and the server path that operate it, not just the data layer.
+- Do not leave a customer-facing action such as Pay Now visible when the server gate will reject it; either enable the full path or remove/disable the action with an exact explanation.
+- Do not use "feature gate", "prelaunch" or "owner approval" as a substitute for the implementable portion of the work.
+- Verify visual behavior at real desktop, laptop, tablet and phone widths, including clipping, scrolling, focus and touch.
+- Re-test production after deployment. Unit tests alone are not production verification.
+- Record the exact residual blocker and the next implementable step; never call a partially implemented workflow finished.
+
+`RECURRING_SCHEDULING_ENABLED` is a safety gate, not a reason to leave recurring
+checkout in a dead-end state. If the gate is off, the customer-facing Pay Now
+path must not be offered; if it is on, recurring checkout, scheduling and
+failure recovery must be operational.
+
 ## Working method
 
 1. Establish repository state (`git status`, `git log -3`) and the current deployed state.

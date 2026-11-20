@@ -111,6 +111,16 @@ function esc(value: unknown): string {
     .replaceAll("'", '&#39;');
 }
 
+function durationLabel(value: unknown): string {
+  const total = Number(value);
+  if (!Number.isFinite(total) || total <= 0) return '-';
+  const minutes = Math.round(total);
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (hours <= 0) return `${remainder} min`;
+  return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
+}
+
 function money(cents: unknown): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(cents ?? 0) / 100);
 }
@@ -121,6 +131,7 @@ function dateTime(value: unknown): string {
   const parsed = new Date(raw.includes('T') ? raw : `${raw}T12:00:00`);
   if (!Number.isFinite(parsed.getTime())) return raw;
   return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
     month: 'short', day: 'numeric', year: 'numeric',
     ...(raw.includes('T') ? { hour: 'numeric', minute: '2-digit' } : {}),
   }).format(parsed);
@@ -377,7 +388,7 @@ async function loadOverview(): Promise<void> {
       ['Active gifts', counts.activeGifts ?? 0],
       ['Booking recovery', counts.failedCommitments ?? 0],
       ['Financial issues', counts.financialIssues ?? 0],
-      ['Recurring failures', counts.failedWorkerRuns ?? 0],
+      ['Failed recurring runs', counts.failedWorkerRuns ?? 0],
     ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('');
   }
   const alerts = document.querySelector<HTMLElement>('[data-admin-alerts]');
@@ -577,6 +588,7 @@ async function openRequest(requestId: string): Promise<void> {
         `/api/admin/documents?view=requests&bookingReference=${encodeURIComponent(String(request.quote_reference))}`,
       ).then((result) => result.requests ?? []).catch(() => [])
     : [];
+  const checkout = await api<{ enabled?: boolean; recurringScheduling?: boolean; mode?: string; checks?: Record<string, boolean | null> }>('/api/estimate-checkout').catch(() => null);
   const linked = Boolean(request.customer_id);
   const status = String(request.status ?? '');
   const pending = status === 'pending';
@@ -649,6 +661,9 @@ async function openRequest(requestId: string): Promise<void> {
           </form>
         </details>
       </div>`;
+
+  const checkoutFailure = String(payload.checkout_failure_reason ?? payload.checkout_error ?? '').trim();
+  const checkoutCard = `<div class="admin-card" style="margin-top:1rem;"><h3>Payment &amp; checkout</h3><dl class="admin-definition"><dt>Payment state</dt><dd>${esc(requestPayment(request))}</dd><dt>Checkout readiness</dt><dd>${checkout?.enabled ? 'Ready' : 'Unavailable'}</dd><dt>Recurring scheduling</dt><dd>${checkout?.recurringScheduling ? 'Enabled' : 'Disabled - recurring checkout is blocked'}</dd><dt>Last checkout issue</dt><dd>${esc(checkoutFailure || 'No failed checkout is recorded for this request.')}</dd><dt>Last issue time</dt><dd>${esc(dateTime(payload.checkout_failure_at || ''))}</dd></dl></div>`;
 
   const actions = can('booking.write')
     ? pending
@@ -765,7 +780,7 @@ async function openRequest(requestId: string): Promise<void> {
     <h3 style="margin-top:1rem;">Customer email history</h3>
     ${notificationRows}
     ${email ? `<form class="admin-inline-form" data-form="request-notify" style="margin-top:.75rem;"><input type="hidden" name="requestId" value="${esc(requestId)}" /><button class="btn btn--ghost btn--small" type="submit">Resend last customer email</button></form>` : ''}
-  </div>${association}${actions}${lifecycleActions}${archiveAction}${reopenAction}`;
+  </div>${association}${checkoutCard}${actions}${lifecycleActions}${archiveAction}${reopenAction}`;
 }
 
 async function submitRequestAction(body: Record<string, unknown>): Promise<void> {
@@ -1126,7 +1141,7 @@ async function createRecurringPlan(form: HTMLFormElement): Promise<void> {
 }
 
 async function loadRecurring(): Promise<void> {
-  const data = await api<{ recurring?: Array<Record<string, unknown>>; recurringEnabled?: boolean }>(
+  const data = await api<{ recurring?: Array<Record<string, unknown>>; recurringEnabled?: boolean; workerRuns?: Array<Record<string, unknown>> }>(
     '/api/admin/operations?view=recurring',
   );
   const recurringEnabled = data.recurringEnabled !== false;
@@ -1148,7 +1163,7 @@ async function loadRecurring(): Promise<void> {
       esc(titleCase(plan.frequency)),
       writable ? `<select class="admin-select" data-recurring-window="${esc(plan.id)}"><option value="">Not scheduled</option><option value="morning"${plan.window === 'morning' ? ' selected' : ''}>Morning</option><option value="afternoon"${plan.window === 'afternoon' ? ' selected' : ''}>Afternoon</option></select>` : esc(plan.window ? titleCase(String(plan.window)) : 'Not scheduled'),
       writable ? `<input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(plan.start_time ?? '')}" data-recurring-start="${esc(plan.id)}" />` : esc(plan.start_time ?? '?'),
-      writable ? `<span class="admin-duration"><input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" aria-label="Duration in minutes" /><span class="admin-duration__unit" aria-hidden="true">min</span></span>` : esc(plan.duration_minutes ? `${plan.duration_minutes} min` : '?'),
+      writable ? `<span class="admin-duration"><input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" aria-label="Duration in minutes" /><span class="admin-duration__unit" aria-hidden="true">min</span></span>` : esc(plan.duration_minutes ? durationLabel(plan.duration_minutes) : '?'),
       esc(money(plan.ongoing_price_cents)),
       esc(dateTime(plan.next_visit_date)),
       `<span class="admin-status">${esc(titleCase(plan.sync_status ?? 'pending'))}</span>${
@@ -1159,6 +1174,27 @@ async function loadRecurring(): Promise<void> {
       writable ? `<select class="admin-select" data-recurring-status="${esc(plan.id)}">${['active', 'paused', 'cancelled', 'completed'].map((status) => `<option value="${status}"${status === plan.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select>` : `<span class="admin-status">${esc(titleCase(plan.status))}</span>`,
       `<div class="admin-actions">${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-save" data-id="${esc(plan.id)}">Save</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrences" data-id="${esc(plan.id)}">Occurrences</button>${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-sync" data-id="${esc(plan.id)}">Sync</button>` : ''}</div>`,
     ]), 'No recurring plans are recorded yet.');
+  }
+  const runsTarget = document.querySelector<HTMLElement>('[data-admin-recurring-runs]');
+  if (runsTarget) {
+    const runs = data.workerRuns ?? [];
+    renderTable(runsTarget, ['Date', 'Status', 'Plans', 'Synced', 'Errors', 'Cause'], runs.map((run) => {
+      let details: Array<Record<string, unknown>> = [];
+      try { details = JSON.parse(String(run.detail_json ?? '[]')) as Array<Record<string, unknown>>; } catch { details = []; }
+      const reasons = new Map<string, string>();
+      for (const detail of details) {
+        for (const conflict of (detail.conflictDetails as Array<Record<string, unknown>>) ?? []) {
+          const reason = String(conflict.reason ?? 'unknown');
+          reasons.set(reason, recurringReasonLabel(reason));
+        }
+        for (const error of (detail.errors as string[]) ?? []) {
+          const reason = error.split(':').pop() ?? error;
+          reasons.set(reason, recurringReasonLabel(reason));
+        }
+      }
+      const cause = reasons.size ? [...reasons.values()].join('; ') : (String(run.status) === 'completed' ? 'No failure' : 'Unclassified');
+      return [esc(run.run_key), esc(titleCase(run.status)), esc(run.plans_scanned ?? 0), esc(run.plans_synced ?? 0), esc(run.errors ?? 0), esc(cause)];
+    }), 'No recurring worker runs recorded.');
   }
   await loadCustomerOptions();
 }

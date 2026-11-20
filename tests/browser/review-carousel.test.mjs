@@ -140,6 +140,14 @@ test('cards share a consistent height and long reviews open accessible full text
     await page.waitForTimeout(1400);
     const active = page.locator('[data-review-card][aria-current="true"]');
     assert.equal((await active.locator('footer strong').innerText()).trim(), 'K V');
+    const quote = active.locator('[data-review-quote]');
+    assert.equal(await quote.evaluate((el) => getComputedStyle(el).overflowY), 'auto', 'review text has internal scrolling');
+    assert.equal(await quote.evaluate((el) => el.scrollHeight > el.clientHeight), true, 'long review is scrollable');
+    await quote.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    assert.ok(await quote.evaluate((el) => el.scrollTop > 0), 'review text scrolls with the mouse/wheel');
+    const activeBox = await active.boundingBox();
+    const sectionBox = await page.locator('#reviews').boundingBox();
+    assert.ok(activeBox && sectionBox && activeBox.y >= sectionBox.y, 'card top is not clipped');
     const expand = active.locator('[data-review-expand]');
     assert.equal(await expand.isVisible(), true, 'long review exposes full-text control');
     await expand.click();

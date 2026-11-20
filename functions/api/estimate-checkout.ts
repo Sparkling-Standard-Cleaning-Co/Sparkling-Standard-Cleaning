@@ -1128,6 +1128,31 @@ async function fulfillGiftOnlyOrder(
     url: `${siteOrigin(env)}/estimate/payment-success/?gift_order=${encodeURIComponent(input.attempt)}`,
   });
 }
+async function recordCheckoutFailure(
+  env: Env,
+  fields: Record<string, string>,
+  code: string,
+  reason: string,
+): Promise<void> {
+  const quote = (fields.quote_reference ?? '').trim();
+  if (!env.DB || !quote) return;
+  try {
+    await env.DB.prepare(
+      `UPDATE booking_requests
+       SET payload_json = json_set(payload_json,
+             '$.checkout_failure_code', ?,
+             '$.checkout_failure_reason', ?,
+             '$.checkout_failure_at', ?),
+           updated_at = ?
+       WHERE quote_reference = ?`,
+    )
+      .bind(code, reason.slice(0, 500), new Date().toISOString(), new Date().toISOString(), quote)
+      .run();
+  } catch {
+    // Diagnostics must never replace the real checkout error.
+  }
+}
+
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
   if (throttled(request)) return json({ ok: false, error: 'rate_limited' }, 429);
@@ -1168,6 +1193,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       mode: ready.mode,
       checks: ready.checks,
     });
+    await recordCheckoutFailure(env, fields, 'payment_not_ready', 'Payment configuration is not ready.');
     return json({ ok: false, error: 'payment_not_ready', reason: 'configuration' }, 503);
   }
   const recurringFrequency = (fields.frequency ?? fields.ongoing_frequency ?? '').trim().toLowerCase();
@@ -1176,6 +1202,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     ['weekly', 'biweekly', 'monthly'].includes(recurringFrequency) &&
     !recurringSchedulingEnabled(env)
   ) {
+    await recordCheckoutFailure(env, fields, 'recurring_scheduling_gated', 'Recurring scheduling is disabled in this deployment.');
     return json(
       {
         ok: false,
@@ -1755,6 +1782,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     return json({
       ok: true,
       enabled: ready.enabled,
+      recurringScheduling: recurringSchedulingEnabled(env),
       mode: ready.mode,
       checks: ready.checks,
     });

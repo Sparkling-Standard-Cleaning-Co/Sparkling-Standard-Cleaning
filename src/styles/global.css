@@ -5528,20 +5528,30 @@ fieldset.input--invalid {
   min-height: 0;
   flex-direction: column;
   justify-content: center;
-  overflow: hidden;
+  overflow-y: auto;
+  padding-right: 0.35rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-sand-400) transparent;
+  overscroll-behavior: contain;
 }
 
-.review-carousel[data-enhanced='true'] .review-carousel__card[data-clamped='true'] .review-carousel__quote {
+.review-carousel__quote:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.review-carousel__quote::-webkit-scrollbar {
+  width: 0.42rem;
+}
+
+.review-carousel__quote::-webkit-scrollbar-thumb {
+  background: var(--color-sand-400);
+  border-radius: var(--radius-full);
+}
+
+.review-carousel[data-enhanced='true'] .review-carousel__card[data-scrollable='true'] .review-carousel__quote {
   justify-content: flex-start;
-}
-
-.review-carousel[data-enhanced='true'] .review-carousel__card[data-clamped='true'] .review-carousel__quote::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 0;
-  height: 3.5rem;
-  background: linear-gradient(to bottom, rgba(255, 253, 250, 0), var(--color-surface));
-  pointer-events: none;
 }
 
 .review-carousel__quote p {
@@ -5632,7 +5642,8 @@ fieldset.input--invalid {
   container-type: inline-size;
   perspective: 1800px;
   perspective-origin: 50% 45%;
-  padding-block: var(--space-5);
+  padding-block: var(--space-6);
+  overflow: visible;
 }
 
 .review-carousel[data-enhanced='true'] .review-carousel__card {
@@ -5641,7 +5652,7 @@ fieldset.input--invalid {
   width: 36%;
   height: 35rem;
   align-self: center;
-  overflow: hidden;
+  overflow: visible;
   transition:
     transform 0.6s cubic-bezier(0.22, 0.75, 0.25, 1),
     opacity 0.45s ease,

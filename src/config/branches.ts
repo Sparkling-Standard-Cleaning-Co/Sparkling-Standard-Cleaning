@@ -63,6 +63,8 @@ export interface BranchPublicConfig {
   readonly capabilities: BranchCapabilities;
   readonly serviceAreaZips: ReadonlyArray<string>;
   readonly serviceStates: ReadonlyArray<'FL' | 'AL'>;
+  readonly serviceCounties: ReadonlyArray<string>;
+  readonly travelLimitMiles: number;
   readonly publicPhone: string;
   readonly publicEmail: string;
   readonly hoursLabel: string;
@@ -70,6 +72,23 @@ export interface BranchPublicConfig {
   readonly gbpUrl: string;
   readonly launchNote: string;
 }
+
+const tampaZips = [
+  '33503', '33510', '33511', '33523', '33525', '33527', '33530', '33534', '33540', '33541',
+  '33542', '33543', '33544', '33545', '33547', '33548', '33549', '33550', '33556', '33558',
+  '33559', '33563', '33565', '33566', '33567', '33569', '33570', '33572', '33573', '33574',
+  '33576', '33578', '33579', '33584', '33592', '33594', '33596', '33597', '33598', '33602',
+  '33603', '33604', '33605', '33606', '33607', '33609', '33610', '33611', '33612', '33613',
+  '33614', '33615', '33616', '33617', '33618', '33619', '33620', '33621', '33624', '33625',
+  '33626', '33629', '33634', '33635', '33637', '33647', '33701', '33702', '33703', '33704',
+  '33705', '33706', '33707', '33708', '33709', '33710', '33711', '33712', '33713', '33714',
+  '33715', '33716', '33744', '33755', '33756', '33759', '33760', '33761', '33762', '33763',
+  '33764', '33765', '33767', '33770', '33771', '33772', '33773', '33774', '33776', '33777',
+  '33778', '33781', '33782', '33785', '33786', '33809', '33810', '33849', '33860', '34610',
+  '34637', '34638', '34639', '34652', '34653', '34654', '34655', '34667', '34668', '34669',
+  '34677', '34679', '34681', '34683', '34684', '34685', '34688', '34689', '34690', '34691',
+  '34695', '34698',
+] as const;
 
 const sevenDays = 'Seven days a week, 7:00 a.m. - 7:00 p.m.';
 
@@ -110,6 +129,8 @@ export const branchConfigs: Readonly<Record<BranchId, BranchPublicConfig>> = {
     },
     serviceAreaZips: pensacolaZips(),
     serviceStates: ['FL', 'AL'],
+    serviceCounties: ['Escambia County, FL', 'Santa Rosa County, FL', 'Baldwin County, AL', 'Escambia County, AL'],
+    travelLimitMiles: 45,
     publicPhone: '(850) 426-8479',
     publicEmail: 'owner@sparkling-standard.com',
     hoursLabel: sevenDays,
@@ -147,8 +168,10 @@ export const branchConfigs: Readonly<Record<BranchId, BranchPublicConfig>> = {
       fulfillmentVerified: false,
       googleProfileVerified: false,
     },
-    serviceAreaZips: [],
+    serviceAreaZips: [...tampaZips],
     serviceStates: ['FL'],
+    serviceCounties: ['Pasco County, FL', 'Pinellas County, FL', 'Hillsborough County, FL'],
+    travelLimitMiles: 20,
     publicPhone: '',
     publicEmail: 'owner@sparkling-standard.com',
     hoursLabel: 'By appointment after launch',

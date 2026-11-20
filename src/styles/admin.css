@@ -22,7 +22,8 @@
 .admin-grid { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }
 .admin-kpi__label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--color-text-muted); }
 .admin-kpi__value { font-family: var(--font-display); font-size: 1.8rem; margin: .25rem 0 0; }
-.admin-table-scroll { overflow-x: auto; }
+.admin-table-scroll { overflow: auto; max-height: 30rem; scrollbar-width: thin;}
+.admin-table thead th { position: sticky; top: 0; z-index: 1; background: #f4ece3; }
 .admin-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
 .admin-table th, .admin-table td { text-align: left; padding: .55rem .4rem; border-bottom: 1px solid #eadfd3; vertical-align: top; }
 .admin-table th { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-muted); }

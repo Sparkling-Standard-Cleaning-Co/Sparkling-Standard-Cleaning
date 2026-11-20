@@ -104,7 +104,7 @@ const paragraphsOf = (quote: string): string[] =>
                   </span>
                 </div>
 
-                <div class="review-carousel__quote" data-review-quote>
+                <div class="review-carousel__quote" data-review-quote tabindex="0" aria-label="Review text. Scroll to read the full review.">
                   {paragraphs.map((paragraph, paragraphIndex) => (
                     <p>
                       {paragraphIndex === 0 ? '“' : ''}
@@ -254,7 +254,7 @@ const paragraphsOf = (quote: string): string[] =>
         const expand = card.querySelector<HTMLButtonElement>('[data-review-expand]');
         if (!quote || !expand) continue;
         const overflow = quote.scrollHeight > quote.clientHeight + 2;
-        card.dataset.clamped = overflow ? 'true' : 'false';
+        card.dataset.scrollable = overflow ? 'true' : 'false';
         expand.hidden = !overflow;
       }
     };

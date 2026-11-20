@@ -49,6 +49,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         ok: true,
         recurring: await listRecurring(db, actor),
         recurringEnabled: recurringSchedulingEnabled(context.env),
+        workerRuns: (
+          await db.prepare(
+            `SELECT run_key, status, started_at, finished_at, plans_scanned, plans_synced, errors, detail_json
+             FROM recurring_worker_runs ORDER BY started_at DESC LIMIT 30`,
+          ).all<Record<string, unknown>>()
+        ).results ?? [],
       });
     }
     if (view === 'occurrences') {
