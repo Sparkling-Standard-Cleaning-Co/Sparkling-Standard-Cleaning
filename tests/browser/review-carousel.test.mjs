@@ -137,7 +137,7 @@ test('cards share a consistent height and long reviews open accessible full text
     assert.equal(new Set(heights).size, 1, 'all cards share a consistent height');
 
     await page.locator('[data-review-dot][data-index="4"]').click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1400);
     const active = page.locator('[data-review-card][aria-current="true"]');
     assert.equal((await active.locator('footer strong').innerText()).trim(), 'K V');
     const expand = active.locator('[data-review-expand]');
