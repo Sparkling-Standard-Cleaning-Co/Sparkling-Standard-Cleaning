@@ -270,7 +270,31 @@ export interface GooglePrediction {
   id: string;
   label: string;
   kind: 'address' | 'street' | 'locality';
-  state?: string;
+  state?: string | undefined;
+  mainText?: string | undefined;
+  secondaryText?: string | undefined;
+}
+
+export interface GoogleAutocompleteOptions {
+  latitude?: number | undefined;
+  longitude?: number | undefined;
+  radiusMeters?: number | undefined;
+  includedPrimaryTypes?: string[] | undefined;
+}
+
+export interface GooglePlaceDetailsFull {
+  placeId: string;
+  formattedAddress: string;
+  line1: string;
+  unit: string;
+  city: string;
+  county: string;
+  state: string;
+  postalCode: string;
+  latitude: number;
+  longitude: number;
+  precise: boolean;
+  supportedState: boolean;
 }
 
 function googleState(value: string | undefined): 'FL' | 'AL' | null {
@@ -324,6 +348,7 @@ export async function googleAutocomplete(
   env: GeocodeEnv,
   input: string,
   sessionToken?: string,
+  options: GoogleAutocompleteOptions = {},
 ): Promise<GooglePrediction[]> {
   const key = googleMapsKey(env);
   if (!key) return [];
@@ -339,7 +364,18 @@ export async function googleAutocomplete(
       includedRegionCodes: ['us'],
       languageCode: 'en',
       regionCode: 'us',
-      locationBias: { circle: { center: { latitude: 30.4213, longitude: -87.2169 }, radius: 50000 } },
+      locationBias: {
+        circle: {
+          center: {
+            latitude: options.latitude ?? 30.4213,
+            longitude: options.longitude ?? -87.2169,
+          },
+          radius: options.radiusMeters ?? 50000,
+        },
+      },
+      ...(options.includedPrimaryTypes && options.includedPrimaryTypes.length
+        ? { includedPrimaryTypes: options.includedPrimaryTypes.slice(0, 5) }
+        : {}),
       ...(sessionToken ? { sessionToken } : {}),
     }),
     signal: AbortSignal.timeout(7000),
@@ -363,7 +399,13 @@ export async function googleAutocomplete(
     if (!id || !label || seen.has(id)) continue;
     seen.add(id);
     const main = place?.structuredFormat?.mainText?.text ?? label.split(',')[0] ?? '';
-    results.push({ id, label, kind: /^\d+[a-z]?\b/i.test(main) ? 'address' : 'street' });
+    results.push({
+      id,
+      label,
+      kind: /^\d+[a-z]?\b/i.test(main) ? 'address' : 'street',
+      ...(place?.structuredFormat?.mainText?.text ? { mainText: place.structuredFormat.mainText.text } : {}),
+      ...(place?.structuredFormat?.secondaryText?.text ? { secondaryText: place.structuredFormat.secondaryText.text } : {}),
+    });
     if (results.length >= 5) break;
   }
   return results;
@@ -389,6 +431,63 @@ export async function googlePlaceDetails(
   return googleAddress(await response.json().catch(() => ({})));
 }
 
+export async function googlePlaceDetailsFull(
+  env: GeocodeEnv,
+  placeId: string,
+  sessionToken?: string,
+): Promise<GooglePlaceDetailsFull | null> {
+  const key = googleMapsKey(env);
+  if (!key || !placeId) return null;
+  const url = new URL(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`);
+  if (sessionToken) url.searchParams.set('sessionToken', sessionToken);
+  const response = await fetch(url, {
+    headers: {
+      'X-Goog-Api-Key': key,
+      'X-Goog-FieldMask': 'id,formattedAddress,addressComponents,location,types',
+    },
+    signal: AbortSignal.timeout(7000),
+  });
+  if (!response.ok) return null;
+  const place = (await response.json().catch(() => ({}))) as {
+    id?: string;
+    formattedAddress?: string;
+    addressComponents?: Array<{ longText?: string; shortText?: string; types?: string[] }>;
+    location?: { latitude?: number; longitude?: number };
+  };
+  const components = place.addressComponents ?? [];
+  const streetNumber = componentValue(components, 'street_number');
+  const route = componentValue(components, 'route');
+  const unit = componentValue(components, 'subpremise');
+  const city =
+    componentValue(components, 'locality') ||
+    componentValue(components, 'postal_town') ||
+    componentValue(components, 'sublocality_level_1') ||
+    componentValue(components, 'sublocality');
+  const county = componentValue(components, 'administrative_area_level_2');
+  const stateComponent = components.find((entry) => (entry.types ?? []).includes('administrative_area_level_1'));
+  const state = String(stateComponent?.shortText ?? stateComponent?.longText ?? '').toUpperCase();
+  const postalCode = componentValue(components, 'postal_code');
+  const latitude = Number(place.location?.latitude);
+  const longitude = Number(place.location?.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !state) return null;
+  const formattedAddress = String(place.formattedAddress ?? '').trim();
+  const streetLine = [streetNumber, route].filter(Boolean).join(' ').trim();
+  const fallbackLine = formattedAddress.split(',')[0]?.trim() ?? '';
+  return {
+    placeId: String(place.id ?? placeId),
+    formattedAddress: formattedAddress || streetLine,
+    line1: streetLine || fallbackLine,
+    unit,
+    city,
+    county,
+    state,
+    postalCode,
+    latitude,
+    longitude,
+    precise: Boolean(streetNumber && route),
+    supportedState: state === 'FL' || state === 'AL',
+  };
+}
 export async function googleGeocode(env: GeocodeEnv, query: string): Promise<GeocodedAddress | null> {
   const key = googleMapsKey(env);
   if (!key) return null;

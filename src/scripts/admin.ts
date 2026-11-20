@@ -5,6 +5,7 @@ import {
   passwordProblem,
 } from '../lib/password-policy.ts';
 import { loadPricingView } from './pricing-admin';
+import './admin-address-autocomplete';
 import { PET_OPTIONS, PROPERTY_TYPE_OPTIONS, RESIDENTIAL_INPUT_LIMITS } from '../config/estimators/input-definitions';
 import { pricing } from '../config/pricing';
 
@@ -593,10 +594,21 @@ async function openRequest(requestId: string): Promise<void> {
             <label>Last name <input name="lastName" /></label>
             <label>Email <input name="email" type="email" /></label>
             <label>Phone <input name="phone" /></label>
-            <label class="admin-field--wide">Service address <input name="addressLine1" value="${esc(String(payload.locationText ?? ''))}" required /></label>
-            <label>City <input name="city" value="${esc(String(payload.city ?? ''))}" /></label>
-            <label>State <input name="state" maxlength="2" value="FL" /></label>
-            <label>ZIP <input name="postalCode" maxlength="10" /></label>
+            <div class="admin-field--wide admin-address-block" data-admin-address-block>
+              <div class="admin-address-grid">
+                <label class="admin-field--wide">Service address
+                  <input name="addressLine1" value="${esc(String(payload.locationText ?? ''))}" maxlength="200" autocomplete="off" data-admin-address-input required />
+                </label>
+                <label>Apartment / unit <input name="addressUnit" maxlength="40" data-admin-address-unit /></label>
+                <label>City <input name="city" value="${esc(String(payload.city ?? ''))}" maxlength="80" data-admin-address-city /></label>
+                <label>State <input name="state" maxlength="2" value="FL" data-admin-address-state /></label>
+                <label>ZIP <input name="postalCode" maxlength="10" data-admin-address-zip /></label>
+                <input type="hidden" name="latitude" data-admin-address-lat />
+                <input type="hidden" name="longitude" data-admin-address-lng />
+                <input type="hidden" name="precision" data-admin-address-precision />
+              </div>
+              <p class="admin-address-status" data-admin-address-status role="status" aria-live="polite"></p>
+            </div>
             <button class="btn btn--primary btn--small" type="submit">Create and Link Customer</button>
           </form>
         </details>
@@ -806,11 +818,21 @@ function propertyFields(property: Record<string, unknown> = {}, options: { first
     `<label>${esc(label)}${hint ? ` <span class="admin-muted">${esc(hint)}</span>` : ''}<input name="${name}" type="number" min="${limits.min}" max="${limits.max}" step="${limits.step ?? 1}" value="${value === null || value === undefined ? '' : esc(value)}" /></label>`;
   return `<div class="admin-form--grid">
     <label>Property label <input name="label" value="${esc(property.label ?? 'Service property')}" maxlength="80" /></label>
-    <label class="admin-field--wide">Street address <input name="line1" value="${esc(property.line1 ?? '')}" maxlength="200" required /></label>
-    <label>Address line 2 <input name="line2" value="${esc(property.line2 ?? '')}" maxlength="120" /></label>
-    <label>City <input name="city" value="${esc(property.city ?? '')}" maxlength="80" /></label>
-    <label>State <input name="state" value="${esc(property.state ?? 'FL')}" maxlength="2" /></label>
-    <label>ZIP <input name="postalCode" value="${esc(property.postal_code ?? '')}" inputmode="numeric" maxlength="10" /></label>
+    <div class="admin-field--wide admin-address-block" data-admin-address-block>
+      <div class="admin-address-grid">
+        <label class="admin-field--wide">Street address
+          <input name="line1" value="${esc(property.line1 ?? '')}" maxlength="200" autocomplete="off" data-admin-address-input required />
+        </label>
+        <label>Apartment / unit <input name="line2" value="${esc(property.line2 ?? '')}" maxlength="120" data-admin-address-unit /></label>
+        <label>City <input name="city" value="${esc(property.city ?? '')}" maxlength="80" data-admin-address-city /></label>
+        <label>State <input name="state" value="${esc(property.state ?? 'FL')}" maxlength="2" data-admin-address-state /></label>
+        <label>ZIP <input name="postalCode" value="${esc(property.postal_code ?? '')}" inputmode="numeric" maxlength="10" data-admin-address-zip /></label>
+        <input type="hidden" name="latitude" value="${property.latitude === null || property.latitude === undefined ? '' : esc(property.latitude)}" data-admin-address-lat />
+        <input type="hidden" name="longitude" value="${property.longitude === null || property.longitude === undefined ? '' : esc(property.longitude)}" data-admin-address-lng />
+        <input type="hidden" name="precision" value="${esc(property.precision ?? '')}" data-admin-address-precision />
+      </div>
+      <p class="admin-address-status" data-admin-address-status role="status" aria-live="polite"></p>
+    </div>
     <label>Property type <select name="propertyType">${optionMarkup(PROPERTY_TYPE_OPTIONS, propertyType, 'Not specified')}</select></label>
     ${numberInput('squareFeet', 'Square footage', RESIDENTIAL_INPUT_LIMITS.squareFeet, property.square_feet)}
     ${numberInput('bedrooms', 'Bedrooms', RESIDENTIAL_INPUT_LIMITS.bedrooms, property.bedrooms)}
@@ -1780,6 +1802,7 @@ interface QuickQuoteView {
 
 let quickEstimateId = '';
 let quickLastQuote: QuickQuoteView | null = null;
+let quickPropertyData: Array<Record<string, unknown>> = [];
 
 function quickForm(): HTMLFormElement | null {
   return document.querySelector<HTMLFormElement>('[data-quick-form]');
@@ -1804,9 +1827,15 @@ function quickPayload(): Record<string, unknown> {
     customerEmail: quickValue('customerEmail'),
     customerPhone: quickValue('customerPhone'),
     addressLine1: quickValue('addressLine1'),
+    addressUnit: quickValue('addressUnit'),
     city: quickValue('city'),
     state: quickValue('state'),
     postalCode: quickValue('postalCode'),
+    latitude: quickValue('latitude'),
+    longitude: quickValue('longitude'),
+    placeId: quickValue('placeId'),
+    county: quickValue('county'),
+    formattedAddress: quickValue('formattedAddress'),
     serviceDate: quickValue('serviceDate'),
     engine: quickValue('engine'),
     serviceType: quickValue('serviceType'),
@@ -1908,6 +1937,7 @@ async function loadQuickProperties(customerId: string, selected = ''): Promise<v
   const data = await api<{ properties?: Array<Record<string, unknown>> }>(
     `/api/admin/bookings?view=context&customerId=${encodeURIComponent(customerId)}`,
   );
+  quickPropertyData = data.properties ?? [];
   select.innerHTML = `<option value="">No property selected</option>${(data.properties ?? [])
     .map((property) => `<option value="${esc(property.id)}" ${String(property.id) === selected ? 'selected' : ''}>${esc(
       property.label || property.line1 || 'Property',
@@ -1938,17 +1968,23 @@ function applyQuickProperty(): void {
   const propertyId = quickValue('propertyId');
   const select = quickField<HTMLSelectElement>('propertyId');
   if (!propertyId || !select) return;
-  const option = select.selectedOptions[0];
-  const label = option?.textContent ?? '';
-  const [, address = ''] = label.split(' - ');
-  if (address) {
-    const line = address.split(',')[0]?.trim();
-    const city = address.split(',')[1]?.trim();
-    const lineField = quickField<HTMLInputElement>('addressLine1');
-    const cityField = quickField<HTMLInputElement>('city');
-    if (lineField && !lineField.value && line) lineField.value = line;
-    if (cityField && !cityField.value && city) cityField.value = city;
-  }
+  const property = quickPropertyData.find((entry) => String(entry.id) === propertyId);
+  const block = document.querySelector<HTMLElement>('[data-quick-form] [data-admin-address-block]');
+  block?.dispatchEvent(new Event('admin-address-reset'));
+  if (!property) return;
+  const set = (name: string, value: unknown): void => {
+    const field = quickField<HTMLInputElement>(name);
+    if (field) field.value = value === null || value === undefined ? '' : String(value);
+  };
+  set('addressLine1', property.line1 ?? '');
+  set('addressUnit', property.line2 ?? '');
+  set('city', property.city ?? '');
+  set('state', property.state ?? 'FL');
+  set('postalCode', property.postal_code ?? '');
+  set('latitude', property.latitude ?? '');
+  set('longitude', property.longitude ?? '');
+  set('precision', property.precision ?? '');
+  window.refreshAdminAddressFields?.(quickForm() ?? document);
 }
 
 function renderQuickQuote(quote: QuickQuoteView): void {
@@ -3353,7 +3389,8 @@ document.addEventListener('submit', (event) => {
   const checked = (key: string) => data.get(key) === 'yes';
   const propertyPayload = {
     label: value('label'), line1: value('line1'), line2: value('line2'), city: value('city'),
-    state: value('state'), postalCode: value('postalCode'), propertyType: value('propertyType'),
+    state: value('state'), postalCode: value('postalCode'), latitude: value('latitude'),
+    longitude: value('longitude'), precision: value('precision'), propertyType: value('propertyType'),
     squareFeet: value('squareFeet'), bedrooms: value('bedrooms'), fullBaths: value('fullBaths'),
     halfBaths: value('halfBaths'), stories: value('stories'), beds: value('beds'), pets: value('pets'),
     accessNotes: value('accessNotes'), parkingNotes: value('parkingNotes'),
@@ -3487,8 +3524,10 @@ document.addEventListener('submit', (event) => {
   if (kind === 'request-link') void submitRequestAction({ action: 'link_customer', requestId: value('requestId'), customerId: value('customerId'), propertyId: value('propertyId') });
   if (kind === 'request-create') void submitRequestAction({
     action: 'create_customer', requestId: value('requestId'), firstName: value('firstName'), lastName: value('lastName'),
-    email: value('email'), phone: value('phone'), addressLine1: value('addressLine1'), city: value('city'),
-    state: value('state'), postalCode: value('postalCode'),
+    email: value('email'), phone: value('phone'), addressLine1: value('addressLine1'),
+    addressUnit: value('addressUnit'), city: value('city'), state: value('state'),
+    postalCode: value('postalCode'), latitude: value('latitude'), longitude: value('longitude'),
+    precision: value('precision'),
   });
   if (kind === 'request-close') { if (window.confirm('Close this pending request and release its hold?')) void submitRequestAction({ action: 'close', requestId: value('requestId'), reason: value('reason') }); }
   if (kind === 'request-duplicate') { if (window.confirm('Close this request as a duplicate? The original is not changed.')) void submitRequestAction({ action: 'duplicate', requestId: value('requestId'), duplicateOf: value('duplicateOf') }); }

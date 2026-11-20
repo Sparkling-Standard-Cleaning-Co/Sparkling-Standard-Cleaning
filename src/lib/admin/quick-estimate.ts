@@ -28,6 +28,10 @@ export interface QuickEstimateEnv extends ManualBookingEnv {
 
 export interface QuickEstimateInput extends ManualEstimateInput {
   addressLine1: string;
+  addressUnit?: string | undefined;
+  placeId?: string | undefined;
+  county?: string | undefined;
+  formattedAddress?: string | undefined;
   city: string;
   state: string;
   postalCode: string;
@@ -153,6 +157,10 @@ export function normalizeQuickEstimateInput(
     lastClean: (base.lastClean ?? 'within_month') as LastProfessionalClean,
     pets: (base.pets ?? 'none') as PetSituation,
     addressLine1: text(raw.addressLine1, 200),
+    addressUnit: text(raw.addressUnit, 40),
+    placeId: text(raw.placeId, 200),
+    county: text(raw.county, 120),
+    formattedAddress: text(raw.formattedAddress, 300),
     city: text(raw.city, 120),
     state: (text(raw.state, 2).toUpperCase() || 'FL') as string,
     postalCode: text(raw.postalCode, 12),
@@ -173,7 +181,7 @@ export function normalizeQuickEstimateInput(
 
 function addressText(input: QuickEstimateInput): string {
   const line = [
-    input.addressLine1,
+    [input.addressLine1, input.addressUnit].filter(Boolean).join(', '),
     input.city,
     [input.state, input.postalCode].filter(Boolean).join(' '),
   ]

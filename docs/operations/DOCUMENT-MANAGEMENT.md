@@ -2,7 +2,7 @@
 
 **Admin:** `/admin/` → **Documents & Agreements**
 **Public signing:** `/document-sign/?token=…`
-**Last verified:** 2026-11-19
+**Last verified:** 2026-11-19 (migrations `0038` applied to production D1)
 
 The owner controls document templates, bundles, enforcement stages and signing
 status from the existing admin console. Policy is stored in D1; changing a

@@ -2022,3 +2022,47 @@ test('resending an invoice receipt requires finance permission and matching bran
   const row = db.raw.prepare('SELECT COUNT(*) AS count FROM payment_receipts WHERE invoice_id = ?').get(invoice.id) as { count: number };
   assert.equal(row.count, 0);
 });
+
+test('verified property coordinates are stored, preserved and invalidated when the address changes', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Coordinate', lastName: 'Customer', email: 'coords@example.test',
+    addressLine1: '1000 Bayou Blvd', city: 'Pensacola', state: 'FL', postalCode: '32503',
+    latitude: 30.4213, longitude: -87.2169, precision: 'exact',
+  });
+  const property = db.raw.prepare('SELECT id, latitude, longitude, precision FROM properties WHERE customer_id = ?').get(customer.id) as {
+    id: string; latitude: number; longitude: number; precision: string;
+  };
+  assert.equal(property.latitude, 30.4213);
+  assert.equal(property.longitude, -87.2169);
+  assert.equal(property.precision, 'exact');
+
+  await updateProperty(db, actor, property.id, {
+    label: 'Service property', line1: '1000 Bayou Blvd', line2: '', city: 'Pensacola', state: 'FL',
+    postalCode: '32503', propertyType: '', pets: '',
+  });
+  const preserved = db.raw.prepare('SELECT latitude, longitude FROM properties WHERE id = ?').get(property.id) as { latitude: number; longitude: number };
+  assert.equal(preserved.latitude, 30.4213);
+  assert.equal(preserved.longitude, -87.2169);
+
+  await updateProperty(db, actor, property.id, {
+    label: 'Service property', line1: '2000 New Street', line2: '', city: 'Pensacola', state: 'FL',
+    postalCode: '32503', propertyType: '', pets: '',
+  });
+  const changed = db.raw.prepare('SELECT latitude, longitude FROM properties WHERE id = ?').get(property.id) as { latitude: number | null; longitude: number | null };
+  assert.equal(changed.latitude, null);
+  assert.equal(changed.longitude, null);
+
+  await updateProperty(db, actor, property.id, {
+    label: 'Service property', line1: '2000 New Street', line2: 'Apt 4', city: 'Pensacola', state: 'FL',
+    postalCode: '32503', latitude: 30.43, longitude: -87.22, precision: 'street',
+  });
+  const updated = db.raw.prepare('SELECT latitude, longitude, precision FROM properties WHERE id = ?').get(property.id) as {
+    latitude: number; longitude: number; precision: string;
+  };
+  assert.equal(updated.latitude, 30.43);
+  assert.equal(updated.longitude, -87.22);
+  assert.equal(updated.precision, 'street');
+  assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM properties WHERE customer_id = ?').get(customer.id) as { n: number }).n, 1);
+});

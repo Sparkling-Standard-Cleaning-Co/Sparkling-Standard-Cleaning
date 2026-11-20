@@ -2,7 +2,7 @@
 
 **Admin:** `/admin/` -> **Quick Estimate**  
 **Last verified:** 2026-11-19  
-**Migration:** `0039_quick_estimates.sql`
+**Migration:** `0039_quick_estimates.sql` (applied to production D1 2026-11-19)
 
 ## 1. Purpose
 
@@ -24,8 +24,10 @@ No formula is duplicated. `priceEstimateInput()` in
 
 ## 2. What the owner can do
 
-1. Enter a service address and ZIP (required for travel) or use a saved customer
-   and property.
+1. Enter a service address and ZIP (required for travel). Street addresses offer
+   Google Places predictions; selecting one fills city/state/ZIP, unit, county,
+   Place ID and verified coordinates. See `ADMIN-ADDRESS-AUTOCOMPLETE.md`.
+   Alternatively select a saved customer and property.
 2. Select service, frequency, property facts, condition, pets, extras and
    facility facts where applicable.
 3. Select an active database promotion. FRIENDS15 is applied automatically when

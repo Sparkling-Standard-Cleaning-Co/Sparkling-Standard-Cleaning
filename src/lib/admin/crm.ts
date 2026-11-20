@@ -267,7 +267,7 @@ export async function updateCustomer(
 }
 
 const PROPERTY_COLUMNS =
-  'label, line1, line2, city, state, postal_code, access_notes, parking_notes, property_type, square_feet, bedrooms, full_baths, half_baths, stories, beds, pets, internal_notes, is_primary';
+  'label, line1, line2, city, state, postal_code, latitude, longitude, precision, access_notes, parking_notes, property_type, square_feet, bedrooms, full_baths, half_baths, stories, beds, pets, internal_notes, is_primary';
 
 function propertyBindValues(property: NormalizedProperty): unknown[] {
   return [
@@ -277,6 +277,9 @@ function propertyBindValues(property: NormalizedProperty): unknown[] {
     property.city,
     property.state,
     property.postalCode,
+    property.latitude,
+    property.longitude,
+    property.precision,
     property.accessNotes,
     property.parkingNotes,
     property.propertyType,
@@ -299,7 +302,7 @@ function propertyInsertStatement(
   return db
     .prepare(
       `INSERT INTO properties (id, customer_id, branch_id, ${PROPERTY_COLUMNS})
-       VALUES (?, ?, ?, ${new Array(18).fill('?').join(', ')})`,
+       VALUES (?, ?, ?, ${new Array(PROPERTY_COLUMNS.split(',').length).fill('?').join(', ')})`,
     )
     .bind(input.id, input.customerId, input.branchId, ...propertyBindValues(input.property));
 }
@@ -311,9 +314,9 @@ function propertyUpdateStatement(
   return db
     .prepare(
       `UPDATE properties SET label = ?, line1 = ?, line2 = ?, city = ?, state = ?, postal_code = ?,
-         access_notes = ?, parking_notes = ?, property_type = ?, square_feet = ?, bedrooms = ?,
-         full_baths = ?, half_baths = ?, stories = ?, beds = ?, pets = ?, internal_notes = ?,
-         is_primary = ?, status = ?, updated_at = ?
+         latitude = ?, longitude = ?, precision = ?, access_notes = ?, parking_notes = ?, property_type = ?,
+         square_feet = ?, bedrooms = ?, full_baths = ?, half_baths = ?, stories = ?, beds = ?, pets = ?,
+         internal_notes = ?, is_primary = ?, status = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(...propertyBindValues(input.property), input.status, now(), input.id);
@@ -369,14 +372,39 @@ export async function updateProperty(
 ): Promise<void> {
   const property = await db
     .prepare(
-      `SELECT p.id, p.customer_id, p.status FROM properties p
+      `SELECT p.id, p.customer_id, p.status, p.line1, p.city, p.state, p.postal_code,
+              p.latitude, p.longitude, p.precision
+       FROM properties p
        JOIN customers c ON c.id = p.customer_id
        WHERE p.id = ? ${scope(actor, 'c.primary_branch_id').sql} LIMIT 1`,
     )
     .bind(propertyId, ...scope(actor, 'c.primary_branch_id').bind)
-    .first<{ id: string; customer_id: string; status: string }>();
+    .first<{
+      id: string;
+      customer_id: string;
+      status: string;
+      line1: string;
+      city: string;
+      state: string;
+      postal_code: string;
+      latitude: number | null;
+      longitude: number | null;
+      precision: string;
+    }>();
   if (!property) throw new AdminAuthError(404, 'property_not_found');
   const normalized = normalizePropertyInput(input);
+  const addressChanged =
+    normalized.line1 !== property.line1 ||
+    normalized.city !== property.city ||
+    normalized.state !== property.state ||
+    normalized.postalCode !== property.postal_code;
+  if (input.latitude === undefined && input.longitude === undefined && !addressChanged) {
+    normalized.latitude = property.latitude;
+    normalized.longitude = property.longitude;
+    normalized.precision = ['exact', 'street', 'approximate', 'zip'].includes(property.precision)
+      ? (property.precision as 'exact' | 'street' | 'approximate' | 'zip')
+      : 'exact';
+  }
   const status =
     input.status === 'archived' ? 'archived' : input.status === 'active' ? 'active' : property.status;
   const statements: D1PreparedStatement[] = [];

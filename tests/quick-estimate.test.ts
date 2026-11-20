@@ -245,3 +245,26 @@ test('a saved Quick Estimate converts into a real pending booking only after rev
     /quick_estimate_converted/,
   );
 });
+
+test('unit, Google place identity and county travel with the saved Quick Estimate', async () => {
+  const f = await fixture();
+  const input = {
+    ...residentialInput,
+    addressLine1: '1000 Bayou Blvd',
+    addressUnit: 'Apt 4',
+    placeId: 'place_123',
+    county: 'Escambia County',
+    formattedAddress: '1000 Bayou Blvd Apt 4, Pensacola, FL 32503, USA',
+    postalCode: '32503',
+  };
+  const calculated = await calculateQuickEstimate({ DB: f.db } as never, f.db, f.actor, input);
+  assert.match(calculated.addressText, /1000 Bayou Blvd, Apt 4/);
+  const saved = await saveQuickEstimate({ DB: f.db } as never, f.db, f.actor, input);
+  const record = await getQuickEstimate(f.db, f.actor, saved.id);
+  const stored = JSON.parse(String(record?.input_json)) as Record<string, unknown>;
+  assert.equal(stored.addressUnit, 'Apt 4');
+  assert.equal(stored.placeId, 'place_123');
+  assert.equal(stored.county, 'Escambia County');
+  assert.equal(stored.formattedAddress, '1000 Bayou Blvd Apt 4, Pensacola, FL 32503, USA');
+  assert.equal(record?.address_text, '1000 Bayou Blvd, Apt 4, Pensacola, FL 32503');
+});

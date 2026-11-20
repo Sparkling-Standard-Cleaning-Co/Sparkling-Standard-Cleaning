@@ -306,14 +306,28 @@ import {
               <form class="admin-form admin-form--grid" data-quick-form style="max-width:none">
                 <label>Existing customer (optional) <select name="customerId" data-quick-customer><option value="">New inquiry</option></select></label>
                 <label>Property (optional) <select name="propertyId" data-quick-property><option value="">Choose a customer first</option></select></label>
-                <label>Branch <select name="branchId" data-quick-branch><option value="branch_pensacola">Pensacola</option><option value="branch_tampa">Tampa Bay / Central Florida</option></select></label>
+                <label>Branch <select name="branchId" data-quick-branch data-admin-address-branch><option value="branch_pensacola">Pensacola</option><option value="branch_tampa" disabled>Tampa Bay / Central Florida (inactive)</option></select></label>
                 <label>Contact name <input name="customerName" maxlength="200" /></label>
                 <label>Contact email <input name="customerEmail" type="email" maxlength="200" /></label>
                 <label>Contact phone <input name="customerPhone" maxlength="40" /></label>
-                <label class="admin-field--wide">Street address <input name="addressLine1" maxlength="200" placeholder="100 Main Street" /></label>
-                <label>City <input name="city" maxlength="120" /></label>
-                <label>State <select name="state"><option value="FL">Florida</option><option value="AL">Alabama</option></select></label>
-                <label>ZIP <input name="postalCode" inputmode="numeric" maxlength="10" required /></label>
+                <div class="admin-field--wide admin-address-block" data-admin-address-block>
+                  <div class="admin-address-grid">
+                    <label class="admin-field--wide">Street address
+                      <input name="addressLine1" maxlength="200" placeholder="Start typing an address" autocomplete="off" data-admin-address-input required />
+                    </label>
+                    <label>Apartment / unit <input name="addressUnit" maxlength="40" placeholder="Optional" data-admin-address-unit /></label>
+                    <label>City <input name="city" maxlength="120" data-admin-address-city /></label>
+                    <label>State <select name="state" data-admin-address-state><option value="FL">Florida</option><option value="AL">Alabama</option></select></label>
+                    <label>ZIP <input name="postalCode" inputmode="numeric" maxlength="10" data-admin-address-zip required /></label>
+                    <input type="hidden" name="latitude" data-admin-address-lat />
+                    <input type="hidden" name="longitude" data-admin-address-lng />
+                    <input type="hidden" name="precision" data-admin-address-precision />
+                    <input type="hidden" name="placeId" data-admin-address-place-id />
+                    <input type="hidden" name="county" data-admin-address-county />
+                    <input type="hidden" name="formattedAddress" data-admin-address-formatted />
+                  </div>
+                  <p class="admin-address-status" data-admin-address-status role="status" aria-live="polite"></p>
+                </div>
                 <label>Service date (optional) <input name="serviceDate" type="date" /></label>
                 <label>Service <select name="engine" data-quick-engine><option value="residential">Residential cleaning</option><option value="str">Short-term rental turnover</option><option value="commercial">Commercial cleaning</option><option value="church">Church cleaning</option></select></label>
                 <label>Service type <select name="serviceType" data-quick-service><option value="standard">Residential maintenance</option><option value="deep">Deep cleaning</option><option value="move_in_out">Move-in / move-out</option></select></label>
