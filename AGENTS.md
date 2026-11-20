@@ -84,7 +84,20 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-20 workforce intelligence and intelligent dispatch):** application code
+- **Current release (2026-11-20 post-dispatch production closeout):** application code
+  **`09404df`** is live on `production-safe` (Cloudflare Pages production deployment
+  `3082e1b6-d873-4f37-808b-bdb5dedf1b98`). Migration `0042` adds private branch operating origins
+  and travel limits. Branches & Launch now has a Google Places-enabled origin field, owner-only
+  readiness checklist and a live-advance gate. Dispatch readiness now reports each employee's exact
+  blockers; `team_hayli` has onboarding clearance but still needs service, equipment, transport and
+  origin configuration. Homepage metadata now carries equal residential/commercial Pensacola
+  positioning. Production verification: Pensacola is live with an origin warning; Tampa is setup and
+  blocked by missing public phone/service, pricing, public estimator, scheduling, payments and
+  fulfillment; dispatch remains analysis-only, disabled, paused, with 0 unassigned jobs and 0
+  dispatch-ready employees. CI `validate` and `browser` passed; unit **935** (934 pass, 1
+  pre-existing skip), browser **232** pass. No charge, customer message or data deletion was
+  performed. Evidence: `docs/verification/2026-11-20-POST-DISPATCH-CLOSEOUT.md`.
+- **Prior release (2026-11-20 workforce intelligence and intelligent dispatch):** application code
   **`9c4b49a`** is live on `production-safe` (Cloudflare Pages production deployment
   `5162c0c2-6e3e-4c75-b02d-1b80b1e5398a`). Migration `0041` adds owner-controlled intelligent
   dispatch under **Admin -> Jobs & Team**: employee qualifications, equipment, independent/shared

@@ -74,10 +74,19 @@
 
 Recorded after deployment:
 
-- Application commit and Cloudflare Pages deployment identifier.
-- `GET /api/admin/dispatch`: unauthenticated request returns 401.
-- Authenticated owner dashboard: analysis-only, automatic assignment disabled, emergency pause on,
-  0 unassigned jobs, 0 automatic decisions.
+- Final HEAD `09404df`; Cloudflare Pages production deployment
+  `3082e1b6-d873-4f37-808b-bdb5dedf1b98`.
+- GitHub CI `validate` and `browser` passed; unit **935** (934 pass, 1 pre-existing skip), browser
+  **232** pass.
+- Live homepage title is `Residential & Commercial Cleaning Pensacola, FL | Sparkling Standard`;
+  canonical remains `https://sparkling-standard.com/`.
+- Authenticated owner branch API: Pensacola is live, readiness passes with a warning that its origin
+  is not configured. Tampa is setup and blocked by missing public phone/public service, pricing,
+  public estimator, scheduling, payments and fulfillment; its origin and GBP are also not configured.
+- Authenticated dispatch dashboard: analysis-only, automatic assignment disabled, emergency pause on,
+  0 unassigned jobs, 0 automatic decisions, 0 dispatch-ready employees. `team_hayli` onboarding is
+  satisfied but service, equipment, transport and origin are missing.
+- Production document data: 0 templates, 6 empty packet definitions, 0 packet items, 0 signatures.
 - Branch origins remain blank; no origin was invented.
 
 ## Still incomplete / owner action
