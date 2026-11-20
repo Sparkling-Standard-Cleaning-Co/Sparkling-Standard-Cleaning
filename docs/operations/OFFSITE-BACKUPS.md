@@ -221,3 +221,7 @@ archives unrecoverable.
 Still owner-dependent: password-manager/key custody, OneDrive cloud-sync
 confirmation, GitHub Actions secrets/schedule and any second independent
 provider beyond OneDrive.
+
+## Automation status - 2026-11-20
+
+The encrypted backup workflow file exists on `production-safe`, but GitHub does not list it as an active workflow on the repository default branch (`main`). The nightly schedule is therefore not established until the workflow is present on the default branch and the repository secrets are configured. The existing manual archives and restore evidence are unaffected.

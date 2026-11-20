@@ -108,3 +108,10 @@ silently bypassed.
 - The production branch row now carries the 132-ZIP registry and three counties.
 - The exact operating origin is intentionally unset; no coordinates or starting address were invented.
 - County membership is not the same as bookable driving-distance eligibility. Until a real origin is configured, Tampa public booking remains disabled.
+
+## Operating origin and readiness closeout - 2026-11-20
+
+- Migration `0042_branch_origins.sql` adds private origin coordinates, Google Place ID and a one-way travel limit per branch.
+- The owner Branches & Launch form now supports a verified origin and readiness checklist.
+- Tampa remains non-bookable. The static capability report still shows missing public estimator, scheduling, payments, pricing and fulfillment capabilities.
+- No Tampa origin was invented; production origin values remain unset.

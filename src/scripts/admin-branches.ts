@@ -21,6 +21,15 @@ interface BranchSettings {
   gbpStatus: string;
   gbpUrl: string;
   launchNote: string;
+  originAddress: string;
+  originCity: string;
+  originState: string;
+  originPostalCode: string;
+  originLat: number | null;
+  originLng: number | null;
+  originPlaceId: string;
+  travelLimitMiles: number | null;
+  readiness?: { ready: boolean; blockers: string[]; warnings: string[] };
 }
 
 interface BranchResponse {
@@ -79,6 +88,26 @@ function fillForm(): void {
   set('serviceCommercial', branch.services.commercial);
   set('serviceChurch', branch.services.church);
   set('launchNote', branch.launchNote);
+  set('travelLimitMiles', branch.travelLimitMiles === null ? '' : String(branch.travelLimitMiles));
+  const branchField = field<HTMLInputElement>('branchId');
+  if (branchField) branchField.value = branch.id;
+  const addressBlock = document.querySelector<HTMLElement>('[data-branch-form] [data-admin-address-block]');
+  addressBlock?.dispatchEvent(new Event('admin-address-reset'));
+  set('addressLine1', branch.originAddress);
+  set('city', branch.originCity);
+  set('state', branch.originState);
+  set('postalCode', branch.originPostalCode);
+  set('latitude', branch.originLat === null ? '' : String(branch.originLat));
+  set('longitude', branch.originLng === null ? '' : String(branch.originLng));
+  set('placeId', branch.originPlaceId);
+  const addressStatus = document.querySelector<HTMLElement>('[data-branch-form] [data-admin-address-status]');
+  if (addressStatus) {
+    addressStatus.textContent = branch.originLat !== null && branch.originLng !== null
+      ? 'Operating origin saved.'
+      : 'No verified operating origin is saved.';
+    addressStatus.className = 'admin-address-status admin-address-status--muted';
+  }
+  renderReadiness(branch);
   const fl = field<HTMLInputElement>('serviceStateFL');
   const al = field<HTMLInputElement>('serviceStateAL');
   if (fl) fl.checked = branch.serviceStates.includes('FL');
@@ -87,6 +116,20 @@ function fillForm(): void {
   if (title) {
     title.textContent = `${branch.name}: ${branch.lifecycle}. ${branch.lifecycle === 'live' ? 'Public operations may be active.' : 'Not publicly bookable.'}`;
   }
+}
+
+function renderReadiness(branch: BranchSettings): void {
+  const target = document.querySelector<HTMLElement>('[data-branch-readiness]');
+  if (!target) return;
+  const blockers = branch.readiness?.blockers ?? [];
+  const warnings = branch.readiness?.warnings ?? [];
+  target.innerHTML = branch.readiness?.ready
+    ? '<div class="admin-dispatch-good"><strong>Infrastructure checks passed.</strong> All configured branch launch prerequisites are present. Owner activation still controls public availability.</div>' +
+      (warnings.length ? '<div class="admin-dispatch-warning" style="margin-top:.5rem;"><strong>Warnings:</strong> ' + esc(warnings.join(', ')) + '</div>' : '')
+    : '<div class="admin-dispatch-warning"><strong>Not ready for activation.</strong><ul>' +
+      blockers.map((reason) => '<li>' + esc(reason) + '</li>').join('') +
+      warnings.map((reason) => '<li>Warning: ' + esc(reason) + '</li>').join('') +
+      '</ul></div>';
 }
 
 function renderSelect(): void {
@@ -153,6 +196,14 @@ async function save(): Promise<void> {
     hoursLabel: data.get('hoursLabel'),
     gbpStatus: data.get('gbpStatus'),
     gbpUrl: data.get('gbpUrl'),
+    originAddress: data.get('addressLine1'),
+    originCity: data.get('city'),
+    originState: data.get('state'),
+    originPostalCode: data.get('postalCode'),
+    originLat: data.get('latitude') || null,
+    originLng: data.get('longitude') || null,
+    originPlaceId: data.get('placeId'),
+    travelLimitMiles: data.get('travelLimitMiles') || null,
     serviceAreaZips: zips,
     serviceStates: [
       ...(data.get('serviceStateFL') ? ['FL'] : []),

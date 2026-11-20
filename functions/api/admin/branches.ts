@@ -15,6 +15,7 @@ import {
 } from '../../../src/lib/admin/operations.ts';
 import {
   BranchSettingsError,
+  branchReadiness,
   listBranchSettings,
   saveBranchSettings,
 } from '../../../src/lib/branches/settings.ts';
@@ -41,7 +42,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     );
   }
   try {
-    const branches = await listBranchSettings(db);
+    const branches = (await listBranchSettings(db)).map((branch) => ({ ...branch, readiness: branchReadiness(branch) }));
     return json({ ok: true, actor: { role: actor.role, branchId: actor.branchId }, branches });
   } catch {
     return json({ ok: false, error: 'branch_settings_load_failed' }, 500);
@@ -73,8 +74,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       entityId: saved.id,
       detail: `lifecycle ${saved.lifecycle}; slug ${saved.publicSlug}; services ${JSON.stringify(saved.services)}`,
     });
-    const branches = await listBranchSettings(db);
-    return json({ ok: true, branch: saved, branches });
+    const branches = (await listBranchSettings(db)).map((branch) => ({ ...branch, readiness: branchReadiness(branch) }));
+    return json({ ok: true, branch: { ...saved, readiness: branchReadiness(saved) }, branches });
   } catch (error) {
     const status = error instanceof BranchSettingsError ? error.status : 500;
     const code = error instanceof BranchSettingsError ? error.code : 'branch_settings_save_failed';

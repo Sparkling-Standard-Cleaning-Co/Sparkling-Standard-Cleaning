@@ -579,10 +579,7 @@ export async function dispatchDashboard(
   const settings = await loadDispatchSettings(db, branchId);
   const timeZone = timezoneForBranch(branchId);
   const range = dateRangeForDispatch(timeZone);
-  const fromDate = localDateKey(new Date().toISOString(), timeZone);
-  const toDate = localDateKey(range.to, timeZone);
-  const [employees, unassigned, jobs, decisions] = await Promise.all([
-    loadDispatchEmployees(db, branchId, fromDate, toDate),
+  const [unassigned, jobs, decisions] = await Promise.all([
     listDispatchJobs(db, branchId, { unassignedOnly: true, from: new Date().toISOString(), to: range.to, limit: 100 }),
     listDispatchJobs(db, branchId, { from: new Date().toISOString(), to: range.to, limit: 200 }),
     listDispatchDecisions(db, branchId, { limit: 30 }),
@@ -600,20 +597,37 @@ export async function dispatchDashboard(
     )
     .bind(branchId)
     .all<Record<string, unknown>>();
-  const team = (teamRows.results ?? []).map((row) => ({
+  const team = await Promise.all((teamRows.results ?? []).map(async (row) => {
+    const role = Number(row.is_solo) === 1 ? 'solo' : Number(row.is_lead) === 1 ? 'lead' : 'helper';
+    const onboarding = await employeeOnboardingStatus(db, String(row.id), role);
+    let services: string[] = [];
+    let equipment: string[] = [];
+    try { services = JSON.parse(String(row.dispatch_services_json ?? '[]')) as string[]; } catch { services = []; }
+    try { equipment = JSON.parse(String(row.dispatch_equipment_json ?? '[]')) as string[]; } catch { equipment = []; }
+    const workdays = String(row.workdays ?? '').split(',').map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6);
+    const readiness: string[] = [];
+    if (String(row.status) !== 'active') readiness.push('employee_inactive');
+    if (Number(row.is_bookable) !== 1) readiness.push('employee_not_bookable');
+    if (services.length === 0) readiness.push('service_qualifications_missing');
+    if (equipment.length === 0) readiness.push('equipment_qualifications_missing');
+    if (String(row.dispatch_transport_mode ?? 'unknown') === 'unknown') readiness.push('transport_not_configured');
+    if (row.dispatch_origin_lat === null || row.dispatch_origin_lng === null) readiness.push('dispatch_origin_missing');
+    if (workdays.length === 0) readiness.push('availability_missing');
+    if (!onboarding.satisfied) readiness.push('onboarding_requirements_missing');
+    return ({
     id: row.id,
     name: row.display_name,
     status: row.status,
     bookable: Number(row.is_bookable) === 1,
-    role: Number(row.is_solo) === 1 ? 'solo' : Number(row.is_lead) === 1 ? 'lead' : 'helper',
-    services: JSON.parse(String(row.dispatch_services_json ?? '[]')),
-    equipment: JSON.parse(String(row.dispatch_equipment_json ?? '[]')),
+    role,
+    services,
+    equipment,
     transportMode: row.dispatch_transport_mode,
     canDrive: Number(row.dispatch_can_drive) === 1,
     seats: Number(row.dispatch_vehicle_seats ?? 0),
     canTransportEquipment: Number(row.dispatch_can_transport_equipment) === 1,
     maxWeeklyHours: Number(row.dispatch_max_weekly_hours ?? 40),
-    workdays: String(row.workdays ?? '').split(',').map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6),
+    workdays,
     workdayStart: String(row.workday_start ?? '07:00'),
     workdayEnd: String(row.workday_end ?? '18:00'),
     overtimeApproved: Number(row.dispatch_overtime_approved) === 1,
@@ -625,6 +639,9 @@ export async function dispatchDashboard(
     altOriginLat: actor.role === 'owner' ? row.dispatch_alt_origin_lat : null,
     altOriginLng: actor.role === 'owner' ? row.dispatch_alt_origin_lng : null,
     notes: actor.role === 'owner' ? row.dispatch_notes : '',
+    readiness,
+    onboarding: { satisfied: onboarding.satisfied, bundleCode: onboarding.bundleCode, missing: onboarding.missing.map((entry) => entry.title) },
+    });
   }));
   const teamById = new Map(team.map((entry) => [String(entry.id), entry]));
   const unassignedIds = new Set(unassigned.map((row) => String(row.id)));
@@ -682,7 +699,7 @@ export async function dispatchDashboard(
       pendingRecommendations: pendingRecommendations.length,
       coverageExceptions: exceptions.length,
       team: team.length,
-      dispatchReady: employees.filter((employee) => employee.origin && employee.services.length > 0 && employee.transportMode !== 'unknown' && employee.equipment.length > 0).length,
+      dispatchReady: team.filter((member) => member.readiness.length === 0).length,
     },
     unassigned: unassigned.map((row) => ({
       id: row.id,

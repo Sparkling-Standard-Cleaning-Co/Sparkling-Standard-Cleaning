@@ -507,6 +507,7 @@ import {
               <h2 class="admin-section-title">Employee Dispatch Profile</h2>
               <p class="admin-muted">Private origins are visible only to the owner and are never shown to customers or coworkers. Automatic assignment stays blocked until qualifications, equipment and transport are complete.</p>
               <form class="admin-form admin-form--grid" data-dispatch-profile>
+                <div class="admin-field--wide admin-dispatch-readiness" data-dispatch-readiness></div>
                 <input type="hidden" name="memberId" />
                 <input type="hidden" name="branchId" value="branch_pensacola" />
                 <label>Team member <select name="profileMember" data-dispatch-profile-select required><option value="">Choose a team member</option></select></label>
@@ -1053,6 +1054,27 @@ import {
                 <label><input type="checkbox" name="serviceStateFL" /> Florida</label>
                 <label><input type="checkbox" name="serviceStateAL" /> Alabama</label>
               </fieldset>
+              <div class="admin-card" style="background:#fbf7f1;">
+                <h3>Operating origin</h3>
+                <p class="admin-muted">This private branch origin determines customer travel eligibility and dispatch planning. It is never published. Verify it with Google Places before activation.</p>
+                <input type="hidden" name="branchId" value="" data-admin-address-branch />
+                <div class="admin-field--wide admin-address-block" data-admin-address-block>
+                  <div class="admin-address-grid">
+                    <label class="admin-field--wide">Street address
+                      <input name="addressLine1" maxlength="200" autocomplete="off" data-admin-address-input placeholder="Start typing the verified operating address" />
+                    </label>
+                    <label>City <input name="city" maxlength="120" data-admin-address-city /></label>
+                    <label>State <select name="state" data-admin-address-state><option value="FL">Florida</option><option value="AL">Alabama</option></select></label>
+                    <label>ZIP <input name="postalCode" inputmode="numeric" maxlength="10" data-admin-address-zip /></label>
+                    <input type="hidden" name="latitude" data-admin-address-lat />
+                    <input type="hidden" name="longitude" data-admin-address-lng />
+                    <input type="hidden" name="placeId" data-admin-address-place-id />
+                  </div>
+                  <p class="admin-address-status" data-admin-address-status role="status" aria-live="polite"></p>
+                </div>
+                <label>Travel limit (one-way miles) <input name="travelLimitMiles" type="number" min="1" max="500" step="0.5" /></label>
+              </div>
+              <div data-branch-readiness style="margin-bottom:1rem;"></div>
               <label>Launch note <textarea name="launchNote" rows="4" maxlength="1000"></textarea></label>
               <label>Change note <input name="note" maxlength="500" placeholder="Why this setup changed" /></label>
               <div class="admin-actions">

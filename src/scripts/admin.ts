@@ -2298,6 +2298,8 @@ interface DispatchTeamMember {
   altOriginLat: number | null;
   altOriginLng: number | null;
   notes: string;
+  readiness?: string[];
+  onboarding?: { satisfied: boolean; bundleCode?: string; missing: string[] };
 }
 
 interface DispatchDashboard {
@@ -2403,6 +2405,27 @@ function setDispatchProfile(memberId: string): void {
       ? 'Verified dispatch origin is saved.'
       : 'No dispatch origin is saved. Automatic assignment will block until verified.';
     status.className = 'admin-address-status admin-address-status--muted';
+  }
+  const readiness = document.querySelector<HTMLElement>('[data-dispatch-readiness]');
+  if (readiness) {
+    const labels: Record<string, string> = {
+      employee_inactive: 'Employee is inactive.',
+      employee_not_bookable: 'Employee is not bookable.',
+      service_qualifications_missing: 'No approved service qualifications.',
+      equipment_qualifications_missing: 'No approved equipment.',
+      transport_not_configured: 'Transportation is not configured.',
+      dispatch_origin_missing: 'No verified dispatch origin.',
+      availability_missing: 'No regular workdays.',
+      onboarding_requirements_missing: 'Employee onboarding requirements are incomplete.',
+    };
+    const reasons = member.readiness ?? [];
+    const missing = member.onboarding?.missing ?? [];
+    readiness.innerHTML = reasons.length === 0
+      ? '<p class="admin-dispatch-good"><strong>Dispatch-ready.</strong> This employee has the recorded qualifications, equipment, transport, origin, availability and onboarding clearance required for automatic assignment.</p>'
+      : '<div class="admin-dispatch-warning"><strong>Not dispatch-ready.</strong><ul>' +
+        reasons.map((reason) => '<li>' + esc(labels[reason] ?? reason) + '</li>').join('') +
+        (missing.length ? '<li>Missing documents: ' + esc(missing.join(', ')) + '</li>' : '') +
+        '</ul></div>';
   }
 }
 

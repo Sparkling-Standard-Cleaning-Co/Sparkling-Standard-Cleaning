@@ -55,6 +55,14 @@ export interface BranchSettings {
   hoursLabel: string;
   serviceAreaZips: string[];
   serviceStates: Array<'FL' | 'AL'>;
+  originAddress: string;
+  originCity: string;
+  originState: string;
+  originPostalCode: string;
+  originLat: number | null;
+  originLng: number | null;
+  originPlaceId: string;
+  travelLimitMiles: number | null;
   services: Record<'residential' | 'str' | 'commercial' | 'church', ServiceMode>;
   gbpStatus: BranchPublicConfig['gbpStatus'];
   gbpUrl: string;
@@ -114,6 +122,14 @@ export function rowToBranchSettings(row: BranchRow): BranchSettings | null {
     hoursLabel: typeof hours.label === 'string' ? hours.label : base.hoursLabel,
     serviceAreaZips: [...new Set(zips)],
     serviceStates: states.length ? [...new Set(states)] : (['FL'] as Array<'FL' | 'AL'>),
+    originAddress: row.address_line1 || '',
+    originCity: row.city || '',
+    originState: row.state || 'FL',
+    originPostalCode: row.postal_code || '',
+    originLat: row.origin_lat === null || row.origin_lat === undefined ? null : Number(row.origin_lat),
+    originLng: row.origin_lng === null || row.origin_lng === undefined ? null : Number(row.origin_lng),
+    originPlaceId: row.origin_place_id || '',
+    travelLimitMiles: row.travel_limit_miles === null || row.travel_limit_miles === undefined ? base.travelLimitMiles : Number(row.travel_limit_miles),
     services: {
       residential: SERVICE_MODES.includes(services.residential as ServiceMode)
         ? (services.residential as ServiceMode)
@@ -139,7 +155,9 @@ export async function listBranchSettings(db: D1Database): Promise<BranchSettings
     .prepare(
       `SELECT id, name, status, lifecycle_status, public_slug, public_name, region_label,
               timezone, city, state, public_phone, public_email, gbp_status, gbp_url,
-              launch_note, service_area_json, hours_json, services_json
+              launch_note, service_area_json, hours_json, services_json,
+              address_line1, postal_code, origin_lat, origin_lng,
+              origin_place_id, travel_limit_miles
        FROM branches ORDER BY CASE WHEN id = 'branch_pensacola' THEN 0 ELSE 1 END, id`,
     )
     .all<BranchRow>();
@@ -147,6 +165,36 @@ export async function listBranchSettings(db: D1Database): Promise<BranchSettings
     const settings = rowToBranchSettings(row);
     return settings ? [settings] : [];
   });
+}
+
+export interface BranchReadiness {
+  ready: boolean;
+  blockers: string[];
+  warnings: string[];
+}
+
+export function branchReadiness(settings: BranchSettings): BranchReadiness {
+  const base = branchConfig(settings.id);
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  if (!base) return { ready: false, blockers: ['branch_identity_missing'], warnings };
+  if (!settings.publicPhone) blockers.push('public_phone_missing');
+  if (!settings.publicEmail) blockers.push('public_email_missing');
+  if (settings.serviceAreaZips.length === 0) blockers.push('service_area_missing');
+  if (!Object.values(settings.services).some((mode) => mode === 'bookable' || mode === 'estimate_enabled')) {
+    blockers.push('public_service_missing');
+  }
+  if (!base.capabilities.pricingConfigured) blockers.push('branch_pricing_not_configured');
+  if (!base.capabilities.publicEstimates) blockers.push('public_estimator_not_implemented');
+  if (!base.capabilities.scheduling) blockers.push('scheduling_not_implemented');
+  if (!base.capabilities.payments) blockers.push('branch_payments_not_enabled');
+  if (!base.capabilities.fulfillmentVerified) blockers.push('fulfillment_not_verified');
+  if (settings.gbpStatus !== 'verified') warnings.push('google_profile_not_verified');
+  if (!settings.originAddress || settings.originLat === null || settings.originLng === null) {
+    warnings.push('branch_origin_not_configured');
+  }
+  if (settings.travelLimitMiles === null) warnings.push('travel_limit_not_configured');
+  return { ready: blockers.length === 0, blockers, warnings };
 }
 
 function normalizeInput(input: Record<string, unknown>, existing: BranchSettings): BranchSettings {
@@ -183,6 +231,18 @@ function normalizeInput(input: Record<string, unknown>, existing: BranchSettings
   if (!GBP_STATES.includes(gbpStatus)) throw new BranchSettingsError('gbp_status_invalid');
   const gbpUrl = text(input.gbpUrl, 500);
   if (gbpUrl && !/^https:\/\//i.test(gbpUrl)) throw new BranchSettingsError('gbp_url_invalid');
+  const originLatRaw = input.originLat === null || input.originLat === undefined || input.originLat === '' ? null : Number(input.originLat);
+  const originLngRaw = input.originLng === null || input.originLng === undefined || input.originLng === '' ? null : Number(input.originLng);
+  if (originLatRaw !== null && (!Number.isFinite(originLatRaw) || originLatRaw < -90 || originLatRaw > 90)) {
+    throw new BranchSettingsError('origin_latitude_invalid');
+  }
+  if (originLngRaw !== null && (!Number.isFinite(originLngRaw) || originLngRaw < -180 || originLngRaw > 180)) {
+    throw new BranchSettingsError('origin_longitude_invalid');
+  }
+  const travelLimitRaw = input.travelLimitMiles === null || input.travelLimitMiles === undefined || input.travelLimitMiles === '' ? null : Number(input.travelLimitMiles);
+  if (travelLimitRaw !== null && (!Number.isFinite(travelLimitRaw) || travelLimitRaw <= 0 || travelLimitRaw > 500)) {
+    throw new BranchSettingsError('travel_limit_invalid');
+  }
 
   const next: BranchSettings = {
     ...existing,
@@ -196,6 +256,14 @@ function normalizeInput(input: Record<string, unknown>, existing: BranchSettings
     hoursLabel: text(input.hoursLabel, 200) || existing.hoursLabel,
     serviceAreaZips: [...new Set(zips)].sort(),
     serviceStates: states.length ? [...new Set(states)] : (['FL'] as Array<'FL' | 'AL'>),
+    originAddress: text(input.originAddress, 300) || existing.originAddress,
+    originCity: text(input.originCity, 120) || existing.originCity,
+    originState: text(input.originState, 2).toUpperCase() || existing.originState,
+    originPostalCode: text(input.originPostalCode, 10) || existing.originPostalCode,
+    originLat: originLatRaw,
+    originLng: originLngRaw,
+    originPlaceId: text(input.originPlaceId, 200),
+    travelLimitMiles: travelLimitRaw,
     services,
     gbpStatus,
     gbpUrl,
@@ -209,6 +277,10 @@ function normalizeInput(input: Record<string, unknown>, existing: BranchSettings
     if (!Object.values(next.services).some((mode) => mode === 'bookable' || mode === 'estimate_enabled')) {
       throw new BranchSettingsError('launch_service_required');
     }
+    if (!next.originAddress || next.originLat === null || next.originLng === null) {
+      throw new BranchSettingsError('launch_origin_required');
+    }
+    if (next.travelLimitMiles === null) throw new BranchSettingsError('launch_travel_limit_required');
   }
   return next;
 }
@@ -242,6 +314,16 @@ export async function saveBranchSettings(
     publicEmail: next.publicEmail,
     hoursLabel: next.hoursLabel,
     serviceArea: { zips: next.serviceAreaZips, states: next.serviceStates },
+    origin: {
+      address: next.originAddress,
+      city: next.originCity,
+      state: next.originState,
+      postalCode: next.originPostalCode,
+      latitude: next.originLat,
+      longitude: next.originLng,
+      placeId: next.originPlaceId,
+      travelLimitMiles: next.travelLimitMiles,
+    },
     services: next.services,
     gbpStatus: next.gbpStatus,
     gbpUrl: next.gbpUrl,
@@ -260,6 +342,8 @@ export async function saveBranchSettings(
         `UPDATE branches SET
            lifecycle_status = ?, public_slug = ?, public_name = ?, region_label = ?,
            timezone = ?, public_phone = ?, public_email = ?, gbp_status = ?, gbp_url = ?,
+           address_line1 = ?, city = ?, state = ?, postal_code = ?, origin_lat = ?, origin_lng = ?,
+           origin_place_id = ?, travel_limit_miles = ?,
            launch_note = ?, service_area_json = ?, hours_json = ?, services_json = ?,
            status = ?, updated_at = ?
          WHERE id = ?`,
@@ -274,6 +358,14 @@ export async function saveBranchSettings(
         next.publicEmail,
         next.gbpStatus,
         next.gbpUrl,
+        next.originAddress,
+        next.originCity,
+        next.originState,
+        next.originPostalCode,
+        next.originLat,
+        next.originLng,
+        next.originPlaceId,
+        next.travelLimitMiles,
         next.launchNote,
         JSON.stringify({ zips: next.serviceAreaZips, states: next.serviceStates }),
         JSON.stringify({ label: next.hoursLabel }),

@@ -68,6 +68,7 @@ function freshDb(): TestD1 {
     '0002_admin_security_and_seeds.sql',
     '0026_pricing_control.sql',
     '0040_branch_topology.sql',
+    '0042_branch_origins.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join(process.cwd(), 'migrations', file), 'utf8'));
   }
@@ -178,6 +179,13 @@ test('branch setup cannot go live without launch prerequisites and preserves ver
     () =>
       saveBranchSettings(db, actor, BRANCH_PENSACOLA, {
         ...loaded[0]!,
+        originAddress: '100 Test Way',
+        originCity: 'Cantonment',
+        originState: 'FL',
+        originPostalCode: '32533',
+        originLat: 30.6,
+        originLng: -87.3,
+        travelLimitMiles: 45,
         publicSlug: 'tampa-bay',
       }),
     (error: unknown) => error instanceof BranchSettingsError && error.code === 'public_slug_in_use',

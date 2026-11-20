@@ -26,8 +26,14 @@ export interface BranchRow {
   public_name: string;
   region_label: string;
   timezone: string;
+  address_line1: string;
   city: string;
   state: string;
+  postal_code: string;
+  origin_lat: number | null;
+  origin_lng: number | null;
+  origin_place_id: string;
+  travel_limit_miles: number | null;
   public_phone: string;
   public_email: string;
   gbp_status: BranchPublicConfig['gbpStatus'];
@@ -39,7 +45,8 @@ export interface BranchRow {
 }
 
 const BRANCH_COLUMNS = `id, name, status, lifecycle_status, public_slug, public_name,
-  region_label, timezone, city, state, public_phone, public_email, gbp_status,
+  region_label, timezone, address_line1, city, state, postal_code, origin_lat, origin_lng,
+  origin_place_id, travel_limit_miles, public_phone, public_email, gbp_status,
   gbp_url, launch_note, service_area_json, hours_json, services_json`;
 
 function isBranchId(value: string): value is BranchId {
