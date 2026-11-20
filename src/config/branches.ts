@@ -10,6 +10,7 @@
 // eligibility are verified by the owner.
 
 import { zipReference } from './geography.ts';
+import { EMAIL_ROUTING } from './email-routing.ts';
 
 export const BRANCH_PENSACOLA = 'branch_pensacola' as const;
 export const BRANCH_TAMPA = 'branch_tampa' as const;
@@ -132,7 +133,7 @@ export const branchConfigs: Readonly<Record<BranchId, BranchPublicConfig>> = {
     serviceCounties: ['Escambia County, FL', 'Santa Rosa County, FL', 'Baldwin County, AL', 'Escambia County, AL'],
     travelLimitMiles: 45,
     publicPhone: '(850) 426-8479',
-    publicEmail: 'owner@sparkling-standard.com',
+    publicEmail: EMAIL_ROUTING.customerService,
     hoursLabel: sevenDays,
     gbpStatus: 'verified',
     gbpUrl: 'https://www.google.com/search?kgmid=/g/11zz5t1059&hl=en-US&q=Sparkling+Standard+Cleaning+Co.',
@@ -173,7 +174,7 @@ export const branchConfigs: Readonly<Record<BranchId, BranchPublicConfig>> = {
     serviceCounties: ['Pasco County, FL', 'Pinellas County, FL', 'Hillsborough County, FL'],
     travelLimitMiles: 20,
     publicPhone: '',
-    publicEmail: 'owner@sparkling-standard.com',
+    publicEmail: EMAIL_ROUTING.customerService,
     hoursLabel: 'By appointment after launch',
     gbpStatus: 'not_created',
     gbpUrl: '',

@@ -15,6 +15,7 @@ import {
   wrap,
 } from '../pdf/pdf-core.ts';
 import type { QuickEstimateInput, QuickEstimateQuote } from './quick-estimate.ts';
+import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 
 function money(cents: number | null | undefined): string {
   return `$${((Number(cents) || 0) / 100).toFixed(2)}`;
@@ -174,7 +175,7 @@ export function buildQuickEstimatePdf(
   pages.push(content);
   const withFooters = pages.map((page, index) => {
     let footer = rule(58);
-    footer += text('Sparkling Standard Cleaning Co. - (850) 426-8479 - owner@sparkling-standard.com - sparkling-standard.com', LEFT, 44, 7, false, MUTED);
+    footer += text(`Sparkling Standard Cleaning Co. - (850) 426-8479 - ${EMAIL_ROUTING.customerService} - sparkling-standard.com`, LEFT, 44, 7, false, MUTED);
     footer += text(`Page ${index + 1} of ${pages.length}`, RIGHT - 60, 44, 7, false, MUTED);
     return page + footer;
   });

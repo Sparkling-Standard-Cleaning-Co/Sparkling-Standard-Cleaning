@@ -6,6 +6,7 @@ import {
   type InvoiceLineItem,
 } from './invoice.ts';
 import { CUSTOMER_EMAIL_BUSINESS } from '../forms/customer-email.ts';
+import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 
 export function buildAdminInvoice(input: {
   invoice: Record<string, unknown>;
@@ -67,7 +68,7 @@ export function buildAdminInvoice(input: {
     contact: {
       name: CUSTOMER_EMAIL_BUSINESS.name,
       phone: CUSTOMER_EMAIL_BUSINESS.phone ?? '',
-      email: CUSTOMER_EMAIL_BUSINESS.email ?? '',
+      email: EMAIL_ROUTING.billing,
       website: CUSTOMER_EMAIL_BUSINESS.website,
       legalName: 'Sparkling Standard LLC',
     },

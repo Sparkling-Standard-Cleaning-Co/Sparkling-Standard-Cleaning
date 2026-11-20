@@ -1,4 +1,5 @@
 import { activationLabel } from './activation.ts';
+import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 import { certificateHtml, formatGiftValue, redeemUrl } from './certificate.ts';
 
 export interface GiftEmailData {
@@ -34,7 +35,7 @@ export function buildGiftCertificateEmail(data: GiftEmailData): GiftEmail {
     redeemUrl: url,
     contact: {
       phone: '(850) 426-8479',
-      email: 'owner@sparkling-standard.com',
+      email: EMAIL_ROUTING.customerService,
       website: 'sparkling-standard.com',
     },
     redemptionSteps: [
@@ -60,7 +61,7 @@ export function buildGiftCertificateEmail(data: GiftEmailData): GiftEmail {
     'This certificate is a prepaid service value, not cash. It does not expire and carries no post-sale service fee.',
     'Contact Sparkling Standard with the code and service address to redeem.',
     'Phone or text: (850) 426-8479',
-    'Email: owner@sparkling-standard.com',
+    `Email: ${EMAIL_ROUTING.customerService}`,
   ].join('\n');
   return {
     subject:

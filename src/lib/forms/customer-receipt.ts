@@ -5,11 +5,13 @@
 // suppresses the owner notification; the owner sees the delivery status and can
 // resend from Stripe/Resend if needed.
 import { buildReceipt, type ReceiptData } from '../payments/receipt.ts';
+import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 
 export interface ReceiptEmailEnv {
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   RESEND_REPLY_TO?: string;
+  RESEND_BILLING_REPLY_TO?: string;
 }
 
 export type ReceiptEmailStatus =
@@ -25,8 +27,9 @@ export interface ReceiptEmailOutcome {
   providerMessageId?: string;
 }
 
-const DEFAULT_FROM = 'Sparkling Standard <notifications@sparkling-standard.com>';
-const DEFAULT_REPLY_TO = 'owner@sparkling-standard.com';
+
+export const DEFAULT_RECEIPT_EMAIL_FROM = EMAIL_ROUTING.notificationsSender;
+export const DEFAULT_RECEIPT_EMAIL_REPLY_TO = EMAIL_ROUTING.billing;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function sendCustomerReceipt(
@@ -50,12 +53,12 @@ export async function sendCustomerReceipt(
         'Idempotency-Key': idempotencyKey,
       },
       body: JSON.stringify({
-        from: env.RESEND_FROM_EMAIL?.trim() || DEFAULT_FROM,
+        from: env.RESEND_FROM_EMAIL?.trim() || DEFAULT_RECEIPT_EMAIL_FROM,
         to: [to],
         subject: receipt.subject,
         html: receipt.html,
         text: receipt.text,
-        reply_to: env.RESEND_REPLY_TO?.trim() || DEFAULT_REPLY_TO,
+        reply_to: env.RESEND_BILLING_REPLY_TO?.trim() || env.RESEND_REPLY_TO?.trim() || DEFAULT_RECEIPT_EMAIL_REPLY_TO,
       }),
       signal: AbortSignal.timeout(10_000),
     });

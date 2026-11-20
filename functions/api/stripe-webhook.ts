@@ -64,6 +64,8 @@ interface Env extends PaymentStorageEnv, BookingEnv {
   PUBLIC_SITE_URL?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
+  RESEND_REPLY_TO?: string;
+  RESEND_BILLING_REPLY_TO?: string;
 }
 
 interface StripeEvent {

@@ -5524,15 +5524,14 @@ fieldset.input--invalid {
 .review-carousel__quote {
   position: relative;
   display: flex;
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
   flex-direction: column;
-  justify-content: center;
-  overflow-y: auto;
-  padding-right: 0.35rem;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-sand-400) transparent;
-  overscroll-behavior: contain;
+  justify-content: flex-start;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  overflow: hidden;
 }
 
 .review-carousel__quote:focus-visible {
@@ -5541,17 +5540,8 @@ fieldset.input--invalid {
   border-radius: var(--radius-sm);
 }
 
-.review-carousel__quote::-webkit-scrollbar {
-  width: 0.42rem;
-}
-
-.review-carousel__quote::-webkit-scrollbar-thumb {
-  background: var(--color-sand-400);
-  border-radius: var(--radius-full);
-}
-
-.review-carousel[data-enhanced='true'] .review-carousel__card[data-scrollable='true'] .review-carousel__quote {
-  justify-content: flex-start;
+.review-carousel__full {
+  display: none;
 }
 
 .review-carousel__quote p {
@@ -5564,6 +5554,14 @@ fieldset.input--invalid {
 
 .review-carousel__quote p:last-child {
   margin-bottom: 0;
+}
+
+.review-carousel__card[data-has-photos='true'] .review-carousel__quote {
+  -webkit-line-clamp: 4;
+}
+
+.review-carousel__card[data-has-photos='true'] .review-carousel__photos img {
+  height: 8rem;
 }
 
 .review-carousel__photos {
@@ -5640,8 +5638,6 @@ fieldset.input--invalid {
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   container-type: inline-size;
-  perspective: 1800px;
-  perspective-origin: 50% 45%;
   padding-block: var(--space-6);
   overflow: visible;
 }
@@ -5649,15 +5645,16 @@ fieldset.input--invalid {
 .review-carousel[data-enhanced='true'] .review-carousel__card {
   grid-area: 1 / 1;
   justify-self: center;
-  width: 36%;
-  height: 35rem;
-  align-self: center;
+  width: 42%;
+  min-height: 31rem;
+  height: 31rem;
+  align-self: stretch;
   overflow: visible;
   transition:
     transform 0.6s cubic-bezier(0.22, 0.75, 0.25, 1),
     opacity 0.45s ease,
     box-shadow 0.6s ease;
-  transform: translateX(0) translateY(0) translateZ(0) rotateY(0deg) scale(1);
+  transform: translateX(0) translateY(0) scale(1);
   z-index: 3;
   opacity: 1;
   box-shadow: var(--shadow-lg);
@@ -5668,17 +5665,18 @@ fieldset.input--invalid {
 .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'],
 .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
   z-index: 2;
-  opacity: 0.97;
+  width: 28%;
+  opacity: 1;
   box-shadow: var(--shadow-md);
   cursor: pointer;
 }
 
 .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'] {
-  transform: translateX(-33.7cqw) translateY(12px) translateZ(-90px) rotateY(5deg) scale(0.94);
+  transform: translateX(-36cqw) translateY(12px) scale(0.94);
 }
 
 .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
-  transform: translateX(33.7cqw) translateY(12px) translateZ(-90px) rotateY(-5deg) scale(0.94);
+  transform: translateX(36cqw) translateY(12px) scale(0.94);
 }
 
 .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1']:hover,
@@ -5778,17 +5776,15 @@ fieldset.input--invalid {
   }
 
   .review-carousel[data-enhanced='true'] .review-carousel__card {
-    height: 32rem;
+    height: auto;
+    min-height: 0;
+    -webkit-line-clamp: unset;
   }
 
   .review-carousel[data-enhanced='true'] .review-carousel__card,
   .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'],
   .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
     width: min(100%, 40rem);
-  }
-
-  .review-carousel[data-enhanced='true'] .review-carousel__quote {
-    justify-content: center;
   }
 
   .review-carousel[data-enhanced='true'] .review-carousel__card:not([data-offset='0']) {
@@ -5801,11 +5797,12 @@ fieldset.input--invalid {
 }
 
 @media (max-width: 720px) {
-  .review-carousel[data-enhanced='true'] .review-carousel__card {
-    height: 33rem;
+  .review-carousel__card[data-has-photos='true'] .review-carousel__quote {
+    -webkit-line-clamp: 6;
   }
 
-  .review-carousel__photos img {
+  .review-carousel__photos img,
+  .review-carousel__card[data-has-photos='true'] .review-carousel__photos img {
     height: 9.5rem;
   }
 

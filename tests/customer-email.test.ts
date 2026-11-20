@@ -55,19 +55,28 @@ async function withFetch<T>(
 
 test('the embedded business facts cannot drift from business.ts', () => {
   const source = fs.readFileSync('src/config/business.ts', 'utf8');
+  const routing = fs.readFileSync('src/config/email-routing.ts', 'utf8');
   assert.equal(CUSTOMER_EMAIL_BUSINESS.name, 'Sparkling Standard');
   assert.equal(CUSTOMER_EMAIL_BUSINESS.founder, 'Hayli');
   assert.equal(CUSTOMER_EMAIL_BUSINESS.phone, '(850) 426-8479');
-  assert.equal(CUSTOMER_EMAIL_BUSINESS.email, 'owner@sparkling-standard.com');
+  assert.equal(CUSTOMER_EMAIL_BUSINESS.email, 'customer-service@sparkling-standard.com');
   assert.equal(CUSTOMER_EMAIL_BUSINESS.website, 'sparkling-standard.com');
   for (const literal of [
     "'Sparkling Standard'",
     "firstName: 'Hayli'",
     "formatPhone('850-426-8479')",
-    "'owner@sparkling-standard.com'",
+    'EMAIL_ROUTING.customerService',
     "'https://sparkling-standard.com'",
   ]) {
     assert.ok(source.includes(literal), `business.ts no longer contains ${literal}`);
+  }
+  for (const literal of [
+    "customerService: 'customer-service@sparkling-standard.com'",
+    "hiring: 'hiring@sparkling-standard.com'",
+    "admin: 'admin@sparkling-standard.com'",
+    "owner: 'owner@sparkling-standard.com'",
+  ]) {
+    assert.ok(routing.includes(literal), `email-routing.ts no longer contains ${literal}`);
   }
 });
 

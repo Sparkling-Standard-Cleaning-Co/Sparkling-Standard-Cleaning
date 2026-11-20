@@ -142,10 +142,11 @@ test('cards share a consistent height and long reviews open accessible full text
     const active = page.locator('[data-review-card][aria-current="true"]');
     assert.equal((await active.locator('footer strong').innerText()).trim(), 'K V');
     const quote = active.locator('[data-review-quote]');
-    assert.equal(await quote.evaluate((el) => getComputedStyle(el).overflowY), 'auto', 'review text has internal scrolling');
-    assert.equal(await quote.evaluate((el) => el.scrollHeight > el.clientHeight), true, 'long review is scrollable');
-    await quote.evaluate((el) => { el.scrollTop = el.scrollHeight; });
-    assert.ok(await quote.evaluate((el) => el.scrollTop > 0), 'review text scrolls with the mouse/wheel');
+    assert.equal(await quote.evaluate((el) => getComputedStyle(el).overflowY), 'hidden', 'excerpt does not create an internal scroller');
+    assert.equal(await quote.evaluate((el) => { el.scrollTop = el.scrollHeight; return el.scrollTop; }), 0, 'excerpt never scrolls inside the card');
+    assert.ok((await quote.innerText()).length < (await active.locator('[data-review-full]').innerText()).length, 'long review is intentionally excerpted');
+    assert.equal(await active.locator('[data-review-full]').isHidden(), true, 'full text is available but not duplicated visually');
+    assert.match(await active.locator('[data-review-full]').innerText(), /I recently hired Sparkling Standard for a deep clean/);
     const activeBox = await active.boundingBox();
     const sectionBox = await page.locator('#reviews').boundingBox();
     assert.ok(activeBox && sectionBox && activeBox.y >= sectionBox.y, 'card top is not clipped');
@@ -158,6 +159,34 @@ test('cards share a consistent height and long reviews open accessible full text
     await page.keyboard.press('Escape');
     assert.equal(await dialog.isVisible(), false, 'dialog closes with Escape');
     assert.equal(await card('Dennis D').locator('.review-carousel__photos img').count(), 2);
+  } finally {
+    await context.close();
+  }
+});
+
+test('reviews with photographs keep photos and attribution inside the card', async () => {
+  const { context, page } = await open(1280);
+  try {
+    await page.locator('[data-review-dot][data-index="3"]').click();
+    await page.waitForTimeout(1200);
+    const active = page.locator('[data-review-card][aria-current="true"]');
+    assert.equal((await active.locator('footer strong').innerText()).trim(), 'Dennis D');
+    const bounds = await active.evaluate((card) => {
+      const cardBox = card.getBoundingClientRect();
+      const images = [...card.querySelectorAll('.review-carousel__photos img')].map((image) => image.getBoundingClientRect());
+      const footer = card.querySelector('footer')?.getBoundingClientRect();
+      return {
+        cardBottom: cardBox.bottom,
+        imageBottoms: images.map((image) => image.bottom),
+        footerBottom: footer?.bottom ?? 0,
+        scrollbars: [...card.querySelectorAll('[data-review-quote]')].map((quote) => getComputedStyle(quote).overflowY),
+      };
+    });
+    assert.equal(bounds.imageBottoms.length, 2);
+    assert.ok(bounds.imageBottoms.every((bottom) => bottom <= bounds.cardBottom), 'photos stay inside the card');
+    assert.ok(bounds.footerBottom <= bounds.cardBottom, 'attribution stays inside the card');
+    assert.deepEqual(bounds.scrollbars, ['hidden']);
+    assert.equal(await active.locator('[data-review-expand]').isVisible(), true);
   } finally {
     await context.close();
   }

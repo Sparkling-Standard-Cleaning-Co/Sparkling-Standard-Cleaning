@@ -9,6 +9,7 @@
 import type { D1Database } from '../admin/d1.ts';
 import { hashToken, randomToken } from '../admin/auth.ts';
 import { AdminAuthError, audit } from '../admin/operations.ts';
+import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 
 export const SIGNING_TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 export const ESIGN_CONSENT_VERSION = '2026-11-01.esign-consent.v1';
@@ -126,7 +127,7 @@ export const DOCUMENT_COMPANY = {
   legalName: 'Sparkling Standard LLC',
   slogan: 'Standards That Sparkle.',
   phone: '(850) 426-8479',
-  email: 'owner@sparkling-standard.com',
+  email: EMAIL_ROUTING.customerService,
   website: 'https://sparkling-standard.com',
 } as const;
 

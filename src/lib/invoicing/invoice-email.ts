@@ -1,14 +1,15 @@
 import { formatInvoiceDate, formatMoney, type InvoiceData, type InvoiceTotals } from './invoice.ts';
+import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 
 export const RESEND_ENDPOINT = 'https://api.resend.com/emails';
-export const DEFAULT_INVOICE_EMAIL_FROM =
-  'Sparkling Standard <notifications@sparkling-standard.com>';
-export const DEFAULT_INVOICE_EMAIL_REPLY_TO = 'owner@sparkling-standard.com';
+export const DEFAULT_INVOICE_EMAIL_FROM = EMAIL_ROUTING.notificationsSender;
+export const DEFAULT_INVOICE_EMAIL_REPLY_TO = EMAIL_ROUTING.billing;
 
 export interface InvoiceEmailEnv {
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   RESEND_REPLY_TO?: string;
+  RESEND_BILLING_REPLY_TO?: string;
 }
 
 export type InvoiceEmailStatus = 'sent' | 'skipped_not_configured' | 'failed';
@@ -105,7 +106,7 @@ export async function sendInvoiceEmail(input: {
       body: JSON.stringify({
         from: input.env.RESEND_FROM_EMAIL?.trim() || DEFAULT_INVOICE_EMAIL_FROM,
         to: [input.to],
-        reply_to: input.env.RESEND_REPLY_TO?.trim() || DEFAULT_INVOICE_EMAIL_REPLY_TO,
+        reply_to: input.env.RESEND_BILLING_REPLY_TO?.trim() || input.env.RESEND_REPLY_TO?.trim() || DEFAULT_INVOICE_EMAIL_REPLY_TO,
         subject: email.subject,
         html: email.html,
         text: email.text,
