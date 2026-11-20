@@ -281,6 +281,10 @@ function normalizeInput(input: Record<string, unknown>, existing: BranchSettings
       throw new BranchSettingsError('launch_origin_required');
     }
     if (next.travelLimitMiles === null) throw new BranchSettingsError('launch_travel_limit_required');
+    const readiness = branchReadiness(next);
+    if (readiness.blockers.length > 0) {
+      throw new BranchSettingsError('launch_readiness_incomplete', 409, `Missing: ${readiness.blockers.join(', ')}`);
+    }
   }
   return next;
 }
