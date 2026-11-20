@@ -48,6 +48,14 @@
 - Build: 37 pages.
 - Validation: pass.
 
+## Deployment and live verification
+
+- Final application HEAD: `397be7b`.
+- Cloudflare Pages deployment: `144f1239-5fbc-44a9-b83b-c89d761b150e`.
+- `https://sparkling-standard.com/locations/tampa-bay/` returns **404**.
+- `/service-area/` contains the single-region heading and no Tampa card.
+- Homepage contains no Tampa text and retains the approved residential/commercial title.
+
 ## Still incomplete
 
 - Tampa estimator, booking, payments, scheduling and recurring customer workflow.

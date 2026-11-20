@@ -84,7 +84,18 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-20 post-dispatch production closeout):** application code
+- **Current release (2026-11-20 document library and Tampa visibility gate):** application code
+  **`397be7b`** is live on `production-safe` (Cloudflare Pages production deployment
+  `144f1239-5fbc-44a9-b83b-c89d761b150e`). An owner-review Word library was generated from 183
+  business documents; 176 contained the old gold-S logo and now use the approved Sparkling STANDARD
+  wordmark in review copies. Originals are untouched. `OPEN-DOCUMENT-LIBRARY.html` is the entry
+  point in `00 START HERE`; nothing is approved or uploaded. Production-host middleware now keeps
+  Tampa OFF unless `branch_tampa.lifecycle_status = live` and `status = active`; the Tampa page
+  returns 404/noindex and the service-area page removes the Tampa card. Live verification: Tampa page
+  404, service-area single-region heading, no Tampa on homepage. CI passed; unit **940** (939 pass,
+  1 pre-existing skip), browser **232** pass. No charge, message or deletion. Evidence:
+  `docs/verification/2026-11-20-DOCUMENT-LIBRARY-AND-TAMPA-VISIBILITY.md`.
+- **Prior release (2026-11-20 post-dispatch production closeout):** application code
   **`6ea55d7`** is live on `production-safe` (Cloudflare Pages production deployment
   `5a8e151b-a7fd-4eec-8622-231a197ebe0b`). Migration `0042` adds private branch operating origins
   and travel limits. Branches & Launch now has a Google Places-enabled origin field, owner-only
