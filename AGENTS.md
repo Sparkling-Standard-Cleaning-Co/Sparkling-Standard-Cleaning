@@ -84,23 +84,24 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-20 two-branch foundation, verified reviews and Follow Us refinement):**
-  application code **`d70e656`** is live on `production-safe` (Cloudflare Pages production
-  deployment `f43f0984-9614-41f7-a23d-6761172e764d`). Migration `0040` (branch lifecycle,
-  branch-scoped immutable pricing and branch config versions) is applied to production D1 and
-  verified; `0038`/`0039` remain applied. Pensacola is live; Tampa Bay is setup/prelaunch and
-  cannot publish pricing or accept bookings. The owner has All/Pensacola/Tampa branch view,
-  Branches & Launch setup and per-branch pricing control; the B2B commercial/church launchpad is
-  in the Windows master workspace. The homepage now shows seven verified Google reviews
-  (Christina, Richard, Laura, Dennis, Amanda, Elizabeth, Rob & Christi) with the owner-supplied
-  5.0 / 10 profile total stated separately; Bob is excluded and K V / S Ismail remain unverified
-  because Google hides their full text from signed-out viewers. The footer Follow Us section is
-  a boxless integrated row of twelve official marks on transparent 44px targets. CI
-  `validate` and `browser` pass; local suite 906 tests (905 pass, 1 pre-existing skip) and 226
-  browser tests pass. No live charge, refund, customer email, legal execution or production
-  customer record change was performed. Evidence:
-  `docs/verification/2026-11-20-TWO-BRANCH-B2B.md` and
-  `docs/verification/2026-11-20-REVIEWS-FOOTER.md`.
+- **Current release (2026-11-20 master directive: reviews, photos, footer and Tampa inquiries):**
+  application code **`1d7c997`** is live on `production-safe` (Cloudflare Pages production
+  deployment `c6469de6-bf79-407c-a2a4-3f54c4051d35`). Migration `0040` remains applied and
+  verified; Pensacola is live and Tampa Bay is setup/prelaunch. The owner-approved review set is
+  now **Christina, Richard, Laura, Dennis D, K V, S Ismail and Rob & Christi Moore**; Bob, Amanda
+  and Elizabeth are excluded. K V and S Ismail use the exact owner-supplied text, and K V's
+  "bi-monthly" wording is preserved. Dennis's two couch photographs and Laura's shower photograph
+  are restored from the public Google review. The former rating/count summary and the footer
+  service-area paragraph were removed. Follow Us remains twelve transparent 44px official marks.
+  Tampa Bay now has a premium public page and a branch-assigned inquiry form that creates a Tampa
+  lead but no booking, quote or payment; the page remains noindex until launch gates pass.
+  Capability flags for marketing, inquiries, commercial leads, estimates, scheduling, payments,
+  fulfillment and Google profile are code-owned in `src/config/branches.ts`. The B2B launchpad
+  and separate Pensacola/Tampa operations workspaces are in the Windows master. CI `validate`
+  and `browser` pass; local suite **907 tests (906 pass, 1 pre-existing skip)** and **228 browser
+  tests** pass. No live charge, refund, customer email, legal execution or production customer
+  record change was performed. Evidence: `docs/verification/2026-11-20-REVIEWS-FOOTER.md`,
+  `docs/operations/TAMPA-BAY-LAUNCH.md`, `docs/verification/2026-11-20-TWO-BRANCH-B2B.md`.
 - **Prior release (2026-11-19 production activation and admin address autocomplete):** application
   code **`019fad6`** remains in production history (Cloudflare Pages deployment
   `f890914f-32fc-4691-9557-009214a9e380`). It applied migrations `0038`/`0039`, added Google

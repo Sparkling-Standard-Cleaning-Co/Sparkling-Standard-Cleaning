@@ -102,3 +102,34 @@ Final local captures:
 - Unit: **907 tests, 906 pass, 1 pre-existing skip, 0 fail**.
 - Browser: **228 pass, 0 fail**.
 - Targeted review/footer/Tampa tests: 16 pass.
+
+## Production deployment
+
+- Application code: `1d7c997`.
+- Cloudflare Pages production deployment: `c6469de6-bf79-407c-a2a4-3f54c4051d35`.
+- CI `validate` and `browser`: pass.
+
+Live verification at https://sparkling-standard.com:
+
+- 7 review cards render in the order Christina, Richard, Laura, Dennis D, K V,
+  S Ismail, Rob & Christi Moore.
+- No rating/count summary or selected-view disclaimer appears under the heading.
+- Bob, Amanda and Elizabeth are absent.
+- Dennis's two couch photos and Laura's shower photo load from the production
+  image pipeline (320x480 and 320x240 rendered WebP variants).
+- 12 Follow Us links render with 44 x 44 px transparent targets, 0px border
+  and 0px radius.
+- The footer service-area paragraph is absent.
+- Tampa page loads with no delivery warning; `/api/lead-readiness` reports
+  `ready: true`.
+- Tampa remains `noindex, nofollow` and absent from the sitemap.
+- Service-area page shows two branch cards.
+- Screenshots: `live-reviews-desktop.png`, `live-reviews-dennis-desktop.png`,
+  `live-reviews-dennis-mobile.png`, `live-footer-desktop.png`,
+  `live-footer-mobile.png`, `live-service-area-desktop.png`,
+  `live-tampa-page-desktop.png`, `live-tampa-page-mobile.png`.
+
+## Remaining
+
+No review text or photograph is missing from the owner-approved seven. Bob,
+Amanda and Elizabeth remain excluded by instruction.

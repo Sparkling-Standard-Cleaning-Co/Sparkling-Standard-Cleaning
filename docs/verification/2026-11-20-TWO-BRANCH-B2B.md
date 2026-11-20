@@ -55,8 +55,8 @@
 - `tests/branch-topology.test.ts`: 4 pass.
 - `tests/pricing-control.test.ts`: 11 pass.
 - `tests/admin.test.ts`: 40 pass.
-- Full unit suite: **906 tests, 905 pass, 1 pre-existing skip, 0 fail**.
-- Browser suite: **225 pass** (after the admin phone overflow repair).
+- Full unit suite: **907 tests, 906 pass, 1 pre-existing skip, 0 fail**.
+- Browser suite: **228 pass** (after the admin phone overflow repair).
 - `astro check`: 0 errors, 0 warnings, 2 pre-existing hints.
 - Build: 37 pages.
 - `npm run validate`: pass (2331 internal links, SEO, QR, GTM, checklist).
@@ -84,8 +84,8 @@
 
 ## Production deployment
 
-- Application code: `d70e656`.
-- Cloudflare Pages production deployment: `f43f0984-9614-41f7-a23d-6761172e764d`.
+- Application code: `1d7c997`.
+- Cloudflare Pages production deployment: `c6469de6-bf79-407c-a2a4-3f54c4051d35`.
 - Migration `0040` was applied to production D1 after the verified pre-migration
   backup and before this deployment.
 - Live checks: `/locations/pensacola/` returns 200 and is in the sitemap;
@@ -93,3 +93,7 @@
   from the sitemap; unauthenticated `/api/admin/branches` returns 401;
   `/api/pricing?branch=branch_tampa` returns 404.
 - CI `validate` and `browser` pass.
+
+## Tampa Bay public inquiry addition
+
+The same production release also replaces the Tampa technical prelaunch page with a premium regional page and a dedicated inquiry form. It captures residential, commercial, church/facility, property-management, STR and realtor interest plus the service address. The server persists the inquiry to `branch_tampa` and creates no booking, quote or payment. Tampa remains noindex and not publicly bookable. See `docs/operations/TAMPA-BAY-LAUNCH.md` and `docs/verification/2026-11-20-REVIEWS-FOOTER.md`.
