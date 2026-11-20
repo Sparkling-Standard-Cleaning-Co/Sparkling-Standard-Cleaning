@@ -21,6 +21,7 @@ async function verifyDatabase(filePath) {
     const sql = await fsp.readFile(filePath, 'utf8');
     if (!/create\s+table/i.test(sql)) throw new Error(`SQL export has no CREATE TABLE statements: ${filePath}`);
     const db = new DatabaseSync(':memory:');
+      db.exec('PRAGMA foreign_keys=OFF;');
     try {
       db.exec(sql);
       const check = db.prepare('PRAGMA integrity_check').get();
@@ -57,7 +58,9 @@ async function main() {
     });
     const databases = [];
     for (const entry of result.entries) {
-      const database = await verifyDatabase(path.join(outDir, entry.path));
+      const database = entry.path.startsWith('database/') || /\.(db|sqlite|sqlite3)$/i.test(entry.path)
+        ? await verifyDatabase(path.join(outDir, entry.path))
+        : null;
       if (database) databases.push({ path: entry.path, ...database });
     }
     const bad = databases.filter((entry) => entry.integrity !== 'ok');

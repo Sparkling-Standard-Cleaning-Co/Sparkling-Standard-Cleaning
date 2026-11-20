@@ -1,7 +1,9 @@
 # Encrypted off-site backups and recovery
 
-**Status (2026-11-19): tooling implemented and verified. Production activation is
-blocked pending owner-supplied backup credentials.**
+**Status (2026-11-19): first real manual backup created, encrypted, uploaded and
+restore-verified.** Cloudflare D1 and the local master workspace are covered.
+Application R2 documents/photos and the scheduled GitHub workflow still require
+owner-supplied R2 S3 credentials.
 
 No password, API token, R2 key or encryption key is stored in this repository.
 
@@ -149,3 +151,51 @@ by GB-month. No paid service is activated without owner approval.
 
 Actual production backup and restore were **not** performed because the
 credentials and destination do not exist yet.
+
+## 8. First real backup - 2026-11-19
+
+### Cloudflare D1
+
+- Export: `d1-pre-0038-0039-2026-11-19.sql` from `sparkling-standard-operations`.
+- Encrypted archive: `sparkling-standard-backup-2026-11-20T01-09-34.ssbk`.
+- Archive size: 218,628 bytes; SHA-256 `268ef6287034ca063611c7728501b8e11dd92212b9b88358188727bffadad37e`.
+- Verified locally and after a remote download: 1 file, 78 tables, SQLite
+  `integrity_check = ok`.
+- Remote location: `sparkling-standard-backups/sparkling-standard/backups/d1/`
+  (archive, encrypted manifest, checksum).
+
+### Local master workspace
+
+- Source: `C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER` (excluding its
+  own `08 BACKUPS & ARCHIVE` folder).
+- Encrypted archive: `sparkling-standard-backup-2026-11-20T01-36-53.ssbk`.
+- Files: 1,681; plaintext 2,498,139,542 bytes; archive 2,498,421,718 bytes.
+- SHA-256 `e1e4ddcbafcfc2a89989ba226cdd0b13ce2ad22d5363a5a2baad4619db0ec75d`.
+- Local verify: all 1,681 files and sizes passed.
+- Restore rehearsal to an isolated temporary directory passed; a PDF opened with
+  `%PDF-` header and a video with `ftypmp42`.
+- Remote storage: the 2.5 GB archive was split into 10 authenticated-encrypted
+  parts (250 MB each) under
+  `sparkling-standard-backups/sparkling-standard/backups/master/parts/`, plus the
+  parts manifest. The parts were downloaded again, rejoined, and the rejoined
+  archive matched the original SHA-256 and passed full verification.
+- Local archive, manifest, checksum and parts remain in
+  `08 BACKUPS & ARCHIVE\MASTER\2026-11-19\`.
+
+### Key custody
+
+The 32-byte key is stored as a Windows DPAPI-protected value at
+`08 BACKUPS & ARCHIVE\keys\d1-backup-key-dpapi.txt`. It is readable only by the
+owner's Windows account on this machine. Copy it into the owner password manager
+and store the recovery copy off-site; a machine loss without that copy makes the
+archives unrecoverable.
+
+### Still uncovered
+
+- Application R2 buckets `sparkling-standard-documents` and
+  `sparkling-standard-lead-photos`: the S3 API requires a dedicated R2 access key
+  and secret. Wrangler OAuth can write objects but cannot list/download every
+  object for archive creation. The owner must create a bucket-scoped R2 S3 token.
+- Scheduled GitHub workflow: needs the GitHub secrets plus the R2 S3 token.
+- A truly independent secondary destination outside the Cloudflare account: the
+  owner must choose and provision it.

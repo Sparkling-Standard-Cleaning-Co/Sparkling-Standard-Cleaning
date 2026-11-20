@@ -32,7 +32,8 @@ async function fixtureSource(): Promise<{ root: string; files: Array<{ absolute:
   await fsp.writeFile(path.join(root, 'papers', 'agreement.txt'), 'Synthetic agreement text\n');
   await fsp.writeFile(path.join(root, 'papers', 'records.json'), JSON.stringify({ synthetic: true }));
   await fsp.writeFile(path.join(root, 'videos', 'sample.bin'), crypto.randomBytes(64 * 1024));
-  await fsp.writeFile(path.join(root, 'database.sql'), 'CREATE TABLE synthetic (id TEXT PRIMARY KEY, value TEXT);\nINSERT INTO synthetic VALUES (\'1\', \'ok\');\n');
+  await fsp.mkdir(path.join(root, 'database'), { recursive: true });
+  await fsp.writeFile(path.join(root, 'database', 'export.sql'), 'CREATE TABLE synthetic (id TEXT PRIMARY KEY, value TEXT);\nINSERT INTO synthetic VALUES (\'1\', \'ok\');\n');
   return { root, files: await listFiles(root) };
 }
 

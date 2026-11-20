@@ -45,14 +45,15 @@ async function main() {
     throw new Error('Provide at least one --source label=path or --d1 file.');
   }
 
+  const excluded = new Set(argValues('--exclude'));
   const entries = [];
   const sourceReports = [];
   for (const source of sources) {
-    const files = await listFiles(source.root);
+    const files = await listFiles(source.root, { exclude: [...excluded] });
     for (const file of files) {
       entries.push({ absolute: file.absolute, path: `${source.label}/${file.path}` });
     }
-    sourceReports.push(await inventory(source.root));
+    sourceReports.push(await inventory(source.root, { exclude: [...excluded] }));
   }
   for (const d1 of d1Files) {
     const stat = await fsp.stat(d1);

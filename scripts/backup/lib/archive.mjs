@@ -40,8 +40,8 @@ export async function listFiles(root, options = {}) {
   return results;
 }
 
-export async function inventory(root) {
-  const files = await listFiles(root);
+export async function inventory(root, options = {}) {
+  const files = await listFiles(root, options);
   let bytes = 0;
   const byExtension = new Map();
   for (const file of files) {
