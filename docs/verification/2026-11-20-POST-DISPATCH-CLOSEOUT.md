@@ -74,8 +74,8 @@
 
 Recorded after deployment:
 
-- Final HEAD `09404df`; Cloudflare Pages production deployment
-  `3082e1b6-d873-4f37-808b-bdb5dedf1b98`.
+- Final HEAD `6ea55d7`; Cloudflare Pages production deployment
+  `5a8e151b-a7fd-4eec-8622-231a197ebe0b`.
 - GitHub CI `validate` and `browser` passed; unit **935** (934 pass, 1 pre-existing skip), browser
   **232** pass.
 - Live homepage title is `Residential & Commercial Cleaning Pensacola, FL | Sparkling Standard`;

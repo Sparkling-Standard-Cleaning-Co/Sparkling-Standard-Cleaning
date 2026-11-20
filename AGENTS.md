@@ -85,8 +85,8 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
 - **Current release (2026-11-20 post-dispatch production closeout):** application code
-  **`09404df`** is live on `production-safe` (Cloudflare Pages production deployment
-  `3082e1b6-d873-4f37-808b-bdb5dedf1b98`). Migration `0042` adds private branch operating origins
+  **`6ea55d7`** is live on `production-safe` (Cloudflare Pages production deployment
+  `5a8e151b-a7fd-4eec-8622-231a197ebe0b`). Migration `0042` adds private branch operating origins
   and travel limits. Branches & Launch now has a Google Places-enabled origin field, owner-only
   readiness checklist and a live-advance gate. Dispatch readiness now reports each employee's exact
   blockers; `team_hayli` has onboarding clearance but still needs service, equipment, transport and
