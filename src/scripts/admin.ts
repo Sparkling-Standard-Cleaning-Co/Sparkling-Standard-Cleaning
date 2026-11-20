@@ -2273,6 +2273,376 @@ async function loadQuickEstimate(): Promise<void> {
   await loadQuickList();
 }
 
+interface DispatchTeamMember {
+  id: string;
+  name: string;
+  status: string;
+  bookable: boolean;
+  role: string;
+  services?: string[];
+  equipment?: string[];
+  transportMode: string;
+  canDrive: boolean;
+  seats: number;
+  canTransportEquipment: boolean;
+  maxWeeklyHours: number;
+  overtimeApproved: boolean;
+  workdays?: number[];
+  workdayStart?: string;
+  workdayEnd?: string;
+  originConfigured: boolean;
+  originAddress: string;
+  originLat: number | null;
+  originLng: number | null;
+  altOriginAddress: string;
+  altOriginLat: number | null;
+  altOriginLng: number | null;
+  notes: string;
+}
+
+interface DispatchDashboard {
+  branchId: string;
+  timezone: string;
+  settings: {
+    mode: string;
+    autoAssignEnabled: boolean;
+    reassignmentRecommendations: boolean;
+    customerReschedulingRecommendations: boolean;
+    paused: boolean;
+    minSavingsCents: number;
+    maxCandidates: number;
+    vehicleCostCentsPerMile: number;
+    travelPayPercent: number;
+    weights: Record<string, number>;
+  };
+  counts: {
+    unassigned: number;
+    assignedToday: number;
+    autoAssignedToday: number;
+    pendingRecommendations: number;
+    coverageExceptions: number;
+    team: number;
+    dispatchReady: number;
+  };
+  unassigned: Array<Record<string, unknown>>;
+  recommendations: Array<Record<string, unknown>>;
+  exceptions: Array<Record<string, unknown>>;
+  decisions: Array<Record<string, unknown>>;
+  lanes: Array<{ id: string; name: string; jobs: Array<Record<string, unknown>> }>;
+  team: DispatchTeamMember[];
+  metadata: {
+    services: Array<{ code: string; label: string }>;
+    equipment: Array<{ code: string; label: string }>;
+    branches: Array<{ id: string; name: string; timezone: string }>;
+  };
+}
+
+let dispatchTeam: DispatchTeamMember[] = [];
+
+function dispatchMemberName(id: string): string {
+  return dispatchTeam.find((member) => member.id === id)?.name ?? id;
+}
+
+function dispatchTeamNames(value: unknown): string {
+  return Array.isArray(value) ? value.map((id) => dispatchMemberName(String(id))).join(', ') : '';
+}
+
+function dispatchBranchValue(): string {
+  return document.querySelector<HTMLSelectElement>('[data-dispatch-branch]')?.value || actor?.branchId || 'branch_pensacola';
+}
+
+function dispatchResult(message: string, kind: 'ok' | 'error' = 'ok'): void {
+  const target = document.querySelector<HTMLElement>('[data-dispatch-result]');
+  if (!target) return;
+  target.textContent = message;
+  target.className = kind === 'error' ? 'admin-error' : 'admin-status-message';
+}
+
+function dispatchSettingsForm(): HTMLFormElement | null {
+  return document.querySelector<HTMLFormElement>('[data-dispatch-settings]');
+}
+
+function dispatchProfileForm(): HTMLFormElement | null {
+  return document.querySelector<HTMLFormElement>('[data-dispatch-profile]');
+}
+
+function setDispatchProfile(memberId: string): void {
+  const form = dispatchProfileForm();
+  const member = dispatchTeam.find((entry) => entry.id === memberId);
+  if (!form || !member) return;
+  const field = (name: string): HTMLInputElement | HTMLSelectElement | null =>
+    form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null;
+  const set = (name: string, value: unknown): void => {
+    const input = field(name);
+    if (input) input.value = value === null || value === undefined ? '' : String(value);
+  };
+  const block = form.querySelector<HTMLElement>('[data-admin-address-block]');
+  block?.dispatchEvent(new Event('admin-address-reset'));
+  set('memberId', member.id);
+  set('transportMode', member.transportMode);
+  set('seats', member.seats);
+  set('maxWeeklyHours', member.maxWeeklyHours);
+  set('workdayStart', member.workdayStart ?? '07:00');
+  set('workdayEnd', member.workdayEnd ?? '18:00');
+  set('notes', member.notes);
+  for (const box of form.querySelectorAll<HTMLInputElement>('input[name="workdays"]')) box.checked = (member.workdays ?? []).includes(Number(box.value));
+  const drive = field('canDrive');
+  if (drive instanceof HTMLInputElement) drive.checked = member.canDrive;
+  const equipment = field('canTransportEquipment');
+  if (equipment instanceof HTMLInputElement) equipment.checked = member.canTransportEquipment;
+  const overtime = field('overtimeApproved');
+  if (overtime instanceof HTMLInputElement) overtime.checked = member.overtimeApproved;
+  for (const box of form.querySelectorAll<HTMLInputElement>('input[name="services"]')) box.checked = (member.services ?? []).includes(box.value);
+  for (const box of form.querySelectorAll<HTMLInputElement>('input[name="equipment"]')) box.checked = (member.equipment ?? []).includes(box.value);
+  set('addressLine1', member.originAddress);
+  set('latitude', member.originLat);
+  set('longitude', member.originLng);
+  const status = form.querySelector<HTMLElement>('[data-admin-address-status]');
+  if (status) {
+    status.textContent = member.originConfigured
+      ? 'Verified dispatch origin is saved.'
+      : 'No dispatch origin is saved. Automatic assignment will block until verified.';
+    status.className = 'admin-address-status admin-address-status--muted';
+  }
+}
+
+async function loadDispatch(): Promise<void> {
+  const branchSelect = document.querySelector<HTMLSelectElement>('[data-dispatch-branch]');
+  if (!branchSelect) return;
+  const branchId = branchSelect.value || actor?.branchId || 'branch_pensacola';
+  const data = await api<DispatchDashboard>('/api/admin/dispatch?branchId=' + encodeURIComponent(branchId));
+  dispatchTeam = data.team;
+  if (branchSelect.options.length <= 1) {
+    branchSelect.innerHTML = data.metadata.branches
+      .map((branch) => '<option value="' + esc(branch.id) + '">' + esc(branch.name) + ' - ' + esc(branch.timezone) + '</option>')
+      .join('');
+  }
+  branchSelect.value = branchId;
+  const hiddenBranch = dispatchProfileForm()?.elements.namedItem('branchId') as HTMLInputElement | null;
+  if (hiddenBranch) hiddenBranch.value = branchId;
+  const form = dispatchSettingsForm();
+  if (form) {
+    const field = (name: string): HTMLInputElement | HTMLSelectElement | null =>
+      form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null;
+    const mode = field('mode');
+    if (mode) mode.value = data.settings.mode;
+    for (const [name, value] of [
+      ['autoAssignEnabled', data.settings.autoAssignEnabled],
+      ['paused', data.settings.paused],
+      ['reassignmentRecommendations', data.settings.reassignmentRecommendations],
+    ] as Array<[string, boolean]>) {
+      const box = field(name);
+      if (box instanceof HTMLInputElement) box.checked = value;
+    }
+    const savings = field('minSavingsCents');
+    if (savings) savings.value = String(data.settings.minSavingsCents / 100);
+    const maxCandidates = field('maxCandidates');
+    if (maxCandidates) maxCandidates.value = String(data.settings.maxCandidates);
+    const mileage = field('vehicleCostCentsPerMile');
+    if (mileage) mileage.value = String(data.settings.vehicleCostCentsPerMile);
+    const travel = field('travelPayPercent');
+    if (travel) travel.value = String(data.settings.travelPayPercent);
+  }
+  const weights = document.querySelector<HTMLFormElement>('[data-dispatch-weights]');
+  if (weights) {
+    for (const [name, value] of Object.entries(data.settings.weights)) {
+      const input = weights.elements.namedItem(name) as HTMLInputElement | null;
+      if (input) input.value = String(value);
+    }
+  }
+  const kpis = document.querySelector<HTMLElement>('[data-dispatch-kpis]');
+  if (kpis) {
+    kpis.innerHTML = [
+      ['Unassigned', data.counts.unassigned],
+      ['Assigned today', data.counts.assignedToday],
+      ['Auto-assigned today', data.counts.autoAssignedToday],
+      ['Recommendations', data.counts.pendingRecommendations],
+      ['Coverage exceptions', data.counts.coverageExceptions],
+      ['Dispatch-ready staff', data.counts.dispatchReady + '/' + data.counts.team],
+    ].map(([label, value]) =>
+      '<div class="admin-dispatch-kpi"><strong>' + esc(value) + '</strong><span>' + esc(label) + '</span></div>',
+    ).join('');
+  }
+  const unassigned = document.querySelector<HTMLElement>('[data-admin-dispatch-unassigned]');
+  if (unassigned) {
+    renderTable(unassigned, ['When', 'Reference', 'Customer', 'Service', 'Crew', 'Action'], data.unassigned.map((job) => [
+      esc(dateTime(job.startAt, branchId)),
+      esc(job.reference),
+      esc(job.customer),
+      esc(job.serviceCode),
+      esc(job.crewSize),
+      '<span class="admin-muted">Use Jobs below</span>',
+    ]), 'No unassigned jobs in the dispatch window.');
+  }
+  const recommendations = document.querySelector<HTMLElement>('[data-admin-dispatch-recommendations]');
+  if (recommendations) {
+    recommendations.innerHTML = data.recommendations.length
+      ? data.recommendations.map((entry) =>
+          '<div class="admin-record"><p><strong>' + esc(entry.reference ?? entry.appointment_id) + '</strong> - ' + esc(entry.reason ?? '') + '</p>' +
+          '<p class="admin-muted">Current: ' + esc(dispatchTeamNames(entry.currentTeam)) + ' | Proposed: ' + esc(dispatchTeamNames(entry.chosenTeam)) + '</p>' +
+          '<div class="admin-actions"><button class="btn btn--primary btn--small" type="button" data-admin-action="dispatch-approve" data-id="' + esc(entry.id) + '">Approve</button>' +
+          '<button class="btn btn--ghost btn--small" type="button" data-admin-action="dispatch-reject" data-id="' + esc(entry.id) + '">Reject</button>' +
+          '<button class="btn btn--ghost btn--small" type="button" data-admin-action="dispatch-defer" data-id="' + esc(entry.id) + '">Defer</button></div></div>',
+        ).join('')
+      : '<p class="admin-muted">No pending reassignment recommendations. Existing assignments are never changed automatically.</p>';
+  }
+  const exceptions = document.querySelector<HTMLElement>('[data-admin-dispatch-exceptions]');
+  if (exceptions) {
+    exceptions.innerHTML = data.exceptions.length
+      ? data.exceptions.map((entry) =>
+          '<div class="admin-dispatch-warning"><strong>' + esc(entry.reference ?? entry.appointment_id) + '</strong> - ' + esc(entry.reason ?? 'Coverage exception') + '</div>',
+        ).join('')
+      : '<p class="admin-muted">No open coverage exceptions.</p>';
+  }
+  const lanes = document.querySelector<HTMLElement>('[data-admin-dispatch-lanes]');
+  if (lanes) {
+    lanes.innerHTML = '<div class="admin-dispatch-lanes">' + data.lanes.map((lane) =>
+      '<div class="admin-dispatch-lane"><h4>' + esc(lane.name) + '</h4>' + (lane.jobs.length
+        ? lane.jobs.map((job) =>
+            '<div class="admin-dispatch-job"><strong>' + esc(dateTime(job.startAt, branchId)) + ' - ' + esc(job.reference) + '</strong>' +
+            '<span>' + esc(job.customer) + ' - ' + esc(job.location) + '</span></div>',
+          ).join('')
+        : '<p class="admin-muted">No jobs in this window.</p>') + '</div>',
+    ).join('') + '</div>';
+  }
+  const log = document.querySelector<HTMLElement>('[data-admin-dispatch-log]');
+  if (log) {
+    renderTable(log, ['Created', 'Job', 'Decision', 'Status', 'Calendar', 'Reason', 'Alternatives', 'Action'], data.decisions.map((entry) => [
+      esc(dateTime(entry.createdAt, branchId)),
+      esc(entry.reference ?? entry.appointmentId),
+      esc(titleCase(entry.kind)),
+      esc(titleCase(entry.status)),
+      esc(entry.calendarStatus ?? '-'),
+      esc(entry.reason ?? '-'),
+      esc(entry.candidateNames || '-'),
+      entry.calendarStatus === 'failed'
+        ? '<button class="btn btn--ghost btn--small" type="button" data-admin-action="dispatch-retry-calendar" data-id="' + esc(entry.id) + '">Retry calendar</button>'
+        : '-',
+    ]), 'No dispatch decisions recorded yet.');
+  }
+  const profileSelect = document.querySelector<HTMLSelectElement>('[data-dispatch-profile-select]');
+  if (profileSelect) {
+    const selected = profileSelect.value;
+    profileSelect.innerHTML = '<option value="">Choose a team member</option>' + data.team
+      .map((member) => '<option value="' + esc(member.id) + '">' + esc(member.name) + ' - ' + esc(member.status) + '</option>')
+      .join('');
+    if (selected && data.team.some((member) => member.id === selected)) {
+      profileSelect.value = selected;
+      setDispatchProfile(selected);
+    }
+  }
+}
+
+async function dispatchAction(body: Record<string, unknown>): Promise<void> {
+  try {
+    const result = await api<{ summary?: Record<string, unknown> }>('/api/admin/dispatch', {
+      method: 'POST',
+      body: JSON.stringify({ ...body, branchId: dispatchBranchValue() }),
+    });
+    const summary = result.summary;
+    if (summary) {
+      dispatchResult(
+        'Scanned ' + String(summary.scanned ?? 0) +
+        ' jobs, assigned ' + String(summary.assigned ?? 0) +
+        ', exceptions ' + String(summary.exceptions ?? 0) +
+        ', recommendations ' + String(summary.recommendations ?? 0) + '.',
+      );
+    } else {
+      dispatchResult('Dispatch updated.');
+    }
+    await loadDispatch();
+  } catch (error) {
+    dispatchResult(friendly(error), 'error');
+  }
+}
+
+document.querySelector<HTMLSelectElement>('[data-dispatch-branch]')?.addEventListener('change', () => {
+  void loadDispatch().catch((error) => setAppError(friendly(error)));
+});
+
+document.querySelector<HTMLSelectElement>('[data-dispatch-profile-select]')?.addEventListener('change', (event) => {
+  const value = (event.target as HTMLSelectElement).value;
+  if (value) setDispatchProfile(value);
+});
+
+dispatchSettingsForm()?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const data = new FormData(form);
+  void dispatchAction({
+    action: 'update_settings',
+    mode: String(data.get('mode') ?? 'analysis_only'),
+    autoAssignEnabled: data.get('autoAssignEnabled') === 'on',
+    paused: data.get('paused') === 'on',
+    reassignmentRecommendations: data.get('reassignmentRecommendations') === 'on',
+    customerReschedulingRecommendations: false,
+    minSavingsCents: Math.round(Number(data.get('minSavingsCents') ?? 0) * 100),
+    maxCandidates: Number(data.get('maxCandidates') ?? 8),
+    vehicleCostCentsPerMile: Number(data.get('vehicleCostCentsPerMile') ?? 0),
+    travelPayPercent: Number(data.get('travelPayPercent') ?? 0),
+  });
+});
+
+document.querySelector<HTMLFormElement>('[data-dispatch-weights]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const data = new FormData(form);
+  void dispatchAction({
+    action: 'update_settings',
+    weights: {
+      travel: Number(data.get('travel') ?? 1),
+      miles: Number(data.get('miles') ?? 0.2),
+      labor: Number(data.get('labor') ?? 0.1),
+      workload: Number(data.get('workload') ?? 0.5),
+      continuity: Number(data.get('continuity') ?? 12),
+      shared: Number(data.get('shared') ?? 0),
+    },
+  });
+});
+
+dispatchProfileForm()?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const data = new FormData(form);
+  const memberId = String(data.get('memberId') ?? '');
+  if (!memberId) {
+    dispatchResult('Choose a team member before saving a dispatch profile.', 'error');
+    return;
+  }
+  const services = [...form.querySelectorAll<HTMLInputElement>('input[name="services"]:checked')].map((box) => box.value);
+  const equipment = [...form.querySelectorAll<HTMLInputElement>('input[name="equipment"]:checked')].map((box) => box.value);
+  try {
+    await api('/api/admin/dispatch', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'update_profile',
+        branchId: dispatchBranchValue(),
+        memberId,
+        services,
+        equipment,
+        transportMode: String(data.get('transportMode') ?? 'unknown'),
+        canDrive: data.get('canDrive') === 'on',
+        seats: Number(data.get('seats') ?? 0),
+        canTransportEquipment: data.get('canTransportEquipment') === 'on',
+        maxWeeklyHours: Number(data.get('maxWeeklyHours') ?? 40),
+        overtimeApproved: data.get('overtimeApproved') === 'on',
+        workdays: [...form.querySelectorAll<HTMLInputElement>('input[name="workdays"]:checked')].map((box) => Number(box.value)),
+        workdayStart: String(data.get('workdayStart') ?? '07:00'),
+        workdayEnd: String(data.get('workdayEnd') ?? '18:00'),
+        originAddress: String(data.get('addressLine1') ?? ''),
+        originLat: data.get('latitude') ? Number(data.get('latitude')) : null,
+        originLng: data.get('longitude') ? Number(data.get('longitude')) : null,
+        originPlaceId: String(data.get('placeId') ?? ''),
+        notes: String(data.get('notes') ?? ''),
+      }),
+    });
+    dispatchResult('Dispatch profile saved for ' + dispatchMemberName(memberId) + '.');
+    await loadDispatch();
+  } catch (error) {
+    dispatchResult(friendly(error), 'error');
+  }
+});
+
 async function loadJobs(): Promise<void> {
   const data = await api<{ jobs?: Array<Record<string, unknown>>; team?: Array<Record<string, unknown>> }>('/api/admin/operations?view=jobs');
   const team = data.team ?? [];
@@ -2288,6 +2658,7 @@ async function loadJobs(): Promise<void> {
       return `<div class="admin-record admin-job"><div><strong>${esc(dateTime(job.start_at))}</strong> — ${esc(job.reference)} — ${esc([job.first_name, job.last_name].filter(Boolean).join(' '))}<p class="admin-muted">${esc([job.line1, job.city].filter(Boolean).join(', '))}${crewDetail ? ` — ${crewDetail}` : ''}</p></div><div class="admin-actions">${can('job.write') ? `<select class="admin-select" data-job-status="${esc(job.id)}">${['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'].map((status) => `<option value="${status}"${status === job.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-save" data-id="${esc(job.id)}">Save</button><select class="admin-select" data-job-team="${esc(job.id)}"><option value="">Assign cleaner</option>${team.map((member) => `<option value="${esc(member.id)}">${esc(member.display_name)}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-assign" data-id="${esc(job.id)}">Add</button>` : `<span class="admin-status">${esc(titleCase(job.status))}</span>`}<button class="btn btn--secondary btn--small" type="button" data-admin-action="job-checklist" data-id="${esc(job.id)}">Checklist</button></div></div>`;
     }).join('') || '<div class="admin-empty">No jobs are recorded yet.</div>';
   }
+  await loadDispatch().catch((error) => setAppError(friendly(error)));
   const teamTarget = document.querySelector<HTMLElement>('[data-admin-team]');
   if (teamTarget) {
     renderTable(teamTarget, ['Name', 'Email', 'Qualification', 'Bookable', 'Status', 'Actions'], team.map((member) => {
@@ -3919,6 +4290,37 @@ document.addEventListener('click', (event) => {
   if (!target) return;
   const actionName = target.dataset.adminAction ?? '';
   const id = target.dataset.id ?? '';
+  if (actionName === 'dispatch-run-analysis') { void dispatchAction({ action: 'run_analysis' }); return; }
+  if (actionName === 'dispatch-run-auto') {
+    if (window.confirm('Automatically staff eligible unassigned jobs? Existing assignments and customer times will not change.')) {
+      void dispatchAction({ action: 'run_automatic' });
+    }
+    return;
+  }
+  if (actionName === 'dispatch-add-timeoff') {
+    const form = dispatchProfileForm();
+    if (!form) return;
+    const data = new FormData(form);
+    const memberId = String(data.get('memberId') ?? '');
+    const from = String(data.get('unavailableFrom') ?? '');
+    const to = String(data.get('unavailableTo') ?? '');
+    if (!memberId || !from || !to) {
+      dispatchResult('Choose a team member and both unavailability times.', 'error');
+      return;
+    }
+    void dispatchAction({
+      action: 'add_time_off',
+      memberId,
+      from,
+      to,
+      reason: String(data.get('unavailableReason') ?? ''),
+    });
+    return;
+  }
+  if (actionName === 'dispatch-retry-calendar') { void dispatchAction({ action: 'retry_calendar', decisionId: id }); return; }
+  if (actionName === 'dispatch-approve') { void dispatchAction({ action: 'approve_recommendation', decisionId: id }); return; }
+  if (actionName === 'dispatch-reject') { void dispatchAction({ action: 'reject_recommendation', decisionId: id }); return; }
+  if (actionName === 'dispatch-defer') { void dispatchAction({ action: 'defer_recommendation', decisionId: id }); return; }
   if (actionName === 'time-load') void loadTimekeeping();
   if (actionName === 'time-export') {
     const week = document.querySelector<HTMLInputElement>('[data-time-week]')?.value ?? '';

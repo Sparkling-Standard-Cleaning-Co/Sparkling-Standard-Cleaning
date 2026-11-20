@@ -42,6 +42,7 @@ async function open(width, height = 900, options = {}) {
   const context = await browser.newContext({ viewport: { width, height }, ...options });
   const page = await context.newPage();
   await page.goto(BASE + '/', { waitUntil: 'load' });
+  await page.evaluate(() => document.fonts.ready);
   await page.locator('#reviews').scrollIntoViewIfNeeded();
   return { context, page };
 }

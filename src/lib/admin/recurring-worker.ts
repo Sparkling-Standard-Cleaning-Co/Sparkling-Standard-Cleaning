@@ -7,6 +7,7 @@
 import type { D1Database } from './d1.ts';
 import type { AdminActor } from './operations.ts';
 import { syncRecurringPlan, type RecurringEnv } from './recurring-schedule.ts';
+import { runDispatch, type DispatchEnv } from '../dispatch/service.ts';
 
 const SYSTEM_ACTOR: AdminActor = {
   id: 'system',
@@ -161,6 +162,31 @@ export async function runRecurringReplenishment(
         summary.errors += 1;
         summary.detail.push({ planId, status: 'exception', error: (error as Error).message });
       }
+    }
+    try {
+      const dispatchBranches = await db
+        .prepare(
+          "SELECT branch_id FROM dispatch_settings WHERE auto_assign_enabled = 1 AND paused = 0 AND automation_mode = 'automatic_unassigned'",
+        )
+        .all<{ branch_id: string }>();
+      for (const row of dispatchBranches.results ?? []) {
+        const dispatch = await runDispatch(env as unknown as DispatchEnv, db, SYSTEM_ACTOR, {
+          branchId: row.branch_id,
+          apply: true,
+        });
+        summary.detail.push({
+          dispatch: {
+            branchId: row.branch_id,
+            scanned: dispatch.scanned,
+            assigned: dispatch.assigned,
+            exceptions: dispatch.exceptions,
+            recommendations: dispatch.recommendations,
+          },
+        });
+      }
+    } catch (error) {
+      summary.errors += 1;
+      summary.detail.push({ dispatchError: (error as Error).message });
     }
     summary.ok = summary.errors === 0;
     await finishRun(db, claim.id, summary.ok ? 'completed' : 'failed', summary);

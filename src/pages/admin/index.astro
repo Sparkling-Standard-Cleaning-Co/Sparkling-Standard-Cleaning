@@ -449,6 +449,129 @@ import {
           </section>
 
           <section class="admin-view" data-admin-view="jobs" hidden>
+            <div class="admin-card admin-dispatch">
+              <div class="admin-detail-head">
+                <div>
+                  <h2 class="admin-section-title">Intelligent Dispatch</h2>
+                  <p class="admin-muted">Automatic assignment is limited to unassigned jobs. Existing assignments and customer appointment times are never changed automatically.</p>
+                </div>
+                <select class="admin-select" data-dispatch-branch aria-label="Dispatch branch"><option value="branch_pensacola">Pensacola</option></select>
+              </div>
+              <p class="admin-status-message" data-dispatch-result role="status" aria-live="polite"></p>
+              <div class="admin-dispatch-kpis" data-dispatch-kpis></div>
+              <form class="admin-form admin-form--grid" data-dispatch-settings style="margin-top:1rem;">
+                <label>Automation mode
+                  <select name="mode">
+                    <option value="analysis_only">Analysis only</option>
+                    <option value="automatic_unassigned">Automatically staff unassigned jobs</option>
+                  </select>
+                </label>
+                <label class="admin-check"><input type="checkbox" name="autoAssignEnabled" /> Enable automatic initial assignment</label>
+                <label class="admin-check"><input type="checkbox" name="paused" /> Emergency pause</label>
+                <label class="admin-check"><input type="checkbox" name="reassignmentRecommendations" /> Recommend improvements to existing assignments</label>
+                <label class="admin-check"><input type="checkbox" name="customerReschedulingRecommendations" disabled /> Recommend customer rescheduling (not enabled)</label>
+                <label>Minimum worthwhile saving (USD) <input name="minSavingsCents" type="number" min="0" step="0.01" /></label>
+                <label>Maximum candidates <input name="maxCandidates" type="number" min="1" max="20" step="1" /></label>
+                <label>Vehicle cost (cents per mile, optional) <input name="vehicleCostCentsPerMile" type="number" min="0" step="1" /></label>
+                <label>Compensable travel pay (%) <input name="travelPayPercent" type="number" min="0" max="100" step="1" /></label>
+                <div class="admin-actions">
+                  <button class="btn btn--secondary btn--small" type="submit">Save dispatch controls</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="dispatch-run-analysis">Run read-only analysis</button>
+                  <button class="btn btn--primary btn--small" type="button" data-admin-action="dispatch-run-auto">Run automatic assignment</button>
+                </div>
+              </form>
+              <details class="admin-detail-toggle" style="margin-top:1rem;">
+                <summary>Optimizer weights</summary>
+                <form class="admin-form admin-form--grid" data-dispatch-weights>
+                  <label>Travel minutes <input name="travel" type="number" min="0" step="0.1" /></label>
+                  <label>Travel miles <input name="miles" type="number" min="0" step="0.1" /></label>
+                  <label>Labor cost <input name="labor" type="number" min="0" step="0.1" /></label>
+                  <label>Weekly workload <input name="workload" type="number" min="0" step="0.1" /></label>
+                  <label>Customer continuity <input name="continuity" type="number" min="0" step="0.1" /></label>
+                  <label>Shared transport <input name="shared" type="number" min="0" step="0.1" /></label>
+                  <button class="btn btn--secondary btn--small" type="submit">Save weights</button>
+                </form>
+              </details>
+              <h3 style="margin-top:1rem;">Coverage queue</h3>
+              <div data-admin-dispatch-unassigned></div>
+              <h3>Reassignment recommendations</h3>
+              <div data-admin-dispatch-recommendations></div>
+              <h3>Coverage exceptions</h3>
+              <div data-admin-dispatch-exceptions></div>
+              <h3>Employee lanes</h3>
+              <div data-admin-dispatch-lanes></div>
+              <h3>Dispatch decision log</h3>
+              <div data-admin-dispatch-log></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Employee Dispatch Profile</h2>
+              <p class="admin-muted">Private origins are visible only to the owner and are never shown to customers or coworkers. Automatic assignment stays blocked until qualifications, equipment and transport are complete.</p>
+              <form class="admin-form admin-form--grid" data-dispatch-profile>
+                <input type="hidden" name="memberId" />
+                <input type="hidden" name="branchId" value="branch_pensacola" />
+                <label>Team member <select name="profileMember" data-dispatch-profile-select required><option value="">Choose a team member</option></select></label>
+                <fieldset class="admin-field--wide"><legend>Approved service categories</legend>
+                  <label class="admin-check"><input type="checkbox" name="services" value="standard" /> Residential cleaning</label>
+                  <label class="admin-check"><input type="checkbox" name="services" value="deep" /> Deep cleaning</label>
+                  <label class="admin-check"><input type="checkbox" name="services" value="move_in_out" /> Move-in / move-out</label>
+                  <label class="admin-check"><input type="checkbox" name="services" value="str_turnover" /> STR turnover</label>
+                  <label class="admin-check"><input type="checkbox" name="services" value="commercial-cleaning" /> Commercial cleaning</label>
+                  <label class="admin-check"><input type="checkbox" name="services" value="church-cleaning" /> Church cleaning</label>
+                </fieldset>
+                <fieldset class="admin-field--wide"><legend>Approved equipment</legend>
+                  <label class="admin-check"><input type="checkbox" name="equipment" value="standard-kit" /> Standard residential kit</label>
+                  <label class="admin-check"><input type="checkbox" name="equipment" value="deep-kit" /> Deep-clean equipment</label>
+                  <label class="admin-check"><input type="checkbox" name="equipment" value="commercial-kit" /> Commercial equipment</label>
+                </fieldset>
+                <label>Transportation
+                  <select name="transportMode">
+                    <option value="unknown">Not configured</option>
+                    <option value="independent">Independent driver</option>
+                    <option value="shared">Shared crew transport</option>
+                    <option value="none">Needs transportation</option>
+                  </select>
+                </label>
+                <label class="admin-check"><input type="checkbox" name="canDrive" /> Can drive others</label>
+                <label>Vehicle seats <input name="seats" type="number" min="0" max="12" step="1" /></label>
+                <label class="admin-check"><input type="checkbox" name="canTransportEquipment" /> Can transport required equipment</label>
+                <label>Maximum weekly hours <input name="maxWeeklyHours" type="number" min="1" max="80" step="0.5" /></label>
+                <label class="admin-check"><input type="checkbox" name="overtimeApproved" /> Overtime approved</label>
+                <fieldset class="admin-field--wide"><legend>Regular workdays</legend>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="0" /> Sunday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="1" /> Monday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="2" /> Tuesday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="3" /> Wednesday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="4" /> Thursday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="5" /> Friday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="6" /> Saturday</label>
+                </fieldset>
+                <label>Regular shift start <input name="workdayStart" type="time" step="900" /></label>
+                <label>Regular shift end <input name="workdayEnd" type="time" step="900" /></label>
+                <div class="admin-field--wide admin-address-block" data-admin-address-block>
+                  <div class="admin-address-grid">
+                    <label class="admin-field--wide">Dispatch origin
+                      <input name="addressLine1" maxlength="200" autocomplete="off" data-admin-address-input placeholder="Start typing the approved dispatch address" />
+                    </label>
+                    <label>City <input name="city" maxlength="120" data-admin-address-city /></label>
+                    <label>State <select name="state" data-admin-address-state><option value="FL">Florida</option><option value="AL">Alabama</option></select></label>
+                    <label>ZIP <input name="postalCode" inputmode="numeric" maxlength="10" data-admin-address-zip /></label>
+                    <input type="hidden" name="latitude" data-admin-address-lat />
+                    <input type="hidden" name="longitude" data-admin-address-lng />
+                    <input type="hidden" name="precision" data-admin-address-precision />
+                    <input type="hidden" name="placeId" data-admin-address-place-id />
+                  </div>
+                  <p class="admin-address-status" data-admin-address-status role="status" aria-live="polite"></p>
+                </div>
+                <fieldset class="admin-field--wide"><legend>Temporary unavailability</legend>
+                  <label>Starts <input name="unavailableFrom" type="datetime-local" /></label>
+                  <label>Ends <input name="unavailableTo" type="datetime-local" /></label>
+                  <label>Reason <input name="unavailableReason" maxlength="300" /></label>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="dispatch-add-timeoff">Add time off</button>
+                </fieldset>
+                <label class="admin-field--wide">Dispatch notes <textarea name="notes" rows="2"></textarea></label>
+                <button class="btn btn--secondary btn--small" type="submit">Save dispatch profile</button>
+              </form>
+            </div>
             <div class="admin-card">
               <h2 class="admin-section-title">Jobs</h2>
               <div data-admin-jobs></div>

@@ -151,7 +151,7 @@ test('the admin address field offers predictions, keyboard selection and autofil
   await page.waitForSelector('.admin-address-menu__option');
   const options = await page.locator('.admin-address-menu__option').count();
   assert.equal(options, 2);
-  const menuText = await page.textContent('.admin-address-menu');
+  const menuText = await page.textContent('.admin-address-menu:not([hidden])');
   assert.match(menuText ?? '', /Address lookup/);
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
@@ -176,7 +176,7 @@ test('the admin address field offers predictions, keyboard selection and autofil
   await page.setViewportSize({ width: 390, height: 844 });
   await page.fill('[data-quick-form] input[name="addressLine1"]', '1000 Bay');
   await page.waitForSelector('.admin-address-menu__option');
-  const menu = await page.locator('.admin-address-menu').boundingBox();
+  const menu = await page.locator('.admin-address-menu:not([hidden])').last().boundingBox();
   assert.ok(menu);
   assert.ok(menu.x >= 0 && menu.x + menu.width <= 390, `menu stays inside the phone viewport: ${JSON.stringify(menu)}`);
   await context.close();
