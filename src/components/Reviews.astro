@@ -253,9 +253,10 @@ const paragraphsOf = (quote: string): string[] =>
         const quote = card.querySelector<HTMLElement>('[data-review-quote]');
         const expand = card.querySelector<HTMLButtonElement>('[data-review-expand]');
         if (!quote || !expand) continue;
-        const clamped = quote.scrollHeight > quote.clientHeight + 2;
-        card.dataset.clamped = clamped ? 'true' : 'false';
-        expand.hidden = !clamped;
+        const overflow = quote.scrollHeight > quote.clientHeight + 2;
+        const needsFullText = overflow || quote.textContent.trim().length > 300;
+        card.dataset.clamped = overflow ? 'true' : 'false';
+        expand.hidden = !needsFullText;
       }
     };
 
