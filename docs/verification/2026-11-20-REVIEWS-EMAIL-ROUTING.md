@@ -89,9 +89,12 @@ Not verified from this environment:
 
 ## Deployment
 
-Recorded after release:
-
-- Application commit, Cloudflare Pages deployment ID and live email/reviews verification.
+- Final application HEAD: `061e167`.
+- Cloudflare Pages deployment: `46a8416a-5dd8-49dc-9748-6f65d03635b7`.
+- Live homepage/contact/careers public email resolves to `customer-service@sparkling-standard.com`; the hiring link is Cloudflare-obfuscated on the public page and targets `hiring@sparkling-standard.com`.
+- Live review cards are equal height (496 px at 1440), use `overflow: hidden` without an internal scroller, and expose Read full review.
+- Tampa public URL remains 404 and the service-area page has no Tampa card.
+- No live password reset, customer email, applicant email, charge or refund was sent.
 
 ## Remaining work
 

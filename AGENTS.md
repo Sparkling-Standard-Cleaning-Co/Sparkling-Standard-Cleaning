@@ -84,7 +84,18 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-20 document library and Tampa visibility gate):** application code
+- **Current release (2026-11-20 reviews and department email routing):** application code
+  **`061e167`** is live on `production-safe` (Cloudflare Pages production deployment
+  `46a8416a-5dd8-49dc-9748-6f65d03635b7`). The reviews carousel was rebuilt around readable excerpts,
+  no internal scrolling, equal-height cards and an accessible full-review dialog; live cards are
+  496 px at 1440 and photographs stay inside the card. Public contact now defaults to
+  `customer-service@sparkling-standard.com`; invoices and receipts reply to
+  `billing@sparkling-standard.com`; careers uses `hiring@sparkling-standard.com`; owner alerts
+  remain private. DNS shows Google Workspace MX, Google DKIM and DMARC p=none. CI passed; unit
+  **944** (943 pass, 1 pre-existing skip), browser **233** pass. No live message, charge or refund.
+  Evidence: `docs/verification/2026-11-20-REVIEWS-EMAIL-ROUTING.md`,
+  `docs/operations/EMAIL-ROUTING.md`.
+- **Prior release (2026-11-20 document library and Tampa visibility gate):** application code
   **`397be7b`** is live on `production-safe` (Cloudflare Pages production deployment
   `144f1239-5fbc-44a9-b83b-c89d761b150e`). An owner-review Word library was generated from 183
   business documents; 176 contained the old gold-S logo and now use the approved Sparkling STANDARD
@@ -432,6 +443,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Lead capture, notification fields, provider relay | `functions/api/lead.ts`, `src/lib/forms/` | `docs/verification/VERIFICATION.md` |
 | Services, FAQs, checklists, page copy | `src/content/`, `src/content/site/` | `docs/CONTENT-GUIDE.md` |
 | SEO, structured data, sitemap, robots, page ownership | `src/components/BaseHead.astro`, `src/lib/schema.ts`, page files | `docs/seo/SEO-STRATEGY.md`, `docs/operations/SEARCH-CONSOLE-SETUP.md` |
+| Department email routing | `src/config/email-routing.ts`, customer/invoice/receipt mailers, `src/pages/careers.astro` | `docs/operations/EMAIL-ROUTING.md` |
 | Analytics, consent, event taxonomy, attribution | `src/scripts/consent-controller.ts`, `src/lib/analytics/`, `src/lib/attribution.ts` | `docs/analytics/ANALYTICS-SETUP.md`, `docs/analytics/GTM-CONTAINER-SETUP.md` |
 | Visual design, tokens, images, icons, OG image | `src/styles/`, `public/brand/`, `src/assets/images/` | `docs/design/DESIGN-SYSTEM.md`, `docs/design/IMAGE-GUIDE.md`, `docs/design/IMAGE-SOURCE-REGISTER.md` |
 | Document packet builder, variables and template lifecycle | `src/lib/documents/service.ts`, `functions/api/admin/documents.ts`, migration `0038`, `src/pages/admin/index.astro` | `docs/operations/DOCUMENT-MANAGEMENT.md` |
