@@ -11,6 +11,10 @@
 // no third-party carousel library.
 
 import { getCollection } from 'astro:content';
+import { Image } from 'astro:assets';
+import dennisCouch1 from '../assets/images/reviews/dennis-couch-1.webp';
+import dennisCouch2 from '../assets/images/reviews/dennis-couch-2.webp';
+import lauraShower from '../assets/images/reviews/laura-shower.webp';
 import GoogleG from './GoogleG.astro';
 import Icon from './Icon.astro';
 import PremiumIcon from './PremiumIcon.astro';
@@ -26,8 +30,11 @@ const { heading = 'Kind Words From Our Customers', eyebrow = 'Reviews' } = Astro
 const reviews = (await getCollection('reviews')).sort((a, b) => a.data.order - b.data.order);
 const profileUrl = isPending(business.reviews.profileUrl) ? null : business.reviews.profileUrl;
 const total = reviews.length;
-const overallRating = business.reviews.overallRating;
-const totalGoogleReviews = business.reviews.totalGoogleReviews;
+const photoAssets = {
+  'dennis-couch-1': dennisCouch1,
+  'dennis-couch-2': dennisCouch2,
+  'laura-shower': lauraShower,
+} as const;
 
 // Split authentic wording into readable paragraphs on blank lines. The quote
 // itself is never edited, truncated or "improved" — only whitespace between
@@ -49,17 +56,6 @@ const paragraphsOf = (quote: string): string[] =>
           </div>
           <p class="eyebrow">{eyebrow}</p>
           <h2 id="reviews-heading">{heading}</h2>
-          <p class="reviews-summary">
-            <span class="reviews-summary__rating">
-              <Icon name="star" size={17} />
-              {overallRating.toFixed(1)}
-            </span>
-            <span>average on Google from {totalGoogleReviews} reviews</span>
-          </p>
-          <p class="reviews-summary__note">
-            Showing {total} verified Google {total === 1 ? 'review' : 'reviews'}. This carousel is a
-            selected view of our profile, not a complete copy.
-          </p>
         </div>
       </div>
 
@@ -115,6 +111,23 @@ const paragraphsOf = (quote: string): string[] =>
                     </p>
                   ))}
                 </div>
+
+                {review.data.photos.length > 0 && (
+                  <div class="review-carousel__photos" data-photo-count={review.data.photos.length}>
+                    {review.data.photos.map((photo) => {
+                      const asset = photoAssets[photo.src as keyof typeof photoAssets];
+                      return asset ? (
+                        <Image
+                          src={asset}
+                          alt={photo.alt}
+                          widths={[300, 480, 720]}
+                          sizes="(max-width: 720px) 80vw, 320px"
+                          loading="lazy"
+                        />
+                      ) : null;
+                    })}
+                  </div>
+                )}
 
                 <footer class="review-carousel__footer">
                   <strong>{review.data.author}</strong>

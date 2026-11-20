@@ -115,6 +115,12 @@ const INQUIRY_TYPE_LABELS: Record<string, string> = {
   short_term_rental: 'Short-term rental turnover',
   commercial_cleaning: 'Commercial cleaning',
   church_cleaning: 'Church cleaning',
+  residential_inquiry: 'Tampa Bay residential interest',
+  commercial_account: 'Tampa Bay commercial account',
+  church_facility: 'Tampa Bay church / facility',
+  property_management: 'Tampa Bay property management',
+  str_opportunity: 'Tampa Bay STR opportunity',
+  realtor_partner: 'Tampa Bay realtor partner',
 };
 
 const ARRIVAL_LABELS: Record<string, string> = {
@@ -501,6 +507,13 @@ export function buildLeadNotification(fields: Record<string, string>): Record<st
     .filter(Boolean)
     .join(' · ');
   add('Summary — Request', summaryRequest);
+  const branchName =
+    text(fields, 'branch_id') === 'branch_tampa'
+      ? 'Tampa Bay'
+      : text(fields, 'branch_id') === 'branch_pensacola'
+        ? 'Pensacola'
+        : '';
+  add('Summary - Branch', branchName, 'branch_id');
   const summaryCustomer = [
     text(fields, 'name'),
     text(fields, 'organization'),

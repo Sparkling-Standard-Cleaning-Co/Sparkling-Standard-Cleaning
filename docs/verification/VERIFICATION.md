@@ -1,8 +1,9 @@
 # Verification status
 
-## Reviews carousel and footer refinement - 2026-11-20
+## Reviews, photographs, footer and Tampa inquiry corrections - 2026-11-20
 
-Seven verified Google reviews now render (Christina, Richard, Laura, Dennis, Amanda, Elizabeth, Rob & Christi) with the verified 5.0 / 10 profile rating shown separately. Bob's review is excluded by owner instruction; K V and S Ismail could not be verified in full because Google hides the remaining reviews from signed-out viewers. The footer Follow Us section is now a boxless integrated row of 12 official social marks on transparent 44px targets, with no white circles, and remains shared across every public page. Unit suite 906 (905 pass, one pre-existing skip); 226 browser tests pass. Application code `d70e656` is live in Cloudflare Pages deployment `f43f0984-9614-41f7-a23d-6761172e764d`. Screenshots: `docs/verification/2026-11-20-reviews-footer/`. Full detail: [`2026-11-20-REVIEWS-FOOTER.md`](2026-11-20-REVIEWS-FOOTER.md).
+The owner-approved carousel now displays seven reviews: Christina, Richard, Laura, Dennis D, K V, S Ismail and Rob & Christi Moore. Bob, Amanda and Elizabeth are excluded. The exact owner-supplied K V and S Ismail text is included, with K V's "bi-monthly" wording preserved. Dennis's two couch photographs and Laura's shower photograph were restored from the public Google review. The former rating/count summary and footer service-area paragraph were removed. Follow Us remains twelve transparent 44px official marks with no white circles. Tampa Bay now has a premium public page with a dedicated branch-assigned inquiry form; it creates a Tampa lead but no booking, quote or payment, and the page remains noindex until launch gates pass. Unit suite 907 (906 pass, one pre-existing skip); 228 browser tests pass. Screenshots: `docs/verification/2026-11-20-reviews-footer/`. Full detail: [`2026-11-20-REVIEWS-FOOTER.md`](2026-11-20-REVIEWS-FOOTER.md).
+
 
 ## Two-branch topology and B2B launchpad - 2026-11-20
 

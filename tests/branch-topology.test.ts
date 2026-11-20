@@ -28,6 +28,7 @@ import { normalizePricingSnapshot } from '../src/lib/pricing/snapshot.ts';
 import { setPathValue } from '../src/lib/pricing/catalog.ts';
 import { onRequestGet as publicPricingGet } from '../functions/api/pricing.ts';
 import { BRANCH_PENSACOLA, BRANCH_TAMPA } from '../src/config/branches.ts';
+import { persistLeadSubmission } from '../src/lib/admin/lead-persistence.ts';
 
 class SqlStatement implements D1PreparedStatement {
   private values: unknown[] = [];
@@ -181,4 +182,34 @@ test('branch setup cannot go live without launch prerequisites and preserves ver
       }),
     (error: unknown) => error instanceof BranchSettingsError && error.code === 'public_slug_in_use',
   );
+});
+
+
+test('a Tampa inquiry is persisted to Tampa without creating a booking', async () => {
+  const db = freshDb();
+  const result = await persistLeadSubmission(db, {
+    name: 'Tampa Test',
+    email: 'tampa-test@example.test',
+    phone: '8135550100',
+    request_type: 'contact',
+    inquiry_type: 'commercial_account',
+    service_address: '100 Test Street',
+    address_city: 'Tampa',
+    address_state: 'FL',
+    zip: '33602',
+    branch_id: BRANCH_TAMPA,
+  });
+  assert.ok(result);
+  const lead = db.raw.prepare('SELECT branch_id FROM leads WHERE id = ?').get(result!.leadId) as { branch_id: string };
+  assert.equal(lead.branch_id, BRANCH_TAMPA);
+  const customer = db.raw.prepare('SELECT primary_branch_id FROM customers WHERE id = ?').get(result!.customerId) as { primary_branch_id: string };
+  assert.equal(customer.primary_branch_id, BRANCH_TAMPA);
+  const property = db.raw.prepare('SELECT branch_id FROM properties WHERE id = ?').get(result!.propertyId) as { branch_id: string };
+  assert.equal(property.branch_id, BRANCH_TAMPA);
+  const requests = db.raw.prepare('SELECT COUNT(*) AS count FROM booking_requests').get() as { count: number };
+  assert.equal(requests.count, 0, 'Tampa inquiry creates no booking request');
+  const tampa = await effectiveBranch(db, BRANCH_TAMPA);
+  assert.equal(tampa?.capabilities.inquiries, true);
+  assert.equal(tampa?.capabilities.publicEstimates, false);
+  assert.equal(tampa?.capabilities.fulfillmentVerified, false);
 });

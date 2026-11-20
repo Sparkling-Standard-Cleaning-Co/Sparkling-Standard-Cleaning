@@ -1,0 +1,79 @@
+﻿---
+// Tampa Bay interest form. This is a branch-assigned inquiry, never a booking,
+// estimate, or payment. The server resolves and stores branch_tampa, creates
+// no appointment and charges nothing.
+---
+<form class="form-card tampa-inquiry" data-lead-form data-variant="tampa" action="#" method="post">
+  <input type="hidden" name="branch_id" value="branch_tampa" />
+  <input type="hidden" name="request_type" value="contact" />
+
+  <p class="form-status" data-delivery-warning role="status" hidden></p>
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="tampa-name">Your name</label>
+      <input class="input" id="tampa-name" name="name" type="text" autocomplete="name" required />
+    </div>
+    <div class="field">
+      <label for="tampa-phone">Phone</label>
+      <input class="input" id="tampa-phone" name="phone" type="tel" autocomplete="tel" required />
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="tampa-email">Email</label>
+    <input class="input" id="tampa-email" name="email" type="email" autocomplete="email" required />
+  </div>
+
+  <div class="field">
+    <label for="tampa-inquiry-type">What is this about?</label>
+    <select class="select" id="tampa-inquiry-type" name="inquiry_type" required>
+      <option value="">Choose one</option>
+      <option value="residential_inquiry">Residential cleaning</option>
+      <option value="commercial_account">Commercial office or facility</option>
+      <option value="church_facility">Church or institutional facility</option>
+      <option value="property_management">Property management / apartments</option>
+      <option value="str_opportunity">Short-term rental / STR</option>
+      <option value="realtor_partner">Realtor or move-out referral</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="tampa-address">Service address</label>
+    <input class="input" id="tampa-address" name="service_address" type="text" autocomplete="street-address" required />
+  </div>
+
+  <div class="field-row field-row--2">
+    <div class="field">
+      <label for="tampa-city">City</label>
+      <input class="input" id="tampa-city" name="address_city" type="text" autocomplete="address-level2" required />
+    </div>
+    <div class="field">
+      <label for="tampa-zip">ZIP</label>
+      <input class="input" id="tampa-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" pattern="[0-9]{5}(-[0-9]{4})?" required />
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="tampa-message">What would you like us to know?</label>
+    <textarea class="textarea" id="tampa-message" name="message" rows="5" required placeholder="Tell us about the space, timing, frequency, or the decision process."></textarea>
+  </div>
+
+  <div class="honeypot" aria-hidden="true">
+    <input id="tampa-extra-ref" name="extra_ref" type="text" tabindex="-1" autocomplete="off" data-lpignore="true" data-1p-ignore data-bwignore data-protonpass-ignore />
+  </div>
+
+  <p class="small text-muted">
+    This is an inquiry, not a confirmed appointment. Tampa Bay availability is being prepared and will be confirmed personally. By sending this message you agree to our <a href="/privacy/">privacy policy</a>.
+  </p>
+
+  <button class="btn btn--primary btn--large btn--block" type="submit" data-cta="tampa-inquiry-submit">
+    Send Tampa Bay Inquiry
+  </button>
+
+  <p class="form-status" data-form-status role="status" aria-live="polite"></p>
+</form>
+
+<script>
+  import '../scripts/lead-forms';
+</script>

@@ -131,7 +131,7 @@ test('footer has distinct read and leave review actions and the approved review 
   }
 });
 
-test('reviews use larger stars with a source label and authentic first-name attributions', async () => {
+test('reviews use larger stars with a source label and owner-approved attributions', async () => {
   const { context, page } = await open('/');
   try {
     const stars = page.locator('.review-card__stars svg');
@@ -139,7 +139,7 @@ test('reviews use larger stars with a source label and authentic first-name attr
     const width = await stars.first().getAttribute('width');
     assert.equal(width, '22');
     assert.equal(await page.locator('.review-carousel__source').count(), 7);
-    const text = await page.locator('#reviews').innerText();
+    const text = (await page.locator('#reviews').textContent()) ?? '';
     assert.match(text, /Christina/);
     assert.match(text, /Richard/);
     assert.match(text, /Laura/);

@@ -1,117 +1,104 @@
-﻿# Reviews carousel and footer refinement - 2026-11-20
+﻿# Reviews, photographs, footer and Tampa inquiry corrections - 2026-11-20
 
-## Review audit
+## Owner-approved review set
 
-The Google Business Profile currently shows **5.0 from 10 reviews**.
-Google Maps exposes five reviews to a signed-out browser; the remaining five
-require a signed-in Google session or the owner's screenshots.
+The owner-approved carousel displays exactly seven reviews:
 
-Verified and included (7):
+1. Christina - residential cleaning
+2. Richard - deep cleaning
+3. Laura - residential cleaning
+4. Dennis D - residential cleaning / upholstery add-on
+5. K V - residential deep cleaning
+6. S Ismail - commercial office cleaning
+7. Rob & Christi Moore - recurring residential cleaning
 
-1. Christina - residential cleaning (existing owner-supplied review).
-2. Richard - deep cleaning (existing owner-supplied review).
-3. Laura - residential cleaning; full text re-verified on the public profile.
-4. Dennis - residential cleaning / upholstery add-on (newly visible).
-5. Amanda - residential cleaning (newly visible).
-6. Elizabeth - residential cleaning (newly visible).
-7. Rob & Christi - recurring residential cleaning (newly visible).
+Excluded by owner instruction: **Bob**, **Amanda** and **Elizabeth**.
 
-Excluded by owner instruction (1): **Bob**.
+K V and S Ismail use the exact owner-supplied text in this directive. K V's
+"bi-monthly" wording is preserved. Both are five stars. No summary, aggregate
+count or "not a complete copy" disclaimer appears under the heading; the owner
+asked for that text to be removed.
 
-Could not verify exact public wording (2): **K V** and **S Ismail**. Both are
-shown in the owner's screenshots and the public profile count, but their full
-review text is behind Google's signed-out review limit. They were **not
-invented or paraphrased**.
+## Review photographs
 
-The carousel therefore states the true 5.0 / 10 profile total and separately
-states that 7 verified reviews are shown. It explicitly says the carousel is a
-selected view, not a complete copy of the profile.
+Real Google review photographs were restored from the public review profile and
+optimized as local WebP assets:
 
-## Implementation
+- Dennis D: `src/assets/images/reviews/dennis-couch-1.webp` and
+  `dennis-couch-2.webp` (the two couch photographs on his review).
+- Laura: `src/assets/images/reviews/laura-shower.webp` (the shower photograph
+  associated with her review).
 
-- New verified review entries:
-  - `src/content/reviews/dennis.md`
-  - `src/content/reviews/amanda.md`
-  - `src/content/reviews/elizabeth.md`
-  - `src/content/reviews/rob-and-christi.md`
-- Existing review entries keep verbatim quote text with first-name-only public
-  attribution. Laura's corrupted apostrophe was repaired to the original curly
-  apostrophe.
-- `src/components/Reviews.astro` now shows the overall Google rating separately
-  from the displayed count, adds reviewer context, exposes a keyboard-focusable
-  carousel stage with instructions, and keeps the existing no-JS stacked view.
-- The existing layered-card design, dots, arrows, swipe, reduced-motion and
-  live-region behavior remain. No autoplay was added.
-- `src/components/SocialLinks.astro` and the footer CSS remove the white
-  circular chips. Official marks now sit on transparent 44px targets at 32px.
-- The Follow Us block is a boxless, integrated section beneath the footer
-  masthead. Black marks receive a subtle light outline for contrast; coloured
-  marks keep their official brand colours.
-- The shared `Footer.astro` is rendered by `BaseLayout`, so Follow Us appears on
-  every ordinary public page, including estimator pages. Private/admin and
-  signature-only pages keep their exclusions.
+No stock, AI-generated or third-party substitutes were used.
 
-## Social registry verification
+## Carousel presentation
 
-Twelve confirmed profiles render from `src/config/business.ts`:
+- Cards now size to their content instead of stretching every short review to
+  the height of the longest.
+- Hidden cards beyond the active neighbours no longer reserve stage height; on
+  phones only the active card is in layout, eliminating the large blank area
+  above short reviews.
+- Photos render in a responsive card grid with lazy loading and descriptive
+  alt text.
+- Existing arrows, dots, swipe, arrow-key navigation, live announcements,
+  focus styles and reduced-motion handling remain.
+- No autoplay was added.
 
-Google Business Profile, Facebook, Nextdoor, Instagram, TikTok, YouTube,
-Pinterest, Rumble, Gab, Parler, Locals and X.
+## Footer corrections
 
-Every link keeps `target="_blank"`, `rel="noopener noreferrer"`, an explicit
-accessible name and no outbound UTM parameters. No pending platform renders.
+- Removed the entire footer service-area paragraph beginning "Serving
+  Pensacola, Cantonment and surrounding communities..." from
+  `src/components/Footer.astro`.
+- Remaining footer content moves upward.
+- Follow Us remains a boxless integrated row of twelve official marks on
+  transparent 44px targets, with no white circular chips.
+- Logo, slogan, Matthew 5:16, navigation and contact actions remain intact.
+- The shared footer still renders on every ordinary public page.
+
+## Tampa Bay public page and inquiry
+
+- Replaced the technical prelaunch explanation with a premium regional page:
+  services, honest availability wording, service-area context and a dedicated
+  Tampa inquiry form.
+- Removed developer-style status language from the main presentation.
+- The page remains `noindex, nofollow` until fulfillment and launch gates are
+  approved.
+- The inquiry form captures name, phone, email, category, service address,
+  city and ZIP.
+- `branch_id=branch_tampa` and `request_type=contact` are submitted; the server
+  persists the lead, customer and property to Tampa and creates no booking,
+  appointment, quote or payment.
+- Commercial/church/property-management/STR/realtor categories are included.
+- Owner notification includes the branch name and inquiry category.
+- Capabilities are code-owned in `src/config/branches.ts`; inquiries and
+  commercial leads are enabled for Tampa, while public estimates, scheduling,
+  payments and fulfillment remain disabled.
+
+## Service-area navigation
+
+The `/service-area/` page now uses two professional branch cards: Pensacola
+(live branch) and Tampa Bay (preparing for launch), instead of disconnected
+small text links.
 
 ## Visual verification
 
-Screenshots saved in `docs/verification/2026-11-20-reviews-footer/`:
+Final local captures:
 
-- `reviews-desktop.png`
-- `reviews-mobile.png`
-- `footer-desktop.png`
-- `footer-mobile.png`
-- `footer-commercial.png`
-- `footer-church.png`
-- `footer-estimator.png`
-
-Checked desktop and mobile review cards, 7 dots/controls, all seven reviews,
-Bob absent, no duplicated reviews, footer icon row, no white chips, and no
-horizontal overflow. Commercial, church and residential-estimator footers use
-the same shared component.
+- `docs/verification/2026-11-20-reviews-footer/reviews-desktop.png`
+- `docs/verification/2026-11-20-reviews-footer/reviews-dennis-desktop.png`
+- `docs/verification/2026-11-20-reviews-footer/reviews-dennis-mobile.png`
+- `docs/verification/2026-11-20-reviews-footer/footer-desktop.png`
+- `docs/verification/2026-11-20-reviews-footer/footer-mobile.png`
+- `docs/verification/2026-11-20-reviews-footer/service-area-desktop.png`
+- `docs/verification/2026-11-20-reviews-footer/tampa-page-desktop.png`
+- `docs/verification/2026-11-20-reviews-footer/tampa-page-mobile.png`
 
 ## Validation
 
 - `npm run check`: 0 errors, 0 warnings, 2 pre-existing hints.
 - Build: 37 pages.
-- `npm run validate`: pass (links, SEO, QR, GTM, checklist leak).
-- Unit: 906 tests, 905 pass, 1 pre-existing skip, 0 fail.
-- Browser: 226 pass, 0 fail.
-- Targeted review/footer tests: 14 pass.
-
-## Remaining
-
-K V and S Ismail exact review text is still required to reach the expected 9
-displayed reviews. Bob remains intentionally excluded. No review text was
-fabricated.
-
-## Production deployment
-
-- Application code: `d70e656`.
-- Cloudflare Pages production deployment: `f43f0984-9614-41f7-a23d-6761172e764d`.
-- CI `validate` and `browser`: pass.
-
-Live verification at https://sparkling-standard.com:
-
-- 7 review cards render in the order Christina, Richard, Laura, Dennis, Amanda,
-  Elizabeth, Rob & Christi.
-- The summary reads 5.0 average on Google from 10 reviews, and the note states
-  that 7 verified reviews are shown and the carousel is not a complete copy.
-- Bob, K V and S Ismail are absent from the rendered review section.
-- 12 Follow Us links render with the verified registry URLs.
-- Every social target is 44 x 44 px with transparent background, 0px border
-  and 0px radius.
-- Commercial, church, residential-estimator, Pensacola-location and Tampa
-  prelaunch pages each return 200 with exactly one Follow Us section and 12
-  social links.
-- Tampa Bay remains `noindex, nofollow` and is absent from the sitemap.
-- Screenshots: `live-reviews-desktop.png`, `live-reviews-mobile.png`,
-  `live-footer-desktop.png`, `live-footer-mobile.png`.
+- `npm run validate`: pass.
+- No-fabrication audit: pass.
+- Unit: **907 tests, 906 pass, 1 pre-existing skip, 0 fail**.
+- Browser: **228 pass, 0 fail**.
+- Targeted review/footer/Tampa tests: 16 pass.

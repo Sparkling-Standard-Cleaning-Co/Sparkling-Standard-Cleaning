@@ -176,7 +176,7 @@ const proof = defineCollection({
 
 // Customer reviews — genuine owner-supplied reviews only. The Google reviews
 // were supplied verbatim by the owner (two on 2026-10-23, Laura on
-// 2026-10-24); public attributions are first names only. Never fabricate
+// 2026-10-24; owner-approved display names updated 2026-11-20). Never fabricate
 // ratings, reviews or star counts (directive §56, §77).
 const reviews = defineCollection({
   loader: glob({ pattern: '*.md', base: './src/content/reviews' }),
@@ -187,6 +187,8 @@ const reviews = defineCollection({
     source: z.enum(['google', 'direct', 'other']).default('direct'),
     /** Authentic star rating when the platform provides one (1–5). */
     rating: z.number().int().min(1).max(5).optional(),
+    /** Owner-approved photos that belong to this review. */
+    photos: z.array(z.object({ src: z.string(), alt: z.string() })).default([]),
     order: z.number().int().default(99),
   }),
 });

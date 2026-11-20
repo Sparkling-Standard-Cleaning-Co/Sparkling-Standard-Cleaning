@@ -193,6 +193,9 @@ test('the footer shows a distinct Follow Us section with only confirmed platform
       assert.equal(style.radius, '0px', `${CONFIRMED[index].label} is not a circular chip`);
     }
 
+    const footerText = await page.locator('.site-footer').innerText();
+    assert.doesNotMatch(footerText, /Serving Pensacola, Cantonment and surrounding communities/i, 'footer service-area paragraph is removed');
+
     const text = (await section.textContent()) ?? '';
     for (const pending of PENDING_LABELS) {
       const escaped = pending.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

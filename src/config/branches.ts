@@ -34,6 +34,18 @@ export interface BranchServiceMode {
   readonly church: ServiceMode;
 }
 
+export interface BranchCapabilities {
+  readonly marketing: boolean;
+  readonly inquiries: boolean;
+  readonly commercialLeads: boolean;
+  readonly pricingConfigured: boolean;
+  readonly publicEstimates: boolean;
+  readonly scheduling: boolean;
+  readonly payments: boolean;
+  readonly fulfillmentVerified: boolean;
+  readonly googleProfileVerified: boolean;
+}
+
 export interface BranchPublicConfig {
   readonly id: BranchId;
   readonly name: string;
@@ -48,6 +60,7 @@ export interface BranchPublicConfig {
   readonly paymentsEnabled: boolean;
   readonly publishedPricingAllowed: boolean;
   readonly services: BranchServiceMode;
+  readonly capabilities: BranchCapabilities;
   readonly serviceAreaZips: ReadonlyArray<string>;
   readonly serviceStates: ReadonlyArray<'FL' | 'AL'>;
   readonly publicPhone: string;
@@ -84,6 +97,17 @@ export const branchConfigs: Readonly<Record<BranchId, BranchPublicConfig>> = {
       commercial: 'estimate_enabled',
       church: 'estimate_enabled',
     },
+    capabilities: {
+      marketing: true,
+      inquiries: true,
+      commercialLeads: true,
+      pricingConfigured: true,
+      publicEstimates: true,
+      scheduling: true,
+      payments: true,
+      fulfillmentVerified: true,
+      googleProfileVerified: true,
+    },
     serviceAreaZips: pensacolaZips(),
     serviceStates: ['FL', 'AL'],
     publicPhone: '(850) 426-8479',
@@ -111,6 +135,17 @@ export const branchConfigs: Readonly<Record<BranchId, BranchPublicConfig>> = {
       str: 'disabled',
       commercial: 'request_only',
       church: 'request_only',
+    },
+    capabilities: {
+      marketing: true,
+      inquiries: true,
+      commercialLeads: true,
+      pricingConfigured: false,
+      publicEstimates: false,
+      scheduling: false,
+      payments: false,
+      fulfillmentVerified: false,
+      googleProfileVerified: false,
     },
     serviceAreaZips: [],
     serviceStates: ['FL'],

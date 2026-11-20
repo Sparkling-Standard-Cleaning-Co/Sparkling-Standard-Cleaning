@@ -5417,38 +5417,6 @@ fieldset.input--invalid {
    review is a prominent center card with two slightly recessed, fully readable
    neighbours. Equal card widths keep text wrapping stable so the stage height
    never jumps between reviews; all cards stretch to the tallest review. */
-.reviews-summary {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem 0.6rem;
-  margin: var(--space-2) 0 0;
-  color: var(--color-ink-700);
-  font-size: var(--text-sm);
-}
-
-.reviews-summary__rating {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  color: var(--color-rose-700);
-  font-weight: var(--weight-semibold);
-}
-
-.reviews-summary__rating svg {
-  color: var(--color-google-gold);
-  fill: var(--color-google-gold);
-}
-
-.reviews-summary__note {
-  max-width: 46ch;
-  margin: var(--space-2) auto 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-}
-
 .review-carousel__stage:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 4px;
@@ -5481,7 +5449,7 @@ fieldset.input--invalid {
 }
 
 .reviews-head {
-  margin-bottom: var(--space-7);
+  margin-bottom: var(--space-5);
 }
 
 .reviews-head__icon {
@@ -5572,6 +5540,25 @@ fieldset.input--invalid {
   margin-bottom: 0;
 }
 
+.review-carousel__photos {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.review-carousel__photos[data-photo-count='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.review-carousel__photos img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  box-shadow: var(--shadow-sm);
+}
+
 .review-carousel__footer {
   display: flex;
   align-items: baseline;
@@ -5611,7 +5598,8 @@ fieldset.input--invalid {
   grid-area: 1 / 1;
   justify-self: center;
   width: 36%;
-  height: 100%;
+  height: auto;
+  align-self: center;
   transition:
     transform 0.6s cubic-bezier(0.22, 0.75, 0.25, 1),
     opacity 0.45s ease,
@@ -5645,12 +5633,9 @@ fieldset.input--invalid {
   box-shadow: var(--shadow-lg);
 }
 
-/* Reviews beyond the immediate neighbours wait behind the front pair. */
+/* Reviews beyond the immediate neighbours do not reserve card height. */
 .review-carousel[data-enhanced='true'] .review-carousel__card:not([data-offset='-1']):not([data-offset='0']):not([data-offset='1']) {
-  z-index: 1;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(0) translateY(0) translateZ(-320px) scale(0.7);
+  display: none;
 }
 
 .review-carousel[data-enhanced='true'] .review-carousel__controls {
@@ -5749,11 +5734,8 @@ fieldset.input--invalid {
     justify-content: center;
   }
 
-  .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='-1'],
-  .review-carousel[data-enhanced='true'] .review-carousel__card[data-offset='1'] {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(0) translateY(0) translateZ(0) rotateY(0deg) scale(0.98);
+  .review-carousel[data-enhanced='true'] .review-carousel__card:not([data-offset='0']) {
+    display: none;
   }
 
   .review-carousel[data-enhanced='true'] .review-carousel__controls {

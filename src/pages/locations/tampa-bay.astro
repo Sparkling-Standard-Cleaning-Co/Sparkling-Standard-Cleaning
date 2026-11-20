@@ -1,40 +1,105 @@
-﻿---
+---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
-import { branchConfig, BRANCH_TAMPA } from '../../config/branches';
-
-const branch = branchConfig(BRANCH_TAMPA)!;
+import TampaInquiryForm from '../../components/TampaInquiryForm.astro';
 ---
 
 <BaseLayout
-  title="Tampa Bay Cleaning Service | Prelaunch"
-  description="Sparkling Standard is preparing a Tampa Bay operating branch. This page is informational only; online booking and payment are not yet available."
+  title="Tampa Bay Cleaning Service | Sparkling Standard Cleaning Co."
+  description="Sparkling Standard is preparing residential and commercial cleaning for the Tampa Bay area. Contact us about upcoming availability, commercial accounts, churches and property-management needs."
   noindex={true}
 >
   <section class="section section--tight">
     <div class="container container--narrow">
       <Breadcrumbs trail={[{ name: 'Home', path: '/' }, { name: 'Tampa Bay', path: '/locations/tampa-bay/' }]} />
-      <p class="eyebrow mt-4">Tampa Bay prelaunch</p>
-      <h1>We are preparing Tampa Bay the right way.</h1>
+      <p class="eyebrow mt-4">Tampa Bay</p>
+      <h1>Exceptional cleaning is coming to Tampa Bay.</h1>
       <p class="lead">
-        Sparkling Standard is one company with a live Pensacola branch. A Tampa Bay branch is in
-        setup, not open for online booking or payment. We will only publish local pricing,
-        availability and a local Google Business Profile when real staffing, licensing, insurance,
-        tax and service capacity are in place.
+        Sparkling Standard Cleaning Co. is preparing to bring our residential and commercial
+        cleaning standards to the Tampa Bay area. We are speaking with homeowners, churches,
+        offices, property managers and rental hosts now so the first Tampa Bay schedules are
+        built around real needs, not promises.
       </p>
-      <div class="admin-card" style="margin-top:1.5rem;">
-        <h2 class="card__title">What this means today</h2>
-        <ul class="checklist mt-4">
-          <li>No Tampa Bay online estimate, booking or payment is active.</li>
-          <li>No Tampa Bay local phone number or Google Business Profile is being claimed yet.</li>
-          <li>Commercial and church inquiries can be recorded for planning, but no service date is promised.</li>
-        </ul>
-      </div>
       <div class="hero__actions mt-4">
-        <a class="btn btn--primary" href="/contact/?branch=tampa-bay">Register Interest</a>
-        <a class="btn btn--secondary" href="/locations/pensacola/">Visit Pensacola Operations</a>
+        <a class="btn btn--primary" href="#inquiry">Start a Tampa Bay Conversation</a>
+        <a class="btn btn--secondary" href="/locations/pensacola/">See Pensacola Operations</a>
       </div>
-      <p class="small text-muted mt-4">{branch.launchNote}</p>
+      <p class="small text-muted mt-4">
+        Tampa Bay inquiries are being accepted. A service date, price and availability are
+        confirmed personally; this page does not create a booking.
+      </p>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-head section-head--center">
+        <p class="eyebrow">Built for the way Tampa Bay works</p>
+        <h2>Residential care. Commercial reliability. One standard.</h2>
+        <p class="lead">The same owner-operated attention that shapes our Pensacola work will shape Tampa Bay.</p>
+      </div>
+      <div class="grid grid--3">
+        <div class="card">
+          <h3 class="card__title">Residential cleaning</h3>
+          <p class="card__text">Recurring home care, deep cleaning and move-in or move-out cleaning, with the scope agreed before the first visit.</p>
+        </div>
+        <div class="card">
+          <h3 class="card__title">Commercial &amp; offices</h3>
+          <p class="card__text">Professional suites, retail, salons, gyms and shared workspaces cleaned around your hours and access rules.</p>
+        </div>
+        <div class="card">
+          <h3 class="card__title">Churches &amp; institutions</h3>
+          <p class="card__text">Sanctuary, fellowship hall, classroom, office and restroom scopes built around your event calendar.</p>
+        </div>
+        <div class="card">
+          <h3 class="card__title">Property management</h3>
+          <p class="card__text">Common areas, model units and turnover support for managers who need a clear, accountable scope.</p>
+        </div>
+        <div class="card">
+          <h3 class="card__title">STR &amp; rental hosts</h3>
+          <p class="card__text">Turnover cleaning planned around check-out and check-in windows, with linen and laundry preferences captured up front.</p>
+        </div>
+        <div class="card">
+          <h3 class="card__title">Realtor partnerships</h3>
+          <p class="card__text">Move-out, move-in and listing-preparation cleaning for clients who need a reliable referral and a real scope.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="inquiry">
+    <div class="container split">
+      <div>
+        <p class="eyebrow">Tampa Bay inquiry</p>
+        <h2>Tell us what you are planning.</h2>
+        <p class="lead">
+          Share the property, service category and approximate timing. We will review the request
+          personally and tell you honestly what is available.
+        </p>
+        <ul class="checklist mt-4">
+          <li>Residential and recurring home cleaning interest</li>
+          <li>Commercial offices, retail, salons, gyms and facilities</li>
+          <li>Church and institutional walkthroughs</li>
+          <li>Property-management and apartment portfolios</li>
+          <li>Short-term rental turnovers and realtor referrals</li>
+        </ul>
+        <p class="small text-muted mt-4">
+          Serving the Pensacola area today. Tampa Bay coverage is being confirmed by address and
+          capacity; no neighborhood is promised until we verify it with you.
+        </p>
+      </div>
+      <div>
+        <TampaInquiryForm />
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container container--narrow">
+      <p class="small text-muted">
+        Prefer to start with our live branch? Visit <a href="/locations/pensacola/">Pensacola operations</a>
+        or call <a href="tel:+18504268479">(850) 426-8479</a>.
+      </p>
     </div>
   </section>
 </BaseLayout>

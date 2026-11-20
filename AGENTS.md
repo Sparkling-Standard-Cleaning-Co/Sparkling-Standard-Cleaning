@@ -649,18 +649,18 @@ collections are intentionally empty — not errors.
   the exact four-dollar-sign design (first filled gold, three outlined). The small footer review
   button uses the matching reading-glasses vector at 24 px. Church Cleaning is the
   sixth homepage card. Registry: `docs/design/WHITE-TILE-ICON-INVENTORY.md`.
-- **Authentic reviews live (2026-10-24; expanded 2026-11-20):** the homepage reviews
-  section is a premium layered editorial carousel (`src/components/Reviews.astro`) rendering ONE
-  prominent center review with recessed-but-readable equal-height neighbours; it is progressively
-  enhanced (no-JS shows every review readable), keyboard/swipe navigable, respects
-  `prefers-reduced-motion`, and never autoplays. Seven verified Google reviews render -
-  **Christina, Richard, Laura, Dennis, Amanda, Elizabeth, Rob & Christi** - with public
-  attributions limited to first names (never publish surnames in testimonials). The site shows
-  the verified owner-supplied overall Google rating (5.0 from 10 reviews) separately from the
-  number of reviews displayed. The owner explicitly excluded Bob's review. K V and S Ismail
-  remain unverified in the repository because their full public review text could not be retrieved;
-  do not invent them. Review source files live in `src/content/reviews/`; quote text is verbatim
-  and new genuine entries render automatically. Never fabricate reviews or aggregate/Review schema.
+- **Authentic reviews live (2026-10-24; owner-approved set 2026-11-20):** the homepage reviews
+  section is a premium layered editorial carousel (`src/components/Reviews.astro`) with one
+  prominent center card and two recessed, readable neighbours. It is progressively enhanced
+  (no-JS shows every review), keyboard/swipe navigable, respects `prefers-reduced-motion`, never
+  autoplays and sizes cards to their content. The owner-approved displayed set is **Christina,
+  Richard, Laura, Dennis D, Rob & Christi Moore, K V and S Ismail**. Bob, Amanda and Elizabeth are
+  explicitly excluded. K V and S Ismail use the exact owner-supplied text; K V's "bi-monthly"
+  wording is preserved. Dennis has two actual review photographs and Laura one; they are optimized
+  copies of the public Google review photos in `src/assets/images/reviews/`, never stock or
+  AI substitutes. The owner removed the former summary/disclaimer text under the heading; do not
+  restore it. Review source files live in `src/content/reviews/`; never fabricate reviews or
+  aggregate/Review schema.
 - **Five-step estimator (owner priority UX directive; current 2026-10-29):** the residential and STR
   journey is exactly **When & Where → Service & Home → Condition & Frequency → Your Details →
   Extras & Payment** (`src/lib/estimate/steps.ts`, `src/lib/estimate/engines.ts`). Step 1 now

@@ -9,7 +9,7 @@ import { failureCopy, type FailureReason } from '../lib/forms/failure-copy';
 import { saveSubmissionSummary } from '../lib/forms/submission-receipt';
 import { track, type AnalyticsEventName } from '../lib/analytics/events';
 
-type Variant = 'contact' | 'commercial' | 'str' | 'gift';
+type Variant = 'contact' | 'commercial' | 'str' | 'gift' | 'tampa';
 
 const phone = contactPhone();
 const contact = {
@@ -52,6 +52,8 @@ function variantEvent(variant: Variant): AnalyticsEventName | null {
       return 'commercial_quote_submit';
     case 'str':
       return 'str_request_submit';
+    case 'tampa':
+      return 'cleaning_request_submit';
     case 'gift':
       // Gift requests are not cleaning conversions and no purchase has
       // happened; they must not be counted as successful conversions.
@@ -67,6 +69,8 @@ function variantEventPayload(variant: Variant, fields: Record<string, string>): 
       return { facility_type: fields.facility_type };
     case 'str':
       return {};
+    case 'tampa':
+      return { journey: 'tampa_inquiry' };
     default:
       return { journey: 'residential' };
   }
@@ -114,6 +118,8 @@ for (const form of document.querySelectorAll<HTMLFormElement>('[data-lead-form]'
         ? `Commercial walkthrough request — ${fields.organization ?? 'facility'}`
         : variant === 'str'
           ? 'Short-term rental turnover request'
+          : variant === 'tampa'
+            ? `Tampa Bay service inquiry - ${fields.inquiry_type ?? 'general'}`
           : variant === 'gift'
             ? `Gift certificate request — ${fields.recipient_name ?? 'recipient'}`
             : 'Website message';
@@ -129,7 +135,9 @@ for (const form of document.querySelectorAll<HTMLFormElement>('[data-lead-form]'
       setStatus(
         form,
         'success',
-        variant === 'gift'
+        variant === 'tampa'
+          ? 'Tampa Bay inquiry received. This is not a booking or a confirmed service date. We will review the property and contact you honestly about availability.'
+          : variant === 'gift'
           ? 'Gift certificate request received. We will confirm the amount and details with you, then send a secure payment link. No payment has been taken and nothing is charged by this form.'
           : 'Request received — not booked yet. Sparkling Standard reviews every request personally and will confirm scope, date and price with you before anything is scheduled.',
       );

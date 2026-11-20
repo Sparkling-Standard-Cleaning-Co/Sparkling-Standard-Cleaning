@@ -18,4 +18,7 @@ source: google
 # profile (the Sparkling Standard review carries five filled stars).
 rating: 5
 order: 3
+photos:
+  - src: laura-shower
+    alt: Cleaned glass shower enclosure with the water marks removed.
 ---

@@ -385,6 +385,13 @@ export async function onRequestPost(context: {
   if (transactionalRequest && !branch.bookable) {
     return json({ ok: false, error: 'branch_not_available' }, 409);
   }
+  if (!transactionalRequest && !branch.capabilities.inquiries) {
+    return json({ ok: false, error: 'branch_inquiries_unavailable' }, 409);
+  }
+  const commercialInquiry = ['commercial_account', 'church_facility', 'property_management', 'str_opportunity', 'realtor_partner'].includes(clean.inquiry_type ?? '');
+  if (commercialInquiry && !branch.capabilities.commercialLeads) {
+    return json({ ok: false, error: 'branch_commercial_inquiries_unavailable' }, 409);
+  }
   if (transactionalRequest) {
     if (clean.terms_accepted !== 'yes') {
       return json({ ok: false, error: 'terms_required' }, 400);

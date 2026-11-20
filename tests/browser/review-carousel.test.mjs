@@ -51,28 +51,33 @@ const quotes = [
   'Very respectful, AMAZING cleaning',
   'Quality, affordable, attention to detail',
   'crispy couch',
-  'detail oriented young lady',
-  'extremely reliable and professional',
+  'I recently hired Sparkling Standard for a deep clean',
+  'Excellent office cleaning service',
   'outstanding job every week',
 ];
 
-test('all seven verified reviews render with first-name-only attributions', async () => {
+test('all seven verified reviews render with owner-approved attributions', async () => {
   const { context, page } = await open(1280);
   try {
     const cards = page.locator('[data-review-card]');
     assert.equal(await cards.count(), 7, 'seven verified reviews');
-    const text = await page.locator('#reviews').innerText();
+    const text = (await page.locator('#reviews').textContent()) ?? '';
     for (const fragment of quotes) assert.ok(text.includes(fragment), `quote preserved: ${fragment}`);
     const authors = await page.locator('[data-review-card] footer strong').allTextContents();
-    assert.deepEqual(authors.map((a) => a.trim()), ['Christina', 'Richard', 'Laura', 'Dennis', 'Amanda', 'Elizabeth', 'Rob & Christi']);
-    for (const surname of ['Sherwin', 'Lionhart', 'Harman', 'Larsh', 'Wood', 'Moore']) {
+    assert.deepEqual(authors.map((a) => a.trim()), ['Christina', 'Richard', 'Laura', 'Dennis D', 'K V', 'S Ismail', 'Rob & Christi Moore']);
+    for (const surname of ['Sherwin', 'Lionhart', 'Harman', 'Larsh', 'Wood']) {
       assert.ok(!text.includes(surname), `surname not published: ${surname}`);
     }
-    const summary = await page.locator('.reviews-summary').innerText();
-    assert.match(summary, /5\.0/);
-    assert.match(summary, /10 reviews/);
-    assert.match(await page.locator('.reviews-summary__note').innerText(), /Showing 7 verified Google reviews/);
-    assert.ok(!text.includes('Bob'), 'the owner-excluded review is not displayed');
+    assert.equal(await page.locator('.reviews-summary').count(), 0, 'owner requested no summary text');
+    assert.equal(await page.locator('.reviews-summary__note').count(), 0, 'owner requested no disclaimer text');
+    for (const excluded of ['Bob', 'Amanda', 'Elizabeth']) {
+      assert.ok(!text.includes(excluded), `${excluded} is excluded from the carousel`);
+    }
+    const dennis = page.locator('[data-review-card]', { has: page.locator('footer strong', { hasText: 'Dennis D' }) });
+    assert.equal(await dennis.locator('.review-carousel__photos img').count(), 2, 'Dennis has two review photos');
+    const laura = page.locator('[data-review-card]', { has: page.locator('footer strong', { hasText: 'Laura' }) });
+    assert.equal(await laura.locator('.review-carousel__photos img').count(), 1, 'Laura has one review photo');
+    assert.match(await dennis.locator('.review-carousel__photos img').first().getAttribute('alt'), /sofa|living room/i);
 
     // Laura's five-star rating is verified (Google Maps contributor profile),
     // so every review presents the same intentional star row.
@@ -108,11 +113,13 @@ test('stars are centered in authentic Google gold and reviewer names sit at the 
     assert.equal(footerJustify, 'center', 'reviewer name is centered');
 
     const gaps = await page.locator('[data-review-card]').evaluateAll((cards) =>
-      cards.map((card) => {
-        const footer = card.querySelector('footer');
-        if (!footer) return -1;
-        return Math.round(card.getBoundingClientRect().bottom - footer.getBoundingClientRect().bottom);
-      }),
+      cards
+        .filter((card) => card.getClientRects().length > 0)
+        .map((card) => {
+          const footer = card.querySelector('footer');
+          if (!footer) return -1;
+          return Math.round(card.getBoundingClientRect().bottom - footer.getBoundingClientRect().bottom);
+        }),
     );
     assert.ok(gaps.every((gap) => gap >= 15 && gap <= 40), `names sit at the card bottom (${gaps.join(', ')})`);
   } finally {
@@ -120,14 +127,19 @@ test('stars are centered in authentic Google gold and reviewer names sit at the 
   }
 });
 
-test('all cards share one height so the stage never jumps between reviews', async () => {
+test('short and long review cards size to their content without clipping', async () => {
   const { context, page } = await open(1280);
   try {
     await page.waitForFunction(() => document.querySelector('[data-review-carousel]')?.dataset.enhanced === 'true');
-    const heights = await page
-      .locator('[data-review-card]')
-      .evaluateAll((nodes) => nodes.map((node) => node.offsetHeight));
-    assert.equal(new Set(heights).size, 1, `cards are equal height (${heights.join(', ')})`);
+    const card = (author) =>
+      page.locator('[data-review-card]', { has: page.locator('footer strong', { hasText: author }) });
+    const richardHeight = await card('Richard').evaluate((el) => el.offsetHeight);
+    const robHeight = await card('Rob & Christi Moore').evaluate((el) => el.offsetHeight);
+    assert.ok(richardHeight < robHeight, 'short cards stay compact instead of stretching to the longest review');
+    const clipped = await page.locator('[data-review-card]').evaluateAll((nodes) =>
+      nodes.filter((node) => node.scrollHeight > node.clientHeight + 1).length,
+    );
+    assert.equal(clipped, 0, 'no card clips its content');
   } finally {
     await context.close();
   }
@@ -227,7 +239,7 @@ test('mobile keeps one fully readable card with touch-friendly controls and no o
     const front = page.locator('[data-review-card][aria-current="true"]');
     assert.ok(await front.isVisible(), 'front card visible');
     const side = page.locator('[data-review-card][data-offset="-1"]');
-    assert.equal(await side.evaluate((el) => getComputedStyle(el).pointerEvents), 'none');
+    assert.equal(await side.evaluate((el) => getComputedStyle(el).display), 'none');
     const nextBox = await page.locator('[data-review-next]').boundingBox();
     assert.ok(nextBox && nextBox.height >= 44, 'touch target >= 44px');
     const stageHeight = await page

@@ -191,3 +191,23 @@ Owner-gated:
 - decide whether/when Tampa is eligible for a GBP;
 - run a real authenticated owner walkthrough of branch switching, Quick
   Estimate and packet signing.
+
+## 10. Tampa inquiry workflow
+
+Tampa now has a dedicated, branch-assigned inquiry form on
+`/locations/tampa-bay/`. It captures residential, commercial, church/facility,
+property-management, STR and realtor interest, plus a service address.
+
+- The form sends `branch_id=branch_tampa` and `request_type=contact`.
+- The lead relay resolves the branch server-side and persists the lead,
+  customer and property to Tampa.
+- It creates no booking request, appointment, quote, invoice or payment.
+- The owner notification includes `Summary - Branch: Tampa Bay` and the
+  inquiry category.
+- Transactional requests remain blocked while Tampa is not bookable.
+- The public page is still `noindex, nofollow` until fulfillment and launch
+  gates are verified.
+
+Capability states are defined in `src/config/branches.ts`; the lead relay
+checks inquiries/commercial leads and refuses a non-bookable transactional
+request. See `docs/operations/TAMPA-BAY-LAUNCH.md`.
