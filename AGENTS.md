@@ -84,7 +84,21 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-20 execution reliability and checkout repair):** application code
+- **Current release (2026-11-20 workforce intelligence and intelligent dispatch):** application code
+  **`9c4b49a`** is live on `production-safe` (Cloudflare Pages production deployment
+  `5162c0c2-6e3e-4c75-b02d-1b80b1e5398a`). Migration `0041` adds owner-controlled intelligent
+  dispatch under **Admin -> Jobs & Team**: employee qualifications, equipment, independent/shared
+  transport, private dispatch origins, time off, availability and weekly-hour rules; a deterministic
+  feasibility/ranking engine; automatic assignment of eligible unassigned confirmed jobs; owner-only
+  reassignment recommendations; coverage exceptions; decision/audit history; calendar-status retry;
+  and employee lanes. Existing assignments and customer appointment times are never changed
+  automatically. Production defaults are analysis-only and paused; `team_hayli` still needs a
+  completed dispatch profile before candidates exist. CI `validate` and `browser` passed; unit
+  **935** (934 pass, 1 pre-existing skip), browser **232** pass. Migration applied to production D1;
+  live owner dashboard verified with 0 unassigned jobs and 0 dispatch-ready employees. No customer
+  charge or message was performed. Evidence:
+  `docs/verification/2026-11-20-WORKFORCE-DISPATCH.md`.
+- **Prior release (2026-11-20 execution reliability and checkout repair):** application code
   **`cd612e7`** is live on `production-safe` (Cloudflare Pages production deployment
   `dc7419a3-5cb0-4158-ab51-6c008e8b0b0d`). It fixes the displayed-total promotion acceptance path
   that could reject a `HOLIDAY15` checkout (`quote_changed`), enables and reports recurring checkout

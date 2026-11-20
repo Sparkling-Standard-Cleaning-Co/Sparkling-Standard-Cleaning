@@ -57,10 +57,20 @@ Migration `0041_workforce_dispatch.sql` executed successfully on production D1:
 
 ## Production state
 
+- Application code `9c4b49a` deployed to `production-safe` at Pages deployment
+  `5162c0c2-6e3e-4c75-b02d-1b80b1e5398a`; GitHub `validate` and `browser` passed.
+- Migration `0041` is applied to production D1.
+- Live authenticated dashboard check: 0 unassigned jobs, 0 auto-assignment decisions, 0
+  dispatch-ready employees, mode analysis-only, automatic assignment disabled, emergency pause on.
+- The only production team member, `team_hayli`, has no approved dispatch services, no configured
+  transport, and no verified dispatch origin. Automatic assignment therefore produces coverage
+  exceptions until the owner completes that profile.
 - Automatic assignment is deliberately **not activated** by the migration. Production defaults are
   analysis-only and paused until the owner completes employee dispatch profiles and enables the
   controls.
-- Migration is applied; application code deployment and live dashboard checks are recorded below.
+- Unauthenticated `GET /api/admin/dispatch` returns 401, and the production admin HTML contains the
+  Intelligent Dispatch interface.
+- No customer charge, customer message or employee notification was performed.
 
 ## Remaining limitations
 
