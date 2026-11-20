@@ -265,8 +265,8 @@ async function fetchGoogleSuggestions(
     if (!suggestionApi?.fetchAutocompleteSuggestions) return null;
     const bias =
       branchId === 'branch_tampa'
-        ? { center: { lat: 27.9506, lng: -82.4572 }, radius: 90000 }
-        : { center: { lat: 30.4213, lng: -87.2169 }, radius: 90000 };
+        ? { center: { lat: 27.9506, lng: -82.4572 }, radius: 50000 }
+        : { center: { lat: 30.4213, lng: -87.2169 }, radius: 50000 };
     const result = await suggestionApi.fetchAutocompleteSuggestions({
       input: query,
       includedRegionCodes: ['us'],

@@ -20,8 +20,8 @@ export interface AddressBias {
 }
 
 const BRANCH_BIAS: Record<string, AddressBias> = {
-  branch_pensacola: { latitude: 30.4213, longitude: -87.2169, radiusMeters: 90000 },
-  branch_tampa: { latitude: 27.9506, longitude: -82.4572, radiusMeters: 90000 },
+  branch_pensacola: { latitude: 30.4213, longitude: -87.2169, radiusMeters: 50000 },
+  branch_tampa: { latitude: 27.9506, longitude: -82.4572, radiusMeters: 50000 },
 };
 
 export function branchAddressBias(branchId: string | null | undefined): AddressBias {
