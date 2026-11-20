@@ -1245,47 +1245,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     );
   }
 
-  const acceptedAmount =
-    typeof payload.acceptedAmount === 'number' ? payload.acceptedAmount : Number(payload.acceptedAmount);
-  const explicitAcceptance =
-    payload.acceptRecalculated === true &&
-    Number.isFinite(acceptedAmount) &&
-    cents(acceptedAmount) === candidate.amountCents;
-  if (candidate.priceChanged && !explicitAcceptance) {
-    return json(
-      {
-        ok: false,
-        error: 'quote_changed',
-        amount: candidate.amountCents / 100,
-        quotedAmount: candidate.quotedCents / 100,
-        cleaningAmount: candidate.cleaningAmountCents / 100,
-        tax: candidate.tax,
-        reference: candidate.reference,
-        serviceType: candidate.serviceType,
-      },
-      409,
-    );
-  }
-
-  const emailProblem = customerEmailProblem(fields.email);
-  if (emailProblem) return json({ ok: false, error: emailProblem }, 400);
-  const email = normalizeCustomerEmail(fields.email);
-
-  const stripeCustomer = await resolveCheckoutStripeCustomer(env.DB ?? null, env, {
-    reference: candidate.reference,
-    holdId: fields.booking_hold_id ?? '',
-    email,
-    name: fields.name ?? fields.organization ?? '',
-  }).catch((error) => {
-    console.error('[estimate-checkout] stripe_customer_failed', {
-      name: error instanceof Error ? error.name : 'unknown',
-    });
-    return null;
-  });
-  if (!stripeCustomer) {
-    return json({ ok: false, error: 'stripe_customer_unavailable' }, 502);
-  }
-
   let dynamicPromotion: { id: string; code: string; discountCents: number; customerId: string | null; redemptionId?: string } | null = null;
   const promotionCode = (fields.promotion_code ?? '').trim().toUpperCase();
   if (promotionCode && !['SPARKLE15', 'SPARKLE100'].includes(promotionCode)) {
@@ -1375,6 +1334,47 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         customerId: (evaluation as { customerId?: string }).customerId ?? null,
       };
     }
+  }
+
+  const acceptedAmount =
+    typeof payload.acceptedAmount === 'number' ? payload.acceptedAmount : Number(payload.acceptedAmount);
+  const explicitAcceptance =
+    payload.acceptRecalculated === true &&
+    Number.isFinite(acceptedAmount) &&
+    cents(acceptedAmount) === candidate.amountCents;
+  if (candidate.priceChanged && !explicitAcceptance) {
+    return json(
+      {
+        ok: false,
+        error: 'quote_changed',
+        amount: candidate.amountCents / 100,
+        quotedAmount: candidate.quotedCents / 100,
+        cleaningAmount: candidate.cleaningAmountCents / 100,
+        tax: candidate.tax,
+        reference: candidate.reference,
+        serviceType: candidate.serviceType,
+      },
+      409,
+    );
+  }
+
+  const emailProblem = customerEmailProblem(fields.email);
+  if (emailProblem) return json({ ok: false, error: emailProblem }, 400);
+  const email = normalizeCustomerEmail(fields.email);
+
+  const stripeCustomer = await resolveCheckoutStripeCustomer(env.DB ?? null, env, {
+    reference: candidate.reference,
+    holdId: fields.booking_hold_id ?? '',
+    email,
+    name: fields.name ?? fields.organization ?? '',
+  }).catch((error) => {
+    console.error('[estimate-checkout] stripe_customer_failed', {
+      name: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  });
+  if (!stripeCustomer) {
+    return json({ ok: false, error: 'stripe_customer_unavailable' }, 502);
   }
 
   const totalCents = candidate.amountCents;

@@ -99,3 +99,12 @@ silently bypassed.
 - Fingerprint: `2026-10-25.engine-calibration-supportive-tax.v1.49705bdc08ec90b4`.
 - Initial values match the Pensacola/source baseline; Pensacola has no separate published version and remains on the same source baseline.
 - Public `/api/pricing?branch=branch_tampa` still returns 404 because Tampa is not bookable.
+
+## Approved regional coverage and travel policy - 2026-11-20
+
+- Approved counties: **Pasco, Pinellas and Hillsborough, Florida**.
+- Coverage registry: **132 ZCTAs** derived from the 2020 Census ZCTA-county relationship file for county FIPS 12101 (Pasco, 33), 12103 (Pinellas, 49) and 12057 (Hillsborough, 59); ZIPs crossing county lines are included.
+- Default one-way travel limit: **20 miles**.
+- The production branch row now carries the 132-ZIP registry and three counties.
+- The exact operating origin is intentionally unset; no coordinates or starting address were invented.
+- County membership is not the same as bookable driving-distance eligibility. Until a real origin is configured, Tampa public booking remains disabled.

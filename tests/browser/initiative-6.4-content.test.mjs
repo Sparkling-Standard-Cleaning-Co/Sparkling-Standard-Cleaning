@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 
-const PORT = 4422;
+const PORT = 4423;
 const BASE = `http://localhost:${PORT}`;
 
 let server;

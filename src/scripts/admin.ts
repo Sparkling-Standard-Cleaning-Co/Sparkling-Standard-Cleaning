@@ -125,13 +125,18 @@ function money(cents: unknown): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(cents ?? 0) / 100);
 }
 
-function dateTime(value: unknown): string {
+const BRANCH_TIME_ZONES: Record<string, string> = {
+  branch_pensacola: 'America/Chicago',
+  branch_tampa: 'America/New_York',
+};
+
+function dateTime(value: unknown, branchId?: unknown): string {
   const raw = String(value ?? '');
   if (!raw) return '—';
   const parsed = new Date(raw.includes('T') ? raw : `${raw}T12:00:00`);
   if (!Number.isFinite(parsed.getTime())) return raw;
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Chicago',
+    timeZone: BRANCH_TIME_ZONES[String(branchId ?? '')] ?? 'America/Chicago',
     month: 'short', day: 'numeric', year: 'numeric',
     ...(raw.includes('T') ? { hour: 'numeric', minute: '2-digit' } : {}),
   }).format(parsed);
@@ -663,7 +668,7 @@ async function openRequest(requestId: string): Promise<void> {
       </div>`;
 
   const checkoutFailure = String(payload.checkout_failure_reason ?? payload.checkout_error ?? '').trim();
-  const checkoutCard = `<div class="admin-card" style="margin-top:1rem;"><h3>Payment &amp; checkout</h3><dl class="admin-definition"><dt>Payment state</dt><dd>${esc(requestPayment(request))}</dd><dt>Checkout readiness</dt><dd>${checkout?.enabled ? 'Ready' : 'Unavailable'}</dd><dt>Recurring scheduling</dt><dd>${checkout?.recurringScheduling ? 'Enabled' : 'Disabled - recurring checkout is blocked'}</dd><dt>Last checkout issue</dt><dd>${esc(checkoutFailure || 'No failed checkout is recorded for this request.')}</dd><dt>Last issue time</dt><dd>${esc(dateTime(payload.checkout_failure_at || ''))}</dd></dl></div>`;
+  const checkoutCard = `<div class="admin-card" style="margin-top:1rem;"><h3>Payment &amp; checkout</h3><dl class="admin-definition"><dt>Payment state</dt><dd>${esc(requestPayment(request))}</dd><dt>Checkout readiness</dt><dd>${checkout?.enabled ? 'Ready' : 'Unavailable'}</dd><dt>Recurring scheduling</dt><dd>${checkout?.recurringScheduling ? 'Enabled' : 'Disabled - recurring checkout is blocked'}</dd><dt>Last checkout issue</dt><dd>${esc(checkoutFailure || 'No failed checkout is recorded for this request.')}</dd><dt>Last issue time</dt><dd>${esc(dateTime(payload.checkout_failure_at || '', request.branch_id))}</dd></dl></div>`;
 
   const actions = can('booking.write')
     ? pending
@@ -762,7 +767,7 @@ async function openRequest(requestId: string): Promise<void> {
     </div>
     ${duplicates.length ? `<div class="admin-warning"><strong>Possible duplicate requests.</strong> ${duplicates.map((duplicate) => `${esc(duplicate.quote_reference)} (${esc(dateTime(duplicate.start_at))})`).join(', ')}. Nothing was merged or deleted. Review before confirming.</div>` : ''}
     <dl class="admin-definition">
-      <dt>Requested</dt><dd>${esc(dateTime(request.start_at))} – ${esc(dateTime(request.end_at))}</dd>
+      <dt>Requested</dt><dd>${esc(dateTime(request.start_at, request.branch_id))} – ${esc(dateTime(request.end_at, request.branch_id))}</dd>
       <dt>Status</dt><dd>${esc(titleCase(status))}</dd>
       <dt>Customer</dt><dd>${esc(customerName || 'Not linked')}</dd>
       <dt>Contact</dt><dd>${esc(email || '—')}</dd>

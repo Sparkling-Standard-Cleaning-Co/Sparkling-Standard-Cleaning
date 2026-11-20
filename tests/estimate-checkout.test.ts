@@ -1088,6 +1088,49 @@ test('an explicitly compatible promotion stacks with Community Support', async (
   assert.equal(receiptDiscount, '7500');
 });
 
+test('a displayed promotion total is accepted against the matching server promotion', async () => {
+  const ledger = new FakeLedger();
+  const db = checkoutDb();
+  await activeCheckoutPromotion(db, {
+    code: 'THANKS75',
+    name: 'Thanksgiving Deep Clean Special',
+    valueCents: 7500,
+    supportiveStackable: true,
+    minPurchaseCents: 20000,
+  });
+  const env = { ...makeEnv(ledger), DB: db };
+  const provider = providerStub();
+  const { amount, fields: baseFields } = validResidentialInput('standard', { supportive: true });
+  const fields = withHold(baseFields, ledger);
+  const finalCents = Math.round(amount * 100) - 7500;
+  let unitAmount = '';
+  const response = await withFetch(
+    async (url, init) => {
+      if (String(url).includes('/v1/checkout/sessions') && !String(url).includes('/v1/checkout/sessions/')) {
+        const body = init?.body as URLSearchParams;
+        unitAmount = body.get('line_items[0][price_data][unit_amount]') ?? '';
+      }
+      return provider.stub(url, init);
+    },
+    () =>
+      onRequestPost({
+        request: jsonRequest({
+          fields: {
+            ...fields,
+            promotion_code: 'THANKS75',
+            quoted_total: (finalCents / 100).toFixed(2),
+          },
+          acceptedAmount: finalCents / 100,
+          acceptRecalculated: true,
+          returnPath: '/estimate/residential/',
+        }),
+        env,
+      } as never),
+  );
+  assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
+  assert.equal(unitAmount, String(finalCents));
+});
+
 test('FRIENDS15 never stacks with Community Support and replaces it only when larger', async () => {
   const ledger = new FakeLedger();
   const db = checkoutDb();
