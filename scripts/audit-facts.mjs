@@ -58,11 +58,23 @@ const targets = [
 const failures = [];
 const review = [];
 
+// Owner-confirmed verified profile totals (2026-11-20). Only these exact
+// counts may appear in the config and the rendered homepage summary. Anything
+// else is still a hard failure.
+const OWNER_APPROVED_REVIEW_COUNTS = new Set(['10 reviews']);
+const OWNER_APPROVED_REVIEW_FILES = new Set(['src/config/business.ts', 'dist/index.html']);
+
 for (const file of targets) {
   const content = fs.readFileSync(file, 'utf8');
   for (const { pattern, label } of HARD_BANNED) {
     const match = content.match(pattern);
-    if (match) failures.push(`${file}: [${label}] "${match[0]}"`);
+    if (match) {
+      const ownerApproved =
+        label === 'review count' &&
+        OWNER_APPROVED_REVIEW_FILES.has(file.replaceAll('\\', '/')) &&
+        OWNER_APPROVED_REVIEW_COUNTS.has(match[0].trim().toLowerCase());
+      if (!ownerApproved) failures.push(`${file}: [${label}] "${match[0]}"`);
+    }
   }
   for (const { pattern, label } of REVIEW_TERMS) {
     const match = content.match(pattern);
