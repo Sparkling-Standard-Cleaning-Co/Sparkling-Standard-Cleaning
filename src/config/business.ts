@@ -241,9 +241,12 @@ export const business = {
      */
     submissionUrl: 'https://g.page/r/CXAcv1Pp7OI2ECE/review',
     /**
-     * No review counts are ever displayed unless the owner supplies a verified
-     * figure AND real reviews exist in the reviews collection. Never invent.
+     * Owner-supplied verified Google profile totals (2026-11-20): 10 reviews at
+     * a 5.0 average. The carousel renders only verified review entries from the
+     * content collection and is never presented as an exhaustive copy.
      */
+    overallRating: 5.0,
+    totalGoogleReviews: 10,
   },
 
   // ── Payments (owner-approved methods; Stripe confirmed 2026-10-21) ────────

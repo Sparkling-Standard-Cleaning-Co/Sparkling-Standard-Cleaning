@@ -50,25 +50,35 @@ const quotes = [
   'did an amazing job',
   'Very respectful, AMAZING cleaning',
   'Quality, affordable, attention to detail',
+  'crispy couch',
+  'detail oriented young lady',
+  'extremely reliable and professional',
+  'outstanding job every week',
 ];
 
-test('all three authentic reviews render with first-name-only attributions', async () => {
+test('all seven verified reviews render with first-name-only attributions', async () => {
   const { context, page } = await open(1280);
   try {
     const cards = page.locator('[data-review-card]');
-    assert.equal(await cards.count(), 3, 'three reviews');
+    assert.equal(await cards.count(), 7, 'seven verified reviews');
     const text = await page.locator('#reviews').innerText();
     for (const fragment of quotes) assert.ok(text.includes(fragment), `quote preserved: ${fragment}`);
     const authors = await page.locator('[data-review-card] footer strong').allTextContents();
-    assert.deepEqual(authors.map((a) => a.trim()), ['Christina', 'Richard', 'Laura']);
-    for (const surname of ['Sherwin', 'Lionhart', 'Harman']) {
+    assert.deepEqual(authors.map((a) => a.trim()), ['Christina', 'Richard', 'Laura', 'Dennis', 'Amanda', 'Elizabeth', 'Rob & Christi']);
+    for (const surname of ['Sherwin', 'Lionhart', 'Harman', 'Larsh', 'Wood', 'Moore']) {
       assert.ok(!text.includes(surname), `surname not published: ${surname}`);
     }
+    const summary = await page.locator('.reviews-summary').innerText();
+    assert.match(summary, /5\.0/);
+    assert.match(summary, /10 reviews/);
+    assert.match(await page.locator('.reviews-summary__note').innerText(), /Showing 7 verified Google reviews/);
+    assert.ok(!text.includes('Bob'), 'the owner-excluded review is not displayed');
+
     // Laura's five-star rating is verified (Google Maps contributor profile),
     // so every review presents the same intentional star row.
     const starRows = page.locator('[data-review-card] [aria-label="Rated 5 out of 5 stars"]');
-    assert.equal(await starRows.count(), 3, 'all reviews present five gold stars');
-    for (let index = 0; index < 3; index += 1) {
+    assert.equal(await starRows.count(), 7, 'all reviews present five gold stars');
+    for (let index = 0; index < 7; index += 1) {
       assert.equal(await starRows.nth(index).locator('svg').count(), 5, `review ${index + 1} has five stars`);
     }
   } finally {
@@ -97,13 +107,14 @@ test('stars are centered in authentic Google gold and reviewer names sit at the 
       .evaluate((el) => getComputedStyle(el).justifyContent);
     assert.equal(footerJustify, 'center', 'reviewer name is centered');
 
-    const bottoms = await page.locator('[data-review-card]').evaluateAll((cards) =>
+    const gaps = await page.locator('[data-review-card]').evaluateAll((cards) =>
       cards.map((card) => {
         const footer = card.querySelector('footer');
-        return footer ? card.offsetTop + card.offsetHeight - (footer.offsetTop + footer.offsetHeight) : -1;
+        if (!footer) return -1;
+        return Math.round(card.getBoundingClientRect().bottom - footer.getBoundingClientRect().bottom);
       }),
     );
-    assert.equal(new Set(bottoms.map((value) => Math.round(value))).size, 1, 'names share one bottom rhythm');
+    assert.ok(gaps.every((gap) => gap >= 15 && gap <= 40), `names sit at the card bottom (${gaps.join(', ')})`);
   } finally {
     await context.close();
   }
@@ -129,8 +140,12 @@ test('the center card is prominent and the neighbours are recessed', async () =>
       page.locator('[data-review-card]', { has: page.locator('footer strong', { hasText: author }) });
     const christina = card('Christina');
     const richard = card('Richard');
-    const laura = card('Laura');
+    const rob = card('Rob & Christi');
     await page.waitForFunction(() => document.querySelector('[data-review-carousel]')?.dataset.enhanced === 'true');
+    await page.waitForFunction(() => {
+      const side = document.querySelector('[data-review-card][data-offset="1"]');
+      return side && Number.parseFloat(getComputedStyle(side).opacity) >= 0.9;
+    });
 
     assert.equal(await christina.getAttribute('data-offset'), '0');
     assert.equal(await christina.getAttribute('aria-current'), 'true');
@@ -138,11 +153,14 @@ test('the center card is prominent and the neighbours are recessed', async () =>
     const offsets = await page.locator('[data-review-card]').evaluateAll((nodes) =>
       nodes.map((node) => node.dataset.offset),
     );
-    assert.deepEqual(offsets.sort(), ['-1', '0', '1'].sort());
+    assert.equal(offsets.filter((value) => value === '0').length, 1, 'one active card');
+    assert.equal(offsets.filter((value) => value === '-1').length, 1, 'one left neighbour');
+    assert.equal(offsets.filter((value) => value === '1').length, 1, 'one right neighbour');
+    assert.equal(offsets.length, 7, 'every review has a position');
 
     // Neighbours remain visible (not blurred/hidden) on desktop.
-    for (const side of [richard, laura]) {
-      assert.ok((await side.evaluate((el) => getComputedStyle(el).opacity)) >= '0.9');
+    for (const side of [richard, rob]) {
+      assert.ok(Number(await side.evaluate((el) => getComputedStyle(el).opacity)) >= 0.9, 'neighbour remains readable');
     }
     // The front card is the top layer.
     assert.equal(
@@ -166,7 +184,7 @@ test('next/previous, dots, card click, keyboard and status announcement work', a
     assert.equal((await activeAuthor()).trim(), 'Christina');
     await page.locator('[data-review-next]').click();
     assert.equal((await activeAuthor()).trim(), 'Richard');
-    assert.match(await status.innerText(), /Review 2 of 3 — Richard/);
+    assert.match(await status.innerText(), /Review 2 of 7/);
     await page.locator('[data-review-prev]').click();
     assert.equal((await activeAuthor()).trim(), 'Christina');
     await page.locator('[data-review-dot][data-index="2"]').click();
@@ -247,7 +265,7 @@ test('reduced motion removes transitions', async () => {
 test('without JavaScript every review remains readable', async () => {
   const { context, page } = await open(1280, 900, { javaScriptEnabled: false });
   try {
-    assert.equal(await page.locator('[data-review-card]').count(), 3);
+    assert.equal(await page.locator('[data-review-card]').count(), 7);
     const text = await page.locator('#reviews').innerText();
     for (const fragment of quotes) assert.ok(text.includes(fragment), `no-JS review readable: ${fragment}`);
     assert.equal(await page.locator('[data-review-carousel]').getAttribute('data-enhanced'), null);

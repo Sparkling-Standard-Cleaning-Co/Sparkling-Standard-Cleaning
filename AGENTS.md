@@ -643,18 +643,18 @@ collections are intentionally empty — not errors.
   the exact four-dollar-sign design (first filled gold, three outlined). The small footer review
   button uses the matching reading-glasses vector at 24 px. Church Cleaning is the
   sixth homepage card. Registry: `docs/design/WHITE-TILE-ICON-INVENTORY.md`.
-- **Authentic reviews live (2026-10-24, Initiative 5.0):** the homepage reviews section is a
-  premium layered editorial carousel (`src/components/Reviews.astro`) rendering ONE prominent
-  center review with two recessed-but-readable equal-height neighbours; it is progressively
+- **Authentic reviews live (2026-10-24; expanded 2026-11-20):** the homepage reviews
+  section is a premium layered editorial carousel (`src/components/Reviews.astro`) rendering ONE
+  prominent center review with recessed-but-readable equal-height neighbours; it is progressively
   enhanced (no-JS shows every review readable), keyboard/swipe navigable, respects
-  `prefers-reduced-motion`, and never autoplays.
-  Three genuine owner-supplied Google reviews render — **Christina, Richard, Laura** — public
-  attributions are **first names only** (never publish surnames in testimonials). Christina and
-  Richard carry their authentic 5-star ratings; Laura's rating is verified as five stars
-  (owner-supplied Google Maps review, checked 2026-10-24). Review source files are `src/content/reviews/christina.md`,
-  `richard.md`, `laura.md` (quote text verbatim; never fabricate or "improve" it). Never
-  fabricate additional reviews or aggregate/Review schema; new genuine entries render
-  automatically and the verified Google reviews link stays intact.
+  `prefers-reduced-motion`, and never autoplays. Seven verified Google reviews render -
+  **Christina, Richard, Laura, Dennis, Amanda, Elizabeth, Rob & Christi** - with public
+  attributions limited to first names (never publish surnames in testimonials). The site shows
+  the verified owner-supplied overall Google rating (5.0 from 10 reviews) separately from the
+  number of reviews displayed. The owner explicitly excluded Bob's review. K V and S Ismail
+  remain unverified in the repository because their full public review text could not be retrieved;
+  do not invent them. Review source files live in `src/content/reviews/`; quote text is verbatim
+  and new genuine entries render automatically. Never fabricate reviews or aggregate/Review schema.
 - **Five-step estimator (owner priority UX directive; current 2026-10-29):** the residential and STR
   journey is exactly **When & Where → Service & Home → Condition & Frequency → Your Details →
   Extras & Payment** (`src/lib/estimate/steps.ts`, `src/lib/estimate/engines.ts`). Step 1 now
@@ -743,7 +743,8 @@ collections are intentionally empty — not errors.
   additional profile
   URLs (TikTok, Pinterest, Rumble, Gab, Parler, Locals). Instagram, YouTube and X were added
   2026-10-27, so **twelve profiles render** in the Follow Us section (including the verified Google
-  Business Profile) as **logo-only 52px circular buttons** in four columns (4 + 4 + 4 on phones). Platform names are visually
+  Business Profile) as **logo-only official marks on transparent 44px touch targets** with no
+  white circular chips; rows centre and wrap naturally on phones. Platform names are visually
   hidden but remain each link's explicit accessible name. Icons use official marks, including
   Nextdoor's house-"n" favicon, the official Gab and Parler marks and the official Locals logo
   (`src/components/SocialIcon.astro` documents each source). **The owner confirms the basic

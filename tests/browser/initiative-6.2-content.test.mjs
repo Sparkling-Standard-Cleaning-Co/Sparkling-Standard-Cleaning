@@ -135,10 +135,10 @@ test('reviews use larger stars with a source label and authentic first-name attr
   const { context, page } = await open('/');
   try {
     const stars = page.locator('.review-card__stars svg');
-    assert.equal(await stars.count(), 15, 'three five-star reviews');
+    assert.equal(await stars.count(), 35, 'seven five-star reviews');
     const width = await stars.first().getAttribute('width');
     assert.equal(width, '22');
-    assert.equal(await page.locator('.review-carousel__source').count(), 3);
+    assert.equal(await page.locator('.review-carousel__source').count(), 7);
     const text = await page.locator('#reviews').innerText();
     assert.match(text, /Christina/);
     assert.match(text, /Richard/);

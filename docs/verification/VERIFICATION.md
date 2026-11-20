@@ -1,8 +1,13 @@
 # Verification status
 
+## Reviews carousel and footer refinement - 2026-11-20
+
+Seven verified Google reviews now render (Christina, Richard, Laura, Dennis, Amanda, Elizabeth, Rob & Christi) with the verified 5.0 / 10 profile rating shown separately. Bob's review is excluded by owner instruction; K V and S Ismail could not be verified in full because Google hides the remaining reviews from signed-out viewers. The footer Follow Us section is now a boxless integrated row of 12 official social marks on transparent 44px targets, with no white circles, and remains shared across every public page. Unit suite 906 (905 pass, one pre-existing skip); 226 browser tests pass. Screenshots: `docs/verification/2026-11-20-reviews-footer/`. Full detail: [`2026-11-20-REVIEWS-FOOTER.md`](2026-11-20-REVIEWS-FOOTER.md).
+
 ## Two-branch topology and B2B launchpad - 2026-11-20
 
 Migration `0040` adds branch lifecycle/configuration and per-branch immutable pricing versions. Production D1 was backed up and verified before application; Pensacola remains live and Tampa Bay remains setup/prelaunch. The owner gained a server-scoped All/Pensacola/Tampa view, Branches & Launch setup and branch-specific pricing control. Public `/locations/pensacola/` is indexable; `/locations/tampa-bay/` is noindex and excluded from the sitemap. The commercial/institutional campaign launchpad was generated in the Windows master workspace with six print-ready Pensacola one-pagers, scripts, checklists, pipeline and 30/60/90 plan. Full unit suite 906 (905 pass, one pre-existing skip); 225 browser tests pass. Full detail: [`2026-11-20-TWO-BRANCH-B2B.md`](2026-11-20-TWO-BRANCH-B2B.md).
+
 ## Production activation and admin address autocomplete - 2026-11-19
 
 Application code **`019fad6`** is live on `production-safe` (Cloudflare Pages production deployment `f890914f-32fc-4691-9557-009214a9e380`). Migrations `0038` and `0039` are applied to production D1 and verified; legacy customer/appointment/invoice/payment counts match the pre-migration backup. Google Places (New) admin address autocomplete is live and the production endpoint returned real predictions/details for a synthetic Pensacola address. Quick Estimate calculation and PDF generation were exercised against production without creating business records. Encrypted D1 and 2.5 GB master-workspace backups were created, uploaded to private R2, downloaded, rejoined and restore-verified. CI `validate` and `browser` passed; local suite 902 tests (901 pass, 1 pre-existing skip) and 225 browser tests passed. No live charge, refund, customer email, legal execution or production customer record change was performed. Full detail: [`2026-11-19-PRODUCTION-ACTIVATION.md`](2026-11-19-PRODUCTION-ACTIVATION.md).

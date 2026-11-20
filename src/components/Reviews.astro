@@ -26,6 +26,8 @@ const { heading = 'Kind Words From Our Customers', eyebrow = 'Reviews' } = Astro
 const reviews = (await getCollection('reviews')).sort((a, b) => a.data.order - b.data.order);
 const profileUrl = isPending(business.reviews.profileUrl) ? null : business.reviews.profileUrl;
 const total = reviews.length;
+const overallRating = business.reviews.overallRating;
+const totalGoogleReviews = business.reviews.totalGoogleReviews;
 
 // Split authentic wording into readable paragraphs on blank lines. The quote
 // itself is never edited, truncated or "improved" — only whitespace between
@@ -47,6 +49,17 @@ const paragraphsOf = (quote: string): string[] =>
           </div>
           <p class="eyebrow">{eyebrow}</p>
           <h2 id="reviews-heading">{heading}</h2>
+          <p class="reviews-summary">
+            <span class="reviews-summary__rating">
+              <Icon name="star" size={17} />
+              {overallRating.toFixed(1)}
+            </span>
+            <span>average on Google from {totalGoogleReviews} reviews</span>
+          </p>
+          <p class="reviews-summary__note">
+            Showing {total} verified Google {total === 1 ? 'review' : 'reviews'}. This carousel is a
+            selected view of our profile, not a complete copy.
+          </p>
         </div>
       </div>
 
@@ -55,7 +68,8 @@ const paragraphsOf = (quote: string): string[] =>
           class="review-carousel__stage"
           role="group"
           aria-roledescription="carousel"
-          aria-label="Customer reviews"
+          aria-label="Customer review carousel. Use the left and right arrow keys or the controls below to move between reviews."
+          tabindex="0"
         >
           {reviews.map((review, index) => {
             const paragraphs = paragraphsOf(review.data.quote);
@@ -104,6 +118,9 @@ const paragraphsOf = (quote: string): string[] =>
 
                 <footer class="review-carousel__footer">
                   <strong>{review.data.author}</strong>
+                  {review.data.context && (
+                    <span class="review-carousel__meta">{review.data.context}</span>
+                  )}
                 </footer>
               </blockquote>
             );
