@@ -84,24 +84,31 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-20 master directive: reviews, photos, footer and Tampa inquiries):**
-  application code **`1d7c997`** is live on `production-safe` (Cloudflare Pages production
-  deployment `c6469de6-bf79-407c-a2a4-3f54c4051d35`). Migration `0040` remains applied and
-  verified; Pensacola is live and Tampa Bay is setup/prelaunch. The owner-approved review set is
-  now **Christina, Richard, Laura, Dennis D, K V, S Ismail and Rob & Christi Moore**; Bob, Amanda
-  and Elizabeth are excluded. K V and S Ismail use the exact owner-supplied text, and K V's
-  "bi-monthly" wording is preserved. Dennis's two couch photographs and Laura's shower photograph
-  are restored from the public Google review. The former rating/count summary and the footer
-  service-area paragraph were removed. Follow Us remains twelve transparent 44px official marks.
-  Tampa Bay now has a premium public page and a branch-assigned inquiry form that creates a Tampa
-  lead but no booking, quote or payment; the page remains noindex until launch gates pass.
-  Capability flags for marketing, inquiries, commercial leads, estimates, scheduling, payments,
-  fulfillment and Google profile are code-owned in `src/config/branches.ts`. The B2B launchpad
-  and separate Pensacola/Tampa operations workspaces are in the Windows master. CI `validate`
-  and `browser` pass; local suite **907 tests (906 pass, 1 pre-existing skip)** and **228 browser
-  tests** pass. No live charge, refund, customer email, legal execution or production customer
-  record change was performed. Evidence: `docs/verification/2026-11-20-REVIEWS-FOOTER.md`,
-  `docs/operations/TAMPA-BAY-LAUNCH.md`, `docs/verification/2026-11-20-TWO-BRANCH-B2B.md`.
+- **Current release (2026-11-20 data recovery, review design and backup closeout):** application code
+  **`e011105`** is live on `production-safe` (Cloudflare Pages production deployment
+  `df9fa304-c87c-4812-a5ad-47018356f999`). The pre-existing residential and commercial prospect
+  systems were recovered intact: **4,241 addresses / 3,892 owner-occupied / 66 routes / 20
+  neighborhoods**, and **800 commercial prospects / 16 sectors / 56 route groups / 192 Priority A**.
+  Protected recovery copies and checksum manifests now live in the master workspace; the full
+  master inventory indexes 1,932 files. The review carousel uses seven owner-approved reviews,
+  consistent 35rem cards with a controlled overflow/read-full-review dialog, Dennis's two real
+  couch photographs, Laura's real shower photograph and collapsed Laura paragraph spacing. Bob,
+  Amanda and Elizabeth remain excluded. Follow Us is twelve transparent 44px marks; the footer
+  service-area paragraph remains removed. Tampa has independent pricing-version space ready for
+  owner configuration, but full booking activation remains blocked by the missing branch-aware
+  public estimator/travel/scheduling path. A new encrypted full backup covers D1, application R2
+  (88 objects) and the master workspace; parts were uploaded to private R2, downloaded, rejoined
+  and verified, and an independent OneDrive copy was created and checksum-verified locally.
+  CI `validate` and `browser` pass; local suite **907 tests (906 pass, 1 pre-existing skip)** and
+  **228 browser tests** pass. No live charge, refund, unsolicited customer email or legal
+  execution was performed. Evidence: `docs/operations/PROSPECT-DATA-RECOVERY.md`,
+  `docs/operations/OFFSITE-BACKUPS.md`, `docs/verification/2026-11-20-REVIEWS-FOOTER.md`.
+- **Prior release (2026-11-20 master directive: reviews, photos, footer and Tampa inquiries):**
+  application code `1d7c997` remains in production history (deployment
+  `c6469de6-bf79-407c-a2a4-3f54c4051d35`). It corrected the owner-approved review set, restored
+  Dennis/Laura photos, removed the summary and footer area paragraph, added the Tampa inquiry
+  page/form and deployed the branch foundation. Evidence:
+  `docs/verification/2026-11-20-REVIEWS-FOOTER.md`.
 - **Prior release (2026-11-19 production activation and admin address autocomplete):** application
   code **`019fad6`** remains in production history (Cloudflare Pages deployment
   `f890914f-32fc-4691-9557-009214a9e380`). It applied migrations `0038`/`0039`, added Google
