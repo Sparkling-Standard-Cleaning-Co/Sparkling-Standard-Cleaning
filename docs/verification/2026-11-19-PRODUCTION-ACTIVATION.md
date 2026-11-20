@@ -178,3 +178,37 @@ received a legal document.
 | Backups | D1 + local master activated; app R2 objects blocked |
 | Regression | 902 unit (901 pass, 1 skip), 225 browser pass |
 | Production deployment | Recorded after the release commit |
+
+## 12. Actual production verification after deployment
+
+Deployment: `f890914f-32fc-4691-9557-009214a9e380` (Production, branch
+`production-safe`, source `019fad6`).
+
+Using a short-lived owner session created only for validation and deleted
+immediately afterward, the following were exercised against
+`https://sparkling-standard.com`:
+
+- `POST /api/admin/address-autocomplete` (`suggest`): returned
+  `provider: "google"`, 5 real predictions, first
+  `1000 Bayou Blvd, Pensacola, FL`.
+- `POST /api/admin/address-autocomplete` (`details`): returned
+  `1000 Bayou Boulevard`, Pensacola, FL 32503, Escambia County, precise, with
+  coordinates 30.4313847, -87.1836633.
+- `POST /api/admin/quick-estimates` (`calculate`): returned `priced`, total
+  $280.00, cleaning subtotal $282.15, $0 travel, pricing version
+  `2026-10-25.engine-calibration-supportive-tax.v1.49705bdc08ec90b4`.
+- `POST /api/admin/quick-estimates` (`pdf`): returned a real `%PDF-` file.
+- `GET /api/admin/documents?view=bundles`: returned all six packet starters.
+
+These calls created no customer, booking, invoice, payment or document record.
+The temporary sessions were deleted; they are not reported in this document.
+
+The initial deployed Google helper used a 90 km location bias, which Google
+rejects; it was corrected to the supported 50 km radius and redeployed. The
+tests above were run after that correction.
+
+## 13. Deployment identifier
+
+Cloudflare Pages production deployment for this release:
+
+`f890914f-32fc-4691-9557-009214a9e380`

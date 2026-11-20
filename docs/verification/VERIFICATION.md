@@ -1,8 +1,12 @@
 # Verification status
 
+## Production activation and admin address autocomplete - 2026-11-19
+
+Application code **`019fad6`** is live on `production-safe` (Cloudflare Pages production deployment `f890914f-32fc-4691-9557-009214a9e380`). Migrations `0038` and `0039` are applied to production D1 and verified; legacy customer/appointment/invoice/payment counts match the pre-migration backup. Google Places (New) admin address autocomplete is live and the production endpoint returned real predictions/details for a synthetic Pensacola address. Quick Estimate calculation and PDF generation were exercised against production without creating business records. Encrypted D1 and 2.5 GB master-workspace backups were created, uploaded to private R2, downloaded, rejoined and restore-verified. CI `validate` and `browser` passed; local suite 902 tests (901 pass, 1 pre-existing skip) and 225 browser tests passed. No live charge, refund, customer email, legal execution or production customer record change was performed. Full detail: [`2026-11-19-PRODUCTION-ACTIVATION.md`](2026-11-19-PRODUCTION-ACTIVATION.md).
+
 ## Master production closeout - 2026-11-19
 
-Application code **`054d395`** is live on `production-safe`; the static admin page was verified at `https://sparkling-standard.com/admin/` with the Quick Estimate and packet markup present. Cloudflare Pages deployment IDs are dashboard-only and were not retrievable without account credentials. Migrations `0038` and `0039` are additive and still require an owner/dashboard step before the new admin features are used. CI `validate` and `browser` passed; local suite 896 tests (895 pass, 1 pre-existing skip) and 223 browser tests passed. No live charge, refund, customer email, legal execution or production customer record change was performed. Full detail: [`2026-11-19-MASTER-CLOSEOUT.md`](2026-11-19-MASTER-CLOSEOUT.md).
+Application code **`054d395`** remains in production history. It delivered the Quick Estimate, document packet builder, admin improvements and backup tooling. Evidence: [`2026-11-19-MASTER-CLOSEOUT.md`](2026-11-19-MASTER-CLOSEOUT.md).
 
 ## Invoice payment receipts - 2026-11-19
 

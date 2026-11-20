@@ -45,8 +45,8 @@ Predictions are location-biased, never hard-restricted:
 
 | Branch | Bias centre | Radius |
 | --- | --- | --- |
-| Pensacola | 30.4213, -87.2169 | 90 km |
-| Tampa (future) | 27.9506, -82.4572 | 90 km |
+| Pensacola | 30.4213, -87.2169 | 50 km |
+| Tampa (future) | 27.9506, -82.4572 | 50 km |
 
 The API returns nationwide US predictions so nearby Alabama and other valid
 service addresses remain selectable. The UI rejects a non-FL/AL state with a
