@@ -84,7 +84,20 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-20 data recovery, review design and backup closeout):** application code
+- **Current release (2026-11-20 execution reliability and checkout repair):** application code
+  **`cd612e7`** is live on `production-safe` (Cloudflare Pages production deployment
+  `dc7419a3-5cb0-4158-ab51-6c008e8b0b0d`). It fixes the displayed-total promotion acceptance path
+  that could reject a `HOLIDAY15` checkout (`quote_changed`), enables and reports recurring checkout
+  readiness, records failed checkout reasons on the request, uses branch-local admin time (Pensacola
+  Central; Tampa Eastern), renders recurring duration in hours/minutes, and bounds long admin tables.
+  Review cards keep the approved 35rem/33rem heights with internal quote scrolling and no top
+  clipping at 1440/1280/1024/390. Tampa coverage is registered as 132 Census ZCTAs for Pasco,
+  Pinellas and Hillsborough with a 20-mile default one-way limit; Tampa pricing version 1 is internal
+  at fingerprint `2026-10-25.engine-calibration-supportive-tax.v1.49705bdc08ec90b4`. CI `validate`
+  and `browser` passed; unit **908** (907 pass, 1 pre-existing skip), browser **228** pass. No live
+  charge, refund or customer message was performed. Evidence:
+  `docs/verification/2026-11-20-EXECUTION-RELIABILITY-FIXES.md`.
+- **Prior release (2026-11-20 data recovery, review design and backup closeout):** application code
   **`e011105`** is live on `production-safe` (Cloudflare Pages production deployment
   `df9fa304-c87c-4812-a5ad-47018356f999`). The pre-existing residential and commercial prospect
   systems were recovered intact: **4,241 addresses / 3,892 owner-occupied / 66 routes / 20

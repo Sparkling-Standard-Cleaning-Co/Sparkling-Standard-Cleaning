@@ -85,8 +85,8 @@ diagnostics without weakening payment, privacy or authorization controls.
 ## Tests
 
 - `npm run check`: 0 errors, 0 warnings, 2 hints.
-- Unit suite: 907 tests, 906 pass, 1 pre-existing skip (before the added
-  promotion regression); focused checkout file: 28/28 pass after the addition.
+- Unit suite: 908 tests, 907 pass, 1 pre-existing skip; focused checkout file:
+  28/28 pass including the new promotion-total regression.
 - Browser suite: 228/228 pass after assigning unique preview ports to two admin
   test files that shared port 4436/4422.
 - Build: 37 pages.
