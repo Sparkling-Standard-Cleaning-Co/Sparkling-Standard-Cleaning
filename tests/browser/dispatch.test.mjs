@@ -156,13 +156,12 @@ test('the owner can save dispatch controls and run automatic assignment', async 
     await page.uncheck('[data-dispatch-settings] input[name="paused"]');
     await page.selectOption('[data-dispatch-settings] select[name="mode"]', 'automatic_unassigned');
     await page.click('[data-dispatch-settings] button[type="submit"]');
-    await page.waitForFunction(() => true);
+    await page.waitForFunction(() => document.querySelector('[data-dispatch-result]')?.textContent === 'Dispatch updated.');
     assert.ok(posts.some((entry) => entry.action === 'update_settings' && entry.autoAssignEnabled === true && entry.paused === false));
     page.once('dialog', (dialog) => void dialog.accept());
     await page.click('[data-admin-action="dispatch-run-auto"]');
-    await page.waitForFunction(() => true);
+    await page.waitForFunction(() => /assigned 1/.test(document.querySelector('[data-dispatch-result]')?.textContent ?? ''));
     assert.ok(posts.some((entry) => entry.action === 'run_automatic'));
-    assert.match(await page.textContent('[data-dispatch-result]') ?? '', /assigned 1/);
   } finally {
     await context.close();
   }
