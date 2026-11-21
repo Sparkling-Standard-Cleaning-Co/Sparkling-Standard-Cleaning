@@ -266,7 +266,7 @@ No APM; recurring worker has 11 failures and 0 incidents; payment/email/worker f
 
 ## Stabilization execution status — 2026-11-21
 
-**Completed and deployed (application commit `b066554`):**
+**Completed and deployed (application/security commits `fac8da6`, `b066554`, `f7fa3c0`):**
 - Server-authoritative tax jurisdiction on the dynamic-promotion path.
 - Correct outstanding/discount financial reporting.
 - Idempotent booking-request invoice generation with migration `0048`.
@@ -296,3 +296,6 @@ No APM; recurring worker has 11 failures and 0 incidents; payment/email/worker f
 - Communications Center sender/template wiring and delivery/bounce webhook.
 - Historical branch/gift backfill, which must not be guessed or rewritten
   without evidence.
+### Email MFA verification status
+
+Email-code MFA is implemented, tested and available for owner/administrator enrollment. Authenticator MFA is preserved. SMS is not enabled; a provider budget and abuse controls require owner approval. The production owner still has `mfa_enabled = 0`, so login enforcement is unchanged until the owner completes enrollment, a fresh login and recovery-code verification. A general per-action step-up token for exports/deletion/role changes remains open.

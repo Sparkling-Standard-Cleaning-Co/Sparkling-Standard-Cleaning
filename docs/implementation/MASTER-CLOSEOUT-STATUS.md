@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-21 (stabilization batch and email-code MFA deployed; remaining workflows tracked)
+Last updated: 2026-11-21 (email-code MFA refined, tested and pushed; remaining workflows tracked)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -21,7 +21,7 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Browser tests | 237 pass | **247 pass / 0 fail** (`node --test --test-concurrency=2 "tests/browser/*.test.mjs"`) |
 | Newest migrations | 0043 | `0044`–`0047` (production at **47**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
-| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`d45b2eeb-d70c-4e45-a258-c8f67a22d9bf`** (source `b066554`); prior checkout fix also verified on `3f6ded04` |
+| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`b0e5a8e4-41a5-4efd-838e-23264b3ec838`** (source `f7fa3c0`); prior checkout fix also verified on `3f6ded04` |
 | Prior release deployment | — | `bb936ae2-cf37-4682-89af-4b5acd03ab5b` (source `10aef33`) |
 
 Git topology note (unresolved, requires owner approval before any change):
@@ -430,3 +430,33 @@ Next executable steps:
   UI/resume links; portal-request inbox; post-payment photo recovery;
   Communications Center wiring; automated backup monitor/Workers; branch-aware
   historical backfill. Tampa remains OFF and dispatch paused.
+### 2026-11-21 - email MFA and security refinement
+
+- Migration `0049_email_mfa.sql` applied; production has **49 migrations**.
+  It adds `admin_users.mfa_method`, the private email MFA challenge table and
+  clears any pending authenticator secret when MFA was not enabled.
+- Email MFA is implemented alongside authenticator MFA: six-digit codes are
+  hashed and bound to a random challenge token; five-minute expiry; five
+  attempts; 60-second resend cooldown; IP/account rate limits; single-use
+  recovery codes. Codes are delivered through Resend, never logged, placed in
+  URLs or browser storage.
+- Login accepts either TOTP or email challenges based on the stored method.
+  Enrollment and disablement require the existing factor/password controls;
+  email enrollment requires a fresh password confirmation.
+- Admin setup UI exposes **Use email verification codes** alongside
+  **Set up authenticator**. SMS was assessed but is not enabled; the provider
+  budget, opt-in, STOP handling and A2P fees still require owner approval.
+- Production security state verified after push: `mfa_enabled = 0`,
+  `mfa_method = totp`, pending secret `none`, zero email challenges. Login
+  enforcement is deliberately unchanged until the owner enrolls and verifies a
+  successful login and recovery.
+- Verification: unit **978** (977 pass, 1 skip); browser **247 pass** at
+  concurrency 2; check 0 errors; build 39 pages; validate/smoke pass; GitHub
+  validate/browser run `44938278485` successful.
+- Application/security commit **`f7fa3c0`**; final production deployment
+  **`b0e5a8e4-41a5-4efd-838e-23264b3ec838`** (source `f7fa3c0`), synchronized
+  with `origin/production-safe`.
+- Remaining: general per-action step-up, SMS activation, automated backups,
+  real declined/canceled payment lifecycle proof, payment-attempt incident
+  queue/resume, portal inbox, post-payment photo recovery and Communications
+  Center wiring. Tampa remains OFF and dispatch paused.
