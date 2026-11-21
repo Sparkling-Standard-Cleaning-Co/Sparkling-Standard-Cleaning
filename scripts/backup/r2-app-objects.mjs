@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 // Download application R2 objects for encryption/off-site backup.
 //
 // Uses the Cloudflare REST API with a least-privilege token that can read the
@@ -17,8 +17,8 @@ function arg(name, fallback = '') {
   return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
 }
 
-const token = process.env.CLOUDFLARE_API_TOKEN?.trim();
-const account = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+const token = (process.env.R2_APP_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN)?.trim();
+const account = (process.env.R2_APP_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID)?.trim();
 const buckets = (process.env.APP_R2_BUCKETS || 'sparkling-standard-documents,sparkling-standard-lead-photos')
   .split(',')
   .map((value) => value.trim())
@@ -26,7 +26,7 @@ const buckets = (process.env.APP_R2_BUCKETS || 'sparkling-standard-documents,spa
 const out = path.resolve(arg('--out', 'backup-out/r2-app'));
 
 if (!token || !account) {
-  console.error('CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required.');
+  console.error('R2_APP_API_TOKEN (or CLOUDFLARE_API_TOKEN) and R2_APP_ACCOUNT_ID (or CLOUDFLARE_ACCOUNT_ID) are required.');
   process.exit(1);
 }
 
