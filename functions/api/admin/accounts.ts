@@ -1,5 +1,5 @@
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
-import { AdminAuthError, audit, rateLimit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { AdminAuthError, audit, rateLimit, requireActor, requireCsrf, requireStepUp } from '../../../src/lib/admin/operations.ts';
 import { verifyPassword } from '../../../src/lib/admin/auth.ts';
 import {
   changePassword,
@@ -229,6 +229,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
     const actor = await requireActor(db, context.request, 'admin.manage');
     requireCsrf(context.request, actor);
+    requireStepUp(actor);
     if (action === 'invite') {
       const result = await inviteAdmin(db, actor, body);
       const origin = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;

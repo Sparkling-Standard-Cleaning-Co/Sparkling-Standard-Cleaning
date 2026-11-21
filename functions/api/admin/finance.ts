@@ -1,5 +1,5 @@
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
-import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { AdminAuthError, audit, requireActor, requireCsrf, requireStepUp } from '../../../src/lib/admin/operations.ts';
 import { verifyPassword } from '../../../src/lib/admin/auth.ts';
 import {
   applyCreditToInvoice,
@@ -86,6 +86,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     requireCsrf(context.request, actor);
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = String(body.action ?? '');
+    if (
+      action !== 'preview_invoice_email' &&
+      ['create_invoice', 'invoice_status', 'record_payment', 'record_refund', 'create_credit', 'apply_credit', 'payment_link', 'billing_portal', 'resend_invoice_receipt', 'email_invoice', 'stripe_refund'].includes(action)
+    ) {
+      requireStepUp(actor);
+    }
     if (action === 'create_invoice') return json({ ok: true, ...(await createInvoice(db, actor, body)) });
     if (action === 'invoice_status') {
       await updateInvoiceStatus(db, actor, String(body.invoiceId ?? ''), String(body.status ?? ''));

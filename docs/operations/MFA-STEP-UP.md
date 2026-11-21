@@ -36,7 +36,31 @@ These are planning ranges, not quotes; current provider pricing and carrier fees
 
 ## Step-up status
 
-Existing high-risk financial actions (Stripe refunds, gift redemption/void and saved-card charging) already require password step-up. MFA-enabled accounts are challenged at login. A general per-action MFA step-up token is **not yet enforced** on every administrative operation; that remains a tracked stabilization item. Do not describe the current system as fully step-up protected until those endpoints share a tested step-up policy.
+A fresh second-factor step-up is now enforced for MFA-enabled accounts on:
+
+- permanent customer deletion;
+- business-record data exports;
+- storage cleanup, retention-policy and legal-hold changes;
+- administrator invitations, role/status changes, password resets and session revocation;
+- invoice creation, payments, refunds, credits, payment links and invoice emailing;
+- Stripe refunds.
+
+The step-up window is ten minutes. A successful MFA login counts as a fresh
+step-up for its new session. When a protected action is attempted with an older
+session, the server returns `mfa_step_up_required`; the admin interface sends a
+fresh authenticator or email challenge and retries the original action once
+after verification. The challenge is bound to the authenticated administrator
+and a single challenge token; codes remain hashed at rest.
+
+Accounts without MFA (including the production owner until enrollment is
+verified) continue to operate without this gate. Existing password step-up for
+Stripe refunds, gift redemption/void and saved-card charging remains in place.
+
+The step-up policy is not yet applied to every administrative endpoint. Booking
+creation/cancellation, dispatch assignment, document sending, pricing publication,
+communications settings and other operational writes should be reviewed for the
+same policy as their risk is assessed. Do not describe the system as fully
+step-up protected across every endpoint.
 
 ## Owner activation checklist
 

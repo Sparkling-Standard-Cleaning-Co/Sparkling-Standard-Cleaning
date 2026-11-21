@@ -6,6 +6,7 @@ import {
   enrollOwner,
   expiredSessionCookie,
   auditFromRequest,
+  markSessionStepUp,
   rateLimit,
   readOpsActor,
   requireCsrf,
@@ -106,6 +107,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
             branchView: requestedBranchView(context.request),
             permissions: actor.permissions,
             mfaEnabled: actor.mfaEnabled,
+            mfaMethod: actor.mfaMethod ?? 'totp',
           }
         : null,
       csrf: actor?.csrf ?? null,
@@ -163,10 +165,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const action = safeText(payload.action, 30);
   const ip = context.request.headers.get('CF-Connecting-IP') ?? 'local';
   const ipKey = `ops:ip:${await hashToken(ip)}`;
-  const sessionFor = async (userId: string): Promise<Response | null> => {
+  const sessionFor = async (userId: string, stepUp = false): Promise<Response | null> => {
     const actor = await actorPayload(db, userId);
     if (!actor) return null;
-    const session = await createOpsSession(db, actor.id, context.request);
+    const session = await createOpsSession(db, actor.id, context.request, stepUp ? { stepUpAt: new Date().toISOString() } : {});
     return json(
       { ok: true, actor, csrf: session.csrf },
       200,
@@ -329,9 +331,78 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (verifiedActor) {
       await auditFromRequest(db, context.request, { ...verifiedActor, csrf: '', permissions: [], mfaEnabled: true }, 'admin.mfa_verified');
     }
-    return (await sessionFor(verified.userId)) ?? json({ ok: false, error: 'mfa_failed' }, 401);
+    return (await sessionFor(verified.userId, true)) ?? json({ ok: false, error: 'mfa_failed' }, 401);
   }
 
+  if (action === 'step_up_start') {
+    const actor = await readOpsActor(db, context.request);
+    if (!actor) return json({ ok: false, error: 'unauthorized' }, 401);
+    requireCsrf(context.request, actor);
+    if (!actor.mfaEnabled) return json({ ok: false, error: 'mfa_not_enabled' }, 400);
+    if (!(await rateLimit(db, `ops:stepup:${actor.id}`, 10, 15, 15))) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
+    if (actor.mfaMethod === 'email') {
+      const key = context.env.RESEND_API_KEY?.trim();
+      if (!key) return json({ ok: false, error: 'mfa_email_unavailable' }, 503);
+      const code = generateEmailCode();
+      const challenge = await createEmailMfaChallenge(db, actor.id, code);
+      const site = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+      const delivered = await sendAdminEmail(
+        {
+          RESEND_API_KEY: key,
+          ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+          PUBLIC_SITE_URL: site,
+        },
+        actor.email,
+        buildOpsMfaCodeEmail({ PUBLIC_SITE_URL: site }, code, actor.name),
+        `ops-stepup-code-${crypto.randomUUID()}`,
+      );
+      if (!delivered) {
+        await auditFromRequest(db, context.request, actor, 'admin.step_up_email_failed');
+        return json({ ok: false, error: 'mfa_email_unavailable' }, 503);
+      }
+      await auditFromRequest(db, context.request, actor, 'admin.step_up_started');
+      return json({
+        ok: true,
+        mfaMethod: 'email',
+        challengeToken: challenge.token,
+        expiresAt: challenge.expiresAt,
+      });
+    }
+    const challenge = await createMfaChallenge(db, actor.id);
+    await auditFromRequest(db, context.request, actor, 'admin.step_up_started');
+    return json({ ok: true, mfaMethod: 'totp', challengeToken: challenge.token, expiresAt: challenge.expiresAt });
+  }
+
+  if (action === 'step_up_verify') {
+    const actor = await readOpsActor(db, context.request);
+    if (!actor) return json({ ok: false, error: 'unauthorized' }, 401);
+    requireCsrf(context.request, actor);
+    if (!actor.mfaEnabled) return json({ ok: false, error: 'mfa_not_enabled' }, 400);
+    if (!(await rateLimit(db, `ops:stepup-verify:${actor.id}`, 20, 15, 15))) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
+    const challengeToken = safeText(payload.challengeToken, 300);
+    const emailChallenge = await emailMfaChallengeExists(db, challengeToken);
+    const verified = emailChallenge
+      ? await verifyEmailMfaChallenge(db, challengeToken, {
+          code: safeText(payload.code, 20),
+          recoveryCode: safeText(payload.recoveryCode, 40),
+        })
+      : await verifyMfaChallenge(db, challengeToken, {
+          code: safeText(payload.code, 20),
+          recoveryCode: safeText(payload.recoveryCode, 40),
+          ...(context.env.MFA_ENCRYPTION_KEY ? { encryptionKey: context.env.MFA_ENCRYPTION_KEY } : {}),
+        });
+    if (!verified || verified.userId !== actor.id || !actor.sessionId) {
+      await auditFromRequest(db, context.request, actor, 'admin.step_up_failed');
+      return json({ ok: false, error: 'mfa_invalid' }, 401);
+    }
+    await markSessionStepUp(db, actor.sessionId, actor.id);
+    await auditFromRequest(db, context.request, actor, 'admin.step_up_verified');
+    return json({ ok: true });
+  }
   if (action === 'setup') {
     const required = await setupRequired(db);
     if (!required) return json({ ok: false, error: 'already_configured' }, 409);

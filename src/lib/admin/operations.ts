@@ -10,6 +10,7 @@ import { requestedBranchView } from './branch-view.ts';
 
 export const OPS_COOKIE = 'ss_ops';
 export const OPS_SESSION_SECONDS = 8 * 60 * 60;
+export const STEP_UP_SECONDS = 10 * 60;
 
 export interface AdminPermission {
   permission: string;
@@ -25,6 +26,8 @@ export interface AdminActor {
   permissions: string[];
   mfaEnabled: boolean;
   mfaMethod?: 'totp' | 'email';
+  sessionId?: string;
+  stepUpAt?: string | null;
 }
 
 export class AdminAuthError extends Error {
@@ -135,6 +138,7 @@ export async function createOpsSession(
   db: D1Database,
   userId: string,
   request: Request,
+  options: { stepUpAt?: string } = {},
 ): Promise<{ token: string; csrf: string; expiresAt: string }> {
   const token = randomToken(32);
   const tokenHash = await hashToken(token);
@@ -145,8 +149,8 @@ export async function createOpsSession(
   await db
     .prepare(
       `INSERT INTO admin_sessions
-       (id, user_id, token_hash, csrf_token, ip_hash, user_agent_hash, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (id, user_id, token_hash, csrf_token, ip_hash, user_agent_hash, expires_at, step_up_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       `sess_${crypto.randomUUID()}`,
@@ -156,6 +160,7 @@ export async function createOpsSession(
       ip ? await hashToken(ip) : null,
       userAgent ? await hashToken(userAgent) : null,
       expiresAt,
+      options.stepUpAt ?? null,
     )
     .run();
   return { token, csrf, expiresAt };
@@ -167,7 +172,7 @@ export async function readOpsActor(db: D1Database, request: Request): Promise<Ad
   const tokenHash = await hashToken(token);
   const row = await db
     .prepare(
-      `SELECT s.id AS session_id, s.csrf_token, s.expires_at, s.revoked_at,
+      `SELECT s.id AS session_id, s.csrf_token, s.expires_at, s.revoked_at, s.step_up_at,
               u.id, u.email, u.display_name, u.status, u.role_id, u.branch_id, u.mfa_enabled, u.mfa_method
        FROM admin_sessions s JOIN admin_users u ON u.id = s.user_id
        WHERE s.token_hash = ? LIMIT 1`,
@@ -178,6 +183,7 @@ export async function readOpsActor(db: D1Database, request: Request): Promise<Ad
       csrf_token: string;
       expires_at: string;
       revoked_at: string | null;
+      step_up_at: string | null;
       id: string;
       email: string;
       display_name: string;
@@ -207,7 +213,28 @@ export async function readOpsActor(db: D1Database, request: Request): Promise<Ad
     permissions,
     mfaEnabled: Number(row.mfa_enabled) === 1,
     mfaMethod: row.mfa_method === 'email' ? 'email' : 'totp',
+    sessionId: row.session_id,
+    stepUpAt: row.step_up_at,
   };
+}
+
+export function requireStepUp(actor: AdminActor): void {
+  if (!actor.mfaEnabled) return;
+  const verifiedAt = actor.stepUpAt ? Date.parse(actor.stepUpAt) : Number.NaN;
+  if (!Number.isFinite(verifiedAt) || Date.now() - verifiedAt > STEP_UP_SECONDS * 1000) {
+    throw new AdminAuthError(403, 'mfa_step_up_required');
+  }
+}
+
+export async function markSessionStepUp(
+  db: D1Database,
+  sessionId: string,
+  userId: string,
+): Promise<void> {
+  await db
+    .prepare('UPDATE admin_sessions SET step_up_at = ? WHERE id = ? AND user_id = ?')
+    .bind(new Date().toISOString(), sessionId, userId)
+    .run();
 }
 
 export async function requireActor(

@@ -1,5 +1,5 @@
-﻿import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
-import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
+import { AdminAuthError, requireActor, requireCsrf, requireStepUp } from '../../../src/lib/admin/operations.ts';
 import {
   addCustomerNote,
   addProperty,
@@ -82,6 +82,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       return json({ ok: true, status: action === 'archive' ? 'archived' : 'active' });
     }
     if (action === 'delete') {
+      requireStepUp(actor);
       return json({ ok: true, ...(await deleteCustomer(db, actor, customerId, String(body.confirmation ?? ''))) });
     }
     if (action === 'add_note') {

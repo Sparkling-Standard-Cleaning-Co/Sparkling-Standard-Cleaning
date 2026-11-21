@@ -3,7 +3,7 @@
 // endpoint never attempts to hold an entire R2 archive in one request.
 
 import { adminDb, type AdminDbEnv, type D1Database } from '../../../src/lib/admin/d1.ts';
-import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { AdminAuthError, audit, requireActor, requireCsrf, requireStepUp } from '../../../src/lib/admin/operations.ts';
 import { isPhotoKey, isPhotoSidecarKey } from '../../../src/lib/photos.ts';
 
 interface R2Object {
@@ -192,6 +192,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const branch = exportBranch(url.searchParams.get('branch'));
     const format = url.searchParams.get('format') === 'json' ? 'json' : 'csv';
     if (exportKind) {
+      requireStepUp(actor);
       const file = await csv(db, exportKind, branch);
       await audit(db, {
         actorUserId: actor.id,
@@ -282,6 +283,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const actor = await requireActor(db, context.request);
     if (actor.role !== 'owner') return json({ ok: false, error: 'owner_required' }, 403);
     requireCsrf(context.request, actor);
+    requireStepUp(actor);
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = String(body.action ?? '');
     if (action === 'photo_cleanup') {

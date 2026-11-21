@@ -13,6 +13,7 @@ import {
   readOpsActor,
   requireActor,
   requireCsrf,
+  requireStepUp,
 } from '../src/lib/admin/operations.ts';
 import { hashPassword } from '../src/lib/admin/auth.ts';
 import { persistLeadSubmission } from '../src/lib/admin/lead-persistence.ts';
@@ -22,6 +23,7 @@ import { onRequestGet as adminRequestsGet, onRequestPost as adminRequestsPost } 
 import { onRequestGet as operationsGet } from '../functions/api/admin/operations.ts';
 import { onRequestPost as operationsPost } from '../functions/api/admin/operations.ts';
 import { onRequestGet as customersGet } from '../functions/api/admin/customers.ts';
+import { onRequestGet as storageGet } from '../functions/api/admin/storage.ts';
 
 const MFA_KEY = 'synthetic-mfa-encryption-key-32-bytes-minimum';
 
@@ -525,6 +527,94 @@ test('email MFA challenges are hashed, single-use, rate-limited and recoverable'
   );
 });
 
+test('sensitive actions require a fresh MFA step-up and the step-up route refreshes it', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'step-up@example.test',
+    name: 'Step Up Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const enrollment = await startMfaEnrollment(db, owner.id, owner.email, MFA_KEY);
+  await enableMfa(db, owner.id, totpCode(enrollment.secret), MFA_KEY);
+  const session = await createOpsSession(db, owner.id, request());
+  const cookie = `ss_ops=${session.token}`;
+  let actor = await readOpsActor(db, request(cookie));
+  assert.ok(actor);
+  assert.throws(() => requireStepUp(actor!), /mfa_step_up_required/);
+
+  const start = await authPost({
+    request: new Request('https://example.test/api/admin/auth', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'X-CSRF-Token': session.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'step_up_start' }),
+    }),
+    env: { DB: db, MFA_ENCRYPTION_KEY: MFA_KEY },
+  } as never);
+  assert.equal(start.status, 200);
+  const started = (await start.json()) as { challengeToken?: string; mfaMethod?: string };
+  assert.equal(started.mfaMethod, 'totp');
+  assert.ok(started.challengeToken);
+
+  const verify = await authPost({
+    request: new Request('https://example.test/api/admin/auth', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'X-CSRF-Token': session.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'step_up_verify',
+        challengeToken: started.challengeToken,
+        code: totpCode(enrollment.secret),
+      }),
+    }),
+    env: { DB: db, MFA_ENCRYPTION_KEY: MFA_KEY },
+  } as never);
+  assert.equal(verify.status, 200);
+  actor = await readOpsActor(db, request(cookie));
+  assert.ok(actor?.stepUpAt);
+  requireStepUp(actor!);
+
+  db.raw
+    .prepare('UPDATE admin_sessions SET step_up_at = ? WHERE user_id = ?')
+    .run(new Date(Date.now() - 11 * 60_000).toISOString(), owner.id);
+  actor = await readOpsActor(db, request(cookie));
+  assert.throws(() => requireStepUp(actor!), /mfa_step_up_required/);
+});
+test('data exports reject a stale MFA session and recover after step-up', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'export-step-up@example.test',
+    name: 'Export Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const enrollment = await startMfaEnrollment(db, owner.id, owner.email, MFA_KEY);
+  await enableMfa(db, owner.id, totpCode(enrollment.secret), MFA_KEY);
+  const session = await createOpsSession(db, owner.id, request());
+  const cookie = `ss_ops=${session.token}`;
+  const url = 'https://example.test/api/admin/storage?export=customers&format=csv';
+  const blocked = await storageGet({
+    request: new Request(url, { headers: { Cookie: cookie } }),
+    env: { DB: db },
+  } as never);
+  assert.equal(blocked.status, 403);
+  assert.equal(((await blocked.json()) as { error?: string }).error, 'mfa_step_up_required');
+
+  db.raw
+    .prepare('UPDATE admin_sessions SET step_up_at = ? WHERE user_id = ?')
+    .run(new Date().toISOString(), owner.id);
+  const allowed = await storageGet({
+    request: new Request(url, { headers: { Cookie: cookie } }),
+    env: { DB: db },
+  } as never);
+  assert.equal(allowed.status, 200);
+  assert.match(allowed.headers.get('Content-Type') ?? '', /text\/csv/);
+});
 test('the login route sends an email code and accepts it without exposing a session early', async () => {
   const db = migratedDb();
   const owner = await enrollOwner(db, {

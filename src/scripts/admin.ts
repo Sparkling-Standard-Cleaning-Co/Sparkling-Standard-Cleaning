@@ -209,6 +209,8 @@ function friendly(error: unknown): string {
     mfa_resend_cooldown: 'Please wait before requesting another code.',
     email_mfa_not_configured: 'Email verification is not configured yet.',
     mfa_already_enabled: 'Two-step verification is already enabled.',
+    mfa_step_up_required: 'Confirm your identity again before continuing.',
+    mfa_not_enabled: 'Two-step verification is not enabled for this account.',
     reset_invalid: 'This reset link is invalid, expired or already used. Request a new one.',
     origin_rejected: 'The request came from an unexpected origin. Reload and try again.',
     email_not_configured: 'Email delivery is not configured.',
@@ -263,13 +265,66 @@ function friendly(error: unknown): string {
   return messages[code] ?? titleCase(code);
 }
 
-async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+let stepUpPromise: Promise<boolean> | null = null;
+
+async function confirmStepUp(): Promise<boolean> {
+  if (!actor?.mfaEnabled) return false;
+  if (stepUpPromise) return stepUpPromise;
+  stepUpPromise = (async () => {
+    try {
+      const started = await api<{
+        challengeToken?: string;
+        mfaMethod?: 'totp' | 'email';
+        expiresAt?: string;
+      }>('/api/admin/auth', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'step_up_start' }),
+      });
+      if (!started.challengeToken) throw new Error('mfa_challenge_invalid');
+      const code = window.prompt(
+        started.mfaMethod === 'email'
+          ? 'Enter the six-digit code sent to your account email.'
+          : 'Enter the current authenticator code.',
+      );
+      if (!code) {
+        setAppError('A fresh verification code is required for this sensitive action.');
+        return false;
+      }
+      await api('/api/admin/auth', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'step_up_verify',
+          challengeToken: started.challengeToken,
+          code,
+        }),
+      });
+      setSuccess('Identity confirmed. Continuing the sensitive action.');
+      return true;
+    } catch (error) {
+      setAppError(friendly(error));
+      return false;
+    } finally {
+      stepUpPromise = null;
+    }
+  })();
+  return stepUpPromise;
+}
+
+async function api<T>(path: string, init: RequestInit = {}, stepUpRetried = false): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.body) headers.set('Content-Type', 'application/json');
   if (csrf && init.method && init.method !== 'GET') headers.set('X-CSRF-Token', csrf);
   const response = await fetch(path, { ...init, headers, credentials: 'same-origin' });
   const data = (await response.json().catch(() => ({}))) as T & { ok?: boolean; error?: string };
+  if (
+    response.status === 403 &&
+    data.error === 'mfa_step_up_required' &&
+    !stepUpRetried &&
+    path !== '/api/admin/auth'
+  ) {
+    if (await confirmStepUp()) return api<T>(path, init, true);
+  }
   if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}`);
   return data;
 }
@@ -3773,13 +3828,43 @@ function storageFormat(): string {
   return document.querySelector<HTMLSelectElement>('[data-admin-storage-format]')?.value ?? 'csv';
 }
 
+async function downloadStorageExport(exportKind: string): Promise<void> {
+  const params = new URLSearchParams({ export: exportKind, format: storageFormat() });
+  if (storageBranch()) params.set('branch', storageBranch());
+  const path = `/api/admin/storage?${params.toString()}`;
+  setAppError();
+  try {
+    let response = await fetch(path, { credentials: 'same-origin' });
+    if (response.status === 403) {
+      const data = (await response.clone().json().catch(() => ({}))) as { error?: string };
+      if (data.error === 'mfa_step_up_required' && (await confirmStepUp())) {
+        response = await fetch(path, { credentials: 'same-origin' });
+      }
+    }
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') ?? '';
+    const match = /filename="([^"]+)"/i.exec(disposition);
+    const filename = match?.[1] ?? `${exportKind}.${storageFormat()}`;
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    setSuccess(`Exported ${filename}.`);
+  } catch (error) {
+    setAppError(friendly(error));
+  }
+}
+
 document.querySelector<HTMLElement>('[data-admin-view="storage"]')?.addEventListener('click', (event) => {
   const exportKind = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-export]')?.dataset.adminExport;
-  if (exportKind) {
-    const params = new URLSearchParams({ export: exportKind, format: storageFormat() });
-    if (storageBranch()) params.set('branch', storageBranch());
-    window.location.assign(`/api/admin/storage?${params.toString()}`);
-  }
+  if (exportKind) void downloadStorageExport(exportKind);
 });
 async function loadStorage(): Promise<void> {
   const params = new URLSearchParams();
