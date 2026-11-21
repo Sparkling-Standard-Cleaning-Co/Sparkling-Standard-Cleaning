@@ -21,7 +21,7 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Browser tests | 237 pass | **248 pass / 0 fail** (`node --test --test-concurrency=2 "tests/browser/*.test.mjs"`) |
 | Newest migrations | 0043 | `0044`–`0050` (production at **50**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
-| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`7ea7af39-8f8b-47e7-8347-7d0797b6ed60`** (source `041303e`); prior checkout fix also verified on `3f6ded04` |
+| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`a583186f-79f5-494d-b4b6-422031658c68`** (source `d45ef7a`); prior checkout fix also verified on `3f6ded04` |
 | Prior release deployment | — | `bb936ae2-cf37-4682-89af-4b5acd03ab5b` (source `10aef33`) |
 
 Git topology note (unresolved, requires owner approval before any change):
@@ -514,8 +514,8 @@ Next executable steps:
   `mfa_enabled = 0`, `mfa_method = totp`, no pending secret; no owner session or
   credential was changed.
 - Verification: unit **981** (980 pass, 1 skip); browser **248 pass**; check 0
-  errors; build 39 pages. Commit **`041303e`**; active production deployment
-  **`7ea7af39-8f8b-47e7-8347-7d0797b6ed60`**; GitHub run `44947264510` passed.
+  errors; build 39 pages. Commit **`d45ef7a`** for the backup workstream; prior UI commit `041303e`; active production deployment
+  **`7ea7af39-8f8b-47e7-8347-7d0797b6ed60`**; GitHub run `44947264510` passed; backup workstream CI run `44952277389` passed.
 ### 2026-11-21 - encrypted backup and disaster recovery workstream
 
 - Actual encrypted recovery point created and verified:
