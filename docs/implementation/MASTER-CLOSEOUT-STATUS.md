@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-21 (owner UX, estimator and branch presentation improvements production-verified)
+Last updated: 2026-11-21 (owner UX release pushed to GitHub and mobile-verified)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -21,7 +21,7 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Browser tests | 237 pass | **245 pass / 0 fail** (`npm run test:browser`) |
 | Newest migrations | 0043 | `0044`–`0047` (production at **47**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
-| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`7fe55dcc-65c2-4207-8545-80dc6438b50f`** (source `cd0ecf6`); prior checkout fix also verified on `3f6ded04` |
+| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`e781e915-69e4-41c5-a29a-1d09e3d36b74`** (application source `88124eb`); prior checkout fix also verified on `3f6ded04` |
 | Prior release deployment | — | `bb936ae2-cf37-4682-89af-4b5acd03ab5b` (source `10aef33`) |
 
 Git topology note (unresolved, requires owner approval before any change):
@@ -304,3 +304,24 @@ Next executable steps:
   storage. No checkout session, charge or customer message was created.
 - No production charge, refund, customer message, branch activation, dispatch
   activation or destructive data action was performed during implementation.
+
+### 2026-11-21 - GitHub push synchronization and CI closeout
+
+- Pushed the verified release fast-forward to `origin/production-safe` with no
+  force, rebase, reset or `main` change. The push initially triggered Pages
+  deployment `1b05aae3-a0e6-48b8-a065-0f23d0dcf7c1` from `dd1a970`.
+- GitHub `validate` then exposed one stale smoke assertion: it expected the
+  exact `class="site-footer"` string after the shared footer gained its
+  mobile-bar modifier. Fixed the assertion in `88124eb`; `npm run smoke`
+  passed, and GitHub run `44884371126` completed **successfully** (both
+  validate and browser jobs).
+- Cloudflare Pages application deployment `e781e915-69e4-41c5-a29a-1d09e3d36b74`
+  is Active from `88124eb`. The push did not activate Tampa or dispatch.
+- Live 390px production verification passed: compact Proverbs 16:3 separator;
+  K V review scrolls from the top (334px overflow, overflow end state updates);
+  Dennis D has two fully contained/loaded photographs; Gift Certificates clears
+  the sticky action bar with 0px overlap; Service Area is Pensacola-only with
+  one map and no Tampa text; estimator Step 2 defaults to regular cleaning and
+  Step 3 shows the corrected frequency order and Deep Cleaning reset.
+- Final local and remote `production-safe` both point to `88124eb` before this
+  documentation-only closeout.
