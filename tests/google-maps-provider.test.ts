@@ -46,6 +46,30 @@ test('Google Place Details preserves house number and rejects out-of-state resul
   } finally { globalThis.fetch = original; }
 });
 
+test('a Google Routes failure falls back to the MapMap route before straight-line', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input) => {
+    if (String(input).includes('routes.googleapis.com')) {
+      return new Response(JSON.stringify({ error: { message: 'quota' } }), { status: 429 });
+    }
+    return new Response(JSON.stringify({ routes: [{ distance: 16093.44, duration: 1200 }] }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const route = await resolveRoute(
+      {
+        GOOGLE_MAPS_SERVER_API_KEY: 'synthetic-google-key',
+        ROUTES_API_KEY: 'synthetic-mapmap-key',
+        MAPMAP_BASE: 'https://api.mapmap.test',
+      },
+      { lat: 30.5, lng: -87.3 },
+      { lat: 30.6, lng: -87.4 },
+    );
+    assert.equal(route.verified, true);
+    assert.equal(route.provider, 'mapmap');
+    assert.equal(route.oneWayMiles, 10);
+  } finally { globalThis.fetch = original; }
+});
+
 test('Google Routes drives the existing route representation without exposing the origin', async () => {
   const original = globalThis.fetch;
   globalThis.fetch = (async () => new Response(JSON.stringify({ routes: [{ distanceMeters: 16093.44, duration: '1200s' }] }), { status: 200 })) as typeof fetch;

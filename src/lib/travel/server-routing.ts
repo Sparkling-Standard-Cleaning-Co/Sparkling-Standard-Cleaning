@@ -137,7 +137,7 @@ export async function resolveRoute(
     }
   }
 
-  if (provider === 'mapmap' && apiKey) {
+  if ((provider === 'mapmap' || provider === 'google') && apiKey) {
     try {
       // MapMap hosted gateway — OSRM-compatible response (distance metres,
       // duration seconds). Free tier: requests are refused at quota, so
@@ -157,7 +157,7 @@ export async function resolveRoute(
         return {
           oneWayMiles: meters / 1609.344,
           durationMinutes: seconds !== null ? seconds / 60 : null,
-          provider,
+          provider: 'mapmap',
           method: 'route',
           verified: true,
         };
