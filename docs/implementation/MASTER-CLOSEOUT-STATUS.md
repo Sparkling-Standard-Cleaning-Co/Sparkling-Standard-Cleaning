@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-21 (session 2: production release, customer portal, reminders, Data Control)
+Last updated: 2026-11-21 (session 2 complete: two guarded production releases)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -17,11 +17,12 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Final reported HEAD | `851a28b` | `851a28b` (`Record bookings and careers release evidence`) |
 | Application commit | `e7f18c6` | `e7f18c6` (`Add bookings email and secure careers applications`) |
 | Latest migration | `0043_career_applications.sql` | present; `migrations/0001`–`0043` |
-| Unit tests | 947 total / 946 pass / 1 skip | initial baseline reproduced; after this session **962 total / 961 pass / 1 skip / 0 fail** (`npm test`) |
-| Browser tests | 237 pass | full suite re-run after this session: **238 pass / 0 fail** (237 prior + 1 new communications UI test) |
+| Unit tests | 947 total / 946 pass / 1 skip | **972 total / 971 pass / 1 pre-existing skip / 0 fail** (`npm test`) |
+| Browser tests | 237 pass | **240 pass / 0 fail** (`npm run test:browser`) |
+| Newest migrations | 0043 | `0044`–`0047` (production at **47**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
-| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | recorded in release docs; not directly queryable from this checkout |
-| Docs deployment | `97e0ce54-9e87-4a29-8dbe-7d2a91c6c285` | recorded in release docs |
+| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`bb936ae2-cf37-4682-89af-4b5acd03ab5b`** (source `10aef33`, Active) |
+| Prior release deployment | — | `c50ba68b-d634-4a1d-a98a-5a2b9dc02978` (source `e65db71`) |
 
 Git topology note (unresolved, requires owner approval before any change):
 `origin/main` is 41 commits behind `origin/production-safe`
@@ -207,3 +208,32 @@ Next executable steps:
 5. Owner confirms inbox delivery/replies and Stripe portal settings.
 6. Continue archive search, short-lived download storage and approved
    permanent-deletion workflow.
+
+### 2026-11-21 � second production release
+
+- Migrations **0045, 0046, 0047** applied and recorded; production D1 now has
+  **47 migrations** and the portal, retention and reminder tables exist.
+- Pre-release export: 333,347 bytes, SHA-256
+  `EC4C13AAAE2A3B852A40ED26F4F37C5A962378B720236A447C1B20FD200C77D2`,
+  44 migrations, 87 tables, 0 foreign-key violations.
+- Commit **`10aef33`** pushed to `production-safe`.
+- Cloudflare Pages production deployment
+  **`bb936ae2-cf37-4682-89af-4b5acd03ab5b`** (Active).
+- Live smoke: `/portal/` 200 with noindex, portal auth GET 200, portal data and
+  document endpoints 401 without a session, admin retention/reminder controls
+  present, Tampa 404, home 200.
+- No charge, refund, customer message, legal-template publication, Tampa launch
+  or dispatch activation occurred.
+
+### Remaining next steps (current)
+
+1. Deploy `workers/backup-monitor` and `workers/document-reminders` with
+   `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `OPS_ALERT_URL` / `OPS_ALERT_TOKEN`
+   and `REMINDER_MONITOR_TOKEN`. Owner-provided secrets are required.
+2. Owner confirms portal sign-in, reply routing and delivery in real mailboxes.
+3. Configure Stripe billing-portal settings; then set
+   `PORTAL_BILLING_ENABLED=true` only after review.
+4. Complete short-lived download storage, archive search and the approved
+   permanent-deletion workflow in Data Control.
+5. Owner decides GitHub `main` reconciliation; no branch change has been made.
+6. Tampa remains OFF; dispatch remains analysis-only and paused.

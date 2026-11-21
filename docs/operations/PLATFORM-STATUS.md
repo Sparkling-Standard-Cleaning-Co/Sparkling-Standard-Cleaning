@@ -6,17 +6,25 @@ owner-reported setting into a code-verified fact. Historical records stay histor
 
 Last reviewed: **2026-11-20** (bookings/careers release and closeout implementation pass).
 
+**2026-11-21 corrections - these supersede any conflicting row below:**
+
+- Production code is **`10aef33`** on `production-safe`; Cloudflare Pages production
+  deployment **`bb936ae2-cf37-4682-89af-4b5acd03ab5b`** is Active.
+- Migrations `0044`–`0047` are applied; production D1 has **47 migrations**.
+- Live: communications center, customer portal `/portal/`, retention registry and
+  legal holds, document reminder controls, branch-filtered Data Control exports.
+- `origin/main` remains behind `production-safe`; branch reconciliation still needs
+  owner approval.
+- Backup and document reminder Workers are implemented but staged until the owner
+  supplies Resend and monitor secrets.
+- Tampa remains publicly OFF. Dispatch remains analysis-only and paused.
+
 **2026-11-20 corrections - these supersede any conflicting row below:**
 
-- The working release tip is `851a28b` on `production-safe`; application code is `e7f18c6`
-  (bookings department email and secure careers applications). `origin/main` is 41 commits
-  behind. No branch, push or Cloudflare change was made in this pass; reconciliation requires
-  owner approval.
-- A closeout implementation pass is **staged but not deployed**: communications/notification
-  admin settings (migration `0044`), backup alert monitoring Worker, owner-initiated Stripe
-  billing-portal sessions and server pagination for customers/leads/careers/invoices. See
-  `docs/implementation/MASTER-CLOSEOUT-STATUS.md`.
-- Tampa remains publicly OFF. Dispatch remains analysis-only and paused.
+- The release tip was `851a28b`; application code `e7f18c6` (bookings department
+  email and secure careers applications).
+- The staged closeout work described in `docs/implementation/MASTER-CLOSEOUT-STATUS.md`
+  has since been released as above.
 
 **2026-11-10 corrections - these supersede any conflicting row below:**
 
