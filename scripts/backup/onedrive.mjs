@@ -72,7 +72,13 @@ async function authCommand() {
     intervalSeconds: Number(device.interval ?? 5),
     expiresInSeconds: Number(device.expires_in ?? 900),
   });
-  const cache = await writeTokenCache({ refreshToken: token.refreshToken, account: null });
+  const cache = await writeTokenCache({
+    refreshToken: token.refreshToken,
+    clientId: config.clientId,
+    tenant: config.tenant,
+    scope: config.scope,
+    account: null,
+  });
   process.stdout.write(`${JSON.stringify({
     ok: true,
     authorized: true,

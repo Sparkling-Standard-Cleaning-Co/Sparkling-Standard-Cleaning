@@ -198,6 +198,9 @@ export async function writeTokenCache(cache, env = process.env) {
     version: 1,
     savedAt: new Date().toISOString(),
     refreshToken: cache.refreshToken,
+    clientId: cache.clientId ?? null,
+    tenant: cache.tenant ?? DEFAULT_TENANT,
+    scope: cache.scope ?? DEFAULT_SCOPE,
     account: cache.account ?? null,
   });
   const protectedValue = isDpapiAvailable() ? protectWithDpapi(plaintext) : plaintext;
@@ -209,8 +212,16 @@ export async function writeTokenCache(cache, env = process.env) {
 export async function accessTokenFromEnvironment(env = process.env, fetchImpl = fetch) {
   const direct = env.ONEDRIVE_ACCESS_TOKEN?.trim();
   if (direct) return { accessToken: direct, refreshToken: env.ONEDRIVE_REFRESH_TOKEN?.trim() || '', expiresAt: null, source: 'access_token' };
-  const config = requireGraphConfig(env);
   const cached = await readTokenCache(env).catch(() => null);
+  const configured = graphConfig(env);
+  const config = configured ?? (cached?.clientId
+    ? {
+        clientId: cached.clientId,
+        tenant: cached.tenant || DEFAULT_TENANT,
+        scope: cached.scope || DEFAULT_SCOPE,
+      }
+    : null);
+  if (!config) throw new Error('ONEDRIVE_CLIENT_ID is required for OneDrive backups.');
   const refreshToken = env.ONEDRIVE_REFRESH_TOKEN?.trim() || cached?.refreshToken || '';
   if (!refreshToken) {
     throw new Error('OneDrive is not authorized. Run `npm run backup:onedrive -- auth` once on the owner computer.');
