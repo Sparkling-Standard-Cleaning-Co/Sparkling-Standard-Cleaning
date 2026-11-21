@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-21 (owner UX, estimator and branch presentation improvements)
+Last updated: 2026-11-21 (owner UX, estimator and branch presentation improvements production-verified)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -21,7 +21,7 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Browser tests | 237 pass | **245 pass / 0 fail** (`npm run test:browser`) |
 | Newest migrations | 0043 | `0044`–`0047` (production at **47**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
-| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`edc50a01`** (source `84379cb`); checkout fix also verified on `3f6ded04` |
+| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`7fe55dcc-65c2-4207-8545-80dc6438b50f`** (source `cd0ecf6`); prior checkout fix also verified on `3f6ded04` |
 | Prior release deployment | — | `bb936ae2-cf37-4682-89af-4b5acd03ab5b` (source `10aef33`) |
 
 Git topology note (unresolved, requires owner approval before any change):
@@ -292,5 +292,15 @@ Next executable steps:
   `npm run validate` passed; 39 pages built. Visual checks covered 320, 375,
   390, 430, tablet and desktop widths, including the footer/CTA boundary and
   both single- and multi-branch Service Area presentations.
+- **Release:** commit **`cd0ecf6`**, Cloudflare Pages production deployment
+  **`7fe55dcc-65c2-4207-8545-80dc6438b50f`** (source `cd0ecf6`).
+- **Production smoke:** home 200 with compact Scripture, contained review
+  images, no repeated review links and mobile footer clearance; Service Area
+  200 with **zero Tampa references**, one map, no branch selector and the
+  Pensacola H1; Tampa page **404**; estimator 200 with the default regular
+  choice, visible radio indicator, Step 3 deep reset and corrected frequency
+  labels; `/api/estimate-checkout` readiness **enabled / live** with all six
+  checks true; `/api/lead-readiness` ready with customer email and photo
+  storage. No checkout session, charge or customer message was created.
 - No production charge, refund, customer message, branch activation, dispatch
   activation or destructive data action was performed during implementation.
