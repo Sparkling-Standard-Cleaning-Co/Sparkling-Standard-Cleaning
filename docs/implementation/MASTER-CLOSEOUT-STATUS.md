@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-21 (email-code MFA refined, tested and pushed; remaining workflows tracked)
+Last updated: 2026-11-21 (MFA step-up enforced for sensitive admin actions; remaining workflows tracked)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -17,16 +17,16 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Final reported HEAD | `851a28b` | `851a28b` (`Record bookings and careers release evidence`) |
 | Application commit | `e7f18c6` | `e7f18c6` (`Add bookings email and secure careers applications`) |
 | Latest migration | `0043_career_applications.sql` | present; `migrations/0001`–`0043` |
-| Unit tests | 947 total / 946 pass / 1 skip | **978 total / 977 pass / 1 pre-existing skip / 0 fail** (`npm test`) |
+| Unit tests | 947 total / 946 pass / 1 skip | **980 total / 979 pass / 1 pre-existing skip / 0 fail** (`npm test`) |
 | Browser tests | 237 pass | **247 pass / 0 fail** (`node --test --test-concurrency=2 "tests/browser/*.test.mjs"`) |
-| Newest migrations | 0043 | `0044`–`0047` (production at **47**) |
+| Newest migrations | 0043 | `0044`–`0050` (production at **50**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
-| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`b0e5a8e4-41a5-4efd-838e-23264b3ec838`** (source `f7fa3c0`); prior checkout fix also verified on `3f6ded04` |
+| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`fd0e2394-103d-4870-a8cb-45fdf0e62e6d`** (source `de7dc39`); prior checkout fix also verified on `3f6ded04` |
 | Prior release deployment | — | `bb936ae2-cf37-4682-89af-4b5acd03ab5b` (source `10aef33`) |
 
 Git topology note (unresolved, requires owner approval before any change):
 `origin/main` is 41 commits behind `origin/production-safe`
-(`origin/main` = `efcf73e`, `origin/production-safe` = `851a28b`). The
+(`origin/main` = `efcf73e`, `origin/production-safe` = `de7dc39`). The
 directive wants one authoritative current `main`, but also forbids changing the
 authoritative production branch or Cloudflare deployment source without owner
 approval. Nothing was pushed, merged, reset or rewritten.
@@ -460,3 +460,33 @@ Next executable steps:
   real declined/canceled payment lifecycle proof, payment-attempt incident
   queue/resume, portal inbox, post-payment photo recovery and Communications
   Center wiring. Tampa remains OFF and dispatch paused.
+### 2026-11-21 - MFA step-up for sensitive administrator actions
+
+- Migration `0050_admin_step_up.sql` adds `admin_sessions.step_up_at`; production
+  has **50 migrations**. A pre-migration D1 export was created at
+  `backup-out/d1-pre-0050-20261121-1436.sql`.
+- MFA-enabled accounts must complete a fresh second factor within **ten minutes**
+  before: permanent customer deletion; business-record exports; storage/retention/
+  legal-hold changes; administrator invitations, roles, status, resets and session
+  revocation; invoice creation/payment/refund/credit/payment-link/email actions;
+  and Stripe refunds.
+- `step_up_start` and `step_up_verify` use the existing authenticator or email
+  challenge tables. The admin client detects `mfa_step_up_required`, obtains a
+  fresh code and retries the original action once. Login MFA establishes a fresh
+  ten-minute step-up for the new session.
+- The gate is server-enforced and fail-closed. It applies only when the account
+  has `mfa_enabled = 1`; the production owner is still `mfa_enabled = 0` until she
+  completes enrollment and login/recovery verification. Password re-authentication
+  remains in place for Stripe refunds, gift redemption/void and saved-card charging.
+- Verification: unit **980** (979 pass, 1 skip); browser **247 pass**; check 0
+  errors; build 39 pages. The focused step-up tests prove stale sessions are
+  rejected, the route refreshes the session, and a storage export is blocked then
+  allowed after step-up.
+- Commit **`de7dc39`**; production deployment
+  **`fd0e2394-103d-4870-a8cb-45fdf0e62e6d`** (auto deployment from the push);
+  direct deployment `cfe66c9e-0aca-40b5-af83-362fe2fdb85b` used for verification.
+  GitHub run `44941936444` passed. Local/remote synchronized at `de7dc39`.
+- Remaining: apply the same policy to booking/dispatch/document/pricing/
+  communications writes where risk warrants; owner MFA enrollment/recovery proof;
+  SMS provider approval; automated backups; real payment-lifecycle proof; portal
+  inbox; post-payment photo recovery. Tampa remains OFF and dispatch paused.

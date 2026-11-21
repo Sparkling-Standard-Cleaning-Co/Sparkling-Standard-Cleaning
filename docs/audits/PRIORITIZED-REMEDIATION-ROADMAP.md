@@ -299,3 +299,6 @@ No APM; recurring worker has 11 failures and 0 incidents; payment/email/worker f
 ### Email MFA verification status
 
 Email-code MFA is implemented, tested and available for owner/administrator enrollment. Authenticator MFA is preserved. SMS is not enabled; a provider budget and abuse controls require owner approval. The production owner still has `mfa_enabled = 0`, so login enforcement is unchanged until the owner completes enrollment, a fresh login and recovery-code verification. A general per-action step-up token for exports/deletion/role changes remains open.
+### Step-up verification status
+
+MFA-enabled administrators now require a fresh authenticator or email step-up (ten-minute window) for permanent customer deletion, exports, storage/legal-hold changes, account administration, invoice/payment/refund actions and Stripe refunds. The policy is server-enforced and the admin interface retries once after verification. Login MFA counts as a fresh step-up. The production owner remains unenrolled, so these controls are dormant until owner verification. Booking/dispatch/document/pricing/communications writes still need risk-based review for the same policy.
