@@ -1686,7 +1686,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         failedAt: new Date().toISOString(),
         reason: `stripe_${data.error?.code ?? 'unknown'}`,
       }).catch(() => undefined);
-      return json({ ok: false, error: 'stripe_unavailable' }, 502);
+      return json({
+        ok: false,
+        error: 'stripe_unavailable',
+        reason: data.error?.code ?? 'unknown',
+        ...(data.error?.param ? { field: data.error.param } : {}),
+      }, 502);
     }
     const record: CheckoutRecord = {
       ...claim,
@@ -1761,7 +1766,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     console.error('[estimate-checkout] stripe_transport_failed', {
       name: error instanceof Error ? error.name : 'unknown',
     });
-    return json({ ok: false, error: 'stripe_unavailable' }, 502);
+    return json({ ok: false, error: 'stripe_unavailable', reason: 'transport' }, 502);
   }
 }
 
