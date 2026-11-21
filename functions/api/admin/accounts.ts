@@ -134,6 +134,14 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       if (action === 'mfa_email_start') {
         if (actor.mfaEnabled) return json({ ok: false, error: 'mfa_already_enabled' }, 409);
+        const password = String(body.password ?? '');
+        const storedPassword = await db
+          .prepare('SELECT password_hash FROM admin_users WHERE id = ? LIMIT 1')
+          .bind(actor.id)
+          .first<{ password_hash: string }>();
+        if (!storedPassword || !(await verifyPassword(password, storedPassword.password_hash))) {
+          return json({ ok: false, error: 'reauth_failed' }, 401);
+        }
         const key = context.env.RESEND_API_KEY?.trim();
         if (!key) return json({ ok: false, error: 'email_mfa_not_configured' }, 503);
         if (!(await rateLimit(db, `ops:mfa-email:${actor.id}`, 5, 15, 15))) {

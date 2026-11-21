@@ -42,7 +42,7 @@ Existing high-risk financial actions (Stripe refunds, gift redemption/void and s
 
 1. Sign in at `/admin/`.
 2. Open Settings → Your security.
-3. Choose **Use email verification codes** or **Set up authenticator**.
+3. Choose **Use email verification codes** or **Set up authenticator**. Email enrollment asks for the current account password before sending the first code.
 4. For email, enter the six-digit code sent to the account email within five minutes.
 5. Save the one-time recovery codes in the approved password manager/offline location.
 6. Sign out, sign in again using the selected method, and verify the session is issued only after the code.

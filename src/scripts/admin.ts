@@ -5293,9 +5293,11 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'mfa-email-start') {
     setAppError();
+    const password = window.prompt('Confirm your account password before enabling email verification.');
+    if (!password) return;
     void api<{ challengeToken?: string; expiresAt?: string; resendAfterSeconds?: number }>('/api/admin/accounts', {
       method: 'POST',
-      body: JSON.stringify({ action: 'mfa_email_start' }),
+      body: JSON.stringify({ action: 'mfa_email_start', password }),
     })
       .then((result) => {
         emailMfaChallenge = result.challengeToken ?? '';
