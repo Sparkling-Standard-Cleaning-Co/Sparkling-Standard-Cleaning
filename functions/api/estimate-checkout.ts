@@ -162,6 +162,8 @@ interface CheckoutRecord {
   chargeAmountCents?: number;
   /** Idempotency fingerprint used to return a gift-only order result. */
   attempt?: string;
+  /** Safe reason retained so a retry advances the Stripe idempotency key. */
+  failureReason?: string;
   /** Whether the customer still owes required photos before confirmation. */
   photosOutstanding?: boolean;
   /** Result of automatic confirmation for a paid, complete booking. */
@@ -1426,8 +1428,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const bucket = paymentLedger(env);
   if (!bucket) return json({ ok: false, error: 'payment_not_ready' }, 503);
   const key = ledgerKey('checkouts', attemptFingerprint);
+  const failureKey = ledgerKey('checkout-failures', attemptFingerprint);
 
-  const existing = await readLedgerJson<CheckoutRecord>(bucket, key).catch(() => null);
+  const [existing, priorFailure] = await Promise.all([
+    readLedgerJson<CheckoutRecord>(bucket, key).catch(() => null),
+    readLedgerJson<{ generation: number }>(bucket, failureKey).catch(() => null),
+  ]);
   if (existing) {
     const response = await existingCheckoutResponse(env, bucket, key, existing.value);
     if (response) return response;
@@ -1475,7 +1481,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!checkoutSlotId) return json({ ok: false, error: 'checkout_in_progress' }, 409);
   }
 
-  const generation = (existing?.value.generation ?? 0) + 1;
+  const generation = Math.max(existing?.value.generation ?? 0, priorFailure?.value.generation ?? 0) + 1;
   const now = new Date().toISOString();
   const claim: CheckoutRecord = {
     version: 1,
@@ -1675,6 +1681,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
       await deleteLedgerKey(bucket, key).catch(() => undefined);
+      await writeLedgerJson(bucket, failureKey, {
+        generation,
+        failedAt: new Date().toISOString(),
+        reason: `stripe_${data.error?.code ?? 'unknown'}`,
+      }).catch(() => undefined);
       return json({ ok: false, error: 'stripe_unavailable' }, 502);
     }
     const record: CheckoutRecord = {
@@ -1729,6 +1740,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
       }
     }
+    await deleteLedgerKey(bucket, failureKey).catch(() => undefined);
     return json({ ok: true, url: data.url });
   } catch (error) {
     if (gift && giftLedger) {
@@ -1741,6 +1753,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
     await deleteLedgerKey(bucket, key).catch(() => undefined);
+    await writeLedgerJson(bucket, failureKey, {
+      generation,
+      failedAt: new Date().toISOString(),
+      reason: 'stripe_transport_failed',
+    }).catch(() => undefined);
     console.error('[estimate-checkout] stripe_transport_failed', {
       name: error instanceof Error ? error.name : 'unknown',
     });

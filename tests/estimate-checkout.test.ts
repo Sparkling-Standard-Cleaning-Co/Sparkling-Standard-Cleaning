@@ -757,6 +757,52 @@ for (const serviceType of ['standard', 'str_turnover'] as const) {
   });
 }
 
+test('a Stripe parameter failure is retained so a retry advances the idempotency key', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub();
+  const keys: string[] = [];
+  let posts = 0;
+  const { fields: baseFields } = validResidentialInput('standard');
+  const fields = withHold(baseFields, ledger);
+  const fetcher = async (url: string | URL, init?: RequestInit) => {
+    if (String(url).includes('/v1/checkout/sessions') && !String(url).includes('/v1/checkout/sessions/')) {
+      posts += 1;
+      keys.push(new Headers(init?.headers).get('Idempotency-Key') ?? '');
+      if (posts === 1) {
+        return jsonResponse({
+          error: {
+            code: 'parameter_unknown',
+            type: 'invalid_request_error',
+            param: 'customer_update[email]',
+            message: 'Received unknown parameter: customer_update[email]',
+          },
+        }, 400);
+      }
+      return jsonResponse({ id: 'cs_retry', url: 'https://checkout.stripe.test/retry' });
+    }
+    return provider.stub(url, init);
+  };
+  const first = await withFetch(fetcher, () =>
+    onRequestPost({
+      request: jsonRequest({ fields, returnPath: '/estimate/residential/' }),
+      env,
+    } as never),
+  );
+  assert.equal(first.status, 502);
+  const second = await withFetch(fetcher, () =>
+    onRequestPost({
+      request: jsonRequest({ fields, returnPath: '/estimate/residential/' }),
+      env,
+    } as never),
+  );
+  const secondBody = await second.json();
+  assert.equal(second.status, 200, JSON.stringify(secondBody));
+  assert.equal(posts, 2);
+  assert.match(keys[0] ?? '', /-1$/);
+  assert.match(keys[1] ?? '', /-2$/, 'the retry must not reuse Stripe cached failure idempotency');
+});
+
 test('a residential route without a driving duration cannot create checkout', async () => {
   const ledger = new FakeLedger();
   const env = makeEnv(ledger);
