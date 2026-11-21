@@ -1656,13 +1656,15 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const data = (await response.json().catch(() => ({}))) as {
       id?: string;
       url?: string;
-      error?: { code?: string; type?: string };
+      error?: { code?: string; type?: string; param?: string; message?: string };
     };
     if (!response.ok || !data.url || !data.id) {
       console.error('[estimate-checkout] stripe_session_failed', {
         status: response.status,
         code: data.error?.code ?? 'unknown',
         type: data.error?.type ?? 'unknown',
+        param: data.error?.param ?? 'unknown',
+        message: (data.error?.message ?? '').slice(0, 300),
       });
       if (gift && giftLedger) {
         await releaseGiftReservation(giftLedger, gift.code, gift.reservationId).catch(
