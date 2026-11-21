@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-21 (session 2 complete: two guarded production releases)
+Last updated: 2026-11-21 (checkout incident repaired and production-verified)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -21,8 +21,8 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Browser tests | 237 pass | **240 pass / 0 fail** (`npm run test:browser`) |
 | Newest migrations | 0043 | `0044`–`0047` (production at **47**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
-| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`bb936ae2-cf37-4682-89af-4b5acd03ab5b`** (source `10aef33`, Active) |
-| Prior release deployment | — | `c50ba68b-d634-4a1d-a98a-5a2b9dc02978` (source `e65db71`) |
+| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`edc50a01`** (source `84379cb`); checkout fix also verified on `3f6ded04` |
+| Prior release deployment | — | `bb936ae2-cf37-4682-89af-4b5acd03ab5b` (source `10aef33`) |
 
 Git topology note (unresolved, requires owner approval before any change):
 `origin/main` is 41 commits behind `origin/production-safe`
@@ -53,6 +53,7 @@ Status legend: **verified working** · **partial** · **missing** · **owner-gat
 |---|---|---|---|
 | Stripe invoice payment links, receipts, saved cards, off-session | verified working (existing) | `src/lib/admin/stripe-billing.ts`, `src/lib/invoicing/invoice-receipt.ts`; tests in `tests/admin.test.ts`, `tests/receipt.test.ts` | Live charge/refund remains owner-authorized |
 | Customer self-service billing portal | **implemented in customer portal (staged)** | Portal opens a Stripe-hosted billing session when `PORTAL_BILLING_ENABLED=true`; reuses/creates one Stripe customer, branch scoped, audited, no charge/refund path. Admin-initiated portal button also exists | Configure Stripe portal settings; enable flag after owner review |
+| Live Pay Now checkout | **repaired and production-verified** | Root cause `customer_update[email]` Stripe `parameter_unknown`. Removed; routing now retries/falls back; retry advances Stripe idempotency generation. 6360 Haupert Ln, Molino, FL 32577 reached live Stripe Checkout; simulated failure showed **Try Secure Payment Again** and retry reached Stripe. No charge/refund. Full evidence: `docs/verification/2026-11-21-CHECKOUT-RECOVERY.md` | None for initiation; Stripe Dashboard remains as previously configured |
 | Unified customer portal | **implemented and tested (staged)** | Passwordless single-use 15-minute links, hashed 7-day sessions, CSRF, anti-enumeration, rate limits, bookings, recurring plans, invoices/payment links, signed documents, profile/properties, customer-service requests. Migration `0045`; `/portal/` page; `docs/operations/CUSTOMER-PORTAL.md` | Apply migration, deploy, confirm one real sign-in/inbox delivery |
 | Data Control Center | **improved, still partial** | Branch-filtered counts and CSV/JSON exports, signing-evidence export, backup health/incident panel, retention policy registry and legal holds (migration `0046`), audited exports. Encrypted full recovery remains CLI/documented | Add controlled short-lived download storage, archive search and approved permanent-deletion workflow |
 | Server-driven admin pagination | **improved, still partial** | Customers, leads, careers, invoices and audit history now page server-side with totals, ordering whitelist, page sizes 25/50/100 and UI pagers. Requests/jobs/employees/time/documents keep specialized/bounded views | Extend to remaining long lists only where a table is appropriate |
@@ -209,7 +210,7 @@ Next executable steps:
 6. Continue archive search, short-lived download storage and approved
    permanent-deletion workflow.
 
-### 2026-11-21 � second production release
+### 2026-11-21 � second production release
 
 - Migrations **0045, 0046, 0047** applied and recorded; production D1 now has
   **47 migrations** and the portal, retention and reminder tables exist.
@@ -237,3 +238,23 @@ Next executable steps:
    permanent-deletion workflow in Data Control.
 5. Owner decides GitHub `main` reconciliation; no branch change has been made.
 6. Tampa remains OFF; dispatch remains analysis-only and paused.
+
+### 2026-11-21 � critical checkout repair
+
+- Reported live Pay Now fallback reproduced with **6360 Haupert Ln, Molino,
+  FL 32577**.
+- Runtime log proved Stripe returned `parameter_unknown` for
+  `customer_update[email]`.
+- Removed the invalid parameter; linked Stripe Customers retain their verified
+  email and new customers use `customer_email`.
+- Added Google route retry and MapMap fallback so a transient Google failure
+  does not degrade a verified quote to `quote_not_verified`.
+- Retained failed checkout generations so **Try Secure Payment Again** advances
+  the Stripe idempotency key instead of receiving a cached failure.
+- Production commits: `5ae8244`, `d079a0d`, `734e3ce`, `3e0f65e`, `84379cb`.
+  Final production build `edc50a01`; checkout verification build `3f6ded04`.
+- Live verification: normal Pay Now redirected to live Stripe Checkout; a
+  simulated failure showed the retry state and the retry reached Stripe.
+- No charge, refund or paid webhook event occurred. Synthetic test records were
+  archived/released/expired and audited.
+- Evidence: `docs/verification/2026-11-21-CHECKOUT-RECOVERY.md`.

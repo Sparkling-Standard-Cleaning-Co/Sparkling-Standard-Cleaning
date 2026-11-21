@@ -8,8 +8,16 @@ Last reviewed: **2026-11-20** (bookings/careers release and closeout implementat
 
 **2026-11-21 corrections - these supersede any conflicting row below:**
 
-- Production code is **`10aef33`** on `production-safe`; Cloudflare Pages production
-  deployment **`bb936ae2-cf37-4682-89af-4b5acd03ab5b`** is Active.
+- Production code is **`84379cb`** on `production-safe`; final Cloudflare Pages
+  production deployment **`edc50a01`**. The live checkout repair was verified on
+  deployment `3f6ded04`.
+- **Live Pay Now checkout is repaired and production-verified.** The root cause
+  was Stripe `parameter_unknown` for `customer_update[email]`; the invalid
+  parameter was removed. A transient routing failure could also reject a
+  verified quote, so Google routing now retries and MapMap is used as fallback.
+  Failed attempts retain their generation so **Try Secure Payment Again** uses a
+  fresh Stripe idempotency key. Evidence:
+  `docs/verification/2026-11-21-CHECKOUT-RECOVERY.md`.
 - Migrations `0044`–`0047` are applied; production D1 has **47 migrations**.
 - Live: communications center, customer portal `/portal/`, retention registry and
   legal holds, document reminder controls, branch-filtered Data Control exports.

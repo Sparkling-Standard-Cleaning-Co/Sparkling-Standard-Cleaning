@@ -84,7 +84,20 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-20 bookings department and secure careers applications):** application code
+- **Current release (2026-11-21 checkout recovery):** application code **`84379cb`** is
+  live on `production-safe` (final Cloudflare Pages production deployment `edc50a01`; the
+  checkout fix was verified on `3f6ded04`). Live Pay Now failed because
+  `functions/api/estimate-checkout.ts` sent Stripe's unsupported
+  `customer_update[email]` parameter (`parameter_unknown`). It was removed; Google
+  routing now retries and falls back to MapMap before a straight-line estimate; and a
+  failed checkout retains its generation so **Try Secure Payment Again** uses a fresh
+  Stripe idempotency key. The owner-specified **6360 Haupert Ln, Molino, FL 32577**
+  journey reached live Stripe Checkout; a simulated failure showed the retry state and
+  the retry reached Checkout. No charge, refund, paid webhook event or duplicate booking
+  occurred. Unit **974** (973 pass, 1 pre-existing skip), browser **240** pass,
+  `astro check` 0 errors, 39 pages built, validation passed. Evidence:
+  `docs/verification/2026-11-21-CHECKOUT-RECOVERY.md`.
+- **Prior release (2026-11-20 bookings department and secure careers applications):** application code
   **`e7f18c6`** is live on `production-safe` (Cloudflare Pages production deployment
   `e5b8331e-380f-44bc-b3a7-c310b4d90c50`). Migration `0043` adds private career applications and
   resume metadata. `bookings@sparkling-standard.com` is the sixth department address and is now the
