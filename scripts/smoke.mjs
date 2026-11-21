@@ -57,7 +57,7 @@ for (const page of REQUIRED_PAGES) {
         : 'class="mobile-action-bar"';
   for (const [label, needle] of [
     ['header shell', 'class="site-header"'],
-    ['footer shell', 'class="site-footer"'],
+    ['footer shell', '<footer class="site-footer'],
     ['follow-us section', 'data-social-follow'],
     ['mobile actions', mobileChrome],
     ['skip link', 'class="skip-link"'],
