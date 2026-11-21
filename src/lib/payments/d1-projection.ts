@@ -1,4 +1,4 @@
-﻿import type { D1Database } from '../admin/d1.ts';
+import type { D1Database } from '../admin/d1.ts';
 
 export const FINANCIAL_SYSTEM_CUSTOMER_ID = 'customer_financial_system';
 
@@ -163,10 +163,11 @@ export async function projectStripePayment(
         booking_request_id, gift_certificate_id, provider, status, amount_cents, currency,
         stripe_customer_id, stripe_payment_intent_id, stripe_charge_id, idempotency_key,
         received_at, metadata_json)
-       VALUES (?, NULL, ?, ?, NULL, ?, ?, ?, 'stripe', 'succeeded', ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, COALESCE((SELECT branch_id FROM booking_requests WHERE id = ?), 'branch_pensacola'), ?, ?, NULL, ?, ?, ?, 'stripe', 'succeeded', ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       paymentId,
+      text(input.bookingRequestId, 100) || null,
       text(input.customerId, 100) || FINANCIAL_SYSTEM_CUSTOMER_ID,
       text(input.payerPartyId, 200) || null,
       text(input.appointmentId, 100) || null,
@@ -257,11 +258,12 @@ export async function projectGiftCleaningPayment(
           booking_request_id, gift_certificate_id, provider, status, amount_cents, currency,
           stripe_customer_id, stripe_payment_intent_id, stripe_charge_id, idempotency_key,
           received_at, metadata_json)
-         VALUES (?, NULL, ?, NULL, NULL, NULL, ?, NULL, 'external', 'succeeded', ?, 'USD',
+         VALUES (?, COALESCE((SELECT branch_id FROM booking_requests WHERE id = ?), 'branch_pensacola'), ?, NULL, NULL, NULL, ?, NULL, 'external', 'succeeded', ?, 'USD',
                  NULL, NULL, NULL, ?, ?, ?)`,
       )
       .bind(
         paymentId,
+        booking?.id ?? null,
         booking?.customer_id ?? FINANCIAL_SYSTEM_CUSTOMER_ID,
         booking?.id ?? null,
         amount,
@@ -394,7 +396,7 @@ export async function projectGiftSale(
           valid_from_date, activates_at, stripe_event_id, stripe_session_id, terms_version,
           purchaser_name, purchaser_email, recipient_name, recipient_email, message,
           delivery_method, delivery_status)
-         VALUES (?, ?, NULL, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+         VALUES (?, ?, 'branch_pensacola', ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       )
       .bind(
         giftCertificateId,

@@ -313,6 +313,13 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
 
     const requestScope = scoped(actor, 'r.branch_id');
     const appointmentScope = scoped(actor, 'a.branch_id');
+    const now = new Date();
+    const appointmentFrom =
+      text(url.searchParams.get('from'), 30) ||
+      new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10) + 'T00:00:00.000Z';
+    const appointmentTo =
+      text(url.searchParams.get('to'), 30) ||
+      new Date(now.getTime() + 61 * 86_400_000).toISOString().slice(0, 10) + 'T23:59:59.999Z';
     const leadScope = scoped(actor, 'l.branch_id');
     const view = text(url.searchParams.get('view') ?? 'actionable', 20) || 'actionable';
     const query = text(url.searchParams.get('q'), 100);
@@ -361,9 +368,9 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
          FROM appointments a
          LEFT JOIN customers c ON c.id = a.customer_id
          LEFT JOIN properties p ON p.id = a.property_id
-         WHERE 1 = 1 ${appointmentScope.sql}
+         WHERE a.start_at >= ? AND a.start_at <= ? ${appointmentScope.sql}
          ORDER BY a.start_at ASC LIMIT 200`,
-      ).bind(...appointmentScope.bind).all(),
+      ).bind(appointmentFrom, appointmentTo, ...appointmentScope.bind).all(),
       db.prepare(
         `SELECT l.id, l.status, l.quote_reference, l.created_at, c.first_name, c.last_name
          FROM leads l LEFT JOIN customers c ON c.id = l.customer_id

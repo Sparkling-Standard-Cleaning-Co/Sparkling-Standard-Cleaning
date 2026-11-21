@@ -113,6 +113,14 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
          )`,
       ),
     ]);
+    const failedCheckouts = await count(
+      db,
+      "SELECT COUNT(*) AS count FROM checkout_sessions WHERE status = 'failed' OR (status = 'open' AND created_at < datetime('now','-35 minutes'))",
+    );
+    const ownerMfaMissing = await count(
+      db,
+      "SELECT COUNT(*) AS count FROM admin_users WHERE role_id = 'owner' AND status = 'active' AND mfa_enabled = 0",
+    );
     return json({
       ok: true,
       actor: { name: actor.name, role: actor.role, branchId: actor.branchId },
@@ -134,6 +142,8 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         unsignedAgreements,
         outstandingInvoices,
         failedCommunications,
+        failedCheckouts,
+        ownerMfaMissing,
       },
       alerts: [
         ...(failedCommitments > 0
@@ -159,6 +169,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
           : []),
         ...(outstandingInvoices > 0
           ? [{ kind: 'outstanding_invoices', severity: 'medium', message: `${outstandingInvoices} invoice(s) have an outstanding balance.`, view: 'finance' }]
+          : []),
+        ...(ownerMfaMissing > 0
+          ? [{ kind: 'security_mfa', severity: 'high', message: 'An active owner account does not have two-step verification enabled.', view: 'settings' }]
+          : []),
+        ...(failedCheckouts > 0
+          ? [{ kind: 'checkout_failure', severity: 'high', message: `${failedCheckouts} checkout session(s) failed or are stale.`, view: 'calendar' }]
           : []),
         ...(unassignedJobs > 0
           ? [{ kind: 'unassigned_jobs', severity: 'medium', message: `${unassignedJobs} upcoming job(s) have no assigned cleaner.`, view: 'jobs' }]

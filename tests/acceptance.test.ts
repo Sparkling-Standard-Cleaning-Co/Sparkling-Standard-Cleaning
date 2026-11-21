@@ -225,6 +225,16 @@ test('synthetic end-to-end: inquiry, packet signature, quick estimate, booking, 
   assert.equal(receiptRow.status, 'sent');
   assert.equal(receiptRow.provider_message_id, 'email_acceptance_receipt');
 
+  const openInvoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    serviceCode: 'residential-cleaning',
+    lines: [
+      { kind: 'service', description: 'Open reporting invoice', quantity: 1, unitAmountCents: 10000, totalCents: 10000 },
+      { kind: 'discount', description: 'Reporting discount', quantity: 1, unitAmountCents: 1000, totalCents: 1000 },
+    ],
+  });
+  assert.ok(openInvoice.id);
+
   const workspace = await getCustomer(db, actor, customer.id);
   assert.ok(workspace);
   assert.equal((workspace.quickEstimates as Array<Record<string, unknown>>).length, 1);
@@ -237,7 +247,8 @@ test('synthetic end-to-end: inquiry, packet signature, quick estimate, booking, 
   const financial = report.financial as Record<string, number>;
   assert.ok(financial.collectedCents >= 20000);
   assert.ok(financial.invoicedCents >= 20000);
-  assert.equal(financial.outstandingCents, 0);
+  assert.ok(financial.outstandingCents >= 9000, 'open balances are included in reporting');
+  assert.ok(financial.discountCents >= 1000, 'invoice discounts are included in reporting');
   assert.ok(Array.isArray(report.estimates));
   assert.ok((db.raw.prepare('SELECT COUNT(*) AS n FROM booking_requests WHERE status = ?').get('confirmed') as { n: number }).n >= 1);
   assert.equal((await getQuickEstimate(db, actor, saved.id))?.status, 'converted');

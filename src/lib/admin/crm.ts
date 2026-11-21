@@ -659,6 +659,25 @@ export async function deleteCustomer(
   const current = await getCustomer(db, actor, customerId);
   if (!current) return { mode: 'deleted' };
   const stamp = now();
+  const legalHold = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM legal_holds
+       WHERE status = 'active'
+         AND (
+           (subject_type = 'customer' AND subject_id = ?)
+           OR (subject_type = 'booking_request' AND subject_id IN
+               (SELECT id FROM booking_requests WHERE customer_id = ?))
+           OR (subject_type = 'appointment' AND subject_id IN
+               (SELECT id FROM appointments WHERE customer_id = ?))
+           OR (subject_type = 'invoice' AND subject_id IN
+               (SELECT id FROM invoices WHERE customer_id = ?))
+         )`,
+    )
+    .bind(customerId, customerId, customerId, customerId)
+    .first<{ n: number }>();
+  if (Number(legalHold?.n ?? 0) > 0) {
+    throw new AdminAuthError(409, 'legal_hold_active');
+  }
   const blockers = await Promise.all([
     count(db, "SELECT COUNT(*) AS n FROM appointments WHERE customer_id = ? AND status IN ('pending','confirmed','in_progress')", customerId),
     count(db, "SELECT COUNT(*) AS n FROM booking_requests WHERE customer_id = ? AND status IN ('pending','confirmed') AND archived_at IS NULL AND closed_at IS NULL", customerId),
@@ -692,9 +711,13 @@ export async function deleteCustomer(
     db.prepare("UPDATE signing_requests SET signer_email = '', updated_at = ? WHERE customer_id = ?").bind(stamp, customerId),
     db
       .prepare(
-        `UPDATE document_signatures SET signer_name = 'Redacted', signer_email = ''
+        `UPDATE document_signatures SET signer_name = 'Redacted', signer_email = '',
+           signed_content_text = ''
          WHERE signing_request_id IN (SELECT id FROM signing_requests WHERE customer_id = ?)`,
       )
+      .bind(customerId),
+    db
+      .prepare("UPDATE agreements SET signed_content_text = '' WHERE customer_id = ?")
       .bind(customerId),
     db
       .prepare(
@@ -704,6 +727,16 @@ export async function deleteCustomer(
       )
       .bind(customerId, customerId),
   ];
+  const portalTable = await db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'customer_portal_requests' LIMIT 1")
+    .first<{ name: string }>();
+  if (portalTable) {
+    scrubStatements.push(
+      db.prepare("UPDATE customer_portal_requests SET message = '[redacted]' WHERE customer_id = ?").bind(customerId),
+      db.prepare('DELETE FROM customer_portal_sessions WHERE customer_id = ?').bind(customerId),
+      db.prepare('DELETE FROM customer_portal_tokens WHERE customer_id = ?').bind(customerId),
+    );
+  }
   if (db.batch) await db.batch(scrubStatements);
   else for (const statement of scrubStatements) await statement.run();
   const hasHistory = history.some((value) => value > 0);

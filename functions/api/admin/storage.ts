@@ -285,10 +285,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = String(body.action ?? '');
     if (action === 'photo_cleanup') {
+      const dryRun = body.dryRun !== false;
+      if (!dryRun) {
+        const activeHolds = await db
+          .prepare("SELECT COUNT(*) AS n FROM legal_holds WHERE status = 'active'")
+          .first<{ n: number }>();
+        if (Number(activeHolds?.n ?? 0) > 0) {
+          return json({ ok: false, error: 'legal_hold_active' }, 409);
+        }
+      }
       const result = await cleanupPhotos(
         context.env.PHOTOS_BUCKET,
         Math.min(365, Math.max(1, Number(body.days) || 30)),
-        body.dryRun !== false,
+        dryRun,
       );
       await db
         .prepare(

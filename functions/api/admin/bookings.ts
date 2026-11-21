@@ -148,15 +148,17 @@ async function invoiceForRequest(
   if (!row.customer_id) throw new AdminAuthError(400, 'request_customer_incomplete');
   const total = Number(row.total_cents);
   if (!Number.isFinite(total) || total <= 0) throw new AdminAuthError(409, 'request_not_priced');
-  const existing = row.appointment_id
-    ? await db.prepare('SELECT id, number FROM invoices WHERE appointment_id = ? LIMIT 1').bind(String(row.appointment_id)).first<{ id: string; number: string }>()
-    : null;
+  const existing = await db
+    .prepare('SELECT id, number FROM invoices WHERE booking_request_id = ? OR (booking_request_id IS NULL AND appointment_id = ?) LIMIT 1')
+    .bind(requestId, String(row.appointment_id ?? ''))
+    .first<{ id: string; number: string }>();
   const invoice = existing
     ? { id: existing.id, number: existing.number, totalCents: total }
       : await createInvoice(db, actor, {
         customerId: String(row.customer_id),
         propertyId: row.property_id ?? undefined,
         appointmentId: row.appointment_id ?? undefined,
+        bookingRequestId: requestId,
         serviceCode: String(row.service_code ?? ''),
         issueDate: new Date().toISOString().slice(0, 10),
         lines: [

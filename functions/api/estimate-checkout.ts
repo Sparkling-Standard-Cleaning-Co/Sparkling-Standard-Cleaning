@@ -193,6 +193,8 @@ interface VerifiedCandidate {
   reference: string;
   serviceType: string;
   tax: ServiceTaxResult;
+  verifiedState: string | null;
+  verifiedZip: string | null;
   /** Automatic quote discount already included in cleaningAmountCents. */
   automaticDiscountCents?: number;
   automaticDiscountLabel?: string;
@@ -750,6 +752,8 @@ async function verifyFacilityPayment(
     reference,
     serviceType,
     tax,
+    verifiedState: destination.state ?? null,
+    verifiedZip: destination.zip ?? null,
     ...(verification.discountAmount && verification.discountAmount > 0
       ? {
           automaticDiscountCents: cents(verification.discountAmount),
@@ -834,6 +838,8 @@ async function verifyResidentialPayment(
     reference: await residentialReference(verification, fields, amountCents),
     serviceType,
     tax,
+    verifiedState: verification.travel.destinationState ?? null,
+    verifiedZip: verification.travel.destinationZip ?? null,
     ...(verification.breakdown?.discount
       ? {
           automaticDiscountCents: cents(verification.breakdown.discount.amount),
@@ -1291,8 +1297,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const cleaningAfter = Math.max(0, promotionBaseCents - combinedDiscount);
       const taxAfter = calculateServiceTax({
         serviceType: candidate.serviceType,
-        state: fields.address_state ?? null,
-        zip: fields.zip ?? null,
+        state: candidate.verifiedState,
+        zip: candidate.verifiedZip,
         taxableBase: cleaningAfter / 100,
       });
       if (!taxAfter.canCharge) {

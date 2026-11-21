@@ -12,9 +12,9 @@ A live customer reached the final estimator step, clicked **Pay Now**, and saw:
 
 The failure was reproduced against production using the owner-specified address:
 
-**6360 Haupert Ln, Molino, FL 32577**
+**the owner-approved Molino test address (redacted from public docs)**
 
-- Address resolved exactly by Google geocoding (`30.7210325, -87.4415066`, ZIP 32577).
+- Address resolved exactly by Google geocoding (`[redacted coordinates]`, ZIP 32577).
 - Travel route resolved to approximately 15.7 miles one way / 21 minutes.
 - Residential standard cleaning, 1,600 sq ft, 3 bedrooms, 2 full baths, one-time,
   maintained condition, 5h 55m scheduled window, $270 verified quote.
@@ -69,7 +69,7 @@ Verified live:
 
 | Check | Result |
 |---|---|
-| Address geocode | exact Google result for 6360 Haupert Ln, Molino, FL 32577 |
+| Address geocode | exact Google result for the owner-approved Molino test address (redacted from public docs) |
 | Travel | live route verified, ~15.7 mi / ~21 min |
 | Lead verification | `verified`, travel verified, config match |
 | Normal Pay Now | **redirected to live Stripe Checkout** (`cs_live_...`) |

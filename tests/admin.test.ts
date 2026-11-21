@@ -62,48 +62,7 @@ class TestD1 implements D1Database {
 function migratedDb(): TestD1 {
   const db = new TestD1();
   db.raw.exec('PRAGMA foreign_keys = ON');
-  for (const file of [
-    '0001_operational_foundation.sql',
-    '0002_admin_security_and_seeds.sql',
-    '0003_admin_session_hardening.sql',
-    '0004_branch_scope.sql',
-    '0005_admin_accounts_and_operations.sql',
-    '0006_service_catalog_and_lead_permissions.sql',
-    '0007_cleaner_field_scope.sql',
-    '0008_invoice_payment_links.sql',
-    '0009_signed_documents_and_payment_authorizations.sql',
-    '0010_signed_content_and_card_setup.sql',
-    '0011_booking_management_and_notifications.sql',
-    '0012_employee_timekeeping.sql',
-    '0013_request_lifecycle.sql',
-    '0014_request_payment_status.sql',
-    '0015_recurring_schedule.sql',
-    '0016_recurring_occurrence_state.sql',
-    '0017_dynamic_booking_resources.sql',
-    '0018_document_management_and_signing.sql',
-    '0019_recurring_worker_runs.sql',
-    '0020_recurring_worker_claim_owner.sql',
-    '0021_least_privilege_cleaner_role.sql',
-    '0022_refund_idempotency.sql',
-    '0023_document_signature_attempts.sql',
-    '0024_financial_ledger_parties.sql',
-    '0025_refunds_disputes_webhooks.sql',
-    '0026_pricing_control.sql',
-    '0027_checkout_session_registry.sql',
-    '0028_property_profiles.sql',
-    '0029_booking_commitments.sql',
-    '0030_booking_payment_claims.sql',
-    '0031_document_execution_integrity.sql',
-    '0032_promotions_and_redemptions.sql',
-    '0033_promotion_deadlines.sql',
-    '0034_promotion_scope.sql',
-    '0035_promotion_supportive_stacking.sql',
-    '0036_customer_promotion_entitlements.sql',
-    '0037_payment_receipts.sql',
-    '0038_document_packet_builder.sql',
-    '0039_quick_estimates.sql',
-    '0040_branch_topology.sql',
-  ]) {
+  for (const file of fs.readdirSync('migrations').filter((name) => name.endsWith('.sql')).sort()) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
   return db;
@@ -1493,7 +1452,7 @@ test('legacy requests can be opened, flagged as possible duplicates and linked',
   );
   const payload = JSON.stringify({
     source: 'r2_backfill',
-    locationText: '6360 HAUPERT LANE ? MOLINO, FL 32577',
+    locationText: '100 S BAYLEN ST - PENSACOLA, FL 32502',
     destination: { lat: 30.719, lng: -87.442 },
   });
   insert.run('BR-1', 'hold-1', 'SS-ONE', '2026-10-30T13:45:00.000Z', '2026-10-30T21:03:00.000Z', payload);
@@ -1507,7 +1466,7 @@ test('legacy requests can be opened, flagged as possible duplicates and linked',
   assert.equal(detailResponse.status, 200);
   const detail = (await detailResponse.json()) as Record<string, unknown>;
   assert.equal((detail.request as Record<string, unknown>).customer_id, null);
-  assert.equal((detail.payload as Record<string, unknown>).locationText, '6360 HAUPERT LANE ? MOLINO, FL 32577');
+  assert.equal((detail.payload as Record<string, unknown>).locationText, '100 S BAYLEN ST - PENSACOLA, FL 32502');
   assert.equal((detail.possibleDuplicates as unknown[]).length, 1, 'the second legacy request is flagged');
   assert.equal(detail.email, '');
 
@@ -1515,7 +1474,7 @@ test('legacy requests can be opened, flagged as possible duplicates and linked',
     firstName: 'Verified',
     lastName: 'Customer',
     email: 'verified@example.test',
-    addressLine1: '6360 Haupert Ln',
+    addressLine1: '100 S Baylen St',
     city: 'Molino',
     state: 'FL',
     postalCode: '32577',
@@ -1753,6 +1712,20 @@ test('customers archive, restore and permanently delete when no history blocks i
   assert.equal(retained.first_name, 'Deleted');
   assert.equal(retained.status, 'archived');
   assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM booking_requests WHERE id = ?').get('BR-HISTORY') as { n: number }).n, 1);
+
+  const heldCustomer = await createCustomer(db, actor!, {
+    firstName: 'Held', lastName: 'Customer', email: 'delete-held@example.test',
+  });
+  db.raw.prepare(
+    "INSERT INTO legal_holds (id, subject_type, subject_id, reason, status) VALUES ('hold-delete-test','customer',?, 'active litigation hold','active')",
+  ).run(heldCustomer.id);
+  await assert.rejects(
+    () => deleteCustomer(db, actor!, String(heldCustomer.id), 'DELETE'),
+    (error: Error & { code?: string }) => error.code === 'legal_hold_active',
+  );
+  assert.ok(db.raw.prepare('SELECT id FROM customers WHERE id = ?').get(heldCustomer.id));
+  db.raw.prepare("UPDATE legal_holds SET status = 'released' WHERE id = 'hold-delete-test'").run();
+  assert.equal((await deleteCustomer(db, actor!, String(heldCustomer.id), 'DELETE')).mode, 'deleted');
 
   const protectedCustomer = await createCustomer(db, actor!, {
     firstName: 'Protected',

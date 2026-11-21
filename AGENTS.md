@@ -91,7 +91,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   `customer_update[email]` parameter (`parameter_unknown`). It was removed; Google
   routing now retries and falls back to MapMap before a straight-line estimate; and a
   failed checkout retains its generation so **Try Secure Payment Again** uses a fresh
-  Stripe idempotency key. The owner-specified **6360 Haupert Ln, Molino, FL 32577**
+  Stripe idempotency key. The owner-specified **the owner-approved Molino test address (redacted from public docs)**
   journey reached live Stripe Checkout; a simulated failure showed the retry state and
   the retry reached Checkout. No charge, refund, paid webhook event or duplicate booking
   occurred. Unit **974** (973 pass, 1 pre-existing skip), browser **240** pass,

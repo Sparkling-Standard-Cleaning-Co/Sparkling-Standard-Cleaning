@@ -138,9 +138,9 @@ async function openAdmin() {
             start_at: '2026-10-30T13:45:00.000Z',
             end_at: '2026-10-30T21:03:00.000Z',
             duration_minutes: 438,
-            payload_json: JSON.stringify({ locationText: '6360 Haupert Ln, Molino, FL 32577' }),
+            payload_json: JSON.stringify({ locationText: '100 S Baylen St, Pensacola, FL 32502' }),
           },
-          payload: { locationText: '6360 Haupert Ln, Molino, FL 32577' },
+          payload: { locationText: '100 S Baylen St, Pensacola, FL 32502' },
           contacts: [],
           properties: [],
           notifications: [],
@@ -160,7 +160,7 @@ async function openAdmin() {
           requests: [{
             id: 'BR-LEGACY-1', customer_id: null, status: 'pending', quote_reference: 'SS-LEGACY-ONE',
             start_at: '2026-10-30T13:45:00.000Z', end_at: '2026-10-30T21:03:00.000Z',
-            payload_json: JSON.stringify({ locationText: '6360 Haupert Ln, Molino, FL 32577' }),
+            payload_json: JSON.stringify({ locationText: '100 S Baylen St, Pensacola, FL 32502' }),
           }],
           appointments: [],
           reservationLeads: [],
@@ -263,7 +263,7 @@ test('a legacy request can be opened, reviewed and confirmed from the admin', as
     await detail.waitFor({ state: 'visible' });
     const text = await detail.innerText();
     assert.match(text, /SS-LEGACY-ONE/);
-    assert.match(text, /6360 Haupert Ln/);
+    assert.match(text, /100 S Baylen St/);
     assert.match(text, /Possible duplicate requests/);
     assert.match(text, /Link this request to a customer/);
     assert.match(text, /Accept \/ Confirm Booking/);

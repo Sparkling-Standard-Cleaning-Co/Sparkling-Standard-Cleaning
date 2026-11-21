@@ -1,4 +1,4 @@
-﻿import type { AdminActor } from './operations.ts';
+import type { AdminActor } from './operations.ts';
 import type { D1Database } from './d1.ts';
 
 function scope(actor: AdminActor, column: string): { sql: string; bind: unknown[] } {
@@ -46,7 +46,10 @@ export async function operationsReport(
       `SELECT status, COUNT(*) AS count FROM appointments WHERE 1 = 1 ${appointmentBranch.sql} GROUP BY status`,
     ).bind(...appointmentBranch.bind).all(),
     db.prepare(
-      `SELECT status, COUNT(*) AS count, COALESCE(SUM(total_cents),0) AS total_cents
+      `SELECT status, COUNT(*) AS count,
+              COALESCE(SUM(total_cents),0) AS total_cents,
+              COALESCE(SUM(balance_cents),0) AS balance_cents,
+              COALESCE(SUM(discount_cents),0) AS discount_cents
        FROM invoices WHERE 1 = 1 ${invoiceBranch.sql} GROUP BY status`,
     ).bind(...invoiceBranch.bind).all(),
     db.prepare(

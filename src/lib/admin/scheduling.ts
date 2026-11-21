@@ -60,8 +60,13 @@ export async function listAppointments(
   input: { from?: string; to?: string; status?: string } = {},
 ): Promise<Array<Record<string, unknown>>> {
   const branch = scope(actor, 'a.branch_id');
-  const from = validIso(input.from ?? '') ? input.from! : '1970-01-01T00:00';
-  const to = validIso(input.to ?? '') ? input.to! : '2999-12-31T23:59';
+  const now = new Date();
+  const from = validIso(input.from ?? '')
+    ? input.from!
+    : new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10) + 'T00:00:00.000Z';
+  const to = validIso(input.to ?? '')
+    ? input.to!
+    : new Date(now.getTime() + 61 * 86_400_000).toISOString().slice(0, 10) + 'T23:59:59.999Z';
   const status = text(input.status, 20);
   const result = await db
     .prepare(
