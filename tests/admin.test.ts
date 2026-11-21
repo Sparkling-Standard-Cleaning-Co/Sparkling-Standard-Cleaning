@@ -20,6 +20,7 @@ import { persistLeadSubmission } from '../src/lib/admin/lead-persistence.ts';
 import { onRequestGet as overviewGet } from '../functions/api/admin/overview.ts';
 import { onRequestPost as authPost } from '../functions/api/admin/auth.ts';
 import { onRequestGet as adminRequestsGet, onRequestPost as adminRequestsPost } from '../functions/api/admin/requests.ts';
+import { onRequestPost as accountsPost } from '../functions/api/admin/accounts.ts';
 import { onRequestGet as operationsGet } from '../functions/api/admin/operations.ts';
 import { onRequestPost as operationsPost } from '../functions/api/admin/operations.ts';
 import { onRequestGet as customersGet } from '../functions/api/admin/customers.ts';
@@ -614,6 +615,95 @@ test('data exports reject a stale MFA session and recover after step-up', async 
   } as never);
   assert.equal(allowed.status, 200);
   assert.match(allowed.headers.get('Content-Type') ?? '', /text\/csv/);
+});
+test('email MFA enrollment, verified login and recovery work together with a controlled account', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'email-enrollment@example.test',
+    name: 'Email Enrollment Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const cookie = `ss_ops=${session.token}`;
+  const sent: Array<Record<string, unknown>> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (_input, init) => {
+    sent.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+    return new Response(JSON.stringify({ id: 'email_mfa_controlled' }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const env = {
+      DB: db,
+      RESEND_API_KEY: 're_test_synthetic',
+      RESEND_FROM_EMAIL: 'notifications@example.test',
+      PUBLIC_SITE_URL: 'https://sparkling-standard.com',
+    };
+    const started = await accountsPost({
+      request: new Request('https://example.test/api/admin/accounts', {
+        method: 'POST',
+        headers: {
+          Cookie: cookie,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'mfa_email_start', password: 'SyntheticOwner!2026' }),
+      }),
+      env,
+    } as never);
+    assert.equal(started.status, 200);
+    const enrollment = (await started.json()) as { challengeToken?: string };
+    assert.ok(enrollment.challengeToken);
+    assert.equal(sent.length, 1);
+    const code = String(sent[0].text ?? '').match(/\b\d{6}\b/)?.[0] ?? '';
+    assert.match(code, /^\d{6}$/);
+
+    const enabled = await accountsPost({
+      request: new Request('https://example.test/api/admin/accounts', {
+        method: 'POST',
+        headers: {
+          Cookie: cookie,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'mfa_email_enable',
+          challengeToken: enrollment.challengeToken,
+          code,
+        }),
+      }),
+      env,
+    } as never);
+    assert.equal(enabled.status, 200);
+    const recovery = (await enabled.json()) as { recoveryCodes?: string[] };
+    assert.equal(recovery.recoveryCodes?.length, 8);
+    const authenticated = await authenticate(db, owner.email, 'SyntheticOwner!2026');
+    assert.equal(authenticated?.mfaEnabled, true);
+    assert.equal(authenticated?.mfaMethod, 'email');
+    const refreshed = await readOpsActor(db, request(cookie));
+    assert.equal(refreshed?.mfaEnabled, true);
+    assert.equal(refreshed?.stepUpAt, null);
+
+    const disabled = await accountsPost({
+      request: new Request('https://example.test/api/admin/accounts', {
+        method: 'POST',
+        headers: {
+          Cookie: cookie,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'mfa_disable',
+          password: 'SyntheticOwner!2026',
+          recoveryCode: recovery.recoveryCodes?.[0],
+        }),
+      }),
+      env,
+    } as never);
+    assert.equal(disabled.status, 200);
+    assert.equal((await authenticate(db, owner.email, 'SyntheticOwner!2026'))?.mfaEnabled, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 test('the login route sends an email code and accepts it without exposing a session early', async () => {
   const db = migratedDb();

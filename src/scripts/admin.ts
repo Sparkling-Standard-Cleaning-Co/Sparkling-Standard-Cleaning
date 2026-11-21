@@ -36,7 +36,7 @@ const mfaForm = document.querySelector<HTMLFormElement>('[data-admin-mfa]');
 const mfaCopy = document.querySelector<HTMLElement>('[data-admin-mfa-copy]');
 const mfaCodeLabel = document.querySelector<HTMLElement>('[data-admin-mfa-code-label]');
 const mfaResend = document.querySelector<HTMLButtonElement>('[data-admin-mfa-resend]');
-const mfaStatus = document.querySelector<HTMLElement>('[data-admin-mfa-status]');
+const mfaGateStatus = document.querySelector<HTMLElement>('[data-admin-mfa-gate-status]');
 const inviteForm = document.querySelector<HTMLFormElement>('[data-admin-invite]');
 const resetForm = document.querySelector<HTMLFormElement>('[data-admin-reset]');
 const passwordChangeForm = document.querySelector<HTMLFormElement>('[data-admin-password-change]');
@@ -3573,12 +3573,12 @@ async function loadSettings(): Promise<void> {
         )
       : Promise.resolve({ audit: [] as Array<Record<string, unknown>>, total: 0, limit: 50, offset: 0 }),
   ]);
-  const mfaStatus = document.querySelector<HTMLElement>('[data-admin-mfa-status]');
+  const mfaStatus = document.querySelector<HTMLElement>('[data-admin-view="settings"] [data-admin-mfa-status]');
   if (mfaStatus) {
     const method = actor?.mfaMethod === 'email' ? 'email' : 'totp';
     mfaStatus.innerHTML = actor?.mfaEnabled
       ? `<p><strong>Two-step verification is enabled (${method === 'email' ? 'email code' : 'authenticator app'}).</strong></p><details class="admin-detail-toggle"><summary>Disable two-step verification</summary><form class="admin-form" data-form="mfa-disable"><label>Password <input name="password" type="password" required /></label>${method === 'email' ? '<label>Recovery code <input name="recoveryCode" autocomplete="off" maxlength="40" required /></label>' : '<label>Current authenticator code <input name="code" inputmode="numeric" maxlength="6" required /></label>'}<button class="btn btn--secondary btn--small" type="submit">Disable</button></form></details>`
-      : '<p>Two-step verification is not enabled.</p><div class="admin-actions"><button class="btn btn--primary btn--small" type="button" data-admin-action="mfa-start">Set up authenticator</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="mfa-email-start">Use email verification codes</button></div>';
+      : '<p>Two-step verification is not enabled.</p><p class="admin-muted">Email verification is recommended. We will send a six-digit code to your administrator email each time you sign in.</p><div class="admin-actions"><button class="btn btn--primary btn--small" type="button" data-admin-action="mfa-email-start">Set up email verification codes</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="mfa-start">Set up authenticator app</button></div>';
   }
   const adminsTarget = document.querySelector<HTMLElement>('[data-admin-admins]');
   if (adminsTarget) {
@@ -4248,18 +4248,18 @@ mfaForm?.addEventListener('submit', async (event) => {
 
 document.querySelector<HTMLButtonElement>('[data-admin-mfa-resend]')?.addEventListener('click', () => {
   if (!mfaChallenge || mfaMethod !== 'email' || Date.now() < mfaResendAt) return;
-  if (mfaStatus) mfaStatus.textContent = 'Sending a new code…';
+  if (mfaGateStatus) mfaGateStatus.textContent = 'Sending a new code…';
   void api<{ expiresAt?: string; resendAfterSeconds?: number }>('/api/admin/auth', {
     method: 'POST',
     body: JSON.stringify({ action: 'mfa_resend', challengeToken: mfaChallenge }),
   })
     .then((result) => {
       mfaResendAt = Date.now() + (result.resendAfterSeconds ?? 60) * 1000;
-      if (mfaStatus) mfaStatus.textContent = 'A new six-digit code was sent to the account email.';
+      if (mfaGateStatus) mfaGateStatus.textContent = 'A new six-digit code was sent to the account email.';
       configureMfaGate();
     })
     .catch((error) => {
-      if (mfaStatus) mfaStatus.textContent = friendly(error);
+      if (mfaGateStatus) mfaGateStatus.textContent = friendly(error);
     });
 });
 
