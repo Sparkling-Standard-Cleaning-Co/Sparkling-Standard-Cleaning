@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-21 (afternoon Pay Now defect repaired and production-verified)
+Last updated: 2026-11-21 (stabilization batch and email-code MFA deployed; remaining workflows tracked)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -17,11 +17,11 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Final reported HEAD | `851a28b` | `851a28b` (`Record bookings and careers release evidence`) |
 | Application commit | `e7f18c6` | `e7f18c6` (`Add bookings email and secure careers applications`) |
 | Latest migration | `0043_career_applications.sql` | present; `migrations/0001`–`0043` |
-| Unit tests | 947 total / 946 pass / 1 skip | **976 total / 975 pass / 1 pre-existing skip / 0 fail** (`npm test`) |
-| Browser tests | 237 pass | **245 pass / 0 fail** (`npm run test:browser`) |
+| Unit tests | 947 total / 946 pass / 1 skip | **978 total / 977 pass / 1 pre-existing skip / 0 fail** (`npm test`) |
+| Browser tests | 237 pass | **247 pass / 0 fail** (`node --test --test-concurrency=2 "tests/browser/*.test.mjs"`) |
 | Newest migrations | 0043 | `0044`–`0047` (production at **47**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
-| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`94ebf4ed-9f98-40df-aea9-45dd4114619d`** (source `a7bcfd5`); prior checkout fix also verified on `3f6ded04` |
+| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`d45b2eeb-d70c-4e45-a258-c8f67a22d9bf`** (source `b066554`); prior checkout fix also verified on `3f6ded04` |
 | Prior release deployment | — | `bb936ae2-cf37-4682-89af-4b5acd03ab5b` (source `10aef33`) |
 
 Git topology note (unresolved, requires owner approval before any change):
@@ -53,7 +53,7 @@ Status legend: **verified working** · **partial** · **missing** · **owner-gat
 |---|---|---|---|
 | Stripe invoice payment links, receipts, saved cards, off-session | verified working (existing) | `src/lib/admin/stripe-billing.ts`, `src/lib/invoicing/invoice-receipt.ts`; tests in `tests/admin.test.ts`, `tests/receipt.test.ts` | Live charge/refund remains owner-authorized |
 | Customer self-service billing portal | **implemented in customer portal (staged)** | Portal opens a Stripe-hosted billing session when `PORTAL_BILLING_ENABLED=true`; reuses/creates one Stripe customer, branch scoped, audited, no charge/refund path. Admin-initiated portal button also exists | Configure Stripe portal settings; enable flag after owner review |
-| Live Pay Now checkout | **repaired and production-verified** | Root cause `customer_update[email]` Stripe `parameter_unknown`. Removed; routing now retries/falls back; retry advances Stripe idempotency generation. 6360 Haupert Ln, Molino, FL 32577 reached live Stripe Checkout; simulated failure showed **Try Secure Payment Again** and retry reached Stripe. No charge/refund. Full evidence: `docs/verification/2026-11-21-CHECKOUT-RECOVERY.md` | None for initiation; Stripe Dashboard remains as previously configured |
+| Live Pay Now checkout | **repaired and production-verified** | Root cause `customer_update[email]` Stripe `parameter_unknown`. Removed; routing now retries/falls back; retry advances Stripe idempotency generation. the owner-approved Molino test address (redacted from public docs) reached live Stripe Checkout; simulated failure showed **Try Secure Payment Again** and retry reached Stripe. No charge/refund. Full evidence: `docs/verification/2026-11-21-CHECKOUT-RECOVERY.md` | None for initiation; Stripe Dashboard remains as previously configured |
 | Unified customer portal | **implemented and tested (staged)** | Passwordless single-use 15-minute links, hashed 7-day sessions, CSRF, anti-enumeration, rate limits, bookings, recurring plans, invoices/payment links, signed documents, profile/properties, customer-service requests. Migration `0045`; `/portal/` page; `docs/operations/CUSTOMER-PORTAL.md` | Apply migration, deploy, confirm one real sign-in/inbox delivery |
 | Data Control Center | **improved, still partial** | Branch-filtered counts and CSV/JSON exports, signing-evidence export, backup health/incident panel, retention policy registry and legal holds (migration `0046`), audited exports. Encrypted full recovery remains CLI/documented | Add controlled short-lived download storage, archive search and approved permanent-deletion workflow |
 | Server-driven admin pagination | **improved, still partial** | Customers, leads, careers, invoices and audit history now page server-side with totals, ordering whitelist, page sizes 25/50/100 and UI pagers. Requests/jobs/employees/time/documents keep specialized/bounded views | Extend to remaining long lists only where a table is appropriate |
@@ -241,7 +241,7 @@ Next executable steps:
 
 ### 2026-11-21 � critical checkout repair
 
-- Reported live Pay Now fallback reproduced with **6360 Haupert Ln, Molino,
+- Reported live Pay Now fallback reproduced with **the owner-approved Molino test address, Molino,
   FL 32577**.
 - Runtime log proved Stripe returned `parameter_unknown` for
   `customer_update[email]`.
@@ -389,3 +389,44 @@ Next executable steps:
     explanation, Pay Later remains available.
   - No charge, payment event or completed checkout occurred. Synthetic open
     sessions will expire normally.
+### 2026-11-21 - stabilization batch and email-code MFA
+
+- **Financial/reporting repairs:** invoice reporting now selects `balance_cents`
+  and `discount_cents`; invoice generation is request-idempotent with migration
+  `0048` and a unique partial index; appointment/job views use a current
+  60-day operational window instead of unbounded oldest-first results; new
+  online payment/gift projections attribute the Pensacola branch instead of
+  NULL.
+- **Tax authority:** dynamic-promotion tax now uses the server-verified
+  destination state/ZIP from the verified quote, not client request fields.
+- **Privacy/data protection:** customer deletion checks active legal holds
+  across customer, booking, appointment and invoice subjects; portal messages/
+  sessions/tokens, signed document text and agreement text are scrubbed.
+  Photo cleanup refuses a real cleanup when any legal hold is active. Current
+  public docs no longer contain the private test address/coordinates; Git
+  history still contains historical references and requires owner approval for
+  any rewrite.
+- **Admin visibility:** overview raises checkout-failure/stale-session and
+  owner-MFA-missing alerts. Checkout failures now persist safe failure codes
+  and reasons in the request record.
+- **Email-code MFA:** migration `0049` adds `mfa_method` and hashed email MFA
+  challenges; pending authenticator secrets are invalidated. Email codes expire
+  in five minutes, have five attempts, 60-second resend cooldown and rate
+  limits, are never stored plainly/logged/in URLs/browser storage, and support
+  recovery codes. Authenticator MFA remains available. Setup/disable controls
+  are in Admin -> Settings. Production login enforcement is unchanged because
+  the owner account is still `mfa_enabled = 0`.
+- **Verification:** migration **49** applied; unit **978** (977 pass, 1
+  pre-existing skip); browser **247 pass** at concurrency 2; check 0 errors;
+  build 39 pages; validate and smoke pass. Production deployment
+  **`d45b2eeb-d70c-4e45-a258-c8f67a22d9bf`** source **`b066554`**; public
+  app/auth probes 200, invalid MFA resend 401, unauthenticated email setup 401.
+- **Backups:** pre-0048 and pre-0049 D1 exports created in git-ignored
+  `backup-out/` and independently verified in-memory (48/49 migrations, 0 FK
+  violations). `backup_runs` remains empty and scheduled automation remains
+  unproven; this is still an owner-credential/destination blocker.
+- **Not completed / explicitly deferred:** general per-action MFA step-up;
+  real declined/card-failure lifecycle proof; full payment-attempt incident
+  UI/resume links; portal-request inbox; post-payment photo recovery;
+  Communications Center wiring; automated backup monitor/Workers; branch-aware
+  historical backfill. Tampa remains OFF and dispatch paused.
