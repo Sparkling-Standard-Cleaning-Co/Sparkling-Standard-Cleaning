@@ -117,6 +117,7 @@ import {
             <button type="button" data-admin-nav="quick-estimate">Quick Estimate</button>
             <button type="button" data-admin-nav="recurring">Recurring Plans</button>
             <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
+            <button type="button" data-admin-nav="careers">Careers</button>
             <button type="button" data-admin-nav="documents">Documents &amp; Agreements</button>
             <button type="button" data-admin-nav="timekeeping">Timekeeping</button>
             <button type="button" data-admin-nav="finance">Invoices &amp; Payments</button>
@@ -586,6 +587,28 @@ import {
                 <label>Email <input name="email" type="email" /></label>
                 <button class="btn btn--secondary btn--small" type="submit">Add team member</button>
               </form>
+            </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="careers" hidden>
+            <div class="admin-card">
+              <div class="admin-detail-head">
+                <div><h2 class="admin-section-title">Career Applications</h2><p class="admin-muted">Private applicant records. Resumes are stored in private object storage and downloaded only through an authorized owner session.</p></div>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="careers-refresh">Refresh</button>
+              </div>
+              <label class="admin-inline-field">Status
+                <select data-careers-filter>
+                  <option value="">All</option>
+                  <option value="new">New</option>
+                  <option value="reviewing">Reviewing</option>
+                  <option value="interview">Interview</option>
+                  <option value="offer">Offer</option>
+                  <option value="declined">Declined</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </label>
+              <div data-careers-list style="margin-top:1rem;"></div>
+              <div data-career-detail style="margin-top:1rem;"></div>
             </div>
           </section>
 

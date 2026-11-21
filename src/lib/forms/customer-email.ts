@@ -29,7 +29,7 @@ export const CUSTOMER_EMAIL_BUSINESS: ConfirmationBusiness = {
   name: 'Sparkling Standard',
   founder: 'Hayli',
   phone: '(850) 426-8479',
-  email: EMAIL_ROUTING.customerService,
+  email: EMAIL_ROUTING.bookings,
   website: 'sparkling-standard.com',
 };
 
@@ -37,7 +37,7 @@ export const CUSTOMER_EMAIL_BUSINESS: ConfirmationBusiness = {
 export const DEFAULT_CUSTOMER_EMAIL_FROM = EMAIL_ROUTING.notificationsSender;
 
 /** Customer replies reach the owner directly. */
-export const DEFAULT_CUSTOMER_EMAIL_REPLY_TO = EMAIL_ROUTING.customerService;
+export const DEFAULT_CUSTOMER_EMAIL_REPLY_TO = EMAIL_ROUTING.bookings;
 
 export const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 

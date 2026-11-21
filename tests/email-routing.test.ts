@@ -8,7 +8,8 @@ import { DEFAULT_INVOICE_EMAIL_REPLY_TO } from '../src/lib/invoicing/invoice-ema
 import { DEFAULT_RECEIPT_EMAIL_REPLY_TO } from '../src/lib/forms/customer-receipt.ts';
 
 test('department addresses are distinct and use the confirmed domain', () => {
-  assert.equal(new Set([EMAIL_ROUTING.customerService, EMAIL_ROUTING.billing, EMAIL_ROUTING.hiring, EMAIL_ROUTING.admin, EMAIL_ROUTING.owner]).size, 5);
+  assert.equal(new Set([EMAIL_ROUTING.bookings, EMAIL_ROUTING.customerService, EMAIL_ROUTING.billing, EMAIL_ROUTING.hiring, EMAIL_ROUTING.admin, EMAIL_ROUTING.owner]).size, 6);
+  assert.equal(EMAIL_ROUTING.bookings, 'bookings@sparkling-standard.com');
   assert.equal(EMAIL_ROUTING.customerService, 'customer-service@sparkling-standard.com');
   assert.equal(EMAIL_ROUTING.billing, 'billing@sparkling-standard.com');
   assert.equal(EMAIL_ROUTING.hiring, 'hiring@sparkling-standard.com');
@@ -17,7 +18,7 @@ test('department addresses are distinct and use the confirmed domain', () => {
 });
 
 test('customer replies use customer service while owner alerts stay private', () => {
-  assert.equal(DEFAULT_CUSTOMER_EMAIL_REPLY_TO, EMAIL_ROUTING.customerService);
+  assert.equal(DEFAULT_CUSTOMER_EMAIL_REPLY_TO, EMAIL_ROUTING.bookings);
   assert.equal(DEFAULT_OWNER_NOTIFICATION_EMAIL, EMAIL_ROUTING.owner);
   assert.equal(DEFAULT_INVOICE_EMAIL_REPLY_TO, EMAIL_ROUTING.billing);
   assert.equal(DEFAULT_RECEIPT_EMAIL_REPLY_TO, EMAIL_ROUTING.billing);

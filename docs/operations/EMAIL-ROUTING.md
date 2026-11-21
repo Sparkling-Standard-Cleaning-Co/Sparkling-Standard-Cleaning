@@ -4,13 +4,14 @@
 
 | Purpose | Address | Sender / reply behaviour |
 | --- | --- | --- |
-| Public contact, estimates, booking support, rescheduling, cancellations, complaints, re-cleans | `customer-service@sparkling-standard.com` | Customer email defaults use the verified notifications sender and reply to customer service |
+| Public contact, general inquiries, complaints and re-clean requests | `customer-service@sparkling-standard.com` | Public website and customer-service correspondence |
+| Booking requests, confirmations, reminders, rescheduling, cancellations and recurring scheduling | `bookings@sparkling-standard.com` | Booking confirmation and booking-related reply-to |
 | Recruitment and applicants | `hiring@sparkling-standard.com` | Public careers link and subject; display name `Sparkling Standard | Hiring Team` |
 | Billing, invoices, receipts, payment reminders and refund correspondence | `billing@sparkling-standard.com` | Invoice and receipt reply-to address; not the general public support address |
 | Internal administration and vendor correspondence | `admin@sparkling-standard.com` | Owner/staff correspondence; not the default public support address |
 | Ownership, financial and critical security/backup alerts | `owner@sparkling-standard.com` | Owner notifications, invoices/security and critical alerts |
 
-The public website now uses the customer-service address in business config, the contact page, footer, legal pages, structured data, branch pages and customer email reply-to. Invoice and receipt reply-to defaults use billing. Owner notifications remain addressed to the owner.
+The public website uses customer service. Booking confirmations use bookings. Invoice and receipt reply-to use billing. Owner notifications remain addressed to the owner.
 
 ## DNS observed on 2026-11-20
 
@@ -24,8 +25,8 @@ The mailbox existence and Google Workspace account settings were not verified fr
 
 ## Owner setup
 
-1. Confirm all five department mailboxes/aliases exist and are able to receive mail.
-2. Confirm the Google Workspace sending/alias configuration for `customer-service@`, `billing@`, `hiring@` and `admin@`.
+1. Confirm all six department mailboxes/aliases exist and are able to receive mail.
+2. Confirm the Google Workspace sending/alias configuration for `bookings@`, `customer-service@`, `billing@`, `hiring@` and `admin@`.
 3. Confirm the Resend sender domain is verified. Set `RESEND_REPLY_TO=customer-service@sparkling-standard.com` and `RESEND_BILLING_REPLY_TO=billing@sparkling-standard.com`.
 4. Confirm `OWNER_NOTIFICATION_EMAIL=owner@sparkling-standard.com`.
 5. If Google Workspace sends as the public addresses, add the required SPF include and DKIM records only after checking the current records. Do not overwrite the existing Google records.
@@ -36,7 +37,8 @@ The mailbox existence and Google Workspace account settings were not verified fr
 
 ## Application behaviour
 
-- Customer confirmations and service correspondence: reply to customer service.
+- Booking confirmations and scheduling correspondence: reply to bookings.
+- General service correspondence: reply to customer service.
 - Invoice emails and payment receipts: reply to billing.
 - Owner notifications and critical document alerts: owner address.
 - Hiring: public careers link and a mailto subject; no automated applicant tracking system was added.
