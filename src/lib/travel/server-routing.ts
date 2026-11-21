@@ -98,72 +98,78 @@ export async function resolveRoute(
           : '';
 
   if (provider === 'google' && googleKey) {
-    try {
-      const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': googleKey,
-          'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
-        },
-        body: JSON.stringify({
-          origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
-          destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
-          travelMode: 'DRIVE',
-          routingPreference: 'TRAFFIC_UNAWARE',
-          computeAlternativeRoutes: false,
-          languageCode: 'en-US',
-          units: 'METRIC',
-        }),
-        signal: AbortSignal.timeout(10_000),
-      });
-      const data = (await response.json().catch(() => ({}))) as {
-        routes?: Array<{ distanceMeters?: number; duration?: string }>;
-      };
-      const route = data.routes?.[0];
-      const meters = route?.distanceMeters;
-      const seconds = typeof route?.duration === 'string' ? Number(route.duration.replace(/s$/, '')) : NaN;
-      if (response.ok && typeof meters === 'number' && meters >= 0) {
-        return {
-          oneWayMiles: meters / 1609.344,
-          durationMinutes: Number.isFinite(seconds) && seconds >= 0 ? seconds / 60 : null,
-          provider: 'google',
-          method: 'route',
-          verified: true,
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 200));
+        const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': googleKey,
+            'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+          },
+          body: JSON.stringify({
+            origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
+            destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+            travelMode: 'DRIVE',
+            routingPreference: 'TRAFFIC_UNAWARE',
+            computeAlternativeRoutes: false,
+            languageCode: 'en-US',
+            units: 'METRIC',
+          }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          routes?: Array<{ distanceMeters?: number; duration?: string }>;
         };
+        const route = data.routes?.[0];
+        const meters = route?.distanceMeters;
+        const seconds = typeof route?.duration === 'string' ? Number(route.duration.replace(/s$/, '')) : NaN;
+        if (response.ok && typeof meters === 'number' && meters >= 0) {
+          return {
+            oneWayMiles: meters / 1609.344,
+            durationMinutes: Number.isFinite(seconds) && seconds >= 0 ? seconds / 60 : null,
+            provider: 'google',
+            method: 'route',
+            verified: true,
+          };
+        }
+      } catch {
+        // Retry once, then fall through to MapMap/straight-line.
       }
-    } catch {
-      // Fall through to the labeled straight-line fallback.
     }
   }
 
   if ((provider === 'mapmap' || provider === 'google') && apiKey) {
-    try {
-      // MapMap hosted gateway — OSRM-compatible response (distance metres,
-      // duration seconds). Free tier: requests are refused at quota, so
-      // overage charges cannot occur.
-      const base = env.MAPMAP_BASE?.trim() || 'https://api.mapmap.ai';
-      const url =
-        `${base}/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
-        `?overview=false`;
-      const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
-      const data = (await response.json().catch(() => ({}))) as {
-        routes?: Array<{ distance?: number; duration?: number }>;
-      };
-      const route = data.routes?.[0];
-      const meters = route?.distance;
-      const seconds = typeof route?.duration === 'number' && route.duration >= 0 ? route.duration : null;
-      if (response.ok && typeof meters === 'number' && meters >= 0) {
-        return {
-          oneWayMiles: meters / 1609.344,
-          durationMinutes: seconds !== null ? seconds / 60 : null,
-          provider: 'mapmap',
-          method: 'route',
-          verified: true,
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 200));
+        // MapMap hosted gateway - OSRM-compatible response (distance metres,
+        // duration seconds). Free tier: requests are refused at quota, so
+        // overage charges cannot occur.
+        const base = env.MAPMAP_BASE?.trim() || 'https://api.mapmap.ai';
+        const url =
+          `${base}/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
+          `?overview=false`;
+        const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+        const data = (await response.json().catch(() => ({}))) as {
+          routes?: Array<{ distance?: number; duration?: number }>;
         };
+        const route = data.routes?.[0];
+        const meters = route?.distance;
+        const seconds = typeof route?.duration === 'number' && route.duration >= 0 ? route.duration : null;
+        if (response.ok && typeof meters === 'number' && meters >= 0) {
+          return {
+            oneWayMiles: meters / 1609.344,
+            durationMinutes: seconds !== null ? seconds / 60 : null,
+            provider: 'mapmap',
+            method: 'route',
+            verified: true,
+          };
+        }
+      } catch {
+        // Retry once, then fall through to the straight-line estimate.
       }
-    } catch {
-      // Fall through to the straight-line estimate.
     }
   }
 
