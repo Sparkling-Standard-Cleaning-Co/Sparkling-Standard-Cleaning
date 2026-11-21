@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-21 (MFA step-up enforced for sensitive admin actions; remaining workflows tracked)
+Last updated: 2026-11-21 (owner MFA enrollment UI regression fixed and verified; remaining workflows tracked)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -17,11 +17,11 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Final reported HEAD | `851a28b` | `851a28b` (`Record bookings and careers release evidence`) |
 | Application commit | `e7f18c6` | `e7f18c6` (`Add bookings email and secure careers applications`) |
 | Latest migration | `0043_career_applications.sql` | present; `migrations/0001`–`0043` |
-| Unit tests | 947 total / 946 pass / 1 skip | **980 total / 979 pass / 1 pre-existing skip / 0 fail** (`npm test`) |
-| Browser tests | 237 pass | **247 pass / 0 fail** (`node --test --test-concurrency=2 "tests/browser/*.test.mjs"`) |
+| Unit tests | 947 total / 946 pass / 1 skip | **981 total / 980 pass / 1 pre-existing skip / 0 fail** (`npm test`) |
+| Browser tests | 237 pass | **248 pass / 0 fail** (`node --test --test-concurrency=2 "tests/browser/*.test.mjs"`) |
 | Newest migrations | 0043 | `0044`–`0050` (production at **50**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
-| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`fd0e2394-103d-4870-a8cb-45fdf0e62e6d`** (source `de7dc39`); prior checkout fix also verified on `3f6ded04` |
+| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`7ea7af39-8f8b-47e7-8347-7d0797b6ed60`** (source `041303e`); prior checkout fix also verified on `3f6ded04` |
 | Prior release deployment | — | `bb936ae2-cf37-4682-89af-4b5acd03ab5b` (source `10aef33`) |
 
 Git topology note (unresolved, requires owner approval before any change):
@@ -490,3 +490,29 @@ Next executable steps:
   communications writes where risk warrants; owner MFA enrollment/recovery proof;
   SMS provider approval; automated backups; real payment-lifecycle proof; portal
   inbox; post-payment photo recovery. Tampa remains OFF and dispatch paused.
+### 2026-11-21 - owner MFA enrollment UI regression
+
+- Root cause: the email-MFA login gate introduced a second `data-admin-mfa-status`
+  attribute. `loadSettings()` used an unscoped `querySelector`, so the enrollment
+  controls were written into the hidden login-gate status paragraph instead of
+  the **Your security** container. The administrator table still reported
+  `MFA: Not enabled`, making the missing controls look like a backend failure.
+- Fix: the login gate now uses `data-admin-mfa-gate-status`; the settings query
+  is scoped to `[data-admin-view="settings"] [data-admin-mfa-status]`. Email
+  verification is now presented first as the recommended method, with the
+  authenticator option second.
+- Added a browser regression test that opens Settings with a controlled owner
+  actor, asserts both enrollment controls exist in the visible settings scope,
+  and exercises the email setup form after the password confirmation prompt.
+- Added a controlled-account route test covering email enrollment, eight recovery
+  codes, verified email login and recovery-code disablement without touching owner
+  credentials.
+- Production verification: a temporary controlled owner account was created,
+  used to confirm both controls appear in the live Settings view, then removed.
+  The production email challenge path delivered to Resend's controlled test
+  address and rendered the email-code form. Owner account remains the sole admin,
+  `mfa_enabled = 0`, `mfa_method = totp`, no pending secret; no owner session or
+  credential was changed.
+- Verification: unit **981** (980 pass, 1 skip); browser **248 pass**; check 0
+  errors; build 39 pages. Commit **`041303e`**; active production deployment
+  **`7ea7af39-8f8b-47e7-8347-7d0797b6ed60`**; GitHub run `44947264510` passed.

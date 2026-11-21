@@ -62,7 +62,7 @@ communications settings and other operational writes should be reviewed for the
 same policy as their risk is assessed. Do not describe the system as fully
 step-up protected across every endpoint.
 
-## Owner activation checklist
+## Enrollment interface recovery (2026-11-21)\n\nThe login MFA gate and the **Your security** panel previously shared the\n`data-admin-mfa-status` attribute. The settings renderer used an unscoped query\nand wrote the enrollment controls into the hidden login gate, so the owner saw\n**MFA: Not enabled** in the administrator table but no setup buttons in Your\nsecurity. The gate now uses `data-admin-mfa-gate-status`, the settings renderer\nis scoped to the visible Settings section, and email verification is presented\nfirst as the recommended method. A browser regression test and a production\ncontrolled-account check protect this behavior. The test account was removed;\nthe owner account and credentials were not changed.\n\n## Owner activation checklist
 
 1. Sign in at `/admin/`.
 2. Open Settings → Your security.
