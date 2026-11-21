@@ -1215,7 +1215,15 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     );
   }
   const hold = await authoritativeHoldId(fields, env);
-  if (!hold.ok) return json({ ok: false, error: hold.error }, 400);
+  if (!hold.ok) {
+    await recordCheckoutFailure(
+      env,
+      fields,
+      hold.error,
+      'The selected arrival time could not be held for secure checkout.',
+    );
+    return json({ ok: false, error: hold.error }, 400);
+  }
   fields.booking_hold_id = hold.holdId;
   fields.booking_slot_start = hold.start;
   fields.booking_slot_end = hold.end;
@@ -1241,6 +1249,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       : await verifyResidentialPayment(fields, env, pricingConfig);
 
   if (!candidate.ok) {
+    await recordCheckoutFailure(
+      env,
+      fields,
+      'quote_not_payable',
+      `Quote could not be verified: ${candidate.reason}`,
+    );
     return json(
       { ok: false, error: 'quote_not_payable', reason: candidate.reason },
       400,
@@ -1376,6 +1390,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return null;
   });
   if (!stripeCustomer) {
+    await recordCheckoutFailure(
+      env,
+      fields,
+      'stripe_customer_unavailable',
+      'Stripe customer setup failed before checkout could start.',
+    );
     return json({ ok: false, error: 'stripe_customer_unavailable' }, 502);
   }
 
@@ -1686,6 +1706,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         failedAt: new Date().toISOString(),
         reason: `stripe_${data.error?.code ?? 'unknown'}`,
       }).catch(() => undefined);
+      await recordCheckoutFailure(
+        env,
+        fields,
+        'stripe_session_failed',
+        `Stripe rejected checkout: ${data.error?.code ?? 'unknown'}${data.error?.param ? ` (${data.error.param})` : ''}`,
+      );
       return json({
         ok: false,
         error: 'stripe_unavailable',
@@ -1727,6 +1753,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         await releasePromotionRedemption(env.DB, attemptFingerprint).catch(() => undefined);
       }
       console.error('[estimate-checkout] checkout_state_uncertain', { sessionId: data.id });
+      await recordCheckoutFailure(
+        env,
+        fields,
+        'checkout_state_uncertain',
+        'Stripe created a session but the local checkout state could not be persisted.',
+      );
       return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
     }
     if (env.DB && checkoutSlotId) {
@@ -1742,6 +1774,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           await releasePromotionRedemption(env.DB, attemptFingerprint).catch(() => undefined);
         }
         await deleteLedgerKey(bucket, key).catch(() => undefined);
+        await recordCheckoutFailure(
+          env,
+          fields,
+          'checkout_state_uncertain',
+          'Stripe created a session but the checkout slot could not be activated.',
+        );
         return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
       }
     }
@@ -1766,6 +1804,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     console.error('[estimate-checkout] stripe_transport_failed', {
       name: error instanceof Error ? error.name : 'unknown',
     });
+    await recordCheckoutFailure(
+      env,
+      fields,
+      'stripe_transport_failed',
+      'The server could not reach Stripe to create the checkout session.',
+    );
     return json({ ok: false, error: 'stripe_unavailable', reason: 'transport' }, 502);
   }
 }

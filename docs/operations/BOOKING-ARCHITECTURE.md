@@ -30,6 +30,10 @@ choice provisional. At the final step the wizard calls `finalize()` with the rea
 destination; the controller re-requests availability, finds the same start (or matches a preferred
 fallback window by label), creates the temporary hold, and renders legitimate alternatives when the
 time is no longer available. A customer's held resource assignment is honored by owner confirmation.
+Pay Now is never allowed to proceed without an exact held slot: if final availability, capacity or
+a technical failure prevents the hold, the wizard explains the scheduling blocker, starts no
+checkout, takes no payment, and leaves Pay Later available. This applies equally to the morning and
+afternoon arrival windows.
 
 **Hold vs pending request lifecycle (2026-10-28):** a 20-minute hold protects only the checkout
 window. When the customer submits the lead, the server creates a durable pending booking request

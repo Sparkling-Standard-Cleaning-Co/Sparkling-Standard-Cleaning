@@ -343,6 +343,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   let bookingCalendar: BookingCalendarHandle | null = null;
   let bookingFinalizedKey = '';
   let bookingFinalizeNote = '';
+  let bookingFinalizedStatus = '';
 
   let currentStep = 1;
   let location: ConfirmedLocation | null = null;
@@ -2089,6 +2090,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const selected = bookingCalendar?.selection();
         bookingFinalizedKey = '';
         bookingFinalizeNote = '';
+        bookingFinalizedStatus = '';
         updateAppointmentSummary();
         const alternatives = form.querySelector<HTMLElement>('[data-booking-alternatives]');
         if (alternatives) {
@@ -2180,6 +2182,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     addressDetailsRevealed = false;
     bookingFinalizedKey = '';
     bookingFinalizeNote = '';
+    bookingFinalizedStatus = '';
     photosDeferred = false;
     hidePhotoGate();
     clearAllErrors();
@@ -2566,6 +2569,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       button.addEventListener('click', () => {
         bookingCalendar?.selectSlot(slot.start, slot.end, slot.startLabel);
         bookingFinalizedKey = '';
+        bookingFinalizedStatus = '';
         container.hidden = true;
         container.innerHTML = '';
         updateAppointmentSummary();
@@ -2583,9 +2587,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
   async function finalizeBookingForSubmit(result: EstimateResult): Promise<{
     blockedPayment: boolean;
     note: string;
+    status: string;
   }> {
     if (!bookingCalendar || result.status !== 'estimated' || !latestQuote) {
-      return { blockedPayment: false, note: '' };
+      return { blockedPayment: false, note: '', status: '' };
     }
     const submission = submissionAddress();
     const fallback = submission.location ? null : zipReferenceFor(submission.zip);
@@ -2595,7 +2600,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
         ? { lat: fallback.lat, lng: fallback.lng }
         : null;
     if (!destination) {
-      return { blockedPayment: false, note: 'Your preferred date is saved; we will confirm the time with you.' };
+      return {
+        blockedPayment: false,
+        note: 'Your preferred date is saved; we will confirm the time with you.',
+        status: 'none',
+      };
     }
     const durationMinutes = Math.max(
       bookingConfig.minimumJobMinutes,
@@ -2609,7 +2618,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
       destination.lng.toFixed(5),
     ].join('|');
     if (key === bookingFinalizedKey) {
-      return { blockedPayment: false, note: bookingFinalizeNote };
+      return {
+        blockedPayment: bookingFinalizedStatus !== 'held',
+        note: bookingFinalizeNote,
+        status: bookingFinalizedStatus,
+      };
     }
     bookingFinalizedKey = key;
     const outcome = await bookingCalendar.finalize({
@@ -2621,11 +2634,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
         : `ZIP ${submission.zip}`,
     });
     bookingFinalizeNote = outcome.message;
+    bookingFinalizedStatus = outcome.status;
     renderBookingAlternatives(outcome.alternatives, outcome.message);
     updateAppointmentSummary();
     return {
-      blockedPayment: outcome.status === 'alternatives',
+      blockedPayment: outcome.status !== 'held',
       note: outcome.message,
+      status: outcome.status,
     };
   }
 
@@ -2676,8 +2691,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
         setPayNowBusy(false);
         if (status) {
           status.dataset.state = 'info';
+          const schedulingCopy = finalized.note.trim();
           status.textContent =
-            'That start time is no longer available with your final details. Choose an available time above, or reserve without paying and we will help.';
+            finalized.status === 'alternatives'
+              ? `${schedulingCopy || 'That start time is no longer available with your final details.'} No payment has been taken. Choose an available time above, or reserve without paying.`
+              : 'We could not confirm a live held slot for that arrival time, so secure payment cannot start yet. No payment has been taken. Choose another available time or reserve without paying.';
         }
         return;
       }
