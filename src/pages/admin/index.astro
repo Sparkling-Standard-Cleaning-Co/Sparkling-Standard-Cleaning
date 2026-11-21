@@ -118,6 +118,7 @@ import {
             <button type="button" data-admin-nav="recurring">Recurring Plans</button>
             <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
             <button type="button" data-admin-nav="careers">Careers</button>
+            <button type="button" data-admin-nav="communications">Communications &amp; Notifications</button>
             <button type="button" data-admin-nav="documents">Documents &amp; Agreements</button>
             <button type="button" data-admin-nav="timekeeping">Timekeeping</button>
             <button type="button" data-admin-nav="finance">Invoices &amp; Payments</button>
@@ -201,9 +202,12 @@ import {
               <form class="admin-inline-form" data-admin-lead-filter>
                 <label>Status <select name="status"><option value="">All</option><option value="new">New</option><option value="contacted">Contacted</option><option value="quoted">Quoted</option><option value="converted">Converted</option><option value="lost">Lost</option><option value="archived">Archived</option></select></label>
                 <label>Search <input name="q" type="search" placeholder="Name, reference, address" /></label>
+                <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="status">Status</option><option value="request_type">Request type</option></select></label>
+                <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
                 <button class="btn btn--secondary btn--small" type="submit">Filter</button>
               </form>
               <div data-admin-leads style="margin-top:1rem;"></div>
+              <div data-admin-leads-pagination style="margin-top:.75rem;"></div>
             </div>
           </section>
 
@@ -212,10 +216,13 @@ import {
               <h2 class="admin-section-title">Customers</h2>
               <form class="admin-inline-form" data-admin-customer-search>
                 <label>Search <input name="q" type="search" placeholder="Name, email or phone" /></label>
+                <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="name">Name</option><option value="status">Status</option></select></label>
+                <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
                 <button class="btn btn--secondary btn--small" type="submit">Search</button>
                 <button class="btn btn--ghost btn--small" type="button" data-admin-customer-new>New customer</button>
               </form>
               <div data-admin-customers style="margin-top:1rem;"></div>
+              <div data-admin-customers-pagination style="margin-top:.75rem;"></div>
               <div class="admin-detail" data-admin-customer-detail hidden></div>
             </div>
           </section>
@@ -596,18 +603,32 @@ import {
                 <div><h2 class="admin-section-title">Career Applications</h2><p class="admin-muted">Private applicant records. Resumes are stored in private object storage and downloaded only through an authorized owner session.</p></div>
                 <button class="btn btn--ghost btn--small" type="button" data-admin-action="careers-refresh">Refresh</button>
               </div>
-              <label class="admin-inline-field">Status
-                <select data-careers-filter>
-                  <option value="">All</option>
-                  <option value="new">New</option>
-                  <option value="reviewing">Reviewing</option>
-                  <option value="interview">Interview</option>
-                  <option value="offer">Offer</option>
-                  <option value="declined">Declined</option>
-                  <option value="archived">Archived</option>
-                </select>
-              </label>
+              <form class="admin-inline-form" data-careers-search>
+                <label>Status
+                  <select data-careers-filter name="status">
+                    <option value="">All</option>
+                    <option value="new">New</option>
+                    <option value="reviewing">Reviewing</option>
+                    <option value="interview">Interview</option>
+                    <option value="offer">Offer</option>
+                    <option value="declined">Declined</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label>Branch
+                  <select name="branch">
+                    <option value="">All branches</option>
+                    <option value="pensacola">Pensacola</option>
+                    <option value="tampa">Tampa future interest</option>
+                  </select>
+                </label>
+                <label>Search <input name="q" type="search" placeholder="Name, email, reference or role" /></label>
+                <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="name">Applicant name</option><option value="status">Status</option></select></label>
+                <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
+                <button class="btn btn--secondary btn--small" type="submit">Filter</button>
+              </form>
               <div data-careers-list style="margin-top:1rem;"></div>
+              <div data-careers-pagination style="margin-top:.75rem;"></div>
               <div data-career-detail style="margin-top:1rem;"></div>
             </div>
           </section>
@@ -824,7 +845,15 @@ import {
             <div class="admin-grid" data-admin-finance-summary></div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Invoices</h2>
-              <div data-admin-invoices></div>
+              <form class="admin-inline-form" data-admin-finance-filter>
+                <label>Status <select name="status"><option value="">All</option><option value="draft">Draft</option><option value="open">Open</option><option value="partially_paid">Partially paid</option><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></select></label>
+                <label>Search <input name="q" type="search" placeholder="Invoice number or customer" /></label>
+                <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="due_date">Due date</option><option value="balance">Balance</option><option value="status">Status</option></select></label>
+                <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
+                <button class="btn btn--secondary btn--small" type="submit">Filter</button>
+              </form>
+              <div data-admin-invoices style="margin-top:1rem;"></div>
+              <div data-admin-invoices-pagination style="margin-top:.75rem;"></div>
               <div data-admin-invoice-detail style="margin-top:1rem;"></div>
               <div data-admin-invoice-controls style="margin-top:1rem;"></div>
             </div>
@@ -1106,6 +1135,69 @@ import {
               </div>
               <p class="admin-status-message" data-branch-form-status role="status" aria-live="polite"></p>
             </form>
+          </section>
+
+          <section class="admin-view" data-admin-view="communications" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Communications &amp; notifications</h2>
+              <p class="admin-muted">
+                The six department addresses are approved architecture. Owners control which department receives each
+                operational notice, the reply-to department for customer mail and the approved notification wording.
+                Critical security and backup alerts always include both admin@ and owner@.
+              </p>
+              <div data-admin-communications-status></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Provider and delivery health</h2>
+              <div data-admin-communications-provider></div>
+              <div data-admin-communications-health style="margin-top:1rem;"></div>
+              <div data-admin-communications-failures style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
+              <h2 class="admin-section-title">Routing and templates</h2>
+              <form data-communications-form>
+                <h3 class="admin-section-title" style="font-size:1rem;">Notification routing</h3>
+                <div data-communications-routing></div>
+                <h3 class="admin-section-title" style="font-size:1rem;margin-top:1.25rem;">Reply-to department</h3>
+                <div data-communications-reply-to></div>
+                <h3 class="admin-section-title" style="font-size:1rem;margin-top:1.25rem;">Approved template</h3>
+                <label>Template <select data-communications-template-select></select></label>
+                <label>Subject <input data-communications-subject maxlength="200" /></label>
+                <label>Body <textarea data-communications-body rows="10" maxlength="6000"></textarea></label>
+                <div class="admin-actions">
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="communications-preview">Preview</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="communications-reset">Reset form to saved settings</button>
+                </div>
+                <div data-communications-preview style="margin-top:.75rem;"></div>
+                <h3 class="admin-section-title" style="font-size:1rem;margin-top:1.25rem;">Alert thresholds</h3>
+                <div class="admin-form admin-form--grid">
+                  <label>Owner escalation (minutes) <input data-communications-escalation type="number" min="5" max="1440" /></label>
+                  <label>Failure threshold before escalation <input data-communications-threshold type="number" min="1" max="100" /></label>
+                </div>
+                <label>Change note <input data-communications-note maxlength="500" placeholder="Why this configuration changed" /></label>
+                <div class="admin-actions">
+                  <button class="btn btn--primary btn--small" type="submit">Save configuration</button>
+                </div>
+                <p class="admin-status-message" data-communications-form-status role="status" aria-live="polite"></p>
+                <div data-communications-errors class="admin-error" role="alert"></div>
+              </form>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
+              <h2 class="admin-section-title">Controlled delivery test</h2>
+              <p class="admin-muted">
+                Sends a clearly marked test email with no customer data. Only do this when you can check the destination
+                mailbox. A provider acceptance is not inbox proof.
+              </p>
+              <div class="admin-inline-form">
+                <label>Department <select data-communications-test-department></select></label>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-action="communications-test">Send test message</button>
+              </div>
+              <p class="admin-status-message" data-communications-test-status role="status" aria-live="polite"></p>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
+              <h2 class="admin-section-title">Version history</h2>
+              <div data-communications-versions></div>
+            </div>
           </section>
 
           <section class="admin-view" data-admin-view="settings" hidden>

@@ -74,6 +74,7 @@ const viewMeta: Record<string, [string, string]> = {
   recurring: ['Recurring Plans', 'Recurring cleaning administration.'],
   jobs: ['Jobs & Team', 'Cleaning jobs, assignments and checklists.'],
   careers: ['Careers', 'Private applications and hiring workflow.'],
+  communications: ['Communications & Notifications', 'Department routing, approved templates, delivery health and version history.'],
   documents: ['Documents & Agreements', 'Owner-controlled templates, bundles and electronic signatures.'],
   timekeeping: ['Timekeeping', 'Employee hours, corrections and location verification.'],
   finance: ['Invoices & Payments', 'Invoicing, payments, credits and reconciliation.'],
@@ -94,6 +95,7 @@ const navPermission: Record<string, string> = {
   'quick-estimate': 'booking.write',
   recurring: 'job.read',
   jobs: 'job.read',
+  communications: 'settings.write',
   documents: 'job.read',
   timekeeping: 'job.write',
   finance: 'finance.read',
@@ -801,10 +803,48 @@ async function submitRequestAction(body: Record<string, unknown>): Promise<void>
   }
 }
 
-async function loadLeads(status = '', query = ''): Promise<void> {
-  const data = await api<{ leads?: Array<Record<string, unknown>> }>(`/api/admin/leads?status=${encodeURIComponent(status)}&q=${encodeURIComponent(query)}`);
+interface PageState {
+  limit: number;
+  offset: number;
+  sort: string;
+}
+
+const leadPage: PageState & { status: string; q: string } = { status: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
+const customerPage: PageState & { q: string } = { q: '', limit: 25, offset: 0, sort: 'created_at' };
+const careerPage: PageState & { status: string; branch: string; q: string } = { status: '', branch: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
+const financePage: PageState & { status: string; q: string } = { status: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
+
+function renderPager(
+  target: HTMLElement | null,
+  meta: { total?: number; limit?: number; offset?: number },
+  actionName: string,
+): void {
+  if (!target) return;
+  const total = Math.max(0, Number(meta.total) || 0);
+  const limit = Math.max(1, Number(meta.limit) || 25);
+  const offset = Math.max(0, Number(meta.offset) || 0);
+  const page = Math.floor(offset / limit) + 1;
+  const pages = Math.max(1, Math.ceil(total / limit));
+  target.innerHTML = `<p class="admin-muted">${total} matching record${total === 1 ? '' : 's'} - page ${page} of ${pages}</p><div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="${esc(actionName)}" data-offset="${Math.max(0, offset - limit)}"${offset <= 0 ? ' disabled' : ''}>Previous</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="${esc(actionName)}" data-offset="${offset + limit}"${offset + limit >= total ? ' disabled' : ''}>Next</button></div>`;
+}
+
+async function loadLeads(status = leadPage.status, query = leadPage.q): Promise<void> {
+  if (status !== leadPage.status || query !== leadPage.q) {
+    leadPage.status = status;
+    leadPage.q = query;
+    leadPage.offset = 0;
+  }
+  const params = new URLSearchParams({
+    status: leadPage.status,
+    q: leadPage.q,
+    limit: String(leadPage.limit),
+    offset: String(leadPage.offset),
+    sort: leadPage.sort,
+  });
+  const data = await api<{ leads?: Array<Record<string, unknown>>; total?: number; limit?: number; offset?: number }>(`/api/admin/leads?${params.toString()}`);
   const target = document.querySelector<HTMLElement>('[data-admin-leads]');
   if (!target) return;
+  renderPager(document.querySelector<HTMLElement>('[data-admin-leads-pagination]'), data, 'leads-page');
   renderTable(target, ['Date', 'Type', 'Customer', 'Reference', 'Delivery', 'Status', 'Action'], (data.leads ?? []).map((lead) => [
     esc(dateTime(lead.created_at)),
     esc(lead.request_type),
@@ -829,12 +869,23 @@ async function loadCustomerOptions(): Promise<void> {
   }
 }
 
-async function loadCustomers(query = ''): Promise<void> {
-  const data = await api<{ customers?: Array<Record<string, unknown>> }>(`/api/admin/customers?q=${encodeURIComponent(query)}`);
+async function loadCustomers(query = customerPage.q): Promise<void> {
+  if (query !== customerPage.q) {
+    customerPage.q = query;
+    customerPage.offset = 0;
+  }
+  const params = new URLSearchParams({
+    q: customerPage.q,
+    limit: String(customerPage.limit),
+    offset: String(customerPage.offset),
+    sort: customerPage.sort,
+  });
+  const data = await api<{ customers?: Array<Record<string, unknown>>; total?: number; limit?: number; offset?: number }>(`/api/admin/customers?${params.toString()}`);
   const list = document.querySelector<HTMLElement>('[data-admin-customers]');
   const detail = document.querySelector<HTMLElement>('[data-admin-customer-detail]');
   if (!list) return;
   if (detail) { detail.hidden = true; detail.innerHTML = ''; }
+  renderPager(document.querySelector<HTMLElement>('[data-admin-customers-pagination]'), data, 'customers-page');
   if ((data.customers ?? []).length === 0) return renderEmpty(list, query ? 'No matching customers.' : 'No customers have been persisted yet.');
   list.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Properties</th><th>Branch</th><th></th></tr></thead><tbody>${(data.customers ?? []).map((customer) => `<tr><td>${esc([customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name)}</td><td>${esc(customer.email)}</td><td>${esc(customer.phone)}</td><td>${esc(customer.property_count)}</td><td>${esc(customer.branch_name)}</td><td><button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-open" data-id="${esc(customer.id)}">Open</button></td></tr>`).join('')}</tbody></table></div>`;
   void loadCustomerOptions();
@@ -2689,11 +2740,24 @@ interface CareerApplication {
 
 let careerApplications: CareerApplication[] = [];
 
-async function loadCareers(status = document.querySelector<HTMLSelectElement>('[data-careers-filter]')?.value ?? ''): Promise<void> {
+async function loadCareers(status?: string): Promise<void> {
+  if (status !== undefined && status !== careerPage.status) {
+    careerPage.status = status;
+    careerPage.offset = 0;
+  }
   const target = document.querySelector<HTMLElement>('[data-careers-list]');
   if (!target) return;
-  const data = await api<{ applications?: CareerApplication[] }>('/api/admin/careers?status=' + encodeURIComponent(status));
+  const params = new URLSearchParams({
+    status: careerPage.status,
+    branch: careerPage.branch,
+    q: careerPage.q,
+    limit: String(careerPage.limit),
+    offset: String(careerPage.offset),
+    sort: careerPage.sort,
+  });
+  const data = await api<{ applications?: CareerApplication[]; total?: number; limit?: number; offset?: number }>('/api/admin/careers?' + params.toString());
   careerApplications = data.applications ?? [];
+  renderPager(document.querySelector<HTMLElement>('[data-careers-pagination]'), data, 'careers-page');
   renderTable(target, ['Submitted', 'Applicant', 'Role', 'Branch', 'Experience', 'Status', 'Action'], careerApplications.map((application) => [
     esc(dateTime(application.created_at)),
     '<strong>' + esc(application.name) + '</strong><br /><span class="admin-muted">' + esc(application.email) + ' - ' + esc(application.reference) + '</span>',
@@ -2728,8 +2792,16 @@ document.addEventListener('submit', (event) => {
   }).then(() => openCareer(applicationId)).then(() => loadCareers()).catch((error) => setAppError(friendly(error)));
 });
 
-document.querySelector<HTMLSelectElement>('[data-careers-filter]')?.addEventListener('change', (event) => {
-  void loadCareers((event.target as HTMLSelectElement).value).catch((error) => setAppError(friendly(error)));
+document.querySelector<HTMLFormElement>('[data-careers-search]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget as HTMLFormElement);
+  careerPage.status = String(data.get('status') ?? '');
+  careerPage.branch = String(data.get('branch') ?? '');
+  careerPage.q = String(data.get('q') ?? '');
+  careerPage.sort = String(data.get('sort') ?? 'created_at');
+  careerPage.limit = Number(data.get('pageSize') ?? 25) || 25;
+  careerPage.offset = 0;
+  void loadCareers().catch((error) => setAppError(friendly(error)));
 });
 
 
@@ -2781,8 +2853,16 @@ async function openChecklist(appointmentId: string): Promise<void> {
 }
 
 async function loadFinance(): Promise<void> {
-  const data = await api<{ invoices?: Array<Record<string, unknown>>; summary?: Record<string, Record<string, number>> }>('/api/admin/finance');
+  const params = new URLSearchParams({
+    status: financePage.status,
+    q: financePage.q,
+    limit: String(financePage.limit),
+    offset: String(financePage.offset),
+    sort: financePage.sort,
+  });
+  const data = await api<{ invoices?: Array<Record<string, unknown>>; total?: number; limit?: number; offset?: number; summary?: Record<string, Record<string, number>> }>(`/api/admin/finance?${params.toString()}`);
   const summary = data.summary ?? {};
+  renderPager(document.querySelector<HTMLElement>('[data-admin-invoices-pagination]'), data, 'invoices-page');
   const summaryTarget = document.querySelector<HTMLElement>('[data-admin-finance-summary]');
   if (summaryTarget) {
     summaryTarget.innerHTML = [['Invoiced', money(summary.invoices?.total)], ['Collected', money(summary.payments?.total)], ['Outstanding', money(summary.outstanding?.total)], ['Gift balances', money(summary.gifts?.balance)]].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('');
@@ -2813,7 +2893,8 @@ async function openInvoice(invoiceId: string): Promise<void> {
   target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(invoice.number)}</h2><span class="admin-status">${esc(titleCase(invoice.status))}</span></div><dl class="admin-definition"><dt>Customer</dt><dd>${esc([invoice.first_name, invoice.last_name].filter(Boolean).join(' '))}</dd><dt>Email</dt><dd>${esc(invoice.customer_email || 'Not recorded')}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Paid</dt><dd>${esc(money(invoice.amount_paid_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(dateTime(invoice.due_date))}</dd></dl><h3>Lines</h3>${lines.map((line) => `<div class="admin-record">${esc(line.description)} · ${esc(money(line.total_cents))}</div>`).join('') || '<p class="admin-muted">No lines.</p>'}<h3>Payments</h3>${payments.map((payment) => `<div class="admin-record">${esc(titleCase(payment.provider))} · ${esc(money(payment.amount_cents))} · ${esc(payment.status)} · ${esc(dateTime(payment.created_at))}<details class="admin-detail-toggle"><summary>Record refund</summary><form class="admin-form" data-form="refund"><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Refund amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="reason" /></label><button class="btn btn--secondary btn--small" type="submit">Record refund</button></form></details></div>`).join('') || '<p class="admin-muted">No payments.</p>'}${Number(invoice.balance_cents) > 0 ? `<form class="admin-form" data-form="payment"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Payment method <select name="provider"><option value="cash">Cash</option><option value="check">Check</option><option value="external">External</option></select></label><label>Amount <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Reference <input name="reference" /></label><button class="btn btn--primary btn--small" type="submit">Record payment</button></form>` : ''}<form class="admin-form" data-form="credit"><input type="hidden" name="customerId" value="${esc(invoice.customer_id)}" /><label>Customer credit amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="source" /></label><button class="btn btn--secondary btn--small" type="submit">Add credit</button></form></div>`;
   const controls = document.querySelector<HTMLElement>('[data-admin-invoice-controls]');
   if (controls) {
-    controls.innerHTML = `<a class="btn btn--secondary btn--small" href="/api/admin/invoice-document?id=${encodeURIComponent(invoiceId)}">Download invoice PDF</a>`;
+    controls.innerHTML = `<a class="btn btn--secondary btn--small" href="/api/admin/invoice-document?id=${encodeURIComponent(invoiceId)}">Download invoice PDF</a>` +
+      (can('finance.write') ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="customer-billing-portal" data-id="${esc(invoice.customer_id)}">Open secure billing portal</button>` : '');
     if (String(invoice.status) === 'paid' && can('finance.write')) {
       const latestReceipt = receipts[0];
       controls.insertAdjacentHTML(
@@ -3141,6 +3222,252 @@ async function loadReports(): Promise<void> {
   const payments = target.querySelector<HTMLElement>('[data-admin-report-payments]');
   if (payments) renderTable(payments, ['Provider', 'Status', 'Count', 'Total'], ((report.payments as Array<Record<string, unknown>>) ?? []).map((row) => [esc(titleCase(row.provider)), esc(row.status), esc(row.count), esc(money(row.total_cents))]), 'No payment history yet.');
 }
+
+interface CommunicationSettingsShape {
+  schemaVersion: number;
+  departments: Record<string, { address: string; enabled: boolean }>;
+  routing: Record<string, string[]>;
+  replyTo: Record<string, string>;
+  templates: Record<string, { subject: string; body: string; enabled: boolean }>;
+  alerts: { escalationMinutes: number; failureThreshold: number };
+}
+
+interface CommunicationMetadataShape {
+  departments: Array<{ key: string; label: string }>;
+  events: Array<{ key: string; label: string; critical: boolean; defaults: string[]; description: string }>;
+  replyTo: Array<{ key: string; label: string }>;
+  templates: Array<{ key: string }>;
+}
+
+interface CommunicationsPayload {
+  settings?: CommunicationSettingsShape;
+  source?: string;
+  valid?: boolean;
+  errors?: string[];
+  versions?: Array<Record<string, unknown>>;
+  health?: {
+    summary?: Record<string, number>;
+    recent?: Array<Record<string, unknown>>;
+    leadFailures?: Array<Record<string, unknown>>;
+    bookingFailures?: Array<Record<string, unknown>>;
+    receiptFailures?: Array<Record<string, unknown>>;
+    note?: string;
+  };
+  provider?: Record<string, unknown>;
+  metadata?: CommunicationMetadataShape;
+}
+
+let communicationsPayload: CommunicationsPayload | null = null;
+let communicationsActiveTemplate = 'booking_confirmation';
+
+function communicationDepartmentOptions(selected: string): string {
+  const departments = communicationsPayload?.metadata?.departments ?? [];
+  return departments.map((department) => `<option value="${esc(department.key)}"${department.key === selected ? ' selected' : ''}>${esc(department.label)}</option>`).join('');
+}
+
+function populateCommunicationForm(): void {
+  const payload = communicationsPayload;
+  const settings = payload?.settings;
+  if (!settings || !payload.metadata) return;
+  const routingTarget = document.querySelector<HTMLElement>('[data-communications-routing]');
+  if (routingTarget) {
+    routingTarget.innerHTML = payload.metadata.events.map((event) => {
+      const selected = settings.routing[event.key] ?? [];
+      const options = payload.metadata!.departments.map((department) => {
+        const checked = selected.includes(department.key);
+        return `<label style="display:inline-flex;align-items:center;gap:.35rem;margin-right:1rem;"><input type="checkbox" data-communication-route="${esc(event.key)}" value="${esc(department.key)}"${checked ? ' checked' : ''}${event.critical ? ' disabled' : ''} /> ${esc(department.label)}</label>`;
+      }).join('');
+      return `<div class="admin-record"><p><strong>${esc(event.label)}</strong>${event.critical ? ' <span class="admin-status">Critical</span>' : ''}</p><p class="admin-muted">${esc(event.description)}</p><div>${options}</div>${event.critical ? '<p class="admin-muted">Admin and Owner are required and cannot be changed.</p>' : ''}</div>`;
+    }).join('');
+  }
+  const replyTarget = document.querySelector<HTMLElement>('[data-communications-reply-to]');
+  if (replyTarget) {
+    replyTarget.innerHTML = payload.metadata.replyTo.map((entry) => `<label>${esc(entry.label)} <select data-communication-reply-to="${esc(entry.key)}">${communicationDepartmentOptions(settings.replyTo[entry.key] ?? '')}</select></label>`).join('');
+  }
+  const templateSelect = document.querySelector<HTMLSelectElement>('[data-communications-template-select]');
+  if (templateSelect) {
+    templateSelect.innerHTML = payload.metadata.templates.map((template) => `<option value="${esc(template.key)}"${template.key === communicationsActiveTemplate ? ' selected' : ''}>${esc(titleCase(template.key.replaceAll('_', ' ')))}</option>`).join('');
+  }
+  loadCommunicationTemplateEditor();
+  const escalation = document.querySelector<HTMLInputElement>('[data-communications-escalation]');
+  if (escalation) escalation.value = String(settings.alerts.escalationMinutes);
+  const threshold = document.querySelector<HTMLInputElement>('[data-communications-threshold]');
+  if (threshold) threshold.value = String(settings.alerts.failureThreshold);
+  const testSelect = document.querySelector<HTMLSelectElement>('[data-communications-test-department]');
+  if (testSelect) {
+    const previous = testSelect.value;
+    testSelect.innerHTML = payload.metadata.departments.map((department) => `<option value="${esc(department.key)}">${esc(department.label)} - ${esc(settings.departments[department.key]?.address ?? '')}</option>`).join('');
+    if (previous) testSelect.value = previous;
+  }
+}
+
+function loadCommunicationTemplateEditor(): void {
+  const settings = communicationsPayload?.settings;
+  if (!settings) return;
+  const template = settings.templates[communicationsActiveTemplate];
+  const subject = document.querySelector<HTMLInputElement>('[data-communications-subject]');
+  const body = document.querySelector<HTMLTextAreaElement>('[data-communications-body]');
+  if (subject) subject.value = template?.subject ?? '';
+  if (body) body.value = template?.body ?? '';
+  const preview = document.querySelector<HTMLElement>('[data-communications-preview]');
+  if (preview) preview.innerHTML = '';
+}
+
+function readCommunicationSettingsFromForm(): CommunicationSettingsShape | null {
+  const payload = communicationsPayload;
+  if (!payload?.settings) return null;
+  const settings: CommunicationSettingsShape = {
+    schemaVersion: payload.settings.schemaVersion,
+    departments: payload.settings.departments,
+    routing: { ...payload.settings.routing },
+    replyTo: { ...payload.settings.replyTo },
+    templates: { ...payload.settings.templates },
+    alerts: { ...payload.settings.alerts },
+  };
+  for (const checkbox of document.querySelectorAll<HTMLInputElement>('[data-communication-route]')) {
+    const eventKey = checkbox.dataset.communicationRoute ?? '';
+    if (!eventKey) continue;
+    const current = new Set(settings.routing[eventKey] ?? []);
+    if (checkbox.checked) current.add(checkbox.value); else current.delete(checkbox.value);
+    settings.routing[eventKey] = [...current];
+  }
+  for (const select of document.querySelectorAll<HTMLSelectElement>('[data-communication-reply-to]')) {
+    const key = select.dataset.communicationReplyTo ?? '';
+    if (key) settings.replyTo[key] = select.value;
+  }
+  const subject = document.querySelector<HTMLInputElement>('[data-communications-subject]');
+  const body = document.querySelector<HTMLTextAreaElement>('[data-communications-body]');
+  if (settings.templates[communicationsActiveTemplate]) {
+    settings.templates[communicationsActiveTemplate] = {
+      ...settings.templates[communicationsActiveTemplate]!,
+      subject: subject?.value ?? '',
+      body: body?.value ?? '',
+    };
+  }
+  const escalation = document.querySelector<HTMLInputElement>('[data-communications-escalation]');
+  const threshold = document.querySelector<HTMLInputElement>('[data-communications-threshold]');
+  if (escalation) settings.alerts.escalationMinutes = Number(escalation.value);
+  if (threshold) settings.alerts.failureThreshold = Number(threshold.value);
+  return settings;
+}
+
+function renderCommunicationHealth(payload: CommunicationsPayload): void {
+  const providerTarget = document.querySelector<HTMLElement>('[data-admin-communications-provider]');
+  if (providerTarget) {
+    const provider = payload.provider ?? {};
+    providerTarget.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><tbody>${[
+      ['Provider', provider.provider ?? 'resend'],
+      ['Resend API key configured', provider.resendConfigured ? 'Yes' : 'No'],
+      ['Sender address configured', provider.senderConfigured ? 'Yes' : 'No'],
+      ['Reply-to configured', provider.replyToConfigured ? 'Yes' : 'No'],
+      ['Sending domain', provider.domain ?? 'sparkling-standard.com'],
+    ].map(([label, value]) => `<tr><th>${esc(label)}</th><td>${esc(value)}</td></tr>`).join('')}</tbody></table></div><p class="admin-muted">${esc(provider.note ?? '')}</p>`;
+  }
+  const healthTarget = document.querySelector<HTMLElement>('[data-admin-communications-health]');
+  if (healthTarget) {
+    const health = payload.health ?? {};
+    const summary = health.summary ?? {};
+    healthTarget.innerHTML = `<div class="admin-grid">${Object.entries(summary).map(([status, count]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(titleCase(status))}</p><p class="admin-kpi__value">${esc(count)}</p></div>`).join('') || '<p class="admin-muted">No recorded delivery events yet.</p>'}</div>` +
+      ((health.recent ?? []).length ? `<div class="admin-table-scroll" style="margin-top:1rem;"><table class="admin-table"><thead><tr><th>When</th><th>Event</th><th>Department</th><th>Recipient</th><th>Status</th><th>Detail</th></tr></thead><tbody>${(health.recent ?? []).map((event) => `<tr><td>${esc(dateTime(event.created_at))}</td><td>${esc(event.event_key)}</td><td>${esc(event.department)}</td><td>${esc(event.recipient)}</td><td>${esc(titleCase(event.status))}</td><td>${esc(event.error_code || '-')}</td></tr>`).join('')}</tbody></table></div>` : '') +
+      `<p class="admin-muted">${esc(health.note ?? '')}</p>`;
+  }
+  const failureTarget = document.querySelector<HTMLElement>('[data-admin-communications-failures]');
+  if (failureTarget) {
+    const failures: Array<[string, Array<Record<string, unknown>>]> = [
+      ['Lead notifications', payload.health?.leadFailures ?? []],
+      ['Booking notifications', payload.health?.bookingFailures ?? []],
+      ['Payment receipts', payload.health?.receiptFailures ?? []],
+    ];
+    failureTarget.innerHTML = failures.map(([label, rows]) => `<h3 style="font-size:.95rem;">${esc(label)} (${rows.length})</h3>${rows.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Record</th><th>Status</th><th>Detail</th><th>When</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${esc(row.quote_reference || row.invoice_id || row.id)}</td><td>${esc(row.status || row.delivery_status)}</td><td>${esc(row.last_delivery_error || row.error_detail || row.error_code)}</td><td>${esc(dateTime(row.created_at))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">None recorded.</p>'}`).join('');
+  }
+}
+
+async function loadCommunications(): Promise<void> {
+  const data = await api<CommunicationsPayload>('/api/admin/communications');
+  communicationsPayload = data;
+  const status = document.querySelector<HTMLElement>('[data-admin-communications-status]');
+  if (status) {
+    const stored = data.source === 'stored';
+    status.innerHTML = `<p>${stored ? 'Saved configuration is active.' : 'Approved defaults are active; no saved configuration exists yet.'}${data.valid === false ? ' <strong>The stored configuration is invalid and defaults are being used until corrected.</strong>' : ''}</p>` +
+      (data.valid === false && data.errors?.length ? `<ul class="admin-muted">${data.errors.map((error) => `<li>${esc(error)}</li>`).join('')}</ul>` : '');
+  }
+  renderCommunicationHealth(data);
+  populateCommunicationForm();
+  const versionsTarget = document.querySelector<HTMLElement>('[data-communications-versions]');
+  if (versionsTarget) {
+    const versions = data.versions ?? [];
+    versionsTarget.innerHTML = versions.length
+      ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Version</th><th>Saved</th><th>By</th><th>Change note</th></tr></thead><tbody>${versions.map((version) => `<tr><td>${esc(version.version)}</td><td>${esc(dateTime(version.created_at))}</td><td>${esc(version.created_by || 'system')}</td><td>${esc(version.change_note || '-')}</td></tr>`).join('')}</tbody></table></div>`
+      : '<p class="admin-muted">No configuration versions have been saved yet.</p>';
+  }
+}
+
+document.querySelector<HTMLSelectElement>('[data-communications-template-select]')?.addEventListener('change', (event) => {
+  communicationsActiveTemplate = (event.target as HTMLSelectElement).value;
+  loadCommunicationTemplateEditor();
+});
+
+document.querySelector<HTMLElement>('[data-admin-view="communications"]')?.addEventListener('click', (event) => {
+  const action = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-action]')?.dataset.adminAction;
+  if (action === 'communications-preview') {
+    const settings = readCommunicationSettingsFromForm();
+    if (!settings) return;
+    const target = document.querySelector<HTMLElement>('[data-communications-preview]');
+    void api<{ preview?: { subject?: string; body?: string }; details?: string[] }>('/api/admin/communications', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'preview', templateKey: communicationsActiveTemplate, settings }),
+    }).then((result) => {
+      if (target) target.innerHTML = `<div class="admin-record"><p><strong>${esc(result.preview?.subject ?? '')}</strong></p><pre style="white-space:pre-wrap">${esc(result.preview?.body ?? '')}</pre></div>`;
+    }).catch((error) => {
+      if (target) target.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
+    });
+  }
+  if (action === 'communications-reset') {
+    void loadCommunications().catch((error) => setAppError(friendly(error)));
+  }
+  if (action === 'communications-test') {
+    const select = document.querySelector<HTMLSelectElement>('[data-communications-test-department]');
+    const department = select?.value ?? '';
+    const label = select?.selectedOptions[0]?.textContent ?? department;
+    if (!window.confirm(`Send a clearly marked test email to ${label}? This is a real outbound message.`)) return;
+    const target = document.querySelector<HTMLElement>('[data-communications-test-status]');
+    if (target) target.textContent = 'Sending test message...';
+    void api<{ status?: string; recipient?: string; error?: string }>('/api/admin/communications', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'send_test', department }),
+    }).then((result) => {
+      if (target) target.textContent = result.status === 'sent' ? `Provider accepted the test message for ${result.recipient ?? label}. Confirm it actually arrived in that inbox.` : `Test message status: ${result.status ?? 'unknown'}${result.error ? ` (${result.error})` : ''}.`;
+      return loadCommunications();
+    }).catch((error) => {
+      if (target) target.textContent = friendly(error);
+    });
+  }
+});
+
+document.addEventListener('submit', (event) => {
+  const form = event.target as HTMLFormElement;
+  if (!form.matches('[data-communications-form]')) return;
+  event.preventDefault();
+  const settings = readCommunicationSettingsFromForm();
+  if (!settings) return;
+  const note = document.querySelector<HTMLInputElement>('[data-communications-note]')?.value ?? '';
+  const status = document.querySelector<HTMLElement>('[data-communications-form-status]');
+  const errors = document.querySelector<HTMLElement>('[data-communications-errors]');
+  if (errors) errors.textContent = '';
+  if (status) status.textContent = 'Saving...';
+  void api<{ version?: number; details?: string[] }>('/api/admin/communications', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'save', settings, note }),
+  }).then((result) => {
+    if (status) status.textContent = `Saved as version ${result.version ?? ''}.`;
+    const noteInput = document.querySelector<HTMLInputElement>('[data-communications-note]');
+    if (noteInput) noteInput.value = '';
+    return loadCommunications();
+  }).catch((error) => {
+    if (status) status.textContent = '';
+    if (errors) errors.textContent = friendly(error);
+  });
+});
 
 async function loadSettings(): Promise<void> {
   const [admins, sessions, audit] = await Promise.all([
@@ -3625,6 +3952,7 @@ async function loadView(view: string): Promise<void> {
     if (view === 'recurring') await loadRecurring();
     if (view === 'jobs') await loadJobs();
     if (view === 'careers') await loadCareers();
+    if (view === 'communications') await loadCommunications();
     if (view === 'documents') await loadDocuments();
     if (view === 'timekeeping') await loadTimekeeping();
     if (view === 'finance') await loadFinance();
@@ -3872,7 +4200,22 @@ document.querySelector<HTMLFormElement>('[data-admin-gift-filter]')?.addEventLis
 document.querySelector<HTMLFormElement>('[data-admin-customer-search]')?.addEventListener('submit', (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget as HTMLFormElement);
-  void loadCustomers(String(data.get('q') ?? ''));
+  customerPage.q = String(data.get('q') ?? '');
+  customerPage.sort = String(data.get('sort') ?? 'created_at');
+  customerPage.limit = Number(data.get('pageSize') ?? 25) || 25;
+  customerPage.offset = 0;
+  void loadCustomers().catch((error) => setAppError(friendly(error)));
+});
+
+document.querySelector<HTMLFormElement>('[data-admin-finance-filter]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget as HTMLFormElement);
+  financePage.status = String(data.get('status') ?? '');
+  financePage.q = String(data.get('q') ?? '');
+  financePage.sort = String(data.get('sort') ?? 'created_at');
+  financePage.limit = Number(data.get('pageSize') ?? 25) || 25;
+  financePage.offset = 0;
+  void loadFinance().catch((error) => setAppError(friendly(error)));
 });
 
 document.querySelector<HTMLFormElement>('[data-admin-request-filter]')?.addEventListener('submit', (event) => {
@@ -3884,7 +4227,12 @@ document.querySelector<HTMLFormElement>('[data-admin-request-filter]')?.addEvent
 document.querySelector<HTMLFormElement>('[data-admin-lead-filter]')?.addEventListener('submit', (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget as HTMLFormElement);
-  void loadLeads(String(data.get('status') ?? ''), String(data.get('q') ?? ''));
+  leadPage.status = String(data.get('status') ?? '');
+  leadPage.q = String(data.get('q') ?? '');
+  leadPage.sort = String(data.get('sort') ?? 'created_at');
+  leadPage.limit = Number(data.get('pageSize') ?? 25) || 25;
+  leadPage.offset = 0;
+  void loadLeads().catch((error) => setAppError(friendly(error)));
 });
 
 document.addEventListener('change', (event) => {
@@ -4381,6 +4729,26 @@ document.addEventListener('click', (event) => {
   if (!target) return;
   const actionName = target.dataset.adminAction ?? '';
   const id = target.dataset.id ?? '';
+  if (actionName === 'leads-page') {
+    leadPage.offset = Number(target.dataset.offset ?? 0) || 0;
+    void loadLeads().catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (actionName === 'customers-page') {
+    customerPage.offset = Number(target.dataset.offset ?? 0) || 0;
+    void loadCustomers().catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (actionName === 'careers-page') {
+    careerPage.offset = Number(target.dataset.offset ?? 0) || 0;
+    void loadCareers().catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (actionName === 'invoices-page') {
+    financePage.offset = Number(target.dataset.offset ?? 0) || 0;
+    void loadFinance().catch((error) => setAppError(friendly(error)));
+    return;
+  }
   if (actionName === 'dispatch-run-analysis') { void dispatchAction({ action: 'run_analysis' }); return; }
   if (actionName === 'dispatch-run-auto') {
     if (window.confirm('Automatically staff eligible unassigned jobs? Existing assignments and customer times will not change.')) {
@@ -4646,6 +5014,17 @@ document.addEventListener('click', (event) => {
   if (actionName === 'job-checklist') void openChecklist(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'checklist-create') void action('/api/admin/operations', { action: 'create_checklist', appointmentId: id }).then(() => openChecklist(id));
   if (actionName === 'invoice-open') void openInvoice(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'customer-billing-portal') {
+    setAppError();
+    void api<{ url?: string }>('/api/admin/finance', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'billing_portal', customerId: id }),
+    }).then((result) => {
+      if (result.url) window.open(result.url, '_blank', 'noopener,noreferrer');
+      else setAppError('The billing portal did not return a secure URL.');
+    }).catch((error) => setAppError(friendly(error)));
+    return;
+  }
   if (actionName === 'invoice-link') {
     setAppError();
     void api<{ url: string }>('/api/admin/finance', { method: 'POST', body: JSON.stringify({ action: 'payment_link', invoiceId: id }) })

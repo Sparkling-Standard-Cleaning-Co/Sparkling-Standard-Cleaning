@@ -3,7 +3,9 @@ import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admi
 import {
   addCustomerNote,
   addProperty,
+  countCustomers,
   createCustomer,
+  customerPageBounds,
   deleteCustomer,
   getCustomer,
   listCustomers,
@@ -33,12 +35,19 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       if (!detail) return json({ ok: false, error: 'customer_not_found' }, 404);
       return json({ ok: true, ...detail });
     }
-    const customers = await listCustomers(db, actor, {
+    const input = {
       q: url.searchParams.get('q') ?? '',
       status: url.searchParams.get('status') ?? '',
-      limit: Number(url.searchParams.get('limit') ?? 50),
-    });
-    return json({ ok: true, customers });
+      limit: Number(url.searchParams.get('limit') ?? 25),
+      offset: Number(url.searchParams.get('offset') ?? 0),
+      sort: url.searchParams.get('sort') ?? 'created_at',
+    };
+    const [customers, total] = await Promise.all([
+      listCustomers(db, actor, input),
+      countCustomers(db, actor, input),
+    ]);
+    const bounds = customerPageBounds(input);
+    return json({ ok: true, customers, total, limit: bounds.limit, offset: bounds.offset, sort: bounds.sort });
   } catch (error) {
     return json(
       { ok: false, error: error instanceof AdminAuthError ? error.code : 'customers_failed' },

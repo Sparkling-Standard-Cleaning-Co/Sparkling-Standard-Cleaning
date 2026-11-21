@@ -1,0 +1,22 @@
+# Copy to wrangler.toml and deploy with:
+#   npx wrangler deploy --config wrangler.toml
+#
+# Secrets (never commit real values):
+#   npx wrangler secret put RESEND_API_KEY --config wrangler.toml
+#   npx wrangler secret put RESEND_FROM_EMAIL --config wrangler.toml
+#   npx wrangler secret put BACKUP_MONITOR_TOKEN --config wrangler.toml
+#
+# The D1 database is the existing Sparkling Standard operations database.
+# Replace REPLACE_WITH_THE_D1_DATABASE_ID locally; never commit the id.
+
+name = "sparkling-standard-backup-monitor"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sparkling-standard-operations"
+database_id = "REPLACE_WITH_THE_D1_DATABASE_ID"

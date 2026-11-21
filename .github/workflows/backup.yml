@@ -55,3 +55,38 @@ jobs:
       - name: Record the backup result
         run: |
           node -e "const r=require('./backup-out/last-backup.json'); console.log(JSON.stringify({createdAt:r.createdAt,fileCount:r.fileCount,plainBytes:r.plainBytes,archiveSha256:r.archiveSha256,uploaded:Boolean(r.upload)},null,2))"
+      - name: Report backup success to operations
+        if: success()
+        env:
+          OPS_ALERT_URL: ${{ secrets.OPS_ALERT_URL }}
+          OPS_ALERT_TOKEN: ${{ secrets.OPS_ALERT_TOKEN }}
+          RUN_KEY: github-backup-${{ github.run_id }}
+        run: |
+          if [ -z "$OPS_ALERT_URL" ] || [ -z "$OPS_ALERT_TOKEN" ]; then
+            echo "Backup status reporting is not configured; skipping."
+            exit 0
+          fi
+          SUMMARY=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write('Encrypted backup created: ' + r.fileCount + ' files, uploaded=' + Boolean(r.upload))")
+          jq -n --arg runKey "$RUN_KEY" --arg summary "$SUMMARY" \
+            '{runKey: $runKey, status: "success", summary: $summary}' > /tmp/backup-status.json
+          curl -fsS -X POST "$OPS_ALERT_URL/api/internal/backup-status" \
+            -H "Authorization: Bearer $OPS_ALERT_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/backup-status.json
+      - name: Report backup failure to operations
+        if: failure()
+        env:
+          OPS_ALERT_URL: ${{ secrets.OPS_ALERT_URL }}
+          OPS_ALERT_TOKEN: ${{ secrets.OPS_ALERT_TOKEN }}
+          RUN_KEY: github-backup-${{ github.run_id }}
+        run: |
+          if [ -z "$OPS_ALERT_URL" ] || [ -z "$OPS_ALERT_TOKEN" ]; then
+            echo "Backup status reporting is not configured; skipping."
+            exit 0
+          fi
+          jq -n --arg runKey "$RUN_KEY" \
+            '{runKey: $runKey, status: "failure", summary: "Encrypted backup workflow failed or did not complete."}' > /tmp/backup-status.json
+          curl -fsS -X POST "$OPS_ALERT_URL/api/internal/backup-status" \
+            -H "Authorization: Bearer $OPS_ALERT_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/backup-status.json

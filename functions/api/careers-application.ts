@@ -2,6 +2,11 @@ import { adminDb, type AdminDbEnv } from '../../src/lib/admin/d1.ts';
 import { checkPublicRateLimit, clientIp, consumePublicRateLimit, PUBLIC_RATE_LIMITS } from '../../src/lib/public-rate-limit.ts';
 import { EMAIL_ROUTING } from '../../src/config/email-routing.ts';
 import {
+  DEPARTMENT_ADDRESSES,
+  readCommunicationSettings,
+  recordNotificationDelivery,
+} from '../../src/lib/admin/communications.ts';
+import {
   CAREER_BRANCHES,
   CAREER_EXPERIENCE_LEVELS,
   CAREER_ROLES,
@@ -153,22 +158,52 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
 
   const site = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+  const communications = await readCommunicationSettings(db);
+  const careersReplyTo = DEPARTMENT_ADDRESSES[communications.settings.replyTo.careers] ?? EMAIL_ROUTING.hiring;
+  const hiringRecipients = [...new Set(
+    communications.settings.routing.hiring_notification.map(
+      (department) => communications.settings.departments[department]?.address,
+    ).filter((address): address is string => Boolean(address)),
+  )];
   const applicantEmail = await sendEmail({
     to: email,
     subject: `Application received - ${appReference}`,
-    replyTo: EMAIL_ROUTING.hiring,
+    replyTo: careersReplyTo,
     env: context.env,
     idempotencyKey: `career-ack-${id}`,
     text: `Hello ${name},\n\nThank you for applying to Sparkling Standard. We received your application ${appReference}.\n\nWe review every application against the current hiring need. If your experience and availability are a fit, the hiring team will contact you. We do not promise a role, schedule or pay rate before that review.\n\nApplication status: ${site}/careers/#status\nReference: ${appReference}\nEmail used: ${email}\n\nPlease do not send sensitive documents such as a Social Security number or banking information by email.\n\nSparkling Standard | Hiring Team`,
   });
-  const hiringEmail = await sendEmail({
-    to: EMAIL_ROUTING.hiring,
-    subject: `New career application - ${name} - ${branchPreference}`,
-    replyTo: email,
-    env: context.env,
-    idempotencyKey: `career-hiring-${id}`,
-    text: `New application ${appReference}\n\nName: ${name}\nEmail: ${email}\nPhone: ${phone}\nExperience: ${experienceLevel}\nDesired role: ${desiredRole}\nBranch: ${branchPreference}\nAvailability: ${availability}\nTransportation: ${transportation}\nDriver license: ${driverLicense}\nResume: ${resumeName || 'not attached'}\n\nReview securely in Admin -> Careers.`,
-  });
+  let hiringEmail = false;
+  for (const [index, recipient] of hiringRecipients.entries()) {
+    const delivered = await sendEmail({
+      to: recipient,
+      subject: `New career application - ${name} - ${branchPreference}`,
+      replyTo: email,
+      env: context.env,
+      idempotencyKey: `career-hiring-${id}-${index}`,
+      text: `New application ${appReference}\n\nName: ${name}\nEmail: ${email}\nPhone: ${phone}\nExperience: ${experienceLevel}\nDesired role: ${desiredRole}\nBranch: ${branchPreference}\nAvailability: ${availability}\nTransportation: ${transportation}\nDriver license: ${driverLicense}\nResume: ${resumeName || 'not attached'}\n\nReview securely in Admin -> Careers.`,
+    });
+    hiringEmail = hiringEmail || delivered;
+    await recordNotificationDelivery(db, {
+      eventKey: 'hiring_notification',
+      department: communications.settings.routing.hiring_notification[index] ?? 'hiring',
+      recipient,
+      status: delivered ? 'sent' : context.env.RESEND_API_KEY ? 'failed' : 'suppressed',
+      errorCode: delivered ? '' : context.env.RESEND_API_KEY ? 'provider_rejected' : 'resend_not_configured',
+      relatedType: 'career_application',
+      relatedId: id,
+    }).catch(() => undefined);
+  }
+  if (applicantEmail) {
+    await recordNotificationDelivery(db, {
+      eventKey: 'careers_application',
+      department: communications.settings.replyTo.careers,
+      recipient: email,
+      status: 'sent',
+      relatedType: 'career_application',
+      relatedId: id,
+    }).catch(() => undefined);
+  }
   if (applicantEmail || hiringEmail) {
     await db.prepare('UPDATE career_applications SET applicant_notified_at = ?, hiring_notified_at = ?, updated_at = ? WHERE id = ?')
       .bind(applicantEmail ? now : null, hiringEmail ? now : null, now, id).run().catch(() => undefined);

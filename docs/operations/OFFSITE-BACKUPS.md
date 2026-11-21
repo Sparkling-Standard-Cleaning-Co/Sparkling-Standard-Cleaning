@@ -97,15 +97,24 @@ owner before backups are operational:
    `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_NAME`,
    `BACKUP_ENCRYPTION_KEY`, `BACKUP_R2_ENDPOINT`, `BACKUP_R2_BUCKET`,
    `BACKUP_R2_ACCESS_KEY_ID`, `BACKUP_R2_SECRET_ACCESS_KEY`.
-5. Enable the `.github/workflows/backup.yml` schedule (it is dormant until the
+5. Add `OPS_ALERT_URL` (site origin, for example
+   `https://sparkling-standard.com`) and `OPS_ALERT_TOKEN` (a random token also
+   configured as the Pages secret with the same name). The workflow then
+   reports success/failure to `/api/internal/backup-status`.
+6. Deploy `workers/backup-monitor/` and configure `RESEND_API_KEY`,
+   `RESEND_FROM_EMAIL`, `BACKUP_MONITOR_TOKEN` and the production D1 binding.
+   It alerts admin@ and owner@ for failed or missing backups and escalates to
+   owner@ after the configured interval. See
+   `docs/operations/COMMUNICATIONS-CENTER.md`.
+7. Enable the `.github/workflows/backup.yml` schedule (it is dormant until the
    secrets exist).
-6. Choose and document a **secondary independent destination** outside the
+8. Choose and document a **secondary independent destination** outside the
    Cloudflare account (for example an encrypted external drive kept off-site, or
    another provider's private object storage). Cloudflare R2 alone is not an
    independent recovery destination.
-7. Run one manual workflow dispatch and one full local archive, then run
+9. Run one manual workflow dispatch and one full local archive, then run
    `backup:verify` on both.
-8. Record the first successful restore rehearsal date in this document.
+10. Record the first successful restore rehearsal date in this document.
 
 Until those steps are complete, backups are **not** operational.
 

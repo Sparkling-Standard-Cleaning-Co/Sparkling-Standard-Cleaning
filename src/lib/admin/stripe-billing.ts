@@ -9,6 +9,8 @@ export interface StripeBillingEnv {
   ADMIN_STRIPE_REFUNDS_ENABLED?: string;
   ADMIN_STRIPE_SAVED_CARDS_ENABLED?: string;
   ADMIN_STRIPE_OFF_SESSION_ENABLED?: string;
+  ADMIN_STRIPE_PORTAL_ENABLED?: string;
+  STRIPE_BILLING_PORTAL_CONFIGURATION_ID?: string;
 }
 
 export interface StripeBillingResult {
@@ -40,6 +42,50 @@ async function stripeRequest(
     throw new AdminAuthError(502, String(error?.code ?? error?.message ?? 'stripe_failed'));
   }
   return data;
+}
+
+export async function createCustomerBillingPortalSession(
+  db: D1Database,
+  actor: AdminActor,
+  customerId: string,
+  env: StripeBillingEnv,
+): Promise<{ url: string; sessionId: string }> {
+  if (env.ADMIN_STRIPE_PORTAL_ENABLED !== 'true') {
+    throw new AdminAuthError(503, 'stripe_billing_portal_disabled');
+  }
+  const customer = await db
+    .prepare("SELECT id, primary_branch_id, stripe_customer_id FROM customers WHERE id = ? AND source <> 'financial_system' LIMIT 1")
+    .bind(customerId)
+    .first<{ id: string; primary_branch_id: string | null; stripe_customer_id: string | null }>();
+  if (!customer) throw new AdminAuthError(404, 'customer_not_found');
+  if (agentScope(actor) && customer.primary_branch_id !== actor.branchId) {
+    throw new AdminAuthError(403, 'forbidden');
+  }
+  if (!customer.stripe_customer_id) {
+    throw new AdminAuthError(409, 'stripe_customer_required');
+  }
+  const origin = (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
+  const form = new URLSearchParams();
+  form.set('customer', customer.stripe_customer_id);
+  form.set('return_url', `${origin}/admin/`);
+  const configuration = env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID?.trim();
+  if (configuration) form.set('configuration', configuration);
+  const session = await stripeRequest(
+    env,
+    'billing_portal/sessions',
+    form,
+    `billing-portal-${customerId}-${Date.now()}`,
+  );
+  const url = String(session.url ?? '');
+  const sessionId = String(session.id ?? '');
+  if (!url || !sessionId) throw new AdminAuthError(502, 'stripe_portal_session_failed');
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'customer.billing_portal_opened',
+    entityType: 'customer',
+    entityId: customerId,
+  });
+  return { url, sessionId };
 }
 
 async function customerForInvoice(

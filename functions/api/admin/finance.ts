@@ -3,17 +3,24 @@ import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/l
 import { verifyPassword } from '../../../src/lib/admin/auth.ts';
 import {
   applyCreditToInvoice,
+  countInvoices,
   createCredit,
   createInvoice,
   financeSummary,
   getInvoice,
+  invoicePageBounds,
   listCustomerCredits,
   listInvoices,
   recordPayment,
   recordRefund,
   updateInvoiceStatus,
 } from '../../../src/lib/admin/billing.ts';
-import { createInvoicePaymentLink, refundStripePayment, type StripeBillingEnv } from '../../../src/lib/admin/stripe-billing.ts';
+import {
+  createCustomerBillingPortalSession,
+  createInvoicePaymentLink,
+  refundStripePayment,
+  type StripeBillingEnv,
+} from '../../../src/lib/admin/stripe-billing.ts';
 import { buildAdminInvoice } from '../../../src/lib/invoicing/admin-invoice.ts';
 import { buildInvoicePdf } from '../../../src/lib/invoicing/pdf.ts';
 import { buildInvoiceEmail, sendInvoiceEmail, type InvoiceEmailEnv } from '../../../src/lib/invoicing/invoice-email.ts';
@@ -48,14 +55,20 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       if (!customerId) return json({ ok: false, error: 'customer_required' }, 400);
       return json({ ok: true, credits: await listCustomerCredits(db, actor, customerId) });
     }
-    return json({
-      ok: true,
-      invoices: await listInvoices(db, actor, {
-        status: url.searchParams.get('status') ?? '',
-        q: url.searchParams.get('q') ?? '',
-      }),
-      summary: await financeSummary(db, actor),
-    });
+    const input = {
+      status: url.searchParams.get('status') ?? '',
+      q: url.searchParams.get('q') ?? '',
+      limit: Number(url.searchParams.get('limit') ?? 25),
+      offset: Number(url.searchParams.get('offset') ?? 0),
+      sort: url.searchParams.get('sort') ?? 'created_at',
+    };
+    const [invoices, total, summary] = await Promise.all([
+      listInvoices(db, actor, input),
+      countInvoices(db, actor, input),
+      financeSummary(db, actor),
+    ]);
+    const bounds = invoicePageBounds(input);
+    return json({ ok: true, invoices, total, limit: bounds.limit, offset: bounds.offset, sort: bounds.sort, summary });
   } catch (error) {
     return json(
       { ok: false, error: error instanceof AdminAuthError ? error.code : 'finance_failed' },
@@ -83,6 +96,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'apply_credit') return json({ ok: true, ...(await applyCreditToInvoice(db, actor, body)) });
     if (action === 'payment_link') {
       return json({ ok: true, ...(await createInvoicePaymentLink(db, actor, String(body.invoiceId ?? ''), context.env)) });
+    }
+    if (action === 'billing_portal') {
+      return json({
+        ok: true,
+        ...(await createCustomerBillingPortalSession(db, actor, String(body.customerId ?? ''), context.env)),
+      });
     }
     if (action === 'resend_invoice_receipt') {
       const invoiceId = String(body.invoiceId ?? '');

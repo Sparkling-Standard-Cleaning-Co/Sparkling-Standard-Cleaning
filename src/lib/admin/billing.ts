@@ -38,27 +38,74 @@ function invoiceNumber(): string {
   return `INV-${stamp}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
 }
 
-export async function listInvoices(
-  db: D1Database,
-  actor: AdminActor,
-  input: { status?: string; q?: string } = {},
-): Promise<Array<Record<string, unknown>>> {
+export interface InvoiceListInput {
+  status?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+  sort?: string;
+}
+
+const INVOICE_SORTS: Record<string, string> = {
+  created_at: 'i.created_at DESC, i.id ASC',
+  due_date: 'i.due_date ASC, i.created_at DESC, i.id ASC',
+  balance: 'i.balance_cents DESC, i.created_at DESC, i.id ASC',
+  status: 'i.status ASC, i.created_at DESC, i.id ASC',
+};
+
+function invoiceFilters(actor: AdminActor, input: InvoiceListInput): { sql: string; bind: unknown[] } {
   const status = text(input.status, 20);
   const q = text(input.q, 120);
   const branch = scope(actor, 'i.branch_id');
+  return {
+    sql: `WHERE (? = '' OR i.status = ?)
+         AND (? = '' OR i.number LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?)
+         ${branch.sql}`,
+    bind: [status, status, q, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind],
+  };
+}
+
+export function invoicePageBounds(input: InvoiceListInput): { limit: number; offset: number; sort: string } {
+  const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 200);
+  const offset = Math.max(Number(input.offset) || 0, 0);
+  const sort = INVOICE_SORTS[input.sort ?? ''] ? String(input.sort) : 'created_at';
+  return { limit, offset, sort };
+}
+
+export async function listInvoices(
+  db: D1Database,
+  actor: AdminActor,
+  input: InvoiceListInput = {},
+): Promise<Array<Record<string, unknown>>> {
+  const bounds = invoicePageBounds(input);
+  const filter = invoiceFilters(actor, input);
   const result = await db
     .prepare(
       `SELECT i.*, c.first_name, c.last_name, p.line1, p.city
        FROM invoices i JOIN customers c ON c.id = i.customer_id
        LEFT JOIN properties p ON p.id = i.property_id
-       WHERE (? = '' OR i.status = ?)
-         AND (? = '' OR i.number LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?)
-         ${branch.sql}
-       ORDER BY i.created_at DESC LIMIT 200`,
+       ${filter.sql}
+       ORDER BY ${INVOICE_SORTS[bounds.sort]} LIMIT ? OFFSET ?`,
     )
-    .bind(status, status, q, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind)
+    .bind(...filter.bind, bounds.limit, bounds.offset)
     .all();
   return result.results ?? [];
+}
+
+export async function countInvoices(
+  db: D1Database,
+  actor: AdminActor,
+  input: InvoiceListInput = {},
+): Promise<number> {
+  const filter = invoiceFilters(actor, input);
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM invoices i JOIN customers c ON c.id = i.customer_id
+       ${filter.sql}`,
+    )
+    .bind(...filter.bind)
+    .first<{ count: number }>();
+  return Number(row?.count ?? 0);
 }
 
 export async function getInvoice(

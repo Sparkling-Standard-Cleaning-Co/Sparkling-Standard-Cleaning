@@ -53,18 +53,30 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       return json({ ok: true, application });
     }
     const status = text(url.searchParams.get('status'), 30);
-    const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit') ?? 50)));
+    const branch = text(url.searchParams.get('branch'), 40);
+    const q = text(url.searchParams.get('q'), 120);
+    const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit') ?? 25)));
     const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0));
+    const sorts: Record<string, string> = {
+      created_at: 'created_at DESC, id ASC',
+      name: 'name ASC, created_at DESC, id ASC',
+      status: 'status ASC, created_at DESC, id ASC',
+    };
+    const sortKey = sorts[url.searchParams.get('sort') ?? ''] ? String(url.searchParams.get('sort')) : 'created_at';
+    const filters = `WHERE (? = '' OR status = ?)
+       AND (? = '' OR branch_preference = ?)
+       AND (? = '' OR name LIKE ? OR email LIKE ? OR reference LIKE ? OR desired_role LIKE ?)`;
+    const filterBind = [status, status, branch, branch, q, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`];
     const rows = await db.prepare(
       `SELECT id, reference, created_at, name, email, phone, experience_level, desired_role,
               branch_preference, availability, transportation, resume_key, status, notes,
               hiring_notified_at, applicant_notified_at
-       FROM career_applications
-       WHERE (? = '' OR status = ?)
-       ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-    ).bind(status, status, limit, offset).all<Record<string, unknown>>();
-    const total = await db.prepare('SELECT COUNT(*) AS count FROM career_applications WHERE (? = \'\' OR status = ?)').bind(status, status).first<{ count: number }>();
-    return json({ ok: true, applications: rows.results ?? [], total: Number(total?.count ?? 0), limit, offset });
+       FROM career_applications ${filters}
+       ORDER BY ${sorts[sortKey]} LIMIT ? OFFSET ?`,
+    ).bind(...filterBind, limit, offset).all<Record<string, unknown>>();
+    const total = await db.prepare(`SELECT COUNT(*) AS count FROM career_applications ${filters}`)
+      .bind(...filterBind).first<{ count: number }>();
+    return json({ ok: true, applications: rows.results ?? [], total: Number(total?.count ?? 0), limit, offset, sort: sortKey });
   } catch (error) {
     return json({ ok: false, error: error instanceof AdminAuthError ? error.code : 'careers_failed' }, error instanceof AdminAuthError ? error.status : 500);
   }

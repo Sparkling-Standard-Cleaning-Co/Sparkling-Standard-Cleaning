@@ -4,7 +4,19 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-11-10** (repository reconciliation and production release).
+Last reviewed: **2026-11-20** (bookings/careers release and closeout implementation pass).
+
+**2026-11-20 corrections - these supersede any conflicting row below:**
+
+- The working release tip is `851a28b` on `production-safe`; application code is `e7f18c6`
+  (bookings department email and secure careers applications). `origin/main` is 41 commits
+  behind. No branch, push or Cloudflare change was made in this pass; reconciliation requires
+  owner approval.
+- A closeout implementation pass is **staged but not deployed**: communications/notification
+  admin settings (migration `0044`), backup alert monitoring Worker, owner-initiated Stripe
+  billing-portal sessions and server pagination for customers/leads/careers/invoices. See
+  `docs/implementation/MASTER-CLOSEOUT-STATUS.md`.
+- Tampa remains publicly OFF. Dispatch remains analysis-only and paused.
 
 **2026-11-10 corrections - these supersede any conflicting row below:**
 

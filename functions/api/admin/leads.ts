@@ -1,6 +1,12 @@
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
 import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
-import { listLeads, retryLeadNotification, updateLead } from '../../../src/lib/admin/crm.ts';
+import {
+  countLeads,
+  leadPageBounds,
+  listLeads,
+  retryLeadNotification,
+  updateLead,
+} from '../../../src/lib/admin/crm.ts';
 
 interface Env extends AdminDbEnv {
   WEB3FORMS_ACCESS_KEY?: string;
@@ -29,14 +35,25 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
   try {
     const actor = await requireActor(db, context.request, 'lead.read');
     const url = new URL(context.request.url);
-    const leads = await listLeads(db, actor, {
+    const input = {
       status: url.searchParams.get('status') ?? '',
       q: url.searchParams.get('q') ?? '',
-      limit: Number(url.searchParams.get('limit') ?? 100),
-    });
+      limit: Number(url.searchParams.get('limit') ?? 25),
+      offset: Number(url.searchParams.get('offset') ?? 0),
+      sort: url.searchParams.get('sort') ?? 'created_at',
+    };
+    const [leads, total] = await Promise.all([
+      listLeads(db, actor, input),
+      countLeads(db, actor, input),
+    ]);
+    const bounds = leadPageBounds(input);
     return json({
       ok: true,
       leads: leads.map((lead) => ({ ...lead, payload: payload(lead.payload_json) })),
+      total,
+      limit: bounds.limit,
+      offset: bounds.offset,
+      sort: bounds.sort,
     });
   } catch (error) {
     return json(

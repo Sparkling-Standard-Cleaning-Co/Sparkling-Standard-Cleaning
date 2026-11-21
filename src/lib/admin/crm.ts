@@ -38,15 +38,48 @@ function customerBranch(actor: AdminActor, requested: unknown): string | null {
   return text(requested, 80) || null;
 }
 
+export interface CustomerListInput {
+  q?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+  sort?: string;
+}
+
+const CUSTOMER_SORTS: Record<string, string> = {
+  created_at: 'c.created_at DESC, c.id ASC',
+  name: 'c.last_name ASC, c.first_name ASC, c.id ASC',
+  status: 'c.status ASC, c.created_at DESC, c.id ASC',
+};
+
+function customerFilters(actor: AdminActor, input: CustomerListInput): { sql: string; bind: unknown[] } {
+  const q = text(input.q, 120);
+  const status = ['active', 'archived'].includes(input.status ?? '') ? input.status : '';
+  const branch = scope(actor, 'c.primary_branch_id');
+  return {
+    sql: `WHERE c.source <> 'financial_system'
+         AND (? = '' OR c.status = ?)
+         AND (? = '' OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company_name LIKE ?
+              OR EXISTS (SELECT 1 FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.normalized_value LIKE ?))
+         ${branch.sql}`,
+    bind: [status, status, q, `%${q}%`, `%${q}%`, `%${q}%`, `%${q.toLowerCase()}%`, ...branch.bind],
+  };
+}
+
+export function customerPageBounds(input: CustomerListInput): { limit: number; offset: number; sort: string } {
+  const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 200);
+  const offset = Math.max(Number(input.offset) || 0, 0);
+  const sort = CUSTOMER_SORTS[input.sort ?? ''] ? String(input.sort) : 'created_at';
+  return { limit, offset, sort };
+}
+
 export async function listCustomers(
   db: D1Database,
   actor: AdminActor,
-  input: { q?: string; status?: string; limit?: number },
+  input: CustomerListInput,
 ): Promise<Array<Record<string, unknown>>> {
-  const q = text(input.q, 120);
-  const status = ['active', 'archived'].includes(input.status ?? '') ? input.status : '';
-  const bounded = Math.min(Math.max(Number(input.limit) || 50, 1), 200);
-  const branch = scope(actor, 'c.primary_branch_id');
+  const bounds = customerPageBounds(input);
+  const filter = customerFilters(actor, input);
   const result = await db
     .prepare(
       `SELECT c.id, c.first_name, c.last_name, c.company_name, c.status, c.source,
@@ -56,26 +89,25 @@ export async function listCustomers(
               (SELECT value FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.kind = 'phone' ORDER BY cc.is_primary DESC LIMIT 1) AS phone,
               (SELECT COUNT(*) FROM properties p WHERE p.customer_id = c.id AND p.status = 'active') AS property_count
        FROM customers c LEFT JOIN branches b ON b.id = c.primary_branch_id
-       WHERE c.source <> 'financial_system'
-         AND (? = '' OR c.status = ?)
-         AND (? = '' OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company_name LIKE ?
-              OR EXISTS (SELECT 1 FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.normalized_value LIKE ?))
-         ${branch.sql}
-       ORDER BY c.created_at DESC LIMIT ?`,
+       ${filter.sql}
+       ORDER BY ${CUSTOMER_SORTS[bounds.sort]} LIMIT ? OFFSET ?`,
     )
-    .bind(
-      status,
-      status,
-      q,
-      `%${q}%`,
-      `%${q}%`,
-      `%${q}%`,
-      `%${q.toLowerCase()}%`,
-      ...branch.bind,
-      bounded,
-    )
+    .bind(...filter.bind, bounds.limit, bounds.offset)
     .all();
   return result.results ?? [];
+}
+
+export async function countCustomers(
+  db: D1Database,
+  actor: AdminActor,
+  input: CustomerListInput,
+): Promise<number> {
+  const filter = customerFilters(actor, input);
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS count FROM customers c ${filter.sql}`)
+    .bind(...filter.bind)
+    .first<{ count: number }>();
+  return Number(row?.count ?? 0);
 }
 
 export async function getCustomer(
@@ -434,14 +466,47 @@ export async function addCustomerNote(
   await audit(db, { actorUserId: actor.id, action: 'customer.note_added', entityType: 'customer', entityId: customerId });
 }
 
-export async function listLeads(
-  db: D1Database,
-  actor: AdminActor,
-  input: { status?: string; q?: string; limit?: number },
-): Promise<Array<Record<string, unknown>>> {
+export interface LeadListInput {
+  status?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+  sort?: string;
+}
+
+const LEAD_SORTS: Record<string, string> = {
+  created_at: 'l.created_at DESC, l.id ASC',
+  status: 'l.status ASC, l.created_at DESC, l.id ASC',
+  request_type: 'l.request_type ASC, l.created_at DESC, l.id ASC',
+};
+
+function leadFilters(actor: AdminActor, input: LeadListInput): { sql: string; bind: unknown[] } {
   const status = text(input.status, 30);
   const q = text(input.q, 120);
   const branch = scope(actor, 'l.branch_id');
+  return {
+    sql: `WHERE (? = '' OR l.status = ?)
+         AND (? = '' OR l.quote_reference LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?
+              OR p.line1 LIKE ? OR l.payload_json LIKE ?)
+         ${branch.sql}`,
+    bind: [status, status, q, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind],
+  };
+}
+
+export function leadPageBounds(input: LeadListInput): { limit: number; offset: number; sort: string } {
+  const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 200);
+  const offset = Math.max(Number(input.offset) || 0, 0);
+  const sort = LEAD_SORTS[input.sort ?? ''] ? String(input.sort) : 'created_at';
+  return { limit, offset, sort };
+}
+
+export async function listLeads(
+  db: D1Database,
+  actor: AdminActor,
+  input: LeadListInput,
+): Promise<Array<Record<string, unknown>>> {
+  const bounds = leadPageBounds(input);
+  const filter = leadFilters(actor, input);
   const result = await db
     .prepare(
       `SELECT l.id, l.request_type, l.status, l.source, l.quote_reference, l.delivery_status,
@@ -451,15 +516,30 @@ export async function listLeads(
               p.line1, p.city, p.state, p.postal_code
        FROM leads l LEFT JOIN customers c ON c.id = l.customer_id
        LEFT JOIN properties p ON p.id = l.property_id
-       WHERE (? = '' OR l.status = ?)
-         AND (? = '' OR l.quote_reference LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?
-              OR p.line1 LIKE ? OR l.payload_json LIKE ?)
-         ${branch.sql}
-       ORDER BY l.created_at DESC LIMIT ?`,
+       ${filter.sql}
+       ORDER BY ${LEAD_SORTS[bounds.sort]} LIMIT ? OFFSET ?`,
     )
-    .bind(status, status, q, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind, Math.min(Math.max(Number(input.limit) || 100, 1), 300))
+    .bind(...filter.bind, bounds.limit, bounds.offset)
     .all();
   return result.results ?? [];
+}
+
+export async function countLeads(
+  db: D1Database,
+  actor: AdminActor,
+  input: LeadListInput,
+): Promise<number> {
+  const filter = leadFilters(actor, input);
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM leads l
+       LEFT JOIN customers c ON c.id = l.customer_id
+       LEFT JOIN properties p ON p.id = l.property_id
+       ${filter.sql}`,
+    )
+    .bind(...filter.bind)
+    .first<{ count: number }>();
+  return Number(row?.count ?? 0);
 }
 
 export async function updateLead(
