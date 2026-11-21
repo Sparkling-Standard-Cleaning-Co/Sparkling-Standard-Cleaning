@@ -19,7 +19,8 @@ export function parseBackupDate(name) {
 }
 
 export function backupBaseName(name) {
-  return String(name).split('/').pop() ?? String(name)
+  const base = String(name).split('/').pop() ?? String(name);
+  return base
     .replace(/\.part\d+$/i, '')
     .replace(/\.manifest\.json\.enc$/i, '')
     .replace(/\.sha256$/i, '')

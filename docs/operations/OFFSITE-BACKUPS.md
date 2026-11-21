@@ -299,20 +299,39 @@ The encrypted backup workflow file exists on `production-safe`, but GitHub does 
   sizes must be measured before they are counted; do not assume the 5 GB limit
   can hold 30/12/12 copies that include large photo/document sets.
 
-### Monitor deployment result\n\n`sparkling-standard-backup-monitor` was deployed with a 15-minute cron and the\nproduction D1 binding. A manual tick returned `status: missing` and opened a\ncritical `backup_stale` incident because no successful `backup_runs` heartbeat\nhas been recorded. The Worker currently has no Resend credentials, so provider\nacceptance is suppressed rather than faked. Add `RESEND_API_KEY`,\n`RESEND_FROM_EMAIL` and a new `BACKUP_MONITOR_TOKEN` to the Worker, then verify\nthe health endpoint and the Data & Storage dashboard. A green Worker is not\nrestore proof.\n\n### Still owner-dependent
+### Monitor deployment result
 
-- OneDrive authorization requires the owner to register the public client in
-  Microsoft Entra and run the device-code auth once. See
-  `docs/operations/ONEDRIVE-BACKUP-SETUP.md`. No OneDrive upload, download or
-  independent retrieval has been claimed yet.
+`sparkling-standard-backup-monitor` was deployed with a 15-minute cron and the
+production D1 binding. A manual tick returned `status: missing` and opened a
+critical `backup_stale` incident because no successful `backup_runs` heartbeat
+has been recorded. The Worker currently has no Resend credentials, so provider
+acceptance is suppressed rather than faked. Add `RESEND_API_KEY`,
+`RESEND_FROM_EMAIL` and a new `BACKUP_MONITOR_TOKEN` to the Worker, then verify
+the health endpoint and the Data & Storage dashboard. A green Worker is not
+restore proof.
+
+### OneDrive verification completed
+
+- Existing folder `Sparkling-Standard-Encrypted-Backups` authorized with
+  delegated `Files.ReadWrite` for the personal account.
+- Uploaded archive, encrypted manifest and checksum; OneDrive listed all three.
+- Independently downloaded the archive; SHA-256 matched
+  `393525b4953c89540e1472ba0053ca5ea8ee72b00872949e938c48c7d62ee866`.
+- Encrypted manifest decrypted and matched the archive digest.
+- `backup:verify` and isolated restore passed; the restored D1 export had
+  50 migrations, 95 data tables and 0 foreign-key violations.
+- OneDrive quota: 5,368,709,120 total; 1,151,898 used; 5,367,557,222 remaining.
+- GitHub Actions still needs the client ID and refresh token as repository
+  secrets. The DPAPI cache remains local.
+
+### Still owner-dependent
+
 - Application R2 objects still require a least-privilege Cloudflare API token
   with R2 object read/list access. The backup workflow's `R2_APP_BACKUP` path
   and `backup:r2-app` command are ready; they have not been exercised against
   production objects.
-- The backup monitor Worker still needs its own deployment secrets
-  (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `BACKUP_MONITOR_TOKEN`) and the
-  production D1 binding. Unit tests for incident creation, escalation and
-  recovery pass, but live alert delivery has not been claimed.
+- The backup monitor Worker still needs `RESEND_API_KEY`,
+  `RESEND_FROM_EMAIL` and a new `BACKUP_MONITOR_TOKEN`.
 - The nightly scheduler Worker needs a fine-grained GitHub Actions:write token.
   The workflow schedule remains dormant on `main`; this Worker is the safe
   alternative without changing branches or deployment sources.

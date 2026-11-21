@@ -12,16 +12,26 @@ import { spawnSync } from 'node:child_process';
 
 export const DEFAULT_TENANT = 'consumers';
 export const DEFAULT_SCOPE = 'offline_access Files.ReadWrite.AppFolder User.Read';
+export const EXISTING_FOLDER_SCOPE = 'offline_access Files.ReadWrite User.Read';
 export const DEFAULT_FOLDER = 'Sparkling-Standard-Encrypted-Backups';
 export const SIMPLE_UPLOAD_LIMIT = 4 * 1024 * 1024;
 export const UPLOAD_CHUNK_BYTES = 10 * 1024 * 1024;
 
+export function targetMode(env = process.env) {
+  return env.ONEDRIVE_TARGET_MODE === 'existing' ? 'existing' : 'appfolder';
+}
+
+export function defaultScope(mode = targetMode()) {
+  return mode === 'existing' ? EXISTING_FOLDER_SCOPE : DEFAULT_SCOPE;
+}
+
 export function graphConfig(env = process.env) {
   const clientId = env.ONEDRIVE_CLIENT_ID?.trim() ?? '';
   const tenant = (env.ONEDRIVE_TENANT?.trim() || DEFAULT_TENANT).replace(/[^A-Za-z0-9.-]/g, '');
-  const scope = env.ONEDRIVE_SCOPE?.trim() || DEFAULT_SCOPE;
+  const mode = targetMode(env);
+  const scope = env.ONEDRIVE_SCOPE?.trim() || defaultScope(mode);
   if (!clientId) return null;
-  return { clientId, tenant, scope };
+  return { clientId, tenant, scope, mode };
 }
 
 export function requireGraphConfig(env = process.env) {
@@ -292,7 +302,32 @@ async function listChildrenByItem(accessToken, itemId, fetchImpl = fetch) {
   return items;
 }
 
-export async function ensureFolder(accessToken, folderName = DEFAULT_FOLDER, fetchImpl = fetch) {
+export function folderGraphPath(folderName, mode = 'appfolder') {
+  return mode === 'existing'
+    ? `root:/${encodeGraphPath(folderName)}`
+    : `special/approot:/${encodeGraphPath(folderName)}`;
+}
+
+export function itemGraphPath(folderName, name, mode = 'appfolder') {
+  return `${folderGraphPath(folderName, mode)}/${encodeGraphPath(name)}`;
+}
+
+export async function ensureFolder(accessToken, folderName = DEFAULT_FOLDER, fetchImpl = fetch, mode = 'appfolder') {
+  if (mode === 'existing') {
+    const response = await graphRequest(accessToken, `/me/drive/${folderGraphPath(folderName, mode)}`, {}, fetchImpl);
+    const item = await response.json();
+    if (!item?.folder) throw new Error(`OneDrive folder is not a folder: ${folderName}`);
+    return {
+      id: String(item.id ?? ''),
+      name: String(item.name ?? folderName),
+      size: 0,
+      folder: true,
+      file: false,
+      createdAt: item.createdDateTime ?? '',
+      modifiedAt: item.lastModifiedDateTime ?? '',
+      webUrl: item.webUrl ?? '',
+    };
+  }
   const root = await getAppRoot(accessToken, fetchImpl);
   const children = await listChildrenByItem(accessToken, root.id, fetchImpl);
   const existing = children.find((item) => item.folder && item.name === folderName);
@@ -319,20 +354,20 @@ export async function ensureFolder(accessToken, folderName = DEFAULT_FOLDER, fet
   };
 }
 
-export async function listBackupFolder(accessToken, folderName = DEFAULT_FOLDER, fetchImpl = fetch) {
-  const folder = await ensureFolder(accessToken, folderName, fetchImpl);
+export async function listBackupFolder(accessToken, folderName = DEFAULT_FOLDER, fetchImpl = fetch, mode = 'appfolder') {
+  const folder = await ensureFolder(accessToken, folderName, fetchImpl, mode);
   return listChildrenByItem(accessToken, folder.id, fetchImpl);
 }
 
-export function remotePath(folderName, name) {
-  return `${encodeGraphPath(folderName)}/${encodeGraphPath(name)}`;
+export function remotePath(folderName, name, mode = 'appfolder') {
+  return itemGraphPath(folderName, name, mode);
 }
 
-export async function uploadSmallFile(accessToken, folderName, localPath, name, fetchImpl = fetch) {
+export async function uploadSmallFile(accessToken, folderName, localPath, name, fetchImpl = fetch, mode = 'appfolder') {
   const bytes = await fsp.readFile(localPath);
   const response = await graphRequest(
     accessToken,
-    `/me/drive/special/approot:/${remotePath(folderName, name)}:/content`,
+    `/me/drive/${remotePath(folderName, name, mode)}:/content`,
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/octet-stream' },
@@ -344,11 +379,11 @@ export async function uploadSmallFile(accessToken, folderName, localPath, name, 
   return { id: String(item.id ?? ''), name, size: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') };
 }
 
-export async function uploadLargeFile(accessToken, folderName, localPath, name, fetchImpl = fetch) {
+export async function uploadLargeFile(accessToken, folderName, localPath, name, fetchImpl = fetch, mode = 'appfolder') {
   const stat = await fsp.stat(localPath);
   const sessionResponse = await graphRequest(
     accessToken,
-    `/me/drive/special/approot:/${remotePath(folderName, name)}:/createUploadSession`,
+    `/me/drive/${remotePath(folderName, name, mode)}:/createUploadSession`,
     {
       method: 'POST',
       body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'replace' } }),
@@ -393,17 +428,17 @@ export async function uploadLargeFile(accessToken, folderName, localPath, name, 
   }
 }
 
-export async function uploadFile(accessToken, folderName, localPath, name, fetchImpl = fetch) {
+export async function uploadFile(accessToken, folderName, localPath, name, fetchImpl = fetch, mode = 'appfolder') {
   const stat = await fsp.stat(localPath);
   if (!stat.isFile() || stat.size === 0) throw new Error(`Refusing to upload an empty or missing file: ${localPath}`);
-  if (stat.size <= SIMPLE_UPLOAD_LIMIT) return uploadSmallFile(accessToken, folderName, localPath, name, fetchImpl);
-  return uploadLargeFile(accessToken, folderName, localPath, name, fetchImpl);
+  if (stat.size <= SIMPLE_UPLOAD_LIMIT) return uploadSmallFile(accessToken, folderName, localPath, name, fetchImpl, mode);
+  return uploadLargeFile(accessToken, folderName, localPath, name, fetchImpl, mode);
 }
 
-export async function downloadFileByPath(accessToken, folderName, name, outPath, fetchImpl = fetch) {
+export async function downloadFileByPath(accessToken, folderName, name, outPath, fetchImpl = fetch, mode = 'appfolder') {
   const response = await graphRequest(
     accessToken,
-    `/me/drive/special/approot:/${remotePath(folderName, name)}:/content`,
+    `/me/drive/${remotePath(folderName, name, mode)}:/content`,
     {},
     fetchImpl,
   );
@@ -413,18 +448,18 @@ export async function downloadFileByPath(accessToken, folderName, name, outPath,
   return { path: path.resolve(outPath), bytes: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') };
 }
 
-export async function getItemByPath(accessToken, folderName, name, fetchImpl = fetch) {
+export async function getItemByPath(accessToken, folderName, name, fetchImpl = fetch, mode = 'appfolder') {
   const response = await graphRequest(
     accessToken,
-    `/me/drive/special/approot:/${remotePath(folderName, name)}`,
+    `/me/drive/${remotePath(folderName, name, mode)}`,
     {},
     fetchImpl,
   );
   return response.json();
 }
 
-export async function deleteItemByPath(accessToken, folderName, name, fetchImpl = fetch) {
-  const item = await getItemByPath(accessToken, folderName, name, fetchImpl);
+export async function deleteItemByPath(accessToken, folderName, name, fetchImpl = fetch, mode = 'appfolder') {
+  const item = await getItemByPath(accessToken, folderName, name, fetchImpl, mode);
   if (!item?.id) throw new Error(`OneDrive item not found: ${name}`);
   const response = await graphRequest(accessToken, `/me/drive/items/${encodeURIComponent(item.id)}`, { method: 'DELETE' }, fetchImpl);
   return { deleted: true, id: String(item.id), name };

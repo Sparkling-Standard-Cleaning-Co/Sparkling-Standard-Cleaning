@@ -9,6 +9,7 @@ import {
   deleteItemByPath,
   getDriveQuota,
   listBackupFolder,
+  targetMode,
 } from './lib/onedrive.mjs';
 import { backupBaseName, planRetention } from './lib/retention.mjs';
 
@@ -33,7 +34,7 @@ function flag(name) {
 async function main() {
   const folder = process.env.ONEDRIVE_FOLDER?.trim() || DEFAULT_FOLDER;
   const token = await accessTokenFromEnvironment();
-  const items = await listBackupFolder(token.accessToken, folder);
+  const items = await listBackupFolder(token.accessToken, folder, fetch, targetMode());
   const quota = await getDriveQuota(token.accessToken).catch(() => null);
   const cap = Math.max(1, Number(process.env.ONEDRIVE_CAPACITY_BYTES) || 5 * 1024 ** 3);
   const plan = planRetention(items, {
@@ -56,7 +57,7 @@ async function main() {
     const deleted = [];
     for (const bundle of plan.delete) {
       for (const item of items.filter((entry) => backupBaseName(entry.name) === bundle.id)) {
-        await deleteItemByPath(token.accessToken, folder, item.name);
+        await deleteItemByPath(token.accessToken, folder, item.name, fetch, targetMode());
         deleted.push(item.name);
       }
     }

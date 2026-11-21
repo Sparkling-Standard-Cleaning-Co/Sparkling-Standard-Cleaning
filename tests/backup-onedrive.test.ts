@@ -86,6 +86,31 @@ test('OneDrive uploads use the app-folder path and split large files into ranged
   assert.match(ranges[0], /5242897$/);
 });
 
+test('existing-folder mode uses the root path instead of the app folder', async () => {
+  const file = await tempFile(512);
+  let url = '';
+  await uploadFile('access-token', 'Sparkling-Standard-Encrypted-Backups', file, 'existing.ssbk', (async (input: string) => {
+    url = String(input);
+    return new Response(JSON.stringify({ id: 'existing-item' }), { status: 200 });
+  }) as typeof fetch, 'existing');
+  assert.match(url, /\/me\/drive\/root:\/Sparkling-Standard-Encrypted-Backups\/existing\.ssbk:\/content$/);
+});
+test('retention groups an archive with its manifest and checksum as one recovery point', () => {
+  const items = [
+    { name: 'sparkling-standard-backup-2026-11-21T08-30-00.ssbk', bytes: 100 },
+    { name: 'sparkling-standard-backup-2026-11-21T08-30-00.manifest.json.enc', bytes: 10 },
+    { name: 'sparkling-standard-backup-2026-11-21T08-30-00.sha256', bytes: 1 },
+    { name: 'sparkling-standard-backup-2026-11-20T08-30-00.ssbk', bytes: 100 },
+    { name: 'sparkling-standard-backup-2026-11-20T08-30-00.manifest.json.enc', bytes: 10 },
+    { name: 'sparkling-standard-backup-2026-11-20T08-30-00.sha256', bytes: 1 },
+  ];
+  const plan = planRetention(items, { daily: 1, weekly: 1, monthly: 1, capacityBytes: 5000 });
+  assert.equal(plan.bundles, 2);
+  assert.equal(plan.kept.length, 1);
+  assert.equal(plan.delete.length, 1);
+  assert.equal(plan.delete[0].id, 'sparkling-standard-backup-2026-11-20T08-30-00');
+  assert.equal(plan.delete[0].files, 3);
+});
 test('retention keeps the newest archive and protected recovery points under the approved buckets', () => {
   const items = [
     { name: 'sparkling-standard-backup-2026-11-21T08-30-00.ssbk', bytes: 100 },

@@ -8,6 +8,8 @@
 //
 // Commands:
 //   node scripts/backup/onedrive.mjs auth
+//   node scripts/backup/onedrive.mjs auth-start
+//   node scripts/backup/onedrive.mjs auth-finish
 //   node scripts/backup/onedrive.mjs upload --archive <path>
 //   node scripts/backup/onedrive.mjs download --name <remote-name> --out <path>
 //   node scripts/backup/onedrive.mjs list
@@ -16,6 +18,7 @@
 
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import crypto from 'node:crypto';
 import {
   DEFAULT_FOLDER,
@@ -28,6 +31,7 @@ import {
   pollDeviceCode,
   requireGraphConfig,
   startDeviceCode,
+  targetMode,
   uploadFile,
   writeTokenCache,
 } from './lib/onedrive.mjs';
@@ -88,6 +92,69 @@ async function authCommand() {
   }, null, 2)}\n`);
 }
 
+function deviceFile() {
+  return process.env.ONEDRIVE_DEVICE_FILE?.trim() || path.join(os.tmpdir(), 'sparkling-standard-onedrive-device.json');
+}
+
+async function authStartCommand() {
+  const config = requireGraphConfig();
+  const device = await startDeviceCode(config);
+  const file = deviceFile();
+  await fsp.writeFile(file, JSON.stringify({
+    version: 1,
+    clientId: config.clientId,
+    tenant: config.tenant,
+    scope: config.scope,
+    mode: config.mode,
+    deviceCode: device.device_code,
+    userCode: device.user_code,
+    verificationUri: device.verification_uri,
+    expiresAt: new Date(Date.now() + Number(device.expires_in ?? 900) * 1000).toISOString(),
+  }, null, 2), { mode: 0o600 });
+  process.stdout.write([
+    'Authorize the Sparkling Standard backup application:',
+    `1. Open ${device.verification_uri}`,
+    `2. Enter the one-time code: ${device.user_code}`,
+    '3. Sign in with the personal Microsoft account that owns OneDrive.',
+    '4. Approve the requested permission for the existing backup folder.',
+    '',
+    `The pending device code is stored locally at ${file}. Do not share it.`,
+    'After approving, run: npm run backup:onedrive -- auth-finish',
+    '',
+  ].join('\n'));
+}
+
+async function authFinishCommand() {
+  const file = deviceFile();
+  const pending = JSON.parse((await fsp.readFile(file, 'utf8')).replace(/^\uFEFF/, ''));
+  if (!pending?.deviceCode || !pending?.clientId) throw new Error('The pending OneDrive device authorization file is invalid.');
+  const config = {
+    clientId: pending.clientId,
+    tenant: pending.tenant || 'consumers',
+    scope: pending.scope || 'offline_access Files.ReadWrite.AppFolder User.Read',
+    mode: pending.mode === 'existing' ? 'existing' : 'appfolder',
+  };
+  const token = await pollDeviceCode(config, pending.deviceCode, fetch, {
+    intervalSeconds: 5,
+    expiresInSeconds: Math.max(60, Math.floor((Date.parse(pending.expiresAt) - Date.now()) / 1000)),
+  });
+  const cache = await writeTokenCache({
+    refreshToken: token.refreshToken,
+    clientId: config.clientId,
+    tenant: config.tenant,
+    scope: config.scope,
+    account: null,
+  });
+  await fsp.rm(file, { force: true });
+  process.stdout.write(`${JSON.stringify({
+    ok: true,
+    authorized: true,
+    tokenCache: cache,
+    scope: config.scope,
+    mode: config.mode,
+    note: 'The refresh token is protected with Windows DPAPI. Never print or commit it.',
+  }, null, 2)}\n`);
+}
 async function uploadCommand() {
   const archive = path.resolve(arg('--archive'));
   if (!archive || archive.startsWith('--')) throw new Error('Usage: node scripts/backup/onedrive.mjs upload --archive <path>');
@@ -106,10 +173,10 @@ async function uploadCommand() {
     files.push({ local: candidate, name: path.basename(candidate), bytes: info.size });
   }
   const token = await accessTokenFromEnvironment();
-  await ensureFolder(token.accessToken, folderName());
+  await ensureFolder(token.accessToken, folderName(), fetch, targetMode());
   const uploaded = [];
   for (const file of files) {
-    const result = await uploadFile(token.accessToken, folderName(), file.local, file.name);
+    const result = await uploadFile(token.accessToken, folderName(), file.local, file.name, fetch, targetMode());
     uploaded.push({ ...result, name: file.name, localSha256: await sha256File(file.local) });
     process.stderr.write(`uploaded ${file.name} (${file.bytes} bytes)\n`);
   }
@@ -129,13 +196,13 @@ async function downloadCommand() {
   const out = path.resolve(arg('--out'));
   if (!name || !out || name.startsWith('--')) throw new Error('Usage: node scripts/backup/onedrive.mjs download --name <remote-name> --out <path>');
   const token = await accessTokenFromEnvironment();
-  const result = await downloadFileByPath(token.accessToken, folderName(), name, out);
+  const result = await downloadFileByPath(token.accessToken, folderName(), name, out, fetch, targetMode());
   process.stdout.write(`${JSON.stringify({ ok: true, destination: 'onedrive', name, ...result }, null, 2)}\n`);
 }
 
 async function listCommand() {
   const token = await accessTokenFromEnvironment();
-  const items = await listBackupFolder(token.accessToken, folderName());
+  const items = await listBackupFolder(token.accessToken, folderName(), fetch, targetMode());
   const files = items.filter((item) => item.file).map((item) => ({
     name: item.name,
     bytes: item.size,
@@ -166,19 +233,21 @@ async function deleteCommand() {
   const confirm = arg('--confirm');
   if (!name || name !== confirm) throw new Error('Deletion requires --name and a matching --confirm value.');
   const token = await accessTokenFromEnvironment();
-  const result = await deleteItemByPath(token.accessToken, folderName(), name);
+  const result = await deleteItemByPath(token.accessToken, folderName(), name, fetch, targetMode());
   process.stdout.write(`${JSON.stringify({ ok: true, destination: 'onedrive', ...result }, null, 2)}\n`);
 }
 
 async function main() {
   const cmd = command();
   if (cmd === 'auth') return authCommand();
+  if (cmd === 'auth-start') return authStartCommand();
+  if (cmd === 'auth-finish') return authFinishCommand();
   if (cmd === 'upload') return uploadCommand();
   if (cmd === 'download') return downloadCommand();
   if (cmd === 'list') return listCommand();
   if (cmd === 'quota') return quotaCommand();
   if (cmd === 'delete') return deleteCommand();
-  throw new Error('Usage: node scripts/backup/onedrive.mjs auth|upload|download|list|quota|delete');
+  throw new Error('Usage: node scripts/backup/onedrive.mjs auth|auth-start|auth-finish|upload|download|list|quota|delete');
 }
 
 main().catch((error) => {

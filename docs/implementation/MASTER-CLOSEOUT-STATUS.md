@@ -558,3 +558,20 @@ Next executable steps:
   R2 backup S3 credentials and R2 app-object API token; Worker Resend/monitor
   secrets; scheduler GitHub token. Do not declare backups complete until the
   OneDrive independent retrieval and an isolated full restoration actually pass.
+### 2026-11-21 - OneDrive destination verified
+
+- Personal Microsoft account authorized the public client against the existing
+  OneDrive folder `Sparkling-Standard-Encrypted-Backups` with delegated
+  `Files.ReadWrite`.
+- Archive, encrypted manifest and checksum uploaded; OneDrive listed all three.
+- Independent OneDrive download SHA-256 matched
+  `393525b4953c89540e1472ba0053ca5ea8ee72b00872949e938c48c7d62ee866`.
+- Encrypted manifest decrypted and matched the archive digest.
+- `backup:verify` passed; isolated restore produced the D1 SQL with 50
+  migrations, 95 data tables and 0 foreign-key violations.
+- OneDrive quota: 5,368,709,120 total bytes, 1,151,898 used, 5,367,557,222
+  remaining.
+- R2 primary was already verified independently. Application R2 objects remain
+  unverified pending the Cloudflare R2 API token. Monitor alerts remain
+  suppressed pending Worker Resend secrets. These gaps prevent declaring the
+  entire backup workstream complete.

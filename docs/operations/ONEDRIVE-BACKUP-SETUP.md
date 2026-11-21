@@ -8,13 +8,13 @@ Microsoft Graph supports a delegated `Files.ReadWrite.AppFolder` permission
 only for personal Microsoft accounts. It grants this backup application access
 to its own OneDrive app folder and nothing else in the owner's personal drive.
 
-The application folder is:
+The application folder (app-folder mode) is:
 
 ```text
 OneDrive / Apps / Sparkling Standard / Sparkling-Standard-Encrypted-Backups
 ```
 
-The root-level folder named `Sparkling-Standard-Encrypted-Backups` is not used
+This installation uses the existing root-level folder `Sparkling-Standard-Encrypted-Backups`. Microsoft Graph cannot grant access to one arbitrary root folder without the broader delegated `Files.ReadWrite` scope; that is the permission this installation authorized. The app-folder mode remains available for a future least-privilege migration, but cannot read the existing folder. The old text below describes app-folder mode only.
 because granting access to it would require the much broader `Files.ReadWrite`
 scope over the entire personal OneDrive. The app-folder design is the minimum
 permission that supports unattended encrypted backup uploads.
@@ -60,7 +60,7 @@ After the tenant is created, register the application inside that tenant. Do not
 The script uses delegated device-code authorization with:
 
 ```text
-offline_access Files.ReadWrite.AppFolder User.Read
+offline_access Files.ReadWrite User.Read
 ```
 
 No client secret is created or stored. Device-code flow is a public-client flow
@@ -72,11 +72,14 @@ On the owner Windows computer, run:
 
 ```powershell
 $env:ONEDRIVE_CLIENT_ID = '<application-client-id>'
+$env:ONEDRIVE_TENANT = 'common'
+$env:ONEDRIVE_TARGET_MODE = 'existing'
+$env:ONEDRIVE_FOLDER = 'Sparkling-Standard-Encrypted-Backups'
 npm run backup:onedrive -- auth
 ```
 
 Open the displayed Microsoft device-login URL, enter the one-time code, and
-approve the app-folder permission. The refresh token is stored with Windows
+approve the permission for the existing backup folder. The refresh token is stored with Windows
 DPAPI at:
 
 ```text
@@ -100,7 +103,8 @@ Add after the owner authorization:
 | --- | --- |
 | `ONEDRIVE_CLIENT_ID` | Public application/client ID |
 | `ONEDRIVE_REFRESH_TOKEN` | Delegated refresh token from the owner auth flow |
-| `ONEDRIVE_FOLDER` | Optional; defaults to `Sparkling-Standard-Encrypted-Backups` |
+| `ONEDRIVE_FOLDER` | Existing root folder name; defaults to `Sparkling-Standard-Encrypted-Backups` |
+| `ONEDRIVE_TARGET_MODE` | Repository variable set to `existing` for this installation |
 | `ONEDRIVE_CAPACITY_BYTES` | Optional; defaults to 5 GiB |
 
 Existing backup secrets remain required for R2 and D1. Never create a client
@@ -133,3 +137,29 @@ npm run backup:restore -- <downloaded-archive> --out C:\Temp\isolated-restore
 
 A provider upload response is not restore proof. The owner must retain the
 recovery key outside OneDrive and outside the primary Windows computer.
+
+## Completed authorization and production proof - 2026-11-21
+
+The personal account authorized the `Sparkling Standard Backup` public client
+with the existing-folder permission. The refresh token is protected by Windows
+DPAPI at `%USERPROFILE%\.config\sparkling-standard\onedrive-token.dpapi`.
+
+Actual result:
+
+- Uploaded `sparkling-standard-backup-2026-11-21T21-10-15.ssbk`,
+  its encrypted manifest and checksum to the existing OneDrive folder.
+- OneDrive listed all three objects.
+- Downloaded the archive independently from OneDrive.
+- SHA-256 matched the local archive at
+  `393525b4953c89540e1472ba0053ca5ea8ee72b00872949e938c48c7d62ee866`.
+- Decrypted manifest confirmed the same archive digest.
+- `backup:verify` reported SQLite integrity `ok`.
+- Isolated restore succeeded and `verify-d1-export` reported 50 migrations,
+  95 data tables, 0 foreign-key violations.
+- OneDrive quota showed 5,368,709,120 total bytes, 1,151,898 used bytes and
+  5,367,557,222 remaining bytes at verification time.
+- Retention dry run grouped archive + manifest + checksum as one bundle and made
+  no deletions.
+
+The GitHub Actions copy still requires the refresh token and client ID as
+repository secrets. The local DPAPI cache is intentionally not committed.
