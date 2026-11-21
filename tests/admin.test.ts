@@ -404,9 +404,14 @@ import {
   passwordProblem,
 } from '../src/lib/password-policy.ts';
 import {
+  createEmailMfaChallenge,
   createMfaChallenge,
+  emailMfaChallengeExists,
+  enableEmailMfa,
   enableMfa,
+  prepareEmailMfaResend,
   startMfaEnrollment,
+  verifyEmailMfaChallenge,
   verifyMfaChallenge,
 } from '../src/lib/admin/mfa.ts';
 import { operationsReport } from '../src/lib/admin/reporting.ts';
@@ -482,6 +487,98 @@ test('MFA enrollment, challenge verification and one-time recovery codes work', 
   const reused = await createMfaChallenge(db, owner.id);
   assert.equal(await verifyMfaChallenge(db, reused.token, { recoveryCode: codes![0]!, encryptionKey: MFA_KEY }), null);
   assert.equal(actor.mfaEnabled, false, 'the existing session remains valid until revoked');
+});
+
+test('email MFA challenges are hashed, single-use, rate-limited and recoverable', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'email-mfa@example.test',
+    name: 'Email MFA Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const challenge = await createEmailMfaChallenge(db, owner.id, '123456');
+  assert.equal(await emailMfaChallengeExists(db, challenge.token), true);
+  assert.equal(await verifyEmailMfaChallenge(db, challenge.token, { code: '000000' }), null);
+  const cooldown = await prepareEmailMfaResend(db, challenge.token, '654321');
+  assert.equal(cooldown.ok, false);
+  assert.equal(cooldown.reason, 'cooldown');
+  db.raw
+    .prepare('UPDATE admin_email_mfa_challenges SET last_sent_at = ?')
+    .run(new Date(Date.now() - 120_000).toISOString());
+  const resent = await prepareEmailMfaResend(db, challenge.token, '654321');
+  assert.equal(resent.ok, true);
+  assert.equal(await verifyEmailMfaChallenge(db, challenge.token, { code: '123456' }), null);
+  assert.deepEqual(await verifyEmailMfaChallenge(db, challenge.token, { code: '654321' }), {
+    userId: owner.id,
+  });
+  assert.equal(await verifyEmailMfaChallenge(db, challenge.token, { code: '654321' }), null);
+
+  const recoveryCodes = await enableEmailMfa(db, owner.id);
+  assert.equal(recoveryCodes.length, 8);
+  const authenticated = await authenticate(db, owner.email, 'SyntheticOwner!2026');
+  assert.equal(authenticated?.mfaEnabled, true);
+  assert.equal(authenticated?.mfaMethod, 'email');
+  const recoveryChallenge = await createEmailMfaChallenge(db, owner.id, '111111');
+  assert.deepEqual(
+    await verifyEmailMfaChallenge(db, recoveryChallenge.token, { recoveryCode: recoveryCodes[0] }),
+    { userId: owner.id },
+  );
+});
+
+test('the login route sends an email code and accepts it without exposing a session early', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'email-login@example.test',
+    name: 'Email Login Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  await enableEmailMfa(db, owner.id);
+  const sent: Array<Record<string, unknown>> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (_input, init) => {
+    sent.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+    return new Response(JSON.stringify({ id: 'email_mfa_test' }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const env = {
+      DB: db,
+      RESEND_API_KEY: 're_test_synthetic',
+      RESEND_FROM_EMAIL: 'notifications@example.test',
+      PUBLIC_SITE_URL: 'https://sparkling-standard.com',
+    };
+    const login = await authPost({
+      request: new Request('https://example.test/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', email: owner.email, password: 'SyntheticOwner!2026' }),
+      }),
+      env,
+    } as never);
+    const payload = (await login.json()) as {
+      mfaRequired?: boolean;
+      mfaMethod?: string;
+      challengeToken?: string;
+    };
+    assert.equal(payload.mfaRequired, true);
+    assert.equal(payload.mfaMethod, 'email');
+    assert.equal(login.headers.get('Set-Cookie'), null);
+    assert.equal(sent.length, 1);
+    const body = String(sent[0].text ?? '');
+    const code = body.match(/\b\d{6}\b/)?.[0] ?? '';
+    assert.match(code, /^\d{6}$/);
+    const verify = await authPost({
+      request: new Request('https://example.test/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mfa_verify', challengeToken: payload.challengeToken, code }),
+      }),
+      env,
+    } as never);
+    assert.equal(verify.status, 200);
+    assert.match(verify.headers.get('Set-Cookie') ?? '', /^ss_ops=/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('invitations, password reset and account status are enforced', async () => {

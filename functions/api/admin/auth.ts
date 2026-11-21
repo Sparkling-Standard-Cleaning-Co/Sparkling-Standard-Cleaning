@@ -1,4 +1,4 @@
-﻿import { adminDb, type AdminDbEnv, type D1Database } from '../../../src/lib/admin/d1.ts';
+import { adminDb, type AdminDbEnv, type D1Database } from '../../../src/lib/admin/d1.ts';
 import {
   AdminAuthError,
   authenticate,
@@ -16,7 +16,15 @@ import {
 import { constantTimeEqual, hashToken } from '../../../src/lib/admin/auth.ts';
 import { branchViewCookie, requestedBranchView } from '../../../src/lib/admin/branch-view.ts';
 import { branchConfig } from '../../../src/config/branches.ts';
-import { createMfaChallenge, verifyMfaChallenge } from '../../../src/lib/admin/mfa.ts';
+import {
+  createEmailMfaChallenge,
+  createMfaChallenge,
+  emailMfaChallengeExists,
+  generateEmailCode,
+  prepareEmailMfaResend,
+  verifyEmailMfaChallenge,
+  verifyMfaChallenge,
+} from '../../../src/lib/admin/mfa.ts';
 import {
   acceptInvite,
   passwordResetStatus,
@@ -24,6 +32,7 @@ import {
   resetPassword,
 } from '../../../src/lib/admin/accounts.ts';
 import {
+  buildOpsMfaCodeEmail,
   buildOpsPasswordChangedEmail,
   buildOpsPasswordResetEmail,
   sendAdminEmail,
@@ -109,14 +118,14 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
 async function actorPayload(
   db: D1Database,
   userId: string,
-): Promise<{ id: string; email: string; name: string; role: string; branchId: string | null; permissions: string[]; mfaEnabled: boolean } | null> {
+): Promise<{ id: string; email: string; name: string; role: string; branchId: string | null; permissions: string[]; mfaEnabled: boolean; mfaMethod: 'totp' | 'email' } | null> {
   const row = await db
     .prepare(
-      `SELECT id, email, display_name, role_id, branch_id, mfa_enabled FROM admin_users
+      `SELECT id, email, display_name, role_id, branch_id, mfa_enabled, mfa_method FROM admin_users
        WHERE id = ? AND status = 'active' LIMIT 1`,
     )
     .bind(userId)
-    .first<{ id: string; email: string; display_name: string; role_id: string; branch_id: string | null; mfa_enabled: number }>();
+    .first<{ id: string; email: string; display_name: string; role_id: string; branch_id: string | null; mfa_enabled: number; mfa_method: string | null }>();
   if (!row) return null;
   const perms = await db
     .prepare('SELECT permission FROM admin_role_permissions WHERE role_id = ?')
@@ -129,6 +138,7 @@ async function actorPayload(
     role: row.role_id,
     branchId: row.branch_id ?? null,
     mfaEnabled: Number(row.mfa_enabled) === 1,
+    mfaMethod: row.mfa_method === 'email' ? 'email' : 'totp',
     permissions: (perms.results ?? []).map((entry) => entry.permission),
   };
 }
@@ -254,15 +264,63 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
   }
 
+  if (action === 'mfa_resend') {
+    if (!(await rateLimit(db, `ops:mfa-resend:${ipKey}`, 10, 15, 15))) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
+    const challengeToken = safeText(payload.challengeToken, 300);
+    const code = generateEmailCode();
+    const prepared = await prepareEmailMfaResend(db, challengeToken, code);
+    if (!prepared.ok) {
+      if (prepared.reason === 'cooldown') {
+        return json(
+          { ok: false, error: 'mfa_resend_cooldown', retryAfterSeconds: prepared.retryAfterSeconds },
+          429,
+        );
+      }
+      return json({ ok: false, error: 'mfa_challenge_invalid' }, 401);
+    }
+    const recipient = await actorPayload(db, prepared.userId);
+    if (!recipient) return json({ ok: false, error: 'mfa_challenge_invalid' }, 401);
+    const site = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+    const delivered = await sendAdminEmail(
+      {
+        ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
+        ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+        PUBLIC_SITE_URL: site,
+      },
+      recipient.email,
+      buildOpsMfaCodeEmail({ PUBLIC_SITE_URL: site }, code, recipient.name),
+      `ops-mfa-code-${crypto.randomUUID()}`,
+    );
+    if (!delivered) {
+      await auditFromRequest(db, context.request, null, 'admin.mfa_email_failed');
+      return json({ ok: false, error: 'mfa_email_unavailable' }, 503);
+    }
+    await auditFromRequest(db, context.request, null, 'admin.mfa_email_resent');
+    return json({
+      ok: true,
+      expiresAt: prepared.expiresAt,
+      resendAfterSeconds: prepared.resendAfterSeconds,
+    });
+  }
+
   if (action === 'mfa_verify') {
     if (!(await rateLimit(db, `ops:mfa:${ipKey}`, 20, 15, 15))) {
       return json({ ok: false, error: 'rate_limited' }, 429);
     }
-    const verified = await verifyMfaChallenge(db, safeText(payload.challengeToken, 300), {
-      code: safeText(payload.code, 20),
-      recoveryCode: safeText(payload.recoveryCode, 40),
-      ...(context.env.MFA_ENCRYPTION_KEY ? { encryptionKey: context.env.MFA_ENCRYPTION_KEY } : {}),
-    });
+    const challengeToken = safeText(payload.challengeToken, 300);
+    const emailChallenge = await emailMfaChallengeExists(db, challengeToken);
+    const verified = emailChallenge
+      ? await verifyEmailMfaChallenge(db, challengeToken, {
+          code: safeText(payload.code, 20),
+          recoveryCode: safeText(payload.recoveryCode, 40),
+        })
+      : await verifyMfaChallenge(db, challengeToken, {
+          code: safeText(payload.code, 20),
+          recoveryCode: safeText(payload.recoveryCode, 40),
+          ...(context.env.MFA_ENCRYPTION_KEY ? { encryptionKey: context.env.MFA_ENCRYPTION_KEY } : {}),
+        });
     if (!verified) {
       await auditFromRequest(db, context.request, null, 'admin.mfa_failed');
       return json({ ok: false, error: 'mfa_invalid' }, 401);
@@ -321,12 +379,41 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       await auditFromRequest(db, context.request, null, 'admin.login_failed');
       return json({ ok: false, error: 'credentials_invalid' }, 401);
     }
+    if (actor.mfaEnabled && actor.mfaMethod === 'email') {
+      const code = generateEmailCode();
+      const challenge = await createEmailMfaChallenge(db, actor.id, code);
+      const site = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+      const delivered = await sendAdminEmail(
+        {
+          ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
+          ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+          PUBLIC_SITE_URL: site,
+        },
+        actor.email,
+        buildOpsMfaCodeEmail({ PUBLIC_SITE_URL: site }, code, actor.name),
+        `ops-mfa-code-${crypto.randomUUID()}`,
+      );
+      if (!delivered) {
+        await auditFromRequest(db, context.request, null, 'admin.mfa_email_failed');
+        return json({ ok: false, error: 'mfa_email_unavailable' }, 503);
+      }
+      await auditFromRequest(db, context.request, { ...actor, csrf: '', permissions: [], mfaEnabled: true }, 'admin.mfa_challenge');
+      return json({
+        ok: true,
+        mfaRequired: true,
+        mfaMethod: 'email',
+        challengeToken: challenge.token,
+        expiresAt: challenge.expiresAt,
+        resendAfterSeconds: challenge.resendAfterSeconds,
+      });
+    }
     if (actor.mfaEnabled) {
       const challenge = await createMfaChallenge(db, actor.id);
       await auditFromRequest(db, context.request, { ...actor, csrf: '', permissions: [], mfaEnabled: true }, 'admin.mfa_challenge');
       return json({
         ok: true,
         mfaRequired: true,
+        mfaMethod: 'totp',
         challengeToken: challenge.token,
         expiresAt: challenge.expiresAt,
       });

@@ -68,10 +68,12 @@ import {
 
           <form class="admin-form" data-admin-mfa hidden>
             <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Two-step verification</h2>
-            <p class="admin-muted">Enter the current authenticator code. A recovery code also works.</p>
-            <label>Authenticator code <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /></label>
+            <p class="admin-muted" data-admin-mfa-copy>Enter the current authenticator code. A recovery code also works.</p>
+            <label><span data-admin-mfa-code-label>Authenticator code</span> <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /></label>
             <label>Recovery code <input name="recoveryCode" autocomplete="off" maxlength="40" /></label>
             <button class="btn btn--primary" type="submit">Verify and Sign In</button>
+            <button class="btn btn--ghost btn--small" type="button" data-admin-mfa-resend hidden>Send a new email code</button>
+            <p class="admin-status-message" data-admin-mfa-status role="status" aria-live="polite"></p>
             <button class="btn btn--ghost btn--small" type="button" data-admin-mfa-cancel>Back to sign in</button>
           </form>
 

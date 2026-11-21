@@ -19,6 +19,7 @@ interface AdminActor {
   canSelectBranch?: boolean;
   permissions: string[];
   mfaEnabled: boolean;
+  mfaMethod?: 'totp' | 'email';
 }
 
 type GateMode = 'setup' | 'login' | 'forgot' | 'mfa' | 'invite' | 'reset';
@@ -32,6 +33,10 @@ const forgotStatus = document.querySelector<HTMLElement>('[data-admin-forgot-sta
 const resetStatus = document.querySelector<HTMLElement>('[data-admin-reset-status]');
 const successEl = document.querySelector<HTMLElement>('[data-admin-success]');
 const mfaForm = document.querySelector<HTMLFormElement>('[data-admin-mfa]');
+const mfaCopy = document.querySelector<HTMLElement>('[data-admin-mfa-copy]');
+const mfaCodeLabel = document.querySelector<HTMLElement>('[data-admin-mfa-code-label]');
+const mfaResend = document.querySelector<HTMLButtonElement>('[data-admin-mfa-resend]');
+const mfaStatus = document.querySelector<HTMLElement>('[data-admin-mfa-status]');
 const inviteForm = document.querySelector<HTMLFormElement>('[data-admin-invite]');
 const resetForm = document.querySelector<HTMLFormElement>('[data-admin-reset]');
 const passwordChangeForm = document.querySelector<HTMLFormElement>('[data-admin-password-change]');
@@ -50,7 +55,30 @@ const views = [...document.querySelectorAll<HTMLElement>('[data-admin-view]')];
 let csrf = '';
 let actor: AdminActor | null = null;
 let mfaChallenge = '';
+let mfaMethod: 'totp' | 'email' = 'totp';
+let mfaResendAt = 0;
+let emailMfaChallenge = '';
 let currentView = 'overview';
+
+function configureMfaGate(): void {
+  if (mfaCopy) {
+    mfaCopy.textContent =
+      mfaMethod === 'email'
+        ? 'Enter the six-digit code sent to the account email address. A recovery code also works.'
+        : 'Enter the current authenticator code. A recovery code also works.';
+  }
+  if (mfaCodeLabel) {
+    mfaCodeLabel.textContent = mfaMethod === 'email' ? 'Email verification code' : 'Authenticator code';
+  }
+  if (mfaResend) {
+    mfaResend.hidden = mfaMethod !== 'email';
+    mfaResend.disabled = Date.now() < mfaResendAt;
+    mfaResend.textContent =
+      Date.now() < mfaResendAt
+        ? `Send another code in ${Math.ceil((mfaResendAt - Date.now()) / 1000)}s`
+        : 'Send a new email code';
+  }
+}
 let inviteToken = '';
 let resetToken = '';
 
@@ -174,7 +202,13 @@ function friendly(error: unknown): string {
     csrf_failed: 'Your security token expired. Refresh and try again.',
     rate_limited: 'Too many attempts. Wait a few minutes and try again.',
     credentials_invalid: 'Email or password is incorrect.',
-    mfa_invalid: 'That authenticator or recovery code is invalid.',
+    mfa_invalid: 'That verification or recovery code is invalid.',
+    mfa_code_invalid: 'That verification code is invalid or expired.',
+    mfa_email_unavailable: 'Email verification could not be sent. Try again or use another MFA method.',
+    mfa_challenge_invalid: 'That verification session expired. Sign in again.',
+    mfa_resend_cooldown: 'Please wait before requesting another code.',
+    email_mfa_not_configured: 'Email verification is not configured yet.',
+    mfa_already_enabled: 'Two-step verification is already enabled.',
     reset_invalid: 'This reset link is invalid, expired or already used. Request a new one.',
     origin_rejected: 'The request came from an unexpected origin. Reload and try again.',
     email_not_configured: 'Email delivery is not configured.',
@@ -253,6 +287,7 @@ function showGate(mode: GateMode): void {
   ] as Array<[HTMLFormElement | null, boolean]>) {
     if (form) form.hidden = !visible;
   }
+  if (mode === 'mfa') configureMfaGate();
   if (gateStatus) {
     gateStatus.textContent = {
       setup: 'First-run owner enrollment.',
@@ -3485,9 +3520,10 @@ async function loadSettings(): Promise<void> {
   ]);
   const mfaStatus = document.querySelector<HTMLElement>('[data-admin-mfa-status]');
   if (mfaStatus) {
+    const method = actor?.mfaMethod === 'email' ? 'email' : 'totp';
     mfaStatus.innerHTML = actor?.mfaEnabled
-      ? '<p><strong>Two-step verification is enabled.</strong></p><details class="admin-detail-toggle"><summary>Disable two-step verification</summary><form class="admin-form" data-form="mfa-disable"><label>Password <input name="password" type="password" required /></label><label>Current authenticator code <input name="code" inputmode="numeric" maxlength="6" required /></label><button class="btn btn--secondary btn--small" type="submit">Disable</button></form></details>'
-      : '<p>Two-step verification is not enabled.</p><button class="btn btn--primary btn--small" type="button" data-admin-action="mfa-start">Set up authenticator</button>';
+      ? `<p><strong>Two-step verification is enabled (${method === 'email' ? 'email code' : 'authenticator app'}).</strong></p><details class="admin-detail-toggle"><summary>Disable two-step verification</summary><form class="admin-form" data-form="mfa-disable"><label>Password <input name="password" type="password" required /></label>${method === 'email' ? '<label>Recovery code <input name="recoveryCode" autocomplete="off" maxlength="40" required /></label>' : '<label>Current authenticator code <input name="code" inputmode="numeric" maxlength="6" required /></label>'}<button class="btn btn--secondary btn--small" type="submit">Disable</button></form></details>`
+      : '<p>Two-step verification is not enabled.</p><div class="admin-actions"><button class="btn btn--primary btn--small" type="button" data-admin-action="mfa-start">Set up authenticator</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="mfa-email-start">Use email verification codes</button></div>';
   }
   const adminsTarget = document.querySelector<HTMLElement>('[data-admin-admins]');
   if (adminsTarget) {
@@ -4095,12 +4131,14 @@ loginForm?.addEventListener('submit', async (event) => {
   setError();
   const data = new FormData(loginForm);
   try {
-    const result = await api<{ actor?: AdminActor; csrf?: string; mfaRequired?: boolean; challengeToken?: string }>('/api/admin/auth', {
+    const result = await api<{ actor?: AdminActor; csrf?: string; mfaRequired?: boolean; challengeToken?: string; mfaMethod?: string; resendAfterSeconds?: number }>('/api/admin/auth', {
       method: 'POST',
       body: JSON.stringify({ action: 'login', email: data.get('email'), password: data.get('password') }),
     });
     if (result.mfaRequired && result.challengeToken) {
       mfaChallenge = result.challengeToken;
+      mfaMethod = result.mfaMethod === 'email' ? 'email' : 'totp';
+      mfaResendAt = Date.now() + (result.resendAfterSeconds ?? 60) * 1000;
       showGate('mfa');
       return;
     }
@@ -4118,11 +4156,32 @@ mfaForm?.addEventListener('submit', async (event) => {
       body: JSON.stringify({ action: 'mfa_verify', challengeToken: mfaChallenge, code: data.get('code'), recoveryCode: data.get('recoveryCode') }),
     });
     applySession(result);
+    mfaChallenge = '';
+    mfaMethod = 'totp';
   } catch (error) { setError(friendly(error)); }
+});
+
+document.querySelector<HTMLButtonElement>('[data-admin-mfa-resend]')?.addEventListener('click', () => {
+  if (!mfaChallenge || mfaMethod !== 'email' || Date.now() < mfaResendAt) return;
+  if (mfaStatus) mfaStatus.textContent = 'Sending a new code…';
+  void api<{ expiresAt?: string; resendAfterSeconds?: number }>('/api/admin/auth', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'mfa_resend', challengeToken: mfaChallenge }),
+  })
+    .then((result) => {
+      mfaResendAt = Date.now() + (result.resendAfterSeconds ?? 60) * 1000;
+      if (mfaStatus) mfaStatus.textContent = 'A new six-digit code was sent to the account email.';
+      configureMfaGate();
+    })
+    .catch((error) => {
+      if (mfaStatus) mfaStatus.textContent = friendly(error);
+    });
 });
 
 document.querySelector<HTMLButtonElement>('[data-admin-mfa-cancel]')?.addEventListener('click', () => {
   mfaChallenge = '';
+  mfaMethod = 'totp';
+  mfaResendAt = 0;
   showGate('login');
 });
 
@@ -4589,8 +4648,22 @@ document.addEventListener('submit', (event) => {
     }).then(() => openInvoice(value('invoiceId'))).catch((error) => setAppError(friendly(error)));
   }
   if (kind === 'mfa-disable') {
-    void api('/api/admin/accounts', { method: 'POST', body: JSON.stringify({ action: 'mfa_disable', password: value('password'), code: value('code') }) })
+    void api('/api/admin/accounts', { method: 'POST', body: JSON.stringify({ action: 'mfa_disable', password: value('password'), code: value('code'), recoveryCode: value('recoveryCode') }) })
       .then(() => { if (actor) actor.mfaEnabled = false; return loadView('settings'); })
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (kind === 'mfa-email-enable') {
+    void api<{ recoveryCodes?: string[] }>('/api/admin/accounts', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'mfa_email_enable', challengeToken: emailMfaChallenge, code: value('code') }),
+    })
+      .then((result) => {
+        const target = document.querySelector<HTMLElement>('[data-admin-mfa-setup]');
+        if (target) target.innerHTML = `<div class="admin-card"><p><strong>Email verification enabled.</strong></p><p>Save these one-time recovery codes now. They will not be shown again.</p><pre>${(result.recoveryCodes ?? []).map(esc).join('\n')}</pre></div>`;
+        if (actor) { actor.mfaEnabled = true; actor.mfaMethod = 'email'; }
+        emailMfaChallenge = '';
+        void loadView('settings');
+      })
       .catch((error) => setAppError(friendly(error)));
   }
   if (kind === 'mfa-enable') {
@@ -5217,6 +5290,21 @@ document.addEventListener('click', (event) => {
         const target = document.querySelector<HTMLElement>('[data-admin-mfa-setup]');
         if (target) target.innerHTML = `<div class="admin-card"><p><strong>Add this account to your authenticator.</strong></p><p class="admin-code">${esc(result.secret)}</p><p><a href="${esc(result.uri)}">Open authenticator link</a></p><form class="admin-form" data-form="mfa-enable"><label>Current code <input name="code" inputmode="numeric" maxlength="6" required /></label><button class="btn btn--primary btn--small" type="submit">Enable two-step verification</button></form></div>`;
       }).catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'mfa-email-start') {
+    setAppError();
+    void api<{ challengeToken?: string; expiresAt?: string; resendAfterSeconds?: number }>('/api/admin/accounts', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'mfa_email_start' }),
+    })
+      .then((result) => {
+        emailMfaChallenge = result.challengeToken ?? '';
+        const target = document.querySelector<HTMLElement>('[data-admin-mfa-setup]');
+        if (target) {
+          target.innerHTML = `<div class="admin-card"><p><strong>Check the account email.</strong></p><p>A six-digit code was sent to the administrator email. It expires in five minutes.</p><form class="admin-form" data-form="mfa-email-enable"><label>Email verification code <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required /></label><button class="btn btn--primary btn--small" type="submit">Enable email verification</button></form></div>`;
+        }
+      })
+      .catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'admin-reset') {
     setAppError();

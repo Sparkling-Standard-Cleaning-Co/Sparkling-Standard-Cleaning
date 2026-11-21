@@ -1,4 +1,4 @@
-﻿import {
+import {
   hashPassword,
   hashToken,
   passwordProblem,
@@ -24,6 +24,7 @@ export interface AdminActor {
   csrf: string;
   permissions: string[];
   mfaEnabled: boolean;
+  mfaMethod?: 'totp' | 'email';
 }
 
 export class AdminAuthError extends Error {
@@ -94,12 +95,12 @@ export async function authenticate(
   db: D1Database,
   emailInput: string,
   password: string,
-): Promise<{ id: string; email: string; name: string; role: string; branchId: string | null; mfaEnabled: boolean } | null> {
+): Promise<{ id: string; email: string; name: string; role: string; branchId: string | null; mfaEnabled: boolean; mfaMethod: 'totp' | 'email' } | null> {
   const email = emailInput.trim().toLowerCase();
   const user = await db
     .prepare(
       `SELECT u.id, u.email, u.display_name, u.password_hash, u.status, u.role_id, u.branch_id,
-              u.mfa_enabled, r.name AS role_name
+              u.mfa_enabled, u.mfa_method, r.name AS role_name
        FROM admin_users u JOIN admin_roles r ON r.id = u.role_id
        WHERE u.email = ? LIMIT 1`,
     )
@@ -113,6 +114,7 @@ export async function authenticate(
       role_id: string;
       branch_id: string | null;
       mfa_enabled: number;
+      mfa_method: string | null;
       role_name: string;
     }>();
   if (!user || user.status !== 'active') return null;
@@ -125,6 +127,7 @@ export async function authenticate(
     role: user.role_id,
     branchId: user.branch_id ?? null,
     mfaEnabled: Number(user.mfa_enabled) === 1,
+    mfaMethod: user.mfa_method === 'email' ? 'email' : 'totp',
   };
 }
 
@@ -165,7 +168,7 @@ export async function readOpsActor(db: D1Database, request: Request): Promise<Ad
   const row = await db
     .prepare(
       `SELECT s.id AS session_id, s.csrf_token, s.expires_at, s.revoked_at,
-              u.id, u.email, u.display_name, u.status, u.role_id, u.branch_id, u.mfa_enabled
+              u.id, u.email, u.display_name, u.status, u.role_id, u.branch_id, u.mfa_enabled, u.mfa_method
        FROM admin_sessions s JOIN admin_users u ON u.id = s.user_id
        WHERE s.token_hash = ? LIMIT 1`,
     )
@@ -182,6 +185,7 @@ export async function readOpsActor(db: D1Database, request: Request): Promise<Ad
       role_id: string;
       branch_id: string | null;
       mfa_enabled: number;
+      mfa_method: string | null;
     }>();
   if (!row || row.revoked_at || row.status !== 'active') return null;
   if (Date.parse(row.expires_at) <= Date.now()) {
@@ -202,6 +206,7 @@ export async function readOpsActor(db: D1Database, request: Request): Promise<Ad
     csrf: row.csrf_token,
     permissions,
     mfaEnabled: Number(row.mfa_enabled) === 1,
+    mfaMethod: row.mfa_method === 'email' ? 'email' : 'totp',
   };
 }
 

@@ -98,6 +98,22 @@ export function buildOpsPasswordResetEmail(env: AdminEmailEnv, token: string, na
   };
 }
 
+export function buildOpsMfaCodeEmail(env: AdminEmailEnv, code: string, name?: string): AdminEmail {
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hello,';
+  const plainGreeting = name ? `Hi ${name},` : 'Hello,';
+  return {
+    subject: 'Your Sparkling Standard verification code',
+    html: shell(
+      'Your verification code',
+      `<p style="font-size:16px;line-height:1.6">${greeting}</p>
+       <p style="font-size:16px;line-height:1.6">Use this one-time code to finish signing in. It expires in five minutes.</p>
+       <p style="font-size:32px;letter-spacing:.18em;font-weight:700;color:#7d3f49;margin:1.5rem 0">${code}</p>
+       <p style="font-size:14px;line-height:1.6">If you did not request this code, change your password and contact the owner immediately. Never share this code.</p>`,
+    ),
+    text: `Your Sparkling Standard verification code\n\n${plainGreeting}\n\n${code}\n\nThis one-time code expires in five minutes. If you did not request it, change your password and contact the owner immediately. Never share this code.\n\n${siteUrl(env)}`,
+  };
+}
+
 export function buildOpsPasswordChangedEmail(env: AdminEmailEnv, name?: string): AdminEmail {
   const url = `${siteUrl(env)}/admin/`;
   const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hello,';
