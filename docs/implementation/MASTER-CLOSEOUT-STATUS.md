@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-21 (owner UX release pushed to GitHub and mobile-verified)
+Last updated: 2026-11-21 (afternoon Pay Now defect repaired and production-verified)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -21,7 +21,7 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Browser tests | 237 pass | **245 pass / 0 fail** (`npm run test:browser`) |
 | Newest migrations | 0043 | `0044`–`0047` (production at **47**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
-| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`e781e915-69e4-41c5-a29a-1d09e3d36b74`** (application source `88124eb`); prior checkout fix also verified on `3f6ded04` |
+| Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`94ebf4ed-9f98-40df-aea9-45dd4114619d`** (source `a7bcfd5`); prior checkout fix also verified on `3f6ded04` |
 | Prior release deployment | — | `bb936ae2-cf37-4682-89af-4b5acd03ab5b` (source `10aef33`) |
 
 Git topology note (unresolved, requires owner approval before any change):
@@ -325,3 +325,67 @@ Next executable steps:
   Step 3 shows the corrected frequency order and Deep Cleaning reset.
 - Final local and remote `production-safe` both point to `88124eb` before this
   documentation-only closeout.
+### 2026-11-21 - independent comprehensive platform audit
+
+- Full read-only audit completed against `production-safe` @ `f0d98f8`
+  and production deployment `1bf95d3d`. Reports:
+  `docs/audits/PLATFORM-COMPREHENSIVE-AUDIT.md`,
+  `docs/audits/PRIORITIZED-REMEDIATION-ROADMAP.md`,
+  `docs/audits/ARCHITECTURE-EFFICIENCY-RECOMMENDATIONS.md`,
+  `docs/audits/OWNER-EXECUTIVE-SUMMARY.md`.
+- Verified: 47 migrations applied including `0044_communications.sql`; 0 FK
+  violations; Tampa setup/inactive and publicly 404; dispatch analysis-only,
+  paused and 0 decisions; one admin account with MFA not enabled.
+- Critical findings: **0 completed public estimate checkouts**; most payment
+  failures/cancellations are not persisted for admin action; dynamic-promotion
+  tax recomputation trusts client state/ZIP; online/gift payment projections
+  have NULL branch and D1 gift state does not follow R2 redemptions/refunds;
+  reports show $0 outstanding/discounts; pending requests can duplicate
+  invoices; Jobs/appointments can omit current work; owner branch view is
+  largely cosmetic; legal holds are not enforced on deletion/cleanup; public
+  repository contains a private owner-supplied address/coordinates.
+- Recovery: `backup_runs` is 0, the backup workflow is inactive, backup-monitor
+  and document-reminder Workers are not deployed, and the latest manual archive
+  predates migrations 0044-0047. Recurring worker has 11 failures/4 completions
+  and 0 incidents.
+- Production has one successful **$5 live invoice payment** (branch Pensacola)
+  while prior release narratives said no live charge occurred; owner must
+  reconcile/authorize the record. No audit payment, refund, email or completed
+  checkout was performed.
+- No production changes, Tampa activation, dispatch activation or destructive
+  action occurred. A temporary estimator hold from browser verification expired
+  automatically; no booking request or payment was created.
+- Recommended immediate work is the P0 sequence in the roadmap: complete and
+  observe the payment path, fix tax jurisdiction, correct branch/gift financial
+  attribution, close privacy/legal-hold and MFA gaps, and make backups current
+  and restore-tested. Do not start Tampa/dispatch expansion yet.
+### 2026-11-21 - afternoon Pay Now repair
+
+- Root cause: the wizard treated only `alternatives` from final live scheduling as
+  a Pay Now blocker. `preferred` / no-hold outcomes could continue to lead
+  submission and checkout without a held slot. The provisional 120-minute
+  availability preview also offers late-afternoon starts that cannot fit the
+  actual job duration before the 6:00 PM workday, so those attempts surfaced as
+  technical checkout failures or misleading "confirm with you" copy.
+- Fixed `src/scripts/estimate-wizard.ts`: every non-held finalization outcome now
+  blocks Pay Now, preserves Pay Later, explains the scheduling blocker, and
+  starts no checkout. The finalization status is cached so a repeated click
+  cannot bypass the block.
+- Extended `functions/api/estimate-checkout.ts` to persist genuine checkout
+  failures (hold, quote, Stripe customer/session/transport/state) in the
+  booking request's `checkout_failure_*` fields, which the admin already shows.
+- Added `tests/browser/paynow-arrival-windows.test.mjs`: eligible morning and
+  afternoon windows both hold and initiate checkout; a late afternoon start
+  that cannot fit the real duration is explained with no checkout attempt and
+  no approval wording. Updated `docs/operations/BOOKING-ARCHITECTURE.md`.
+- Verification: unit **976** (975 pass, 1 pre-existing skip), browser **247
+  pass**, `astro check` 0 errors, build 39 pages, `validate` and `smoke` pass.
+- Release commit **`a7bcfd5`**; production deployment
+  **`94ebf4ed-9f98-40df-aea9-45dd4114619d`**.
+- Production verification:
+  - Morning 12/28: 7:30 AM held and reached **Stripe Checkout** (HTTP 200).
+  - Afternoon 12/29: 12:30 PM held and reached **Stripe Checkout** (HTTP 200).
+  - Late 1:15 PM scenario: no hold, no lead/checkout, explicit scheduling
+    explanation, Pay Later remains available.
+  - No charge, payment event or completed checkout occurred. Synthetic open
+    sessions will expire normally.
