@@ -45,16 +45,7 @@ const paragraphsOf = (quote: string): string[] =>
     .map((paragraph) => paragraph.trim())
     .filter((paragraph) => paragraph.length > 0);
 
-const excerptOf = (quote: string, maximum = 430): { text: string; truncated: boolean } => {
-  const normalized = quote.replace(/\s+/g, ' ').trim();
-  if (normalized.length <= maximum) return { text: normalized, truncated: false };
-  const sliced = normalized.slice(0, maximum);
-  const boundary = sliced.lastIndexOf(' ');
-  return {
-    text: (boundary > maximum * 0.7 ? sliced.slice(0, boundary) : sliced).trim(),
-    truncated: true,
-  };
-};
+
 ---
 
 {
@@ -80,7 +71,6 @@ const excerptOf = (quote: string, maximum = 430): { text: string; truncated: boo
         >
           {reviews.map((review, index) => {
             const paragraphs = paragraphsOf(review.data.quote);
-            const excerpt = excerptOf(review.data.quote);
             return (
               <blockquote
                 class="review-carousel__card"
@@ -117,12 +107,19 @@ const excerptOf = (quote: string, maximum = 430): { text: string; truncated: boo
                   </span>
                 </div>
 
-                <div class="review-carousel__quote" data-review-quote aria-label="Review excerpt">
-                  <p>{'\u201c'}{excerpt.text}{excerpt.truncated ? '\u2026' : ''}{'\u201d'}</p>
-                </div>
-                <div class="review-carousel__full" data-review-full hidden>
-                  {paragraphs.map((paragraph) => (
-                    <p>{paragraph}</p>
+                <div
+                  class="review-carousel__quote"
+                  data-review-quote
+                  role="region"
+                  aria-label={`${review.data.author} review text; scroll inside this area for the full review`}
+                  tabindex="0"
+                >
+                  {paragraphs.map((paragraph, paragraphIndex) => (
+                    <p>
+                      {paragraphIndex === 0 ? '\u201c' : ''}
+                      {paragraph}
+                      {paragraphIndex === paragraphs.length - 1 ? '\u201d' : ''}
+                    </p>
                   ))}
                 </div>
 
@@ -142,8 +139,6 @@ const excerptOf = (quote: string, maximum = 430): { text: string; truncated: boo
                     })}
                   </div>
                 )}
-
-                <button type="button" class="review-carousel__expand" data-review-expand>Read full review</button>
 
                 <footer class="review-carousel__footer">
                   <strong>{review.data.author}</strong>
@@ -178,16 +173,6 @@ const excerptOf = (quote: string, maximum = 430): { text: string; truncated: boo
         </div>
         <p class="visually-hidden" aria-live="polite" data-review-status></p>
       </div>
-
-      <dialog class="review-dialog" data-review-dialog aria-labelledby="review-dialog-heading">
-        <div class="review-dialog__panel">
-          <button type="button" class="review-dialog__close" data-review-dialog-close aria-label="Close full review">&times;</button>
-          <p class="eyebrow">Google review</p>
-          <h3 id="review-dialog-heading" data-review-dialog-author></h3>
-          <p class="review-dialog__context" data-review-dialog-context></p>
-          <div class="review-dialog__body" data-review-dialog-body></div>
-        </div>
-      </dialog>
 
       {profileUrl && (
         <div class="container">
@@ -251,45 +236,24 @@ const excerptOf = (quote: string, maximum = 430): { text: string; truncated: boo
     const next = root.querySelector<HTMLButtonElement>('[data-review-next]');
     const dots = [...root.querySelectorAll<HTMLButtonElement>('[data-review-dot]')];
     const status = root.querySelector<HTMLElement>('[data-review-status]');
-    const dialog = document.querySelector<HTMLDialogElement>('[data-review-dialog]');
-    const dialogAuthor = document.querySelector<HTMLElement>('[data-review-dialog-author]');
-    const dialogContext = document.querySelector<HTMLElement>('[data-review-dialog-context]');
-    const dialogBody = document.querySelector<HTMLElement>('[data-review-dialog-body]');
-    const dialogClose = document.querySelector<HTMLButtonElement>('[data-review-dialog-close]');
     const total = cards.length;
     let active = 0;
-    let lastExpand: HTMLButtonElement | null = null;
-
-    const syncExpandButtons = (): void => {
-      for (const card of cards) {
-        const quote = card.querySelector<HTMLElement>('[data-review-quote]');
-        const expand = card.querySelector<HTMLButtonElement>('[data-review-expand]');
-        if (!quote || !expand) continue;
-        if (quote.scrollHeight > quote.clientHeight + 1) expand.hidden = false;
-      }
-    };
-
-    const openReview = (card: HTMLElement, trigger: HTMLButtonElement): void => {
-      const full = card.querySelector<HTMLElement>('[data-review-full]');
-      if (!dialog || !dialogAuthor || !dialogContext || !dialogBody || !full) return;
-      dialogAuthor.textContent = card.dataset.reviewAuthor ?? '';
-      dialogContext.textContent = card.dataset.reviewContext ?? '';
-      dialogBody.replaceChildren(...[...full.querySelectorAll('p')].map((paragraph) => paragraph.cloneNode(true)));
-      lastExpand = trigger;
-      dialog.showModal();
-      dialogClose?.focus();
-    };
-
-    dialogClose?.addEventListener('click', () => dialog?.close());
-    dialog?.addEventListener('click', (event) => {
-      if (event.target === dialog) dialog.close();
-    });
-    dialog?.addEventListener('close', () => lastExpand?.focus());
 
     const offsetOf = (index: number): number => {
       let distance = (index - active + total) % total;
       if (distance > total / 2) distance -= total;
       return distance;
+    };
+
+    const refreshQuoteCues = (): void => {
+      for (const quote of root.querySelectorAll<HTMLElement>('[data-review-quote]')) {
+        const scrollable = quote.scrollHeight - quote.clientHeight > 4;
+        quote.dataset.scrollable = scrollable ? 'true' : 'false';
+        quote.dataset.atEnd =
+          !scrollable || quote.scrollTop + quote.clientHeight >= quote.scrollHeight - 4
+            ? 'true'
+            : 'false';
+      }
     };
 
     const update = (announce: boolean): void => {
@@ -300,6 +264,9 @@ const excerptOf = (quote: string, maximum = 430): { text: string; truncated: boo
         if (offset === 0) card.setAttribute('aria-current', 'true');
         else card.removeAttribute('aria-current');
       }
+      const activeQuote = cards[active]?.querySelector<HTMLElement>('[data-review-quote]');
+      if (activeQuote) activeQuote.scrollTop = 0;
+      refreshQuoteCues();
       for (const dot of dots) {
         dot.setAttribute('aria-pressed', dot.dataset.index === String(active) ? 'true' : 'false');
       }
@@ -322,10 +289,6 @@ const excerptOf = (quote: string, maximum = 430): { text: string; truncated: boo
       });
     }
     for (const card of cards) {
-      card.querySelector<HTMLButtonElement>('[data-review-expand]')?.addEventListener('click', (event) => {
-        event.stopPropagation();
-        openReview(card, event.currentTarget as HTMLButtonElement);
-      });
       card.addEventListener('click', () => {
         const index = Number(card.dataset.index ?? '0');
         if (index !== active) {
@@ -377,11 +340,18 @@ const excerptOf = (quote: string, maximum = 430): { text: string; truncated: boo
       { passive: true },
     );
 
+    for (const quote of root.querySelectorAll<HTMLElement>('[data-review-quote]')) {
+      quote.addEventListener('scroll', refreshQuoteCues, { passive: true });
+    }
+    window.addEventListener('resize', refreshQuoteCues, { passive: true });
+    window.addEventListener('load', refreshQuoteCues);
+    if ('ResizeObserver' in window) {
+      const observer = new ResizeObserver(refreshQuoteCues);
+      for (const quote of root.querySelectorAll<HTMLElement>('[data-review-quote]')) observer.observe(quote);
+    }
+
     update(false);
     root.tabIndex = -1;
     root.dataset.enhanced = 'true';
-    syncExpandButtons();
-    window.addEventListener('resize', syncExpandButtons, { passive: true });
-    window.requestAnimationFrame(syncExpandButtons);
   }
 </script>

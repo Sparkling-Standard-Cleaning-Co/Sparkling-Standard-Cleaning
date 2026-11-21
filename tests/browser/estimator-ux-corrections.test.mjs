@@ -132,7 +132,7 @@ async function stepTwo(page) {
 }
 async function reachCondition(page) {
   await stepTwo(page);
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+  await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="standard"])');
   await page.selectOption('#est-property', 'house');
   await page.fill('#est-sqft', '1600');
   await page.fill('#est-bedrooms', '3');

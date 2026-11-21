@@ -483,7 +483,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     );
     const submission = submissionAddress();
     return {
-      serviceType: radioValue('serviceType') as ServiceType | undefined,
+      serviceType: currentServiceType() as ServiceType | undefined,
       propertyType: textValue('propertyType') as EstimateInput['propertyType'],
       squareFeet: numberValue('squareFeet'),
       bedrooms: numberValue('bedrooms'),
@@ -734,8 +734,17 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
   }
 
-  function currentServiceType(): string | undefined {
+  function baseServiceType(): string | undefined {
     return radioValue('serviceType');
+  }
+
+  function deepCleaningSelected(): boolean {
+    return form.querySelector<HTMLInputElement>('[data-deep-cleaning-input]')?.checked === true;
+  }
+
+  function currentServiceType(): string | undefined {
+    const base = baseServiceType();
+    return base === 'standard' && deepCleaningSelected() ? 'deep' : base;
   }
 
   // ── Transparent add-on prices (from the SAME breakdown as the total) ──────
@@ -908,7 +917,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       result.status === 'custom_confirmation_required' &&
       result.addons.some((addon) => addon.customQuote);
     if (result.status !== 'estimated' && !partial) return [];
-    const tax = taxPresentationForService(radioValue('serviceType'));
+    const tax = taxPresentationForService(currentServiceType());
     const lines: Array<{ label: string; value: string; strong?: boolean; detail?: string; emphasis?: 'saving' | 'tender' }> = [];
     const firstVisit = Boolean(result.ongoing);
     const winner = winningPromotion();
@@ -1849,7 +1858,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   // ── Conditional fields and owner policies ────────────────────────────────
   function requiresInitialDeepClean(): boolean {
-    return radioValue('serviceType') === 'standard' && RECURRING_FREQUENCIES.has(textValue('frequency') ?? '');
+    return baseServiceType() === 'standard' && !deepCleaningSelected() && RECURRING_FREQUENCIES.has(textValue('frequency') ?? '');
   }
 
   /**
@@ -1875,7 +1884,18 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     const frequencyField = form.querySelector<HTMLElement>('[data-frequency-field]');
     const frequencySelect = form.querySelector<HTMLSelectElement>('#est-frequency');
-    const asksFrequency = !service || serviceAsksFrequency(service);
+    const deepField = form.querySelector<HTMLElement>('[data-deep-cleaning]');
+    const deepInput = form.querySelector<HTMLInputElement>('[data-deep-cleaning-input]');
+    const oneTimeNote = form.querySelector<HTMLElement>('[data-one-time-note]');
+    const frequencyValue = textValue('frequency') ?? '';
+    const deepChosen = deepCleaningSelected();
+    const moveCleaning = service === 'move_in_out';
+    const asksFrequency = !service || (serviceAsksFrequency(service) && !moveCleaning && !deepChosen);
+    if (deepField) {
+      const deepAvailable = service === 'standard' && (deepChosen || !frequencyValue || frequencyValue === 'one_time');
+      deepField.hidden = !deepAvailable;
+      if (!deepAvailable && deepInput) deepInput.checked = false;
+    }
     if (frequencyField) {
       frequencyField.hidden = !asksFrequency;
     }
@@ -1886,6 +1906,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         clearFieldError(frequencySelect);
       }
     }
+    if (oneTimeNote) oneTimeNote.hidden = !(moveCleaning || deepChosen);
 
     const deepRequired = requiresInitialDeepClean();
     for (const wrapper of form.querySelectorAll<HTMLElement>('[data-recurring-deep]')) {
@@ -2154,6 +2175,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (addressCardEl) addressCardEl.hidden = false;
     if (addressDetailsEl) addressDetailsEl.hidden = true;
     setSchedulingLocked(true);
+    syncConditionalFields();
     syncRevealGroups(false);
     addressDetailsRevealed = false;
     bookingFinalizedKey = '';
@@ -3231,11 +3253,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const legacy = service && ['standard', 'deep', 'move_in_out', 'str_turnover'].includes(service) ? service : null;
       const serviceValue = preset?.serviceType ?? legacy;
       if (serviceValue) {
-        const radio = form.querySelector<HTMLInputElement>(`input[name="serviceType"][value="${serviceValue}"]`);
+        const targetValue = serviceValue === 'deep' ? 'standard' : serviceValue === 'str_turnover' ? 'standard' : serviceValue;
+        const radio = form.querySelector<HTMLInputElement>(`input[name="serviceType"][value="${targetValue}"]`);
         if (radio) {
           radio.checked = true;
           radio.dispatchEvent(new Event('change', { bubbles: true }));
         }
+        const deepInput = form.querySelector<HTMLInputElement>('[data-deep-cleaning-input]');
+        if (deepInput) deepInput.checked = serviceValue === 'deep';
       }
       if (preset?.frequency) {
         const select = form.querySelector<HTMLSelectElement>('#est-frequency');
@@ -3253,7 +3278,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (frequency && ['weekly', 'biweekly', 'monthly', 'one_time'].includes(frequency)) {
       // A deep-linked rhythm only applies when the selected service genuinely
       // supports it (e.g. ?service=deep ignores ?frequency=weekly).
-      const currentService = radioValue('serviceType') as EstimateInput['serviceType'] | undefined;
+      const currentService = currentServiceType() as EstimateInput['serviceType'] | undefined;
       const compatible = !currentService || serviceSupportsFrequency(currentService, frequency as EstimateInput['frequency']);
       if (compatible) {
         const select = form.querySelector<HTMLSelectElement>('#est-frequency');
@@ -3265,6 +3290,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
 
     syncConditionalFields();
+    syncRevealGroups(false);
     showStep(currentStep);
   }
   form.addEventListener('estimate:pricing-updated', () => {

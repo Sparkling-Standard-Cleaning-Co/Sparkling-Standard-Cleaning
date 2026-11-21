@@ -40,7 +40,7 @@ const {
     <main id="main" class:list={['site-main', { 'site-main--estimator': !showMobileActionBar }]}>
       <slot />
     </main>
-    <Footer />
+    <Footer hasMobileBar={showMobileActionBar} />
     {showMobileActionBar && <MobileActionBar />}
     {analytics && <ConsentBanner compact={!showMobileActionBar} />}
     {analytics && <PromoPopup />}

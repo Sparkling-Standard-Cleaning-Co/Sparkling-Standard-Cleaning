@@ -143,8 +143,8 @@ async function addressAndHome(page, { service = 'standard', beds } = {}) {
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
   );
   const serviceFieldset = page.locator('[data-service-fieldset]');
-  if (await serviceFieldset.isVisible()) {
-    await page.click(`label.option:has(input[name="serviceType"][value="${service}"])`);
+  if (await serviceFieldset.isVisible() && service === 'move_in_out') {
+    await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="move_in_out"])');
   }
   await page.selectOption('#est-property', service === 'str_turnover' ? 'condo' : 'house');
   await page.fill('#est-sqft', service === 'str_turnover' ? '900' : '1600');
@@ -156,6 +156,10 @@ async function addressAndHome(page, { service = 'standard', beds } = {}) {
     if (await bedsInput.isVisible()) await bedsInput.fill(String(beds));
   }
   await page.click('[data-next]');
+  if (service === 'deep') {
+    await page.locator('[data-deep-cleaning-input]').waitFor({ state: 'visible' });
+    await page.check('[data-deep-cleaning-input]');
+  }
 }
 
 async function finishAndSubmit(page, captured, { deepAck = false } = {}) {
@@ -266,7 +270,7 @@ test('switching services mid-wizard clears stale rhythm and STR values', async (
     await page.waitForSelector('input[name="initialDeepCleanAcknowledged"]', { state: 'visible' });
     // …then walk back to Service & Home and switch to move-in/out.
     await page.click('[data-step-jump="2"]');
-    await page.click('label.option:has(input[name="serviceType"][value="move_in_out"])');
+    await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="move_in_out"])');
     await page.click('[data-next]'); // condition step
     // Step 3: the rhythm control is hidden AND normalized — the stale weekly
     // value must never survive into the quote or the submission.
@@ -324,6 +328,29 @@ test('commercial cleaning routes into the dedicated facility estimate engine', a
     );
     const cta = page.locator('a[href="/estimate/commercial/"]').first();
     assert.equal((await cta.count()) >= 1, true, 'the facility estimate CTA renders');
+  } finally {
+    await context.close();
+  }
+});
+
+test('Step 2 defaults to regular home cleaning and Step 3 offers the residential rhythm', async () => {
+  const { context, page } = await openEstimate(390, 844);
+  try {
+    await addressAndHome(page);
+    const regular = page.locator('input[name="serviceType"][value="standard"]');
+    const move = page.locator('input[name="serviceType"][value="move_in_out"]');
+    assert.equal(await regular.isChecked(), true, 'regular cleaning is selected by default');
+    assert.equal(await move.isChecked(), false);
+    assert.equal(await page.locator('[data-deep-cleaning-input]').count(), 1, 'deep-cleaning reset remains available');
+    const labels = await page.locator('label.segmented-choice__option').allTextContents();
+    assert.match(labels[0] ?? '', /No - Regular home cleaning/);
+    assert.match(labels[1] ?? '', /Yes - Move-in or move-out cleaning/);
+    assert.equal(await page.locator('[data-frequency-field]').isVisible(), true);
+    const optionLabels = await page.locator('#est-frequency option').allTextContents();
+    assert.deepEqual(
+      optionLabels.slice(1).map((label) => label.trim()),
+      ['One-Time', 'Weekly', 'Biweekly (Every 2 Weeks)', 'Monthly'],
+    );
   } finally {
     await context.close();
   }

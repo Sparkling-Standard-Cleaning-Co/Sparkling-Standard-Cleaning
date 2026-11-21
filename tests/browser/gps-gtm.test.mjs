@@ -199,7 +199,7 @@ async function completeRemainingSteps(page) {
     );
   }
   if (await page.locator('[data-service-fieldset]').isVisible()) {
-    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+    await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="standard"])');
   }
   await page.selectOption('#est-property', 'house');
   await page.fill('#est-sqft', '1600');

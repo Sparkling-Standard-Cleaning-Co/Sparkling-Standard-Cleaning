@@ -8,7 +8,6 @@ import {
   PET_OPTIONS,
   PROPERTY_TYPE_OPTIONS,
   RESIDENTIAL_INPUT_LIMITS,
-  RESIDENTIAL_SERVICE_OPTIONS,
   TURNOVER_FREQUENCY_OPTIONS,
 } from '../config/estimators/input-definitions';
 import { schedulingConfig } from '../config/scheduling';
@@ -252,26 +251,31 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       <section class="wizard__step" data-step="2" aria-label={stepTitle(1)}>
         <h2 class="wizard__step-heading" data-step-title={1}>{stepTitle(1)}</h2>
         <p class="wizard__step-copy">
-          Choose the cleaning you need and tell us about the home so the estimate reflects the
-          real work.
+          Tell us whether this is a move, then choose your home details.
         </p>
-        <fieldset class="field" data-service-fieldset data-group-error="serviceType" data-group-message="Please select a cleaning service.">
-          <legend>What kind of cleaning are you looking for?</legend>
-          <div class="option-grid">
-            {
-              RESIDENTIAL_SERVICE_OPTIONS.map((option) => (
-                <label class="option">
-                  <input type="radio" name="serviceType" value={option.value} required />
-                  <span class="option__control"></span>
-                  <span>
-                    <span class="option__label">{option.label}</span>
-                    <span class="option__desc">{option.description}</span>
-                  </span>
-                </label>
-              ))
-            }
+        <fieldset class="field" data-service-fieldset data-group-error="serviceType" data-group-message="Please choose whether this is a move-in or move-out cleaning.">
+          <legend>Is this a move-in or move-out cleaning?</legend>
+          <p class="hint">Regular home cleaning is the default. You can add a deep-cleaning reset later.</p>
+          <div class="segmented-choice segmented-choice--stacked" role="radiogroup" aria-label="Move-in or move-out cleaning">
+            <label class="segmented-choice__option">
+              <input type="radio" name="serviceType" value="standard" checked required />
+              <span class="segmented-choice__indicator" aria-hidden="true"></span>
+              <span class="segmented-choice__body">
+                <span class="segmented-choice__label">No - Regular home cleaning</span>
+                <span class="segmented-choice__desc">Routine cleaning for a lived-in home.</span>
+              </span>
+            </label>
+            <label class="segmented-choice__option">
+              <input type="radio" name="serviceType" value="move_in_out" required />
+              <span class="segmented-choice__indicator" aria-hidden="true"></span>
+              <span class="segmented-choice__body">
+                <span class="segmented-choice__label">Yes - Move-in or move-out cleaning</span>
+                <span class="segmented-choice__desc">An empty-home reset for a move. One-time service.</span>
+              </span>
+            </label>
           </div>
         </fieldset>
+        <input type="radio" name="serviceType" value="str_turnover" data-str-service aria-label="Short-term rental turnover" hidden />
         <div data-reveal-group="home" data-reveal-trigger="serviceType" hidden>
         <div class="field">
           <label for="est-property">Property type</label>
@@ -352,15 +356,23 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
       <section class="wizard__step" data-step="3" aria-label={stepTitle(2)}>
         <h2 class="wizard__step-heading" data-step-title={2}>{stepTitle(2)}</h2>
         <div class="field" data-frequency-field>
-          <label for="est-frequency">How often should we clean?</label>
+          <label for="est-frequency">How often would you like your home cleaned?</label>
           <select class="select" id="est-frequency" name="frequency" required>
-            <option value="">Choose one…</option>
+            <option value="">Choose one.</option>
             {FREQUENCY_OPTIONS.map((option) => (
               <option value={option.value}>{option.label}</option>
             ))}
           </select>
           <span class="hint">Recurring homes stay more maintainable, so per-visit value improves.</span>
         </div>
+        <p class="hint" data-one-time-note hidden>This service is a one-time cleaning, so no recurring rhythm is needed.</p>
+        <label class="deep-cleaning-option" data-deep-cleaning hidden>
+          <input type="checkbox" name="deepCleaning" value="yes" data-deep-cleaning-input />
+          <span>
+            <strong>Add a Deep Cleaning reset</strong>
+            <span>Detailed baseboards, frames, buildup and the extra care a deep clean requires. This is a one-time service.</span>
+          </span>
+        </label>
         <div class="policy-notice" data-recurring-deep hidden>
           <p class="policy-notice__title">Your first visit is a Deep Cleaning</p>
           <p>{schedulingConfig.recurringResidential.message}</p>

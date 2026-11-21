@@ -128,7 +128,7 @@ test('stars are centered in authentic Google gold and reviewer names sit at the 
   }
 });
 
-test('cards share a consistent height and long reviews open accessible full text', async () => {
+test('cards share a consistent height and long review text scrolls inside the card from the top', async () => {
   const { context, page } = await open(1280);
   try {
     await page.waitForFunction(() => document.querySelector('[data-review-carousel]')?.dataset.enhanced === 'true');
@@ -142,22 +142,33 @@ test('cards share a consistent height and long reviews open accessible full text
     const active = page.locator('[data-review-card][aria-current="true"]');
     assert.equal((await active.locator('footer strong').innerText()).trim(), 'K V');
     const quote = active.locator('[data-review-quote]');
-    assert.equal(await quote.evaluate((el) => getComputedStyle(el).overflowY), 'hidden', 'excerpt does not create an internal scroller');
-    assert.equal(await quote.evaluate((el) => { el.scrollTop = el.scrollHeight; return el.scrollTop; }), 0, 'excerpt never scrolls inside the card');
-    assert.ok((await quote.innerText()).length < (await active.locator('[data-review-full]').innerText()).length, 'long review is intentionally excerpted');
-    assert.equal(await active.locator('[data-review-full]').isHidden(), true, 'full text is available but not duplicated visually');
-    assert.match(await active.locator('[data-review-full]').innerText(), /I recently hired Sparkling Standard for a deep clean/);
+    assert.equal(await quote.evaluate((el) => getComputedStyle(el).overflowY), 'auto', 'the review text has an internal scroller');
+    assert.equal(await quote.evaluate((el) => el.scrollTop), 0, 'the active review begins at the top');
+    assert.equal(await quote.getAttribute('data-scrollable'), 'true', 'overflow is signalled with a scroll cue');
+    assert.equal(await quote.getAttribute('data-at-end'), 'false');
+    assert.match(await quote.innerText(), /I recently hired Sparkling Standard for a deep clean/);
+    const scrollable = await quote.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+      return { top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight };
+    });
+    assert.ok(scrollable.height > scrollable.client && scrollable.top > 0, 'long text can scroll internally');
+    await page.waitForFunction(() => {
+      const element = document.querySelector('[data-review-card][aria-current="true"] [data-review-quote]');
+      return element?.getAttribute('data-at-end') === 'true';
+    });
+    assert.equal(await page.locator('[data-review-expand]').count(), 0, 'no repeated Read full review links');
+    assert.equal(await page.locator('[data-review-full]').count(), 0, 'no duplicated hidden review body');
+    assert.equal(await page.locator('[data-review-dialog]').count(), 0, 'the card itself is the review experience');
+
+    await page.locator('[data-review-dot][data-index="0"]').click();
+    await page.waitForTimeout(900);
+    await page.locator('[data-review-dot][data-index="4"]').click();
+    await page.waitForTimeout(900);
+    assert.equal(await quote.evaluate((el) => el.scrollTop), 0, 'returning to a review resets it to the top');
+    assert.equal(await quote.getAttribute('data-at-end'), 'false', 'the cue returns until the review is read to the end');
     const activeBox = await active.boundingBox();
     const sectionBox = await page.locator('#reviews').boundingBox();
     assert.ok(activeBox && sectionBox && activeBox.y >= sectionBox.y, 'card top is not clipped');
-    const expand = active.locator('[data-review-expand]');
-    assert.equal(await expand.isVisible(), true, 'long review exposes full-text control');
-    await expand.click();
-    const dialog = page.locator('[data-review-dialog]');
-    assert.equal(await dialog.isVisible(), true, 'full review dialog opens');
-    assert.match(await dialog.innerText(), /I recently hired Sparkling Standard for a deep clean/);
-    await page.keyboard.press('Escape');
-    assert.equal(await dialog.isVisible(), false, 'dialog closes with Escape');
     assert.equal(await card('Dennis D').locator('.review-carousel__photos img').count(), 2);
   } finally {
     await context.close();
@@ -185,8 +196,12 @@ test('reviews with photographs keep photos and attribution inside the card', asy
     assert.equal(bounds.imageBottoms.length, 2);
     assert.ok(bounds.imageBottoms.every((bottom) => bottom <= bounds.cardBottom), 'photos stay inside the card');
     assert.ok(bounds.footerBottom <= bounds.cardBottom, 'attribution stays inside the card');
-    assert.deepEqual(bounds.scrollbars, ['hidden']);
-    assert.equal(await active.locator('[data-review-expand]').isVisible(), true);
+    assert.deepEqual(bounds.scrollbars, ['auto']);
+    assert.equal(await active.locator('[data-review-expand]').count(), 0);
+    const fits = await active.locator('.review-carousel__photos img').evaluateAll((images) =>
+      images.map((image) => getComputedStyle(image).objectFit),
+    );
+    assert.deepEqual(fits, ['contain', 'contain'], 'photographs display fully without cropping');
   } finally {
     await context.close();
   }

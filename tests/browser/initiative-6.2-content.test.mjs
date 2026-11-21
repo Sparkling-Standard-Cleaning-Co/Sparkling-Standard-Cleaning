@@ -71,7 +71,8 @@ test('the estimate hub forwards campaign context and legacy residential deep lin
     try {
       await page.waitForURL(/\/estimate\/residential\/\?service=deep/);
       assert.equal(await page.locator('[data-estimate-form]').count(), 1);
-      assert.equal(await page.locator('input[name="serviceType"][value="deep"]').isChecked(), true);
+      assert.equal(await page.locator('input[name="serviceType"][value="standard"]').isChecked(), true);
+      assert.equal(await page.locator('[data-deep-cleaning-input]').isChecked(), true);
     } finally {
       await context.close();
     }
@@ -85,7 +86,7 @@ test('service area is title -> concise description -> map, without the top ZIP b
     const text = await page.locator('main').innerText();
     assert.doesNotMatch(text, /depending on distance/i);
     assert.match(text, /Pensacola–Cantonment area/);
-    const map = page.locator('.area-map');
+    const map = page.locator('[data-service-area-single] .area-map').first();
     assert.equal(await map.isVisible(), true);
     const intro = await page.locator('.area-intro').boundingBox();
     const mapBox = await map.boundingBox();

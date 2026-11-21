@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-21 (checkout incident repaired and production-verified)
+Last updated: 2026-11-21 (owner UX, estimator and branch presentation improvements)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -17,8 +17,8 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Final reported HEAD | `851a28b` | `851a28b` (`Record bookings and careers release evidence`) |
 | Application commit | `e7f18c6` | `e7f18c6` (`Add bookings email and secure careers applications`) |
 | Latest migration | `0043_career_applications.sql` | present; `migrations/0001`–`0043` |
-| Unit tests | 947 total / 946 pass / 1 skip | **972 total / 971 pass / 1 pre-existing skip / 0 fail** (`npm test`) |
-| Browser tests | 237 pass | **240 pass / 0 fail** (`npm run test:browser`) |
+| Unit tests | 947 total / 946 pass / 1 skip | **976 total / 975 pass / 1 pre-existing skip / 0 fail** (`npm test`) |
+| Browser tests | 237 pass | **245 pass / 0 fail** (`npm run test:browser`) |
 | Newest migrations | 0043 | `0044`–`0047` (production at **47**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
 | Production app deployment | `e5b8331e-380f-44bc-b3a7-c310b4d90c50` | now **`edc50a01`** (source `84379cb`); checkout fix also verified on `3f6ded04` |
@@ -239,7 +239,7 @@ Next executable steps:
 5. Owner decides GitHub `main` reconciliation; no branch change has been made.
 6. Tampa remains OFF; dispatch remains analysis-only and paused.
 
-### 2026-11-21 � critical checkout repair
+### 2026-11-21 � critical checkout repair
 
 - Reported live Pay Now fallback reproduced with **6360 Haupert Ln, Molino,
   FL 32577**.
@@ -258,3 +258,39 @@ Next executable steps:
 - No charge, refund or paid webhook event occurred. Synthetic test records were
   archived/released/expired and audited.
 - Evidence: `docs/verification/2026-11-21-CHECKOUT-RECOVERY.md`.
+
+### 2026-11-21 - owner UX, estimator and branch presentation improvements
+
+- **Community Support:** removed the decorative circle behind the eligibility
+  card; no card text or eligibility rule changed.
+- **Scripture:** the homepage Proverbs 16:3 block now uses the compact variant
+  with a slender gold rule and tightened spacing.
+- **Reviews:** full review text now lives in a real internal scroll region.
+  Each active slide resets to the top, a bottom fade signals overflow, the
+  repeated "Read full review" controls and dialog were removed, and review
+  photographs use `object-fit: contain` so the full image remains visible.
+- **Footer:** mobile bottom clearance moved from `site-main` to the shared
+  footer itself, including safe-area padding, so the final footer links remain
+  tappable above the fixed Call/Text/Estimate bar on every page.
+- **Estimator:** Step 2 now asks only "Is this a move-in or move-out cleaning?"
+  with regular home cleaning selected by default and a visible radio indicator.
+  The cleaning frequency moved to Step 3 in the order One-Time, Weekly,
+  Biweekly (Every 2 Weeks), Monthly. Deep Cleaning is an optional Step 3
+  checkbox that maps to the internal `deep` service and one-time pricing. The
+  five condition tiers, pricing mathematics, service matrix, promotions,
+  checkout, Stripe and payment verification are unchanged. The hidden STR
+  selector remains isolated to `/estimate/str/`.
+- **Service Area:** Tampa OFF renders one automatic Pensacola-only page with
+  one map and no branch selector. When the persisted Tampa branch becomes
+  `lifecycle_status = live` and `status = active`, the production middleware
+  automatically unwraps the two-region template, adds the Florida overview,
+  Pensacola and Tampa maps, switches the H1/lead and replaces the page metadata.
+  No website edit or developer action is required at Tampa launch. Tampa
+  remains OFF.
+- **Verification:** `npm run check` 0 errors / 0 warnings; unit **976**
+  (975 pass, 1 pre-existing skip); browser **245 pass / 0 fail**;
+  `npm run validate` passed; 39 pages built. Visual checks covered 320, 375,
+  390, 430, tablet and desktop widths, including the footer/CTA boundary and
+  both single- and multi-branch Service Area presentations.
+- No production charge, refund, customer message, branch activation, dispatch
+  activation or destructive data action was performed during implementation.

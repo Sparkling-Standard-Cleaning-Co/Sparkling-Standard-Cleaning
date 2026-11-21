@@ -1796,18 +1796,6 @@ div[id] {
   box-shadow: var(--shadow-sm);
 }
 
-.community-support__panel::after {
-  content: '';
-  position: absolute;
-  top: -10rem;
-  right: -8rem;
-  width: 24rem;
-  height: 24rem;
-  border: 1px solid var(--color-champagne-300);
-  border-radius: 50%;
-  opacity: 0.55;
-  pointer-events: none;
-}
 
 .community-support__copy,
 .community-support__list {
@@ -5523,15 +5511,31 @@ fieldset.input--invalid {
 
 .review-carousel__quote {
   position: relative;
-  display: flex;
-  flex: 0 0 auto;
+  display: block;
+  flex: 1 1 auto;
   min-height: 0;
-  flex-direction: column;
-  justify-content: flex-start;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 8;
-  overflow: hidden;
+  margin-top: var(--space-2);
+  padding-right: 0.4rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rose-300) transparent;
+  max-height: 17rem;
+}
+
+.review-carousel__quote::-webkit-scrollbar {
+  width: 0.4rem;
+}
+
+.review-carousel__quote::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-full);
+  background: var(--color-rose-300);
+}
+
+.review-carousel__quote[data-scrollable='true'][data-at-end='false'] {
+  -webkit-mask-image: linear-gradient(to bottom, var(--color-ink-900) 0, var(--color-ink-900) calc(100% - 1.75rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, var(--color-ink-900) 0, var(--color-ink-900) calc(100% - 1.75rem), transparent 100%);
 }
 
 .review-carousel__quote:focus-visible {
@@ -5540,15 +5544,11 @@ fieldset.input--invalid {
   border-radius: var(--radius-sm);
 }
 
-.review-carousel__full {
-  display: none;
-}
-
 .review-carousel__quote p {
   margin: 0 0 0.85em;
   color: var(--color-ink-700);
   font-size: var(--text-base);
-  line-height: 1.7;
+  line-height: 1.65;
   text-wrap: pretty;
 }
 
@@ -5556,18 +5556,12 @@ fieldset.input--invalid {
   margin-bottom: 0;
 }
 
-.review-carousel__card[data-has-photos='true'] .review-carousel__quote {
-  -webkit-line-clamp: 4;
-}
-
-.review-carousel__card[data-has-photos='true'] .review-carousel__photos img {
-  height: 8rem;
-}
-
 .review-carousel__photos {
   display: grid;
   gap: var(--space-2);
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
 }
 
 .review-carousel__photos[data-photo-count='2'] {
@@ -5577,35 +5571,12 @@ fieldset.input--invalid {
 .review-carousel__photos img {
   display: block;
   width: 100%;
-  height: 11rem;
+  height: 8.5rem;
   border-radius: var(--radius-md);
-  object-fit: cover;
+  background: var(--color-cream-100);
+  object-fit: contain;
+  object-position: center;
   box-shadow: var(--shadow-sm);
-}
-
-.review-carousel__expand {
-  align-self: center;
-  margin-top: var(--space-3);
-  padding: 0.2rem 0.35rem;
-  border: 0;
-  background: transparent;
-  color: var(--color-rose-700);
-  font: inherit;
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  text-decoration: underline;
-  text-underline-offset: 0.18em;
-  cursor: pointer;
-}
-
-.review-carousel__expand:hover {
-  color: var(--color-rose-900);
-}
-
-.review-carousel__expand:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 3px;
-  border-radius: var(--radius-sm);
 }
 
 .review-carousel__footer {
@@ -5646,8 +5617,8 @@ fieldset.input--invalid {
   grid-area: 1 / 1;
   justify-self: center;
   width: 42%;
-  min-height: 31rem;
-  height: 31rem;
+  min-height: 34rem;
+  height: 34rem;
   align-self: stretch;
   overflow: visible;
   transition:
@@ -5658,6 +5629,10 @@ fieldset.input--invalid {
   z-index: 3;
   opacity: 1;
   box-shadow: var(--shadow-lg);
+}
+
+.review-carousel[data-enhanced='true'] .review-carousel__quote {
+  max-height: none;
 }
 
 /* Neighbours sit slightly lower, smaller and further back — clearly part of
@@ -5778,7 +5753,10 @@ fieldset.input--invalid {
   .review-carousel[data-enhanced='true'] .review-carousel__card {
     height: auto;
     min-height: 0;
-    -webkit-line-clamp: unset;
+  }
+
+  .review-carousel[data-enhanced='true'] .review-carousel__quote {
+    max-height: 16rem;
   }
 
   .review-carousel[data-enhanced='true'] .review-carousel__card,
@@ -5797,10 +5775,6 @@ fieldset.input--invalid {
 }
 
 @media (max-width: 720px) {
-  .review-carousel__card[data-has-photos='true'] .review-carousel__quote {
-    -webkit-line-clamp: 6;
-  }
-
   .review-carousel__photos img,
   .review-carousel__card[data-has-photos='true'] .review-carousel__photos img {
     height: 9.5rem;
@@ -6069,16 +6043,26 @@ fieldset.input--invalid {
 }
 
 .site-main {
-  padding-bottom: calc(var(--mobile-bar-height) + 1rem);
+  padding-bottom: 0;
 }
 
 .site-main--estimator {
   padding-bottom: 0;
 }
 
+/* The fixed Call / Text / Estimate bar sits over the end of the document.
+   Reserve its exact height (plus the iOS safe area) inside the shared footer
+   so every footer link remains scrollable and tappable. Pages without the bar
+   keep their normal footer spacing. */
+@media (max-width: 59.99rem) {
+  .site-footer--has-mobile-bar {
+    padding-bottom: calc(var(--mobile-bar-height) + env(safe-area-inset-bottom) + var(--space-6));
+  }
+}
+
 @media (min-width: 60rem) {
-  .site-main {
-    padding-bottom: 0;
+  .site-footer--has-mobile-bar {
+    padding-bottom: var(--space-8);
   }
 }
 
@@ -7469,70 +7453,215 @@ body[data-consent-open] .site-main {
 }
 
 
-.review-dialog {
-  width: min(92vw, 40rem);
-  max-height: min(84vh, 42rem);
-  padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  color: var(--color-ink-800);
-  box-shadow: var(--shadow-lg);
+/* Slim Proverbs 16:3 reflection between sections (owner direction,
+   2026-11-21). A quiet separator with one thin gold rule; never a banner. */
+.section--scripture {
+  padding-block: clamp(0.5rem, 1.5vw, 0.9rem);
 }
 
-.review-dialog::backdrop {
-  background: rgba(48, 36, 41, 0.55);
-  backdrop-filter: blur(3px);
+.scripture-block--compact {
+  margin: 0 auto;
+  max-width: 54ch;
+  padding-block: 0.35rem;
 }
 
-.review-dialog__panel {
+.scripture-block--compact::before {
+  content: '';
+  display: block;
+  width: 2.5rem;
+  height: 1px;
+  margin: 0 auto 0.7rem;
+  background: linear-gradient(90deg, transparent, var(--color-champagne-500), transparent);
+}
+
+.scripture-block--compact .scripture-block__text {
+  font-size: clamp(1rem, 0.97rem + 0.22vw, 1.12rem);
+  line-height: 1.5;
+}
+
+.scripture-block--compact .scripture-block__reference {
+  margin-top: 0.35rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+}
+
+/* Residential estimator: move-in/move-out segmented choice and optional deep
+   reset. The internal service identifiers remain standard / move_in_out / deep;
+   only the customer-facing question has been simplified. */
+.segmented-choice {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.segmented-choice__option {
   position: relative;
-  padding: clamp(1.5rem, 3vw, 2.5rem);
-  overflow-y: auto;
-  max-height: inherit;
-}
-
-.review-dialog__close {
-  position: absolute;
-  top: 0.8rem;
-  right: 0.9rem;
-  width: 2.75rem;
-  height: 2.75rem;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: var(--color-surface-warm);
-  color: var(--color-rose-800);
-  font-size: 1.5rem;
-  line-height: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
   cursor: pointer;
 }
 
-.review-dialog__close:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+.segmented-choice__option:has(input:checked) {
+  border-color: var(--color-rose-600);
+  background: var(--color-rose-50);
+  box-shadow: 0 0 0 1px var(--color-rose-600);
 }
 
-.review-dialog__panel h3 {
+.segmented-choice__option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented-choice__indicator {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.1rem;
+  border: 1.5px solid var(--color-taupe-500);
+  border-radius: 50%;
+  background: var(--color-surface);
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.segmented-choice__indicator::after {
+  content: '';
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--color-white);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.segmented-choice__option input:checked ~ .segmented-choice__indicator {
+  border-color: var(--color-rose-600);
+  background: var(--color-rose-600);
+}
+
+.segmented-choice__option input:checked ~ .segmented-choice__indicator::after {
+  opacity: 1;
+}
+
+.segmented-choice__option:has(input:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.segmented-choice__body {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.segmented-choice__label {
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink-900);
+}
+
+.segmented-choice__desc {
+  font-size: var(--text-sm);
+  color: var(--color-taupe-600);
+  line-height: var(--leading-normal);
+}
+
+.deep-cleaning-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-champagne-500);
+  border-radius: var(--radius-md);
+  background: var(--color-champagne-100);
+  cursor: pointer;
+}
+
+.deep-cleaning-option input {
+  margin-top: 0.25rem;
+  flex: none;
+}
+
+.deep-cleaning-option span {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.deep-cleaning-option span span {
+  color: var(--color-taupe-600);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+/* Multi-branch service-area regions (rendered only when Tampa is live). */
+.service-region {
+  display: grid;
+  gap: var(--space-5);
+  align-items: center;
+}
+
+@media (min-width: 56rem) {
+  .service-region {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    gap: var(--space-7);
+  }
+
+  .service-region--reverse .service-region__copy {
+    order: 2;
+  }
+
+  .service-region--reverse .service-region__map {
+    order: 1;
+  }
+}
+
+.service-region__copy h2 {
+  margin-top: var(--space-2);
+}
+
+.service-region__map .area-map {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-2xl);
-  font-weight: var(--weight-regular);
 }
 
-.review-dialog__context {
-  margin: 0.25rem 0 var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
+.area-map__county--northwest {
+  fill: var(--color-map-core);
+  stroke: var(--color-map-core-line);
+  stroke-width: 1.75;
 }
 
-.review-dialog__body p {
-  margin: 0 0 1em;
-  font-size: var(--text-base);
-  line-height: 1.7;
+.area-map__county--tampa {
+  fill: var(--color-rose-200);
+  stroke: var(--color-rose-700);
+  stroke-width: 1.75;
 }
 
-.review-dialog__body p:last-child {
-  margin-bottom: 0;
+.area-map__core--tampa .area-map__county {
+  fill: var(--color-rose-200);
+  stroke: var(--color-rose-700);
+  stroke-width: 1.75;
+}
+
+.area-map__swatch--tampa {
+  background: var(--color-rose-200);
+  border: 1.5px solid var(--color-rose-700);
+}
+
+.area-map--overview .area-map__frame {
+  max-width: 34rem;
+  margin-inline: auto;
+}
+
+.area-map--regional .area-map__frame {
+  max-width: 38rem;
+  margin-inline: auto;
 }

@@ -83,7 +83,8 @@ test('the estimate hub presents the four engines with the right destinations', a
 test('a residential service preset preselects the service, frequency and supportive pathway', async () => {
   const { context, page } = await open('/estimate/residential/?service=deep');
   try {
-    assert.equal(await page.locator('input[name="serviceType"][value="deep"]').isChecked(), true);
+    assert.equal(await page.locator('input[name="serviceType"][value="standard"]').isChecked(), true);
+    assert.equal(await page.locator('[data-deep-cleaning-input]').isChecked(), true, 'deep reset maps to the deep service');
     assert.equal(await page.locator('#est-frequency').inputValue(), 'one_time');
     // The supportive block lives on step 3; assert its visibility state rather
     // than its on-screen presence while step 1 is active.

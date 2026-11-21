@@ -8,6 +8,12 @@ import GoogleG from './GoogleG.astro';
 import Icon from './Icon.astro';
 import Scripture from './Scripture.astro';
 
+interface Props {
+  hasMobileBar?: boolean;
+}
+
+const { hasMobileBar = false } = Astro.props;
+
 const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const year = new Date().getFullYear();
 const reviewLeaveUrl = isPending(business.reviews.submissionUrl) ? null : business.reviews.submissionUrl;
@@ -25,7 +31,7 @@ const taglineLead = taglineWords.join(' ');
 const phone = isPending(business.phone) ? null : business.phone;
 ---
 
-<footer class="site-footer">
+<footer class:list={['site-footer', { 'site-footer--has-mobile-bar': hasMobileBar }]}>
   <div class="container">
     <div class="site-footer__masthead">
       <Logo class="brand" />

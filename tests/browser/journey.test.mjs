@@ -326,7 +326,7 @@ async function addressStep(page, { manual = false } = {}) {
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
   );
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+  await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="standard"])');
 }
 
 async function zipOnlyAddressStep(page, zip = '32503') {
@@ -340,7 +340,7 @@ async function zipOnlyAddressStep(page, zip = '32503') {
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
   );
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+  await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="standard"])');
 }
 
 async function homeStep(page) {
@@ -465,7 +465,12 @@ test('an exact provider suggestion fills the required ZIP and advances', async (
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
     );
     assert.equal(await isVisible(page, '[data-service-fieldset]'), true, 'the wizard advances to Service & Home');
-    assert.equal(await isVisible(page, '#est-property'), false, 'home details wait for the service choice');
+    assert.equal(
+      await page.locator('input[name="serviceType"]:checked').inputValue(),
+      'standard',
+      'regular home cleaning is the default service',
+    );
+    assert.equal(await isVisible(page, '#est-property'), true, 'home details are ready without a separate service choice');
   } finally {
     await context.close();
   }
@@ -794,7 +799,7 @@ test('the complete journey works on mobile without overflow', async () => {
     await page.waitForFunction(
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
     );
-    await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+    await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="standard"])');
     await homeStep(page);
     await conditionStep(page);
     await extrasStep(page, ['inside_fridge']);

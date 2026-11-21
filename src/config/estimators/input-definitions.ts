@@ -71,10 +71,10 @@ export const LINEN_PREFERENCE_OPTIONS = [
 ] as const satisfies readonly SelectOption[];
 
 export const FREQUENCY_OPTIONS = [
+  { value: 'one_time', label: 'One-Time' },
   { value: 'weekly', label: 'Weekly' },
-  { value: 'biweekly', label: 'Every two weeks' },
+  { value: 'biweekly', label: 'Biweekly (Every 2 Weeks)' },
   { value: 'monthly', label: 'Monthly' },
-  { value: 'one_time', label: 'One-time' },
 ] as const satisfies readonly SelectOption[];
 
 export const CONDITION_OPTIONS = [

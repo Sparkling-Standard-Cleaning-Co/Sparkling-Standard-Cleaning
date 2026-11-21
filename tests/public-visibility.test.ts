@@ -37,3 +37,33 @@ test('Tampa-on output retains both regions and removes the single-region heading
   assert.match(output, /Tampa/);
   assert.doesNotMatch(output, /One operating region/);
 });
+
+const serviceAreaHtml = `<html><head><title>Service Area | Pensacola and Cantonment</title><meta name="description" content="Pensacola coverage." /></head><body><h1 data-service-area-heading>Serving Pensacola, Cantonment, and beyond</h1><p class="lead" data-service-area-lead>Based in the Pensacola-Cantonment area.</p>
+<div data-service-area-single-start hidden></div><div data-service-area-single><h2>Pensacola only</h2><div>Single map</div></div><div data-service-area-single-end hidden></div>
+<div data-service-area-multi-start hidden></div><template data-service-area-multi-template><h2>Our Service Areas</h2><div>Florida overview</div><div>Tampa map</div></template><div data-service-area-multi-end hidden></div>
+</body></html>`;
+
+test('service-area page renders the single Pensacola structure while Tampa is off', () => {
+  const output = applyTampaVisibility(serviceAreaHtml, false);
+  assert.match(output, /Pensacola only/);
+  assert.doesNotMatch(output, /Our Service Areas/);
+  assert.doesNotMatch(output, /Tampa map/);
+  assert.match(output, /Service Area \| Pensacola and Cantonment/);
+  assert.match(output, /Serving Pensacola, Cantonment, and beyond/);
+  assert.doesNotMatch(output, /Serving Northwest Florida and Tampa Bay/);
+});
+
+test('service-area page switches to both regions and multi-branch metadata when Tampa is live', () => {
+  const output = applyTampaVisibility(serviceAreaHtml, true);
+  assert.doesNotMatch(output, /Pensacola only/);
+  assert.match(output, /Our Service Areas/);
+  assert.match(output, /Florida overview/);
+  assert.match(output, /Tampa map/);
+  assert.doesNotMatch(output, /data-service-area-multi-template/);
+  assert.match(output, /data-service-area-multi/);
+  assert.match(output, /Service Areas \| Pensacola and Tampa Bay/);
+  assert.match(output, /Pasco, Pinellas and Hillsborough/);
+  assert.match(output, /Serving Northwest Florida and Tampa Bay/);
+  assert.match(output, /approved Tampa Bay communities/);
+  assert.doesNotMatch(output, /Serving Pensacola, Cantonment, and beyond/);
+});
