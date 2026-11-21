@@ -1637,7 +1637,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
   if (stripeCustomer.stripeCustomerId) {
     body.set('customer', stripeCustomer.stripeCustomerId);
-    body.set('customer_update[email]', 'auto');
   } else {
     body.set('customer_email', email);
   }

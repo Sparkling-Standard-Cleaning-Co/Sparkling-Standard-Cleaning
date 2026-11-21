@@ -369,6 +369,7 @@ test('a valid facility quote creates one session at the server-calculated amount
         const body = init?.body as URLSearchParams;
         amountCents = body.get('line_items[0][price_data][unit_amount]') ?? '';
         assert.equal(body.get('metadata[checkout_kind]'), 'estimate_payment');
+        assert.equal(body.get('customer_update[email]'), null, 'Stripe rejects customer_update[email]');
         assert.match(body.get('metadata[checkout_attempt]') ?? '', /^[a-f0-9]{64}$/);
         assert.match(String(init?.headers && (init.headers as Record<string, string>)['Idempotency-Key']), /^ss-estimate-[a-f0-9]{64}-1$/);
       }
