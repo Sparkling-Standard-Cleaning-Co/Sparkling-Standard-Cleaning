@@ -1,0 +1,22 @@
+# Copy to wrangler.toml and deploy:
+#   npx wrangler deploy --config wrangler.toml
+#
+# Required secrets:
+#   npx wrangler secret put GITHUB_DISPATCH_TOKEN --config wrangler.toml
+#   npx wrangler secret put BACKUP_SCHEDULER_TOKEN --config wrangler.toml
+#
+# The token must be a fine-grained GitHub token with Actions: write access only
+# to Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning. Do not use a
+# classic personal access token with broad repository or organization access.
+
+name = "sparkling-standard-backup-scheduler"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+
+[triggers]
+crons = ["30 8 * * *"]
+
+[vars]
+GITHUB_REPO = "Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning"
+GITHUB_REF = "production-safe"
+GITHUB_WORKFLOW = "backup.yml"

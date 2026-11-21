@@ -183,3 +183,14 @@ export async function downloadPrefix(config, prefix, outDir, fetchImpl = fetch) 
   }
   return downloaded;
 }
+
+export async function deleteObject(config, key, fetchImpl = fetch) {
+  const signed = buildSignedRequest(config, {
+    method: 'DELETE',
+    key,
+    payloadHash: crypto.createHash('sha256').update('').digest('hex'),
+  });
+  const response = await fetchImpl(signed.url, { method: 'DELETE', headers: signed.headers });
+  if (!response.ok && response.status !== 204) throw new Error(`R2 delete failed for ${key}: HTTP ${response.status}`);
+  return { key, deleted: true };
+}

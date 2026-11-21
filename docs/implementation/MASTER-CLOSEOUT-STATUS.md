@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-21 (owner MFA enrollment UI regression fixed and verified; remaining workflows tracked)
+Last updated: 2026-11-21 (encrypted D1/R2 backup and restore verified; OneDrive authorization pending)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -17,7 +17,7 @@ Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-
 | Final reported HEAD | `851a28b` | `851a28b` (`Record bookings and careers release evidence`) |
 | Application commit | `e7f18c6` | `e7f18c6` (`Add bookings email and secure careers applications`) |
 | Latest migration | `0043_career_applications.sql` | present; `migrations/0001`–`0043` |
-| Unit tests | 947 total / 946 pass / 1 skip | **981 total / 980 pass / 1 pre-existing skip / 0 fail** (`npm test`) |
+| Unit tests | 947 total / 946 pass / 1 skip | **985 total / 984 pass / 1 pre-existing skip / 0 fail** (`npm test`) |
 | Browser tests | 237 pass | **248 pass / 0 fail** (`node --test --test-concurrency=2 "tests/browser/*.test.mjs"`) |
 | Newest migrations | 0043 | `0044`–`0050` (production at **50**) |
 | Untracked owner files | preserved | `docs/research/`, `public/brand/Elegant Gold S Floral Emblem.png` left untouched |
@@ -516,3 +516,45 @@ Next executable steps:
 - Verification: unit **981** (980 pass, 1 skip); browser **248 pass**; check 0
   errors; build 39 pages. Commit **`041303e`**; active production deployment
   **`7ea7af39-8f8b-47e7-8347-7d0797b6ed60`**; GitHub run `44947264510` passed.
+### 2026-11-21 - encrypted backup and disaster recovery workstream
+
+- Actual encrypted recovery point created and verified:
+  `sparkling-standard-backup-2026-11-21T21-10-15.ssbk`.
+  802,275 archive bytes, 802,060 plaintext bytes, 2 files, SHA-256
+  `393525b4953c89540e1472ba0053ca5ea8ee72b00872949e938c48c7d62ee866`.
+- D1 export: 801,566 bytes, 50 migrations, 96 tables, 0 foreign-key violations.
+  Encrypted archive verification reported SQLite integrity `ok`; isolated restore
+  succeeded into a fresh temporary directory and the SQL restored in memory.
+- R2 primary: archive, encrypted manifest and checksum uploaded to private
+  `sparkling-standard-backups` under
+  `sparkling-standard/backups/d1/sparkling-standard-backup-2026-11-21T21-10-15/`;
+  the archive was downloaded again and its SHA-256, decryption and SQL integrity
+  verified.
+- Local encrypted archive copied to
+  `C:\Users\thoma\Documents\Sparkling-Standard-Master\08-Backups\2026-11-21\`;
+  no plaintext database export was copied there.
+- OneDrive Graph support implemented with device-code public-client auth,
+  `Files.ReadWrite.AppFolder`, DPAPI token cache, app-folder upload/download,
+  quota and capacity reporting, retention and reauthorization handling. Unit
+  tests cover token exchange, upload paths, chunking and retention safety.
+- OneDrive authorization and independent retrieval are **not complete**: the
+  owner must register the public client and provide its client ID through the
+  secure auth flow. No OneDrive upload/retrieval has been claimed.
+- Retention code supports 30 daily / 12 weekly / 12 monthly dry-run or apply,
+  protects the newest, pre-migration and legal-hold bundles, and fails on
+  capacity overflow. D1-only 54-copy capacity is about 43 MB; R2 object sizes
+  still need measurement after the owner supplies the R2 backup token.
+- Backup monitor Worker deployed as `sparkling-standard-backup-monitor` with a
+  15-minute schedule and the production D1 binding. Its manual tick reported
+  `status: missing` and opened incident `incident_4a6b8279...`; alert delivery is
+  suppressed until the Worker receives `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
+  and a known `BACKUP_MONITOR_TOKEN`. No live email was sent.
+- GitHub workflow updated to require OneDrive, R2 round-trip verification,
+  OneDrive round-trip verification/restore and retention. Scheduled execution
+  remains blocked by the default-branch limitation; a separate
+  `workers/backup-scheduler` is prepared to dispatch `backup.yml` on
+  `production-safe` with an owner-created Actions:write token.
+- Remaining owner actions: OneDrive app registration/client ID + device auth;
+  R2 backup S3 credentials and R2 app-object API token; Worker Resend/monitor
+  secrets; scheduler GitHub token. Do not declare backups complete until the
+  OneDrive independent retrieval and an isolated full restoration actually pass.

@@ -247,3 +247,72 @@ provider beyond OneDrive.
 ## Automation status - 2026-11-20
 
 The encrypted backup workflow file exists on `production-safe`, but GitHub does not list it as an active workflow on the repository default branch (`main`). The nightly schedule is therefore not established until the workflow is present on the default branch and the repository secrets are configured. The existing manual archives and restore evidence are unaffected.
+
+## Independent OneDrive destination and scheduler - 2026-11-21
+
+### Implemented
+
+- `scripts/backup/onedrive.mjs` and `scripts/backup/lib/onedrive.mjs` implement
+  Microsoft Graph delegated device-code authorization, DPAPI-protected refresh
+  token caching, app-folder folder creation, simple and chunked uploads,
+  paginated listing, download, quota reporting and delete operations.
+- The default scope is `offline_access Files.ReadWrite.AppFolder User.Read`
+  (personal accounts only). This is the minimum permission that permits the
+  application folder. The app folder is
+  `OneDrive / Apps / Sparkling Standard / Sparkling-Standard-Encrypted-Backups`.
+  The existing root-level folder is not used because that would require broad
+  `Files.ReadWrite` access to the entire personal drive.
+- `scripts/backup/retention.mjs` previews/applies daily/weekly/monthly retention
+  on OneDrive. The newest archive, pre-migration archives and explicit legal
+  holds are never deleted. Dry-run is the default; capacity overflow exits 2.
+- `scripts/backup/retention-r2.mjs` applies the same policy to the private R2
+  backup bucket through the scoped S3 credentials.
+- `.github/workflows/backup.yml` now requires OneDrive authorization, uploads to
+  R2 and OneDrive, downloads each copy again, verifies/restores the OneDrive
+  copy, and applies or previews retention.
+- `workers/backup-scheduler/` is prepared to dispatch `backup.yml` on
+  `production-safe` daily without changing the default `main` branch. It needs
+  an owner-created fine-grained GitHub token with Actions: write.
+
+### Verified on 2026-11-21
+
+- Actual encrypted D1 + metadata archive:
+  `sparkling-standard-backup-2026-11-21T21-10-15.ssbk`
+  - 802,275 archive bytes; 802,060 plaintext bytes; 2 files.
+  - SHA-256 `393525b4953c89540e1472ba0053ca5ea8ee72b00872949e938c48c7d62ee866`.
+  - D1 export 801,566 bytes, 50 migrations, 96 tables, 0 foreign-key violations.
+  - `backup:verify` reported SQLite integrity `ok`.
+  - Isolated restore succeeded to a fresh temporary directory; the SQL restored
+    to an in-memory database with 0 foreign-key violations.
+- R2 primary upload/download:
+  - Uploaded archive, encrypted manifest and checksum to private
+    `sparkling-standard-backups` under
+    `sparkling-standard/backups/d1/sparkling-standard-backup-2026-11-21T21-10-15/`.
+  - Downloaded the archive again from R2; SHA-256 matched exactly; decryption
+    and SQLite verification succeeded.
+- Local archive:
+  `C:\Users\thoma\Documents\Sparkling-Standard-Master\08-Backups\2026-11-21\`
+  contains only the encrypted archive, encrypted manifest and checksum; the
+  plaintext D1 export was deliberately not copied there.
+- D1-only retention capacity: 54 copies at 802,275 bytes each is about **43 MB**,
+  well inside the 5 GB OneDrive allowance. Weekly/monthly application R2 object
+  sizes must be measured before they are counted; do not assume the 5 GB limit
+  can hold 30/12/12 copies that include large photo/document sets.
+
+### Monitor deployment result\n\n`sparkling-standard-backup-monitor` was deployed with a 15-minute cron and the\nproduction D1 binding. A manual tick returned `status: missing` and opened a\ncritical `backup_stale` incident because no successful `backup_runs` heartbeat\nhas been recorded. The Worker currently has no Resend credentials, so provider\nacceptance is suppressed rather than faked. Add `RESEND_API_KEY`,\n`RESEND_FROM_EMAIL` and a new `BACKUP_MONITOR_TOKEN` to the Worker, then verify\nthe health endpoint and the Data & Storage dashboard. A green Worker is not\nrestore proof.\n\n### Still owner-dependent
+
+- OneDrive authorization requires the owner to register the public client in
+  Microsoft Entra and run the device-code auth once. See
+  `docs/operations/ONEDRIVE-BACKUP-SETUP.md`. No OneDrive upload, download or
+  independent retrieval has been claimed yet.
+- Application R2 objects still require a least-privilege Cloudflare API token
+  with R2 object read/list access. The backup workflow's `R2_APP_BACKUP` path
+  and `backup:r2-app` command are ready; they have not been exercised against
+  production objects.
+- The backup monitor Worker still needs its own deployment secrets
+  (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `BACKUP_MONITOR_TOKEN`) and the
+  production D1 binding. Unit tests for incident creation, escalation and
+  recovery pass, but live alert delivery has not been claimed.
+- The nightly scheduler Worker needs a fine-grained GitHub Actions:write token.
+  The workflow schedule remains dormant on `main`; this Worker is the safe
+  alternative without changing branches or deployment sources.
