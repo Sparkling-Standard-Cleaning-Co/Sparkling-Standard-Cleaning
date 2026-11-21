@@ -71,10 +71,14 @@ Stripe and application receipts may duplicate until the owner resolves the dashb
 
 ## Deployment
 
-Recorded after release:
-
-- Application commit and Cloudflare Pages deployment ID.
-- Live careers form presence and private admin route checks.
+- Final application HEAD: `e7f18c6`.
+- Cloudflare Pages deployment: `e5b8331e-380f-44bc-b3a7-c310b4d90c50`.
+- Live `/careers/` contains the application form and status form; Tampa is labeled future interest only.
+- `/api/careers-status` rejects malformed input with 400.
+- `/api/admin/careers` returns 401 without an owner session.
+- Production careers table exists with 0 applications; 43 D1 migrations applied.
+- Tampa public URL remains 404.
+- Live review cards remain equal height with no internal scroller.
 
 ## Remaining
 

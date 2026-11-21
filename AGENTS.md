@@ -84,7 +84,18 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-20 reviews and department email routing):** application code
+- **Current release (2026-11-20 bookings department and secure careers applications):** application code
+  **`e7f18c6`** is live on `production-safe` (Cloudflare Pages production deployment
+  `e5b8331e-380f-44bc-b3a7-c310b4d90c50`). Migration `0043` adds private career applications and
+  resume metadata. `bookings@sparkling-standard.com` is the sixth department address and is now the
+  booking-confirmation reply-to; billing remains invoice/receipt reply-to. The careers page now has
+  a secure application form for experienced and entry-level applicants, optional private PDF/DOCX
+  resume storage, applicant acknowledgment, hiring notification, status lookup and an owner-only
+  admin review/status workflow. Navigation is rate-limited; resumes are private and downloaded only
+  through an authorized owner session. CI passed; unit **947** (946 pass, 1 pre-existing skip),
+  browser **237** pass. Production has 0 applications and 43 migrations; Tampa stays 404. No live
+  message, charge or deletion. Evidence: `docs/verification/2026-11-20-BOOKINGS-CAREERS.md`.
+- **Prior release (2026-11-20 reviews and department email routing):** application code
   **`061e167`** is live on `production-safe` (Cloudflare Pages production deployment
   `46a8416a-5dd8-49dc-9748-6f65d03635b7`). The reviews carousel was rebuilt around readable excerpts,
   no internal scrolling, equal-height cards and an accessible full-review dialog; live cards are
