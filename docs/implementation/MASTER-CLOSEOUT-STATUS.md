@@ -139,8 +139,9 @@ Implemented (not deployed, staged in the working tree):
 - Server pagination and UI pagers for customers, leads, career applications
   and invoices with accurate totals and stable ordering.
 
-Not deployed. No production data, migrations, messages, charges, flags or
-Cloudflare settings were changed.
+Committed locally as **`82e66d5`** (`Add communications center, backup alerts
+and paging`) on `production-safe`. Not pushed and not deployed. No production
+data, migrations, messages, charges, flags or Cloudflare settings were changed.
 
 ### Next executable steps
 
