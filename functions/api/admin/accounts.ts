@@ -3,6 +3,7 @@ import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/l
 import { verifyPassword } from '../../../src/lib/admin/auth.ts';
 import {
   changePassword,
+  countAudit,
   getSettings,
   inviteAdmin,
   issuePasswordReset,
@@ -59,7 +60,14 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     }
     await requireActor(db, context.request, 'admin.manage');
     if (view === 'audit') {
-      return json({ ok: true, audit: await listAudit(db, actor, Number(url.searchParams.get('limit') ?? 100)) });
+      const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') ?? 50)));
+      const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0));
+      const q = url.searchParams.get('q') ?? '';
+      const [auditRows, total] = await Promise.all([
+        listAudit(db, actor, limit, offset, q),
+        countAudit(db, actor, q),
+      ]);
+      return json({ ok: true, audit: auditRows, total, limit, offset });
     }
     if (view === 'settings') {
       return json({ ok: true, settings: await getSettings(db) });

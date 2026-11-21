@@ -25,6 +25,7 @@ import { buildAdminInvoice } from '../../../src/lib/invoicing/admin-invoice.ts';
 import { buildInvoicePdf } from '../../../src/lib/invoicing/pdf.ts';
 import { buildInvoiceEmail, sendInvoiceEmail, type InvoiceEmailEnv } from '../../../src/lib/invoicing/invoice-email.ts';
 import { deliverInvoiceReceipt } from '../../../src/lib/invoicing/invoice-receipt.ts';
+import { DEPARTMENT_ADDRESSES, readCommunicationSettings } from '../../../src/lib/admin/communications.ts';
 
 interface Env extends AdminDbEnv, StripeBillingEnv, InvoiceEmailEnv {}
 
@@ -171,12 +172,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         lines: (result.lines as Array<Record<string, unknown>>) ?? [],
       });
       const pdf = buildInvoicePdf(document.data, document.totals);
+      const communication = await readCommunicationSettings(db).catch(() => null);
+      const invoiceReplyTo = communication
+        ? DEPARTMENT_ADDRESSES[communication.settings.replyTo.invoices]
+        : undefined;
       const outcome = await sendInvoiceEmail({
         to,
         data: document.data,
         totals: document.totals,
         pdf,
-        env: context.env,
+        env: {
+          ...context.env,
+          ...(invoiceReplyTo ? { RESEND_BILLING_REPLY_TO: invoiceReplyTo } : {}),
+        },
         idempotencyKey:
           String(body.idempotencyKey ?? '').trim() || `invoice-email-${invoiceId}-${crypto.randomUUID()}`,
       });

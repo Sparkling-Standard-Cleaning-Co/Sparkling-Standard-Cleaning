@@ -10,6 +10,7 @@ export interface StripeBillingEnv {
   ADMIN_STRIPE_SAVED_CARDS_ENABLED?: string;
   ADMIN_STRIPE_OFF_SESSION_ENABLED?: string;
   ADMIN_STRIPE_PORTAL_ENABLED?: string;
+  PORTAL_BILLING_ENABLED?: string;
   STRIPE_BILLING_PORTAL_CONFIGURATION_ID?: string;
 }
 
@@ -82,6 +83,58 @@ export async function createCustomerBillingPortalSession(
   await audit(db, {
     actorUserId: actor.id,
     action: 'customer.billing_portal_opened',
+    entityType: 'customer',
+    entityId: customerId,
+  });
+  return { url, sessionId };
+}
+
+export async function createPortalBillingSession(
+  db: D1Database,
+  customerId: string,
+  verifiedEmail: string,
+  env: StripeBillingEnv,
+): Promise<{ url: string; sessionId: string }> {
+  if (env.PORTAL_BILLING_ENABLED !== 'true') {
+    throw new AdminAuthError(503, 'portal_billing_disabled');
+  }
+  const customer = await db
+    .prepare("SELECT id, first_name, last_name, company_name, stripe_customer_id FROM customers WHERE id = ? AND status = 'active' AND source <> 'financial_system' LIMIT 1")
+    .bind(customerId)
+    .first<{
+      id: string;
+      first_name: string;
+      last_name: string;
+      company_name: string;
+      stripe_customer_id: string | null;
+    }>();
+  if (!customer) throw new AdminAuthError(404, 'customer_not_found');
+  const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || verifiedEmail;
+  const stripeCustomerId = customer.stripe_customer_id || await reusableStripeCustomer(
+    db,
+    customerId,
+    verifiedEmail,
+    name,
+    env,
+  );
+  const origin = (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
+  const form = new URLSearchParams();
+  form.set('customer', stripeCustomerId);
+  form.set('return_url', `${origin}/portal/`);
+  const configuration = env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID?.trim();
+  if (configuration) form.set('configuration', configuration);
+  const session = await stripeRequest(
+    env,
+    'billing_portal/sessions',
+    form,
+    `portal-billing-${customerId}-${Date.now()}`,
+  );
+  const url = String(session.url ?? '');
+  const sessionId = String(session.id ?? '');
+  if (!url || !sessionId) throw new AdminAuthError(502, 'stripe_portal_session_failed');
+  await audit(db, {
+    actorUserId: null,
+    action: 'customer.portal_billing_session_created',
     entityType: 'customer',
     entityId: customerId,
   });

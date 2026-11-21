@@ -59,13 +59,28 @@ button requires explicit confirmation, sends no customer data, records a
 delivery event and writes an audit record. Do not use it without access to the
 destination mailbox.
 
+## Connected senders
+
+The configured routing/reply-to values are consumed by:
+
+- **Booking confirmations** (`functions/api/lead.ts`, `functions/api/admin/requests.ts`)
+- **Careers** acknowledgment and hiring notification (`functions/api/careers-application.ts`)
+- **Invoice email** (`functions/api/admin/finance.ts`)
+- **Payment receipt copy** (`src/lib/invoicing/invoice-receipt.ts`) — Stripe
+  remains the official receipt source; the application copy is idempotent
+- **Gift certificate delivery** (`functions/api/stripe-webhook.ts`)
+- **Customer portal sign-in and customer-service requests**
+  (`src/lib/portal/service.ts`)
+
+Owner-only operational alerts remain bound to the configured owner notification
+address; the communications center does not expose that address publicly.
+
 ## Relevant files
 
 - `migrations/0044_communications.sql`
 - `src/lib/admin/communications.ts`
 - `functions/api/admin/communications.ts`
 - `src/pages/admin/index.astro` and `src/scripts/admin.ts`
-- `functions/api/careers-application.ts` (uses configured hiring routing)
 - `tests/communications.test.ts`
 
 ## Backup and security alerts

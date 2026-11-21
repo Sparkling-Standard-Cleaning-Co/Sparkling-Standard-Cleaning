@@ -3469,6 +3469,8 @@ document.addEventListener('submit', (event) => {
   });
 });
 
+const auditPage = { limit: 50, offset: 0 };
+
 async function loadSettings(): Promise<void> {
   const [admins, sessions, audit] = await Promise.all([
     can('admin.manage')
@@ -3476,8 +3478,10 @@ async function loadSettings(): Promise<void> {
       : Promise.resolve({ admins: [] }),
     api<{ sessions?: Array<Record<string, unknown>> }>('/api/admin/accounts?view=sessions'),
     can('admin.manage')
-      ? api<{ audit?: Array<Record<string, unknown>> }>('/api/admin/accounts?view=audit&limit=100')
-      : Promise.resolve({ audit: [] }),
+      ? api<{ audit?: Array<Record<string, unknown>>; total?: number; limit?: number; offset?: number }>(
+          `/api/admin/accounts?view=audit&limit=${auditPage.limit}&offset=${auditPage.offset}`,
+        )
+      : Promise.resolve({ audit: [] as Array<Record<string, unknown>>, total: 0, limit: 50, offset: 0 }),
   ]);
   const mfaStatus = document.querySelector<HTMLElement>('[data-admin-mfa-status]');
   if (mfaStatus) {
@@ -3505,17 +3509,30 @@ async function loadSettings(): Promise<void> {
   if (auditTarget) {
     renderTable(auditTarget, ['When', 'Actor', 'Action', 'Entity', 'Success'], (audit.audit ?? []).map((entry) => [esc(dateTime(entry.created_at)), esc(entry.display_name || 'System'), esc(entry.action), esc([entry.entity_type, entry.entity_id].filter(Boolean).join(':')), Number(entry.success) ? 'Yes' : 'No']), 'No audit records yet.');
   }
+  renderPager(document.querySelector<HTMLElement>('[data-admin-audit-pagination]'), audit, 'audit-page');
 }
 
 async function loadDocuments(): Promise<void> {
-  const [templateData, bundleData, requestData] = await Promise.all([
+  const [templateData, bundleData, requestData, reminderData] = await Promise.all([
     api<{ templates?: Array<Record<string, unknown>> }>('/api/admin/documents?view=templates'),
     api<{ bundles?: Array<Record<string, unknown>> }>('/api/admin/documents?view=bundles'),
     api<{ requests?: Array<Record<string, unknown>> }>('/api/admin/documents?view=requests'),
+    actor?.role === 'owner'
+      ? api<{ settings?: { enabled?: boolean; firstHours?: number; secondHours?: number } }>('/api/admin/documents?view=reminder-settings')
+      : Promise.resolve({ settings: undefined }),
   ]);
   const templates = templateData.templates ?? [];
   const bundles = bundleData.bundles ?? [];
   const requests = requestData.requests ?? [];
+  const reminderForm = document.querySelector<HTMLFormElement>('[data-document-reminders]');
+  if (reminderForm && reminderData.settings) {
+    const enabled = reminderForm.querySelector<HTMLInputElement>('input[name="enabled"]');
+    const first = reminderForm.querySelector<HTMLInputElement>('input[name="firstHours"]');
+    const second = reminderForm.querySelector<HTMLInputElement>('input[name="secondHours"]');
+    if (enabled) enabled.checked = reminderData.settings.enabled !== false;
+    if (first) first.value = String(reminderData.settings.firstHours ?? 24);
+    if (second) second.value = String(reminderData.settings.secondHours ?? 72);
+  }
   const templateTarget = document.querySelector<HTMLElement>('[data-admin-documents-templates]');
   if (templateTarget) {
     renderTable(templateTarget, ['Title', 'Category', 'Version', 'Legal review', 'Status', 'Actions'], templates.map((template) => {
@@ -3712,17 +3729,34 @@ async function openDocumentRequest(id: string): Promise<void> {
     ${signatures.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Document</th><th>Version</th><th>Signer</th><th>Status</th><th>Signed</th><th>Actions</th></tr></thead><tbody>${signatures.map((signature) => `<tr><td>${esc(signature.title)}</td><td>${esc(signature.template_version)}</td><td>${esc(signature.signer_name)}</td><td><span class="admin-status">${esc(titleCase(signature.status))}</span></td><td>${esc(dateTime(signature.signed_at))}</td><td><div class="admin-actions"><a class="btn btn--ghost btn--small" href="/api/admin/documents?view=download&signatureId=${encodeURIComponent(String(signature.id))}">Download</a>${signature.status === 'awaiting_verification' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-verify" data-id="${esc(signature.id)}">Verify</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-reject" data-id="${esc(signature.id)}">Reject</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No signatures yet.</p>'}</div>`;
 }
 
+function storageBranch(): string {
+  return document.querySelector<HTMLSelectElement>('[data-admin-storage-branch]')?.value ?? '';
+}
+
+function storageFormat(): string {
+  return document.querySelector<HTMLSelectElement>('[data-admin-storage-format]')?.value ?? 'csv';
+}
+
 document.querySelector<HTMLElement>('[data-admin-view="storage"]')?.addEventListener('click', (event) => {
   const exportKind = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-export]')?.dataset.adminExport;
-  if (exportKind) window.location.assign(`/api/admin/storage?export=${encodeURIComponent(exportKind)}`);
+  if (exportKind) {
+    const params = new URLSearchParams({ export: exportKind, format: storageFormat() });
+    if (storageBranch()) params.set('branch', storageBranch());
+    window.location.assign(`/api/admin/storage?${params.toString()}`);
+  }
 });
 async function loadStorage(): Promise<void> {
+  const params = new URLSearchParams();
+  if (storageBranch()) params.set('branch', storageBranch());
   const data = await api<{
+    branch?: string;
     database?: { bytes?: number | null; counts?: Record<string, number | null> };
     storage?: { photos?: { configured?: boolean; sampledObjects?: number }; documents?: { configured?: boolean; sampledObjects?: number } };
+    backup?: { recentRuns?: Array<Record<string, unknown>>; openIncidents?: Array<Record<string, unknown>> };
+    retention?: { policies?: Array<Record<string, unknown>>; holds?: Array<Record<string, unknown>> };
     settings?: Array<Record<string, unknown>>;
     note?: string;
-  }>('/api/admin/storage');
+  }>(`/api/admin/storage${params.toString() ? `?${params.toString()}` : ''}`);
   const kpis = document.querySelector<HTMLElement>('[data-admin-storage-kpis]');
   const counts = data.database?.counts ?? {};
   if (kpis) {
@@ -3745,8 +3779,29 @@ async function loadStorage(): Promise<void> {
       ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Record</th><th>Value</th><th>Updated</th></tr></thead><tbody>${(data.settings ?? []).map((row) => `<tr><td>${esc(row.key)}</td><td><code>${esc(String(row.value_json ?? '').slice(0, 500))}</code></td><td>${esc(dateTime(row.updated_at))}</td></tr>`).join('')}</tbody></table></div>`
       : '<p class="admin-muted">No backup or cleanup status has been recorded yet.</p>';
   }
+  const backupTarget = document.querySelector<HTMLElement>('[data-admin-storage-backup]');
+  if (backupTarget) {
+    const runs = data.backup?.recentRuns ?? [];
+    const incidents = data.backup?.openIncidents ?? [];
+    backupTarget.innerHTML = `<p class="admin-muted">Recorded backup heartbeats and open incidents. A successful run record is not restore proof.</p>` +
+      (runs.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Run</th><th>Status</th><th>Summary</th><th>Recorded</th></tr></thead><tbody>${runs.map((run) => `<tr><td>${esc(run.run_key)}</td><td>${esc(titleCase(run.status))}</td><td>${esc(run.summary)}</td><td>${esc(dateTime(run.recorded_at))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No backup heartbeat has been recorded.</p>') +
+      (incidents.length ? `<h3 style="font-size:.95rem;margin-top:1rem;">Open incidents</h3><div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Incident</th><th>Status</th><th>Summary</th><th>Opened</th><th>Escalated</th></tr></thead><tbody>${incidents.map((incident) => `<tr><td>${esc(incident.incident_key)}</td><td>${esc(incident.status)}</td><td>${esc(incident.summary)}</td><td>${esc(dateTime(incident.opened_at))}</td><td>${esc(incident.escalation_sent_at ? dateTime(incident.escalation_sent_at) : 'No')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No open backup incidents.</p>');
+  }
+  const retentionTarget = document.querySelector<HTMLElement>('[data-admin-retention]');
+  if (retentionTarget) {
+    const policies = data.retention?.policies ?? [];
+    const holds = data.retention?.holds ?? [];
+    retentionTarget.innerHTML = `<h3 style="font-size:.95rem;">Policies</h3>` +
+      (policies.length
+        ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Record type</th><th>Retention</th><th>Automatic cleanup</th><th>Status</th><th>Approved</th></tr></thead><tbody>${policies.map((policy) => `<tr><td>${esc(policy.record_type)}</td><td>${esc(policy.retention_months)} months</td><td>${Number(policy.automatic_cleanup) ? 'Review only' : 'No'}</td><td>${esc(titleCase(policy.status))}</td><td>${esc(dateTime(policy.approved_at))}</td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="admin-muted">No retention policies recorded.</p>') +
+      `<h3 style="font-size:.95rem;margin-top:1rem;">Legal holds</h3>` +
+      (holds.length
+        ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Subject</th><th>Reason</th><th>Status</th><th>Placed</th><th></th></tr></thead><tbody>${holds.map((hold) => `<tr><td>${esc(hold.subject_type)}:${esc(hold.subject_id)}</td><td>${esc(hold.reason)}</td><td>${esc(hold.status)}</td><td>${esc(dateTime(hold.created_at))}</td><td>${hold.status === 'active' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="release-legal-hold" data-id="${esc(hold.id)}">Release</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="admin-muted">No legal holds recorded.</p>');
+  }
   const status = document.querySelector<HTMLElement>('[data-admin-storage-status]');
-  if (status) status.textContent = `Last refreshed ${new Date().toLocaleString()}.`;
+  if (status) status.textContent = `Last refreshed ${new Date().toLocaleString()}.${data.branch && data.branch !== 'all' ? ` Branch filter: ${data.branch}.` : ''}`;
 }
 
 async function storageCleanup(dryRun: boolean): Promise<void> {
@@ -3769,14 +3824,58 @@ async function storageCleanup(dryRun: boolean): Promise<void> {
 }
 
 document.querySelector<HTMLElement>('[data-admin-view="storage"]')?.addEventListener('click', (event) => {
-  const action = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-action]')?.dataset.adminAction;
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-action]');
+  const action = target?.dataset.adminAction;
   if (action === 'storage-refresh') void loadStorage().catch((error) => setAppError(friendly(error)));
+  if (action === 'storage-apply-branch') void loadStorage().catch((error) => setAppError(friendly(error)));
+  if (action === 'release-legal-hold') {
+    if (window.confirm('Release this legal hold? The record remains preserved; this only ends the hold.')) {
+      void api('/api/admin/storage', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'release_legal_hold', holdId: target?.dataset.id ?? '' }),
+      }).then(() => loadStorage()).catch((error) => setAppError(friendly(error)));
+    }
+  }
   if (action === 'storage-cleanup-preview') void storageCleanup(true);
   if (action === 'storage-cleanup-run') {
     if (window.confirm('Delete only eligible customer photos older than 30 days? Financial, legal, booking and agreement records are never touched.')) {
       void storageCleanup(false);
     }
   }
+});
+
+document.addEventListener('submit', (event) => {
+  const form = event.target as HTMLFormElement;
+  if (!form.matches('[data-retention-policy], [data-legal-hold]')) return;
+  event.preventDefault();
+  const data = new FormData(form);
+  const status = document.querySelector<HTMLElement>('[data-admin-retention-status]');
+  const isPolicy = form.matches('[data-retention-policy]');
+  const body = isPolicy
+    ? {
+        action: 'save_retention_policy',
+        recordType: data.get('recordType'),
+        retentionMonths: data.get('retentionMonths'),
+        status: data.get('status'),
+        description: data.get('description'),
+        automaticCleanup: data.get('automaticCleanup') === 'on',
+      }
+    : {
+        action: 'create_legal_hold',
+        subjectType: data.get('subjectType'),
+        subjectId: data.get('subjectId'),
+        reason: data.get('reason'),
+      };
+  if (status) status.textContent = 'Saving...';
+  void api('/api/admin/storage', { method: 'POST', body: JSON.stringify(body) })
+    .then(() => {
+      if (status) status.textContent = isPolicy ? 'Retention policy saved.' : 'Legal hold recorded.';
+      form.reset();
+      return loadStorage();
+    })
+    .catch((error) => {
+      if (status) status.textContent = friendly(error);
+    });
 });
 async function loadPromotions(): Promise<void> {
   const target = document.querySelector<HTMLElement>('[data-admin-promotions]');
@@ -4620,6 +4719,27 @@ document.querySelector<HTMLFormElement>('[data-document-template-upload]')?.addE
     .catch((error) => documentResult(friendly(error), 'error'));
 });
 
+document.querySelector<HTMLFormElement>('[data-document-reminders]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const data = new FormData(form);
+  const status = document.querySelector<HTMLElement>('[data-document-reminders-status]');
+  if (status) status.textContent = 'Saving...';
+  void api('/api/admin/documents', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'save_reminder_settings',
+      enabled: data.get('enabled') === 'on',
+      firstHours: Number(data.get('firstHours') ?? 24),
+      secondHours: Number(data.get('secondHours') ?? 72),
+    }),
+  }).then(() => {
+    if (status) status.textContent = 'Reminder settings saved.';
+  }).catch((error) => {
+    if (status) status.textContent = friendly(error);
+  });
+});
+
 document.querySelector<HTMLFormElement>('[data-document-bundle-create]')?.addEventListener('submit', (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget as HTMLFormElement);
@@ -4747,6 +4867,11 @@ document.addEventListener('click', (event) => {
   if (actionName === 'invoices-page') {
     financePage.offset = Number(target.dataset.offset ?? 0) || 0;
     void loadFinance().catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (actionName === 'audit-page') {
+    auditPage.offset = Number(target.dataset.offset ?? 0) || 0;
+    void loadSettings().catch((error) => setAppError(friendly(error)));
     return;
   }
   if (actionName === 'dispatch-run-analysis') { void dispatchAction({ action: 'run_analysis' }); return; }

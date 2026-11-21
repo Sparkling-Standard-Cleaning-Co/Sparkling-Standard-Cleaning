@@ -46,6 +46,8 @@ jobs:
           mkdir -p backup-out
           npx --yes wrangler@4 d1 export "$D1_DATABASE_NAME" --remote --output backup-out/d1.sql
           test -s backup-out/d1.sql
+      - name: Verify the D1 export restores independently
+        run: node scripts/backup/verify-d1-export.mjs backup-out/d1.sql
       - name: Create and upload encrypted backup
         run: node scripts/backup/create.mjs --d1 backup-out/d1.sql --out backup-out --upload
       - name: Verify the encrypted archive locally

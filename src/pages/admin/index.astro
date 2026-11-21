@@ -650,6 +650,17 @@ import {
                 must never be sent to customers or employees.
               </p>
             </div>
+            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
+              <h2 class="admin-section-title">Signing reminders</h2>
+              <p class="admin-muted">Reminders never cancel an appointment or agreement. Signing links expire after seven days; an expired link is replaced only when a reminder can be delivered.</p>
+              <form class="admin-form admin-form--grid" data-document-reminders>
+                <label><input type="checkbox" name="enabled" /> Enable automatic reminders</label>
+                <label>First reminder (hours) <input name="firstHours" type="number" min="1" max="168" /></label>
+                <label>Second reminder (hours) <input name="secondHours" type="number" min="2" max="168" /></label>
+                <div class="admin-field--wide"><button class="btn btn--secondary btn--small" type="submit">Save reminder settings</button></div>
+              </form>
+              <p class="admin-status-message" data-document-reminders-status role="status" aria-live="polite"></p>
+            </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Document templates</h2>
               <p class="admin-muted">Only owner-approved templates can create a signing requirement. Draft and retired templates never block a workflow.</p>
@@ -893,6 +904,22 @@ import {
             <div class="admin-card">
               <h2 class="admin-section-title">Data &amp; Storage</h2>
               <p class="admin-muted">Owner-only health, business-record counts, safe exports and photo-retention controls. Provider byte totals require Cloudflare account analytics; no universal capacity percentage is invented.</p>
+              <div class="admin-inline-form" style="margin-bottom:.75rem;">
+                <label>Branch filter
+                  <select data-admin-storage-branch>
+                    <option value="">All branches</option>
+                    <option value="branch_pensacola">Pensacola</option>
+                    <option value="branch_tampa">Tampa Bay</option>
+                  </select>
+                </label>
+                <label>Export format
+                  <select data-admin-storage-format>
+                    <option value="csv">CSV</option>
+                    <option value="json">JSON</option>
+                  </select>
+                </label>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-apply-branch">Apply filter</button>
+              </div>
               <div class="admin-grid" data-admin-storage-kpis></div>
               <p class="small text-muted" data-admin-storage-note></p>
               <div class="admin-actions" style="margin-top:1rem;">
@@ -906,11 +933,37 @@ import {
               <h2 class="admin-section-title">Business records export</h2>
               <p class="admin-muted">CSV downloads contain business records only; never credentials, tokens or card data. Each export is owner-authenticated and audit-recorded.</p>
               <div class="admin-actions">
-                <button class="btn btn--secondary btn--small" type="button" data-admin-export="customers">Customers CSV</button>
-                <button class="btn btn--secondary btn--small" type="button" data-admin-export="properties">Properties CSV</button>
-                <button class="btn btn--secondary btn--small" type="button" data-admin-export="appointments">Appointments CSV</button>
-                <button class="btn btn--secondary btn--small" type="button" data-admin-export="invoices">Invoices CSV</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="customers">Customers</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="properties">Properties</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="appointments">Appointments</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="invoices">Invoices</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="signatures">Signing evidence</button>
               </div>
+              <p class="admin-muted">Exports are generated on demand, owner-authenticated, never cached and audit-recorded. Signing evidence includes signature status, timestamps, hashes and template versions.</p>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Backup health</h2>
+              <div data-admin-storage-backup></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Retention registry and legal holds</h2>
+              <p class="admin-muted">Records retention intent and legal holds only. Saving a policy never deletes or anonymizes a record. Permanent deletion remains a separate, explicit owner operation.</p>
+              <div data-admin-retention></div>
+              <form class="admin-form admin-form--grid" data-retention-policy style="margin-top:1rem;">
+                <label>Record type <input name="recordType" required maxlength="80" placeholder="customer_agreement" /></label>
+                <label>Retention months <input name="retentionMonths" type="number" min="0" max="600" required /></label>
+                <label>Status <select name="status"><option value="draft">Draft</option><option value="active">Active (owner approval)</option><option value="retired">Retired</option></select></label>
+                <label class="admin-field--wide">Description <input name="description" maxlength="1000" /></label>
+                <label><input type="checkbox" name="automaticCleanup" /> Eligible for future automatic cleanup review</label>
+                <div class="admin-field--wide"><button class="btn btn--secondary btn--small" type="submit">Save retention policy</button></div>
+              </form>
+              <form class="admin-form admin-form--grid" data-legal-hold style="margin-top:1rem;">
+                <label>Subject type <input name="subjectType" required maxlength="60" placeholder="customer" /></label>
+                <label>Subject id <input name="subjectId" required maxlength="120" /></label>
+                <label class="admin-field--wide">Reason <textarea name="reason" rows="2" minlength="5" maxlength="1000" required></textarea></label>
+                <div class="admin-field--wide"><button class="btn btn--ghost btn--small" type="submit">Place legal hold</button></div>
+              </form>
+              <p class="admin-status-message" data-admin-retention-status role="status" aria-live="polite"></p>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Backup and cleanup status</h2>
@@ -1236,6 +1289,7 @@ import {
             <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
               <h2 class="admin-section-title">Audit history</h2>
               <div data-admin-audit></div>
+              <div data-admin-audit-pagination style="margin-top:.75rem;"></div>
             </div>
           </section>
         </div>

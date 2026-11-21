@@ -4,7 +4,7 @@ Persistent implementation ledger for the Master Production Closeout directive
 (baseline November 20, 2026). Future sessions must update this file before
 ending so work can resume accurately.
 
-Last updated: 2026-11-20 (session 1, implementation pass complete)
+Last updated: 2026-11-21 (session 2: production release, customer portal, reminders, Data Control)
 Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`
 Active checkout: `C:\Users\thoma\Documents\Sparkling-Standard-Master\01-Website-Repository`
 
@@ -40,7 +40,7 @@ Status legend: **verified working** · **partial** · **missing** · **owner-gat
 |---|---|---|---|
 | Baseline verification | verified working | Git, migrations, unit suite reproduced | Re-verify each session |
 | Six-department email architecture | verified working (configuration) | `src/config/email-routing.ts`; careers uses `hiring@`; invoices/receipts reply-to `billing@`; bookings reply-to `bookings@` | Inbox delivery still requires owner confirmation |
-| Communications & notifications admin settings | **implemented and tested (not deployed)** | New `communications` admin view; fixed six-department registry; routing/reply-to/template editing; server validation; preview; immutable versions; audit; delivery-health panel; controlled `[TEST]` send; careers hiring flow now consumes configured routing; migration `0044`; `docs/operations/COMMUNICATIONS-CENTER.md` | Apply migration `0044`; owner reviews defaults; confirm real inbox delivery |
+| Communications & notifications admin settings | **implemented, tested and deployed (0044 applied)** | Admin view with fixed six-department registry, routing/reply-to/template editing, validation, preview, immutable versions, audit, delivery health and controlled `[TEST]` send. Configured routing now drives booking confirmations, bookings admin notifications, careers, invoice email, receipt copy, gift delivery and portal mail. Migration `0044` applied; deployment `c50ba68b`; `docs/operations/COMMUNICATIONS-CENTER.md` | Owner confirms real inbox delivery/reply routing |
 | Critical backup/security alerts + escalation | **backup alerts implemented and tested (not deployed); security-alert event source still missing** | `src/lib/admin/backup-monitor.ts` + `functions/api/internal/backup-status.ts` + `workers/backup-monitor/`; failed/missing backup alerts admin+owner immediately, escalates owner after configured minutes, resolves with recovery notice; backup workflow reports when `OPS_ALERT_URL`/`OPS_ALERT_TOKEN` secrets exist | Deploy Worker + secrets; connect security-event source; owner confirms inbox delivery |
 | Backup/recovery | partial | `scripts/backup/*` encrypt/verify/restore D1 + master workspace; R2 app objects require owner credentials; documented in `docs/operations/OFFSITE-BACKUPS.md` | Owner provides R2 S3 credentials; perform independent restore rehearsal |
 | GitHub reconciliation | owner-gated | `main` 41 behind `production-safe`; no destructive action taken | Owner approves fast-forward/main reconciliation and branch protection |
@@ -51,10 +51,10 @@ Status legend: **verified working** · **partial** · **missing** · **owner-gat
 | Workstream | Status | Evidence / notes | Next action |
 |---|---|---|---|
 | Stripe invoice payment links, receipts, saved cards, off-session | verified working (existing) | `src/lib/admin/stripe-billing.ts`, `src/lib/invoicing/invoice-receipt.ts`; tests in `tests/admin.test.ts`, `tests/receipt.test.ts` | Live charge/refund remains owner-authorized |
-| Customer self-service billing portal | **partial (admin-initiated session implemented and tested; no customer portal yet)** | `createCustomerBillingPortalSession` in `src/lib/admin/stripe-billing.ts`; owner/finance authorization, branch scope, Stripe customer mapping, audit, no charge/refund calls. Finance view exposes a secure portal button. Customer-facing portal shell/identity does not exist | Build passwordless verified customer portal before exposing; configure Stripe portal settings in Dashboard |
-| Unified customer portal | **missing** | No customer portal page, identity or session system exists | Design and implement verified email access, sessions, bookings/invoices/documents |
-| Data Control Center | partial | `functions/api/admin/storage.ts` provides counts, sampled R2, CSV exports, retention cleanup, backup setting display; owner-only | Add branch filters, signed-document export, short-lived downloads, retention registry |
-| Server-driven admin pagination | **partial → improved** | Customers, leads, career applications and invoices now return accurate totals, server-side search/filter/order, offset paging, stable tie-breakers and page sizes 25/50/100 (customers/leads/careers/invoices). UI pager added. Requests/jobs/employees/time/documents/audit still use their existing bounded lists | Extend the same pattern to remaining long lists |
+| Customer self-service billing portal | **implemented in customer portal (staged)** | Portal opens a Stripe-hosted billing session when `PORTAL_BILLING_ENABLED=true`; reuses/creates one Stripe customer, branch scoped, audited, no charge/refund path. Admin-initiated portal button also exists | Configure Stripe portal settings; enable flag after owner review |
+| Unified customer portal | **implemented and tested (staged)** | Passwordless single-use 15-minute links, hashed 7-day sessions, CSRF, anti-enumeration, rate limits, bookings, recurring plans, invoices/payment links, signed documents, profile/properties, customer-service requests. Migration `0045`; `/portal/` page; `docs/operations/CUSTOMER-PORTAL.md` | Apply migration, deploy, confirm one real sign-in/inbox delivery |
+| Data Control Center | **improved, still partial** | Branch-filtered counts and CSV/JSON exports, signing-evidence export, backup health/incident panel, retention policy registry and legal holds (migration `0046`), audited exports. Encrypted full recovery remains CLI/documented | Add controlled short-lived download storage, archive search and approved permanent-deletion workflow |
+| Server-driven admin pagination | **improved, still partial** | Customers, leads, careers, invoices and audit history now page server-side with totals, ordering whitelist, page sizes 25/50/100 and UI pagers. Requests/jobs/employees/time/documents keep specialized/bounded views | Extend to remaining long lists only where a table is appropriate |
 | Careers administration integration | verified working + pagination/search/branch filter | `functions/api/admin/careers.ts`, owner-only, private resume download, audit; branch filter and search added | Add onboarding packet link and applicant-to-employee approval flow |
 | Administrative communications settings | implemented this session | See Wave A | Apply migration; verify in deployed admin |
 
@@ -64,8 +64,8 @@ Status legend: **verified working** · **partial** · **missing** · **owner-gat
 |---|---|---|---|
 | Template lifecycle | partial | `document_templates.status` draft/approved/retired; `legal_review_status`; packet builder `0038` | Add explicit review→published→superseded workflow and owner publication gate |
 | Packet automation | verified working (existing) | `resolveBundle`, `activeRequirements`, service/subject matching | Extend to careers onboarding packets |
-| E-signature evidence | verified working (existing) | signatures, verification, executed SHA-256, audit, download | Reminders at 24/72h and 7-day link expiry policy need verification/implementation |
-| Retention controls | partial | Signed copies retained; no unified retention registry | Implement registry + legal holds |
+| E-signature evidence | verified working + reminders implemented (staged) | signatures, verification, executed SHA-256, audit, download; signing link now expires after **7 days**; 24h/72h owner-configurable reminders, stop on completion/decline, no appointment cancellation; migration `0047` + hourly Worker | Apply migration/deploy Worker; confirm one reminder in a mailbox |
+| Retention controls | **registry implemented (staged)** | Retention policy registry, legal holds, release flow and audit (migration `0046`); no deletion/anonymization is performed by the registry | Owner approves actual retention schedules; permanent deletion remains owner-gated |
 
 ### Wave D — Tampa internal readiness (public OFF)
 
@@ -155,3 +155,55 @@ data, migrations, messages, charges, flags or Cloudflare settings were changed.
    `ADMIN_STRIPE_PORTAL_ENABLED=true` only after review.
 6. Decide the GitHub branch reconciliation (owner approval required).
 7. Continue customer portal identity design and remaining pagination lists.
+
+### 2026-11-21 � session 2 (production release + portal + data/document controls)
+
+Production release completed:
+
+- Migration `0044` applied to production D1; `d1_migrations` records 44.
+- Pre-migration D1 export: 312,119 bytes, SHA-256
+  `EF847495C477C4FC604CF828678C582477F47A1D0B17B48C5461E02C0B36AFB6`.
+- Independent in-memory restore verification: 43 migrations, 83 tables,
+  0 foreign-key violations, 10 customers / 9 properties / 14 appointments /
+  2 invoices preserved.
+- `production-safe` pushed `851a28b..e65db71`; Cloudflare Pages production
+  deployment **`c50ba68b-d634-4a1d-a98a-5a2b9dc02978`** for `e65db71`.
+- Live smoke: home 200, careers 200, Tampa 404, admin 200 with new
+  communications UI, admin API unauthorized 401, internal backup endpoint
+  responds 503 (token not configured) on POST.
+
+Implemented after that deployment (staged, not yet deployed):
+
+- Customer portal (migration `0045`): passwordless single-use links, hashed
+  sessions, CSRF, anti-enumeration, bookings, recurring plans, invoices/payment
+  links, documents, profile/properties, service requests, Stripe billing portal
+  session. `/portal/` page and footer link.
+- Communications sender integration for booking confirmations, booking admin
+  notifications, invoice email, receipt copy, gift delivery, careers and portal
+  mail. Stripe remains the official receipt source; no duplicate receipt path.
+- Data Control improvements: branch-filtered counts and CSV/JSON exports,
+  signing-evidence export, backup health/incident panel, retention registry and
+  legal holds (migration `0046`).
+- Server pagination for audit history; customers/leads/careers/invoices already
+  paged.
+- Document reminders and secure storage (migration `0047`): 7-day signing links,
+  24h/72h owner-configurable reminders, hourly Worker, no appointment
+  cancellation.
+- `scripts/backup/verify-d1-export.mjs` added and wired into the backup
+  workflow; the production pre-migration export restored independently.
+
+Current verification: unit **972 tests / 971 pass / 1 skip / 0 fail**;
+`astro check` 0 errors; build 39 pages; `validate` passes. Browser suite must be
+re-run after the portal page (see next session entry).
+
+Next executable steps:
+
+1. Re-run the full browser suite and record the final count.
+2. Apply migrations `0045`, `0046`, `0047`; record them in `d1_migrations`.
+3. Commit/push/deploy the second release; verify `/portal/`, admin retention and
+   reminder settings in production.
+4. Deploy `workers/backup-monitor` and `workers/document-reminders` with their
+   secrets and D1 binding.
+5. Owner confirms inbox delivery/replies and Stripe portal settings.
+6. Continue archive search, short-lived download storage and approved
+   permanent-deletion workflow.

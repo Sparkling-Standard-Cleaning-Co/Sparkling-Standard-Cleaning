@@ -30,13 +30,27 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-async function count(db: D1Database, table: string): Promise<number | null> {
+function text(value: unknown, max = 500): string {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+async function count(db: D1Database, table: string, branchColumn = '', branch = ''): Promise<number | null> {
   try {
-    const row = await db.prepare(`SELECT COUNT(*) AS count FROM "${table}"`).first<{ count: number }>();
-    return Number(row?.count ?? 0);
+    const scoped = branchColumn && branch
+      ? await db.prepare(`SELECT COUNT(*) AS count FROM "${table}" WHERE "${branchColumn}" = ?`).bind(branch).first<{ count: number }>()
+      : await db.prepare(`SELECT COUNT(*) AS count FROM "${table}"`).first<{ count: number }>();
+    return Number(scoped?.count ?? 0);
   } catch {
     return null;
   }
+}
+
+function exportBranch(value: string | null): string {
+  return ['branch_pensacola', 'branch_tampa'].includes(value ?? '') ? String(value) : '';
+}
+
+function branchFilter(branch: string, column: string): { sql: string; bind: string[] } {
+  return branch ? { sql: ` AND ${column} = ?`, bind: [branch] } : { sql: '', bind: [] };
 }
 
 async function r2Summary(bucket: R2Bucket | undefined, prefixes: string[]): Promise<{
@@ -105,42 +119,66 @@ function csvValue(value: unknown): string {
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-async function csv(db: D1Database, kind: string): Promise<{ filename: string; body: string }> {
-  const queries: Record<string, { filename: string; sql: string }> = {
+async function csv(
+  db: D1Database,
+  kind: string,
+  branch = '',
+): Promise<{ filename: string; body: string; rows: Array<Record<string, unknown>>; headers: string[] }> {
+  const definitions: Record<string, { filename: string; sql: string; column: string }> = {
     customers: {
       filename: 'customers.csv',
+      column: 'c.primary_branch_id',
       sql: `SELECT c.id, c.first_name, c.last_name, c.company_name, c.status, b.name AS branch,
                    (SELECT value FROM customer_contacts cc WHERE cc.customer_id=c.id AND cc.kind='email' LIMIT 1) AS email,
                    (SELECT value FROM customer_contacts cc WHERE cc.customer_id=c.id AND cc.kind='phone' LIMIT 1) AS phone,
                    c.created_at
-            FROM customers c LEFT JOIN branches b ON b.id=c.primary_branch_id ORDER BY c.created_at LIMIT 5000`,
+            FROM customers c LEFT JOIN branches b ON b.id=c.primary_branch_id
+            WHERE c.source <> 'financial_system'{{BRANCH}} ORDER BY c.created_at LIMIT 5000`,
     },
     properties: {
       filename: 'properties.csv',
+      column: 'branch_id',
       sql: `SELECT id, customer_id, label, line1, line2, city, state, postal_code, status, created_at
-            FROM properties ORDER BY created_at LIMIT 5000`,
+            FROM properties WHERE 1=1{{BRANCH}} ORDER BY created_at LIMIT 5000`,
     },
     appointments: {
       filename: 'appointments.csv',
+      column: 'branch_id',
       sql: `SELECT id, reference, customer_id, property_id, status, start_at, end_at, duration_minutes, created_at
-            FROM appointments ORDER BY start_at LIMIT 5000`,
+            FROM appointments WHERE 1=1{{BRANCH}} ORDER BY start_at LIMIT 5000`,
     },
     invoices: {
       filename: 'invoices.csv',
+      column: 'branch_id',
       sql: `SELECT id, number, customer_id, status, issue_date, due_date, total_cents, amount_paid_cents, balance_cents, created_at
-            FROM invoices ORDER BY created_at LIMIT 5000`,
+            FROM invoices WHERE 1=1{{BRANCH}} ORDER BY created_at LIMIT 5000`,
+    },
+    signatures: {
+      filename: 'signing-evidence.csv',
+      column: 'sr.branch_id',
+      sql: `SELECT s.id AS signature_id, sr.id AS signing_request_id, sr.bundle_code, sr.status AS request_status,
+                   t.title, t.version AS template_version, s.signer_name, s.signer_email, s.status AS signature_status,
+                   s.signed_at, s.signed_ip_hash, s.signed_user_agent_hash, s.signed_content_sha256,
+                   sr.executed_at, sr.executed_sha256
+            FROM document_signatures s
+            JOIN signing_requests sr ON sr.id = s.signing_request_id
+            JOIN document_templates t ON t.id = s.template_id
+            WHERE 1=1{{BRANCH}} ORDER BY s.signed_at DESC LIMIT 5000`,
     },
   };
-  const query = queries[kind];
+  const query = definitions[kind];
   if (!query) throw new AdminAuthError(400, 'export_kind_invalid');
-  const rows = await db.prepare(query.sql).all<Record<string, unknown>>();
+  const filter = branchFilter(branch, query.column);
+  const statement = db.prepare(query.sql.replace('{{BRANCH}}', filter.sql));
+  const rows = filter.bind.length ? await statement.bind(...filter.bind).all<Record<string, unknown>>() : await statement.all<Record<string, unknown>>();
   const records = rows.results ?? [];
   const headers = records.length > 0 ? Object.keys(records[0]!) : [];
   const body = [
     headers.map(csvValue).join(','),
     ...records.map((record) => headers.map((header) => csvValue(record[header])).join(',')),
   ].join('\n');
-  return { filename: query.filename, body };
+  const suffix = branch ? `-${branch.replace('branch_', '')}` : '';
+  return { filename: query.filename.replace('.csv', `${suffix}.csv`), body, rows: records, headers };
 }
 
 export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
@@ -151,19 +189,33 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     if (actor.role !== 'owner') return json({ ok: false, error: 'owner_required' }, 403);
     const url = new URL(context.request.url);
     const exportKind = url.searchParams.get('export') ?? '';
+    const branch = exportBranch(url.searchParams.get('branch'));
+    const format = url.searchParams.get('format') === 'json' ? 'json' : 'csv';
     if (exportKind) {
-      const file = await csv(db, exportKind);
+      const file = await csv(db, exportKind, branch);
       await audit(db, {
         actorUserId: actor.id,
         action: 'storage.business_records_exported',
         entityType: 'export',
         entityId: exportKind,
+        detail: `${format}:${branch || 'all'}:${file.rows.length}`,
       }).catch(() => undefined);
+      if (format === 'json') {
+        return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), branch: branch || 'all', kind: exportKind, records: file.rows }, null, 2), {
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Disposition': `attachment; filename="${file.filename.replace(/\.csv$/, '.json')}"`,
+            'Cache-Control': 'private, no-store',
+            'X-Content-Type-Options': 'nosniff',
+          },
+        });
+      }
       return new Response(file.body, {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': `attachment; filename="${file.filename}"`,
           'Cache-Control': 'private, no-store',
+          'X-Content-Type-Options': 'nosniff',
         },
       });
     }
@@ -176,17 +228,23 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     } catch {
       databaseBytes = null;
     }
-    const [customers, properties, appointments, invoices, documents, photos, settings] = await Promise.all([
-      count(db, 'customers'),
-      count(db, 'properties'),
-      count(db, 'appointments'),
-      count(db, 'invoices'),
+    const requestedBranch = exportBranch(url.searchParams.get('branch'));
+    const [customers, properties, appointments, invoices, documents, photos, settings, backupRuns, incidents, retention, holds] = await Promise.all([
+      count(db, 'customers', 'primary_branch_id', requestedBranch),
+      count(db, 'properties', 'branch_id', requestedBranch),
+      count(db, 'appointments', 'branch_id', requestedBranch),
+      count(db, 'invoices', 'branch_id', requestedBranch),
       count(db, 'document_templates'),
       count(db, 'document_signatures'),
-      db.prepare("SELECT key, value_json, updated_at FROM admin_settings WHERE key LIKE 'backup.%' OR key LIKE 'storage.%' ORDER BY key").all<Record<string, unknown>>().catch(() => ({ results: [] })),
+      db.prepare("SELECT key, value_json, updated_at FROM admin_settings WHERE key LIKE 'backup.%' OR key LIKE 'storage.%' OR key LIKE 'communications.%' ORDER BY key").all<Record<string, unknown>>().catch(() => ({ results: [] })),
+      db.prepare('SELECT run_key, status, summary, recorded_at FROM backup_runs ORDER BY recorded_at DESC LIMIT 5').all<Record<string, unknown>>().catch(() => ({ results: [] })),
+      db.prepare("SELECT id, incident_key, status, summary, opened_at, escalation_sent_at, resolved_at FROM operations_incidents WHERE status <> 'resolved' ORDER BY opened_at DESC LIMIT 20").all<Record<string, unknown>>().catch(() => ({ results: [] })),
+      db.prepare('SELECT * FROM retention_policies ORDER BY record_type').all<Record<string, unknown>>().catch(() => ({ results: [] })),
+      db.prepare('SELECT id, subject_type, subject_id, reason, status, created_at, released_at FROM legal_holds ORDER BY created_at DESC LIMIT 100').all<Record<string, unknown>>().catch(() => ({ results: [] })),
     ]);
     return json({
       ok: true,
+      branch: requestedBranch || 'all',
       database: {
         configured: true,
         bytes: databaseBytes,
@@ -196,9 +254,17 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         photos: await r2Summary(context.env.PHOTOS_BUCKET, ['leads/']),
         documents: await r2Summary(context.env.DOCUMENTS_BUCKET, ['agreements/']),
       },
+      backup: {
+        recentRuns: backupRuns.results ?? [],
+        openIncidents: incidents.results ?? [],
+      },
+      retention: {
+        policies: retention.results ?? [],
+        holds: holds.results ?? [],
+      },
       settings: settings.results ?? [],
       note:
-        'Provider free-tier usage and R2 byte totals require Cloudflare account analytics. Counts above are sampled/D1-derived; no universal capacity percentage is invented.',
+        'Provider free-tier usage and R2 byte totals require Cloudflare account analytics. Counts above are sampled/D1-derived; no universal capacity percentage is invented. A backup run record is not restore proof. The retention registry records intent only; it does not delete records.',
       refreshedAt: new Date().toISOString(),
     });
   } catch (error) {
@@ -242,6 +308,91 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         detail: `eligible=${result.eligible};deleted=${result.deleted}`,
       });
       return json({ ok: true, ...result });
+    }
+    if (action === 'save_retention_policy') {
+      const recordType = text(body.recordType, 80).toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
+      if (!recordType) return json({ ok: false, error: 'record_type_required' }, 400);
+      const retentionMonths = Math.max(0, Math.min(600, Math.round(Number(body.retentionMonths) || 0)));
+      const status = ['draft', 'active', 'retired'].includes(String(body.status)) ? String(body.status) : 'draft';
+      const id = `rpol_${crypto.randomUUID()}`;
+      await db
+        .prepare(
+          `INSERT INTO retention_policies
+           (id, record_type, description, retention_months, automatic_cleanup, status,
+            approved_by_admin_user_id, approved_at, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(record_type) DO UPDATE SET
+             description = excluded.description,
+             retention_months = excluded.retention_months,
+             automatic_cleanup = excluded.automatic_cleanup,
+             status = excluded.status,
+             approved_by_admin_user_id = excluded.approved_by_admin_user_id,
+             approved_at = excluded.approved_at,
+             updated_at = excluded.updated_at`,
+        )
+        .bind(
+          id,
+          recordType,
+          text(body.description, 1000),
+          retentionMonths,
+          body.automaticCleanup === true ? 1 : 0,
+          status,
+          status === 'active' ? actor.id : null,
+          status === 'active' ? new Date().toISOString() : null,
+          new Date().toISOString(),
+          new Date().toISOString(),
+        )
+        .run();
+      await audit(db, {
+        actorUserId: actor.id,
+        action: 'retention.policy_saved',
+        entityType: 'retention_policy',
+        entityId: recordType,
+        detail: `${retentionMonths}:${status}`,
+      });
+      return json({ ok: true });
+    }
+    if (action === 'create_legal_hold') {
+      const subjectType = text(body.subjectType, 60);
+      const subjectId = text(body.subjectId, 120);
+      const reason = text(body.reason, 1000);
+      if (!subjectType || !subjectId || reason.length < 5) {
+        return json({ ok: false, error: 'legal_hold_fields_required' }, 400);
+      }
+      const id = `hold_${crypto.randomUUID()}`;
+      await db
+        .prepare(
+          `INSERT INTO legal_holds
+           (id, subject_type, subject_id, reason, status, created_by_admin_user_id, created_at)
+           VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+        )
+        .bind(id, subjectType, subjectId, reason, actor.id, new Date().toISOString())
+        .run();
+      await audit(db, {
+        actorUserId: actor.id,
+        action: 'retention.legal_hold_created',
+        entityType: subjectType,
+        entityId: subjectId,
+        detail: reason.slice(0, 200),
+      });
+      return json({ ok: true, id });
+    }
+    if (action === 'release_legal_hold') {
+      const holdId = text(body.holdId, 120);
+      if (!holdId) return json({ ok: false, error: 'legal_hold_required' }, 400);
+      await db
+        .prepare(
+          "UPDATE legal_holds SET status = 'released', released_by_admin_user_id = ?, released_at = ? WHERE id = ? AND status = 'active'",
+        )
+        .bind(actor.id, new Date().toISOString(), holdId)
+        .run();
+      await audit(db, {
+        actorUserId: actor.id,
+        action: 'retention.legal_hold_released',
+        entityType: 'legal_hold',
+        entityId: holdId,
+      });
+      return json({ ok: true });
     }
     return json({ ok: false, error: 'invalid_action' }, 400);
   } catch (error) {

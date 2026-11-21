@@ -59,6 +59,7 @@
     "backup:inventory": "node scripts/backup/inventory.mjs",
     "backup:create": "node scripts/backup/create.mjs",
     "backup:verify": "node scripts/backup/verify.mjs",
+    "backup:verify-d1-export": "node scripts/backup/verify-d1-export.mjs",
     "backup:restore": "node scripts/backup/restore.mjs",
     "backup:r2": "node scripts/backup/r2-archive.mjs",
     "backup:split": "node scripts/backup/split.mjs",

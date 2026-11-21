@@ -31,6 +31,7 @@ export default defineConfig({
         !page.includes('/admin') &&
         !page.includes('/employee') &&
         !page.includes('/document-sign') &&
+        !page.includes('/portal') &&
         !page.includes('/gift-certificates/success') &&
         !page.includes('/gift-certificates/redeem') &&
         !page.includes('/locations/tampa-bay'),

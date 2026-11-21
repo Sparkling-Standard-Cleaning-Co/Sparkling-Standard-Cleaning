@@ -35,6 +35,7 @@ import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts'
 import { buildLeadReadiness } from '../../src/lib/forms/delivery-readiness.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
 import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
+import { DEPARTMENT_ADDRESSES, readCommunicationSettings } from '../../src/lib/admin/communications.ts';
 import { schedulingConfig } from '../../src/config/scheduling.ts';
 import { legalTerms } from '../../src/config/legal.ts';
 import {
@@ -928,7 +929,16 @@ export async function onRequestPost(context: {
   // The owner notification was accepted (not necessarily inbox-delivered).
   // The customer confirmation is a best-effort second path; its failure never
   // turns a successful lead into a failed submission.
-  const customerEmail = await sendCustomerConfirmation(clean, env);
+  const communicationState = env.DB
+    ? await readCommunicationSettings(env.DB).catch(() => null)
+    : null;
+  const bookingReplyTo = communicationState
+    ? DEPARTMENT_ADDRESSES[communicationState.settings.replyTo.bookingConfirmations]
+    : undefined;
+  const customerEmail = await sendCustomerConfirmation(clean, {
+    ...env,
+    ...(bookingReplyTo ? { RESEND_REPLY_TO: bookingReplyTo } : {}),
+  });
   if (customerEmail.status === 'failed') {
     console.error(describeCustomerEmailOutcome(customerEmail));
   }

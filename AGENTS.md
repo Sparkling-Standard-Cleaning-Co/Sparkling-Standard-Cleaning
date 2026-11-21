@@ -456,6 +456,9 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | SEO, structured data, sitemap, robots, page ownership | `src/components/BaseHead.astro`, `src/lib/schema.ts`, page files | `docs/seo/SEO-STRATEGY.md`, `docs/operations/SEARCH-CONSOLE-SETUP.md` |
 | Department email routing | `src/config/email-routing.ts`, customer/invoice/receipt mailers, `src/pages/careers.astro` | `docs/operations/EMAIL-ROUTING.md` |
 | Communications & notifications center, backup alert escalation | `src/lib/admin/communications.ts`, `src/lib/admin/backup-monitor.ts`, `functions/api/admin/communications.ts`, `functions/api/internal/backup-status.ts`, migration `0044`, `workers/backup-monitor/` | `docs/operations/COMMUNICATIONS-CENTER.md` |
+| Customer portal (passwordless sessions, billing, documents, requests) | `src/lib/portal/service.ts`, `functions/api/portal/*`, `src/pages/portal/index.astro`, migration `0045` | `docs/operations/CUSTOMER-PORTAL.md` |
+| Retention registry, legal holds, Data Control exports | `functions/api/admin/storage.ts`, migration `0046` | `docs/operations/OFFSITE-BACKUPS.md` |
+| Document signing reminders and link lifetime | `src/lib/documents/reminders.ts`, `workers/document-reminders/`, migration `0047` | `docs/operations/DOCUMENT-MANAGEMENT.md` |
 | Analytics, consent, event taxonomy, attribution | `src/scripts/consent-controller.ts`, `src/lib/analytics/`, `src/lib/attribution.ts` | `docs/analytics/ANALYTICS-SETUP.md`, `docs/analytics/GTM-CONTAINER-SETUP.md` |
 | Visual design, tokens, images, icons, OG image | `src/styles/`, `public/brand/`, `src/assets/images/` | `docs/design/DESIGN-SYSTEM.md`, `docs/design/IMAGE-GUIDE.md`, `docs/design/IMAGE-SOURCE-REGISTER.md` |
 | Document packet builder, variables and template lifecycle | `src/lib/documents/service.ts`, `functions/api/admin/documents.ts`, migration `0038`, `src/pages/admin/index.astro` | `docs/operations/DOCUMENT-MANAGEMENT.md` |

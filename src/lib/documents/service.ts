@@ -11,7 +11,7 @@ import { hashToken, randomToken } from '../admin/auth.ts';
 import { AdminAuthError, audit } from '../admin/operations.ts';
 import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 
-export const SIGNING_TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+export const SIGNING_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const ESIGN_CONSENT_VERSION = '2026-11-01.esign-consent.v1';
 
 export type EnforcementStage =

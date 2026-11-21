@@ -31,6 +31,9 @@ export const PUBLIC_RATE_LIMITS = {
   careerIp: { limit: 8, windowSeconds: 3600, blockSeconds: 1800 },
   careerEmail: { limit: 4, windowSeconds: 86400, blockSeconds: 86400 },
   careerStatusIp: { limit: 30, windowSeconds: 600, blockSeconds: 900 },
+  portalIp: { limit: 20, windowSeconds: 600, blockSeconds: 900 },
+  portalEmail: { limit: 6, windowSeconds: 3600, blockSeconds: 3600 },
+  portalActionIp: { limit: 60, windowSeconds: 600, blockSeconds: 900 },
 } as const satisfies Record<string, PublicRateLimitPolicy>;
 
 export function clientIp(request: Request): string {

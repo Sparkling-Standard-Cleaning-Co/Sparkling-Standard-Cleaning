@@ -10,6 +10,7 @@ import { createCustomer, getCustomer } from '../../../src/lib/admin/crm.ts';
 import type { BookingEnv } from '../../../src/lib/booking/service.ts';
 import { onRequestPost as bookingAdminPost } from '../booking-admin.ts';
 import { sendBookingEmail, type BookingEmailKind } from '../../../src/lib/forms/booking-email.ts';
+import { DEPARTMENT_ADDRESSES, readCommunicationSettings } from '../../../src/lib/admin/communications.ts';
 import { updateCalendarEvent } from '../../../src/lib/booking/google-calendar.ts';
 import {
   beginBookingCommitment,
@@ -238,11 +239,15 @@ async function sendForRequest(
   const address = text(row.line1 ? [row.line1, row.city, row.state, row.postal_code].filter(Boolean).join(', ') : payloadAddress(payload));
   const customerName = [row.first_name, row.last_name].filter(Boolean).join(' ').trim();
   const email = await customerEmail(db, (row.customer_id as string | null) ?? null);
+  const communication = await readCommunicationSettings(db).catch(() => null);
+  const bookingReplyTo = communication
+    ? DEPARTMENT_ADDRESSES[communication.settings.replyTo.bookingConfirmations]
+    : context.env.RESEND_REPLY_TO;
   const outcome = await sendBookingEmail(
     {
       ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
       ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
-      ...(context.env.RESEND_REPLY_TO ? { RESEND_REPLY_TO: context.env.RESEND_REPLY_TO } : {}),
+      ...(bookingReplyTo ? { RESEND_REPLY_TO: bookingReplyTo } : {}),
       PUBLIC_SITE_URL: context.env.PUBLIC_SITE_URL ?? new URL(context.request.url).origin,
     },
     email,

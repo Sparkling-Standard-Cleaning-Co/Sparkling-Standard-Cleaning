@@ -190,3 +190,22 @@ selection, milestone gating, partial and complete signing, idempotent duplicate
 callbacks, immutable signatures, policy changes without redeployment, employee
 verification, commercial/church bundle resolution, per-booking conditions,
 PDF upload/approval and the confirmation gate.
+
+## 11. Signing reminders and link lifetime
+
+- A signing link expires after **7 days**. Expiry never cancels the
+  appointment, booking, recurring plan or agreement.
+- Reminders default to **24 hours** and **72 hours** after request creation and
+  are owner-configurable in **Admin -> Documents & Agreements**.
+- An expired link is replaced with a fresh 7-day link only when a reminder can
+  actually be delivered. The previous link is invalidated at that point.
+- Reminders stop on signed, declined, void or expired requests.
+- Each attempt is recorded in `document_signing_reminders` and audited.
+- Deployment: migration `0047_document_reminders.sql` and the
+  `workers/document-reminders` hourly Worker.
+
+## 12. Portal document access
+
+Customers can download their own executed copies and signed PDFs from
+`/portal/`. The portal verifies the session's `customer_id` before any
+document lookup and records each download in `customer_portal_audit`.

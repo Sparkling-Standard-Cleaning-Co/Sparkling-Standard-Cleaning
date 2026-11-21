@@ -55,6 +55,19 @@ Verify without touching production:
 npm run backup:verify -- backup-out\<archive>.ssbk
 ```
 
+Verify the D1 SQL export restores independently (in-memory, no production
+access):
+
+```powershell
+npm run backup:verify-d1-export -- backup-out\d1.sql
+```
+
+The D1 export can list a table that references a later-created table before that
+table's `CREATE TABLE` statement. The verifier restores with foreign-key
+enforcement disabled, then runs `PRAGMA foreign_key_check`. A clean result is
+restore evidence for the data; a production D1 import still requires a reviewed
+procedure and a fresh backup of the target database first.
+
 Restore into a new, empty directory:
 
 ```powershell

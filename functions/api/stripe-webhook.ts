@@ -18,6 +18,7 @@ import { verifyStripeSignature } from '../../src/lib/gift/stripe-signature.ts';
 import { buildGiftFulfillment, giftCertificateCodeFor } from '../../src/lib/gift/fulfillment.ts';
 import { commitGiftReservation, giftBucket, issueGiftCertificate, releaseGiftReservation, remainingCents } from '../../src/lib/gift/ledger.ts';
 import { buildGiftCertificateEmail } from '../../src/lib/gift/delivery.ts';
+import { DEPARTMENT_ADDRESSES, readCommunicationSettings } from '../../src/lib/admin/communications.ts';
 import { activationInstant, centralToday, isValidCalendarDate } from '../../src/lib/gift/activation.ts';
 import {
   completePaymentEvent,
@@ -368,6 +369,7 @@ async function sendCustomerGiftEmail(
   html: string,
   text: string,
   idempotencyKey: string,
+  replyTo = 'customer-service@sparkling-standard.com',
 ): Promise<boolean> {
   if (!env.RESEND_API_KEY?.trim()) return false;
   try {
@@ -381,6 +383,7 @@ async function sendCustomerGiftEmail(
       body: JSON.stringify({
         from: env.RESEND_FROM_EMAIL?.trim() || 'Sparkling Standard <notifications@sparkling-standard.com>',
         to: [to],
+        reply_to: replyTo,
         subject,
         html,
         text,
@@ -1063,6 +1066,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   fulfillment['Ledger status'] = issued.created ? 'Created once' : 'Existing record reused';
   fulfillment['Remaining value'] = `$${(remainingCents(issued.record) / 100).toFixed(2)}`;
   const siteUrl = env.PUBLIC_SITE_URL?.replace(/\/+$/, '') || 'https://sparkling-standard.com';
+  const communication = env.DB ? await readCommunicationSettings(env.DB).catch(() => null) : null;
+  const giftReplyTo = communication
+    ? DEPARTMENT_ADDRESSES[communication.settings.replyTo.contact]
+    : 'customer-service@sparkling-standard.com';
   const email = buildGiftCertificateEmail({
     code,
     valueUsd: seed.gift.valueUsd,
@@ -1081,6 +1088,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     email.html,
     email.text,
     `gift-${eventId}-purchaser`,
+    giftReplyTo,
   );
   let recipientDelivered = true;
   if (seed.gift.deliveryMethod === 'recipient_email' && seed.gift.recipientEmail) {
@@ -1102,6 +1110,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       recipientEmail.html,
       recipientEmail.text,
       `gift-${eventId}-recipient`,
+      giftReplyTo,
     );
   }
   fulfillment['Customer delivery'] =

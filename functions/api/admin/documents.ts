@@ -37,6 +37,7 @@ import {
   processExecutedDocumentOutbox,
   queueExecutedDocumentEmail,
 } from '../../../src/lib/documents/notifications.ts';
+import { readReminderSettings, saveReminderSettings } from '../../../src/lib/documents/reminders.ts';
 
 interface DocumentsBucket {
   get?: (key: string) => Promise<{
@@ -125,6 +126,10 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const url = new URL(context.request.url);
     const view = url.searchParams.get('view') ?? 'templates';
     if (view === 'templates') return json({ ok: true, templates: await listTemplates(db) });
+    if (view === 'reminder-settings') {
+      ownerOnly(actor);
+      return json({ ok: true, settings: await readReminderSettings(db) });
+    }
     if (view === 'template') {
       const template = await getTemplate(db, url.searchParams.get('id') ?? '');
       if (!template) return json({ ok: false, error: 'template_not_found' }, 404);
@@ -285,6 +290,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       ? Object.fromEntries([...form.entries()].filter(([, value]) => typeof value === 'string'))
       : ((await context.request.json().catch(() => ({}))) as Record<string, unknown>);
     const action = text(body.action, 60);
+
+    if (action === 'save_reminder_settings') {
+      ownerOnly(actor);
+      const settings = await saveReminderSettings(db, actor.id, body);
+      return json({ ok: true, settings });
+    }
 
     if (action === 'upload_template') {
       ownerOnly(actor);

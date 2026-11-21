@@ -1,5 +1,6 @@
 import type { D1Database } from '../admin/d1.ts';
 import { audit } from '../admin/operations.ts';
+import { DEPARTMENT_ADDRESSES, readCommunicationSettings } from '../admin/communications.ts';
 import { sendCustomerReceipt, type ReceiptEmailEnv } from '../forms/customer-receipt.ts';
 import type { ReceiptData, ReceiptLine } from '../payments/receipt.ts';
 
@@ -124,9 +125,16 @@ export async function deliverInvoiceReceipt(
       .bind(receiptId, input.invoiceId, loaded.paymentId)
       .run();
   }
+  const communication = await readCommunicationSettings(db).catch(() => null);
+  const receiptReplyTo = communication
+    ? DEPARTMENT_ADDRESSES[communication.settings.replyTo.receipts]
+    : undefined;
   const outcome = await sendCustomerReceipt(
     loaded.data,
-    env,
+    {
+      ...env,
+      ...(receiptReplyTo ? { RESEND_BILLING_REPLY_TO: receiptReplyTo } : {}),
+    },
     input.force === true
       ? `invoice-receipt-resend-${loaded.paymentId}-${Date.now()}`
       : `invoice-receipt-${loaded.paymentId}`,

@@ -160,9 +160,31 @@ export function buildDocumentSigningEmail(
       'Documents ready for signature',
       `<p style="font-size:16px;line-height:1.6">The following document set is ready for your review and electronic signature: <strong>${escapeHtml(bundleName)}</strong>.</p>
        <p><a href="${url}" style="display:inline-block;background:#9a5b61;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px">Review and sign securely</a></p>
-       <p style="font-size:14px;line-height:1.6">This secure link expires in 14 days and can be used until the required documents are signed. If you were not expecting this, contact Sparkling Standard directly.</p>`,
+       <p style="font-size:14px;line-height:1.6">This secure link expires in 7 days and can be used until the required documents are signed. If you were not expecting this, contact Sparkling Standard directly.</p>`,
     ),
-    text: `Documents ready for your electronic signature: ${bundleName}.\n\nReview and sign securely (expires in 14 days):\n${url}\n\nIf you were not expecting this, contact Sparkling Standard directly.`,
+    text: `Documents ready for your electronic signature: ${bundleName}.\n\nReview and sign securely (expires in 7 days):\n${url}\n\nIf you were not expecting this, contact Sparkling Standard directly.`,
+  };
+}
+
+export function buildSigningReminderEmail(
+  env: AdminEmailEnv,
+  bundleName: string,
+  token?: string,
+): AdminEmail {
+  const url = token ? `${siteUrl(env)}/document-sign/?token=${encodeURIComponent(token)}` : '';
+  const action = url
+    ? `<p><a href="${url}" style="display:inline-block;background:#9a5b61;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px">Review and sign securely</a></p>
+       <p style="font-size:14px;line-height:1.6">This replacement link expires in 7 days.</p>`
+    : '<p style="font-size:14px;line-height:1.6">Open the secure link in your earlier email to review and sign. If that link has expired, contact Sparkling Standard for a new one.</p>';
+  return {
+    subject: `Reminder: documents awaiting your signature - ${bundleName}`,
+    html: shell(
+      'Documents still awaiting your signature',
+      `<p style="font-size:16px;line-height:1.6">The document set <strong>${escapeHtml(bundleName)}</strong> is still awaiting your review and electronic signature.</p>
+       ${action}
+       <p style="font-size:14px;line-height:1.6">Your appointment is not cancelled by this reminder. If you have a question or need help, reply to this message.</p>`,
+    ),
+    text: `Reminder: the document set ${bundleName} is still awaiting your review and electronic signature.\n\n${url ? `Review and sign (replacement link expires in 7 days):\n${url}\n\n` : 'Open the secure link in your earlier email. If it has expired, contact Sparkling Standard for a new one.\n\n'}Your appointment is not cancelled by this reminder.`,
   };
 }
 
