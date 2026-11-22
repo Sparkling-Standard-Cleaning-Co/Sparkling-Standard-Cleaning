@@ -13,6 +13,7 @@ import { commitConfirmedBooking } from '../src/lib/booking/commitment.ts';
 import { autoConfirmPaidBooking } from '../src/lib/booking/auto-confirm.ts';
 import { FakeLedger } from './helpers/payment-fakes.ts';
 import {
+  acknowledgeDocumentUpdate,
   activeRequirements,
   addBundleItem,
   approveTemplate,
@@ -24,6 +25,7 @@ import {
   getExecutedCopy,
   employeeOnboardingStatus,
   evaluateDocumentGate,
+  listDocumentUpdates,
   listSigningRequests,
   removeBundleItem,
   signSigningRequest,
@@ -933,4 +935,79 @@ test('a per-booking signature cannot satisfy a different booking and only a matc
   const firstGate = await evaluateDocumentGate(f.db, firstBooking, 'before_payment');
   const reusableFirst = await findReusableSigningRequest(f.db, firstBooking, firstGate);
   assert.equal(reusableFirst?.id, stale.requestId);
+});
+
+test('document revisions surface owner review, affected packets and a re-signing queue', async () => {
+  const f = await fixture();
+  const old = await createTemplate(f.db, f.owner.id, {
+    title: 'Revision Test Agreement',
+    category: 'residential',
+    version: '1.0',
+    contentText: 'Original agreement for {{customer.legal_name}}.',
+    familyKey: 'revision-test',
+  });
+  await approveTemplate(f.db, f.owner.id, old.id);
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.residential',
+    name: 'Residential documents',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId: old.id,
+    required: true,
+    enforcementStage: 'before_payment',
+    perBooking: true,
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    bookingReference: 'SS-REVISION-1',
+  };
+  const request = await createSigningRequest(f.db, context, { createdByAdminUserId: f.owner.id });
+  await signSigningRequest(f.db, request.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'customer@example.test',
+    consent: true,
+    signatures: { [old.id]: { value: 'Synthetic Customer' } },
+    request: signingRequest(),
+  });
+
+  const revision = await createTemplate(f.db, f.owner.id, {
+    title: 'Revision Test Agreement',
+    category: 'residential',
+    version: '1.1',
+    contentText: 'Revised agreement for {{customer.legal_name}}.',
+    familyKey: 'revision-test',
+    supersedesTemplateId: old.id,
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId: revision.id,
+    required: true,
+    enforcementStage: 'before_payment',
+    perBooking: true,
+  });
+  const pending = await listDocumentUpdates(f.db);
+  const pendingUpdate = pending.find((entry) => entry.templateId === revision.id);
+  assert.equal(pendingUpdate?.status, 'pending_approval');
+  assert.equal(pendingUpdate?.affectedPackets.length, 1);
+  assert.equal(pendingUpdate?.affectedCustomers.length, 1);
+  assert.equal(pendingUpdate?.affectedCustomers[0]?.needsResigning, true);
+
+  await approveTemplate(f.db, f.owner.id, revision.id);
+  const review = (await listDocumentUpdates(f.db)).find((entry) => entry.templateId === revision.id);
+  assert.equal(review?.status, 'owner_review_required');
+
+  await acknowledgeDocumentUpdate(f.db, f.owner.id, revision.id, {
+    materialChange: true,
+    note: 'Synthetic material revision review.',
+  });
+  const material = (await listDocumentUpdates(f.db)).find((entry) => entry.templateId === revision.id);
+  assert.equal(material?.status, 'resigning_recommended');
+  assert.equal(material?.review.materialChange, true);
+  assert.equal(material?.review.note, 'Synthetic material revision review.');
 });

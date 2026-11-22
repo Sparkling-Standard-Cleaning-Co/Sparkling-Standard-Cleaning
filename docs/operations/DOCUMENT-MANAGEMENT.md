@@ -142,6 +142,32 @@ and verify paperwork. Cleaners cannot change policy.
 - Cross-customer and cross-employee access is prohibited: a token only resolves
   its own request, and gate lookups match the subject identity.
 
+## 5a. Document revisions and re-signing review (2026-11-22)
+
+A new template version is created by duplicating an approved template. The
+duplicate starts as `draft`, keeps the same `family_key`, and records
+`supersedes_template_id`; the approved and executed versions remain immutable.
+
+**Admin → Documents & Agreements → Document Updates** shows, for each revision:
+
+- the previous and new version and the approval state;
+- every packet that references either version;
+- customers who signed the previous version and have not signed the new one;
+- their next upcoming appointment, when one exists;
+- the owner review state and the material/nonmaterial classification.
+
+The owner acknowledges a revision as **material** or **formatting/nonmaterial**.
+A material revision with customers still on the old version becomes
+**Re-signing recommended**. Nothing is sent automatically. **Use in composer**
+prefills the existing admin composer with the customer and affected packet; the
+owner reviews the rendered PDF and sends the request individually. Historical
+executed copies are never replaced or deleted.
+
+When a revision is created, an owner notification is sent if
+`OWNER_NOTIFICATION_EMAIL` and Resend are configured; the audit record
+`documents.revision_notification` records whether the alert was sent. No
+customer is contacted by the notification.
+
 ## 6. Integration points
 
 | Flow | Gate |
@@ -167,10 +193,11 @@ with `requires_verification` and complete the actual review independently.
 ## 8. Legal safety
 
 `src/config/agreements.ts` remains the draft catalog. Do not activate draft
-templates or invent legal wording. The document engine is live and tested, but
-real customer/employee signature workflows remain gated until the owner supplies
-approved templates and the required legal review. The catalog and e-signature
-activation flags must remain off until then.
+templates or invent legal wording. The 27 owner-approved 2026-11-22 documents
+are imported in production and live electronic signing is enabled for the four
+verified residential packets. Facility, specialty, property-management, STR and
+employee packets remain imported but inactive until their own acceptance run.
+Do not weaken the server-side `before_payment` and `per_booking` enforcement.
 
 ## 9. Provisioning
 

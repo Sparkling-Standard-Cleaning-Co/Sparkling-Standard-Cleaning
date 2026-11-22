@@ -1,8 +1,10 @@
 // Owner-controlled Documents & Agreements center.
 // Policy changes are owner-only; managers may send and verify paperwork.
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
-import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { sendAdminEmail } from '../../../src/lib/admin/email.ts';
 import {
+  acknowledgeDocumentUpdate,
   addBundleItem,
   approveTemplate,
   createBundle,
@@ -18,6 +20,7 @@ import {
   getTemplate,
   listBundleItems,
   listBundles,
+  listDocumentUpdates,
   listSigningRequests,
   listTemplates,
   previewPacket,
@@ -146,6 +149,61 @@ function emailEnv(env: Env): { RESEND_API_KEY?: string; RESEND_FROM_EMAIL?: stri
   };
 }
 
+async function notifyDocumentRevision(
+  context: { request: Request; env: Env },
+  db: import('../../../src/lib/admin/d1.ts').D1Database,
+  actorUserId: string,
+  templateId: string,
+): Promise<void> {
+  const template = await getTemplate(db, templateId).catch(() => null);
+  if (!template) return;
+  const previousId = text(template.supersedes_template_id, 100);
+  const previous = previousId ? await getTemplate(db, previousId).catch(() => null) : null;
+  const recipient = (context.env.OWNER_NOTIFICATION_EMAIL ?? '').trim();
+  let sent = false;
+  if (recipient) {
+    const subject = `Document revision needs owner review: ${String(template.title ?? 'Document')}`;
+    const textBody = [
+      'A new legal document revision was created and is waiting for owner review.',
+      '',
+      `Document: ${String(template.title ?? '')}`,
+      `New version: ${String(template.version ?? '')}`,
+      previous ? `Previous version: ${String(previous.version ?? '')}` : 'Previous version: none linked',
+      `Status: ${String(template.status ?? '')}`,
+      '',
+      'Open Operations -> Documents & Agreements -> Document Updates to review the affected packets and customers.',
+      'No re-signing request is sent automatically.',
+      '',
+      'Sparkling Standard Operations',
+    ].join('\n');
+    const escapeHtml = (value: string): string =>
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    sent = await sendAdminEmail(
+      context.env,
+      recipient,
+      {
+        subject,
+        html: `<p>${escapeHtml(textBody).replace(/\n/g, '<br />')}</p>`,
+        text: textBody,
+      },
+      `document-revision-${templateId}`,
+    ).catch(() => false);
+  }
+  await audit(db, {
+    actorUserId,
+    action: 'documents.revision_notification',
+    entityType: 'document_template',
+    entityId: templateId,
+    success: true,
+    detail: sent ? 'owner_email_sent' : 'owner_email_not_sent',
+  });
+}
+
 export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
   const db = adminDb(context.env);
   if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
@@ -157,6 +215,10 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const url = new URL(context.request.url);
     const view = url.searchParams.get('view') ?? 'templates';
     if (view === 'templates') return json({ ok: true, templates: await listTemplates(db) });
+    if (view === 'updates') {
+      ownerOnly(actor);
+      return json({ ok: true, updates: await listDocumentUpdates(db) });
+    }
     if (view === 'reminder-settings') {
       ownerOnly(actor);
       return json({ ok: true, settings: await readReminderSettings(db) });
@@ -336,6 +398,15 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       return json({ ok: true, settings });
     }
 
+    if (action === 'acknowledge_update') {
+      ownerOnly(actor);
+      await acknowledgeDocumentUpdate(db, actor.id, text(body.templateId, 100), {
+        materialChange: body.materialChange === true,
+        note: text(body.note, 1000),
+      });
+      return json({ ok: true, updates: await listDocumentUpdates(db) });
+    }
+
     if (action === 'upload_template') {
       ownerOnly(actor);
       const file = form?.get('file');
@@ -374,22 +445,26 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
     if (action === 'create_template') {
       ownerOnly(actor);
-      return json({
-        ok: true,
-        ...(await createTemplate(db, actor.id, {
-          title: text(body.title, 200),
-          category: text(body.category, 80),
-          version: text(body.version, 40),
-          contentText: text(body.contentText, 200_000),
-          signerParty: body.signerParty === 'employee' ? 'employee' : body.signerParty === 'both' ? 'both' : 'customer',
-          requiresCountersignature: body.requiresCountersignature === true,
-          requiresVerification: body.requiresVerification === true,
-          familyKey: text(body.familyKey, 120),
-          effectiveDate: text(body.effectiveDate, 10),
-          legalReviewStatus: text(body.legalReviewStatus, 40),
-          packetNotes: text(body.packetNotes, 1000),
-        })),
+      const created = await createTemplate(db, actor.id, {
+        title: text(body.title, 200),
+        category: text(body.category, 80),
+        version: text(body.version, 40),
+        contentText: text(body.contentText, 200_000),
+        signerParty: body.signerParty === 'employee' ? 'employee' : body.signerParty === 'both' ? 'both' : 'customer',
+        requiresCountersignature: body.requiresCountersignature === true,
+        requiresVerification: body.requiresVerification === true,
+        familyKey: text(body.familyKey, 120),
+        effectiveDate: text(body.effectiveDate, 10),
+        legalReviewStatus: text(body.legalReviewStatus, 40),
+        packetNotes: text(body.packetNotes, 1000),
+        ...(text(body.supersedesTemplateId, 100)
+          ? { supersedesTemplateId: text(body.supersedesTemplateId, 100) }
+          : {}),
       });
+      if (text(body.supersedesTemplateId, 100)) {
+        await notifyDocumentRevision(context, db, actor.id, created.id).catch(() => undefined);
+      }
+      return json({ ok: true, ...created });
     }
     if (action === 'update_draft_template') {
       ownerOnly(actor);
@@ -409,13 +484,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (action === 'duplicate_template') {
       ownerOnly(actor);
-      return json({
-        ok: true,
-        ...(await duplicateTemplate(db, actor.id, text(body.templateId, 100), {
-          ...(text(body.title, 200) ? { title: text(body.title, 200) } : {}),
-          ...(text(body.version, 40) ? { version: text(body.version, 40) } : {}),
-        })),
+      const created = await duplicateTemplate(db, actor.id, text(body.templateId, 100), {
+        ...(text(body.title, 200) ? { title: text(body.title, 200) } : {}),
+        ...(text(body.version, 40) ? { version: text(body.version, 40) } : {}),
       });
+      await notifyDocumentRevision(context, db, actor.id, created.id).catch(() => undefined);
+      return json({ ok: true, ...created });
     }
     if (action === 'restore_template') {
       ownerOnly(actor);

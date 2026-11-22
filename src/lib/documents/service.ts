@@ -1933,6 +1933,215 @@ export async function listBundles(db: D1Database): Promise<Array<Record<string, 
   return rows.results ?? [];
 }
 
+export interface DocumentRevisionImpact {
+  templateId: string;
+  title: string;
+  newVersion: string;
+  previousTemplateId: string | null;
+  previousTitle: string | null;
+  previousVersion: string | null;
+  status: 'pending_approval' | 'owner_review_required' | 'resigning_recommended' | 'reviewed';
+  review: {
+    acknowledgedAt: string | null;
+    acknowledgedByAdminUserId: string | null;
+    materialChange: boolean | null;
+    note: string;
+  };
+  affectedPackets: Array<{
+    id: string;
+    code: string;
+    name: string;
+    status: string;
+    required: boolean;
+    perBooking: boolean;
+  }>;
+  affectedCustomers: Array<{
+    customerId: string;
+    name: string;
+    lastSignedAt: string;
+    newVersionSignedAt: string | null;
+    needsResigning: boolean;
+    nextAppointmentAt: string | null;
+  }>;
+  counts: {
+    packets: number;
+    customers: number;
+    needingResigning: number;
+    upcomingAppointments: number;
+  };
+}
+
+/**
+ * Owner-facing revision impact review. A new template version is never applied
+ * over an executed agreement: the previous signature remains bound to the exact
+ * version and hash it carries. This view reports who may need a new signature
+ * and lets the owner acknowledge a material or nonmaterial revision before
+ * any re-signing request is sent.
+ */
+export async function listDocumentUpdates(
+  db: D1Database,
+  nowIso = now(),
+): Promise<DocumentRevisionImpact[]> {
+  const revisions = await db
+    .prepare(
+      `SELECT n.id, n.title, n.version, n.status, n.created_at, n.approved_at,
+              n.supersedes_template_id,
+              o.title AS previous_title, o.version AS previous_version
+       FROM document_templates n
+       LEFT JOIN document_templates o ON o.id = n.supersedes_template_id
+       WHERE n.supersedes_template_id IS NOT NULL
+         AND n.status IN ('draft','approved')
+       ORDER BY n.created_at DESC LIMIT 200`,
+    )
+    .all<Record<string, unknown>>();
+  const updates: DocumentRevisionImpact[] = [];
+  for (const row of revisions.results ?? []) {
+    const templateId = String(row.id);
+    const previousId = String(row.supersedes_template_id ?? '');
+    const packetRows = await db
+      .prepare(
+        `SELECT DISTINCT b.id, b.code, b.name, b.status, i.required, i.per_booking
+         FROM document_bundle_items i
+         JOIN document_bundles b ON b.id = i.bundle_id
+         WHERE i.template_id IN (?, ?)
+         ORDER BY b.name`,
+      )
+      .bind(templateId, previousId || '__none__')
+      .all<Record<string, unknown>>();
+    const customerRows = previousId
+      ? await db
+          .prepare(
+            `SELECT sr.customer_id,
+                    TRIM(COALESCE(c.company_name, '') || ' ' || COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '')) AS name,
+                    MAX(s.signed_at) AS last_signed_at,
+                    (SELECT MAX(s2.signed_at) FROM document_signatures s2
+                       JOIN signing_requests sr2 ON sr2.id = s2.signing_request_id
+                      WHERE s2.template_id = ? AND sr2.customer_id = sr.customer_id
+                        AND s2.status IN ('signed','awaiting_verification','verified')) AS new_signed_at,
+                    (SELECT MIN(a.start_at) FROM appointments a
+                      WHERE a.customer_id = sr.customer_id AND a.start_at >= ?
+                        AND a.status IN ('pending','confirmed','in_progress')) AS next_appointment_at
+             FROM document_signatures s
+             JOIN signing_requests sr ON sr.id = s.signing_request_id
+             JOIN customers c ON c.id = sr.customer_id
+             WHERE s.template_id = ?
+               AND s.status IN ('signed','awaiting_verification','verified')
+               AND sr.customer_id IS NOT NULL
+             GROUP BY sr.customer_id, name
+             ORDER BY last_signed_at DESC`,
+          )
+          .bind(templateId, nowIso, previousId)
+          .all<Record<string, unknown>>()
+      : { results: [] as Array<Record<string, unknown>> };
+    const reviewRow = await db
+      .prepare(
+        `SELECT actor_user_id, detail_json, created_at FROM admin_audit
+         WHERE action = 'documents.revision_acknowledged'
+           AND entity_type = 'document_template' AND entity_id = ?
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+      .bind(templateId)
+      .first<{ actor_user_id: string | null; detail_json: string; created_at: string }>()
+      .catch(() => null);
+    let reviewDetail: Record<string, unknown> = {};
+    if (reviewRow?.detail_json) {
+      try {
+        const outer = JSON.parse(reviewRow.detail_json) as Record<string, unknown>;
+        if (typeof outer.detail === 'string' && outer.detail.trim().startsWith('{')) {
+          reviewDetail = JSON.parse(outer.detail) as Record<string, unknown>;
+        } else {
+          reviewDetail = outer;
+        }
+      } catch {
+        reviewDetail = {};
+      }
+    }
+    const materialChange =
+      typeof reviewDetail.materialChange === 'boolean' ? reviewDetail.materialChange : null;
+    const affectedCustomers = (customerRows.results ?? []).map((customer) => {
+      const customerId = String(customer.customer_id);
+      const newSignedAt = customer.new_signed_at ? String(customer.new_signed_at) : null;
+      return {
+        customerId,
+        name: String(customer.name ?? '').trim() || customerId,
+        lastSignedAt: String(customer.last_signed_at ?? ''),
+        newVersionSignedAt: newSignedAt,
+        needsResigning: !newSignedAt,
+        nextAppointmentAt: customer.next_appointment_at
+          ? String(customer.next_appointment_at)
+          : null,
+      };
+    });
+    const needingResigning = affectedCustomers.filter((customer) => customer.needsResigning).length;
+    const upcomingAppointments = affectedCustomers.filter(
+      (customer) => customer.nextAppointmentAt,
+    ).length;
+    const status: DocumentRevisionImpact['status'] =
+      String(row.status) !== 'approved'
+        ? 'pending_approval'
+        : !reviewRow
+          ? 'owner_review_required'
+          : materialChange === true && needingResigning > 0
+            ? 'resigning_recommended'
+            : 'reviewed';
+    updates.push({
+      templateId,
+      title: String(row.title ?? ''),
+      newVersion: String(row.version ?? ''),
+      previousTemplateId: previousId || null,
+      previousTitle: row.previous_title ? String(row.previous_title) : null,
+      previousVersion: row.previous_version ? String(row.previous_version) : null,
+      status,
+      review: {
+        acknowledgedAt: reviewRow?.created_at ? String(reviewRow.created_at) : null,
+        acknowledgedByAdminUserId: reviewRow?.actor_user_id ?? null,
+        materialChange,
+        note: typeof reviewDetail.note === 'string' ? reviewDetail.note : '',
+      },
+      affectedPackets: (packetRows.results ?? []).map((packet) => ({
+        id: String(packet.id),
+        code: String(packet.code),
+        name: String(packet.name),
+        status: String(packet.status),
+        required: Number(packet.required) === 1,
+        perBooking: Number(packet.per_booking) === 1,
+      })),
+      affectedCustomers,
+      counts: {
+        packets: packetRows.results?.length ?? 0,
+        customers: affectedCustomers.length,
+        needingResigning,
+        upcomingAppointments,
+      },
+    });
+  }
+  return updates;
+}
+
+export async function acknowledgeDocumentUpdate(
+  db: D1Database,
+  actorUserId: string,
+  templateId: string,
+  input: { materialChange: boolean; note?: string },
+): Promise<void> {
+  const template = await db
+    .prepare('SELECT id, title, version, status FROM document_templates WHERE id = ? LIMIT 1')
+    .bind(templateId)
+    .first<{ id: string; title: string; version: string; status: string }>();
+  if (!template) throw new AdminAuthError(404, 'template_not_found');
+  await audit(db, {
+    actorUserId,
+    action: 'documents.revision_acknowledged',
+    entityType: 'document_template',
+    entityId: templateId,
+    detail: JSON.stringify({
+      materialChange: input.materialChange === true,
+      note: text(input.note, 1000),
+      version: template.version,
+    }),
+  });
+}
+
 export async function listBundleItems(
   db: D1Database,
   bundleId: string,
