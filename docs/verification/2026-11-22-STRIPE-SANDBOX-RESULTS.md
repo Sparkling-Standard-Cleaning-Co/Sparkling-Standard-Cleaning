@@ -107,3 +107,43 @@ isolated runtime with a disposable D1/R2 and a test webhook endpoint.
 - No real charge, capture, refund or customer notification occurred.
 - No production D1/R2 write, deployment or activation occurred.
 - No Stripe secret is recorded in this document, the repository or logs.
+
+
+## Cloudflare bindings audit — 2026-11-22
+
+Inspected via the authenticated Cloudflare API. Values were not recorded.
+
+### Production environment
+
+`STRIPE_SECRET_KEY`, `STRIPE_TEST_SECRET`, `STRIPE_WEBHOOK_SECRET`,
+`GOOGLE_CALENDAR_ID`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+`GOOGLE_REFRESH_TOKEN`, `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are present.
+Production has D1 `sparkling-standard-operations` and the production R2
+`DOCUMENTS_BUCKET` / `PHOTOS_BUCKET`.
+
+**Critical configuration issue:** `GOOGLE_CLIENT_SECRET` is stored as
+`plain_text`, not `secret_text`. It was returned by the Cloudflare API during
+this inspection. The exposed value must be rotated and re-entered as a
+`secret_text` binding before any further Google Calendar testing. Do not use the
+exposed value.
+
+### Preview environment
+
+- `STRIPE_TEST_SECRET` is **not** present in Preview.
+- `PUBLIC_SITE_URL` is **not** present in Preview.
+- **No D1 binding is configured for Preview.**
+- Preview `DOCUMENTS_BUCKET` and `PHOTOS_BUCKET` point at the
+  **production** R2 buckets.
+- Google and Resend secrets are present in Preview, but they are not a
+  dedicated test calendar or test-recipient configuration.
+
+**Conclusion:** the existing Preview environment is not isolated. Running the
+site journey there would risk production R2 data and would not have a working
+D1. It must not be used for the E2E acceptance run until disposable D1/R2
+resources are bound to Preview and the test-specific bindings are added.
+
+### What this means
+
+The credentials are not missing. The blocker is that the preview/deployment
+configuration is not yet an isolated test runtime. The production Google client
+secret also requires rotation because of its plain-text storage.
