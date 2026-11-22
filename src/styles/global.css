@@ -3591,6 +3591,129 @@ fieldset.input--invalid {
   color: var(--color-text-muted);
 }
 
+body:has(.legal-policy-dialog[open]) {
+  overflow: hidden;
+}
+
+.legal-policy-dialog {
+  width: min(52rem, calc(100vw - 1.5rem));
+  max-height: min(86vh, 54rem);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--color-rose-200);
+  border-radius: var(--radius-lg);
+  background: var(--color-cream-50);
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+}
+
+.legal-policy-dialog::backdrop {
+  background: rgba(43, 31, 34, 0.58);
+  backdrop-filter: blur(2px);
+}
+
+.legal-policy-dialog__panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: inherit;
+}
+
+.legal-policy-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-rose-200);
+  background: var(--color-cream-50);
+}
+
+.legal-policy-dialog__heading {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.legal-policy-dialog__close {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid var(--color-rose-200);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.legal-policy-dialog__close:hover,
+.legal-policy-dialog__close:focus-visible {
+  border-color: var(--color-rose-700);
+}
+
+.legal-policy-dialog__body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-5);
+  outline: none;
+}
+
+.legal-policy-dialog__body h1 {
+  margin-top: 0;
+}
+
+.legal-policy-dialog__body.prose > section:first-of-type {
+  margin-top: 0;
+}
+
+.legal-policy-dialog__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-rose-200);
+  background: var(--color-cream-50);
+}
+
+.legal-policy-dialog__full-link {
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
+}
+
+.legal-policy-dialog__loading,
+.legal-policy-dialog__error {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 37.5rem) {
+  .legal-policy-dialog {
+    width: calc(100vw - 1rem);
+    max-height: 92vh;
+  }
+
+  .legal-policy-dialog__header,
+  .legal-policy-dialog__body,
+  .legal-policy-dialog__footer {
+    padding: var(--space-4);
+  }
+
+  .legal-policy-dialog__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .legal-policy-dialog__footer .btn {
+    width: 100%;
+  }
+}
+
 .reservation-summary__qualification--compact {
   margin: var(--space-3) 0 0;
   padding: 0;

@@ -233,6 +233,7 @@ function friendly(error: unknown): string {
     authorization_not_for_after_service: 'This authorization is not approved for after-service charging.',
     authorization_property_mismatch: 'The signed authorization is for a different property.',
     stripe_not_configured: 'Stripe is not configured.',
+    electronic_signing_not_activated: 'Live electronic signing is not activated for this environment.',
     invoice_not_payable: 'This invoice is not payable in its current state.',
     invoice_not_sendable: 'Only open, partially paid or overdue invoices can be emailed.',
     invoice_paid: 'This invoice has no outstanding balance.',
@@ -3736,6 +3737,24 @@ async function showTemplateHistory(templateId: string): Promise<void> {
 function documentSendPayload(): Record<string, unknown> {
   const form = document.querySelector<HTMLFormElement>('[data-document-send]');
   const data = form ? new FormData(form) : new FormData();
+  const variables: Record<string, string> = {};
+  const mapping: Array<[string, string, number]> = [
+    ['serviceScope', 'service.scope', 8000],
+    ['serviceAdditions', 'service.additions', 4000],
+    ['serviceExclusions', 'service.exclusions', 4000],
+    ['serviceDate', 'service.date', 40],
+    ['arrivalWindow', 'service.arrival_window', 120],
+    ['priceSummary', 'price.summary', 2000],
+    ['priceLineItems', 'price.line_items', 8000],
+    ['priceTax', 'price.tax', 1000],
+    ['priceDiscount', 'price.discount', 1000],
+    ['paymentTerms', 'payment.terms', 4000],
+    ['cancellationTerms', 'cancellation.terms', 4000],
+  ];
+  for (const [field, key, limit] of mapping) {
+    const value = String(data.get(field) ?? '').trim().slice(0, limit);
+    if (value) variables[key] = value;
+  }
   return {
     subjectType: String(data.get('subjectType') ?? 'customer'),
     customerId: String(data.get('customerId') ?? ''),
@@ -3747,7 +3766,68 @@ function documentSendPayload(): Record<string, unknown> {
     email: String(data.get('email') ?? ''),
     bundleId: String(data.get('bundleId') ?? ''),
     instructions: String(data.get('instructions') ?? ''),
+    variables,
   };
+}
+
+function composerPreviewFrame(): HTMLIFrameElement | null {
+  return document.querySelector<HTMLIFrameElement>('[data-document-preview-frame]');
+}
+
+function applyComposerZoom(): void {
+  const frame = composerPreviewFrame();
+  const zoom = document.querySelector<HTMLSelectElement>('[data-document-preview-zoom]')?.value ?? '1';
+  const doc = frame?.contentWindow?.document;
+  if (doc?.body) doc.body.style.zoom = zoom;
+}
+
+function renderComposerPreview(preview: Record<string, unknown>): void {
+  const frame = composerPreviewFrame();
+  if (!frame) return;
+  const requirements = (preview.requirements as Array<Record<string, unknown>>) ?? [];
+  const missing = (preview.missingVariables as string[]) ?? [];
+  const sectionSelect = document.querySelector<HTMLSelectElement>('[data-document-preview-section]');
+  if (sectionSelect) {
+    sectionSelect.innerHTML = requirements.length
+      ? requirements.map((item, index) => `<option value="${index}">${esc(String(item.title ?? 'Document'))}</option>`).join('')
+      : '<option value="">No documents</option>';
+  }
+  const body = requirements.map((item, index) => {
+    const text = String(item.contentText ?? '').trim();
+    const itemMissing = (item.missingVariables as string[] | undefined) ?? [];
+    return `<section class="doc" id="doc-${index}"><div class="doc-meta">Document ${index + 1} of ${requirements.length}</div><h1>${esc(String(item.title ?? 'Document'))}</h1><p class="doc-sub">Version ${esc(String(item.version ?? ''))} &middot; ${Number(item.required) ? 'Required' : 'Optional'} &middot; ${esc(titleCase(String(item.stage ?? 'optional')))}</p>${itemMissing.length ? `<p class="warn">Unresolved: ${itemMissing.map((key) => esc(key)).join(', ')}</p>` : ''}<div class="doc-text">${esc(text || 'PDF template - use the Download action to review the source PDF.')}</div></section>`;
+  }).join('');
+  const warning = missing.length
+    ? `<div class="warn banner">Unresolved variables block sending: ${missing.map((key) => esc(key)).join(', ')}</div>`
+    : '<div class="ok banner">All supported values resolve for this draft.</div>';
+  frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>
+    @page{size:Letter;margin:.7in .75in}
+    body{margin:0;background:#f4ece3;color:#2d2428;font-family:Georgia,'Times New Roman',serif;font-size:11pt;line-height:1.55}
+    .banner{padding:8px 12px;border-radius:8px;font-family:Segoe UI,Arial,sans-serif;font-size:9pt;margin:0 0 12px}
+    .warn{background:#fff3d8;border:1px solid #e7cf9a;color:#6b4e12}.ok{background:#e8f4ec;border:1px solid #b9dbc6;color:#245c3c}
+    section.doc{background:#fff;border:1px solid #dccdbc;border-radius:4px;padding:.75in .8in;margin:0 0 18px;box-shadow:0 4px 14px rgba(72,42,38,.08)}
+    .doc-meta{font-family:Segoe UI,Arial,sans-serif;font-size:8pt;letter-spacing:.08em;text-transform:uppercase;color:#8a6d38}
+    h1{font-size:20pt;color:#7a3547;margin:4px 0 2px}
+    .doc-sub{font-family:Segoe UI,Arial,sans-serif;font-size:8.5pt;color:#75655f;margin:0 0 14px;border-bottom:1px solid #e5d8c8;padding-bottom:8px}
+    .doc-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:10.5pt}
+    @media print{body{background:#fff}section.doc{border:0;box-shadow:none;margin:0;padding:0;break-after:page}}
+  </style></head><body>${warning}${body || '<p>No approved documents matched this packet and context.</p>'}</body></html>`;
+  frame.onload = () => applyComposerZoom();
+}
+
+async function sendDocumentPacket(draft: boolean): Promise<void> {
+  const payload = documentSendPayload();
+  const target = document.querySelector<HTMLElement>('[data-document-send-result]');
+  const result = await api<{ required?: boolean; signingUrl?: string; emailSent?: boolean; draft?: boolean; message?: string }>('/api/admin/documents', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'send_request', ...payload, draft }),
+  });
+  if (target) {
+    target.innerHTML = result.required
+      ? `<div class="admin-card"><p><strong>${result.draft ? 'Draft signing link saved.' : 'Signing link created.'}</strong> ${result.emailSent ? 'The email was sent.' : 'Email was not sent; share this private link when ready.'}</p><p><a href="${esc(result.signingUrl)}">${esc(result.signingUrl)}</a></p></div>`
+      : `<p class="admin-muted">${esc(result.message ?? 'No active required documents for this context.')}</p>`;
+  }
+  await loadDocuments();
 }
 
 async function previewDocumentPacket(bundleId = ''): Promise<void> {
@@ -3767,7 +3847,8 @@ async function previewDocumentPacket(bundleId = ''): Promise<void> {
     }
     const requirements = (preview.requirements as Array<Record<string, unknown>>) ?? [];
     const missing = (preview.missingVariables as string[]) ?? [];
-    target.innerHTML = `<div class="admin-card"><h3>${esc(preview.bundleName)}</h3><p class="admin-muted">${esc(preview.bundleCode)} v${esc(preview.bundleVersion)} · ${esc(preview.totalDocuments)} document(s), ${esc(preview.requiredDocuments)} required</p>${preview.instructions ? `<p>${esc(preview.instructions)}</p>` : ''}${missing.length ? `<p class="admin-error">Unresolved variables block sending: ${missing.map((key) => `<code>${esc(key)}</code>`).join(', ')}</p>` : '<p class="admin-status-message">All supported variables resolve for this context.</p>'}${requirements.length ? `<ol>${requirements.map((item) => `<li><strong>${esc(item.title)}</strong> v${esc(item.version)} · ${esc(titleCase(item.stage))} · ${Number(item.required) ? 'Required' : 'Optional'}${((item.missingVariables as string[] | undefined) ?? []).length ? ` · <span class="admin-error">missing ${esc(((item.missingVariables as string[] | undefined) ?? []).join(', '))}</span>` : ''}<details style="margin:.4rem 0"><summary>Preview document text</summary><pre style="white-space:pre-wrap;max-height:18rem;overflow:auto;font-size:.78rem">${esc(item.contentText || 'PDF document - open the template download to review.')}</pre></details></li>`).join('')}</ol>` : '<p class="admin-muted">This packet has no documents yet. Add owner-approved templates below.</p>'}</div>`;
+    renderComposerPreview(preview);
+    target.innerHTML = `<div class="admin-card"><h3>${esc(preview.bundleName)}</h3><p class="admin-muted">${esc(preview.bundleCode)} v${esc(preview.bundleVersion)} - ${esc(preview.totalDocuments)} document(s), ${esc(preview.requiredDocuments)} required</p>${preview.instructions ? `<p>${esc(preview.instructions)}</p>` : ''}${missing.length ? `<p class="admin-error">Unresolved variables block sending: ${missing.map((key) => `<code>${esc(key)}</code>`).join(', ')}</p>` : '<p class="admin-status-message">All supported variables resolve for this draft.</p>'}${requirements.length ? '<p class="admin-muted">The live preview is open in the pane beside the form. Use the section selector to jump between documents.</p>' : '<p class="admin-muted">This packet has no documents yet. Add owner-approved templates below.</p>'}</div>`;
   } catch (error) {
     if (target) target.textContent = friendly(error);
   }
@@ -4947,33 +5028,40 @@ document.querySelector<HTMLButtonElement>('[data-document-preview]')?.addEventLi
 
 document.querySelector<HTMLFormElement>('[data-document-send]')?.addEventListener('submit', (event) => {
   event.preventDefault();
-  const data = new FormData(event.currentTarget as HTMLFormElement);
-  const target = document.querySelector<HTMLElement>('[data-document-send-result]');
-  void api<{ required?: boolean; signingUrl?: string; emailSent?: boolean; message?: string }>('/api/admin/documents', {
-    method: 'POST',
-    body: JSON.stringify({
-      action: 'send_request',
-      subjectType: data.get('subjectType'),
-      customerId: data.get('customerId'),
-      teamMemberId: data.get('teamMemberId'),
-      propertyId: data.get('propertyId'),
-      serviceCode: data.get('serviceCode'),
-      frequency: data.get('frequency'),
-      bookingReference: data.get('bookingReference'),
-      email: data.get('email'),
-      bundleId: data.get('bundleId'),
-      instructions: data.get('instructions'),
-    }),
-  }).then((result) => {
-    if (target) {
-      target.innerHTML = result.required
-        ? `<div class="admin-card"><p><strong>Signing link created.</strong> ${result.emailSent ? 'The email was sent.' : 'Email was not sent; share this private link.'}</p><p><a href="${esc(result.signingUrl)}">${esc(result.signingUrl)}</a></p></div>`
-        : `<p class="admin-muted">${esc(result.message ?? 'No active required documents for this context.')}</p>`;
-    }
-    return loadDocuments();
-  }).catch((error) => {
+  void sendDocumentPacket(false).catch((error) => {
+    const target = document.querySelector<HTMLElement>('[data-document-send-result]');
     if (target) target.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
   });
+});
+
+document.querySelector<HTMLButtonElement>('[data-document-save-draft]')?.addEventListener('click', () => {
+  void sendDocumentPacket(true).catch((error) => {
+    const target = document.querySelector<HTMLElement>('[data-document-send-result]');
+    if (target) target.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
+  });
+});
+
+document.querySelector<HTMLSelectElement>('[data-document-preview-section]')?.addEventListener('change', (event) => {
+  const index = String((event.target as HTMLSelectElement).value);
+  const frame = composerPreviewFrame();
+  const section = frame?.contentWindow?.document.getElementById(`doc-${index}`);
+  section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+document.querySelector<HTMLSelectElement>('[data-document-preview-zoom]')?.addEventListener('change', () => {
+  applyComposerZoom();
+});
+
+document.querySelector<HTMLButtonElement>('[data-document-preview-print]')?.addEventListener('click', () => {
+  const frame = composerPreviewFrame();
+  frame?.contentWindow?.print();
+});
+
+document.querySelector<HTMLButtonElement>('[data-document-preview-fullscreen]')?.addEventListener('click', () => {
+  const pane = document.querySelector<HTMLElement>('[data-document-preview-pane]');
+  if (!pane) return;
+  if (document.fullscreenElement) void document.exitFullscreen();
+  else void pane.requestFullscreen?.();
 });
 
 document.addEventListener('change', (event) => {

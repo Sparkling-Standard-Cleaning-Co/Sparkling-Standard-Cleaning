@@ -28,7 +28,7 @@ function loadDotEnv(file) {
 }
 
 const dotenv = loadDotEnv('.env');
-const key = (process.env.STRIPE_SECRET_KEY || dotenv.STRIPE_SECRET_KEY || '').trim();
+const key = (process.env.STRIPE_TEST_SECRET || dotenv.STRIPE_TEST_SECRET || process.env.STRIPE_SECRET_KEY || dotenv.STRIPE_SECRET_KEY || '').trim();
 const webhookSecret = (process.env.STRIPE_WEBHOOK_SECRET || dotenv.STRIPE_WEBHOOK_SECRET || '').trim();
 const base = (process.env.STRIPE_API_BASE || 'https://api.stripe.com').replace(/\/+$/, '');
 

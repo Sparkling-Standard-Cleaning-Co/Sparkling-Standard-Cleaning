@@ -147,6 +147,11 @@ async function main() {
   await page.setContent(logoPage(fullLogo()), { waitUntil: 'networkidle' });
   await page.evaluate(() => document.fonts.ready);
   const transparentLogo = await page.locator('#logo').screenshot({ omitBackground: true });
+  fs.writeFileSync(
+    path.join(PUBLIC, 'brand', 'sparkling-standard-circular-logo-1024.png'),
+    transparentLogo,
+  );
+  console.log('wrote public/brand/sparkling-standard-circular-logo-1024.png');
 
   await page.setViewportSize({ width: 1200, height: 630 });
   await page.setContent(ogPage, { waitUntil: 'networkidle' });

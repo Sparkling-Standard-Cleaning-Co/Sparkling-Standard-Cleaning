@@ -16,6 +16,11 @@
 //    double sessions from repeated clicks/retries.
 //  - No card data ever touches this site.
 
+import { legalPolicyConfig } from '../../src/config/legal-policy.ts';
+import {
+  resolveStripeSecret,
+  resolveStripeWebhookSecret,
+} from '../../src/lib/payments/stripe-secret.ts';
 import { estimatePaymentConfig } from '../../src/config/payments.ts';
 import {
   QUOTE_MATCH_TOLERANCE,
@@ -87,13 +92,18 @@ import {
 import {
   createSigningRequest,
   evaluateDocumentGate,
+  findReusableSigningRequest,
   rotateSigningRequestToken,
+  sendSigningEmail,
 } from '../../src/lib/documents/service.ts';
+import { createCheckoutIntent, readCheckoutIntent } from '../../src/lib/documents/checkout-intent.ts';
 
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   DB?: import('../../src/lib/admin/d1.ts').D1Database;
   STRIPE_SECRET_KEY?: string;
+  STRIPE_TEST_SECRET?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_TEST_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
   PUBLIC_SITE_URL?: string;
@@ -273,13 +283,13 @@ async function authoritativePhotosOutstanding(
 type CheckoutExpiry = 'expired' | 'completed' | 'failed';
 
 async function expireCheckoutSession(env: Env, sessionId: string): Promise<CheckoutExpiry> {
-  if (!env.STRIPE_SECRET_KEY?.trim() || !sessionId) return 'failed';
+  if (!stripeSecret(env) || !sessionId) return 'failed';
   try {
     const response = await fetch(
       `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}/expire`,
       {
         method: 'POST',
-        headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY.trim()}` },
+        headers: { Authorization: `Bearer ${stripeSecret(env)}` },
         signal: AbortSignal.timeout(10_000),
       },
     );
@@ -328,11 +338,12 @@ async function authoritativeHoldId(
   await writeLedgerJson(store, holdKey(hold.id), { ...hold, expiresAt }).catch(() => undefined);
   return { ok: true, holdId, expiresAt, start: hold.start, end: hold.end };
 }
-async function documentGateForCheckout(
+export async function documentGateForCheckout(
   env: Env,
   fields: Record<string, string>,
   returnPath = '',
-): Promise<{ satisfied: boolean; signingUrl?: string }> {
+): Promise<{ satisfied: boolean; signingUrl?: string; error?: string }> {
+  if (!legalPolicyConfig.activation.electronicSigning) return { satisfied: true };
   if (!env.DB) return { satisfied: true };
   const reference = (fields.quote_reference ?? '').trim();
   const holdId = (fields.booking_hold_id ?? '').trim();
@@ -351,32 +362,62 @@ async function documentGateForCheckout(
     frequency: fields.frequency ?? fields.ongoing_frequency ?? '',
     bookingReference: requestRow?.quote_reference ?? reference,
     ...(requestRow?.id ? { bookingRequestId: requestRow.id } : {}),
+    ...(fields.name ? { customerLegalName: fields.name } : {}),
     ...(fields.email ? { email: fields.email } : {}),
     accessAuthorization: fields.access_authorization === 'yes',
     customerProducts: fields.customer_products === 'yes',
   };
   const gate = await evaluateDocumentGate(env.DB, context, 'before_payment');
   if (gate.satisfied) return { satisfied: true };
-  const pending = await env.DB
-    .prepare(
-      `SELECT id FROM signing_requests
-       WHERE status IN ('pending','partially_signed') AND subject_type = 'customer'
-         AND (customer_id = ? OR (customer_id IS NULL AND booking_reference = ?))
-       ORDER BY created_at DESC LIMIT 1`,
-    )
-    .bind(context.customerId ?? '', context.bookingReference ?? '')
-    .first<{ id: string }>();
+  const store = paymentLedger(env);
+  const signingUrlFor = async (requestId: string, token: string): Promise<string> => {
+    let url = `/document-sign/?token=${encodeURIComponent(token)}${
+      returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''
+    }`;
+    if (store) {
+      const intent = await createCheckoutIntent(store, {
+        signingRequestId: requestId,
+        fields,
+        returnPath,
+      }).catch(() => null);
+      if (intent) url += `&resume=${encodeURIComponent(intent.token)}`;
+    }
+    return url;
+  };
+  const pending = await findReusableSigningRequest(env.DB, context, gate);
   if (pending) {
     const rotated = await rotateSigningRequestToken(env.DB, null, pending.id);
-    return { satisfied: false, signingUrl: `/document-sign/?token=${encodeURIComponent(rotated.token)}${returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''}` };
+    return {
+      satisfied: false,
+      signingUrl: await signingUrlFor(pending.id, rotated.token),
+    };
   }
-  const created = await createSigningRequest(env.DB, context);
-  return {
-    satisfied: false,
-    ...(created.token
-      ? { signingUrl: `/document-sign/?token=${encodeURIComponent(created.token)}${returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''}` }
-      : {}),
-  };
+  try {
+    const created = await createSigningRequest(env.DB, context);
+    if (!created.token || !created.requestId) {
+      return { satisfied: false, error: 'document_packet_unavailable' };
+    }
+    if (fields.email) {
+      await sendSigningEmail(
+        env,
+        fields.email,
+        created.token,
+        created.bundleName || created.bundleCode || 'Cleaning agreement',
+        `documents-before-payment-${created.requestId}`,
+      ).catch(() => false);
+    }
+    return {
+      satisfied: false,
+      signingUrl: await signingUrlFor(created.requestId, created.token),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('document_variables_missing')) {
+      console.error('[estimate-checkout] document_template_incomplete', { message });
+      return { satisfied: false, error: 'document_template_incomplete' };
+    }
+    throw error;
+  }
 }
 
 function sanitizeFields(value: unknown): Record<string, string> {
@@ -422,6 +463,14 @@ async function notifyOwnerGiftOrder(
 
 function siteOrigin(env: Env): string {
   return (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
+}
+
+function productionSite(env: Env): boolean {
+  return siteOrigin(env) === 'https://sparkling-standard.com';
+}
+
+function stripeSecret(env: Env): string {
+  return resolveStripeSecret(env, productionSite(env));
 }
 
 function keyMode(secret: string | undefined): 'live' | 'test' | 'unknown' {
@@ -548,12 +597,12 @@ function needsExplicitAcceptance(quotedCents: number, amountCents: number): bool
 }
 
 async function stripeSession(env: Env, sessionId: string): Promise<StripeSession | null> {
-  if (!env.STRIPE_SECRET_KEY?.trim()) return null;
+  if (!stripeSecret(env)) return null;
   try {
     const response = await fetch(
       `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
       {
-        headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY.trim()}` },
+        headers: { Authorization: `Bearer ${stripeSecret(env)}` },
         signal: AbortSignal.timeout(10_000),
       },
     );
@@ -565,7 +614,7 @@ async function stripeSession(env: Env, sessionId: string): Promise<StripeSession
 }
 
 async function webhookEndpointConfigured(env: Env): Promise<boolean | null> {
-  const secret = env.STRIPE_SECRET_KEY?.trim();
+  const secret = stripeSecret(env);
   if (!secret) return false;
   const fingerprint = await paymentHash(secret).catch(() => 'unknown');
   const now = Date.now();
@@ -623,13 +672,14 @@ export async function paymentReadiness(env: Env): Promise<{
     mode_allowed: boolean;
   };
 }> {
-  const secret = env.STRIPE_SECRET_KEY?.trim();
+  const secret = stripeSecret(env);
   const mode = keyMode(secret);
   const production = siteOrigin(env) === 'https://sparkling-standard.com';
   const modeAllowed = mode === 'live' || (mode === 'test' && !production);
+  const webhookSecret = resolveStripeWebhookSecret(env, production);
   const checks = {
     stripe_key: Boolean(secret),
-    webhook_secret: Boolean(env.STRIPE_WEBHOOK_SECRET?.trim()),
+    webhook_secret: Boolean(webhookSecret),
     webhook_endpoint: null as boolean | null,
     ledger: Boolean(paymentLedger(env)),
     notification: Boolean(env.WEB3FORMS_ACCESS_KEY?.trim()),
@@ -1176,6 +1226,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     returnPath?: unknown;
     acceptRecalculated?: unknown;
     acceptedAmount?: unknown;
+    resume_token?: unknown;
   };
   try {
     payload = (await request.json()) as typeof payload;
@@ -1183,7 +1234,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
 
-  const fields = sanitizeFields(payload.fields);
+  const resumeToken = typeof payload.resume_token === 'string' ? payload.resume_token.trim() : '';
+  let fields: Record<string, string> = {};
+  let resumedReturnPath = '';
+  if (resumeToken) {
+    const store = paymentLedger(env);
+    if (!store) return json({ ok: false, error: 'resume_unavailable' }, 503);
+    const intent = await readCheckoutIntent(store, resumeToken).catch(() => null);
+    if (!intent) return json({ ok: false, error: 'resume_expired' }, 400);
+    fields = sanitizeFields(intent.record.fields);
+    resumedReturnPath = intent.record.returnPath;
+  } else {
+    fields = sanitizeFields(payload.fields);
+  }
   if (Object.keys(fields).length === 0) return json({ ok: false, error: 'invalid_request' }, 400);
   if (fields.terms_accepted !== 'yes' || fields.terms_version !== legalTerms.termsVersion) {
     return json({ ok: false, error: 'terms_required' }, 400);
@@ -1191,7 +1254,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const returnPath =
     typeof payload.returnPath === 'string' && RETURN_PATHS.has(payload.returnPath)
       ? payload.returnPath
-      : '/estimate/';
+      : RETURN_PATHS.has(resumedReturnPath)
+        ? resumedReturnPath
+        : '/estimate/';
 
   const photosOutstanding = await authoritativePhotosOutstanding(fields, env);
   fields.photos_outstanding = photosOutstanding ? 'yes' : 'no';
@@ -1237,6 +1302,17 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
   const documentGate = await documentGateForCheckout(env, fields, returnPath);
   if (!documentGate.satisfied) {
+    if (documentGate.error) {
+      return json(
+        {
+          ok: false,
+          error: documentGate.error,
+          reason:
+            'A required agreement is not fully configured. Sparkling Standard must complete the document setup before payment can be accepted.',
+        },
+        409,
+      );
+    }
     return json(
       {
         ok: false,
@@ -1677,7 +1753,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${env.STRIPE_SECRET_KEY?.trim()}`,
+        Authorization: `Bearer ${stripeSecret(env)}`,
         'Content-Type': 'application/x-www-form-urlencoded',
         'Idempotency-Key': `ss-estimate-${attemptFingerprint}-${generation}`,
       },
@@ -1860,7 +1936,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       checks: ready.checks,
     });
   }
-  if (!env.STRIPE_SECRET_KEY?.trim()) return json({ ok: false, error: 'not_configured' }, 503);
+  if (!stripeSecret(env)) return json({ ok: false, error: 'not_configured' }, 503);
   if (!/^cs_[A-Za-z0-9_]+$/.test(sessionId)) return json({ ok: false, error: 'invalid_request' }, 400);
 
   const session = await stripeSession(env, sessionId);

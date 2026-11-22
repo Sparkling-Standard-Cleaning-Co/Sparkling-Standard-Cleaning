@@ -24,6 +24,7 @@ export default defineConfig({
         !page.includes('/thank-you') &&
         !page.includes('/estimate/payment-success') &&
         !page.includes('/estimate/payment-canceled') &&
+        !page.includes('/estimate/payment-resume') &&
         !page.includes('/leave-review') &&
         !page.includes('/gift-admin') &&
         !page.includes('/invoice-payment') &&

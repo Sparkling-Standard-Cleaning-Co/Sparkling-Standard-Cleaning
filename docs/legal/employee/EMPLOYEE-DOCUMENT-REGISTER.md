@@ -15,7 +15,7 @@ These are official forms. Do not replace them with a company imitation.
 
 | Requirement | Form / record | Status |
 | --- | --- | --- |
-| Employment eligibility verification | USCIS Form I-9 (current edition) and supporting documents | Owner must complete and retain per federal rules |
+| Employment eligibility verification | USCIS Form I-9, edition **01/20/25** (OMB 1615-0047, expires 05/31/2027), plus the official eight-page instructions | Controlled copies and the paper/manual procedure are in `05 EMPLOYEES & TRAINING/Employee Policies/I-9/`. Completed forms are restricted to `05 EMPLOYEES & TRAINING/Employee Records/I-9/RESTRICTED-COMPLETED/`. The Sparkling Standard e-signature portal is **not** a compliant electronic I-9 system. |
 | Federal income tax withholding | IRS Form W-4 (current edition) | Employee completes |
 | Florida new hire reporting | Florida New Hire Reporting Center submission | Owner/payroll must file |
 | Employer identification | IRS EIN confirmation | Located in the private formation records |
@@ -30,7 +30,7 @@ qualified payroll provider should confirm the current rules.
 | Group | Existing master location | Status |
 | --- | --- | --- |
 | Employment application, interview and references | `05 EMPLOYEES & TRAINING/Employee Policies/Employee_Forms/EMP-001` to `EMP-003` | Owner review |
-| Onboarding checklist and I-9 completion checklist | `EMP-004`, `EMP-006` | Internal checklist only; not a substitute for Form I-9 |
+| Onboarding checklist and I-9 completion checklist | `EMP-004`, `EMP-006`; controlled I-9 procedure in `05 EMPLOYEES & TRAINING/Employee Policies/I-9/I-9-COMPLETION-PROCEDURE-2026-11-22.pdf` | Internal checklist only; the controlled paper procedure and official Form I-9 govern |
 | Direct deposit authorization | `EMP-007_Payroll_Direct_Deposit_Authorization.docx` | Payroll review |
 | Employee handbook acknowledgment | `EMP-008_Employee_Handbook_Acknowledgment.docx` | Owner/employment-law review |
 | Confidentiality and client privacy | `EMP-009_Confidentiality_and_Client_Privacy_Agreement.docx` | Owner/legal review |

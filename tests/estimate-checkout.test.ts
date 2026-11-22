@@ -1,3 +1,4 @@
+import './helpers/enable-signing.ts';
 // Estimate checkout endpoint tests: readiness, server-owned amounts, durable
 // idempotency, exact-price enforcement and price-change acceptance.
 // No network: geocoding, routing, Stripe and readiness probes are stubbed.
@@ -10,6 +11,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { D1Database, D1PreparedStatement, D1Result } from '../src/lib/admin/d1.ts';
 import { getActiveCheckoutSlot } from '../src/lib/payments/checkout-registry.ts';
+import { sha256Hex, signSigningRequest } from '../src/lib/documents/service.ts';
 
 import {
   onRequestGet,
@@ -149,6 +151,12 @@ function providerStub(options: { includeDuration?: boolean } = {}) {
         code: 'Ok',
         routes: [{ distance: 16093.44, ...(includeDuration ? { duration: 1200 } : {}) }],
       });
+    }
+    if (href.includes('/v1/customers/')) {
+      return jsonResponse({ id: 'cus_test_synthetic', metadata: { customer_id: 'synthetic' } });
+    }
+    if (href.endsWith('/v1/customers')) {
+      return jsonResponse({ id: 'cus_test_synthetic' });
     }
     if (href.includes('/v1/checkout/sessions/')) {
       return jsonResponse({
@@ -1307,4 +1315,102 @@ test('a promotion is applied before gift-certificate value at checkout', async (
   assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
   assert.equal(giftApplied, '10000');
   assert.equal(unitAmount, String(Math.round(amount * 100) - 7500 - 10_000));
+});
+
+test('pre-payment signing blocks checkout, then the resume token completes the same session without a duplicate Stripe call', async () => {
+  const ledger = new FakeLedger();
+  const db = checkoutDb();
+  const env = { ...makeEnv(ledger), DB: db };
+  const provider = providerStub();
+  const { fields: baseFields } = validResidentialInput('standard');
+  const fields = withHold(baseFields, ledger);
+  const customerId = `cust_${randomUUID()}`;
+  const propertyId = `prop_${randomUUID()}`;
+  const requestId = `request_${randomUUID()}`;
+  const templateId = `tmpl_${randomUUID()}`;
+  const bundleId = `bundle_${randomUUID()}`;
+  const email = `docusign-${randomUUID()}@example.test`;
+  db.raw.prepare("INSERT INTO customers (id, primary_branch_id, first_name, last_name, status) VALUES (?, 'branch_pensacola', 'Synthetic', 'Checkout Customer', 'active')").run(customerId);
+  db.raw.prepare("INSERT INTO customer_contacts (id, customer_id, kind, value, normalized_value, is_primary) VALUES (?, ?, 'email', ?, ?, 1)").run(`cc_${randomUUID()}`, customerId, email, email);
+  db.raw.prepare("INSERT INTO properties (id, customer_id, branch_id, label, line1, city, state, postal_code, status) VALUES (?, ?, 'branch_pensacola', 'Home', '100 S Baylen St', 'Pensacola', 'FL', '32502', 'active')").run(propertyId, customerId);
+  db.raw.prepare(
+    `INSERT INTO booking_requests
+     (id, hold_id, branch_id, customer_id, property_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+     VALUES (?, ?, 'branch_pensacola', ?, ?, 'pending', ?, '2026-11-03', ?, ?, 120, ?)`,
+  ).run(requestId, fields.booking_hold_id, customerId, propertyId, fields.quote_reference, fields.booking_slot_start, fields.booking_slot_end, JSON.stringify({ ...fields, email }));
+  const content = 'Service agreement for {{customer.legal_name}} at {{property.address}}. Price: {{price.summary}}.';
+  db.raw.prepare(
+    `INSERT INTO document_templates (id, title, category, version, status, source_kind, content_text, content_sha256, signer_party)
+     VALUES (?, 'Checkout Agreement', 'residential', '1.0', 'approved', 'text', ?, ?, 'customer')`,
+  ).run(templateId, content, await sha256Hex(content));
+  db.raw.prepare(
+    `INSERT INTO document_bundles (id, code, name, service_category, subject_type, status, version, is_system)
+     VALUES (?, 'customer.residential', 'Residential agreement', 'residential', 'customer', 'active', 1, 0)`,
+  ).run(bundleId);
+  db.raw.prepare(
+    `INSERT INTO document_bundle_items (bundle_id, template_id, sort_order, required, enforcement_stage)
+     VALUES (?, ?, 0, 1, 'before_payment')`,
+  ).run(bundleId, templateId);
+
+  const blocked = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ fields: { ...fields, email }, returnPath: '/estimate/residential/' }),
+      env,
+    } as never),
+  );
+  assert.equal(blocked.status, 409);
+  const blockedBody = (await blocked.json()) as { error?: string; signingUrl?: string };
+  assert.equal(blockedBody.error, 'documents_required');
+  assert.ok(blockedBody.signingUrl?.startsWith('/document-sign/?token='));
+  assert.equal(provider.postCount(), 0, 'no Stripe call while the agreement is unsigned');
+
+  const signingUrl = new URL(blockedBody.signingUrl ?? '', 'https://example.test');
+  const token = signingUrl.searchParams.get('token') ?? '';
+  const resume = signingUrl.searchParams.get('resume') ?? '';
+  assert.ok(token);
+  assert.ok(resume);
+  await signSigningRequest(db, token, {
+    signerName: 'Synthetic Checkout Customer',
+    signerEmail: email,
+    consent: true,
+    signatures: { [templateId]: { value: 'Synthetic Checkout Customer' } },
+    request: new Request('https://example.test/api/document-sign', {
+      headers: { 'CF-Connecting-IP': '203.0.113.77', 'User-Agent': 'synthetic-test' },
+    }),
+  });
+
+  const resumed = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ resume_token: resume }),
+      env,
+    } as never),
+  );
+  assert.equal(resumed.status, 200, JSON.stringify(await resumed.clone().json()));
+  const resumedBody = (await resumed.json()) as { ok?: boolean; url?: string };
+  assert.equal(resumedBody.ok, true);
+  assert.equal(resumedBody.url, 'https://checkout.stripe.test/session');
+  assert.equal(provider.postCount(), 1);
+
+  const repeated = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ resume_token: resume }),
+      env,
+    } as never),
+  );
+  assert.equal(repeated.status, 200);
+  assert.equal(provider.postCount(), 1, 'a repeated resume reuses the existing session');
+
+  const holdKey = `booking/holds/${fields.booking_hold_id}.json`;
+  const hold = JSON.parse(ledger.values.get(holdKey) ?? '{}') as { expiresAt?: string };
+  hold.expiresAt = '2020-01-01T00:00:00.000Z';
+  ledger.values.set(holdKey, JSON.stringify(hold));
+  const expiredHold = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ resume_token: resume }),
+      env,
+    } as never),
+  );
+  assert.equal(expiredHold.status, 400);
+  assert.equal(((await expiredHold.json()) as { error?: string }).error, 'booking_hold_expired');
+  assert.equal(provider.postCount(), 1, 'hold expiration is checked before any new Stripe session');
 });

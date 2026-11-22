@@ -1,3 +1,4 @@
+import './helpers/enable-signing.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,6 +20,7 @@ import {
   createSigningRequest,
   createTemplate,
   countersignSigningRequest,
+  findReusableSigningRequest,
   getExecutedCopy,
   employeeOnboardingStatus,
   evaluateDocumentGate,
@@ -325,6 +327,13 @@ test('commercial and church services resolve their own bundles, not the resident
   });
   assert.equal(resolved.bundle?.code, 'customer.commercial');
   assert.deepEqual(resolved.requirements.map((item) => item.templateId), [commercialDoc]);
+  const weeklyCommercial = await activeRequirements(f.db, {
+    subjectType: 'customer',
+    customerId: f.customerId,
+    serviceCode: 'commercial-cleaning',
+    frequency: 'weekly',
+  });
+  assert.equal(weeklyCommercial.bundle?.code, 'customer.commercial', 'a weekly commercial job is not residential recurring');
   const church = await activeRequirements(f.db, {
     subjectType: 'customer',
     customerId: f.customerId,
@@ -845,4 +854,83 @@ test('a reusable packet can be duplicated with its documents and archived withou
   await updateBundle(f.db, f.owner.id, copy.id, { status: 'inactive' });
   assert.equal((f.db.raw.prepare('SELECT status FROM document_bundles WHERE id = ?').get(copy.id) as { status: string }).status, 'inactive');
   assert.equal((f.db.raw.prepare('SELECT COUNT(*) AS n FROM document_bundle_items WHERE bundle_id = ?').get(copy.id) as { n: number }).n, 1);
+});
+
+test('required customer agreements are enforced before payment even when stored as before_confirmation', async () => {
+  const f = await fixture();
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Residential Booking Agreement');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.residential',
+    name: 'Residential documents',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    frequency: 'one_time',
+    bookingReference: 'SS-BEFORE-PAYMENT-1',
+  };
+  const requirements = await activeRequirements(f.db, context);
+  assert.equal(requirements.requirements[0]?.stage, 'before_payment');
+  const blocked = await evaluateDocumentGate(f.db, context, 'before_payment');
+  assert.equal(blocked.satisfied, false);
+  assert.deepEqual(blocked.missing.map((item) => item.templateId), [templateId]);
+});
+
+test('a per-booking signature cannot satisfy a different booking and only a matching request is reusable', async () => {
+  const f = await fixture();
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Booking-Specific Scope');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.deep',
+    name: 'Deep cleaning documents',
+    serviceCategory: 'deep',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_payment',
+    perBooking: true,
+  });
+  const firstBooking = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'deep-cleaning',
+    bookingReference: 'SS-BOOKING-A',
+  };
+  const first = await createSigningRequest(f.db, firstBooking, { createdByAdminUserId: f.owner.id });
+  await signSigningRequest(f.db, first.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'customer@example.test',
+    consent: true,
+    signatures: { [templateId]: { value: 'Synthetic Customer' } },
+    request: signingRequest(),
+  });
+  assert.equal((await evaluateDocumentGate(f.db, firstBooking, 'before_payment')).satisfied, true);
+
+  const secondBooking = { ...firstBooking, bookingReference: 'SS-BOOKING-B' };
+  const secondGate = await evaluateDocumentGate(f.db, secondBooking, 'before_payment');
+  assert.equal(secondGate.satisfied, false);
+  assert.equal(await findReusableSigningRequest(f.db, secondBooking, secondGate), null);
+
+  const second = await createSigningRequest(f.db, secondBooking, { createdByAdminUserId: f.owner.id });
+  const secondGateAfterCreation = await evaluateDocumentGate(f.db, secondBooking, 'before_payment');
+  const reusable = await findReusableSigningRequest(f.db, secondBooking, secondGateAfterCreation);
+  assert.equal(reusable?.id, second.requestId);
+
+  const stale = await createSigningRequest(f.db, firstBooking, { createdByAdminUserId: f.owner.id });
+  const firstGate = await evaluateDocumentGate(f.db, firstBooking, 'before_payment');
+  const reusableFirst = await findReusableSigningRequest(f.db, firstBooking, firstGate);
+  assert.equal(reusableFirst?.id, stale.requestId);
 });

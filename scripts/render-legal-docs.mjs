@@ -16,8 +16,13 @@ function argValue(name, fallback = '') {
 const outDir = path.resolve(argValue('--out', 'legal-out'));
 const only = argValue('--only');
 const makePdf = !args.includes('--no-pdf');
-const sourceDirs = [path.resolve('docs/legal/templates'), path.resolve('docs/legal/employee')];
-const logoBytes = fs.readFileSync(path.resolve('public/brand/approved-icon-master-1024.png'));
+const sourceDirs = [
+  path.resolve('docs/legal/templates'),
+  path.resolve('docs/legal/employee'),
+  path.resolve('docs/legal/templates-v3'),
+  path.resolve('docs/legal/employee-v3'),
+];
+const logoBytes = fs.readFileSync(path.resolve('public/brand/sparkling-standard-circular-logo-1024.png'));
 const logoData = `data:image/png;base64,${logoBytes.toString('base64')}`;
 
 const CSS = `

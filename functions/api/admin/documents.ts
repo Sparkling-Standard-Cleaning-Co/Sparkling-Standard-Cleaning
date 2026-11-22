@@ -84,6 +84,37 @@ function ownerOnly(actor: { role: string }): void {
   if (actor.role !== 'owner') throw new AdminAuthError(403, 'owner_required');
 }
 
+const ADMIN_VARIABLE_LIMITS: Record<string, number> = {
+  'customer.legal_name': 200,
+  'property.address': 400,
+  'service.scope': 8000,
+  'service.additions': 4000,
+  'service.exclusions': 4000,
+  'service.date': 40,
+  'service.arrival_window': 120,
+  'price.summary': 2000,
+  'price.line_items': 8000,
+  'price.tax': 1000,
+  'price.discount': 1000,
+  'payment.terms': 4000,
+  'cancellation.terms': 4000,
+  'agreement.version': 80,
+  'agreement.effective_date': 40,
+};
+
+function adminVariables(body: Record<string, unknown>): Record<string, string> {
+  const raw = body.variables;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const limit = ADMIN_VARIABLE_LIMITS[key];
+    if (!limit || typeof value !== 'string') continue;
+    const trimmed = value.trim().slice(0, limit);
+    if (trimmed) out[key] = trimmed;
+  }
+  return out;
+}
+
 function contextFrom(body: Record<string, unknown>): DocumentSubjectContext {
   const optional = (key: string, max: number): Record<string, string> => {
     const value = text(body[key], max);
@@ -237,6 +268,14 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     if (view === 'download') {
       const signature = await getSignatureForDownload(db, url.searchParams.get('signatureId') ?? '');
       if (!signature) return json({ ok: false, error: 'signature_not_found' }, 404);
+      const requestBranch = await db
+        .prepare('SELECT branch_id FROM signing_requests WHERE id = ? LIMIT 1')
+        .bind(String(signature.signing_request_id ?? ''))
+        .first<{ branch_id: string | null }>()
+        .catch(() => null);
+      if (!branchAllowed(actor, requestBranch?.branch_id ?? null)) {
+        return json({ ok: false, error: 'forbidden' }, 403);
+      }
       const key = String(signature.r2_key || signature.template_r2_key || '');
       if (key && context.env.DOCUMENTS_BUCKET?.get) {
         const object = await context.env.DOCUMENTS_BUCKET.get(key);
@@ -427,6 +466,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const preview = await previewPacket(db, documentContext, {
         ...(text(body.bundleId, 100) ? { bundleId: text(body.bundleId, 100) } : {}),
         ...(text(body.instructions, 2000) ? { instructions: text(body.instructions, 2000) } : {}),
+        ...(Object.keys(adminVariables(body)).length ? { variables: adminVariables(body) } : {}),
       });
       if (!preview) return json({ ok: false, error: 'packet_not_found' }, 404);
       return json({ ok: true, preview });
@@ -450,11 +490,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         createdByAdminUserId: actor.id,
         ...(text(body.bundleId, 100) ? { bundleId: text(body.bundleId, 100) } : {}),
         ...(text(body.instructions, 2000) ? { instructions: text(body.instructions, 2000) } : {}),
+        ...(Object.keys(adminVariables(body)).length ? { variables: adminVariables(body) } : {}),
       });
       if (!created.required || !created.token) {
         return json({ ok: true, required: false, message: 'No active required documents in this packet.' });
       }
-      const recipient = text(body.email, 200);
+      const draft = body.draft === true;
+      const recipient = draft ? '' : text(body.email, 200);
       const emailSent = recipient
         ? await sendSigningEmail(
             emailEnv(context.env),
@@ -474,6 +516,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         bundleName: created.bundleName,
         instructions: created.instructions,
         emailSent,
+        draft,
         signingUrl: `/document-sign/?token=${encodeURIComponent(created.token)}`,
       });
     }
@@ -524,6 +567,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (action === 'verify_signature' || action === 'reject_signature') {
       const signatureId = text(body.signatureId, 100);
+      const signatureRow = await getSignatureForDownload(db, signatureId);
+      if (!signatureRow) return json({ ok: false, error: 'signature_not_found' }, 404);
+      const requestBranch = await db
+        .prepare('SELECT branch_id FROM signing_requests WHERE id = ? LIMIT 1')
+        .bind(String(signatureRow.signing_request_id ?? ''))
+        .first<{ branch_id: string | null }>()
+        .catch(() => null);
+      if (!branchAllowed(actor, requestBranch?.branch_id ?? null)) {
+        return json({ ok: false, error: 'forbidden' }, 403);
+      }
       await verifySignature(
         db,
         actor.id,

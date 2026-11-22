@@ -7,9 +7,12 @@
 // simultaneous checkout attempts cannot create duplicates.
 
 import type { D1Database } from '../admin/d1.ts';
+import { resolveStripeSecret } from './stripe-secret.ts';
 
 export interface StripeCustomerEnv {
   STRIPE_SECRET_KEY?: string;
+  STRIPE_TEST_SECRET?: string;
+  PUBLIC_SITE_URL?: string;
 }
 
 export interface CheckoutCustomer {
@@ -25,7 +28,10 @@ interface StripeCustomer {
 }
 
 function stripeKey(env: StripeCustomerEnv): string {
-  return env.STRIPE_SECRET_KEY?.trim() ?? '';
+  const production =
+    (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '') ===
+    'https://sparkling-standard.com';
+  return resolveStripeSecret(env, production);
 }
 
 async function stripeGet(
