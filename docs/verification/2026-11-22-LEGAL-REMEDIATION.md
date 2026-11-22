@@ -136,3 +136,22 @@ read the exact comparison PDF, confirm the version and SHA-256, then record
 Do not approve an archived/consolidated record for live use. No packet becomes
 active until the exact version is approved and loaded into the production
 template system.
+
+## 9. Release branch and verification
+
+- Branch: `release/2026-11-22-legal-signing-acceptance`
+- Remediation commit: `72974f313497489ead55df9f187a236a7d34da68`
+- PR: https://github.com/Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning/pull/1 (open; not merged)
+- No merge, deployment, production migration or legal-packet activation.
+
+Verification on the final tree:
+
+- `npm test`: **1,006 tests — 1,005 pass, 1 pre-existing skip, 0 fail**
+- `npm run test:browser`: **248 pass**
+- `npm run check`: **0 errors**, 2 pre-existing hints
+- `npm run build`: **40 pages**
+- `npm run validate` and `npm run smoke`: passed
+- Legal document quality guard: **5 pass**, including obsolete-logo and
+  insurance-target reintroduction checks
+- QA report: 0 banned phrases, 0 unresolved PDF variables, correct logo in every
+  DOCX, all cross-document policy checks pass
