@@ -1,3 +1,4 @@
+import './helpers/enable-signing.ts';
 // Estimate checkout endpoint tests: readiness, server-owned amounts, durable
 // idempotency, exact-price enforcement and price-change acceptance.
 // No network: geocoding, routing, Stripe and readiness probes are stubbed.

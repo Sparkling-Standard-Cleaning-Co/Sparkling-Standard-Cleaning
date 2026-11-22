@@ -19,7 +19,7 @@ document or a support message.
 3. Put it only in the local, git-ignored `.env`:
 
    ```text
-   STRIPE_SECRET_KEY=sk_test_...
+   STRIPE_TEST_SECRET=sk_test_...
    ```
 
 4. Start the local site:
@@ -52,11 +52,13 @@ document or a support message.
 
 ## Preview-environment setup
 
-Use Cloudflare Pages **Preview** environment variables, never the Production
-environment:
+Cloudflare secrets are write-only; a secret configured in the Cloudflare project
+cannot be read back into a local shell. For a local run, use `.env` or
+`.dev.vars`. For a preview run, use Cloudflare Pages **Preview** environment
+variables, never the Production environment:
 
-- `STRIPE_SECRET_KEY` = test-mode secret key
-- `STRIPE_WEBHOOK_SECRET` = signing secret for the preview webhook endpoint
+- `STRIPE_TEST_SECRET` = test-mode secret key
+- `STRIPE_TEST_WEBHOOK_SECRET` = signing secret for the preview webhook endpoint
 - `PUBLIC_SITE_URL` = the preview origin
 
 Create a separate Stripe test-mode webhook endpoint pointing to:

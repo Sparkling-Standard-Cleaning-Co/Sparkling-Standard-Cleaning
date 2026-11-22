@@ -111,6 +111,9 @@ Implemented:
   signature status, executed-copy download and signature download.
 - Existing customer admin history and portal document history remain the
   retrieval paths.
+- Live signing is server-gated: `createSigningRequest` fails closed with
+  `electronic_signing_not_activated` until the owner-authorized activation flag
+  is deployed. The checkout document gate is bypassed while signing is inactive.
 
 The packet builder browser test now additionally verifies the live preview,
 admin-entered variables, draft control, zoom control and iframe rendering.
@@ -144,7 +147,10 @@ post-payment receipt row. The new signing/payment/booking path is covered by
 automated integration/browser tests and a staging signing execution.
 
 Test mode is **not** a mandatory release gate. No new charge or test transaction
-was made.
+was made. The newly configured Cloudflare `STRIPE_TEST_SECRET` is present but
+write-only; its value is not available in this local environment, so a real
+sandbox E2E run remains blocked by secret-value access. See
+`docs/verification/2026-11-22-STRIPE-SANDBOX-ACCESS.md`.
 
 ## 8. Backup and restore
 
@@ -171,7 +177,7 @@ upload and live alert delivery remain owner actions.
 | `astro check` | **0 errors** (2 pre-existing hints) |
 | Focused legal/signing tests | 5/5 pass |
 | Focused signing/payment/checkout tests | 48/48 pass |
-| Full unit suite | **1,013 tests — 1,012 pass, 1 pre-existing skip, 0 fail** |
+| Full unit suite | **1,016 tests — 1,015 pass, 1 pre-existing skip, 0 fail** |
 | Full browser suite | **248/248 pass** |
 | Build | **40 pages** |
 | `validate` | 2,558 links, SEO, QR, GTM, checklist checks pass |

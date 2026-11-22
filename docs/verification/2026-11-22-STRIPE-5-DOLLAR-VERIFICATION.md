@@ -99,8 +99,8 @@ integration tests:
 - `tests/browser/initiative-6.9-paynow.test.mjs` and the full browser suite —
   Pay Now availability and final action behavior.
 
-Targeted payment-path run: **48/48 pass**. Full unit suite: **1,013 tests,
-1,012 pass, 1 pre-existing skip, 0 fail**. Full browser suite: **248/248 pass**.
+Targeted payment-path run: **48/48 pass**. Full unit suite: **1,016 tests,
+1,015 pass, 1 pre-existing skip, 0 fail**. Full browser suite: **248/248 pass**.
 
 The staging import also completed a real signing request, all required
 signatures, and an executed combined PDF with SHA-256

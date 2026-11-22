@@ -233,6 +233,7 @@ function friendly(error: unknown): string {
     authorization_not_for_after_service: 'This authorization is not approved for after-service charging.',
     authorization_property_mismatch: 'The signed authorization is for a different property.',
     stripe_not_configured: 'Stripe is not configured.',
+    electronic_signing_not_activated: 'Live electronic signing is not activated for this environment.',
     invoice_not_payable: 'This invoice is not payable in its current state.',
     invoice_not_sendable: 'Only open, partially paid or overdue invoices can be emailed.',
     invoice_paid: 'This invoice has no outstanding balance.',

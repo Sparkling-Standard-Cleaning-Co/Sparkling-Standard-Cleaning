@@ -84,6 +84,8 @@ for (const packet of data.packets) {
   });
 }
 
+const policy = await import(pathToFileURL(path.join(ROOT, 'src/config/legal-policy.ts')).href);
+policy.legalPolicyConfig.activation.electronicSigning = true;
 const service = await import(pathToFileURL(path.join(ROOT, 'src/lib/documents/service.ts')).href);
 const agreementPdf = await import(pathToFileURL(path.join(ROOT, 'src/lib/documents/agreement-pdf.ts')).href);
 

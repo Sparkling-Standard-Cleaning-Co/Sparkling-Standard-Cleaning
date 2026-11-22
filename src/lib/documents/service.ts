@@ -865,6 +865,9 @@ export async function createSigningRequest(
     variables?: DocumentVariableValues;
   } = {},
 ): Promise<CreatedSigningRequest> {
+  if (!legalPolicyConfig.activation.electronicSigning) {
+    throw new AdminAuthError(409, 'electronic_signing_not_activated');
+  }
   const { bundle, requirements: rawRequirements } = await activeRequirements(db, context, {
     ...(options.bundleId ? { bundleId: options.bundleId } : {}),
   });

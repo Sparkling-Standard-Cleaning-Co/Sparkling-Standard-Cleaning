@@ -16,6 +16,8 @@
 //    double sessions from repeated clicks/retries.
 //  - No card data ever touches this site.
 
+import { legalPolicyConfig } from '../../src/config/legal-policy.ts';
+import { resolveStripeSecret } from '../../src/lib/payments/stripe-secret.ts';
 import { estimatePaymentConfig } from '../../src/config/payments.ts';
 import {
   QUOTE_MATCH_TOLERANCE,
@@ -95,6 +97,7 @@ import { createCheckoutIntent, readCheckoutIntent } from '../../src/lib/document
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   DB?: import('../../src/lib/admin/d1.ts').D1Database;
   STRIPE_SECRET_KEY?: string;
+  STRIPE_TEST_SECRET?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
@@ -275,13 +278,13 @@ async function authoritativePhotosOutstanding(
 type CheckoutExpiry = 'expired' | 'completed' | 'failed';
 
 async function expireCheckoutSession(env: Env, sessionId: string): Promise<CheckoutExpiry> {
-  if (!env.STRIPE_SECRET_KEY?.trim() || !sessionId) return 'failed';
+  if (!stripeSecret(env) || !sessionId) return 'failed';
   try {
     const response = await fetch(
       `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}/expire`,
       {
         method: 'POST',
-        headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY.trim()}` },
+        headers: { Authorization: `Bearer ${stripeSecret(env)}` },
         signal: AbortSignal.timeout(10_000),
       },
     );
@@ -335,6 +338,7 @@ export async function documentGateForCheckout(
   fields: Record<string, string>,
   returnPath = '',
 ): Promise<{ satisfied: boolean; signingUrl?: string; error?: string }> {
+  if (!legalPolicyConfig.activation.electronicSigning) return { satisfied: true };
   if (!env.DB) return { satisfied: true };
   const reference = (fields.quote_reference ?? '').trim();
   const holdId = (fields.booking_hold_id ?? '').trim();
@@ -464,6 +468,14 @@ function siteOrigin(env: Env): string {
   return (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
 }
 
+function productionSite(env: Env): boolean {
+  return siteOrigin(env) === 'https://sparkling-standard.com';
+}
+
+function stripeSecret(env: Env): string {
+  return resolveStripeSecret(env, productionSite(env));
+}
+
 function keyMode(secret: string | undefined): 'live' | 'test' | 'unknown' {
   if (!secret) return 'unknown';
   if (secret.startsWith('sk_live_') || secret.startsWith('rk_live_')) return 'live';
@@ -588,12 +600,12 @@ function needsExplicitAcceptance(quotedCents: number, amountCents: number): bool
 }
 
 async function stripeSession(env: Env, sessionId: string): Promise<StripeSession | null> {
-  if (!env.STRIPE_SECRET_KEY?.trim()) return null;
+  if (!stripeSecret(env)) return null;
   try {
     const response = await fetch(
       `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
       {
-        headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY.trim()}` },
+        headers: { Authorization: `Bearer ${stripeSecret(env)}` },
         signal: AbortSignal.timeout(10_000),
       },
     );
@@ -605,7 +617,7 @@ async function stripeSession(env: Env, sessionId: string): Promise<StripeSession
 }
 
 async function webhookEndpointConfigured(env: Env): Promise<boolean | null> {
-  const secret = env.STRIPE_SECRET_KEY?.trim();
+  const secret = stripeSecret(env);
   if (!secret) return false;
   const fingerprint = await paymentHash(secret).catch(() => 'unknown');
   const now = Date.now();
@@ -663,7 +675,7 @@ export async function paymentReadiness(env: Env): Promise<{
     mode_allowed: boolean;
   };
 }> {
-  const secret = env.STRIPE_SECRET_KEY?.trim();
+  const secret = stripeSecret(env);
   const mode = keyMode(secret);
   const production = siteOrigin(env) === 'https://sparkling-standard.com';
   const modeAllowed = mode === 'live' || (mode === 'test' && !production);
@@ -1743,7 +1755,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${env.STRIPE_SECRET_KEY?.trim()}`,
+        Authorization: `Bearer ${stripeSecret(env)}`,
         'Content-Type': 'application/x-www-form-urlencoded',
         'Idempotency-Key': `ss-estimate-${attemptFingerprint}-${generation}`,
       },
@@ -1926,7 +1938,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       checks: ready.checks,
     });
   }
-  if (!env.STRIPE_SECRET_KEY?.trim()) return json({ ok: false, error: 'not_configured' }, 503);
+  if (!stripeSecret(env)) return json({ ok: false, error: 'not_configured' }, 503);
   if (!/^cs_[A-Za-z0-9_]+$/.test(sessionId)) return json({ ok: false, error: 'invalid_request' }, 400);
 
   const session = await stripeSession(env, sessionId);

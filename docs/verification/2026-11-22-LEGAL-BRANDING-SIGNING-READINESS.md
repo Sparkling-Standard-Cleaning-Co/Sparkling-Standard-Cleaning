@@ -118,7 +118,7 @@ Still owner-gated:
 | Check | Result |
 |---|---|
 | Focused legal/signing tests | 24/24 pass |
-| Full unit suite | **1,013 tests — 1,012 pass, 1 pre-existing skip, 0 fail** |
+| Full unit suite | **1,016 tests — 1,015 pass, 1 pre-existing skip, 0 fail** |
 | Browser suite | **248/248 pass** |
 | `astro check` | **0 errors**, 0 warnings, 2 pre-existing hints |
 | Build | **40 pages** built successfully |

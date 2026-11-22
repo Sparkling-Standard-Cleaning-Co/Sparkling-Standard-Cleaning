@@ -25,13 +25,13 @@ function loadDotEnv(file) {
 }
 
 const dotenv = loadDotEnv('.env');
-const key = (process.env.STRIPE_SECRET_KEY || dotenv.STRIPE_SECRET_KEY || '').trim();
+const key = (process.env.STRIPE_TEST_SECRET || dotenv.STRIPE_TEST_SECRET || process.env.STRIPE_SECRET_KEY || dotenv.STRIPE_SECRET_KEY || '').trim();
 const base = (process.env.STRIPE_API_BASE || 'https://api.stripe.com').replace(/\/+$/, '');
 const cents = Math.max(50, Math.min(10_000, Number(process.env.STRIPE_SANDBOX_AMOUNT_CENTS || 100)));
 
 if (!key) {
   console.error('MISSING STRIPE TEST KEY');
-  console.error('Add a ROTATED test-mode key to .env: STRIPE_SECRET_KEY=sk_test_...');
+  console.error('Add a ROTATED test-mode key to .env: STRIPE_TEST_SECRET=sk_test_... (or STRIPE_SECRET_KEY=sk_test_...)');
   console.error('Nothing was sent. Never paste a live key here.');
   process.exit(2);
 }

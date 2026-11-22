@@ -12,7 +12,7 @@ import {
   resolveSigningDownload,
   safePdfFilename,
 } from '../src/lib/documents/signing-download.ts';
-import { normalizedService } from '../src/lib/documents/service.ts';
+import { createSigningRequest, normalizedService } from '../src/lib/documents/service.ts';
 import { agreementScopeFor } from '../src/lib/documents/agreement-variables.ts';
 
 const requirements = [
@@ -81,4 +81,11 @@ test('property-management service codes resolve to the property-management packe
   assert.equal(normalizedService('real-estate-portfolio'), 'property_management');
   assert.match(agreementScopeFor('property-management-cleaning'), /property schedule/i);
   assert.doesNotMatch(agreementScopeFor('property-management-cleaning'), /full standard cleaning scope/i);
+});
+
+test('live signing request creation fails closed until the activation flag is enabled', async () => {
+  await assert.rejects(
+    () => createSigningRequest({} as never, { subjectType: 'customer', serviceCode: 'residential-deep' }),
+    /electronic_signing_not_activated/,
+  );
 });

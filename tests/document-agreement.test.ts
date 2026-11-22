@@ -1,3 +1,4 @@
+import './helpers/enable-signing.ts';
 // Dynamic agreement variables, production PDF rendering, pre-payment document
 // gate and checkout-resume intent. Synthetic records only; no network.
 

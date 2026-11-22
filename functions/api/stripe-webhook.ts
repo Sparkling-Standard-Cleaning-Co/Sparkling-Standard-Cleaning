@@ -15,6 +15,7 @@
 // Responses: 200 | 400 | 405 | 500 | 503
 
 import { verifyStripeSignature } from '../../src/lib/gift/stripe-signature.ts';
+import { resolveStripeSecret } from '../../src/lib/payments/stripe-secret.ts';
 import { buildGiftFulfillment, giftCertificateCodeFor } from '../../src/lib/gift/fulfillment.ts';
 import { commitGiftReservation, giftBucket, issueGiftCertificate, releaseGiftReservation, remainingCents } from '../../src/lib/gift/ledger.ts';
 import { buildGiftCertificateEmail } from '../../src/lib/gift/delivery.ts';
@@ -59,6 +60,7 @@ import type { ReceiptData, ReceiptLine } from '../../src/lib/payments/receipt.ts
 interface Env extends PaymentStorageEnv, BookingEnv {
   DB?: D1Database;
   STRIPE_SECRET_KEY?: string;
+  STRIPE_TEST_SECRET?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
@@ -532,7 +534,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     event.type === 'checkout.session.completed' &&
     checkoutObject?.metadata?.checkout_kind === 'saved_card_setup'
   ) {
-    if (!env.DB || !env.STRIPE_SECRET_KEY) {
+    if (!env.DB || !resolveStripeSecret(env, (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '') === 'https://sparkling-standard.com')) {
       return json({ ok: false, error: 'saved_card_setup_not_configured' }, 503);
     }
     try {
