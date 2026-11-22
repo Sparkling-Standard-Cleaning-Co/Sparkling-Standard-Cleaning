@@ -17,7 +17,10 @@
 //  - No card data ever touches this site.
 
 import { legalPolicyConfig } from '../../src/config/legal-policy.ts';
-import { resolveStripeSecret } from '../../src/lib/payments/stripe-secret.ts';
+import {
+  resolveStripeSecret,
+  resolveStripeWebhookSecret,
+} from '../../src/lib/payments/stripe-secret.ts';
 import { estimatePaymentConfig } from '../../src/config/payments.ts';
 import {
   QUOTE_MATCH_TOLERANCE,
@@ -99,6 +102,7 @@ interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   STRIPE_SECRET_KEY?: string;
   STRIPE_TEST_SECRET?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_TEST_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
   PUBLIC_SITE_URL?: string;
@@ -679,9 +683,10 @@ export async function paymentReadiness(env: Env): Promise<{
   const mode = keyMode(secret);
   const production = siteOrigin(env) === 'https://sparkling-standard.com';
   const modeAllowed = mode === 'live' || (mode === 'test' && !production);
+  const webhookSecret = resolveStripeWebhookSecret(env, production);
   const checks = {
     stripe_key: Boolean(secret),
-    webhook_secret: Boolean(env.STRIPE_WEBHOOK_SECRET?.trim()),
+    webhook_secret: Boolean(webhookSecret),
     webhook_endpoint: null as boolean | null,
     ledger: Boolean(paymentLedger(env)),
     notification: Boolean(env.WEB3FORMS_ACCESS_KEY?.trim()),

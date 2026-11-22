@@ -254,3 +254,62 @@ test('a deleted linked Stripe Customer is replaced exactly once', async () => {
   assert.equal(stripe.created.size, 1);
   assert.equal(stripe.posts(), 1);
 });
+
+test('non-production Stripe Customer calls use the resolved test secret', async () => {
+  const db = migratedDb();
+  seedCustomer(db);
+  const authHeaders: string[] = [];
+  const stub = async (url: string | URL, init?: RequestInit): Promise<Response> => {
+    authHeaders.push(String((init?.headers as Record<string, string>)?.Authorization ?? ''));
+    if ((init?.method ?? 'GET') === 'POST' && String(url).endsWith('/v1/customers')) {
+      return new Response(JSON.stringify({ id: 'cus_test_mode' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ error: { code: 'resource_missing' } }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  const result = await withFetch(stub, () =>
+    resolveCheckoutStripeCustomer(
+      db,
+      {
+        STRIPE_SECRET_KEY: 'sk_live_synthetic',
+        STRIPE_TEST_SECRET: 'sk_test_sandbox',
+        PUBLIC_SITE_URL: 'https://e2e-preview.pages.dev',
+      },
+      { reference: 'SS-CUSTOMER-1', email: 'customer@example.test' },
+    ),
+  );
+  assert.equal(result.stripeCustomerId, 'cus_test_mode');
+  assert.ok(authHeaders.length > 0);
+  assert.equal(authHeaders.every((header) => header === 'Bearer sk_test_sandbox'), true);
+});
+
+test('production Stripe Customer calls never use the test secret', async () => {
+  const db = migratedDb();
+  seedCustomer(db);
+  let authorization = '';
+  const stub = async (url: string | URL, init?: RequestInit): Promise<Response> => {
+    authorization = String((init?.headers as Record<string, string>)?.Authorization ?? '');
+    return new Response(JSON.stringify({ id: 'cus_live_mode' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  const result = await withFetch(stub, () =>
+    resolveCheckoutStripeCustomer(
+      db,
+      {
+        STRIPE_SECRET_KEY: 'sk_live_synthetic',
+        STRIPE_TEST_SECRET: 'sk_test_sandbox',
+        PUBLIC_SITE_URL: 'https://sparkling-standard.com',
+      },
+      { reference: 'SS-CUSTOMER-1', email: 'customer@example.test' },
+    ),
+  );
+  assert.equal(result.stripeCustomerId, 'cus_live_mode');
+  assert.equal(authorization, 'Bearer sk_live_synthetic');
+});

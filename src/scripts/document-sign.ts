@@ -41,6 +41,7 @@ const params = new URLSearchParams(window.location.search);
 const token = params.get('token') ?? '';
 const returnParam = params.get('return') ?? '';
 const returnPath = returnParam.startsWith('/') && !returnParam.startsWith('//') ? returnParam : '';
+const resumeToken = params.get('resume') ?? '';
 
 function esc(value: unknown): string {
   return String(value ?? '')
@@ -174,7 +175,10 @@ async function load(): Promise<void> {
     return;
   }
   try {
-    const response = await fetch(`/api/document-sign?token=${encodeURIComponent(token)}`, {
+    const query = new URLSearchParams({ token });
+    if (returnPath) query.set('return', returnPath);
+    if (resumeToken) query.set('resume', resumeToken);
+    const response = await fetch(`/api/document-sign?${query.toString()}`, {
       headers: { Accept: 'application/json' },
     });
     const payload = (await response.json().catch(() => ({}))) as SigningPayload;

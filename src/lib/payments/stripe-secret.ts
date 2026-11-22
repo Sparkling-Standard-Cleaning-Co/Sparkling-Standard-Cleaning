@@ -7,6 +7,11 @@ export interface StripeSecretEnv {
   STRIPE_TEST_SECRET?: string;
 }
 
+export interface StripeWebhookSecretEnv extends StripeSecretEnv {
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_TEST_WEBHOOK_SECRET?: string;
+}
+
 export function resolveStripeSecret(
   env: StripeSecretEnv,
   production: boolean,
@@ -16,4 +21,18 @@ export function resolveStripeSecret(
   if (production) return live;
   if (test) return test;
   return live.startsWith('sk_test_') || live.startsWith('rk_test_') ? live : '';
+}
+
+/**
+ * Production always verifies with the production webhook secret. Isolated
+ * test/preview environments use a dedicated test webhook secret when one is
+ * configured, so a production signing secret is never reused for test events.
+ */
+export function resolveStripeWebhookSecret(
+  env: StripeWebhookSecretEnv,
+  production: boolean,
+): string {
+  const test = env.STRIPE_TEST_WEBHOOK_SECRET?.trim() ?? '';
+  if (!production && test) return test;
+  return env.STRIPE_WEBHOOK_SECRET?.trim() ?? '';
 }

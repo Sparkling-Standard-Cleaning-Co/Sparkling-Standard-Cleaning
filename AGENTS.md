@@ -84,7 +84,30 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-21 checkout recovery):** application code **`84379cb`** is
+- **Current release (2026-11-22 isolated Preview end-to-end acceptance):** application code on
+  `release/2026-11-22-legal-signing-acceptance` completed a full isolated Preview acceptance run.
+  A Preview-only exact-host E2E gate (no global `*.pages.dev` bypass; production rejected; ordinary
+  Preview API calls remain `503 preview_read_only`) opened only the disposable E2E host. The
+  residential Deep Cleaning journey passed end to end: estimator, real geocode/route, verified
+  $335.00 quote, temporary hold, approved `customer.deep` packet, six required e-signatures,
+  executed-copy SHA-256, Stripe **test-mode** Checkout payment `pi_3UeirYArIaVXsguz0aWsOzmU`,
+  verified webhook `evt_1UeirZArIaVXsguzsY94yibO`, automatic booking confirmation, appointment
+  creation, and a Google Calendar event on a **dedicated test calendar** (production calendar never
+  written). The Move-In / Move-Out journey also passed end to end at $255.00. The Admin Document
+  Composer previewed, drafted, sent, signed and retained a `customer.move_in_out` request; nine
+  customer packet previews resolved every variable. Three defects were fixed: the signing page did
+  not forward the resume capability, Stripe Customer resolution used the wrong key in Preview, and
+  the webhook had no test-mode secret override. Failure tests passed (missing signature, tampered
+  price, repeated checkout idempotency, expired hold, expired signing link, cross-account document
+  access, duplicate/tampered/missing webhook signatures, abandoned Checkout). Unit **1,029**
+  (1,028 pass, 1 pre-existing skip), browser **249/249**, `astro check` 0 errors, 40 pages,
+  validate 2,558 links, smoke 21 pages. After testing the E2E token, exact-host allowlist, test
+  webhook and test calendar were removed/disabled and the Preview is read-only again. Production
+  was not merged, migrated, deployed or charged; no customer message was sent. Owner decisions
+  remain: authorize production template import/activation; set required customer documents to
+  `before_payment` and decide per-booking document scope; run the remaining facility/specialty
+  payment workflows. Evidence: `docs/verification/2026-11-22-E2E-PREVIEW-ACCEPTANCE.md`.
+- **Prior release (2026-11-21 checkout recovery):** application code **`84379cb`** is
   live on `production-safe` (final Cloudflare Pages production deployment `edc50a01`; the
   checkout fix was verified on `3f6ded04`). Live Pay Now failed because
   `functions/api/estimate-checkout.ts` sent Stripe's unsupported
