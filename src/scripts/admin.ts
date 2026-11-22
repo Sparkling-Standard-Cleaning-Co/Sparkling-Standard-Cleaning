@@ -3743,7 +3743,7 @@ async function loadDocumentUpdates(): Promise<void> {
                 (customer) =>
                   `<tr><td>${esc(customer.name)}</td><td>${esc(dateTime(customer.lastSignedAt))}</td><td>${customer.nextAppointmentAt ? esc(dateTime(customer.nextAppointmentAt)) : '-'}</td><td><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-update-compose" data-customer="${esc(customer.customerId)}" data-packet="${esc(packets[0]?.code ?? '')}">Use in composer</button></td></tr>`,
               )
-              .join('')}</tbody></table></div>${queue.length > 50 ? '<p class="admin-muted">Showing the first 50 customers. Use the customer record for the full history.</p>' : ''}`
+              .join('')}</tbody></table></div>${queue.length > 50 ? '<p class="admin-muted">Only the first 50 matching records are shown here. Use the customer record for the full history.</p>' : ''}`
           : '<p class="admin-muted">No executed copies of the previous version require review.</p>';
         return `<div class="admin-record" style="margin-top:1rem;">
           <p><strong>${esc(update.title)}</strong> ${esc(update.previousVersion ?? '')} &rarr; ${esc(update.newVersion)} <span class="admin-status">${esc(statusLabel)}</span></p>
