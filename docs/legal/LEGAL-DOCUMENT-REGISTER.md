@@ -1,3 +1,8 @@
+> **Owner approvals (2026-11-22):** all 27 active corrected candidates were
+> approved as exact versions in the Legal Registry. See
+> `00 START HERE\LEGAL-REVIEW\APPROVED\APPROVED-VERSION-MANIFEST-2026-11-22.json`.
+> The statements below describing no approvals are historical.
+
 # Legal Document Register
 
 > **Current corrected masters:** `docs/legal/templates-v3/` and

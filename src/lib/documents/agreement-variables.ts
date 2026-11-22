@@ -35,6 +35,7 @@ function normalizedService(serviceCode: string, frequency = ''): string {
   const rhythm = frequency.toLowerCase();
   if (raw.includes('church')) return 'church';
   if (raw.includes('commercial') || raw.includes('office') || raw.includes('facility')) return 'commercial';
+  if (raw.includes('property') || raw.includes('real estate') || raw.includes('real-estate') || raw.includes('hoa')) return 'property_management';
   if (raw.includes('str') || raw.includes('turnover') || raw.includes('rental') || raw.includes('airbnb')) return 'str';
   if (raw.includes('move')) return 'move_in_out';
   if (raw.includes('deep')) return 'deep';
@@ -55,6 +56,8 @@ export function agreementScopeFor(serviceCode: string, frequency = ''): string {
       return 'The signed scope of work controls the facility areas, tasks, frequency, access window, supplies, equipment, pricing and term. Any change requires written authorization. Work not listed in the signed scope is excluded.';
     case 'church':
       return 'The signed scope of work controls the sanctuary, seating, floors, rails, high-touch surfaces, aisles, fellowship areas, restrooms, nursery, classrooms, offices, corridors, entryways, glass and floor care. Sparkling Standard may clean sacramental items and carefully move candles when the church authorizes it within the agreed scope and insurance. Any change requires written authorization.';
+    case 'property_management':
+      return 'The property schedule controls each managed property, unit or common area; the approved scope and frequency for each property; the authorized agent and responsible payer; the access method and key or credential custody; and the reporting and approval process. Any added property, unit, common area or service requires a written authorization. Work not listed in the signed property schedule is excluded.';
     default:
       return 'Full standard cleaning scope; baseboards hand-wiped rather than dry-dusted; doors, door frames and jambs detailed; switch plates and outlet covers wiped; wall spot-cleaning where the finish allows; damp dusting where surfaces call for it; blinds and window sills detailed; cabinet fronts cleaned with detail attention; kitchen and bathroom deep detail including corners, grout lines and fixtures; high-touch points throughout the home; final detailed walkthrough. The signed schedule controls any selected additions.';
   }

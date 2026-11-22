@@ -289,12 +289,25 @@ test('the document packet builder opens a draft, previews unresolved variables a
 
   await page.fill('[data-document-send] input[name="customerId"]', 'cust_1');
   await page.selectOption('[data-document-send] select[name="bundleId"]', 'bundle_1');
+  await page.fill('[data-document-send] textarea[name="serviceScope"]', 'Approved deep-cleaning scope.');
+  await page.fill('[data-document-send] input[name="priceSummary"]', '$260.00');
+  await page.selectOption('[data-document-send] select[name="frequency"]', { label: 'weekly' }).catch(async () => {
+    await page.fill('[data-document-send] input[name="frequency"]', 'weekly');
+  });
   await page.click('[data-document-preview]');
   await page.waitForSelector('[data-document-preview-result] .admin-card');
   const previewText = await page.textContent('[data-document-preview-result]');
   assert.match(previewText ?? '', /Residential One-Time Packet/);
   assert.match(previewText ?? '', /Unresolved variables block sending/);
-  assert.match(previewText ?? '', /customer\.first_name/);
-  assert.ok(actions.some((entry) => entry.action === 'preview_packet'));
+  assert.match(previewText ?? '', /live preview/);
+  const frameText = await page.frameLocator('[data-document-preview-frame]').locator('body').innerText();
+  assert.match(frameText, /Residential One-Time Agreement/);
+  assert.match(frameText, /Unresolved variables/);
+  assert.match(frameText, /customer\.first_name/);
+  assert.ok(await page.isVisible('[data-document-save-draft]'));
+  assert.ok(await page.isVisible('[data-document-preview-zoom]'));
+  const previewAction = actions.find((entry) => entry.action === 'preview_packet');
+  assert.equal(previewAction.variables['service.scope'], 'Approved deep-cleaning scope.');
+  assert.equal(previewAction.variables['price.summary'], '$260.00');
   await page.context().close();
 });

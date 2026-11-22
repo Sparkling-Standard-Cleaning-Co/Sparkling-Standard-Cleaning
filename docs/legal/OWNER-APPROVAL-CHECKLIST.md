@@ -1,3 +1,11 @@
+> **Superseded 2026-11-22.** This 2026-11-19 checklist describes the older
+> draft catalog and older cancellation direction. The controlling packet matrix
+> is `docs/legal/PACKET-MATRIX-2026-11-22.md`; the controlling owner approval
+> interface is the Legal Registry Final approval queue in
+> `C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER\00 START HERE\LEGAL-REVIEW\`.
+> Do not use the old FRIENDS15 or 24-hour/no-fee statements below as current
+> policy.
+
 # Owner Approval Checklist - Core Agreements
 
 **Version:** 2026-11-19.v1  

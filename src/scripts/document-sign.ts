@@ -30,6 +30,7 @@ interface SigningPayload {
   signedTemplateIds?: string[];
   consentVersion?: string;
   resumeCheckoutUrl?: string;
+  executedDownloadUrl?: string;
   error?: string;
 }
 
@@ -65,11 +66,16 @@ function render(payload: SigningPayload): void {
     const resume = payload.resumeCheckoutUrl
       ? `<p><a class="btn btn--primary btn--full" href="${esc(payload.resumeCheckoutUrl)}">Continue to secure payment</a></p>`
       : '';
+    const executed = payload.executedDownloadUrl
+      ? `<p><a class="btn btn--secondary" href="${esc(payload.executedDownloadUrl)}" target="_blank" rel="noopener">Download your executed agreement (PDF)</a></p>`
+      : '';
+    const paperCopy =
+      '<p class="employee-muted">Need a paper copy or want to withdraw consent to future electronic records? Email <a href="mailto:admin@sparkling-standard.com?subject=Signed%20document%20request">admin@sparkling-standard.com</a>. A signed record already completed is not affected by a later withdrawal.</p>';
+    const back = returnPath
+      ? `<p><a class="btn btn--secondary" href="${esc(returnPath)}">Return to your cleaning request</a></p>`
+      : '';
     content.innerHTML =
-      resume +
-      (returnPath
-        ? `<p><a class="btn btn--secondary" href="${esc(returnPath)}">Return to your cleaning request</a></p>`
-        : '') ||
+      resume + executed + paperCopy + back ||
       '<p>Your signed copy is retained privately. Sparkling Standard will follow up with the next step.</p>';
     return;
   }
@@ -108,11 +114,15 @@ function render(payload: SigningPayload): void {
         )
         .join('')}
       <div class="employee-card" style="margin:.8rem 0;padding:1rem;box-shadow:none;border:1px solid rgba(138,74,82,.2)">
+        <h2 style="font-size:1rem;margin:0 0 .3rem;color:#6d343c;">Electronic records and signatures</h2>
+        <p class="employee-muted" style="margin:.2rem 0;font-size:.84rem;line-height:1.55;">You need a current web browser, internet access, and the ability to view, print or save a PDF or text record. You may request a paper copy at any time by emailing <a href="mailto:admin@sparkling-standard.com?subject=Paper%20copy%20request">admin@sparkling-standard.com</a>. You may withdraw consent to future electronic records by written notice to the same address. Withdrawal does not affect a record you already signed. Keep your email address and phone number current.</p>
+      </div>
+      <div class="employee-card" style="margin:.8rem 0;padding:1rem;box-shadow:none;border:1px solid rgba(138,74,82,.2)">
         <label>Your full name <input name="signerName" type="text" autocomplete="name" required /></label>
         <label>Your email <input name="signerEmail" type="email" autocomplete="email" required /></label>
         <label style="display:flex;gap:.5rem;align-items:flex-start;margin-top:.6rem;">
           <input type="checkbox" name="consent" required />
-          <span>I consent to use electronic signatures and electronic records for these documents. I understand my typed name is my legal signature.</span>
+          <span>I can access and retain these documents electronically, and I consent to use electronic signatures and electronic records. I understand my typed name is my legal signature.</span>
         </label>
         <p class="employee-muted" style="font-size:.78rem;margin-top:.5rem;">Consent version ${esc(payload.consentVersion)}. A signed copy and audit record are retained privately.</p>
       </div>

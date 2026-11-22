@@ -34,7 +34,7 @@ function masterFiles() {
 test('the correct circular logo is installed and the obsolete S mark is not used', () => {
   assert.ok(fs.existsSync(LOGO), 'correct circular logo is missing');
   assert.ok(fs.existsSync(OLD_LOGO), 'old logo should be retained only as history');
-  assert.equal(hash(LOGO), 'eb143b389efb54d304f70467ea16ce9383d8350f362814b00158bd95f68e1175');
+  assert.equal(hash(LOGO), '0253b65fba7a90e63325b00bda5dfb15fb6d08f049e3f680c0a75895518ba237');
   assert.notEqual(hash(OLD_LOGO), hash(LOGO));
   const renderer = fs.readFileSync(path.join(ROOT, 'scripts', 'render-legal-docs.mjs'), 'utf8');
   assert.ok(renderer.includes('sparkling-standard-circular-logo-1024.png'));
@@ -94,4 +94,45 @@ test('the corrected packet preserves the key owner policies', () => {
   assert.match(all, /no compounding/i);
   assert.match(all, /electronic records and electronic signatures/i);
   assert.match(all, /Form I-9/i);
+});
+
+test('owner-requested wording removals stay removed', () => {
+  const all = masterFiles().map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+  assert.doesNotMatch(all, /honest duration/i);
+  assert.doesNotMatch(all, /\$25\b/i);
+  assert.doesNotMatch(all, /\$50\b/i);
+  assert.doesNotMatch(all, /24 hours[^.\n]{0,40}no fee/i);
+
+  const core = fs.readFileSync(path.join(ROOT, 'docs', 'legal', 'templates-v3', 'LEG-AB060020.md'), 'utf8');
+  const cancellation = core.slice(core.indexOf('## 19. Cancellation'), core.indexOf('## 20.'));
+  assert.match(cancellation, /48 hours or more before the appointment: no fee/i);
+  assert.match(cancellation, /24 hours but less than 48 hours before the appointment: up to \$20/i);
+  assert.match(cancellation, /Less than 24 hours before the appointment: up to \$40/i);
+  assert.match(cancellation, /Failed access after arrival: up to \$40/i);
+  assert.match(cancellation, /will not charge both a cancellation fee and a failed-access fee/i);
+});
+
+test('the 27 active masters are complete, versioned and identify the approved brand', () => {
+  const active = masterFiles();
+  assert.equal(active.length, 27, 'expected 17 customer and 10 employee active masters');
+  for (const file of active) {
+    const text = fs.readFileSync(file, 'utf8');
+    assert.match(text, /\*\*Version:\*\*\s*2026-11-22\.remediation\.v1/, `${path.basename(file)} version`);
+    assert.match(text, /\*\*Status:\*\*\s*Owner review draft/, `${path.basename(file)} status`);
+    assert.match(text, /Sparkling Standard/, `${path.basename(file)} brand`);
+  }
+  for (const file of [
+    'LEG-AB060020.md',
+    'LEG-4A9FC934.md',
+    'LEG-8EFF2E52.md',
+    'LEG-6C749FA3.md',
+    'LEG-B329F61E.md',
+    'LEG-D25F29B4.md',
+    'LEG-9F30E030.md',
+    'LEG-PM-2026-11.md',
+  ]) {
+    const text = fs.readFileSync(path.join(ROOT, 'docs', 'legal', 'templates-v3', file), 'utf8');
+    assert.match(text, /Sparkling Standard LLC/, `${file} legal entity`);
+    assert.match(text, /Sparkling Standard Cleaning Co\./, `${file} public brand`);
+  }
 });

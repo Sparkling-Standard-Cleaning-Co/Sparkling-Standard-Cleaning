@@ -130,6 +130,7 @@ export function normalizedService(serviceCode: string, frequency = ''): string {
   // church job must not be reclassified as residential recurring.
   if (raw.includes('church')) return 'church';
   if (raw.includes('commercial') || raw.includes('office') || raw.includes('facility')) return 'commercial';
+  if (raw.includes('property') || raw.includes('real estate') || raw.includes('real-estate') || raw.includes('hoa')) return 'property_management';
   if (raw.includes('str') || raw.includes('turnover') || raw.includes('rental')) return 'str';
   if (raw.includes('move')) return 'move_in_out';
   if (raw.includes('deep')) return 'deep';

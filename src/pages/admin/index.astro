@@ -111,26 +111,38 @@ import {
             <span><span class="admin-brand__name">Sparkling<br />Standard</span><br /><span class="admin-brand__sub">Operations</span></span>
           </a>
           <nav class="admin-nav" aria-label="Admin sections">
-            <button type="button" data-admin-nav="overview">Overview</button>
-            <button type="button" data-admin-nav="calendar">Calendar &amp; Requests</button>
-            <button type="button" data-admin-nav="leads">Leads &amp; Inquiries</button>
-            <button type="button" data-admin-nav="customers">Customers</button>
-            <button type="button" data-admin-nav="new-booking">New Booking</button>
-            <button type="button" data-admin-nav="quick-estimate">Quick Estimate</button>
-            <button type="button" data-admin-nav="recurring">Recurring Plans</button>
-            <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
-            <button type="button" data-admin-nav="careers">Careers</button>
-            <button type="button" data-admin-nav="communications">Communications &amp; Notifications</button>
-            <button type="button" data-admin-nav="documents">Documents &amp; Agreements</button>
-            <button type="button" data-admin-nav="timekeeping">Timekeeping</button>
-            <button type="button" data-admin-nav="finance">Invoices &amp; Payments</button>
-            <button type="button" data-admin-nav="gift">Gift Certificates</button>
-            <button type="button" data-admin-nav="reports">Reports</button>
-            <button type="button" data-admin-nav="storage">Data &amp; Storage</button>
-            <button type="button" data-admin-nav="promotions">Promotions &amp; Discounts</button>
-            <button type="button" data-admin-nav="pricing">Pricing &amp; Estimator Control</button>
-            <button type="button" data-admin-nav="branches">Branches &amp; Launch</button>
-            <button type="button" data-admin-nav="settings">Settings &amp; Audit</button>
+            <div class="admin-nav__group"><span class="admin-nav__label">Overview</span>
+              <button type="button" data-admin-nav="overview">Overview</button>
+            </div>
+            <div class="admin-nav__group"><span class="admin-nav__label">Operations</span>
+              <button type="button" data-admin-nav="calendar">Calendar &amp; Requests</button>
+              <button type="button" data-admin-nav="customers">Customers</button>
+              <button type="button" data-admin-nav="new-booking">New Booking</button>
+              <button type="button" data-admin-nav="quick-estimate">Quick Estimate</button>
+              <button type="button" data-admin-nav="recurring">Recurring Plans</button>
+              <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
+              <button type="button" data-admin-nav="timekeeping">Timekeeping</button>
+              <button type="button" data-admin-nav="careers">Careers</button>
+            </div>
+            <div class="admin-nav__group"><span class="admin-nav__label">Sales &amp; Marketing</span>
+              <button type="button" data-admin-nav="leads">Leads &amp; Inquiries</button>
+              <button type="button" data-admin-nav="promotions">Promotions &amp; Discounts</button>
+            </div>
+            <div class="admin-nav__group"><span class="admin-nav__label">Finance</span>
+              <button type="button" data-admin-nav="finance">Invoices &amp; Payments</button>
+              <button type="button" data-admin-nav="gift">Gift Certificates</button>
+              <button type="button" data-admin-nav="reports">Reports</button>
+            </div>
+            <div class="admin-nav__group"><span class="admin-nav__label">Documents &amp; Compliance</span>
+              <button type="button" data-admin-nav="documents">Documents &amp; Agreements</button>
+              <button type="button" data-admin-nav="communications">Communications &amp; Notifications</button>
+              <button type="button" data-admin-nav="storage">Data &amp; Storage</button>
+            </div>
+            <div class="admin-nav__group"><span class="admin-nav__label">System &amp; Security</span>
+              <button type="button" data-admin-nav="pricing">Pricing &amp; Estimator Control</button>
+              <button type="button" data-admin-nav="branches">Branches &amp; Launch</button>
+              <button type="button" data-admin-nav="settings">Settings &amp; Audit</button>
+            </div>
           </nav>
           <div class="admin-sidebar__meta">
             <p data-admin-user></p>
@@ -753,19 +765,46 @@ import {
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Signing requests</h2>
               <p class="admin-muted">Send a secure single-purpose link to a customer or employee. Signed versions are immutable and retained privately.</p>
-              <form class="admin-form admin-form--grid" data-document-send>
-                <label>Packet <select name="bundleId" data-document-send-bundle><option value="">Automatic (service rules)</option></select></label>
-                <label>Subject <select name="subjectType"><option value="customer">Customer</option><option value="employee">Employee</option></select></label>
-                <label>Customer ID <input name="customerId" placeholder="cust_..." /></label>
-                <label>Employee ID <input name="teamMemberId" placeholder="team_..." /></label>
-                <label>Property ID <input name="propertyId" placeholder="prop_..." /></label>
-                <label>Service code <input name="serviceCode" placeholder="residential-cleaning" /></label>
-                <label>Frequency <input name="frequency" placeholder="weekly" /></label>
-                <label>Booking reference <input name="bookingReference" placeholder="SS-..." /></label>
-                <label>Recipient email <input name="email" type="email" /></label>
-                <label class="admin-field--wide">Additional instructions <textarea name="instructions" rows="2" maxlength="2000"></textarea></label>
-                <div class="admin-field--wide admin-actions"><button class="btn btn--ghost btn--small" type="button" data-document-preview>Preview packet</button><button class="btn btn--secondary btn--small" type="submit">Create signing link</button></div>
-              </form>
+              <div class="admin-composer" data-document-composer>
+                <form class="admin-form admin-form--grid" data-document-send>
+                  <label>Packet <select name="bundleId" data-document-send-bundle><option value="">Automatic (service rules)</option></select></label>
+                  <label>Subject <select name="subjectType"><option value="customer">Customer</option><option value="employee">Employee</option></select></label>
+                  <label>Customer ID <input name="customerId" placeholder="cust_..." /></label>
+                  <label>Employee ID <input name="teamMemberId" placeholder="team_..." /></label>
+                  <label>Property ID <input name="propertyId" placeholder="prop_..." /></label>
+                  <label>Service code <input name="serviceCode" placeholder="residential-cleaning" /></label>
+                  <label>Frequency <input name="frequency" placeholder="weekly" /></label>
+                  <label>Booking reference <input name="bookingReference" placeholder="SS-..." /></label>
+                  <label>Recipient email <input name="email" type="email" /></label>
+                  <label class="admin-field--wide">Additional instructions <textarea name="instructions" rows="2" maxlength="2000"></textarea></label>
+                  <fieldset class="admin-field--wide"><legend>Admin-filled agreement values</legend>
+                    <p class="admin-muted">These values populate the approved document variables. Company identity, clauses and prices are locked to the approved template and the values you enter here.</p>
+                    <div class="admin-form admin-form--grid">
+                      <label>Service scope <textarea name="serviceScope" rows="3" maxlength="8000"></textarea></label>
+                      <label>Included additions <textarea name="serviceAdditions" rows="2" maxlength="4000"></textarea></label>
+                      <label>Exclusions <textarea name="serviceExclusions" rows="2" maxlength="4000"></textarea></label>
+                      <label>Service date <input name="serviceDate" type="date" /></label>
+                      <label>Arrival window <input name="arrivalWindow" maxlength="120" placeholder="8:00 a.m. to 10:00 a.m." /></label>
+                      <label>Price summary <input name="priceSummary" maxlength="2000" placeholder="$260.00" /></label>
+                      <label class="admin-field--wide">Line items <textarea name="priceLineItems" rows="2" maxlength="8000"></textarea></label>
+                      <label>Tax <input name="priceTax" maxlength="1000" /></label>
+                      <label>Discount <input name="priceDiscount" maxlength="1000" /></label>
+                      <label>Payment terms <textarea name="paymentTerms" rows="2" maxlength="4000"></textarea></label>
+                      <label>Cancellation terms <textarea name="cancellationTerms" rows="2" maxlength="4000"></textarea></label>
+                    </div>
+                  </fieldset>
+                  <div class="admin-field--wide admin-actions"><button class="btn btn--ghost btn--small" type="button" data-document-preview>Preview packet</button><button class="btn btn--ghost btn--small" type="button" data-document-save-draft>Save draft link</button><button class="btn btn--secondary btn--small" type="submit">Create and send signing link</button></div>
+                </form>
+                <div class="admin-composer__preview" data-document-preview-pane>
+                  <div class="admin-composer__toolbar">
+                    <label>Section <select data-document-preview-section></select></label>
+                    <label>Zoom <select data-document-preview-zoom><option value="0.8">80%</option><option value="1" selected>100%</option><option value="1.2">120%</option><option value="1.5">150%</option></select></label>
+                    <button class="btn btn--ghost btn--small" type="button" data-document-preview-print>Print / Save PDF</button><button class="btn btn--ghost btn--small" type="button" data-document-preview-fullscreen>Full screen</button>
+                  </div>
+                  <iframe class="admin-preview-frame" data-document-preview-frame title="Live agreement preview" sandbox="allow-same-origin"></iframe>
+                  <p class="admin-muted" style="font-size:.72rem;margin:.4rem 0 0;">Live draft preview. Only approved template text is rendered; unresolved fields are flagged before a link can be created.</p>
+                </div>
+              </div>
               <div data-document-preview-result style="margin-top:.6rem;"></div>
               <div data-document-send-result style="margin-top:.6rem;"></div>
               <div data-admin-documents-requests style="margin-top:1rem;"></div>

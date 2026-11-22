@@ -111,12 +111,16 @@ function Send-OptionalAlert([string]$Subject, [string]$Body) {
 $keyFile = Join-Path $Master '08 BACKUPS & ARCHIVE\keys\d1-backup-key-dpapi.txt'
 $secureKey = $null
 $keyPtr = [IntPtr]::Zero
+$pushedRepo = $false
 try {
   if (-not (Test-Path -LiteralPath $keyFile)) { throw "Backup key file not found: $keyFile" }
   if (-not (Test-Path -LiteralPath (Join-Path $Repo 'scripts\backup\create.mjs'))) { throw 'Backup scripts are unavailable in the repository.' }
   $secureKey = Get-Content -LiteralPath $keyFile | ConvertTo-SecureString
   $keyPtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
   $env:BACKUP_ENCRYPTION_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPtr)
+  $pushedRepo = $false
+  Push-Location -LiteralPath $Repo
+  $pushedRepo = $true
 
   # 1. D1 export. Prefer a fresh remote export. A cached verified export is
   #    accepted only with an explicit status so the health check can alert.
@@ -270,6 +274,7 @@ try {
   Send-OptionalAlert 'Sparkling Standard backup FAILED' $alertBody
   exit 1
 } finally {
+  if ($pushedRepo) { Pop-Location }
   if ($keyPtr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($keyPtr) }
   Remove-Item Env:BACKUP_ENCRYPTION_KEY -ErrorAction SilentlyContinue
   Remove-Item Env:ONEDRIVE_TARGET_MODE -ErrorAction SilentlyContinue

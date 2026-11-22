@@ -1,7 +1,14 @@
 # Final Approval Package — 2026-11-22
 
-**Status:** Owner review package. No document is approved, effective, imported
-into D1 or included in a live signing packet.
+**Status:** 27 active documents owner-approved as exact versions on 2026-11-22.
+They remain unimported into production D1 and inactive in live signing packets.
+The 3 archived/consolidated records remain excluded.
+
+## Approved records
+
+- Approved manifest: `00 START HERE\LEGAL-REVIEW\APPROVED\APPROVED-VERSION-MANIFEST-2026-11-22.json`
+- Approval snapshot: `00 START HERE\LEGAL-REVIEW\APPROVED\APPROVAL-SNAPSHOT-2026-11-22.json`
+- Word/PDF library: `FINAL-APPROVAL-PACKAGE-2026-11-22\10-APPROVED-LIBRARY\`
 
 ## Location
 
@@ -25,12 +32,14 @@ into D1 or included in a live signing packet.
 ## Branding
 
 The correct asset is
-`public/brand/sparkling-standard-circular-logo-1024.png`, rendered from the
-approved `logo-primary.svg` circular mark. The old stylized S raster
+`public/brand/sparkling-standard-circular-logo-1024.png` (SHA-256
+`0253b65fba7a90e63325b00bda5dfb15fb6d08f049e3f680c0a75895518ba237`),
+rendered from the approved `logo-primary.svg` circular mark with the embedded
+Great Vibes and Fraunces brand fonts. The old stylized S raster
 `approved-icon-master-1024.png` is obsolete and is not embedded in the corrected
 documents. `docs/brand/LOGO-AUTHORITY.md` records the correction, and
-`tests/legal-document-quality.test.ts` fails if the old mark or the old
-insurance-target wording is reintroduced.
+`tests/legal-document-quality.test.ts` fails if the old mark, fallback-font
+raster, or the old insurance-target wording is reintroduced.
 
 ## Document hierarchy
 
@@ -46,13 +55,14 @@ authorization controls only the work or payment it covers.
 
 ## Approval
 
-Open `06-REPORTS\OWNER-APPROVAL-QUEUE-2026-11-22.xlsx`. For each document:
+Use the existing owner Legal Registry as the approval interface:
 
-1. Read its comparison PDF in `05-COMPARISONS`.
-2. Confirm the correct title, version and SHA-256 in the queue.
-3. Record **Approved exact version**, **Rejected** or **Deferred**.
-4. Initial and date the row.
+1. Double-click `C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER\00 START HERE\LEGAL-REVIEW\OPEN-LEGAL-REGISTRY.cmd`.
+2. Click **Final approval queue** and review the 27 active candidates grouped by service.
+3. Read the corrected PDF, open the **Comparison** link, and confirm the exact DOCX version and SHA-256.
+4. Record **Approve as written** (exact version), **Approve with revisions**, **Reject** or **Defer**.
 5. Do not approve an archived, superseded or consolidated document for live use.
 
-Approval is valid only for the exact DOCX version and hash in the queue. A
-changed file, regenerated PDF or later edit invalidates approval.
+The XLSX in `06-REPORTS` remains a printable backup inventory. Approval is valid
+only for the exact DOCX version and SHA-256 displayed in the registry. A changed
+file, regenerated PDF or later edit invalidates approval.

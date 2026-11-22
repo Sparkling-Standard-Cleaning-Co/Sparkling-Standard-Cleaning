@@ -4,11 +4,16 @@
 import { adminDb, type AdminDbEnv } from '../../src/lib/admin/d1.ts';
 import { AdminAuthError } from '../../src/lib/admin/operations.ts';
 import {
+  ESIGN_CONSENT_VERSION,
   getExecutedAgreementPdf,
   getSigningRequestByToken,
   signSigningRequest,
   type RequirementSnapshot,
 } from '../../src/lib/documents/service.ts';
+import {
+  executedCopyKey,
+  resolveSigningDownload,
+} from '../../src/lib/documents/signing-download.ts';
 import {
   processExecutedDocumentOutbox,
   queueExecutedDocumentEmail,
@@ -57,16 +62,30 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+async function sha256Bytes(value: ArrayBuffer | Uint8Array): Promise<string> {
+  const bytes = new Uint8Array(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes.buffer as ArrayBuffer);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 async function storeExecutedPdf(
   env: Env,
   db: NonNullable<Env['DB']>,
   requestId: string,
-): Promise<boolean> {
+): Promise<string | null> {
   const bucket = env.DOCUMENTS_BUCKET;
-  if (!bucket?.put) return false;
+  if (!bucket?.put) return null;
   const artifact = await getExecutedAgreementPdf(db, requestId).catch(() => null);
-  if (!artifact) return false;
-  const key = `documents/executed/${requestId}.pdf`;
+  if (!artifact) return null;
+  const defaultKey = `documents/executed/${requestId}.pdf`;
+  let key = defaultKey;
+  const existing = bucket.get ? await bucket.get(defaultKey).catch(() => null) : null;
+  if (existing) {
+    const existingBytes = existing.arrayBuffer ? await existing.arrayBuffer() : null;
+    if (existingBytes && (await sha256Bytes(existingBytes)) !== artifact.sha256) {
+      key = `documents/executed/${requestId}-${artifact.sha256}.pdf`;
+    }
+  }
   await bucket.put(key, artifact.pdf, {
     httpMetadata: { contentType: 'application/pdf' },
   });
@@ -77,7 +96,7 @@ async function storeExecutedPdf(
     .bind(key, requestId)
     .run()
     .catch(() => undefined);
-  return true;
+  return key;
 }
 
 async function confirmPaidAfterSigning(
@@ -145,6 +164,7 @@ async function confirmPaidAfterSigning(
 function publicRequirement(
   requirement: RequirementSnapshot,
   latest: Map<string, { attempt: number; status: string }>,
+  token: string,
 ) {
   const state = latest.get(requirement.templateId);
   const status = state?.status ?? '';
@@ -162,7 +182,7 @@ function publicRequirement(
     canResign: status === 'rejected',
     signatureStatus: status,
     downloadUrl: requirement.r2Key
-      ? `/api/document-sign?token=${encodeURIComponent('__TOKEN__')}&download=${encodeURIComponent(requirement.templateId)}`
+      ? `/api/document-sign?token=${encodeURIComponent(token)}&download=${encodeURIComponent(requirement.templateId)}`
       : '',
   };
 }
@@ -190,28 +210,42 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         .filter(([, state]) => ['signed', 'awaiting_verification', 'verified'].includes(state.status))
         .map(([templateId]) => templateId),
     );
+    const allRequiredSigned = requirements
+      .filter((requirement) => requirement.required)
+      .every((requirement) => signed.has(requirement.templateId));
+    const executedPrefix = `documents/executed/${String(request.id)}`;
+    const executedRow = [...signatures].reverse().find((row) =>
+      String(row.r2_key ?? '').startsWith(executedPrefix),
+    );
+    const executedKey = executedRow ? String(executedRow.r2_key) : executedCopyKey(String(request.id));
     const downloadId = url.searchParams.get('download') ?? '';
     if (downloadId) {
-      const requirement = requirements.find((item) => item.templateId === downloadId);
-      if (!requirement || !requirement.r2Key) return json({ ok: false, error: 'document_not_found' }, 404);
+      const target = resolveSigningDownload(downloadId, String(request.id), requirements, allRequiredSigned, executedKey);
+      if ('error' in target) {
+        const status =
+          target.error === 'signing_incomplete'
+            ? 409
+            : target.error === 'invalid_download'
+              ? 400
+              : 404;
+        return json({ ok: false, error: target.error }, status);
+      }
       const bucket = context.env.DOCUMENTS_BUCKET;
       if (!bucket?.get) return json({ ok: false, error: 'document_storage_not_configured' }, 503);
-      const object = await bucket.get(requirement.r2Key);
+      const object = await bucket.get(target.key);
       if (!object) return json({ ok: false, error: 'document_not_found' }, 404);
       const body = object.body ?? (object.arrayBuffer ? await object.arrayBuffer() : null);
       if (!body) return json({ ok: false, error: 'document_unavailable' }, 503);
       return new Response(body as BodyInit, {
         headers: {
           'Content-Type': object.httpMetadata?.contentType || 'application/pdf',
-          'Content-Disposition': `inline; filename="${requirement.title.replace(/[^a-zA-Z0-9._-]/g, '_')}.pdf"`,
+          'Content-Disposition': `inline; filename="${target.filename}"`,
           'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff',
         },
       });
     }
-    const allRequiredSigned = requirements
-      .filter((requirement) => requirement.required)
-      .every((requirement) => signed.has(requirement.templateId));
+    const executedReady = allRequiredSigned && Boolean(executedRow);
     const resumeToken = url.searchParams.get('resume') ?? '';
     let resumeCheckoutUrl = '';
     if (allRequiredSigned && resumeToken) {
@@ -233,13 +267,14 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         expiresAt: request.token_expires_at,
         instructions: String((request as Record<string, unknown>).packet_instructions ?? ''),
       },
-      documents: requirements.map((requirement) => {
-        const item = publicRequirement(requirement, latest);
-        item.downloadUrl = item.downloadUrl.replace('__TOKEN__', token);
-        return item;
-      }),
+      documents: requirements.map((requirement) => publicRequirement(requirement, latest, token)),
       signedTemplateIds: [...signed],
-      consentVersion: '2026-11-01.esign-consent.v1',
+      consentVersion: ESIGN_CONSENT_VERSION,
+      ...(executedReady
+        ? {
+            executedDownloadUrl: `/api/document-sign?token=${encodeURIComponent(token)}&download=executed`,
+          }
+        : {}),
       ...(resumeCheckoutUrl ? { resumeCheckoutUrl } : {}),
     });
   } catch {

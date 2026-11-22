@@ -58,7 +58,8 @@ imported into D1 or included in a live signing packet.
 
 - Correct asset: `public/brand/sparkling-standard-circular-logo-1024.png`,
   rendered from the approved vector `public/brand/logo-primary.svg`.
-- SHA-256: `eb143b389efb54d304f70467ea16ce9383d8350f362814b00158bd95f68e1175`.
+- SHA-256: `0253b65fba7a90e63325b00bda5dfb15fb6d08f049e3f680c0a75895518ba237`.
+- Later correction: the earlier `eb143b389efb54d304f70467ea16ce9383d8350f362814b00158bd95f68e1175` raster had fallback lettering. The corrected raster uses the approved Great Vibes/Fraunces lettering from `logo-primary.svg`.
 - Obsolete mark: `public/brand/approved-icon-master-1024.png` (old stylized S).
   It is retained only as history and is not embedded in the corrected documents.
 - Every corrected DOCX was checked for the correct embedded image hash; every
