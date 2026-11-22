@@ -10,8 +10,10 @@ calendar change was made. Production signing activation remains closed.
 |---|---|
 | Branch | `release/2026-11-22-legal-signing-acceptance` |
 | Starting HEAD | `635efcf33f4c2b43e41848ed378c33c8427044a1` |
+| Acceptance commit | `bac338781a8fd77786169994b0858e7e047db7a3` |
 | `production-safe` baseline | `459383d5618a304f56390bb542de77e7a332aed6` |
-| Pull request | #1, targeting `production-safe` |
+| Pull request | #1, targeting `production-safe`; OPEN and MERGEABLE |
+| CI | `validate` and `browser` pass on the acceptance commit |
 | Production | unchanged; no merge or deployment |
 | Live charges | none |
 
@@ -94,7 +96,7 @@ Functions, disposable D1/R2, test-mode Stripe and the dedicated test calendar.
 | Appointment | `appt_35ddce3f-2a70-4aec-a867-ff09ebcdf8bc`; confirmed; 2027-01-04 |
 | Calendar | event `vsjt6kvg539a1ogi96njfioii8` created on the **dedicated test calendar**; `calendar_links` status `synced` |
 | Customer/property | `cust_8111fc4b-6ab2-42ce-9550-9e3d04a1de8e` / `prop_0cc84877-2293-47f8-a9ae-bde8041b4465` |
-| Customer portal | passwordless session verified; booking, signed documents and executed copy visible |
+| Customer portal | passwordless session verified with a disposable-D1 test token; booking, signed documents and executed copy visible (email magic-link delivery was not read) |
 | Portal executed download | `200`; `X-Executed-SHA256` matched the signing record; signer text present |
 | Cross-account document request | `404 document_not_found` |
 | Duplicate webhook | same event returned `200 duplicate:true` twice; appointment count stayed 1, payment count stayed 1 |
