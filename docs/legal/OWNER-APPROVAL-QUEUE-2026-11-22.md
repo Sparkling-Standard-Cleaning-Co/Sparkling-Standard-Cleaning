@@ -1,5 +1,12 @@
 # Owner Approval Queue — 2026-11-22
 
+> **Superseded for approval purposes.** The owner rejected the abbreviated
+> candidates as final deliverables. The corrected, full-length package and the
+> current approval queue are in
+> `C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER\FINAL-APPROVAL-PACKAGE-2026-11-22\`.
+> See `docs/legal/FINAL-APPROVAL-PACKAGE-2026-11-22.md`. This file remains as
+> historical documentation of the prior queue.
+
 **Status:** prepared, unapproved, inactive. No candidate in this queue may be
 used for signature until the owner approves the exact version and SHA-256.
 

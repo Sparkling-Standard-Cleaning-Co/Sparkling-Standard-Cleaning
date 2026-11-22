@@ -16,7 +16,8 @@ Source files:
 | Use | File |
 | --- | --- |
 | Vector master | `public/brand/logo-primary.svg` (identical artwork: `logo-mark.svg`, `logo-mark-soft.svg`) |
-| High-resolution raster master | `public/brand/approved-icon-master-1024.png` |
+| High-resolution raster master | `public/brand/sparkling-standard-circular-logo-1024.png` (rendered directly from `logo-primary.svg`) |
+| Obsolete raster (do not use) | `public/brand/approved-icon-master-1024.png` — the earlier stylized S mark. It is retained only as history and must not be embedded in a legal document. |
 | Browser/PWA icons | `public/brand/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `favicon.*` |
 | Owner master archive | `C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER\02 BRANDING & DESIGN\Brand Assets\02_Logos_and_Identity\Approved-Brand-Assets\` |
 
@@ -38,8 +39,20 @@ that requires a new explicit brand decision, a proper vector/transparent asset,
 and regeneration of the logo kit. Until then, legal documents and email use the
 approved circular mark only.
 
+## Obsolete artwork
+
+`public/brand/approved-icon-master-1024.png` is the earlier stylized **S** mark.
+It was mistakenly used by the abbreviated 2026-11-22 legal candidates. Do not
+use it for a legal document, email header, packet cover or generated PDF. It is
+retained only as historical inventory. The corrected documents use
+`sparkling-standard-circular-logo-1024.png`, rendered from the approved
+`logo-primary.svg` circular artwork.
+
 ## Legal document rule
 
-`scripts/render-legal-docs.mjs` embeds `approved-icon-master-1024.png` at the top
-of every rendered agreement and uses **Sparkling Standard Cleaning Co.** with
+`scripts/render-legal-docs.mjs` and the final approval package embed
+`public/brand/sparkling-standard-circular-logo-1024.png` at the top of every
+rendered agreement and use **Sparkling Standard Cleaning Co.** with
 **Standards That Sparkle.** The legal entity remains **Sparkling Standard LLC**.
+Any document that embeds the old stylized S mark is rejected and must be
+regenerated.

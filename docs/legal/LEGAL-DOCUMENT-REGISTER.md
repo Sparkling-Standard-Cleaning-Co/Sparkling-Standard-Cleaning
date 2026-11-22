@@ -1,5 +1,12 @@
 # Legal Document Register
 
+> **Current corrected masters:** `docs/legal/templates-v3/` and
+> `docs/legal/employee-v3/`. The final owner-review package and approval queue
+> are in the Master Folder at `FINAL-APPROVAL-PACKAGE-2026-11-22\`. This
+> 2026-11-19 register remains as historical documentation; where it conflicts
+> with the corrected package, the corrected package and its version/hash
+> manifest control.
+
 **Register version:** 2026-11-19.v1  
 **Owner approval:** None recorded for the documents below  
 **Attorney approval:** None recorded  
@@ -15,9 +22,9 @@
 - Legal entity: **Sparkling Standard LLC**
 - Slogan: **Standards That Sparkle.**
 - Phone: **(850) 426-8479**
-- Email: **owner@sparkling-standard.com**
+- Email: **admin@sparkling-standard.com**
 - Website: **https://sparkling-standard.com**
-- Logo: approved circular mark, `public/brand/approved-icon-master-1024.png`
+- Logo: approved circular mark, `public/brand/sparkling-standard-circular-logo-1024.png`
   (see `docs/brand/LOGO-AUTHORITY.md`)
 
 ## 2. Customer documents
