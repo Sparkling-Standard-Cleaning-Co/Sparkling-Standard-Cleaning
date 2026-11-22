@@ -349,12 +349,12 @@ below.
 - Application R2 archive `sparkling-standard-backup-2026-11-20T15-21-43.ssbk`
   (`379EAFE3...E2B9`) verified and restored in isolation: 89 files.
 - New current archive
-  `sparkling-standard-backup-2026-11-22T05-58-55.ssbk`
-  (`4a65c306...8708`) created by the scheduled local wrapper with a fresh
-  2026-11-22 D1 export, the current legal registry and 29 candidates, the owner
-  approval queue and full comparisons, the official Form I-9 and
+  `sparkling-standard-backup-2026-11-22T07-24-41.ssbk`
+  (`69236a1c...ba3e`) created by the scheduled local wrapper with a fresh
+  2026-11-22 D1 export, the current legal registry, the corrected
+  `FINAL-APPROVAL-PACKAGE-2026-11-22`, the official Form I-9 and
   procedure/tracker, the restricted I-9 records folder and the website source.
-  1,868 files. `.env`, `.dev.vars`, `.wrangler` and `secrets.env` were excluded.
+  2,162 files. `.env`, `.dev.vars`, `.wrangler` and `secrets.env` were excluded.
 - Uploaded to OneDrive, independently downloaded with a matching SHA-256,
   verified and restored in isolation. Restored D1: 50 migrations, 95 data
   tables and 0 foreign-key violations. Retention 7/4/6 applied; two superseded

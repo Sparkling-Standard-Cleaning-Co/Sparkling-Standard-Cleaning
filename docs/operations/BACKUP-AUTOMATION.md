@@ -35,11 +35,11 @@ Do not commit or paste any of these values.
 
 ## Current verified evidence
 
-- Archive: `08 BACKUPS & ARCHIVE\SCHEDULED\sparkling-standard-backup-2026-11-22T05-58-55.ssbk`
-- SHA-256: `4a65c30648564cb3b9a930d2ae6bb781dc396233c2e468df820bf3b45e028708`
-- 1,868 files / 263,313,055 plain bytes
+- Archive: `08 BACKUPS & ARCHIVE\SCHEDULED\sparkling-standard-backup-2026-11-22T07-24-41.ssbk`
+- SHA-256: `69236a1cd11ef42c0834ed396cd0fdcfd2bbbec682d328adbbe09db457bdba3e`
+- 2,162 files / 345,434,131 plain bytes
 - Fresh D1 export SHA-256:
-  `480a7f47c1a97c4db9b7dee125e589c77218034d3867a98500736e86db04d625`
+  `784b2b1cd67152550dd07887fd178f9d3207a73f0a8aa2d2f8d43d8cb7795057`
 - Local verify: passed; D1 integrity ok, 96 tables
 - OneDrive upload: accepted; independent download hash matched
 - Independent restore: passed; restored D1 50 migrations, 95 data tables,

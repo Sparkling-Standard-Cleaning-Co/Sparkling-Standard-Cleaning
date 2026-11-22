@@ -174,6 +174,7 @@ try {
     'scripts/backup/create.mjs',
     '--d1', $d1Path,
     '--source', "legal=$Master\00 START HERE\LEGAL-REVIEW",
+    '--source', "final-legal=$Master\FINAL-APPROVAL-PACKAGE-2026-11-22",
     '--source', "i9-control=$Master\05 EMPLOYEES & TRAINING\Employee Policies\I-9",
     '--source', "i9-records=$Master\05 EMPLOYEES & TRAINING\Employee Records\I-9",
     '--source', "website=$Repo",

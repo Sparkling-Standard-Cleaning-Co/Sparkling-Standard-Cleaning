@@ -1,5 +1,11 @@
 # 2026-11-22 Legal, I-9, Dynamic Agreement and Backup Evidence
 
+> **Superseded for the legal-document set by
+> `docs/verification/2026-11-22-LEGAL-REMEDIATION.md`.** The owner rejected the
+> abbreviated candidates as final deliverables; the corrected package is
+> `FINAL-APPROVAL-PACKAGE-2026-11-22`. The I-9, dynamic signing and backup
+> evidence in this document remains historically accurate for its release point.
+
 **Branch:** `production-safe`
 **Start/final HEAD:** `459383d5618a304f56390bb542de77e7a332aed6` (no commit, no push, no deploy)
 **Working tree:** intentionally uncommitted session work; pre-existing untracked files preserved.
@@ -113,16 +119,16 @@ The focused tests prove: variable population from the stored request, no unresol
 
 ### New current legal/I-9/source archive
 
-- Archive: `08 BACKUPS & ARCHIVE\SCHEDULED\sparkling-standard-backup-2026-11-22T05-58-55.ssbk`
-- SHA-256: `4a65c30648564cb3b9a930d2ae6bb781dc396233c2e468df820bf3b45e028708`
-- Contents: fresh 2026-11-22 D1 export, current legal registry and all 29 candidates, the owner approval queue and full comparisons, the official I-9 and procedure/tracker, the restricted I-9 records folder, and the current website source. 1,868 files / 263,313,055 bytes.
+- Archive: `08 BACKUPS & ARCHIVE\SCHEDULED\sparkling-standard-backup-2026-11-22T07-24-41.ssbk`
+- SHA-256: `69236a1cd11ef42c0834ed396cd0fdcfd2bbbec682d328adbbe09db457bdba3e`
+- Contents: fresh 2026-11-22 D1 export, current legal registry and all 29 candidates, the owner approval queue and full comparisons, the official I-9 and procedure/tracker, the restricted I-9 records folder, and the current website source. 2,162 files / 345,434,131 bytes.
 - Excluded: `.env`, `.dev.vars`, `.wrangler`, `secrets.env`. Only example files remain.
 - Local verify: ok, D1 integrity `ok`, 96 tables.
-- Local isolated restore: 1,868 files; fresh D1, I-9 form, reconciliation, owner queue and comparisons present.
+- Local isolated restore: 2,162 files; fresh D1, I-9 form, reconciliation, owner queue and comparisons present.
 - Uploaded to OneDrive `Sparkling-Standard-Encrypted-Backups`; upload SHA-256 matched.
 - Independently downloaded from OneDrive: SHA-256 matched exactly.
-- Independently downloaded archive verified and restored to a fresh temporary directory: 1,868 files; D1 verification 50 migrations, 95 tables, 0 foreign-key violations.
-- Fresh D1 export SHA-256: `480a7f47c1a97c4db9b7dee125e589c77218034d3867a98500736e86db04d625`.
+- Independently downloaded archive verified and restored to a fresh temporary directory: 2,162 files; D1 verification 50 migrations, 95 tables, 0 foreign-key violations.
+- Fresh D1 export SHA-256: `784b2b1cd67152550dd07887fd178f9d3207a73f0a8aa2d2f8d43d8cb7795057`.
 
 OneDrive retention (7 daily / 4 weekly / 6 monthly) removed the earlier 2026-11-22 05:13 and 05:31 cloud copies after this archive was verified; the local copies remain. The initial archive created during this session that accidentally included `.env` and `.wrangler` was deleted after the clean archive was verified. No completed employee I-9 exists in production or in these archives.
 
