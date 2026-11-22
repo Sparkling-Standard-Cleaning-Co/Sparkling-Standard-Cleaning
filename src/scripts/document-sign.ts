@@ -29,6 +29,7 @@ interface SigningPayload {
   documents?: SigningDocument[];
   signedTemplateIds?: string[];
   consentVersion?: string;
+  resumeCheckoutUrl?: string;
   error?: string;
 }
 
@@ -61,9 +62,15 @@ function render(payload: SigningPayload): void {
   if (unsigned.length === 0) {
     message('All required documents are signed. You may close this page.');
     content.hidden = false;
-    content.innerHTML = returnPath
-      ? `<p><a class="btn btn--primary" href="${esc(returnPath)}">Return to your cleaning request</a></p>`
+    const resume = payload.resumeCheckoutUrl
+      ? `<p><a class="btn btn--primary btn--full" href="${esc(payload.resumeCheckoutUrl)}">Continue to secure payment</a></p>`
       : '';
+    content.innerHTML =
+      resume +
+      (returnPath
+        ? `<p><a class="btn btn--secondary" href="${esc(returnPath)}">Return to your cleaning request</a></p>`
+        : '') ||
+      '<p>Your signed copy is retained privately. Sparkling Standard will follow up with the next step.</p>';
     return;
   }
   message('Review each document and sign below.');

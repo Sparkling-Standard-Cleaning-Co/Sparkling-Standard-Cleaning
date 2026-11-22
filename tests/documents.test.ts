@@ -325,6 +325,13 @@ test('commercial and church services resolve their own bundles, not the resident
   });
   assert.equal(resolved.bundle?.code, 'customer.commercial');
   assert.deepEqual(resolved.requirements.map((item) => item.templateId), [commercialDoc]);
+  const weeklyCommercial = await activeRequirements(f.db, {
+    subjectType: 'customer',
+    customerId: f.customerId,
+    serviceCode: 'commercial-cleaning',
+    frequency: 'weekly',
+  });
+  assert.equal(weeklyCommercial.bundle?.code, 'customer.commercial', 'a weekly commercial job is not residential recurring');
   const church = await activeRequirements(f.db, {
     subjectType: 'customer',
     customerId: f.customerId,

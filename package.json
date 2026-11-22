@@ -56,6 +56,7 @@
     "prebuild": "npm run config:validate",
     "pricing:impact": "node --experimental-strip-types scripts/pricing-impact.mjs",
     "stripe:sandbox": "node scripts/stripe-sandbox-verify.mjs",
+    "stripe:checkout-sandbox": "node scripts/stripe-checkout-sandbox.mjs",
     "backup:inventory": "node scripts/backup/inventory.mjs",
     "backup:create": "node scripts/backup/create.mjs",
     "backup:verify": "node scripts/backup/verify.mjs",

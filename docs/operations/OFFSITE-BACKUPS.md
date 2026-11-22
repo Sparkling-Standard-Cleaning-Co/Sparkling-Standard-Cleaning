@@ -335,3 +335,34 @@ restore proof.
 - The nightly scheduler Worker needs a fine-grained GitHub Actions:write token.
   The workflow schedule remains dormant on `main`; this Worker is the safe
   alternative without changing branches or deployment sources.
+
+### 2026-11-22 legal, I-9 and D1 independent restore
+
+This supersedes the earlier statement that application R2 objects had not been
+restored; an independently downloaded R2 application archive was restored in
+isolation on 2026-11-22. It does not change the owner-dependent workflow items
+below.
+
+- Current D1 archive `sparkling-standard-backup-2026-11-21T21-10-15.ssbk`
+  (`393525B4...E866`) verified and restored to a fresh temporary directory.
+  Restored D1: 50 migrations, 95 data tables, 0 foreign-key violations.
+- Application R2 archive `sparkling-standard-backup-2026-11-20T15-21-43.ssbk`
+  (`379EAFE3...E2B9`) verified and restored in isolation: 89 files.
+- New current archive
+  `sparkling-standard-backup-2026-11-22T05-58-55.ssbk`
+  (`4a65c306...8708`) created by the scheduled local wrapper with a fresh
+  2026-11-22 D1 export, the current legal registry and 29 candidates, the owner
+  approval queue and full comparisons, the official Form I-9 and
+  procedure/tracker, the restricted I-9 records folder and the website source.
+  1,868 files. `.env`, `.dev.vars`, `.wrangler` and `secrets.env` were excluded.
+- Uploaded to OneDrive, independently downloaded with a matching SHA-256,
+  verified and restored in isolation. Restored D1: 50 migrations, 95 data
+  tables and 0 foreign-key violations. Retention 7/4/6 applied; two superseded
+  same-day cloud copies were removed and local copies remain.
+- Local scheduled tasks, health check and recovery steps:
+  `docs/operations/BACKUP-AUTOMATION.md`.
+- Evidence: `docs/verification/2026-11-22-LEGAL-I9-BACKUP.md`.
+
+Still owner-dependent: the scheduled workflow on the default branch, live
+alert delivery, a current full media/master archive, key independence and a
+production D1/R2 re-import runbook.

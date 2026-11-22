@@ -4,6 +4,7 @@
 import { adminDb, type AdminDbEnv } from '../../src/lib/admin/d1.ts';
 import { AdminAuthError } from '../../src/lib/admin/operations.ts';
 import {
+  getExecutedAgreementPdf,
   getSigningRequestByToken,
   signSigningRequest,
   type RequirementSnapshot,
@@ -12,6 +13,9 @@ import {
   processExecutedDocumentOutbox,
   queueExecutedDocumentEmail,
 } from '../../src/lib/documents/notifications.ts';
+import { autoConfirmPaidBooking } from '../../src/lib/booking/auto-confirm.ts';
+import type { BookingEnv } from '../../src/lib/booking/service.ts';
+import { readCheckoutIntent } from '../../src/lib/documents/checkout-intent.ts';
 
 interface DocumentsBucket {
   get?: (key: string) => Promise<{
@@ -19,6 +23,11 @@ interface DocumentsBucket {
     arrayBuffer?: () => Promise<ArrayBuffer>;
     httpMetadata?: { contentType?: string };
   } | null>;
+  put?: (
+    key: string,
+    value: ArrayBuffer | Uint8Array,
+    options?: { httpMetadata?: { contentType?: string } },
+  ) => Promise<unknown>;
 }
 
 interface Env extends AdminDbEnv {
@@ -27,6 +36,18 @@ interface Env extends AdminDbEnv {
   RESEND_FROM_EMAIL?: string;
   OWNER_NOTIFICATION_EMAIL?: string;
   PUBLIC_SITE_URL?: string;
+  PAYMENT_LEDGER?: import('../../src/lib/payments/ledger.ts').LedgerBucket;
+  PHOTOS_BUCKET?: import('../../src/lib/payments/ledger.ts').LedgerBucket;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_REFRESH_TOKEN?: string;
+  GOOGLE_CALENDAR_ID?: string;
+  TRAVEL_ORIGIN?: string;
+  ROUTES_PROVIDER?: string;
+  ROUTES_API_KEY?: string;
+  GOOGLE_MAPS_SERVER_API_KEY?: string;
+  MAPMAP_BASE?: string;
+  EIA_API_KEY?: string;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -34,6 +55,91 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
   });
+}
+
+async function storeExecutedPdf(
+  env: Env,
+  db: NonNullable<Env['DB']>,
+  requestId: string,
+): Promise<boolean> {
+  const bucket = env.DOCUMENTS_BUCKET;
+  if (!bucket?.put) return false;
+  const artifact = await getExecutedAgreementPdf(db, requestId).catch(() => null);
+  if (!artifact) return false;
+  const key = `documents/executed/${requestId}.pdf`;
+  await bucket.put(key, artifact.pdf, {
+    httpMetadata: { contentType: 'application/pdf' },
+  });
+  await db
+    .prepare(
+      "UPDATE document_signatures SET r2_key = ? WHERE signing_request_id = ? AND status IN ('signed','awaiting_verification','verified') AND TRIM(signed_content_text) <> ''",
+    )
+    .bind(key, requestId)
+    .run()
+    .catch(() => undefined);
+  return true;
+}
+
+async function confirmPaidAfterSigning(
+  env: Env,
+  db: NonNullable<Env['DB']>,
+  requestId: string,
+): Promise<'confirmed' | 'pending' | 'not_applicable'> {
+  const request = await db
+    .prepare('SELECT booking_request_id, booking_reference FROM signing_requests WHERE id = ? LIMIT 1')
+    .bind(requestId)
+    .first<{ booking_request_id: string | null; booking_reference: string | null }>()
+    .catch(() => null);
+  if (!request?.booking_request_id) return 'not_applicable';
+  const booking = await db
+    .prepare(
+      'SELECT id, hold_id, quote_reference, payment_status, payload_json FROM booking_requests WHERE id = ? LIMIT 1',
+    )
+    .bind(request.booking_request_id)
+    .first<{
+      id: string;
+      hold_id: string;
+      quote_reference: string;
+      payment_status: string | null;
+      payload_json: string;
+    }>()
+    .catch(() => null);
+  if (!booking?.hold_id) return 'not_applicable';
+  if (!String(booking.payment_status ?? '').startsWith('paid')) return 'not_applicable';
+  let fields: Record<string, string> = {};
+  try {
+    const parsed = JSON.parse(booking.payload_json || '{}') as Record<string, unknown>;
+    fields = Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) => typeof value === 'string'),
+    ) as Record<string, string>;
+  } catch {
+    fields = {};
+  }
+  const result = await autoConfirmPaidBooking(
+    env as unknown as BookingEnv,
+    booking.hold_id,
+    booking.quote_reference || request.booking_reference || '',
+    {
+      customerName: fields.name ?? '',
+      customerEmail: fields.email ?? '',
+      serviceCode: fields.service_type ?? 'residential-cleaning',
+      frequency: fields.ongoing_frequency ?? fields.frequency ?? '',
+      ongoingPriceCents: Math.round(Number(fields.ongoing_price_per_visit || 0) * 100),
+      ...(Number(fields.ongoing_duration_minutes) > 0
+        ? { ongoingDurationMinutes: Number(fields.ongoing_duration_minutes) }
+        : {}),
+      termsVersion: fields.terms_version ?? '',
+    },
+  ).catch(() => null);
+  if (result?.ok) {
+    await db
+      .prepare("UPDATE booking_requests SET payment_status = 'paid_confirmed', updated_at = ? WHERE id = ? AND payment_status LIKE 'paid%'")
+      .bind(new Date().toISOString(), booking.id)
+      .run()
+      .catch(() => undefined);
+    return 'confirmed';
+  }
+  return 'pending';
 }
 
 function publicRequirement(
@@ -103,6 +209,18 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         },
       });
     }
+    const allRequiredSigned = requirements
+      .filter((requirement) => requirement.required)
+      .every((requirement) => signed.has(requirement.templateId));
+    const resumeToken = url.searchParams.get('resume') ?? '';
+    let resumeCheckoutUrl = '';
+    if (allRequiredSigned && resumeToken) {
+      const store = context.env.PAYMENT_LEDGER ?? context.env.PHOTOS_BUCKET;
+      const intent = store ? await readCheckoutIntent(store, resumeToken).catch(() => null) : null;
+      if (intent?.record.signingRequestId === String(request.id)) {
+        resumeCheckoutUrl = `/estimate/payment-resume/?token=${encodeURIComponent(resumeToken)}`;
+      }
+    }
     return json({
       ok: true,
       request: {
@@ -122,6 +240,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       }),
       signedTemplateIds: [...signed],
       consentVersion: '2026-11-01.esign-consent.v1',
+      ...(resumeCheckoutUrl ? { resumeCheckoutUrl } : {}),
     });
   } catch {
     return json({ ok: false, error: 'signing_load_failed' }, 500);
@@ -146,10 +265,17 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       request: context.request,
     });
     if (result.status === 'signed') {
+      const executedPdf = await storeExecutedPdf(context.env, db, result.requestId).catch(() => false);
       await queueExecutedDocumentEmail(db, result.requestId).catch(() => undefined);
       await processExecutedDocumentOutbox(db, context.env, {
         requestId: result.requestId,
       }).catch(() => undefined);
+      const bookingStatus = await confirmPaidAfterSigning(
+        context.env,
+        db,
+        result.requestId,
+      ).catch(() => 'pending' as const);
+      return json({ ok: true, ...result, executedPdf, bookingStatus });
     }
     return json({ ok: true, ...result });
   } catch (error) {

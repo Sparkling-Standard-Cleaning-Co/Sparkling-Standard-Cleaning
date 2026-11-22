@@ -72,6 +72,8 @@ const NOINDEX_PAGES = new Set([
   '/estimate/payment-success/',
   '/estimate/payment-canceled/index.html',
   '/estimate/payment-canceled/',
+  '/estimate/payment-resume/index.html',
+  '/estimate/payment-resume/',
   '/invoice-payment/index.html',
   '/invoice-payment/',
   '/payment-authorization/index.html',
@@ -159,7 +161,7 @@ if (!fs.existsSync(sitemapIndex)) {
 } else {
   for (const file of walk(DIST).filter((f) => /^sitemap-\d+\.xml$/.test(path.basename(f)))) {
     const xml = fs.readFileSync(file, 'utf8');
-    for (const marker of ['/404', '/thank-you/', '/estimate/payment-success/', '/estimate/payment-canceled/', '/invoice-payment/', '/payment-authorization/', '/admin/', '/document-sign/', '/portal/']) {
+    for (const marker of ['/404', '/thank-you/', '/estimate/payment-success/', '/estimate/payment-canceled/', '/estimate/payment-resume/', '/invoice-payment/', '/payment-authorization/', '/admin/', '/document-sign/', '/portal/']) {
       if (xml.includes(marker)) problems.push(`${path.basename(file)} contains ${marker} (should be excluded)`);
     }
     for (const match of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) {

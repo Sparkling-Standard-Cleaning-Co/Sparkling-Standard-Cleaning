@@ -237,6 +237,14 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     if (view === 'download') {
       const signature = await getSignatureForDownload(db, url.searchParams.get('signatureId') ?? '');
       if (!signature) return json({ ok: false, error: 'signature_not_found' }, 404);
+      const requestBranch = await db
+        .prepare('SELECT branch_id FROM signing_requests WHERE id = ? LIMIT 1')
+        .bind(String(signature.signing_request_id ?? ''))
+        .first<{ branch_id: string | null }>()
+        .catch(() => null);
+      if (!branchAllowed(actor, requestBranch?.branch_id ?? null)) {
+        return json({ ok: false, error: 'forbidden' }, 403);
+      }
       const key = String(signature.r2_key || signature.template_r2_key || '');
       if (key && context.env.DOCUMENTS_BUCKET?.get) {
         const object = await context.env.DOCUMENTS_BUCKET.get(key);
@@ -524,6 +532,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (action === 'verify_signature' || action === 'reject_signature') {
       const signatureId = text(body.signatureId, 100);
+      const signatureRow = await getSignatureForDownload(db, signatureId);
+      if (!signatureRow) return json({ ok: false, error: 'signature_not_found' }, 404);
+      const requestBranch = await db
+        .prepare('SELECT branch_id FROM signing_requests WHERE id = ? LIMIT 1')
+        .bind(String(signatureRow.signing_request_id ?? ''))
+        .first<{ branch_id: string | null }>()
+        .catch(() => null);
+      if (!branchAllowed(actor, requestBranch?.branch_id ?? null)) {
+        return json({ ok: false, error: 'forbidden' }, 403);
+      }
       await verifySignature(
         db,
         actor.id,

@@ -10,6 +10,9 @@ import type { D1Database } from '../admin/d1.ts';
 import { hashToken, randomToken } from '../admin/auth.ts';
 import { AdminAuthError, audit } from '../admin/operations.ts';
 import { EMAIL_ROUTING } from '../../config/email-routing.ts';
+import { legalPolicyConfig } from '../../config/legal-policy.ts';
+import { buildBookingDocumentVariables } from './agreement-variables.ts';
+import { buildExecutedAgreementPdf } from './agreement-pdf.ts';
 
 export const SIGNING_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const ESIGN_CONSENT_VERSION = '2026-11-01.esign-consent.v1';
@@ -37,6 +40,21 @@ export interface DocumentSubjectContext {
   recurringPlanId?: string;
   bookingReference?: string;
   email?: string;
+  customerLegalName?: string;
+  serviceScope?: string;
+  serviceAdditions?: string;
+  serviceExclusions?: string;
+  serviceDate?: string;
+  arrivalWindow?: string;
+  priceSummary?: string;
+  lineItems?: string;
+  taxSummary?: string;
+  discountSummary?: string;
+  paymentTerms?: string;
+  cancellationTerms?: string;
+  agreementVersion?: string;
+  effectiveDate?: string;
+  signatureName?: string;
 }
 
 export interface TemplateRow extends Record<string, unknown> {
@@ -107,13 +125,16 @@ function splitValues(value: string): string[] {
 
 export function normalizedService(serviceCode: string, frequency = ''): string {
   const raw = serviceCode.toLowerCase();
-  if (['weekly', 'biweekly', 'monthly'].includes(frequency.toLowerCase())) return 'recurring';
+  const rhythm = frequency.toLowerCase();
+  // Explicit service codes win over a schedule rhythm. A weekly commercial or
+  // church job must not be reclassified as residential recurring.
   if (raw.includes('church')) return 'church';
-  if (raw.includes('commercial')) return 'commercial';
+  if (raw.includes('commercial') || raw.includes('office') || raw.includes('facility')) return 'commercial';
   if (raw.includes('str') || raw.includes('turnover') || raw.includes('rental')) return 'str';
   if (raw.includes('move')) return 'move_in_out';
   if (raw.includes('deep')) return 'deep';
-  if (raw.includes('employee')) return 'employee';
+  if (raw.includes('recurring')) return 'recurring';
+  if (['weekly', 'biweekly', 'monthly'].includes(rhythm)) return 'recurring';
   return 'residential';
 }
 
@@ -152,6 +173,21 @@ export const DOCUMENT_VARIABLE_KEYS = [
   'service.frequency',
   'document.version',
   'document.date',
+  'customer.legal_name',
+  'service.scope',
+  'service.additions',
+  'service.exclusions',
+  'service.date',
+  'service.arrival_window',
+  'price.summary',
+  'price.line_items',
+  'price.tax',
+  'price.discount',
+  'payment.terms',
+  'cancellation.terms',
+  'agreement.version',
+  'agreement.effective_date',
+  'signature.name',
 ] as const;
 
 export type DocumentVariableValues = Record<string, string>;
@@ -189,6 +225,21 @@ export async function loadDocumentVariables(
     'service.code': text(context.serviceCode, 80),
     'service.frequency': text(context.frequency, 40),
     'document.date': new Date().toISOString().slice(0, 10),
+    'customer.legal_name': text(context.customerLegalName, 200),
+    'service.scope': text(context.serviceScope, 8000),
+    'service.additions': text(context.serviceAdditions, 4000),
+    'service.exclusions': text(context.serviceExclusions, 4000),
+    'service.date': text(context.serviceDate, 40),
+    'service.arrival_window': text(context.arrivalWindow, 120),
+    'price.summary': text(context.priceSummary, 2000),
+    'price.line_items': text(context.lineItems, 8000),
+    'price.tax': text(context.taxSummary, 1000),
+    'price.discount': text(context.discountSummary, 1000),
+    'payment.terms': text(context.paymentTerms, 4000),
+    'cancellation.terms': text(context.cancellationTerms, 4000),
+    'agreement.version': text(context.agreementVersion, 80),
+    'agreement.effective_date': text(context.effectiveDate, 40),
+    'signature.name': text(context.signatureName, 160),
   };
   if (context.subjectType === 'customer' && context.customerId) {
     const row = await db
@@ -208,6 +259,7 @@ export async function loadDocumentVariables(
       values['customer.company_name'] = text(row.company_name, 200);
       values['customer.email'] = text(row.email, 200);
       values['customer.phone'] = text(row.phone, 40);
+      values['customer.legal_name'] = text(row.company_name, 200) || [text(row.first_name, 120), text(row.last_name, 120)].filter(Boolean).join(' ');
     }
   }
   if (context.subjectType === 'employee' && context.teamMemberId) {
@@ -239,6 +291,37 @@ export async function loadDocumentVariables(
         .map((part) => text(part, 160))
         .filter(Boolean)
         .join(', ');
+    }
+  }
+  if (context.bookingRequestId) {
+    const request = await db
+      .prepare(
+        `SELECT payload_json, requested_date, start_at, end_at, quote_reference
+         FROM booking_requests WHERE id = ? LIMIT 1`,
+      )
+      .bind(context.bookingRequestId)
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+    if (request) {
+      let fields: Record<string, string> = {};
+      try {
+        const parsed = JSON.parse(String(request.payload_json || '{}')) as Record<string, unknown>;
+        fields = Object.fromEntries(
+          Object.entries(parsed).filter(([, value]) => typeof value === 'string'),
+        ) as Record<string, string>;
+      } catch {
+        fields = {};
+      }
+      const derived = buildBookingDocumentVariables({
+        fields,
+        requestedDate: text(request.requested_date, 40),
+        startAt: text(request.start_at, 40),
+        endAt: text(request.end_at, 40),
+        agreementVersion: context.agreementVersion || legalPolicyConfig.version,
+      });
+      for (const [key, value] of Object.entries(derived)) {
+        if (value && !values[key]) values[key] = value;
+      }
     }
   }
   return values;
@@ -460,8 +543,7 @@ async function refreshSigningRequestStatus(
 async function buildExecutedCopy(
   db: D1Database,
   request: Record<string, unknown>,
-): Promise<{ text: string; sha256: string } | null> {
-  const signatures = await db
+): Promise<{ text: string; sha256: string } | null> {  const signatures = await db
     .prepare(
       `SELECT s.*, t.title FROM document_signatures s
        JOIN document_templates t ON t.id = s.template_id
@@ -516,6 +598,114 @@ async function buildExecutedCopy(
   }
   const text = lines.join('\n');
   return { text, sha256: await sha256Hex(text) };
+}
+
+/**
+ * Builds the executed agreement PDF from the immutable signing snapshot and
+ * the latest signature rows. The PDF is generated in the Function runtime with
+ * the shared dependency-free renderer; no browser or external service is used.
+ */
+export async function getExecutedAgreementPdf(
+  db: D1Database,
+  requestId: string,
+): Promise<{ pdf: Uint8Array; sha256: string } | null> {
+  const request = await db
+    .prepare('SELECT * FROM signing_requests WHERE id = ? LIMIT 1')
+    .bind(requestId)
+    .first<Record<string, unknown>>();
+  if (!request) return null;
+  const signatureRows = await db
+    .prepare(
+      `SELECT s.*, t.title FROM document_signatures s
+       JOIN document_templates t ON t.id = s.template_id
+       WHERE s.signing_request_id = ?
+       ORDER BY t.title, s.attempt`,
+    )
+    .bind(requestId)
+    .all<Record<string, unknown>>();
+  if (!signatureRows.results?.length) return null;
+  const latest = new Map<string, Record<string, unknown>>();
+  for (const row of signatureRows.results) {
+    const templateId = String(row.template_id ?? '');
+    const attempt = Number(row.attempt) || 1;
+    const current = latest.get(templateId);
+    if (!current || attempt > (Number(current.attempt) || 1)) latest.set(templateId, row);
+  }
+  const signatures = [...latest.values()]
+    .filter((row) => ['signed', 'verified', 'awaiting_verification'].includes(String(row.status ?? '')))
+    .map((row) => {
+      const signature = (() => {
+        try {
+          return JSON.parse(String(row.signature_json ?? '{}')) as { value?: string };
+        } catch {
+          return {};
+        }
+      })();
+      const content = String(row.signed_content_text ?? '');
+      return {
+        title: String(row.title ?? row.template_id ?? 'Document'),
+        version: String(row.template_version ?? ''),
+        templateId: String(row.template_id ?? ''),
+        contentText: content,
+        contentSha256: String(row.document_sha256 ?? ''),
+        signerName: String(row.signer_name ?? ''),
+        signerEmail: String(row.signer_email ?? ''),
+        signedAt: String(row.signed_at ?? ''),
+        typedSignature: String(signature.value ?? ''),
+        status: String(row.status ?? ''),
+        consentVersion: String(row.consent_version ?? ''),
+        sourceKind: content.trim() ? ('text' as const) : ('pdf' as const),
+      };
+    });
+  if (!signatures.length) return null;
+
+  let customerName = '';
+  if (request.customer_id) {
+    const customer = await db
+      .prepare('SELECT first_name, last_name, company_name FROM customers WHERE id = ? LIMIT 1')
+      .bind(String(request.customer_id))
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+    if (customer) {
+      customerName =
+        String(customer.company_name ?? '').trim() ||
+        [String(customer.first_name ?? '').trim(), String(customer.last_name ?? '').trim()]
+          .filter(Boolean)
+          .join(' ');
+    }
+  }
+  let propertyAddress = '';
+  if (request.property_id) {
+    const property = await db
+      .prepare('SELECT line1, line2, city, state, postal_code FROM properties WHERE id = ? LIMIT 1')
+      .bind(String(request.property_id))
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+    if (property) {
+      propertyAddress = [property.line1, property.line2, property.city, property.state, property.postal_code]
+        .map((part) => (typeof part === 'string' ? part.trim() : ''))
+        .filter(Boolean)
+        .join(', ');
+    }
+  }
+
+  const pdf = buildExecutedAgreementPdf({
+    requestId,
+    bundleName: String(request.packet_name ?? request.bundle_code ?? ''),
+    bundleCode: String(request.bundle_code ?? ''),
+    bundleVersion: Number(request.bundle_version) || 1,
+    bookingReference: String(request.booking_reference ?? ''),
+    serviceCode: String(request.service_code ?? ''),
+    customerName,
+    propertyAddress,
+    executedAt: String(request.executed_at ?? now()),
+    countersignatureName: String(request.counter_signature_name ?? ''),
+    signatures,
+  });
+  const bytes = pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer;
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const sha256 = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return { pdf, sha256 };
 }
 
 async function hasValidSignature(

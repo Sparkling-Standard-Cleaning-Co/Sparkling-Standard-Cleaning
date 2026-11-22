@@ -88,7 +88,9 @@ import {
   createSigningRequest,
   evaluateDocumentGate,
   rotateSigningRequestToken,
+  sendSigningEmail,
 } from '../../src/lib/documents/service.ts';
+import { createCheckoutIntent, readCheckoutIntent } from '../../src/lib/documents/checkout-intent.ts';
 
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   DB?: import('../../src/lib/admin/d1.ts').D1Database;
@@ -328,11 +330,11 @@ async function authoritativeHoldId(
   await writeLedgerJson(store, holdKey(hold.id), { ...hold, expiresAt }).catch(() => undefined);
   return { ok: true, holdId, expiresAt, start: hold.start, end: hold.end };
 }
-async function documentGateForCheckout(
+export async function documentGateForCheckout(
   env: Env,
   fields: Record<string, string>,
   returnPath = '',
-): Promise<{ satisfied: boolean; signingUrl?: string }> {
+): Promise<{ satisfied: boolean; signingUrl?: string; error?: string }> {
   if (!env.DB) return { satisfied: true };
   const reference = (fields.quote_reference ?? '').trim();
   const holdId = (fields.booking_hold_id ?? '').trim();
@@ -351,12 +353,28 @@ async function documentGateForCheckout(
     frequency: fields.frequency ?? fields.ongoing_frequency ?? '',
     bookingReference: requestRow?.quote_reference ?? reference,
     ...(requestRow?.id ? { bookingRequestId: requestRow.id } : {}),
+    ...(fields.name ? { customerLegalName: fields.name } : {}),
     ...(fields.email ? { email: fields.email } : {}),
     accessAuthorization: fields.access_authorization === 'yes',
     customerProducts: fields.customer_products === 'yes',
   };
   const gate = await evaluateDocumentGate(env.DB, context, 'before_payment');
   if (gate.satisfied) return { satisfied: true };
+  const store = paymentLedger(env);
+  const signingUrlFor = async (requestId: string, token: string): Promise<string> => {
+    let url = `/document-sign/?token=${encodeURIComponent(token)}${
+      returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''
+    }`;
+    if (store) {
+      const intent = await createCheckoutIntent(store, {
+        signingRequestId: requestId,
+        fields,
+        returnPath,
+      }).catch(() => null);
+      if (intent) url += `&resume=${encodeURIComponent(intent.token)}`;
+    }
+    return url;
+  };
   const pending = await env.DB
     .prepare(
       `SELECT id FROM signing_requests
@@ -368,15 +386,37 @@ async function documentGateForCheckout(
     .first<{ id: string }>();
   if (pending) {
     const rotated = await rotateSigningRequestToken(env.DB, null, pending.id);
-    return { satisfied: false, signingUrl: `/document-sign/?token=${encodeURIComponent(rotated.token)}${returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''}` };
+    return {
+      satisfied: false,
+      signingUrl: await signingUrlFor(pending.id, rotated.token),
+    };
   }
-  const created = await createSigningRequest(env.DB, context);
-  return {
-    satisfied: false,
-    ...(created.token
-      ? { signingUrl: `/document-sign/?token=${encodeURIComponent(created.token)}${returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''}` }
-      : {}),
-  };
+  try {
+    const created = await createSigningRequest(env.DB, context);
+    if (!created.token || !created.requestId) {
+      return { satisfied: false, error: 'document_packet_unavailable' };
+    }
+    if (fields.email) {
+      await sendSigningEmail(
+        env,
+        fields.email,
+        created.token,
+        created.bundleName || created.bundleCode || 'Cleaning agreement',
+        `documents-before-payment-${created.requestId}`,
+      ).catch(() => false);
+    }
+    return {
+      satisfied: false,
+      signingUrl: await signingUrlFor(created.requestId, created.token),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('document_variables_missing')) {
+      console.error('[estimate-checkout] document_template_incomplete', { message });
+      return { satisfied: false, error: 'document_template_incomplete' };
+    }
+    throw error;
+  }
 }
 
 function sanitizeFields(value: unknown): Record<string, string> {
@@ -1176,6 +1216,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     returnPath?: unknown;
     acceptRecalculated?: unknown;
     acceptedAmount?: unknown;
+    resume_token?: unknown;
   };
   try {
     payload = (await request.json()) as typeof payload;
@@ -1183,7 +1224,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
 
-  const fields = sanitizeFields(payload.fields);
+  const resumeToken = typeof payload.resume_token === 'string' ? payload.resume_token.trim() : '';
+  let fields: Record<string, string> = {};
+  let resumedReturnPath = '';
+  if (resumeToken) {
+    const store = paymentLedger(env);
+    if (!store) return json({ ok: false, error: 'resume_unavailable' }, 503);
+    const intent = await readCheckoutIntent(store, resumeToken).catch(() => null);
+    if (!intent) return json({ ok: false, error: 'resume_expired' }, 400);
+    fields = sanitizeFields(intent.record.fields);
+    resumedReturnPath = intent.record.returnPath;
+  } else {
+    fields = sanitizeFields(payload.fields);
+  }
   if (Object.keys(fields).length === 0) return json({ ok: false, error: 'invalid_request' }, 400);
   if (fields.terms_accepted !== 'yes' || fields.terms_version !== legalTerms.termsVersion) {
     return json({ ok: false, error: 'terms_required' }, 400);
@@ -1191,7 +1244,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const returnPath =
     typeof payload.returnPath === 'string' && RETURN_PATHS.has(payload.returnPath)
       ? payload.returnPath
-      : '/estimate/';
+      : RETURN_PATHS.has(resumedReturnPath)
+        ? resumedReturnPath
+        : '/estimate/';
 
   const photosOutstanding = await authoritativePhotosOutstanding(fields, env);
   fields.photos_outstanding = photosOutstanding ? 'yes' : 'no';
@@ -1237,6 +1292,17 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
   const documentGate = await documentGateForCheckout(env, fields, returnPath);
   if (!documentGate.satisfied) {
+    if (documentGate.error) {
+      return json(
+        {
+          ok: false,
+          error: documentGate.error,
+          reason:
+            'A required agreement is not fully configured. Sparkling Standard must complete the document setup before payment can be accepted.',
+        },
+        409,
+      );
+    }
     return json(
       {
         ok: false,

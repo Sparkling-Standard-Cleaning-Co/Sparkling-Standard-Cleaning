@@ -936,6 +936,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     quotedAmount?: number;
     tax?: ServiceTaxResult;
     reference?: string;
+    signingUrl?: string;
   }
 
   async function startSecurePayment(
@@ -963,9 +964,14 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
         quotedAmount?: number;
         tax?: ServiceTaxResult;
         reference?: string;
+        signingUrl?: string;
       };
       if (response.ok && data.ok && data.url) {
         window.location.assign(data.url);
+        return { ok: true };
+      }
+      if (data.error === 'documents_required' && data.signingUrl) {
+        window.location.assign(data.signingUrl);
         return { ok: true };
       }
       if (data.error) console.warn('[secure-checkout]', data.error, data.reason ?? '');
