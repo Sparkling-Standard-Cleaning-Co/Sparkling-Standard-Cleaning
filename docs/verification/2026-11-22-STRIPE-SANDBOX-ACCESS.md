@@ -1,8 +1,9 @@
 # Stripe Sandbox Access Verification — 2026-11-22
 
-**Status:** `STRIPE_TEST_SECRET` is configured in Cloudflare, but its value is
-encrypted and cannot be read by this local environment. No test-mode transaction
-or charge was made.
+**Status:** `STRIPE_TEST_SECRET` is now available as a Windows User environment
+variable and real Stripe test-mode API transactions passed. No live charge or
+production change was made. The full site journey remains blocked by the absence
+of an isolated Pages runtime and Google Calendar/Resend credentials.
 
 ## What was verified
 
@@ -13,11 +14,14 @@ or charge was made.
 - No Cloudflare **Preview** environment is configured for this project
   (`docs/deployment/DEPLOYMENT.md` records the owner decision not to use previews).
 - Local environment checks:
-  - `STRIPE_TEST_SECRET` absent from Process, User and Machine scope.
-  - `.env` does not contain `STRIPE_TEST_SECRET`.
-  - `.dev.vars` does not exist.
-- `npm run stripe:checkout-sandbox` therefore exits `2` with
-  `MISSING STRIPE TEST KEY`. Nothing was sent.
+  - `STRIPE_TEST_SECRET` is now present in **User** scope and was verified as
+    test-mode without displaying its value.
+  - `.env` does not contain the test secret; `.dev.vars` does not exist.
+  - `STRIPE_TEST_WEBHOOK_SECRET` / `STRIPE_WEBHOOK_SECRET` are not present
+    locally.
+- Real test-mode results are recorded in
+  `docs/verification/2026-11-22-STRIPE-SANDBOX-RESULTS.md`: Checkout primitive
+  6/6, billing lifecycle 23/23, declined payment 402 `card_declined`.
 
 ## Code adaptation completed
 
@@ -33,13 +37,15 @@ or charge was made.
 - Unit tests cover production/test separation and local live-key rejection:
   `tests/stripe-secret-selection.test.ts`.
 
-## Why real test-mode E2E could not run
+## Why the full site journey has not run yet
 
-Cloudflare secrets are write-only. There is no API or CLI operation that returns
-the `STRIPE_TEST_SECRET` value. This checkout has no local copy and no preview
-environment containing it. Running against production would violate the
-requirement to keep testing isolated and is explicitly blocked by the
-production test-mode gate.
+The Stripe test key is available locally, so the API-level test-mode runs work.
+The combined estimate → agreement → signature → payment → webhook → booking
+journey needs an isolated Pages Functions runtime with disposable D1/R2, a test
+webhook signing secret, and Google Calendar credentials. This checkout has no
+such runtime or calendar credentials, and production test mode is deliberately
+blocked. Running the journey against production would violate the isolated-test
+requirement.
 
 ## Safe ways to unblock the real sandbox run
 
@@ -65,7 +71,11 @@ production resolver uses `STRIPE_SECRET_KEY` only.
 
 ## Current acceptance position
 
-- Real Stripe test-mode E2E: **not executed — blocked by secret-value access**.
+- Real Stripe test-mode billing and Checkout: **passed** (6/6 Checkout,
+  23/23 billing, declined card 402).
+- Full site estimate → agreement → signature → payment → booking: **not
+  executed**; blocked by isolated runtime, test webhook secret and Google
+  Calendar credentials.
 - Existing live $5 invoice payment: verified for invoice/webhook/reconciliation
   only.
 - Signing → executed PDF: verified in staging.

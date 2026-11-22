@@ -2,8 +2,9 @@
 
 **Status:** verified from **production D1** and the application audit record.
 The Stripe Dashboard itself was not queried from this environment because no
-live Stripe secret is available locally. No new charge or test transaction was
-made.
+live Stripe secret is available locally. No new **live** charge was made.
+Separate real Stripe **test-mode** billing tests were run and are recorded in
+`docs/verification/2026-11-22-STRIPE-SANDBOX-RESULTS.md`.
 
 ## Transaction found
 

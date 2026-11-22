@@ -146,11 +146,13 @@ booking, because it has no booking request, no signing request and no
 post-payment receipt row. The new signing/payment/booking path is covered by
 automated integration/browser tests and a staging signing execution.
 
-Test mode is **not** a mandatory release gate. No new charge or test transaction
-was made. The newly configured Cloudflare `STRIPE_TEST_SECRET` is present but
-write-only; its value is not available in this local environment, so a real
-sandbox E2E run remains blocked by secret-value access. See
-`docs/verification/2026-11-22-STRIPE-SANDBOX-ACCESS.md`.
+Test mode is **not** a mandatory release gate. The `STRIPE_TEST_SECRET` is now
+available locally and real test-mode API runs passed: Checkout primitive 6/6,
+billing lifecycle 23/23, and a declined card returned 402 `card_declined`. No
+live charge occurred. The combined full-site estimate → agreement → signature →
+payment → webhook → booking journey is not yet executed because no isolated
+Pages runtime, test webhook secret or Google Calendar credentials are available.
+See `docs/verification/2026-11-22-STRIPE-SANDBOX-RESULTS.md`.
 
 ## 8. Backup and restore
 
@@ -192,10 +194,10 @@ passed 5/5 in isolation and the complete suite then passed 248/248.
 1. **Production template/packet import** — staging is proven; production D1/R2
    import requires separate owner authorization.
 2. **Production signing activation** — no customer signing link has been issued.
-3. **Real signing → payment → booking charge** — the existing $5 transaction is
-   invoice-only. A real end-to-end paid signed booking remains an optional
-   owner-authorized acceptance step; it is not a mandatory gate and no new charge
-   was made.
+3. **Full-site signed booking acceptance** — real Stripe test billing passed,
+   but the combined site journey still needs an isolated Pages runtime with a
+   test webhook secret and Google Calendar credentials. It is not a code
+   blocker.
 4. **Merge/deploy** — no commit, push, merge or Cloudflare deployment was
    performed.
 5. **Cloud backup upload/round-trip/retention/live alerts** — not verified in
