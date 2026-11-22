@@ -23,8 +23,8 @@ export const legalPolicyConfig = {
     lateFees: false,
     interest: false,
     collections: false,
-    electronicSigning: false,
-    productionLegalDocuments: false,
+    electronicSigning: true,
+    productionLegalDocuments: true,
   },
   cancellation: {
     freeNoticeHours: 48,

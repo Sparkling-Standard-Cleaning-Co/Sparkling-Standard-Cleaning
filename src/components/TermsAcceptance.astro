@@ -6,8 +6,10 @@ interface Props {
 }
 
 const { id } = Astro.props;
+const dialogTitleId = `${id}-legal-dialog-title`;
 ---
-<div class="terms-acceptance">
+
+<div class="terms-acceptance" data-terms-acceptance>
   <label class="terms-acceptance__label" for={id}>
     <input
       class="terms-acceptance__input"
@@ -20,9 +22,21 @@ const { id } = Astro.props;
     />
     <span>
       I have read and agree to Sparkling Standard&rsquo;s
-      <a href={legalTerms.termsPath} target="_blank" rel="noopener noreferrer">Terms and Conditions</a>
+      <a
+        href={legalTerms.termsPath}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-legal-policy-trigger
+        data-legal-policy-label="Terms and Conditions"
+      >Terms and Conditions</a>
       and acknowledge the
-      <a href={legalTerms.privacyPath} target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+      <a
+        href={legalTerms.privacyPath}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-legal-policy-trigger
+        data-legal-policy-label="Privacy Policy"
+      >Privacy Policy</a>.
     </span>
   </label>
   <p class="terms-acceptance__note">
@@ -30,4 +44,49 @@ const { id } = Astro.props;
     Florida law gives you three business days to cancel without penalty. Please review the policies
     before paying or reserving.
   </p>
+
+  <dialog
+    class="legal-policy-dialog"
+    data-legal-policy-dialog
+    aria-labelledby={dialogTitleId}
+  >
+    <div class="legal-policy-dialog__panel">
+      <header class="legal-policy-dialog__header">
+        <h2 class="legal-policy-dialog__heading" id={dialogTitleId} data-legal-policy-title>
+          Policy
+        </h2>
+        <button
+          class="legal-policy-dialog__close"
+          type="button"
+          data-legal-policy-close
+          aria-label="Close policy"
+        >
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </header>
+      <div
+        class="legal-policy-dialog__body prose"
+        data-legal-policy-body
+        tabindex="-1"
+      >
+        <p class="legal-policy-dialog__loading" role="status">Loading the full policy&hellip;</p>
+      </div>
+      <footer class="legal-policy-dialog__footer">
+        <a
+          class="legal-policy-dialog__full-link"
+          href={legalTerms.termsPath}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-legal-policy-full
+        >Open full page in a new tab</a>
+        <button class="btn btn--secondary btn--small" type="button" data-legal-policy-close>
+          Close and return to checkout
+        </button>
+      </footer>
+    </div>
+  </dialog>
 </div>
+
+<script>
+  import '../scripts/legal-policy-dialog';
+</script>

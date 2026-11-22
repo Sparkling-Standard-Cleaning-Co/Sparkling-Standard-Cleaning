@@ -92,6 +92,7 @@ import {
 import {
   createSigningRequest,
   evaluateDocumentGate,
+  findReusableSigningRequest,
   rotateSigningRequestToken,
   sendSigningEmail,
 } from '../../src/lib/documents/service.ts';
@@ -383,15 +384,7 @@ export async function documentGateForCheckout(
     }
     return url;
   };
-  const pending = await env.DB
-    .prepare(
-      `SELECT id FROM signing_requests
-       WHERE status IN ('pending','partially_signed') AND subject_type = 'customer'
-         AND (customer_id = ? OR (customer_id IS NULL AND booking_reference = ?))
-       ORDER BY created_at DESC LIMIT 1`,
-    )
-    .bind(context.customerId ?? '', context.bookingReference ?? '')
-    .first<{ id: string }>();
+  const pending = await findReusableSigningRequest(env.DB, context, gate);
   if (pending) {
     const rotated = await rotateSigningRequestToken(env.DB, null, pending.id);
     return {

@@ -14,6 +14,7 @@ import {
 } from '../src/lib/documents/signing-download.ts';
 import { createSigningRequest, normalizedService } from '../src/lib/documents/service.ts';
 import { agreementScopeFor } from '../src/lib/documents/agreement-variables.ts';
+import { legalPolicyConfig } from '../src/config/legal-policy.ts';
 
 const requirements = [
   { templateId: 'doc_core', title: 'Core Cleaning Service Terms', r2Key: 'documents/templates/core.pdf' },
@@ -83,9 +84,16 @@ test('property-management service codes resolve to the property-management packe
   assert.doesNotMatch(agreementScopeFor('property-management-cleaning'), /full standard cleaning scope/i);
 });
 
-test('live signing request creation fails closed until the activation flag is enabled', async () => {
-  await assert.rejects(
-    () => createSigningRequest({} as never, { subjectType: 'customer', serviceCode: 'residential-deep' }),
-    /electronic_signing_not_activated/,
-  );
+test('live signing request creation fails closed when the activation flag is disabled', async () => {
+  const activation = legalPolicyConfig.activation as { electronicSigning: boolean };
+  const previous = activation.electronicSigning;
+  activation.electronicSigning = false;
+  try {
+    await assert.rejects(
+      () => createSigningRequest({} as never, { subjectType: 'customer', serviceCode: 'residential-deep' }),
+      /electronic_signing_not_activated/,
+    );
+  } finally {
+    activation.electronicSigning = previous;
+  }
 });

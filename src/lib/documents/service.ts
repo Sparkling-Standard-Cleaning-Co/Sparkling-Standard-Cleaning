@@ -452,21 +452,35 @@ export async function activeRequirements(
     .all<Record<string, unknown>>();
   const requirements = (rows.results ?? [])
     .filter((row) => conditionMatches(row, context))
-    .map((row) => ({
-      templateId: String(row.template_id),
-      title: String(row.title),
-      version: String(row.version),
-      contentText: String(row.content_text ?? ''),
-      contentSha256: String(row.content_sha256 ?? ''),
-      r2Key: String(row.r2_key ?? ''),
-      signerParty: (String(row.signer_party) as Requirement['signerParty']) ?? 'customer',
-      requiresCountersignature: Number(row.requires_countersignature) === 1,
-      requiresVerification: Number(row.requires_verification) === 1,
-      required: Number(row.required) === 1,
-      perBooking: Number(row.per_booking) === 1,
-      stage: String(row.enforcement_stage) as EnforcementStage,
-      sortOrder: Number(row.sort_order) || 0,
-    }));
+    .map((row) => {
+      const required = Number(row.required) === 1;
+      const storedStage = String(row.enforcement_stage) as EnforcementStage;
+      // Owner decision (2026-11-22): every required customer agreement must be
+      // executed before payment. The stored stage is corrected here as a
+      // fail-closed guard so an import that still says `before_confirmation`
+      // cannot let a customer reach Stripe without the approved packet.
+      const stage: EnforcementStage =
+        context.subjectType === 'customer'
+          ? required
+            ? 'before_payment'
+            : 'optional'
+          : storedStage;
+      return {
+        templateId: String(row.template_id),
+        title: String(row.title),
+        version: String(row.version),
+        contentText: String(row.content_text ?? ''),
+        contentSha256: String(row.content_sha256 ?? ''),
+        r2Key: String(row.r2_key ?? ''),
+        signerParty: (String(row.signer_party) as Requirement['signerParty']) ?? 'customer',
+        requiresCountersignature: Number(row.requires_countersignature) === 1,
+        requiresVerification: Number(row.requires_verification) === 1,
+        required,
+        perBooking: Number(row.per_booking) === 1,
+        stage,
+        sortOrder: Number(row.sort_order) || 0,
+      };
+    });
   return { bundle, requirements };
 }
 
@@ -791,6 +805,72 @@ export async function evaluateDocumentGate(
     requirements,
     missing,
   };
+}
+
+function snapshotCoversGate(
+  snapshotJson: string,
+  gate: DocumentGateResult,
+): boolean {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(snapshotJson || '[]');
+  } catch {
+    return false;
+  }
+  if (!Array.isArray(parsed)) return false;
+  const snapshot = new Map<string, string>();
+  for (const item of parsed as RequirementSnapshot[]) {
+    if (!item || typeof item !== 'object' || !item.templateId) continue;
+    snapshot.set(String(item.templateId), String(item.version ?? ''));
+  }
+  return gate.requirements
+    .filter((item) => item.required && item.stage !== 'optional')
+    .every((item) => snapshot.get(item.templateId) === item.version);
+}
+
+/**
+ * Finds an unsigned request that can be resumed without weakening a
+ * booking-specific gate. A request for a different booking, bundle or document
+ * version is never reused; the caller must create a fresh request.
+ */
+export async function findReusableSigningRequest(
+  db: D1Database,
+  context: DocumentSubjectContext,
+  gate: DocumentGateResult,
+): Promise<{ id: string } | null> {
+  if (!gate.bundleCode) return null;
+  const needsBookingScope = gate.requirements.some(
+    (item) => item.required && item.perBooking && item.stage !== 'optional',
+  );
+  const rows = await db
+    .prepare(
+      `SELECT id, requirement_snapshot_json, booking_reference
+       FROM signing_requests
+       WHERE status IN ('pending','partially_signed') AND subject_type = ?
+         AND bundle_code = ?
+         AND (customer_id = ? OR (customer_id IS NULL AND booking_reference = ?))
+       ORDER BY created_at DESC LIMIT 25`,
+    )
+    .bind(
+      context.subjectType,
+      gate.bundleCode,
+      context.customerId ?? '',
+      context.bookingReference ?? '',
+    )
+    .all<{ id: string; requirement_snapshot_json: string; booking_reference: string | null }>();
+  for (const row of rows.results ?? []) {
+    if (
+      needsBookingScope &&
+      (!context.bookingReference ||
+        String(row.booking_reference ?? '') !== context.bookingReference)
+    ) {
+      continue;
+    }
+    if (snapshotCoversGate(String(row.requirement_snapshot_json ?? '[]'), gate)) {
+      return { id: String(row.id) };
+    }
+  }
+  return null;
 }
 
 export async function employeeOnboardingStatus(

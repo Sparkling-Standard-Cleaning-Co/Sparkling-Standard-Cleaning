@@ -12,6 +12,7 @@ import { commitConfirmedBooking, type CommitmentInput } from './commitment.ts';
 import {
   createSigningRequest,
   evaluateDocumentGate,
+  findReusableSigningRequest,
   rotateSigningRequestToken,
 } from '../documents/service.ts';
 
@@ -117,16 +118,9 @@ export async function autoConfirmPaidBooking(
     };
     const gate = await evaluateDocumentGate(env.DB, documentContext, 'before_confirmation');
     if (!gate.satisfied) {
-      const pending = await env.DB
-        .prepare(
-          `SELECT id FROM signing_requests
-           WHERE status IN ('pending','partially_signed') AND subject_type = 'customer'
-             AND (customer_id = ? OR (customer_id IS NULL AND booking_reference = ?))
-           ORDER BY created_at DESC LIMIT 1`,
-        )
-        .bind(documentContext.customerId ?? '', documentContext.bookingReference)
-        .first<{ id: string }>()
-        .catch(() => null);
+      const pending = await findReusableSigningRequest(env.DB, documentContext, gate).catch(
+        () => null,
+      );
       if (pending) {
         const rotated = await rotateSigningRequestToken(env.DB, null, pending.id);
         return {

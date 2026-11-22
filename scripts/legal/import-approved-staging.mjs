@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { pathToFileURL } from 'node:url';
+import { normalizeImport } from './packet-policy.mjs';
 
 const ROOT = process.cwd();
 const manifestPath = process.argv[2];
@@ -19,7 +20,11 @@ if (!manifestPath || !dbPath || !outDir) {
   throw new Error('usage: node scripts/legal/import-approved-staging.mjs <staging-import.json> <db> <out-dir>');
 }
 fs.mkdirSync(outDir, { recursive: true });
-const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+const data = normalizeImport(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
+// Staging verification previews every approved packet, including services that
+// remain inactive in production until their own acceptance run. Activation is
+// a production release decision and is applied by the production import.
+for (const packet of data.packets) packet.status = 'active';
 
 class Statement {
   constructor(db, sql) {
@@ -73,9 +78,9 @@ for (const packet of data.packets) {
   const bundleId = `bundle_${packet.code.replace(/[^a-z0-9]+/gi, '_')}`;
   db.raw.prepare(`INSERT INTO document_bundles
     (id,code,name,description,service_category,subject_type,status,version,purpose,packet_type,instructions,is_system)
-    VALUES (?,?,?,?,?,?, 'active',1,?,?,?,0)`)
+    VALUES (?,?,?,?,?,?, ?,1,?,?,?,0)`)
     .run(bundleId, packet.code, packet.name, packet.instructions || '', packet.serviceCategory, packet.subjectType,
-      packet.purpose, packet.packetType, packet.instructions || '');
+      packet.status, packet.purpose, packet.packetType, packet.instructions || '');
   packet.items.forEach((item, order) => {
     db.raw.prepare(`INSERT INTO document_bundle_items
       (bundle_id,template_id,sort_order,required,enforcement_stage,condition_key,condition_value,per_booking)

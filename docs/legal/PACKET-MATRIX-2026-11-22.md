@@ -1,9 +1,27 @@
 # Service Packet Matrix — 2026-11-22
 
 **Status:** 27 active documents are owner-approved as exact versions (2026-11-22).
-**Zero imported into production D1. Zero active production signing packets.**
-Staging import and packet verification are complete; production activation
-remains owner-gated.
+Staging import and packet verification are complete. The controlled production
+release imports the approved library with the enforcement below. Production
+activation is limited to the four verified residential packet types until each
+remaining workflow passes its own acceptance run.
+
+## Enforcement policy (owner decision 2026-11-22)
+
+- Every **required customer document** is enforced at **`before_payment`**.
+  The server corrects a stored `before_confirmation` stage before evaluating a
+  checkout gate, so an imported packet cannot bypass signing.
+- **Booking-specific** agreements and schedules are `per_booking = 1`:
+  Residential Deep Agreement, Deep Scope, Recurring Agreement, Move-In /
+  Move-Out Agreement, STR Agreement, Commercial Agreement, Church / Facility
+  Agreement, Property Manager Master Agreement, Residential Access
+  Authorization, Add-On Authorization and Commercial Key Custody.
+- General acknowledgments (Core Terms, Cancellation Terms, E-Sign Addendum,
+  Photo Consent, saved-method and recurring payment authorizations) remain
+  reusable customer-scoped records until their own terms require a new
+  signature.
+- A previous signature never satisfies a different booking reference, a
+  different bundle or a newer document version.
 
 ## Core packet for every customer service
 
@@ -73,11 +91,11 @@ remains owner-gated.
 | Gate | State |
 |---|---|
 | 27 active documents complete | Yes |
-| Owner exact-version approval | **Not yet recorded** |
-| Approved-only manifest export | Available from the Legal Registry after decisions |
-| Template import into D1 | **Not performed** |
-| Packet/bundle activation | **Not performed** |
-| Signing link issuance | **Not performed for any real customer** |
+| Owner exact-version approval | **Recorded 2026-11-22** |
+| Approved-only manifest export | `APPROVED-VERSION-MANIFEST-2026-11-22.json` |
+| Template import into D1 | Performed by the controlled production release |
+| Packet/bundle activation | Four residential packets active; others imported inactive |
+| Signing link issuance | No real customer link issued during release verification |
 | Live Stripe charge | **Not performed** |
 
 The production sequence is:

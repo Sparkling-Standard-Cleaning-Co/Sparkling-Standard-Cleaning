@@ -51,28 +51,36 @@ script at production.
    - Confirm the manifest/snapshot checksums.
    - Confirm the 3 archived records are not in the import set.
 
-3. **Import approved templates**
-   - Authenticate as the owner in Admin → Documents & Agreements.
-   - Create each approved template from the staging-import text with its exact
-     title, category, version, signer party, family key, legal-review status
-     `owner_approved`, and packet notes containing the approved DOCX SHA-256.
-   - Approve each template through the existing admin approval action so the
-     audit trail is preserved.
-   - Do not import archived/consolidated records.
+3. **Prepare and import approved templates**
+   - Run `node scripts/legal/prepare-production-import.mjs` with the approved
+     staging import, the approved manifest, the production owner admin ID and
+     an output SQL path. It verifies 27/27 manifest records, exact versions,
+     DOCX hashes in packet notes and staging text hashes, then applies the
+     owner-approved enforcement policy.
+   - Review the generated SQL (`git diff --no-index` or file hash) before it is
+     executed.
+   - Execute it only through the authenticated owner Wrangler session:
+     `npx wrangler d1 execute sparkling-standard-operations --remote --file <sql>`.
+   - The script is idempotent for identical content and never updates a
+     template to different wording. Do not import archived/consolidated records.
    - Verify: 27 approved templates, 0 draft candidates from this import, 0
-     archived records.
+     archived records, and audit records for every template and packet.
 
 4. **Build the 10 packets**
-   - Create the customer packets:
+   - The same import creates:
      `customer.deep`, `customer.residential`, `customer.recurring`,
      `customer.move_in_out`, `customer.str`, `customer.commercial`,
      `customer.church`, `customer.property_management`,
-     `customer.specialty_addons`.
-   - Create `employee.onboarding`.
-   - Add the exact required/optional items and enforcement stages from the
-     approved packet matrix. Commercial key custody, recurring payment, saved
-     method, photo consent and role-specific noncompetition remain optional.
-   - Verify: 10 active non-system packets and the expected item counts.
+     `customer.specialty_addons` and `employee.onboarding`.
+   - Required customer items are `before_payment`. Booking-specific agreements
+     and schedules are `per_booking = 1`; general acknowledgments remain
+     reusable. This is implemented in `scripts/legal/packet-policy.mjs` and
+     enforced again at runtime in `activeRequirements`.
+   - Only `customer.deep`, `customer.residential`, `customer.recurring` and
+     `customer.move_in_out` are active in the residential release. The other
+     packets are imported inactive until their own acceptance run.
+   - Verify: 27 approved templates, 10 imported packets, 4 active residential
+     packets and the expected item counts.
 
 5. **Preview verification**
    - For each customer service, run `preview_packet` with a synthetic customer,
@@ -81,16 +89,15 @@ script at production.
    - Require zero missing variables and the correct document IDs.
    - Verify no archived or retired document appears in any packet.
 
-6. **Activation flag**
-   - Live signing is currently forced off in
-     `src/config/legal-policy.ts` (`electronicSigning: false`,
-     `productionLegalDocuments: false`).
-   - Production activation requires a reviewed config change setting both flags
-     true, a fresh build, and an authorized deployment.
-   - Until that deployment, `createSigningRequest` fails closed with
-     `electronic_signing_not_activated`; admin send is blocked and the checkout
-     document gate is bypassed.
-   - Do not activate the flags before the import and preview checks pass.
+6. **Activation flags**
+   - The residential release requires
+     `src/config/legal-policy.ts` (`electronicSigning: true`,
+     `productionLegalDocuments: true`) in the deployed commit.
+   - Keep both flags false in any build where the approved library has not been
+     imported and verified. The runtime fails closed with
+     `electronic_signing_not_activated` when signing is disabled.
+   - A rollback setting both flags false and redeploying immediately restores
+     the previous no-document-gate behavior.
 
 7. **Controlled signing test**
    - After activation, create one synthetic signing request through the admin
@@ -143,13 +150,17 @@ gh pr checks 1
 **GO** for the release branch and PR #1: approvals, hashes, packets, staging
 signing, tests, CI, and local backup/restore are verified.
 
-**NO-GO** for production activation until:
+The owner authorized the controlled Pensacola residential release on
+2026-11-22. The release is complete only after:
 
-- explicit owner authorization for production import/activation/deployment;
-- production import and zero-missing-variable preview verification;
-- a fresh pre-import backup;
-- activation-flag deployment and synthetic signing test;
-- final owner authorization to merge/deploy.
+- a fresh encrypted pre-release backup and isolated restore verification;
+- required `before_payment`/`per_booking` enforcement and the Terms/Privacy
+  modal fix are in the deployed candidate;
+- full unit, browser, build and validation checks pass;
+- production import reports 27 approved templates and the expected packets;
+- one synthetic production signing request is signed and retrieved, then
+  voided;
+- live prices, holds, checkout readiness, webhook and calendar configuration
+  are verified without a new live charge or customer message.
 
-No production migration, merge, deployment, live signing activation or charge is
-performed by this runbook.
+No live charge is created by the standard release procedure.
