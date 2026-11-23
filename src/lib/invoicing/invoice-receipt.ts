@@ -61,25 +61,36 @@ export async function loadInvoiceReceiptData(
   const addressLines = [invoice.line1, invoice.line2, [invoice.city, invoice.state, invoice.postal_code].filter(Boolean).join(' ')]
     .map((line) => text(line, 200))
     .filter(Boolean);
-  const receiptLines: ReceiptLine[] = (lines.results ?? [])
-    .filter((line) => String(line.kind) !== 'tax')
-    .map((line) => ({
-      label: text(line.description, 300) || 'Cleaning service',
-      amountCents: Math.round(Number(line.total_cents) || 0),
-      kind: moneyLineKind(String(line.kind)),
-    }));
+  const tipCents = Math.max(0, Number(payment.tip_cents) || 0);
+  const tipOnly = tipCents > 0 && Number(payment.service_cents) === 0;
+  const receiptLines: ReceiptLine[] = tipOnly
+    ? [{ label: 'Optional gratuity for your cleaning team', amountCents: tipCents, kind: 'charge' }]
+    : (lines.results ?? [])
+        .filter((line) => String(line.kind) !== 'tax')
+        .map((line) => ({
+          label: text(line.description, 300) || 'Cleaning service',
+          amountCents: Math.round(Number(line.total_cents) || 0),
+          kind: moneyLineKind(String(line.kind)),
+        }));
+  if (tipCents > 0 && !tipOnly) {
+    receiptLines.push({ label: 'Optional gratuity for your cleaning team', amountCents: tipCents, kind: 'charge' });
+  }
   const balanceCents = Math.max(0, Number(invoice.balance_cents) || 0);
-  const totalCents = Math.max(0, Number(invoice.total_cents) || 0);
+  const totalCents = tipOnly
+    ? tipCents
+    : Math.max(0, Number(invoice.total_cents) || 0) + tipCents;
   const data: ReceiptData = {
     receiptNumber: `${text(invoice.number, 80)}-R1`,
     reference: text(invoice.number, 80),
     paidAt: text(payment.received_at, 60) || new Date().toISOString(),
-    service: `Cleaning service — ${text(invoice.number, 80)}`,
+    service: tipOnly
+      ? `Optional gratuity — ${text(invoice.number, 80)}`
+      : `Cleaning service — ${text(invoice.number, 80)}`,
     ...(addressLines.length > 0 ? { serviceLocation: addressLines.join(', ') } : {}),
     ...(customerName ? { customerName } : {}),
     ...(text(invoice.customer_email, 200) ? { customerEmail: text(invoice.customer_email, 200) } : {}),
     lines: receiptLines,
-    subtotalCents: Math.max(0, Number(invoice.subtotal_cents) || 0),
+    subtotalCents: tipOnly ? tipCents : Math.max(0, Number(invoice.subtotal_cents) || 0),
     taxCents: Math.max(0, Number(invoice.tax_cents) || 0),
     taxRatePercent: null,
     taxJurisdiction: null,

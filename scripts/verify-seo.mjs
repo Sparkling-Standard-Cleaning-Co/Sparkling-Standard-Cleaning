@@ -76,6 +76,8 @@ const NOINDEX_PAGES = new Set([
   '/estimate/payment-resume/',
   '/invoice-payment/index.html',
   '/invoice-payment/',
+  '/invoice-pay/index.html',
+  '/invoice-pay/',
   '/payment-authorization/index.html',
   '/payment-authorization/',
   '/locations/tampa-bay/index.html',

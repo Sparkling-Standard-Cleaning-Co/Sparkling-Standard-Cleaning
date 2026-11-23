@@ -24,9 +24,11 @@ export function buildReviewRequestEmail(input: {
   customerName: string;
   branchName: string;
   reviewUrl: string;
+  tipUrl?: string;
 }): { subject: string; html: string; text: string } {
   const name = input.customerName.trim() || 'there';
   const url = /^https:\/\//i.test(input.reviewUrl) ? input.reviewUrl : '';
+  const tipUrl = input.tipUrl && /^https:\/\//i.test(input.tipUrl) ? input.tipUrl : '';
   const subject = 'How did your cleaning go?';
   const html = `<!doctype html>
 <html lang="en"><body style="margin:0;padding:0;background:#f9f3ed;font-family:'Helvetica Neue',Arial,sans-serif;color:#302429;">
@@ -38,6 +40,7 @@ export function buildReviewRequestEmail(input: {
       <p style="margin:0 0 14px;font-size:15px;">Hello ${escapeHtml(name)},</p>
       <p style="margin:0 0 18px;font-size:15px;line-height:1.65;">Thank you for choosing Sparkling Standard ${escapeHtml(input.branchName)}. If you would like to share your experience, a Google review helps other neighbors find us.</p>
       ${url ? `<p style="margin:0 0 18px;"><a href="${escapeHtml(url)}" style="display:inline-block;background:#b15a6f;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:600;">Leave a Google review</a></p>` : ''}
+      ${tipUrl ? `<p style="margin:0 0 18px;font-size:13px;line-height:1.65;color:#6f5f57;">If you would like to leave an optional gratuity for the cleaning team, you can do that separately. It is never required and does not affect your review.</p><p style="margin:0 0 18px;"><a href="${escapeHtml(tipUrl)}" style="color:#93475b;">Leave an optional gratuity</a></p>` : ''}
       <p style="margin:0 0 18px;font-size:13px;line-height:1.65;color:#6f5f57;">There is no obligation, and your honest feedback is welcome either way. If something was not right, please reply to this email so we can make it right.</p>
       <p style="margin:0;font-size:14px;line-height:1.65;color:#4a3b40;">Thank you again for your business.</p>
       <p style="margin:22px 0 0;padding-top:14px;border-top:1px solid #e4d5c7;font-size:12px;line-height:1.6;color:#8c7a70;">${escapeHtml(CUSTOMER_EMAIL_BUSINESS.phone ?? '')} · ${escapeHtml(EMAIL_ROUTING.customerService)} · ${escapeHtml(CUSTOMER_EMAIL_BUSINESS.website)}</p>
@@ -49,6 +52,7 @@ export function buildReviewRequestEmail(input: {
     '',
     `Thank you for choosing Sparkling Standard ${input.branchName}. If you would like to share your experience, a Google review helps other neighbors find us.`,
     ...(url ? ['', `Leave a Google review: ${url}`] : []),
+    ...(tipUrl ? ['', 'Optional gratuity for the cleaning team (never required and does not affect your review):', tipUrl] : []),
     '',
     'There is no obligation, and your honest feedback is welcome either way. If something was not right, please reply to this email so we can make it right.',
     '',
@@ -63,6 +67,7 @@ export async function sendReviewRequestEmail(input: {
   customerName: string;
   branchName: string;
   reviewUrl: string;
+  tipUrl?: string;
   env: ReviewEmailEnv;
   idempotencyKey: string;
 }): Promise<ReviewEmailStatus> {

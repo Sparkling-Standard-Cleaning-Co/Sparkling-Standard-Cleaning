@@ -1,4 +1,5 @@
-﻿import type { D1Database } from './d1.ts';
+import type { D1Database } from './d1.ts';
+import { allocateTipForPayment } from '../tips/service.ts';
 
 export interface StripeInvoiceSession {
   id?: string;
@@ -11,7 +12,14 @@ export interface StripeInvoiceSession {
 export async function applyInvoiceCheckoutPayment(
   db: D1Database,
   session: StripeInvoiceSession,
-): Promise<{ applied: boolean; invoiceId: string; duplicate: boolean }> {
+): Promise<{
+  applied: boolean;
+  invoiceId: string;
+  duplicate: boolean;
+  tipCents?: number;
+  serviceCents?: number;
+  kind?: 'invoice_payment' | 'invoice_tip';
+}> {
   const metadata = session.metadata ?? {};
   const invoiceId = String(metadata.invoice_id ?? '');
   if (!invoiceId) throw new Error('invoice_id_missing');
@@ -29,44 +37,87 @@ export async function applyInvoiceCheckoutPayment(
     .first<Record<string, unknown>>();
   if (!invoice) throw new Error('invoice_not_found');
   if (String(invoice.status) === 'void') throw new Error('invoice_void');
-  if (amount > Number(invoice.balance_cents ?? 0)) throw new Error('invoice_overpayment');
+  const kind =
+    metadata.checkout_kind === 'invoice_tip' ? 'invoice_tip' : 'invoice_payment';
+  const tipCents = Math.max(0, Math.round(Number(metadata.tip_cents) || 0));
+  if (tipCents > amount) throw new Error('invoice_tip_exceeds_payment');
+  const serviceCents =
+    kind === 'invoice_tip'
+      ? 0
+      : metadata.service_amount_cents !== undefined
+        ? Math.max(0, Math.round(Number(metadata.service_amount_cents) || 0))
+        : Math.max(0, amount - tipCents);
+  if (serviceCents + tipCents !== amount) throw new Error('invoice_amount_mismatch');
+  const balance = Math.max(0, Number(invoice.balance_cents ?? 0));
+  if (kind === 'invoice_tip') {
+    if (balance > 0 || String(invoice.status) !== 'paid') {
+      throw new Error('invoice_tip_requires_paid_invoice');
+    }
+    if (serviceCents !== 0) throw new Error('invoice_tip_service_charge_forbidden');
+  } else if (serviceCents > balance) {
+    throw new Error('invoice_overpayment');
+  }
   const paymentId = `payment_${crypto.randomUUID()}`;
   await db
     .prepare(
       `INSERT INTO payments
-       (id, branch_id, customer_id, invoice_id, provider, status, amount_cents, currency,
-        stripe_customer_id, stripe_payment_intent_id, idempotency_key, received_at, metadata_json)
-       VALUES (?, ?, ?, ?, 'stripe', 'succeeded', ?, 'USD', ?, ?, ?, ?, ?)`,
+       (id, branch_id, customer_id, invoice_id, appointment_id, provider, status, amount_cents,
+        service_cents, tip_cents, currency, stripe_customer_id, stripe_payment_intent_id,
+        idempotency_key, received_at, metadata_json)
+       VALUES (?, ?, ?, ?, ?, 'stripe', 'succeeded', ?, ?, ?, 'USD', ?, ?, ?, ?, ?)`,
     )
     .bind(
       paymentId,
       invoice.branch_id ?? null,
       invoice.customer_id,
       invoiceId,
+      invoice.appointment_id ?? null,
       amount,
+      serviceCents,
+      tipCents,
       String(session.customer ?? '') || null,
       String(session.payment_intent ?? '') || null,
       idempotencyKey,
       new Date().toISOString(),
-      JSON.stringify({ checkout_session_id: session.id ?? '', source: 'stripe_webhook' }),
+      JSON.stringify({
+        checkout_session_id: session.id ?? '',
+        source: 'stripe_webhook',
+        checkout_kind: kind,
+        service_amount_cents: serviceCents,
+        tip_cents: tipCents,
+      }),
     )
     .run();
-  const paid = Number(invoice.amount_paid_cents) + amount;
-  const balance = Math.max(0, Number(invoice.balance_cents) - amount);
-  await db
-    .prepare(
-      `UPDATE invoices SET amount_paid_cents = ?, balance_cents = ?, status = ?,
-         payment_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    )
-    .bind(paid, balance, balance === 0 ? 'paid' : 'partially_paid', invoiceId)
-    .run();
+  if (kind === 'invoice_payment') {
+    const paid = Number(invoice.amount_paid_cents) + serviceCents;
+    const newBalance = Math.max(0, balance - serviceCents);
+    await db
+      .prepare(
+        `UPDATE invoices SET amount_paid_cents = ?, balance_cents = ?, status = ?,
+           payment_url = NULL, stripe_checkout_session_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      )
+      .bind(paid, newBalance, newBalance === 0 ? 'paid' : 'partially_paid', invoiceId)
+      .run();
+  } else {
+    await db
+      .prepare('UPDATE invoices SET stripe_checkout_session_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .bind(invoiceId)
+      .run();
+  }
+  if (tipCents > 0) {
+    await allocateTipForPayment(db, paymentId);
+  }
   await db
     .prepare(
       `INSERT INTO admin_audit
        (id, actor_user_id, action, entity_type, entity_id, success, detail_json)
        VALUES (?, NULL, 'invoice.stripe_paid', 'invoice', ?, 1, ?)`,
     )
-    .bind(`audit_${crypto.randomUUID()}`, invoiceId, JSON.stringify({ paymentId, amount }))
+    .bind(
+      `audit_${crypto.randomUUID()}`,
+      invoiceId,
+      JSON.stringify({ paymentId, amount, serviceCents, tipCents, kind }),
+    )
     .run();
-  return { applied: true, invoiceId, duplicate: false };
+  return { applied: true, invoiceId, duplicate: false, tipCents, serviceCents, kind };
 }

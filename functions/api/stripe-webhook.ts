@@ -500,9 +500,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const expired = event.data?.object;
     const attempt = expired?.metadata?.checkout_attempt ?? '';
     const expiredKind = expired?.metadata?.checkout_kind;
-    if (expiredKind === 'invoice_payment' && env.DB && expired?.metadata?.invoice_id) {
+    if (
+      (expiredKind === 'invoice_payment' || expiredKind === 'invoice_tip') &&
+      env.DB &&
+      expired?.metadata?.invoice_id
+    ) {
       await env.DB
-        .prepare('UPDATE invoices SET payment_url = NULL, stripe_checkout_session_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stripe_checkout_session_id = ?')
+        .prepare('UPDATE invoices SET stripe_checkout_session_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stripe_checkout_session_id = ?')
         .bind(expired.metadata.invoice_id, String(expired.id ?? ''))
         .run()
         .catch(() => undefined);
@@ -569,7 +573,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
 
   const metadata = session.metadata ?? {};
-  if (metadata.checkout_kind === 'invoice_payment') {
+  if (metadata.checkout_kind === 'invoice_payment' || metadata.checkout_kind === 'invoice_tip') {
     if (!env.DB) return json({ ok: false, error: 'database_not_configured' }, 503);
     try {
       const result = await applyInvoiceCheckoutPayment(env.DB, {

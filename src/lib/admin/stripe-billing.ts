@@ -1,6 +1,8 @@
 import { AdminAuthError, audit, type AdminActor } from './operations.ts';
 import type { D1Database } from './d1.ts';
 import { beginRefund, completeRefund, failRefund } from './refunds.ts';
+import { createInvoicePayUrl, verifyInvoicePayToken } from '../tips/token.ts';
+import { normalizeTipCents, tipsEnabled } from '../../config/tips.ts';
 
 export interface StripeBillingEnv {
   STRIPE_SECRET_KEY?: string;
@@ -12,6 +14,8 @@ export interface StripeBillingEnv {
   ADMIN_STRIPE_PORTAL_ENABLED?: string;
   PORTAL_BILLING_ENABLED?: string;
   STRIPE_BILLING_PORTAL_CONFIGURATION_ID?: string;
+  TIPS_LINK_SECRET?: string;
+  TIPS_ENABLED?: string;
 }
 
 export interface StripeBillingResult {
@@ -249,6 +253,238 @@ export async function createInvoicePaymentLink(
 
 function agentScope(actor: AdminActor): boolean {
   return actor.role !== 'owner' && Boolean(actor.branchId);
+}
+
+async function invoiceForCheckout(
+  db: D1Database,
+  invoiceId: string,
+): Promise<Record<string, unknown>> {
+  const invoice = await db
+    .prepare(
+      `SELECT i.*, c.first_name, c.last_name, c.company_name,
+              a.status AS appointment_status
+       FROM invoices i
+       JOIN customers c ON c.id = i.customer_id
+       LEFT JOIN appointments a ON a.id = i.appointment_id
+       WHERE i.id = ? LIMIT 1`,
+    )
+    .bind(invoiceId)
+    .first<Record<string, unknown>>();
+  if (!invoice) throw new AdminAuthError(404, 'invoice_not_found');
+  return invoice;
+}
+
+function invoiceCheckoutMode(
+  invoice: Record<string, unknown>,
+  mode: 'invoice' | 'tip',
+  balance: number,
+): 'invoice' | 'tip' {
+  if (mode === 'tip') {
+    if (balance > 0) throw new AdminAuthError(409, 'invoice_balance_outstanding');
+    if (String(invoice.status) !== 'paid') throw new AdminAuthError(409, 'invoice_payment_required');
+    if (
+      invoice.appointment_id &&
+      String(invoice.appointment_status ?? '') !== 'completed'
+    ) {
+      throw new AdminAuthError(409, 'service_not_completed');
+    }
+    return 'tip';
+  }
+  if (balance > 0) return 'invoice';
+  if (String(invoice.status) === 'paid') {
+    if (
+      invoice.appointment_id &&
+      String(invoice.appointment_status ?? '') !== 'completed'
+    ) {
+      throw new AdminAuthError(409, 'service_not_completed');
+    }
+    return 'tip';
+  }
+  throw new AdminAuthError(409, 'invoice_not_payable');
+}
+
+export interface InvoiceCheckoutResult {
+  url: string;
+  sessionId: string;
+  serviceCents: number;
+  tipCents: number;
+  totalCents: number;
+  mode: 'invoice' | 'tip';
+}
+
+/**
+ * Creates (or safely reuses) the Stripe Checkout session for an invoice. The
+ * service amount comes only from the invoice balance; the gratuity is a
+ * separate, validated line item. Tip-only sessions never include service.
+ */
+export async function createInvoiceCheckoutSession(
+  db: D1Database,
+  invoiceId: string,
+  env: StripeBillingEnv,
+  options: { tipCents?: unknown; mode?: 'invoice' | 'tip'; token?: string } = {},
+): Promise<InvoiceCheckoutResult> {
+  if (env.ADMIN_STRIPE_BILLING_ENABLED !== 'true') {
+    throw new AdminAuthError(503, 'stripe_billing_disabled');
+  }
+  if (!tipsEnabled(env)) throw new AdminAuthError(503, 'tips_disabled');
+  const invoice = await invoiceForCheckout(db, invoiceId);
+  if (String(invoice.status) === 'void') throw new AdminAuthError(409, 'invoice_void');
+  const balance = Math.max(0, Number(invoice.balance_cents) || 0);
+  const mode = invoiceCheckoutMode(invoice, options.mode === 'tip' ? 'tip' : 'invoice', balance);
+  const serviceCents = mode === 'tip' ? 0 : balance;
+  const tipCents = normalizeTipCents(options.tipCents);
+  if (tipCents === 0 && serviceCents === 0) {
+    throw new AdminAuthError(400, 'tip_or_balance_required');
+  }
+  const total = serviceCents + tipCents;
+  const existingSessionId = String(invoice.stripe_checkout_session_id ?? '');
+  if (existingSessionId) {
+    const existing = await stripeGet(env, `checkout/sessions/${encodeURIComponent(existingSessionId)}`).catch(
+      () => null,
+    );
+    if (existing) {
+      const status = String(existing.status ?? '');
+      const metadata = (existing.metadata ?? {}) as Record<string, string>;
+      const existingTotal = Number(existing.amount_total);
+      const existingTip = Number(metadata.tip_cents ?? -1);
+      if (
+        status === 'open' &&
+        existingTotal === total &&
+        existingTip === tipCents &&
+        metadata.checkout_kind === (serviceCents > 0 ? 'invoice_payment' : 'invoice_tip')
+      ) {
+        const existingUrl = String(existing.url ?? '');
+        if (!existingUrl) throw new AdminAuthError(502, 'invoice_session_unverified');
+        return {
+          url: existingUrl,
+          sessionId: existingSessionId,
+          serviceCents,
+          tipCents,
+          totalCents: total,
+          mode,
+        };
+      }
+      if (status === 'complete') throw new AdminAuthError(409, 'invoice_payment_processing');
+      if (status === 'open') {
+        const expired = await expireInvoiceCheckoutSession(env, existingSessionId);
+        if (!expired) throw new AdminAuthError(502, 'invoice_session_unverified');
+      }
+      await db
+        .prepare('UPDATE invoices SET stripe_checkout_session_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .bind(invoiceId)
+        .run();
+    } else {
+      await db
+        .prepare('UPDATE invoices SET stripe_checkout_session_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .bind(invoiceId)
+        .run();
+    }
+  }
+  const origin = (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
+  const stripeCustomerId = await customerForInvoice(db, invoice, env);
+  const redirect = options.token
+    ? `${origin}/invoice-pay/?token=${encodeURIComponent(options.token)}`
+    : `${origin}/invoice-payment/`;
+  const form = new URLSearchParams();
+  form.set('mode', 'payment');
+  form.set('customer', stripeCustomerId);
+  form.set('client_reference_id', invoiceId);
+  form.set('success_url', `${redirect}${redirect.includes('?') ? '&' : '?'}status=success&session_id={CHECKOUT_SESSION_ID}`);
+  form.set('cancel_url', `${redirect}${redirect.includes('?') ? '&' : '?'}status=cancelled`);
+  let index = 0;
+  if (serviceCents > 0) {
+    form.set(`line_items[${index}][quantity]`, '1');
+    form.set(`line_items[${index}][price_data][currency]`, 'usd');
+    form.set(`line_items[${index}][price_data][unit_amount]`, String(serviceCents));
+    form.set(`line_items[${index}][price_data][product_data][name]`, `Cleaning service — invoice ${String(invoice.number ?? '')}`);
+    index += 1;
+  }
+  if (tipCents > 0) {
+    form.set(`line_items[${index}][quantity]`, '1');
+    form.set(`line_items[${index}][price_data][currency]`, 'usd');
+    form.set(`line_items[${index}][price_data][unit_amount]`, String(tipCents));
+    form.set(`line_items[${index}][price_data][product_data][name]`, 'Optional gratuity for your cleaning team');
+    index += 1;
+  }
+  const checkoutKind = serviceCents > 0 ? 'invoice_payment' : 'invoice_tip';
+  form.set('metadata[checkout_kind]', checkoutKind);
+  form.set('metadata[invoice_id]', invoiceId);
+  form.set('metadata[customer_id]', String(invoice.customer_id ?? ''));
+  form.set('metadata[service_amount_cents]', String(serviceCents));
+  form.set('metadata[tip_cents]', String(tipCents));
+  form.set('payment_intent_data[metadata][invoice_id]', invoiceId);
+  form.set('payment_intent_data[metadata][checkout_kind]', checkoutKind);
+  form.set('payment_intent_data[metadata][tip_cents]', String(tipCents));
+  const session = await stripeRequest(
+    env,
+    'checkout/sessions',
+    form,
+    `invoice-checkout-${invoiceId}-${serviceCents}-${tipCents}`,
+  );
+  const url = String(session.url ?? '');
+  const sessionId = String(session.id ?? '');
+  if (!url || !sessionId) throw new AdminAuthError(502, 'stripe_session_failed');
+  await db
+    .prepare('UPDATE invoices SET stripe_checkout_session_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .bind(sessionId, invoiceId)
+    .run();
+  await audit(db, {
+    actorUserId: null,
+    action: 'invoice.tip_checkout_created',
+    entityType: 'invoice',
+    entityId: invoiceId,
+    detail: `${checkoutKind}:${serviceCents}:${tipCents}`,
+  });
+  return { url, sessionId, serviceCents, tipCents, totalCents: total, mode };
+}
+
+export async function createInvoicePaymentPageLink(
+  db: D1Database,
+  actor: AdminActor,
+  invoiceId: string,
+  env: StripeBillingEnv,
+  mode: 'invoice' | 'tip' = 'invoice',
+): Promise<{ url: string; sessionId: '' }> {
+  if (env.ADMIN_STRIPE_BILLING_ENABLED !== 'true') {
+    throw new AdminAuthError(503, 'stripe_billing_disabled');
+  }
+  if (!tipsEnabled(env)) throw new AdminAuthError(503, 'tips_disabled');
+  const invoice = await invoiceForCheckout(db, invoiceId);
+  if (agentScope(actor) && invoice.branch_id !== actor.branchId) throw new AdminAuthError(403, 'forbidden');
+  const balance = Math.max(0, Number(invoice.balance_cents) || 0);
+  if (mode === 'invoice' && !['open', 'partially_paid', 'overdue'].includes(String(invoice.status))) {
+    throw new AdminAuthError(409, 'invoice_not_payable');
+  }
+  if (mode === 'invoice' && balance <= 0) throw new AdminAuthError(409, 'invoice_paid');
+  if (mode === 'tip') {
+    invoiceCheckoutMode(invoice, 'tip', balance);
+  }
+  const url = await createInvoicePayUrl(env, invoiceId, mode);
+  await db
+    .prepare('UPDATE invoices SET payment_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .bind(url, invoiceId)
+    .run();
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'invoice.payment_page_link_created',
+    entityType: 'invoice',
+    entityId: invoiceId,
+    detail: mode,
+  });
+  return { url, sessionId: '' };
+}
+
+export async function tipLinkForInvoice(
+  db: D1Database,
+  invoiceId: string,
+  env: StripeBillingEnv,
+): Promise<{ url: string; expiresAt: string }> {
+  if (!tipsEnabled(env)) throw new AdminAuthError(503, 'tips_disabled');
+  const invoice = await invoiceForCheckout(db, invoiceId);
+  invoiceCheckoutMode(invoice, 'tip', Math.max(0, Number(invoice.balance_cents) || 0));
+  const token = await createInvoicePayUrl(env, invoiceId, 'tip');
+  const verified = await verifyInvoicePayToken(env, new URL(token).searchParams.get('token') ?? '');
+  return { url: token, expiresAt: verified?.expiresAt ?? '' };
 }
 
 export async function refundStripePayment(

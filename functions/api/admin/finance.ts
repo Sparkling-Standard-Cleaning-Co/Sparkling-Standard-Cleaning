@@ -18,9 +18,12 @@ import {
 import {
   createCustomerBillingPortalSession,
   createInvoicePaymentLink,
+  createInvoicePaymentPageLink,
   refundStripePayment,
+  tipLinkForInvoice,
   type StripeBillingEnv,
 } from '../../../src/lib/admin/stripe-billing.ts';
+import { assignTipParticipants } from '../../../src/lib/tips/service.ts';
 import { buildAdminInvoice } from '../../../src/lib/invoicing/admin-invoice.ts';
 import { buildInvoicePdf } from '../../../src/lib/invoicing/pdf.ts';
 import { buildInvoiceEmail, sendInvoiceEmail, type InvoiceEmailEnv } from '../../../src/lib/invoicing/invoice-email.ts';
@@ -105,6 +108,22 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'payment_link') {
       return json({ ok: true, ...(await createInvoicePaymentLink(db, actor, String(body.invoiceId ?? ''), context.env)) });
     }
+    if (action === 'payment_page_link') {
+      return json({ ok: true, ...(await createInvoicePaymentPageLink(db, actor, String(body.invoiceId ?? ''), context.env, 'invoice')) });
+    }
+    if (action === 'tip_link') {
+      const invoiceId = String(body.invoiceId ?? '');
+      const invoice = await getInvoice(db, actor, invoiceId);
+      if (!invoice) return json({ ok: false, error: 'invoice_not_found' }, 404);
+      return json({ ok: true, ...(await tipLinkForInvoice(db, invoiceId, context.env)) });
+    }
+    if (action === 'allocate_tip') {
+      const paymentId = String(body.paymentId ?? '');
+      const teamMemberIds = Array.isArray(body.teamMemberIds)
+        ? body.teamMemberIds.filter((value): value is string => typeof value === 'string')
+        : [];
+      return json({ ok: true, ...(await assignTipParticipants(db, actor, paymentId, teamMemberIds)) });
+    }
     if (action === 'billing_portal') {
       return json({
         ok: true,
@@ -165,7 +184,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       if (body.includePaymentLink === true) {
         try {
-          await createInvoicePaymentLink(db, actor, invoiceId, context.env);
+          await createInvoicePaymentPageLink(db, actor, invoiceId, context.env, 'invoice');
           result = await getInvoice(db, actor, invoiceId);
           if (!result) return json({ ok: false, error: 'invoice_not_found' }, 404);
           invoice = result.invoice as Record<string, unknown>;

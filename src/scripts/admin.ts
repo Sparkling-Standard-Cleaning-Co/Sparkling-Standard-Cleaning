@@ -4152,7 +4152,43 @@ async function openInvoice(invoiceId: string): Promise<void> {
   const lines = (data.lines as Array<Record<string, unknown>>) ?? [];
   const payments = (data.payments as Array<Record<string, unknown>>) ?? [];
   const receipts = (data.receipts as Array<Record<string, unknown>>) ?? [];
-  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(invoice.number)}</h2><span class="admin-status">${esc(titleCase(invoice.status))}</span></div><dl class="admin-definition"><dt>Customer</dt><dd>${esc([invoice.first_name, invoice.last_name].filter(Boolean).join(' '))}</dd><dt>Email</dt><dd>${esc(invoice.customer_email || 'Not recorded')}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Paid</dt><dd>${esc(money(invoice.amount_paid_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(dateTime(invoice.due_date))}</dd></dl><h3>Lines</h3>${lines.map((line) => `<div class="admin-record">${esc(line.description)} · ${esc(money(line.total_cents))}</div>`).join('') || '<p class="admin-muted">No lines.</p>'}<h3>Payments</h3>${payments.map((payment) => `<div class="admin-record">${esc(titleCase(payment.provider))} · ${esc(money(payment.amount_cents))} · ${esc(payment.status)} · ${esc(dateTime(payment.created_at))}<details class="admin-detail-toggle"><summary>Record refund</summary><form class="admin-form" data-form="refund"><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Refund amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="reason" /></label><button class="btn btn--secondary btn--small" type="submit">Record refund</button></form></details></div>`).join('') || '<p class="admin-muted">No payments.</p>'}${Number(invoice.balance_cents) > 0 ? `<form class="admin-form" data-form="payment"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Payment method <select name="provider"><option value="cash">Cash</option><option value="check">Check</option><option value="external">External</option></select></label><label>Amount <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Reference <input name="reference" /></label><button class="btn btn--primary btn--small" type="submit">Record payment</button></form>` : ''}<form class="admin-form" data-form="credit"><input type="hidden" name="customerId" value="${esc(invoice.customer_id)}" /><label>Customer credit amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="source" /></label><button class="btn btn--secondary btn--small" type="submit">Add credit</button></form></div>`;
+  const tips = (data.tips ?? {}) as {
+    payments?: Array<Record<string, unknown>>;
+    allocations?: Array<Record<string, unknown>>;
+    summary?: {
+      collectedCents?: number;
+      refundedCents?: number;
+      allocatedCents?: number;
+      unallocatedCents?: number;
+      paidOutCents?: number;
+    };
+  };
+  const tipPayments = tips.payments ?? [];
+  const tipAllocations = tips.allocations ?? [];
+  const tipSummary = tips.summary ?? {};
+  const unallocatedTipPayments = tipPayments.filter((payment) =>
+    tipAllocations.some(
+      (allocation) => allocation.payment_id === payment.id && !allocation.team_member_id &&
+        Number(allocation.amount_cents) > Number(allocation.refunded_cents),
+    ),
+  );
+  const teamForTips = unallocatedTipPayments.length > 0 && can('finance.write')
+    ? await api<{ team?: Array<Record<string, unknown>> }>('/api/admin/operations?view=team')
+        .then((result) => result.team ?? [])
+        .catch(() => [])
+    : [];
+  const tipSection = `<h3>Optional gratuities</h3>${
+    tipPayments.length
+      ? `<dl class="admin-definition"><dt>Collected</dt><dd>${esc(money(tipSummary.collectedCents ?? 0))}</dd><dt>Allocated</dt><dd>${esc(money(tipSummary.allocatedCents ?? 0))}</dd><dt>Unallocated</dt><dd>${esc(money(tipSummary.unallocatedCents ?? 0))}</dd><dt>Refunded</dt><dd>${esc(money(tipSummary.refundedCents ?? 0))}</dd><dt>Recorded paid out</dt><dd>${esc(money(tipSummary.paidOutCents ?? 0))}</dd></dl>
+         ${tipPayments.map((payment) => `<div class="admin-record"><p><strong>${esc(money(payment.tip_cents))} gratuity</strong> · service ${esc(money(payment.service_cents))} · ${esc(titleCase(payment.status))}</p><p class="admin-muted">Collected ${esc(dateTime(payment.received_at))}${payment.stripe_payment_intent_id ? ` · ${esc(payment.stripe_payment_intent_id)}` : ''}</p>${
+           unallocatedTipPayments.some((entry) => entry.id === payment.id) && can('finance.write')
+             ? `<form class="admin-form" data-form="tip-allocate"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><p class="admin-muted">Actual crew participation is not recorded, so this gratuity is unallocated. Select only the cleaners who performed the service.</p><div class="admin-form admin-form--grid">${teamForTips.map((member) => `<label><input type="checkbox" name="teamMemberIds" value="${esc(member.id)}" /> ${esc(member.display_name)}</label>`).join('')}</div><button class="btn btn--secondary btn--small" type="submit">Confirm participating cleaners</button></form>`
+             : ''
+         }</div>`).join('')}
+         ${tipAllocations.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Cleaner</th><th>Allocated</th><th>Refunded</th><th>Status</th></tr></thead><tbody>${tipAllocations.map((allocation) => `<tr><td>${esc(allocation.team_member_name || 'Unallocated')}</td><td>${esc(money(allocation.amount_cents))}</td><td>${esc(money(allocation.refunded_cents))}</td><td>${esc(titleCase(allocation.status))}</td></tr>`).join('')}</tbody></table></div>` : ''}`
+      : '<p class="admin-muted">No optional gratuity has been collected for this invoice. Tips are never required or added automatically.</p>'
+  }`;
+  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(invoice.number)}</h2><span class="admin-status">${esc(titleCase(invoice.status))}</span></div><dl class="admin-definition"><dt>Customer</dt><dd>${esc([invoice.first_name, invoice.last_name].filter(Boolean).join(' '))}</dd><dt>Email</dt><dd>${esc(invoice.customer_email || 'Not recorded')}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Paid</dt><dd>${esc(money(invoice.amount_paid_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(dateTime(invoice.due_date))}</dd></dl><h3>Lines</h3>${lines.map((line) => `<div class="admin-record">${esc(line.description)} · ${esc(money(line.total_cents))}</div>`).join('') || '<p class="admin-muted">No lines.</p>'}<h3>Payments</h3>${payments.map((payment) => `<div class="admin-record">${esc(titleCase(payment.provider))} · ${esc(money(payment.amount_cents))} · ${esc(payment.status)} · ${esc(dateTime(payment.created_at))}<details class="admin-detail-toggle"><summary>Record refund</summary><form class="admin-form" data-form="refund"><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Refund amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="reason" /></label><button class="btn btn--secondary btn--small" type="submit">Record refund</button></form></details></div>`).join('') || '<p class="admin-muted">No payments.</p>'}${tipSection}${Number(invoice.balance_cents) > 0 ? `<form class="admin-form" data-form="payment"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Payment method <select name="provider"><option value="cash">Cash</option><option value="check">Check</option><option value="external">External</option></select></label><label>Amount <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Reference <input name="reference" /></label><button class="btn btn--primary btn--small" type="submit">Record payment</button></form>` : ''}<form class="admin-form" data-form="credit"><input type="hidden" name="customerId" value="${esc(invoice.customer_id)}" /><label>Customer credit amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="source" /></label><button class="btn btn--secondary btn--small" type="submit">Add credit</button></form></div>`;
   const controls = document.querySelector<HTMLElement>('[data-admin-invoice-controls]');
   if (controls) {
     controls.innerHTML = `<a class="btn btn--secondary btn--small" href="/api/admin/invoice-document?id=${encodeURIComponent(invoiceId)}">Download invoice PDF</a>` +
@@ -4161,7 +4197,7 @@ async function openInvoice(invoiceId: string): Promise<void> {
       const latestReceipt = receipts[0];
       controls.insertAdjacentHTML(
         'beforeend',
-        `<p class="admin-muted">Payment receipt: ${esc(latestReceipt ? `${titleCase(latestReceipt.status)} · ${dateTime(latestReceipt.sent_at || latestReceipt.updated_at)}` : 'not sent')}</p><button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-receipt-resend" data-id="${esc(invoiceId)}">Resend payment receipt</button>`,
+        `<p class="admin-muted">Payment receipt: ${esc(latestReceipt ? `${titleCase(latestReceipt.status)} · ${dateTime(latestReceipt.sent_at || latestReceipt.updated_at)}` : 'not sent')}</p><button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-receipt-resend" data-id="${esc(invoiceId)}">Resend payment receipt</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="invoice-tip-link" data-id="${esc(invoiceId)}">Create optional tip link</button>`,
       );
     }
     if (
@@ -4186,13 +4222,13 @@ async function openInvoice(invoiceId: string): Promise<void> {
     if (can('finance.write') && !invoice.payment_url && Number(invoice.balance_cents) > 0) {
       controls.insertAdjacentHTML(
         'beforeend',
-        `<button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-link" data-id="${esc(invoiceId)}">Create Stripe payment link</button>`,
+        `<button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-link" data-id="${esc(invoiceId)}">Create secure payment page</button>`,
       );
     }
     if (invoice.payment_url) {
       controls.insertAdjacentHTML(
         'beforeend',
-        `<p><a class="btn btn--secondary btn--small" href="${esc(invoice.payment_url)}" target="_blank" rel="noopener noreferrer">Open Stripe payment link</a></p>`,
+        `<p><a class="btn btn--secondary btn--small" href="${esc(invoice.payment_url)}" target="_blank" rel="noopener noreferrer">Open secure payment page</a></p>`,
       );
     }
     const stripePayments = payments.filter((payment) => payment.provider === 'stripe');
@@ -6545,6 +6581,20 @@ document.addEventListener('submit', (event) => {
       amountCents: Math.round(Number(value('amount')) * 100),
     }).then(() => openInvoice(value('invoiceId')));
   }
+  if (kind === 'tip-allocate') {
+    const teamMemberIds = [...form.querySelectorAll<HTMLInputElement>('input[name="teamMemberIds"]:checked')].map(
+      (input) => input.value,
+    );
+    void api('/api/admin/finance', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'allocate_tip', paymentId: value('paymentId'), teamMemberIds }),
+    })
+      .then(async () => {
+        setSuccess('Gratuity allocation recorded from the confirmed participating cleaners.');
+        await openInvoice(value('invoiceId'));
+      })
+      .catch((error) => setAppError(friendly(error)));
+  }
   if (kind === 'offsession') {
     setAppError();
     void api<Record<string, unknown>>('/api/admin/payment-authorizations', {
@@ -7361,8 +7411,23 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'invoice-link') {
     setAppError();
-    void api<{ url: string }>('/api/admin/finance', { method: 'POST', body: JSON.stringify({ action: 'payment_link', invoiceId: id }) })
+    void api<{ url: string }>('/api/admin/finance', { method: 'POST', body: JSON.stringify({ action: 'payment_page_link', invoiceId: id }) })
       .then(() => openInvoice(id))
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'invoice-tip-link') {
+    setAppError();
+    void api<{ url: string; expiresAt: string }>('/api/admin/finance', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'tip_link', invoiceId: id }),
+    })
+      .then((result) => {
+        const controls = document.querySelector<HTMLElement>('[data-admin-invoice-controls]');
+        controls?.insertAdjacentHTML(
+          'beforeend',
+          `<p class="admin-status-message" role="status">Optional tip-only link (expires ${esc(dateTime(result.expiresAt))}): <a href="${esc(result.url)}" target="_blank" rel="noopener noreferrer">${esc(result.url)}</a></p>`,
+        );
+      })
       .catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'invoice-receipt-resend') {

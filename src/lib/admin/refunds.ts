@@ -1,5 +1,6 @@
 import type { D1Database } from './d1.ts';
 import { AdminAuthError, audit, type AdminActor } from './operations.ts';
+import { syncTipRefundAllocations } from '../tips/service.ts';
 
 function now(): string {
   return new Date().toISOString();
@@ -40,6 +41,13 @@ export async function recomputePaymentFinancials(
     .bind(paymentId)
     .first<{ total: number }>();
   const refunded = Math.max(0, Number(refundedRow?.total) || 0);
+  const tipRefundedRow = await db
+    .prepare(
+      "SELECT COALESCE(SUM(tip_cents), 0) AS total FROM refunds WHERE payment_id = ? AND status = 'succeeded'",
+    )
+    .bind(paymentId)
+    .first<{ total: number }>();
+  const tipRefunded = Math.max(0, Number(tipRefundedRow?.total) || 0);
   const amount = Math.max(0, Number(payment.amount_cents) || 0);
   const current = String(payment.status ?? '');
   const status =
@@ -52,6 +60,9 @@ export async function recomputePaymentFinancials(
           : current;
   if (status !== current) {
     await db.prepare('UPDATE payments SET status = ? WHERE id = ?').bind(status, paymentId).run();
+  }
+  if (tipRefunded > 0 || Number(payment.tip_cents) > 0) {
+    await syncTipRefundAllocations(db, paymentId, tipRefunded);
   }
 
   const invoiceId = String(payment.invoice_id ?? '');
@@ -70,13 +81,13 @@ export async function recomputeInvoiceFinancials(
 
   const paidRow = await db
     .prepare(
-      "SELECT COALESCE(SUM(amount_cents), 0) AS total FROM payments WHERE invoice_id = ? AND status IN ('succeeded', 'partially_refunded', 'refunded')",
+      "SELECT COALESCE(SUM(CASE WHEN service_cents > 0 THEN service_cents ELSE amount_cents END), 0) AS total FROM payments WHERE invoice_id = ? AND status IN ('succeeded', 'partially_refunded', 'refunded')",
     )
     .bind(invoiceId)
     .first<{ total: number }>();
   const refundedRow = await db
     .prepare(
-      `SELECT COALESCE(SUM(r.amount_cents), 0) AS total
+      `SELECT COALESCE(SUM(CASE WHEN r.service_cents > 0 THEN r.service_cents ELSE r.amount_cents END), 0) AS total
        FROM refunds r
        JOIN payments p ON p.id = r.payment_id
        WHERE p.invoice_id = ? AND r.status = 'succeeded'`,
@@ -129,6 +140,31 @@ export async function beginRefund(
   if (amount <= 0) throw new AdminAuthError(400, 'refund_amount_invalid');
   if (!idempotencyKey) throw new AdminAuthError(400, 'refund_idempotency_required');
 
+  const payment = await db
+    .prepare('SELECT amount_cents, service_cents, tip_cents FROM payments WHERE id = ? LIMIT 1')
+    .bind(paymentId)
+    .first<{ amount_cents: number; service_cents: number; tip_cents: number }>();
+  if (!payment) throw new AdminAuthError(404, 'payment_not_found');
+  const serviceTotal = Math.max(0, Number(payment.service_cents) || Number(payment.amount_cents) || 0);
+  const tipTotal = Math.max(0, Number(payment.tip_cents) || 0);
+  const refundedServiceRow = await db
+    .prepare(
+      "SELECT COALESCE(SUM(service_cents), 0) AS total FROM refunds WHERE payment_id = ? AND status IN ('pending','succeeded')",
+    )
+    .bind(paymentId)
+    .first<{ total: number }>();
+  const refundedTipRow = await db
+    .prepare(
+      "SELECT COALESCE(SUM(tip_cents), 0) AS total FROM refunds WHERE payment_id = ? AND status IN ('pending','succeeded')",
+    )
+    .bind(paymentId)
+    .first<{ total: number }>();
+  const remainingService = Math.max(0, serviceTotal - Number(refundedServiceRow?.total ?? 0));
+  const remainingTip = Math.max(0, tipTotal - Number(refundedTipRow?.total ?? 0));
+  const servicePortion = Math.min(amount, remainingService);
+  const tipPortion = amount - servicePortion;
+  if (tipPortion > remainingTip) throw new AdminAuthError(400, 'refund_exceeds_remaining');
+
   const existing = await db
     .prepare('SELECT * FROM refunds WHERE idempotency_key = ? LIMIT 1')
     .bind(idempotencyKey)
@@ -147,8 +183,8 @@ export async function beginRefund(
   await db
     .prepare(
       `INSERT OR IGNORE INTO refunds
-       (id, payment_id, amount_cents, reason, status, idempotency_key, created_by_admin_user_id)
-       SELECT ?, ?, ?, ?, ?, ?, ?
+       (id, payment_id, amount_cents, service_cents, tip_cents, reason, status, idempotency_key, created_by_admin_user_id)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
        WHERE (
          SELECT COALESCE(SUM(amount_cents), 0) FROM refunds
          WHERE payment_id = ? AND status IN ('pending', 'succeeded')
@@ -160,6 +196,8 @@ export async function beginRefund(
       refundId,
       paymentId,
       amount,
+      servicePortion,
+      tipPortion,
       text(input.reason, 500),
       input.status,
       idempotencyKey,

@@ -54,6 +54,7 @@ export function buildInvoiceEmail(
       <p style="margin:0 0 14px;font-size:15px;">Hello ${escapeHtml(data.billedTo.contact || data.billedTo.company)},</p>
       <p style="margin:0 0 18px;font-size:15px;line-height:1.65;">Your invoice <strong>${escapeHtml(data.invoiceNumber)}</strong> is attached as a PDF. The balance due is <strong>${escapeHtml(balance)}</strong>, due ${escapeHtml(due)}.</p>
       ${payLink}
+      ${payLink ? '<p style="margin:0 0 18px;font-size:13px;line-height:1.65;color:#6f5f57;">The secure payment page also offers a completely optional gratuity for your cleaning team. It defaults to $0.00 and never affects your service, review or receipt.</p>' : ''}
       <p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:#4a3b40;">${escapeHtml(data.paymentTerms || 'Please reply to this email with any questions.')}</p>
       ${review}
       <p style="margin:0;font-size:14px;line-height:1.65;color:#4a3b40;">Thank you for choosing Sparkling Standard Cleaning Co.! We appreciate the opportunity to care for your home and look forward to delivering Standards That Sparkle.</p>
@@ -67,7 +68,7 @@ export function buildInvoiceEmail(
     `Your invoice ${data.invoiceNumber} is attached as a PDF.`,
     `Balance due: ${balance}`,
     `Due: ${due}`,
-    ...(data.paymentUrl && /^https:\/\//i.test(data.paymentUrl) ? ['', `Pay online: ${data.paymentUrl}`] : []),
+    ...(data.paymentUrl && /^https:\/\//i.test(data.paymentUrl) ? ['', `Pay online: ${data.paymentUrl}`, 'The secure payment page offers a completely optional gratuity; it defaults to $0.00.'] : []),
     '',
     data.paymentTerms || 'Please reply to this email with any questions.',
     ...(data.review?.eligible && data.review.url && /^https:\/\//i.test(data.review.url)
