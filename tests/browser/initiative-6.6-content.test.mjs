@@ -231,7 +231,7 @@ test('a confirmed facility location can continue without a ZIP code', async () =
     await context.close();
   }
 });
-test('Pay Now appears only for an exact Tier A facility quote when Stripe is configured', async () => {
+test('facility payment stays disabled and the request path remains available', async () => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   await page.route('**/api/geocode', async (route) => {
@@ -366,24 +366,18 @@ test('Pay Now appears only for an exact Tier A facility quote when Stripe is con
     await page.waitForSelector('[data-booking-picker]', { state: 'visible' });
     await page.locator('[data-booking-hold-selected]').click();
     await page.waitForFunction(() => document.querySelector('[data-booking-hold]')?.hasAttribute('hidden') === false);
-    await page.locator('[data-facility-pay-now]').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('[data-facility-pay-now]').innerText(), 'Pay Now and Reserve This Cleaning');
+    assert.equal(await page.locator('[data-facility-pay-now]').isVisible(), false);
+    assert.match(
+      normalize((await page.locator('[data-facility-payment-guidance]').innerText()) ?? ''),
+      /scheduled after personal review/i,
+    );
     await page.fill('#fac-phone', '8500000000');
     await page.fill('#fac-email', 'customer@example.test');
     await page.check('#commercial-terms');
-    await page.locator('[data-facility-pay-now]').click();
-    await page.waitForFunction(() => document.querySelector('[data-facility-pay-now]')?.getAttribute('aria-busy') === 'true');
-    assert.equal(await page.locator('[data-facility-pay-now]').isDisabled(), true);
-    assert.match(normalize((await page.locator('[data-facility-pay-now]').innerText()) ?? ''), /Preparing Secure Checkout/);
-    await page.waitForFunction(() => (document.querySelector('[data-form-status]')?.textContent ?? '').includes('secure checkout could not start'));
+    await page.locator('[data-facility-submit]').click();
+    await page.waitForFunction(() => (document.querySelector('[data-form-status]')?.textContent ?? '').includes('received'));
     assert.equal(leadRequests, 1);
-    assert.equal(checkoutRequests, 1);
-    assert.equal(await page.locator('[data-facility-submit]').isDisabled(), true);
-    assert.equal(normalize((await page.locator('[data-facility-submit]').innerText()) ?? ''), 'Request Received');
-    await page.locator('[data-facility-pay-now]').click();
-    await page.waitForTimeout(1100);
-    assert.equal(checkoutRequests, 2);
-    assert.equal(leadRequests, 1, 'payment retry must not submit a duplicate lead');
+    assert.equal(checkoutRequests, 0, 'no Stripe checkout is attempted while facility payment is disabled');
   } finally {
     await context.close();
   }

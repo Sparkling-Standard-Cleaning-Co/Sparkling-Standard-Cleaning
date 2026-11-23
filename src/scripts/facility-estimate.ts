@@ -195,11 +195,13 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       paymentGuidance.hidden = !eligibleBase || payable;
       paymentGuidance.textContent = !taxReady
         ? 'Sales tax for this service address needs personal confirmation before online payment. Send your request and Sparkling Standard will confirm the tax and payment options with you.'
-        : canVerify
-          ? 'Verify the service address to unlock secure payment. You can also request to reserve and pay later.'
-          : addressReviewRequired
-            ? "We couldn't verify the exact facility address online. Request the visit without paying online - we'll confirm the address and arrange payment personally."
-            : !holdReady
+        : addressReviewRequired
+          ? "We couldn't verify the exact facility address online. Request the visit without paying online - we'll confirm the address and arrange payment personally."
+          : !commercialTierConfig.facilityOnlinePaymentEnabled
+            ? 'Facility visits are scheduled after personal review. Request the visit and Sparkling Standard will confirm the scope, time and price with you.'
+            : canVerify
+              ? 'Verify the service address to unlock secure payment. You can also request to reserve and pay later.'
+              : !holdReady
               ? 'Select and hold an available time to unlock Pay Now, or request to reserve and pay later.'
               : "Request to reserve and we'll confirm any outstanding detail with you.";
     }
@@ -1324,7 +1326,11 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     try {
       const response = await fetch('/api/estimate-checkout', { headers: { Accept: 'application/json' } });
       const data = (await response.json().catch(() => ({}))) as { ok?: boolean; enabled?: boolean };
-      paymentEnabled = response.ok && data.ok === true && data.enabled === true;
+      paymentEnabled =
+        commercialTierConfig.facilityOnlinePaymentEnabled &&
+        response.ok &&
+        data.ok === true &&
+        data.enabled === true;
     } catch {
       paymentEnabled = false;
     }
