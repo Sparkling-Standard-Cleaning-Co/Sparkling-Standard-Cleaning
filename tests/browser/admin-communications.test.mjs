@@ -20,7 +20,7 @@ after(async () => { await browser?.close(); server?.kill(); });
 const settings = {
   schemaVersion: 1,
   departments: {
-    bookings: { address: 'bookings@sparkling-standard.com', enabled: true },
+    bookings: { address: 'booking@sparkling-standard.com', enabled: true },
     customerService: { address: 'customer-service@sparkling-standard.com', enabled: true },
     billing: { address: 'billing@sparkling-standard.com', enabled: true },
     hiring: { address: 'hiring@sparkling-standard.com', enabled: true },
@@ -81,7 +81,7 @@ test('the owner communications center renders routing, previews templates and ne
         return;
       }
       if (body.action === 'send_test') {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, status: 'sent', recipient: 'bookings@sparkling-standard.com', eventId: 'notif_test' }) });
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, status: 'sent', recipient: 'booking@sparkling-standard.com', eventId: 'notif_test' }) });
         return;
       }
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, version: 2 }) });
@@ -92,7 +92,7 @@ test('the owner communications center renders routing, previews templates and ne
       versions: [{ version: 1, created_at: '2026-11-20T12:00:00.000Z', created_by: 'Owner', change_note: 'Initial' }],
       health: {
         summary: { sent: 3 },
-        recent: [{ event_key: 'communications_test', department: 'bookings', recipient: 'bookings@sparkling-standard.com', status: 'sent', provider: 'resend', error_code: '', attempts: 1, created_at: '2026-11-22T12:00:00.000Z' }],
+        recent: [{ event_key: 'communications_test', department: 'bookings', recipient: 'booking@sparkling-standard.com', status: 'sent', provider: 'resend', error_code: '', attempts: 1, created_at: '2026-11-22T12:00:00.000Z' }],
         leadFailures: [],
         bookingFailures: [],
         receiptFailures: [],

@@ -59,7 +59,7 @@ test('the embedded business facts cannot drift from business.ts', () => {
   assert.equal(CUSTOMER_EMAIL_BUSINESS.name, 'Sparkling Standard');
   assert.equal(CUSTOMER_EMAIL_BUSINESS.founder, 'Hayli');
   assert.equal(CUSTOMER_EMAIL_BUSINESS.phone, '(850) 426-8479');
-  assert.equal(CUSTOMER_EMAIL_BUSINESS.email, 'bookings@sparkling-standard.com');
+  assert.equal(CUSTOMER_EMAIL_BUSINESS.email, 'booking@sparkling-standard.com');
   assert.equal(CUSTOMER_EMAIL_BUSINESS.website, 'sparkling-standard.com');
   for (const literal of [
     "'Sparkling Standard'",
@@ -71,7 +71,7 @@ test('the embedded business facts cannot drift from business.ts', () => {
     assert.ok(source.includes(literal), `business.ts no longer contains ${literal}`);
   }
   for (const literal of [
-    "bookings: 'bookings@sparkling-standard.com'",
+    "bookings: 'booking@sparkling-standard.com'",
     "customerService: 'customer-service@sparkling-standard.com'",
     "hiring: 'hiring@sparkling-standard.com'",
     "admin: 'admin@sparkling-standard.com'",

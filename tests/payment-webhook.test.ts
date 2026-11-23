@@ -313,7 +313,7 @@ test('a paid estimate sends an itemized customer receipt from the stored checkou
   assert.equal(departmentBodies.length, 2);
   assert.deepEqual(
     [...new Set(departmentBodies.flatMap((body) => (Array.isArray(body.to) ? body.to : []) as string[]))].sort(),
-    ['billing@sparkling-standard.com', 'bookings@sparkling-standard.com'],
+    ['billing@sparkling-standard.com', 'booking@sparkling-standard.com'],
   );
   assert.match(String(customerReceipts[0]?.subject), /SS-20261029-ABC123/);
   assert.match(String(customerReceipts[0]?.html), /Commercial Cleaning/);

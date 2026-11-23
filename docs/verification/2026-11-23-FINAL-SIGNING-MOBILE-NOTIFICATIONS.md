@@ -11,7 +11,7 @@ the actual configured business inboxes:
 
 | Department | Recipient | HTTP | Recorded status | Resend message ID |
 | --- | --- | --- | --- | --- |
-| Bookings | `bookings@sparkling-standard.com` | 200 | sent (provider accepted) | `01a2062d-95da-7b27-8548-22043b2ad378` |
+| Bookings | `booking@sparkling-standard.com` | 200 | sent (provider accepted) | `01a2062d-95da-7b27-8548-22043b2ad378` |
 | Admin | `admin@sparkling-standard.com` | 200 | sent (provider accepted) | `01a2062d-97ac-72e5-9c65-98364488685f` |
 | Owner | `owner@sparkling-standard.com` | 200 | sent (provider accepted) | `01a2062d-998c-7af6-b0f0-4758e73ece82` |
 | Customer Service | `customer-service@sparkling-standard.com` | 200 | sent (provider accepted) | `01a2062d-9b2e-797e-97cc-d807d9e6e9f0` |

@@ -47,7 +47,7 @@ encryption requirement.
 Production `admin_settings` has no stored Communications override, so approved default routing is
 active. Controlled test messages were sent through the production Worker to:
 
-- `bookings@sparkling-standard.com`
+- `booking@sparkling-standard.com`
 - `admin@sparkling-standard.com`
 - `owner@sparkling-standard.com`
 - `customer-service@sparkling-standard.com`

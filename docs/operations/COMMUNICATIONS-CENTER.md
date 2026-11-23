@@ -11,7 +11,7 @@ These are fixed architecture. The interface may not change them.
 
 | Department | Address |
 |---|---|
-| Bookings | `bookings@sparkling-standard.com` |
+| Bookings | `booking@sparkling-standard.com` |
 | Customer Service | `customer-service@sparkling-standard.com` |
 | Billing | `billing@sparkling-standard.com` |
 | Hiring | `hiring@sparkling-standard.com` |

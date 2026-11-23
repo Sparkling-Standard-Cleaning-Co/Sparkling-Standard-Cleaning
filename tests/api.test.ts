@@ -287,7 +287,7 @@ test('lead: a successful department delivery sends exactly one branded customer 
     assert.equal(resendCalls.length, 3, 'Bookings and Owner notices plus one customer confirmation');
     const department = resendCalls.find((call) => {
       const body = JSON.parse(String(call.init?.body)) as { to?: string[] };
-      return body.to?.includes('bookings@sparkling-standard.com');
+      return body.to?.includes('booking@sparkling-standard.com');
     });
     assert.ok(department, 'the operational notice reaches Bookings');
     const customer = resendCalls.find((call) => {
@@ -421,7 +421,7 @@ test('lead: an acknowledged recurring request tells the department the first vis
     assert.equal(response.status, 200);
     const department = calls.find((call) => {
       const body = JSON.parse(String(call.init?.body)) as { to?: string[] };
-      return call.url.includes('api.resend.com') && body.to?.includes('bookings@sparkling-standard.com');
+      return call.url.includes('api.resend.com') && body.to?.includes('booking@sparkling-standard.com');
     });
     assert.ok(department, 'the operational notice reaches Bookings');
     const body = JSON.parse(String(department.init?.body)) as { text?: string };

@@ -5,7 +5,7 @@
 | Purpose | Address | Sender / reply behaviour |
 | --- | --- | --- |
 | Public contact, general inquiries, complaints and re-clean requests | `customer-service@sparkling-standard.com` | Public website and customer-service correspondence |
-| Booking requests, confirmations, reminders, rescheduling, cancellations and recurring scheduling | `bookings@sparkling-standard.com` | Booking confirmation and booking-related reply-to |
+| Booking requests, confirmations, reminders, rescheduling, cancellations and recurring scheduling | `booking@sparkling-standard.com` | Booking confirmation and booking-related reply-to |
 | Recruitment and applicants | `hiring@sparkling-standard.com` | Public careers link and subject; display name `Sparkling Standard | Hiring Team` |
 | Billing, invoices, receipts, payment reminders and refund correspondence | `billing@sparkling-standard.com` | Invoice and receipt reply-to address; not the general public support address |
 | Internal administration and vendor correspondence | `admin@sparkling-standard.com` | Owner/staff correspondence; not the default public support address |
@@ -26,7 +26,7 @@ The mailbox existence and Google Workspace account settings were not verified fr
 ## Owner setup
 
 1. Confirm all six department mailboxes/aliases exist and are able to receive mail.
-2. Confirm the Google Workspace sending/alias configuration for `bookings@`, `customer-service@`, `billing@`, `hiring@` and `admin@`.
+2. Confirm the Google Workspace sending/alias configuration for `booking@`, `customer-service@`, `billing@`, `hiring@` and `admin@`.
 3. Confirm the Resend sender domain is verified. Set `RESEND_REPLY_TO=customer-service@sparkling-standard.com` and `RESEND_BILLING_REPLY_TO=billing@sparkling-standard.com`.
 4. Confirm `OWNER_NOTIFICATION_EMAIL=owner@sparkling-standard.com`.
 5. If Google Workspace sends as the public addresses, add the required SPF include and DKIM records only after checking the current records. Do not overwrite the existing Google records.

@@ -8,11 +8,11 @@
 
 ## Department routing
 
-Added `bookings@sparkling-standard.com` as the sixth departmental address.
+Added `booking@sparkling-standard.com` as the sixth departmental address.
 
 | Purpose | Address |
 | --- | --- |
-| Booking request, confirmation, reminders, rescheduling, cancellations, recurring scheduling | `bookings@sparkling-standard.com` |
+| Booking request, confirmation, reminders, rescheduling, cancellations, recurring scheduling | `booking@sparkling-standard.com` |
 | Billing, invoices, receipts, payment/refund correspondence | `billing@sparkling-standard.com` |
 | Public contact, general inquiries, complaints, re-cleans | `customer-service@sparkling-standard.com` |
 | Careers, applications, resumes, interviews | `hiring@sparkling-standard.com` |
@@ -54,7 +54,7 @@ Observed:
 
 Not verified from this environment:
 
-- Existence or send-as permission for `bookings@`, `billing@`, `customer-service@`, `hiring@` or `admin@`.
+- Existence or send-as permission for `booking@`, `billing@`, `customer-service@`, `hiring@` or `admin@`.
 - Resend domain verification and delivery.
 - Stripe automatic receipt/email settings.
 - Customer self-service billing portal.

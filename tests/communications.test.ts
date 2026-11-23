@@ -139,7 +139,7 @@ test('operational notifications resolve department inboxes, send once per inbox 
       relatedType: 'lead',
       relatedId: 'lead_1',
     });
-    assert.deepEqual(booking.recipients, ['bookings@sparkling-standard.com', 'owner@sparkling-standard.com']);
+    assert.deepEqual(booking.recipients, ['booking@sparkling-standard.com', 'owner@sparkling-standard.com']);
     assert.deepEqual(booking.departments, ['bookings', 'owner']);
     assert.equal(booking.sent, 2);
 
@@ -313,7 +313,7 @@ test('delivery health separates application failures from delivery proof', async
   await recordNotificationDelivery(db, {
     eventKey: 'booking_confirmation',
     department: 'bookings',
-    recipient: 'bookings@sparkling-standard.com',
+    recipient: 'booking@sparkling-standard.com',
     status: 'failed',
     errorCode: 'http_422',
   });
