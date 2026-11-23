@@ -7,6 +7,10 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  findInternalContentProblems,
+  prepareTemplateRevisionContent,
+} from '../src/lib/documents/rich-text.ts';
 
 const ROOT = process.cwd();
 const LOGO = path.join(ROOT, 'public', 'brand', 'sparkling-standard-circular-logo-1024.png');
@@ -118,8 +122,15 @@ test('the 27 active masters are complete, versioned and identify the approved br
   for (const file of active) {
     const text = fs.readFileSync(file, 'utf8');
     assert.match(text, /\*\*Version:\*\*\s*2026-11-22\.remediation\.v1/, `${path.basename(file)} version`);
-    assert.match(text, /\*\*Status:\*\*\s*Owner review draft/, `${path.basename(file)} status`);
     assert.match(text, /Sparkling Standard/, `${path.basename(file)} brand`);
+    const prepared = prepareTemplateRevisionContent(text, '2026-11-23.customer-release.v1');
+    assert.equal(
+      findInternalContentProblems(prepared.content).length,
+      0,
+      `${path.basename(file)} must render without internal review notices`,
+    );
+    assert.match(prepared.content, /Version 2026-11-23\.customer-release\.v1/);
+    assert.doesNotMatch(prepared.content, /OWNER REVIEW DRAFT|not effective until approved/i);
   }
   for (const file of [
     'LEG-AB060020.md',

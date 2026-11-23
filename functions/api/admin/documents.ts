@@ -10,6 +10,7 @@ import {
   createBundle,
   createSigningRequest,
   createTemplate,
+  createTemplateRevision,
   countersignSigningRequest,
   documentSubjectBranch,
   duplicateBundle,
@@ -24,6 +25,7 @@ import {
   listSigningRequests,
   listTemplates,
   previewPacket,
+  publishTemplateRevision,
   removeBundleItem,
   restoreTemplate,
   retireTemplate,
@@ -35,6 +37,7 @@ import {
   verifySignature,
   type DocumentSubjectContext,
 } from '../../../src/lib/documents/service.ts';
+import { findInternalContentProblems } from '../../../src/lib/documents/rich-text.ts';
 import {
   executedDocumentEmailStatus,
   processExecutedDocumentOutbox,
@@ -431,6 +434,55 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       return json({ ok: true, ...created });
     }
 
+    if (action === 'create_revision') {
+      ownerOnly(actor);
+      const created = await createTemplateRevision(
+        db,
+        actor.id,
+        text(body.templateId, 100),
+        {
+          ...(text(body.version, 40) ? { version: text(body.version, 40) } : {}),
+          ...(text(body.title, 200) ? { title: text(body.title, 200) } : {}),
+        },
+      );
+      return json({ ok: true, ...created });
+    }
+    if (action === 'compare_revision') {
+      ownerOnly(actor);
+      const next = await getTemplate(db, text(body.templateId, 100));
+      if (!next) return json({ ok: false, error: 'template_not_found' }, 404);
+      const previous = next.supersedes_template_id
+        ? await getTemplate(db, String(next.supersedes_template_id))
+        : null;
+      return json({
+        ok: true,
+        previous: previous
+          ? {
+              id: previous.id,
+              title: previous.title,
+              version: previous.version,
+              status: previous.status,
+              content: String(previous.content_text ?? ''),
+              contentProblems: findInternalContentProblems(String(previous.content_text ?? '')),
+            }
+          : null,
+        next: {
+          id: next.id,
+          title: next.title,
+          version: next.version,
+          status: next.status,
+          content: String(next.content_text ?? ''),
+          contentProblems: findInternalContentProblems(String(next.content_text ?? '')),
+        },
+      });
+    }
+    if (action === 'publish_revision') {
+      ownerOnly(actor);
+      const templateId = text(body.templateId, 100);
+      const published = await publishTemplateRevision(db, actor.id, templateId);
+      await notifyDocumentRevision(context, db, actor.id, templateId).catch(() => undefined);
+      return json({ ok: true, ...published });
+    }
     if (action === 'create_template') {
       ownerOnly(actor);
       const created = await createTemplate(db, actor.id, {
@@ -605,6 +657,28 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const existingRequest = (existingDetails.request ?? {}) as Record<string, unknown>;
       if (!branchAllowed(actor, existingRequest.branch_id)) {
         return json({ ok: false, error: 'forbidden' }, 403);
+      }
+      let snapshot: Array<Record<string, unknown>> = [];
+      try {
+        const parsed = JSON.parse(String(existingRequest.requirement_snapshot_json ?? '[]')) as unknown;
+        if (Array.isArray(parsed)) snapshot = parsed as Array<Record<string, unknown>>;
+      } catch {
+        snapshot = [];
+      }
+      if (
+        snapshot.some((item) =>
+          findInternalContentProblems(String(item.contentText ?? '')).length > 0,
+        )
+      ) {
+        return json(
+          {
+            ok: false,
+            error: 'document_content_internal_notice',
+            message:
+              'This request contains an internal review notice and cannot be resent. Create a new request from the corrected approved templates.',
+          },
+          409,
+        );
       }
       const rotated = await rotateSigningRequestToken(db, actor.id, requestId);
       const recipient = text(body.email, 200) || rotated.email;

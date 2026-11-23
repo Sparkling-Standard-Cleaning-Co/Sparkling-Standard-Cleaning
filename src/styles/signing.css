@@ -655,3 +655,44 @@
     scroll-behavior: auto !important;
   }
 }
+
+.signing-doc-text .doc-title {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: clamp(1.35rem, 3vw, 1.9rem);
+  line-height: 1.2;
+  color: #5f2d35;
+  margin: 0 0 .75rem;
+}
+
+.signing-doc-text .doc-heading {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.15rem;
+  line-height: 1.3;
+  color: #6d343c;
+  margin: 1.5rem 0 .5rem;
+  padding-bottom: .3rem;
+  border-bottom: 1px solid #eadfd3;
+}
+
+.signing-doc-text p {
+  margin: 0 0 .85rem;
+}
+
+.signing-doc-text ul {
+  margin: 0 0 1rem;
+  padding-left: 1.35rem;
+}
+
+.signing-doc-text li {
+  margin: .35rem 0;
+}
+
+.signing-doc-text .doc-meta {
+  color: #756963;
+  font-size: .86rem;
+  margin-bottom: 1.2rem;
+}
+
+.signing-doc-text strong {
+  color: #4a2e33;
+}

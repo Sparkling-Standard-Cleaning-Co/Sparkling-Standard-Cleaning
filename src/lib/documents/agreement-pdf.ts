@@ -20,6 +20,7 @@ import {
   text,
   wrap,
 } from '../pdf/pdf-core.ts';
+import { parseDocumentBlocks, plainDocumentText, stripInternalDraftNotices } from './rich-text.ts';
 
 export interface AgreementPdfSignature {
   title: string;
@@ -96,6 +97,32 @@ export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array 
     }
   };
 
+  const writeDocumentContent = (value: string): void => {
+    const blocks = parseDocumentBlocks(stripInternalDraftNotices(value).content);
+    if (blocks.length === 0) {
+      write(value || 'Document content is retained in the signing record.');
+      return;
+    }
+    for (const block of blocks) {
+      const content = plainDocumentText(block.text);
+      if (!content) continue;
+      if (block.type === 'title') {
+        write(content, LEFT, 13.5, true, ROSE, 18);
+      } else if (block.type === 'heading') {
+        ensure(24);
+        y -= 4;
+        write(content, LEFT, HEAD_SIZE, true, ROSE, 15);
+      } else if (block.type === 'metadata') {
+        write(content, LEFT, 8.4, false, MUTED, 11.5);
+      } else if (block.type === 'bullet') {
+        write(`• ${content}`, LEFT + 8, BODY_SIZE, false, INK, LEADING, RIGHT - LEFT - 8);
+      } else {
+        write(content, LEFT, BODY_SIZE, false, INK);
+        y -= 2;
+      }
+    }
+  };
+
   commands += line('SPARKLING STANDARD', LEFT, y, 15, true, ROSE);
   y -= 20;
   commands += line('Executed Agreement and Signature Record', LEFT, y, 19, true, INK);
@@ -160,7 +187,7 @@ export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array 
         'This document was signed as a separate PDF template. The exact template SHA-256 above is the signed content. The original PDF is retained privately and forms part of this record.',
       );
     } else {
-      write(signature.contentText || 'Document content is retained in the signing record.');
+      writeDocumentContent(signature.contentText || 'Document content is retained in the signing record.');
     }
     ensure(70);
     y -= 6;
