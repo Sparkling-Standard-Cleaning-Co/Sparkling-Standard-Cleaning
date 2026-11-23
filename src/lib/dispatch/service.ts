@@ -431,6 +431,78 @@ export async function approveDispatchRecommendation(
   }
 }
 
+export async function manualAssignDispatchJob(
+  env: DispatchEnv,
+  db: D1Database,
+  actor: AdminActor,
+  input: { branchId: string; appointmentId: string; teamMemberIds: string[] },
+): Promise<{ applied: boolean; calendar: string; employeeNames: string[] }> {
+  appointmentScope(actor, input.branchId);
+  const ids = [...new Set(input.teamMemberIds.filter(Boolean))];
+  if (ids.length === 0 || ids.length > bookingConfig.maxCrewSize) {
+    throw new AdminAuthError(400, 'crew_selection_invalid');
+  }
+  const job = await loadDispatchJob(db, input.branchId, input.appointmentId);
+  if (!job) throw new AdminAuthError(404, 'appointment_not_found');
+  if (!['pending', 'confirmed'].includes(job.status)) {
+    throw new AdminAuthError(409, 'appointment_not_assignable');
+  }
+  if (job.assignedIds.length > 0) {
+    throw new AdminAuthError(409, 'appointment_already_assigned');
+  }
+  const settingsRow = await loadDispatchSettings(db, input.branchId);
+  const employees = await loadDispatchEmployees(
+    db,
+    input.branchId,
+    localDateKey(job.start, job.timeZone),
+    localDateKey(new Date(Date.parse(job.start) + 30 * 86_400_000).toISOString(), job.timeZone),
+  );
+  const evaluation = await evaluate(job, employees, dispatchSettings(settingsRow), env);
+  const candidate = evaluation.feasible.find(
+    (entry) => entry.employeeIds.length === ids.length && ids.every((id) => entry.employeeIds.includes(id)),
+  );
+  if (!candidate) {
+    const blocked = evaluation.blocked
+      .filter((entry) => entry.employeeIds.some((id) => ids.includes(id)))
+      .flatMap((entry) => entry.reasons)
+      .slice(0, 4);
+    throw new AdminAuthError(409, blocked[0] ?? 'crew_not_feasible');
+  }
+  const decisionId = await persistDecision(db, {
+    branchId: input.branchId,
+    appointmentId: job.id,
+    kind: 'manual_assignment',
+    status: 'proposed',
+    currentTeam: [],
+    chosenTeam: candidate.employeeIds,
+    candidates: evaluation.feasible.map(candidateSummary),
+    constraints: evaluation.blocked,
+    score: { total: candidate.score.total, explanation: candidate.explanation },
+    reason: 'Manual assignment by dispatcher',
+    scheduleVersion: job.updatedAt,
+    calendarStatus: 'pending',
+    actorUserId: auditUserId(actor),
+  });
+  const applied = await applyAssignment(db, input.branchId, job, candidate, decisionId);
+  if (!applied) {
+    await updateDecisionStatus(db, decisionId, 'superseded', { reason: 'The appointment changed before assignment.' });
+    throw new AdminAuthError(409, 'appointment_changed');
+  }
+  const calendar = await syncAppointmentCalendarResources(env, db, job.id).then(() => 'synced').catch(() => 'failed');
+  await updateDecisionStatus(db, decisionId, 'applied', {
+    calendarStatus: calendar,
+    chosenTeam: candidate.employeeIds,
+  });
+  await audit(db, {
+    actorUserId: auditUserId(actor),
+    action: 'dispatch.manual_assigned',
+    entityType: 'appointment',
+    entityId: job.id,
+    detail: candidate.employeeIds.join(','),
+  });
+  return { applied: true, calendar, employeeNames: candidate.employeeNames };
+}
+
 export async function decideRecommendation(
   db: D1Database,
   actor: AdminActor,

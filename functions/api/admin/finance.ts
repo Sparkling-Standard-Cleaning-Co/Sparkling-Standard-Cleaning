@@ -25,6 +25,7 @@ import { buildAdminInvoice } from '../../../src/lib/invoicing/admin-invoice.ts';
 import { buildInvoicePdf } from '../../../src/lib/invoicing/pdf.ts';
 import { buildInvoiceEmail, sendInvoiceEmail, type InvoiceEmailEnv } from '../../../src/lib/invoicing/invoice-email.ts';
 import { deliverInvoiceReceipt } from '../../../src/lib/invoicing/invoice-receipt.ts';
+import { invoiceReviewInvitation, reviewContextForInvoice } from '../../../src/lib/reviews/service.ts';
 import { DEPARTMENT_ADDRESSES, readCommunicationSettings } from '../../../src/lib/admin/communications.ts';
 
 interface Env extends AdminDbEnv, StripeBillingEnv, InvoiceEmailEnv {}
@@ -130,9 +131,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const result = await getInvoice(db, actor, invoiceId);
       if (!result) return json({ ok: false, error: 'invoice_not_found' }, 404);
       const invoice = result.invoice as Record<string, unknown>;
+      const review = invoiceReviewInvitation(await reviewContextForInvoice(db, invoiceId).catch(() => null));
       const document = buildAdminInvoice({
         invoice,
         lines: (result.lines as Array<Record<string, unknown>>) ?? [],
+        ...(review ? { review } : {}),
       });
       const email = buildInvoiceEmail(document.data, document.totals);
       return json({
@@ -173,9 +176,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           );
         }
       }
+      const review = invoiceReviewInvitation(await reviewContextForInvoice(db, invoiceId).catch(() => null));
       const document = buildAdminInvoice({
         invoice,
         lines: (result.lines as Array<Record<string, unknown>>) ?? [],
+        ...(review ? { review } : {}),
       });
       const pdf = buildInvoicePdf(document.data, document.totals);
       const communication = await readCommunicationSettings(db).catch(() => null);

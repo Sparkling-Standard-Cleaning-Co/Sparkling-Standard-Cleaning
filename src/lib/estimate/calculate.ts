@@ -183,18 +183,32 @@ export function calculateEstimate(
     return computeCore(input, context);
   }
 
-  const firstVisit = computeCore(
-    { ...input, serviceType: 'deep', frequency: 'one_time' },
-    {
-      ...context,
-      promotions: {
-        ...context.promotions,
-        // Campaign eligibility follows the customer's actual arrangement
-        // (e.g. standard + weekly), not the internal first-visit shape.
-        campaignArrangement: { serviceType: input.serviceType, frequency: input.frequency },
-      },
+  const firstVisitContext: EstimateContext = {
+    ...context,
+    promotions: {
+      ...context.promotions,
+      // Campaign eligibility follows the customer's actual arrangement
+      // (e.g. standard + weekly), not the internal first-visit shape.
+      campaignArrangement: { serviceType: input.serviceType, frequency: input.frequency },
     },
+  };
+  const firstVisitNormal = computeCore(
+    { ...input, serviceType: 'deep', frequency: 'one_time' },
+    firstVisitContext,
   );
+  // A claimed campaign owns the eligible first visit. Community Support may
+  // still apply to separately eligible ongoing visits (evaluated below), but
+  // it never displaces a valid campaign on the same first-visit component.
+  let firstVisit = firstVisitNormal;
+  if (input.supportiveEligible === true && context.promotions?.claimedCampaignCode) {
+    const campaignFirst = computeCore(
+      { ...input, supportiveEligible: false, serviceType: 'deep', frequency: 'one_time' },
+      firstVisitContext,
+    );
+    if (campaignFirst.status === 'estimated' && campaignFirst.pricing.discount?.source === 'campaign') {
+      firstVisit = campaignFirst;
+    }
+  }
   if (firstVisit.status !== 'estimated') {
     // The custom-confirmation gates depend on the home, extras and travel —
     // not on service/frequency — so the ongoing rhythm hits the same

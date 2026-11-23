@@ -19,6 +19,7 @@ import {
   getSignatureForDownload,
   getSigningRequestDetails,
   getTemplate,
+  loadDocumentVariables,
   listBundleItems,
   listBundles,
   listDocumentUpdates,
@@ -37,13 +38,19 @@ import {
   verifySignature,
   type DocumentSubjectContext,
 } from '../../../src/lib/documents/service.ts';
-import { findInternalContentProblems } from '../../../src/lib/documents/rich-text.ts';
+import {
+  findInternalContentProblems,
+  htmlDocumentPlainText,
+  isRichDocumentHtml,
+} from '../../../src/lib/documents/rich-text.ts';
 import {
   executedDocumentEmailStatus,
   processExecutedDocumentOutbox,
   queueExecutedDocumentEmail,
 } from '../../../src/lib/documents/notifications.ts';
 import { readReminderSettings, saveReminderSettings } from '../../../src/lib/documents/reminders.ts';
+import { pricingSnapshotFromAdmin } from '../../../src/lib/documents/pricing-snapshot.ts';
+import { displayVersion } from '../../../src/lib/documents/version-labels.ts';
 
 interface DocumentsBucket {
   get?: (key: string) => Promise<{
@@ -167,8 +174,8 @@ async function notifyDocumentRevision(
     'A new legal document revision was created and is waiting for owner review.',
     '',
     `Document: ${String(template.title ?? '')}`,
-    `New version: ${String(template.version ?? '')}`,
-    previous ? `Previous version: ${String(previous.version ?? '')}` : 'Previous version: none linked',
+    `New version: ${displayVersion(template.version)}`,
+    previous ? `Previous version: ${displayVersion(previous.version)}` : 'Previous version: none linked',
     `Status: ${String(template.status ?? '')}`,
     '',
     'Open Operations -> Documents & Agreements -> Versions & Updates to review the affected packets and customers.',
@@ -462,7 +469,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
               title: previous.title,
               version: previous.version,
               status: previous.status,
-              content: String(previous.content_text ?? ''),
+              content: isRichDocumentHtml(String(previous.content_text ?? ''))
+                ? htmlDocumentPlainText(String(previous.content_text ?? ''))
+                : String(previous.content_text ?? ''),
               contentProblems: findInternalContentProblems(String(previous.content_text ?? '')),
             }
           : null,
@@ -471,7 +480,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           title: next.title,
           version: next.version,
           status: next.status,
-          content: String(next.content_text ?? ''),
+          content: isRichDocumentHtml(String(next.content_text ?? ''))
+            ? htmlDocumentPlainText(String(next.content_text ?? ''))
+            : String(next.content_text ?? ''),
           contentProblems: findInternalContentProblems(String(next.content_text ?? '')),
         },
       });
@@ -600,11 +611,32 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       if (!branchAllowed(actor, await documentSubjectBranch(db, documentContext))) {
         return json({ ok: false, error: 'forbidden' }, 403);
       }
+      const explicitVariables = adminVariables(body);
+      const baseVariables = await loadDocumentVariables(db, documentContext).catch(
+        () => ({}) as Record<string, string>,
+      );
+      const variables = { ...baseVariables, ...explicitVariables };
+      const hasPricing = ['price.summary', 'price.line_items', 'price.tax', 'price.discount'].some(
+        (key) => Boolean(variables[key]?.trim()),
+      );
+      const pricingSnapshot = hasPricing
+          ? pricingSnapshotFromAdmin(variables, {
+            serviceCode: documentContext.serviceCode ?? '',
+            frequency: documentContext.frequency ?? '',
+            propertyAddress: variables['property.address'] ?? '',
+            serviceDate: variables['service.date'] ?? '',
+            arrivalWindow: variables['service.arrival_window'] ?? '',
+            scope: variables['service.scope'] ?? '',
+            addOns: variables['service.additions'] ?? '',
+            paymentTerms: variables['payment.terms'] ?? '',
+          })
+        : undefined;
       const created = await createSigningRequest(db, documentContext, {
         createdByAdminUserId: actor.id,
         ...(text(body.bundleId, 100) ? { bundleId: text(body.bundleId, 100) } : {}),
         ...(text(body.instructions, 2000) ? { instructions: text(body.instructions, 2000) } : {}),
-        ...(Object.keys(adminVariables(body)).length ? { variables: adminVariables(body) } : {}),
+        ...(Object.keys(variables).length ? { variables } : {}),
+        ...(pricingSnapshot ? { pricingSnapshot } : {}),
       });
       if (!created.required || !created.token) {
         return json({ ok: true, required: false, message: 'No active required documents in this packet.' });

@@ -301,3 +301,24 @@ booking request in `booking_payment_claims`.
   confirmed twice against one cleaning slot.
 
 The admin Overview links straight to open financial reconciliation issues.
+
+## Document-gated checkout price consistency (2026-11-23, local)
+
+Before a document-gated customer is sent to signing, `/api/estimate-checkout`
+now verifies the current quote and builds a server-owned pricing snapshot from
+the same candidate amount used for Stripe. The snapshot is persisted on the
+signing request (`signing_requests.pricing_snapshot_json`, migration `0053`) and
+shown on the signing page's **Details & price** step, the executed copy and PDF,
+the admin signing-request detail, and the post-signing payment page.
+
+After every required signature is applied, the signing page redirects directly
+to `/estimate/payment-resume/` with the signing capability attached. The payment
+page displays the signed total and itemization, the signed-PDF download, the
+honest customer-email delivery status and customer-portal access before the
+single Stripe action. The server still recalculates the price and re-checks the
+document gate; a changed amount requires explicit acceptance and no charge is
+made until Stripe Checkout is completed.
+
+The malformed `` display was caused by mojibake in
+`functions/api/estimate-checkout.ts` and `src/scripts/facility-estimate.ts`; the
+affected strings are repaired and all money uses the shared US-dollar formatter.

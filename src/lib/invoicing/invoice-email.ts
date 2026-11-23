@@ -39,6 +39,11 @@ export function buildInvoiceEmail(
       ? `<p style="margin:0 0 18px;"><a href="${escapeHtml(data.paymentUrl)}" style="display:inline-block;background:#b15a6f;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:600;">Pay Invoice Securely</a></p>
          <p style="margin:0 0 18px;font-size:13px;color:#6f5f57;">Or copy this secure link: <a href="${escapeHtml(data.paymentUrl)}" style="color:#93475b;">${escapeHtml(data.paymentUrl)}</a></p>`
       : '';
+  const review =
+    data.review?.eligible && data.review.url && /^https:\/\//i.test(data.review.url)
+      ? `<p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:#4a3b40;">Thank you for choosing Sparkling Standard${data.review.branchName ? ` ${escapeHtml(data.review.branchName)}` : ''}. If you would like to share your experience, a Google review helps other neighbors find us. There is no obligation.</p>
+         <p style="margin:0 0 18px;"><a href="${escapeHtml(data.review.url)}" style="color:#93475b;">Leave a Google review</a></p>`
+      : '';
   const html = `<!doctype html>
 <html lang="en"><body style="margin:0;padding:0;background:#f9f3ed;font-family:'Helvetica Neue',Arial,sans-serif;color:#302429;">
   <div style="padding:28px 12px;">
@@ -50,6 +55,7 @@ export function buildInvoiceEmail(
       <p style="margin:0 0 18px;font-size:15px;line-height:1.65;">Your invoice <strong>${escapeHtml(data.invoiceNumber)}</strong> is attached as a PDF. The balance due is <strong>${escapeHtml(balance)}</strong>, due ${escapeHtml(due)}.</p>
       ${payLink}
       <p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:#4a3b40;">${escapeHtml(data.paymentTerms || 'Please reply to this email with any questions.')}</p>
+      ${review}
       <p style="margin:0;font-size:14px;line-height:1.65;color:#4a3b40;">Thank you for choosing Sparkling Standard Cleaning Co.! We appreciate the opportunity to care for your home and look forward to delivering Standards That Sparkle.</p>
       <p style="margin:22px 0 0;padding-top:14px;border-top:1px solid #e4d5c7;font-size:12px;line-height:1.6;color:#8c7a70;">${escapeHtml(data.contact.phone)} · ${escapeHtml(data.contact.email)} · ${escapeHtml(data.contact.website)}</p>
     </div>
@@ -64,6 +70,13 @@ export function buildInvoiceEmail(
     ...(data.paymentUrl && /^https:\/\//i.test(data.paymentUrl) ? ['', `Pay online: ${data.paymentUrl}`] : []),
     '',
     data.paymentTerms || 'Please reply to this email with any questions.',
+    ...(data.review?.eligible && data.review.url && /^https:\/\//i.test(data.review.url)
+      ? [
+          '',
+          `Thank you for choosing Sparkling Standard${data.review.branchName ? ` ${data.review.branchName}` : ''}. If you would like to share your experience, a Google review helps other neighbors find us. There is no obligation.`,
+          data.review.url,
+        ]
+      : []),
     '',
     'Thank you for choosing Sparkling Standard Cleaning Co.! We appreciate the opportunity to care for your home and look forward to delivering Standards That Sparkle.',
     data.contact.name,

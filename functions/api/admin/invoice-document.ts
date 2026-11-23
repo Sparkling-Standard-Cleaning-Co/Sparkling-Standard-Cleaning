@@ -3,6 +3,7 @@ import { AdminAuthError, requireActor } from '../../../src/lib/admin/operations.
 import { getInvoice } from '../../../src/lib/admin/billing.ts';
 import { buildAdminInvoice } from '../../../src/lib/invoicing/admin-invoice.ts';
 import { buildInvoicePdf } from '../../../src/lib/invoicing/pdf.ts';
+import { invoiceReviewInvitation, reviewContextForInvoice } from '../../../src/lib/reviews/service.ts';
 
 interface Env extends AdminDbEnv {}
 
@@ -22,9 +23,11 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     if (!id) return json({ ok: false, error: 'invoice_required' }, 400);
     const result = await getInvoice(db, actor, id);
     if (!result) return json({ ok: false, error: 'invoice_not_found' }, 404);
+    const review = invoiceReviewInvitation(await reviewContextForInvoice(db, id).catch(() => null));
     const document = buildAdminInvoice({
       invoice: result.invoice as Record<string, unknown>,
       lines: (result.lines as Array<Record<string, unknown>>) ?? [],
+      ...(review ? { review } : {}),
     });
     const pdf = buildInvoicePdf(document.data, document.totals);
     const filename = `${String((result.invoice as Record<string, unknown>).number ?? 'invoice').replace(/[^A-Za-z0-9._-]+/g, '-')}.pdf`;

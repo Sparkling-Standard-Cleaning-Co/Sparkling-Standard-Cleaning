@@ -7,6 +7,7 @@ import {
   approveDispatchRecommendation,
   decideRecommendation,
   dispatchDashboard,
+  manualAssignDispatchJob,
   retryDispatchCalendar,
   runDispatch,
   updateDispatchProfile,
@@ -89,6 +90,17 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'run_automatic') {
       const summary = await runDispatch(context.env as DispatchEnv, db, actor, { branchId, apply: true });
       return json({ ok: true, summary });
+    }
+    if (action === 'assign_job') {
+      const teamMemberIds = Array.isArray(body.teamMemberIds)
+        ? body.teamMemberIds.filter((value): value is string => typeof value === 'string')
+        : [];
+      const result = await manualAssignDispatchJob(context.env as DispatchEnv, db, actor, {
+        branchId,
+        appointmentId: text(body.appointmentId, 120),
+        teamMemberIds,
+      });
+      return json({ ok: true, ...result });
     }
     if (action === 'update_settings') {
       const settings = await updateDispatchSettings(db, actor, branchId, body);

@@ -11,6 +11,7 @@ import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 export function buildAdminInvoice(input: {
   invoice: Record<string, unknown>;
   lines: Array<Record<string, unknown>>;
+  review?: { url: string; eligible: boolean; branchName?: string };
 }): BuiltInvoice {
   const invoice = input.invoice;
   const customerName = [invoice.first_name, invoice.last_name].filter(Boolean).join(' ').trim();
@@ -65,6 +66,7 @@ export function buildAdminInvoice(input: {
       ? `Payment is due by ${formatInvoiceDate(dueDate)}.`
       : 'Please contact us to arrange payment.',
     ...(paymentUrl && /^https:\/\//i.test(paymentUrl) ? { paymentUrl } : {}),
+    ...(input.review ? { review: input.review } : {}),
     contact: {
       name: CUSTOMER_EMAIL_BUSINESS.name,
       phone: CUSTOMER_EMAIL_BUSINESS.phone ?? '',

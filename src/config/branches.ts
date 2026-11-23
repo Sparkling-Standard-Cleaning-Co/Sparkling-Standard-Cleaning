@@ -71,6 +71,8 @@ export interface BranchPublicConfig {
   readonly hoursLabel: string;
   readonly gbpStatus: 'not_created' | 'eligibility_review' | 'prepared' | 'submitted' | 'verified' | 'paused';
   readonly gbpUrl: string;
+  /** Official Google review link for this branch. Empty until the owner supplies one. */
+  readonly reviewUrl: string;
   readonly launchNote: string;
 }
 
@@ -86,7 +88,7 @@ const tampaZips = [
   '33715', '33716', '33744', '33755', '33756', '33759', '33760', '33761', '33762', '33763',
   '33764', '33765', '33767', '33770', '33771', '33772', '33773', '33774', '33776', '33777',
   '33778', '33781', '33782', '33785', '33786', '33809', '33810', '33849', '33860', '34610',
-  '34637', '34638', '34639', '34652', '34653', '34654', '34655', '34667', '34668', '34669',
+  '34609', '34637', '34638', '34639', '34652', '34653', '34654', '34655', '34667', '34668', '34669',
   '34677', '34679', '34681', '34683', '34684', '34685', '34688', '34689', '34690', '34691',
   '34695', '34698',
 ] as const;
@@ -137,6 +139,7 @@ export const branchConfigs: Readonly<Record<BranchId, BranchPublicConfig>> = {
     hoursLabel: sevenDays,
     gbpStatus: 'verified',
     gbpUrl: 'https://www.google.com/search?kgmid=/g/11zz5t1059&hl=en-US&q=Sparkling+Standard+Cleaning+Co.',
+    reviewUrl: 'https://g.page/r/CXAcv1Pp7OI2ECE/review',
     launchNote: '',
   },
   [BRANCH_TAMPA]: {
@@ -178,6 +181,7 @@ export const branchConfigs: Readonly<Record<BranchId, BranchPublicConfig>> = {
     hoursLabel: 'By appointment after launch',
     gbpStatus: 'not_created',
     gbpUrl: '',
+    reviewUrl: '',
     launchNote:
       'Tampa Bay is preparing for a future launch. No online booking, payment, published pricing or local Google Business Profile is active yet.',
   },

@@ -69,6 +69,7 @@ function freshDb(): TestD1 {
     '0026_pricing_control.sql',
     '0040_branch_topology.sql',
     '0042_branch_origins.sql',
+    '0055_branch_calendars_reviews.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join(process.cwd(), 'migrations', file), 'utf8'));
   }

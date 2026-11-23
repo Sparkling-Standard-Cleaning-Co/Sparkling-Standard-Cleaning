@@ -3,7 +3,7 @@ import { hashToken } from './auth.ts';
 import { zonedTimeToUtc } from '../booking/time.ts';
 import { bookingConfig } from '../../config/booking.ts';
 import { isUsableLatLng } from '../travel/server-routing.ts';
-import { resolveServiceBranch } from '../branches/registry.ts';
+import { resolveServiceBranchStrict } from '../branches/registry.ts';
 
 function storedCoordinates(latValue: unknown, lngValue: unknown): { lat: number; lng: number } | null {
   if (typeof latValue !== 'string' && typeof latValue !== 'number') return null;
@@ -54,12 +54,13 @@ export async function persistLeadSubmission(
   const organization = (fields.organization ?? '').trim();
   if (!email && !phone) return null;
 
-  const branch = await resolveServiceBranch(db, {
+  const resolution = await resolveServiceBranchStrict(db, {
     requestedBranchId: (fields.branch_id ?? '').trim() || null,
     zip: fields.zip ?? null,
     state: fields.address_state ?? null,
   });
-  const branchId = branch.id;
+  if (!resolution.branch) return null;
+  const branchId = resolution.branch.id;
 
   const idempotencyKey =
     (fields.quote_reference ?? '').trim() ||

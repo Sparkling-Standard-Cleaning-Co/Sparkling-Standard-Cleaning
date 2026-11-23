@@ -8,6 +8,7 @@ import {
   getExecutedAgreementPdf,
   getSigningRequestByToken,
   loadDocumentVariables,
+  resolveRequestPricingSnapshot,
   signSigningRequest,
   type DocumentSubjectContext,
   type RequirementSnapshot,
@@ -22,9 +23,12 @@ import {
   resolveSigningDownload,
 } from '../../src/lib/documents/signing-download.ts';
 import {
+  customerExecutedEmailStatus,
   processExecutedDocumentOutbox,
   queueExecutedDocumentEmail,
+  sendCustomerExecutedCopy,
 } from '../../src/lib/documents/notifications.ts';
+import { formatPricingMoney } from '../../src/lib/documents/pricing-snapshot.ts';
 import { autoConfirmPaidBooking } from '../../src/lib/booking/auto-confirm.ts';
 import type { BookingEnv } from '../../src/lib/booking/service.ts';
 import { readCheckoutIntent } from '../../src/lib/documents/checkout-intent.ts';
@@ -286,6 +290,10 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       bundleCode: request.bundle_code,
       subjectType: request.subject_type,
     });
+    const pricing = await resolveRequestPricingSnapshot(db, request as unknown as Record<string, unknown>).catch(
+      () => null,
+    );
+    const customerEmailStatus = await customerExecutedEmailStatus(db, String(request.id)).catch(() => null);
     let customerFieldValues: Record<string, string> = {};
     try {
       const storedFields = JSON.parse(
@@ -316,14 +324,19 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       context: {
         customerName: variables['customer.legal_name'] ?? '',
         customerEmail: variables['customer.email'] ?? '',
-        propertyAddress: variables['property.address'] ?? '',
+        propertyAddress: pricing?.propertyAddress || variables['property.address'] || '',
         bookingReference: variables['booking.reference'] ?? '',
-        serviceCode: variables['service.code'] ?? '',
-        serviceDate: variables['service.date'] ?? '',
-        arrivalWindow: variables['service.arrival_window'] ?? '',
-        priceSummary: variables['price.summary'] ?? '',
-        paymentTerms: variables['payment.terms'] ?? '',
+        serviceCode: pricing?.serviceCode || variables['service.code'] || '',
+        serviceLabel: pricing?.serviceLabel ?? '',
+        serviceDate: pricing?.serviceDate || variables['service.date'] || '',
+        arrivalWindow: pricing?.arrivalWindow || variables['service.arrival_window'] || '',
+        priceSummary: pricing
+          ? formatPricingMoney(pricing.totalCents) || variables['price.summary'] || ''
+          : variables['price.summary'] || '',
+        paymentTerms: pricing?.paymentTerms || variables['payment.terms'] || '',
       },
+      ...(pricing ? { pricing } : {}),
+      ...(customerEmailStatus ? { customerEmailStatus } : {}),
       customerFields: {
         definitions: fieldDefinitions,
         values: customerFieldValues,
@@ -384,6 +397,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     });
     if (result.status === 'signed') {
       const executedPdf = await storeExecutedPdf(context.env, db, result.requestId).catch(() => false);
+      const customerEmail = await sendCustomerExecutedCopy(db, context.env, result.requestId).catch(() => ({
+        status: 'failed' as const,
+        reason: 'send_failed',
+      }));
       await queueExecutedDocumentEmail(db, result.requestId).catch(() => undefined);
       await processExecutedDocumentOutbox(db, context.env, {
         requestId: result.requestId,
@@ -393,7 +410,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         db,
         result.requestId,
       ).catch(() => 'pending' as const);
-      return json({ ok: true, ...result, executedPdf, bookingStatus });
+      return json({ ok: true, ...result, executedPdf, bookingStatus, customerEmail });
     }
     return json({ ok: true, ...result });
   } catch (error) {

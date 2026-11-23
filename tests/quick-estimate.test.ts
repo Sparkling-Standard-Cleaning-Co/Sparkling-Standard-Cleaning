@@ -168,8 +168,11 @@ test('Quick Estimates save, list, assign, discard and enforce branch scope', asy
   assert.equal(record?.total_cents, saved.quote.totalCents);
   assert.equal(record?.pricing_version, saved.quote.pricingVersion);
   assert.match(record?.quote_json ?? '', /"pricingVersion"/);
+  assert.match(saved.estimateNumber, /^EST-\d{4}-\d{4}$/);
+  assert.equal(record?.estimate_number, saved.estimateNumber);
   const listed = await listQuickEstimates(f.db, f.actor, { q: '1 Test Way' });
   assert.equal(listed.length, 1);
+  assert.equal(listed[0]?.estimate_number, saved.estimateNumber);
 
   const manager: AdminActor = { ...f.actor, id: 'manager-quick', role: 'manager', branchId: 'branch_pensacola' };
   f.db.raw

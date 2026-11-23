@@ -6,7 +6,7 @@ import {
   requestIdForHold,
   updatePendingBookingRequest,
 } from './requests.ts';
-import { createCalendarEvent, findCalendarEventByReference } from './google-calendar.ts';
+import { calendarEnvForBranchWithDb, createCalendarEvent, findCalendarEventByReference } from './google-calendar.ts';
 import { writeLedgerJson } from '../payments/ledger.ts';
 import { commitConfirmedBooking, type CommitmentInput } from './commitment.ts';
 import {
@@ -176,6 +176,9 @@ export async function autoConfirmPaidBooking(
     date: hold.date,
     durationMinutes: hold.durationMinutes,
     destination: hold.destination,
+    ...(hold.branchId === 'branch_pensacola' || hold.branchId === 'branch_tampa'
+      ? { branchId: hold.branchId }
+      : {}),
     ignoreHoldId: hold.id,
   });
   if (!availability.ok) return { ok: false, reason: availability.reason };
@@ -186,16 +189,18 @@ export async function autoConfirmPaidBooking(
     return { ok: false, reason: 'slot_unavailable' };
   }
 
-  const existingEventId = await findCalendarEventByReference(env, hold.reference);
+  const calendarEnv = await calendarEnvForBranchWithDb(env, env.DB, hold.branchId ?? 'branch_pensacola');
+  if (!calendarEnv) return { ok: false, reason: 'calendar_not_configured' };
+  const existingEventId = await findCalendarEventByReference(calendarEnv, hold.reference);
   let eventId = existingEventId;
   if (!eventId) {
-    const created = await createCalendarEvent(env, {
+    const created = await createCalendarEvent(calendarEnv, {
       summary: `Sparkling Standard Cleaning - ${hold.reference || 'Booking'}`,
       description: `Paid booking confirmed automatically for request ${hold.reference || 'unknown'}. Hold ${hold.id}. Resources: ${exact.resourceIds.join(', ')}.`,
       location: hold.locationText,
       start: hold.start,
       end: hold.end,
-      timeZone: bookingConfig.timeZone,
+      timeZone: availability.timeZone,
       reference: hold.reference,
       resourceIds: exact.resourceIds,
     });

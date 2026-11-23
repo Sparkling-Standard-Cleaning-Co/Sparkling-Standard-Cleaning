@@ -44,8 +44,10 @@ test('the owner can review a revision and prefill the existing composer', async 
     {
       templateId: 'doc_revision_1',
       title: 'Residential Deep Cleaning Agreement',
-      newVersion: '1.1',
-      previousVersion: '1.0',
+      newVersion: '2026-11-23.customer-release.v1',
+      newVersionLabel: 'Version 1.1',
+      previousVersion: '2026-11-22.remediation.v1',
+      previousVersionLabel: 'Version 1.0',
       status: 'owner_review_required',
       review: { acknowledgedAt: null, acknowledgedByAdminUserId: null, materialChange: null, note: '' },
       affectedPackets: [
@@ -117,18 +119,23 @@ test('the owner can review a revision and prefill the existing composer', async 
     await updatesCard.getByText('Residential Deep Cleaning Agreement').waitFor({ state: 'visible' });
     assert.match((await updatesCard.textContent()) ?? '', /Owner review required/);
     assert.match((await updatesCard.textContent()) ?? '', /1 still need the new version/);
+    assert.match((await updatesCard.textContent()) ?? '', /Version 1\.0/);
+    assert.match((await updatesCard.textContent()) ?? '', /Version 1\.1/);
+    assert.doesNotMatch((await updatesCard.textContent()) ?? '', /customer-release|remediation/i);
 
     await updatesCard.getByText(/Re-signing queue/).click();
     await updatesCard.getByRole('button', { name: /Use in composer/i }).click();
     assert.equal(await page.locator('[data-document-send] input[name="customerId"]').inputValue(), 'cust_1');
     assert.equal(await page.locator('[data-document-send] select[name="bundleId"]').inputValue(), 'bundle_customer_deep');
 
+    await page.locator('[data-document-update-note="doc_revision_1"]').fill('Updated the cancellation notice and corrected payment timing.');
     await updatesCard.getByRole('button', { name: /Acknowledge material change/i }).click();
     await page.waitForFunction(() => document.querySelector('[data-document-template-result]')?.textContent?.includes('material change'));
     assert.deepEqual(acknowledged, {
       action: 'acknowledge_update',
       templateId: 'doc_revision_1',
       materialChange: true,
+      note: 'Updated the cancellation notice and corrected payment timing.',
     });
   } finally {
     await context.close();

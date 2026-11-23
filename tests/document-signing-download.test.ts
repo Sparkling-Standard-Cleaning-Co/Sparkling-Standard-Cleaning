@@ -69,7 +69,10 @@ test('the signing page presents hardware, paper-copy, withdrawal and executed-co
   assert.match(script, /withdraw consent to future electronic records/i);
   assert.match(script, /admin@sparkling-standard\.com/);
   assert.match(script, /executedDownloadUrl/);
-  assert.match(script, /Download your executed agreement/);
+  assert.match(script, /Download signed PDF/);
+  assert.match(script, /X — Sign here/);
+  assert.match(script, /Adopt Signature/);
+  assert.match(script, /resumeCheckoutUrl/);
 
   const endpoint = fs.readFileSync('functions/api/document-sign.ts', 'utf8');
   assert.match(endpoint, /resolveSigningDownload/);

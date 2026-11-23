@@ -169,6 +169,27 @@ export function buildInvoicePdf(data: InvoiceData, totals: InvoiceTotals): Uint8
     }
   }
 
+  if (data.review?.eligible && data.review.url && /^https:\/\//i.test(data.review.url)) {
+    ensure(60);
+    y -= 18;
+    content += text('SHARE YOUR EXPERIENCE', LEFT, y, 8, true, MUTED);
+    y -= 14;
+    for (const line of wrap(
+      `Thank you for choosing Sparkling Standard${data.review.branchName ? ` ${data.review.branchName}` : ''}. If you would like to share your experience, a Google review helps other neighbors find us. There is no obligation.`,
+      500,
+      9,
+    )) {
+      ensure(14);
+      content += text(line, LEFT, y, 9, false, INK_SOFT);
+      y -= 12;
+    }
+    for (const line of wrap(data.review.url, 500, 8)) {
+      ensure(14);
+      content += text(line, LEFT, y, 8, false, ROSE);
+      y -= 10;
+    }
+  }
+
   if (data.contact.legalName) {
     ensure(26);
     y -= 18;

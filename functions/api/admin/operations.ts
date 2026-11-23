@@ -9,6 +9,7 @@ import {
 } from '../../../src/lib/admin/recurring-schedule.ts';
 import type { BookingEnv } from '../../../src/lib/booking/service.ts';
 import { recurringSchedulingEnabled } from '../../../src/lib/booking/recurring-gate.ts';
+import { queueReviewForAppointment } from '../../../src/lib/reviews/service.ts';
 import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import {
   assignTeam,
@@ -250,7 +251,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       return json({ ok: true });
     }
     if (action === 'job_status') {
-      await updateAppointmentStatus(db, actor, String(body.appointmentId ?? ''), String(body.status ?? ''));
+      const appointmentId = String(body.appointmentId ?? '');
+      const status = String(body.status ?? '');
+      await updateAppointmentStatus(db, actor, appointmentId, status);
+      if (status === 'completed') {
+        await queueReviewForAppointment(db, appointmentId).catch(() => undefined);
+      }
       return json({ ok: true });
     }
     if (action === 'create_checklist') {

@@ -316,3 +316,41 @@ additive migration before activating this part of the flow in production.
   **Communications & Notifications** and are recorded in
   `notification_delivery_events`. Provider acceptance is not proof of inbox
   delivery.
+
+## 17. Pricing, signature boxes and visual editor (2026-11-23, local)
+
+Migration `0053_signing_pricing_snapshot.sql` adds
+`signing_requests.pricing_snapshot_json` (default `{}`). The snapshot is written
+once when a signing request is created from the verified checkout or the admin
+composer and is never recalculated by the signing page. It carries the service,
+property, schedule, scope, add-ons, line items, base, travel, discount, tax,
+total, amount due now, remaining balance and payment terms. The signing page's
+**Details & price** step, the executed text copy, the executed PDF and the admin
+request detail all read the same snapshot.
+
+The signing ceremony now shows a visible **X — Sign here** box for every
+unsigned document. The first box opens the signature pad (typed or drawn;
+Clear, Cancel, Adopt Signature); later boxes apply the adopted signature only
+when clicked. Each application is recorded with an `appliedAt` timestamp in
+`document_signatures.signature_json`. The page tracks signature progress and
+scrolls to the next required box. Changing the adopted signature clears the
+applied boxes so the customer must sign each one again.
+
+Checkout signing redirects straight to the payment page after completion. The
+payment page shows the signed total, the signed-PDF download, the recorded
+customer-email status and customer-portal access. The old three-option success
+screen is retired for checkout flows.
+
+The template editor is a visual contenteditable canvas with headings, fonts,
+font sizes, colours, bold/italic/underline, alignment, lists, basic tables,
+page breaks, dynamic fields, signature-line placement, optional headers and
+footers, live preview, print/PDF, draft saving, compare and Approve & Publish.
+Rich HTML is sanitized server-side (no scripts, event handlers, links, images,
+iframes, forms or external URLs). Legacy Markdown masters remain readable.
+Owner-facing version labels are conventional (`Version 1.0`, `Version 1.1`, …);
+internal version strings and hashes are retained for audit and signatures.
+
+Automated tests must never call live Resend. `npm test` preloads
+`tests/helpers/no-live-email.mjs`, which blocks `api.resend.com` unless
+`ALLOW_LIVE_RESEND_TESTS=1` is explicitly set for an owner-authorized live test.
+See `docs/verification/2026-11-23-SIGNING-PRICING-EDITOR.md`.

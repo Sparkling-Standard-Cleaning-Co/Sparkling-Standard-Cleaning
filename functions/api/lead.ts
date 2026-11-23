@@ -72,7 +72,8 @@ import { parseLatLng, resolveRoute } from '../../src/lib/travel/server-routing.t
 import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { persistLeadSubmission, updateLeadDelivery } from '../../src/lib/admin/lead-persistence.ts';
 import { requestPricingConfig } from '../../src/lib/pricing/server.ts';
-import { resolveServiceBranch } from '../../src/lib/branches/registry.ts';
+import { resolveServiceBranchStrict } from '../../src/lib/branches/registry.ts';
+import { reverseGeocode } from '../../src/lib/location/server-geocode.ts';
 import {
   PUBLIC_RATE_LIMITS,
   checkPublicRateLimit,
@@ -388,14 +389,53 @@ export async function onRequestPost(context: {
     'residential_estimate',
     'facility_estimate',
   ]).has(clean.request_type ?? '');
-  const branch = await resolveServiceBranch(env.DB ?? null, {
+  let branchZip = (clean.zip ?? '').trim();
+  if (!/^\d{5}$/.test(branchZip)) {
+    const lat = Number(clean.pin_latitude);
+    const lng = Number(clean.pin_longitude);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      const reverse = await reverseGeocode(env, lat, lng).catch(() => null);
+      branchZip = reverse?.zip?.trim() ?? '';
+    }
+  }
+  const resolution = await resolveServiceBranchStrict(env.DB ?? null, {
     requestedBranchId: clean.branch_id ?? null,
-    zip: clean.zip ?? null,
-    state: clean.address_state ?? null,
+    zip: branchZip || null,
+    state: branchZip ? null : clean.address_state ?? null,
   });
+  let branch = resolution.branch;
+  if (!branch && resolution.reason === 'location_missing' && !transactionalRequest) {
+    // Legacy contact messages without an address keep the Pensacola inbox.
+    // Transactional requests must carry a resolvable service location.
+    branch = (
+      await resolveServiceBranchStrict(env.DB ?? null, {
+        requestedBranchId: 'branch_pensacola',
+      })
+    ).branch;
+  }
+  if (!branch) {
+    return json(
+      {
+        ok: false,
+        error: 'service_area_inquiry_required',
+        reason: resolution.reason,
+        message:
+          'This address is outside the current online service area. Please request a personal service-area review and we will confirm whether we can help.',
+      },
+      409,
+    );
+  }
   clean.branch_id = branch.id;
   if (transactionalRequest && !branch.bookable) {
-    return json({ ok: false, error: 'branch_not_available' }, 409);
+    return json(
+      {
+        ok: false,
+        error: 'branch_not_available',
+        message:
+          'Online booking for this service area is not active yet. Please request a personal service-area review.',
+      },
+      409,
+    );
   }
   if (!transactionalRequest && !branch.capabilities.inquiries) {
     return json({ ok: false, error: 'branch_inquiries_unavailable' }, 409);

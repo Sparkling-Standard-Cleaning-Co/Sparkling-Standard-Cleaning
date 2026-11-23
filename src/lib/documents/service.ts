@@ -14,14 +14,28 @@ import { legalPolicyConfig } from '../../config/legal-policy.ts';
 import { buildBookingDocumentVariables } from './agreement-variables.ts';
 import { buildExecutedAgreementPdf } from './agreement-pdf.ts';
 import {
+  parsePricingSnapshot,
+  pricingDocumentVariables,
+  pricingSnapshotFromFields,
+  pricingSnapshotText,
+  serializePricingSnapshot,
+  type PricingSnapshot,
+} from './pricing-snapshot.ts';
+import {
   normalizeSigningFieldValues,
   signingFieldSummary,
   signingFieldsForRequest,
 } from './signing-fields.ts';
 import {
   findInternalContentProblems,
+  isRichDocumentHtml,
+  normalizeRichDocumentHtml,
   prepareTemplateRevisionContent,
 } from './rich-text.ts';
+import {
+  displayVersion,
+  familyVersionOrdinals,
+} from './version-labels.ts';
 
 export const SIGNING_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const ESIGN_CONSENT_VERSION = '2026-11-01.esign-consent.v1';
@@ -649,6 +663,36 @@ async function refreshSigningRequestStatus(
   return status;
 }
 
+export async function resolveRequestPricingSnapshot(
+  db: D1Database,
+  request: Record<string, unknown>,
+): Promise<PricingSnapshot | null> {
+  const stored = parsePricingSnapshot(request.pricing_snapshot_json);
+  if (stored) return stored;
+  if (!request.booking_request_id) return null;
+  const booking = await db
+    .prepare('SELECT payload_json FROM booking_requests WHERE id = ? LIMIT 1')
+    .bind(String(request.booking_request_id))
+    .first<{ payload_json: string }>()
+    .catch(() => null);
+  if (!booking) return null;
+  let fields: Record<string, string> = {};
+  try {
+    const parsed = JSON.parse(booking.payload_json || '{}') as Record<string, unknown>;
+    fields = Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) => typeof value === 'string'),
+    ) as Record<string, string>;
+  } catch {
+    return null;
+  }
+  return pricingSnapshotFromFields({
+    fields,
+    serviceCode: String(request.service_code ?? ''),
+    paymentTerms: '',
+    source: 'booking_record',
+  });
+}
+
 async function buildExecutedCopy(
   db: D1Database,
   request: Record<string, unknown>,
@@ -748,6 +792,12 @@ async function buildExecutedCopy(
       'These customer-provided instructions are incorporated into the signed record. They do not change the approved agreement wording.',
       '',
     );
+  }
+  const pricing = await resolveRequestPricingSnapshot(db, request).catch(() => null);
+  if (pricing) {
+    lines.push('PRICING AND PAYMENT', '');
+    for (const row of pricingSnapshotText(pricing)) lines.push(row);
+    lines.push('');
   }
   for (const row of latest.values()) {
     const signature = (() => {
@@ -885,6 +935,7 @@ export async function getExecutedAgreementPdf(
     fieldValues,
   ).map((row) => ({ label: row.label, value: row.value }));
 
+  const pricing = await resolveRequestPricingSnapshot(db, request).catch(() => null);
   const pdf = buildExecutedAgreementPdf({
     requestId,
     bundleName: String(request.packet_name ?? request.bundle_code ?? ''),
@@ -897,6 +948,7 @@ export async function getExecutedAgreementPdf(
     executedAt: String(request.executed_at ?? now()),
     countersignatureName: String(request.counter_signature_name ?? ''),
     ...(customerFields.length ? { customerFields } : {}),
+    ...(pricing ? { pricing } : {}),
     signatures,
   });
   const bytes = pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer;
@@ -1125,6 +1177,7 @@ export async function createSigningRequest(
     bundleId?: string;
     instructions?: string;
     variables?: DocumentVariableValues;
+    pricingSnapshot?: PricingSnapshot;
   } = {},
 ): Promise<CreatedSigningRequest> {
   if (!legalPolicyConfig.activation.electronicSigning) {
@@ -1140,6 +1193,7 @@ export async function createSigningRequest(
   const variableValues = {
     ...(await loadDocumentVariables(db, context)),
     ...(options.variables ?? {}),
+    ...(options.pricingSnapshot ? pricingDocumentVariables(options.pricingSnapshot) : {}),
   };
   const { requirements, missing } = await resolveRequirementVariables(rawRequirements, variableValues);
   for (const requirement of requirements) {
@@ -1181,20 +1235,51 @@ export async function createSigningRequest(
     identity.branchId,
     identity.signerEmail,
   ];
-  try {
-    await db
-      .prepare(
-        `INSERT INTO signing_requests
-         (id, bundle_id, bundle_code, bundle_version, subject_type, customer_id, team_member_id,
-          property_id, booking_request_id, appointment_id, recurring_plan_id, booking_reference,
-          service_code, status, requirement_snapshot_json, token_hash, token_expires_at,
-          created_by_admin_user_id, branch_id, signer_email, packet_instructions, packet_name)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(...coreBinds, instructions, text(bundle.name, 200))
-      .run();
-  } catch (error) {
-    if (!missingColumn(error, 'packet_instructions')) throw error;
+  const pricingJson = serializePricingSnapshot(options.pricingSnapshot ?? null);
+  const runInsert = async (mode: 'full' | 'no-pricing' | 'no-packet' | 'legacy'): Promise<void> => {
+    if (mode === 'full') {
+      await db
+        .prepare(
+          `INSERT INTO signing_requests
+           (id, bundle_id, bundle_code, bundle_version, subject_type, customer_id, team_member_id,
+            property_id, booking_request_id, appointment_id, recurring_plan_id, booking_reference,
+            service_code, status, requirement_snapshot_json, token_hash, token_expires_at,
+            created_by_admin_user_id, branch_id, signer_email, packet_instructions, packet_name,
+            pricing_snapshot_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(...coreBinds, instructions, text(bundle.name, 200), pricingJson)
+        .run();
+      return;
+    }
+    if (mode === 'no-pricing') {
+      await db
+        .prepare(
+          `INSERT INTO signing_requests
+           (id, bundle_id, bundle_code, bundle_version, subject_type, customer_id, team_member_id,
+            property_id, booking_request_id, appointment_id, recurring_plan_id, booking_reference,
+            service_code, status, requirement_snapshot_json, token_hash, token_expires_at,
+            created_by_admin_user_id, branch_id, signer_email, packet_instructions, packet_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(...coreBinds, instructions, text(bundle.name, 200))
+        .run();
+      return;
+    }
+    if (mode === 'no-packet') {
+      await db
+        .prepare(
+          `INSERT INTO signing_requests
+           (id, bundle_id, bundle_code, bundle_version, subject_type, customer_id, team_member_id,
+            property_id, booking_request_id, appointment_id, recurring_plan_id, booking_reference,
+            service_code, status, requirement_snapshot_json, token_hash, token_expires_at,
+            created_by_admin_user_id, branch_id, signer_email, pricing_snapshot_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(...coreBinds, pricingJson)
+        .run();
+      return;
+    }
     await db
       .prepare(
         `INSERT INTO signing_requests
@@ -1206,6 +1291,27 @@ export async function createSigningRequest(
       )
       .bind(...coreBinds)
       .run();
+  };
+  try {
+    await runInsert('full');
+  } catch (error) {
+    if (missingColumn(error, 'packet_instructions')) {
+      try {
+        await runInsert('no-packet');
+      } catch (fallbackError) {
+        if (!missingColumn(fallbackError, 'pricing_snapshot_json')) throw fallbackError;
+        await runInsert('legacy');
+      }
+    } else if (missingColumn(error, 'pricing_snapshot_json')) {
+      try {
+        await runInsert('no-pricing');
+      } catch (fallbackError) {
+        if (!missingColumn(fallbackError, 'packet_instructions')) throw fallbackError;
+        await runInsert('legacy');
+      }
+    } else {
+      throw error;
+    }
   }
   await audit(db, {
     actorUserId: options.createdByAdminUserId ?? null,
@@ -1224,6 +1330,40 @@ export async function createSigningRequest(
     instructions,
     requirements,
   };
+}
+
+/**
+ * Refreshes the pricing snapshot on a reusable pending request only when no
+ * document has been signed yet. A partially signed request keeps the price the
+ * customer already saw.
+ */
+export async function updatePendingSigningRequestPricing(
+  db: D1Database,
+  requestId: string,
+  snapshot: PricingSnapshot,
+): Promise<void> {
+  const request = await db
+    .prepare('SELECT status FROM signing_requests WHERE id = ? LIMIT 1')
+    .bind(requestId)
+    .first<{ status: string }>()
+    .catch(() => null);
+  if (!request || !['pending', 'partially_signed'].includes(String(request.status))) return;
+  const signed = await db
+    .prepare(
+      "SELECT COUNT(*) AS count FROM document_signatures WHERE signing_request_id = ? AND status IN ('signed','awaiting_verification','verified')",
+    )
+    .bind(requestId)
+    .first<{ count: number }>()
+    .catch(() => null);
+  if (Number(signed?.count ?? 0) > 0) return;
+  try {
+    await db
+      .prepare('UPDATE signing_requests SET pricing_snapshot_json = ?, updated_at = ? WHERE id = ?')
+      .bind(serializePricingSnapshot(snapshot), now(), requestId)
+      .run();
+  } catch (error) {
+    if (!missingColumn(error, 'pricing_snapshot_json')) throw error;
+  }
 }
 
 export interface PacketPreview {
@@ -1334,7 +1474,10 @@ export interface SignInput {
   signerName: string;
   signerEmail: string;
   consent: boolean;
-  signatures: Record<string, { value: string; initials?: string; type?: string; imageData?: string }>;
+  signatures: Record<
+    string,
+    { value: string; initials?: string; type?: string; imageData?: string; appliedAt?: string }
+  >;
   customerFields?: unknown;
   request: Request;
 }
@@ -1451,6 +1594,7 @@ export async function signSigningRequest(
           type: evidence.type,
           value: text(signature.value, 200),
           initials: evidence.initials,
+          ...(signature.appliedAt ? { appliedAt: text(signature.appliedAt, 40) } : {}),
           ...(evidence.imageData ? { imageData: evidence.imageData } : {}),
           consentVersion: ESIGN_CONSENT_VERSION,
         }),
@@ -1599,7 +1743,8 @@ export async function createTemplate(
 ): Promise<{ id: string }> {
   const title = text(input.title, 200);
   if (!title) throw new AdminAuthError(400, 'document_title_required');
-  const contentText = text(input.contentText, 200_000);
+  const rawContent = text(input.contentText, 200_000);
+  const contentText = isRichDocumentHtml(rawContent) ? normalizeRichDocumentHtml(rawContent) : rawContent;
   const sourceKind = input.sourceKind ?? (input.r2Key ? 'pdf' : 'text');
   const contentSha256 = text(input.contentSha256, 64) || (contentText ? await sha256Hex(contentText) : '');
   if (sourceKind === 'text' && !contentText) throw new AdminAuthError(400, 'document_content_required');
@@ -1879,7 +2024,9 @@ export async function updateDraftTemplate(
   if (!existing) throw new AdminAuthError(404, 'template_not_found');
   if (String(existing.status) !== 'draft') throw new AdminAuthError(409, 'template_not_editable');
   const sourceKind = String(existing.source_kind) === 'pdf' ? 'pdf' : 'text';
-  const contentText = input.contentText === undefined ? String(existing.content_text ?? '') : text(input.contentText, 200_000);
+  const rawContent =
+    input.contentText === undefined ? String(existing.content_text ?? '') : text(input.contentText, 200_000);
+  const contentText = isRichDocumentHtml(rawContent) ? normalizeRichDocumentHtml(rawContent) : rawContent;
   if (sourceKind === 'text' && !contentText) throw new AdminAuthError(400, 'document_content_required');
   const contentSha256 = contentText ? await sha256Hex(contentText) : text(existing.content_sha256, 64);
   const legalReviewStatus = LEGAL_REVIEW_STATUSES.has(String(input.legalReviewStatus))
@@ -2316,8 +2463,12 @@ export async function listTemplates(db: D1Database): Promise<Array<Record<string
                 packet_notes
          FROM document_templates ORDER BY category, title, created_at DESC`,
       )
-      .all();
-    return rows.results ?? [];
+      .all<Record<string, unknown>>();
+    const ordinals = familyVersionOrdinals(rows.results ?? []);
+    return (rows.results ?? []).map((row) => ({
+      ...row,
+      version_label: displayVersion(row.version, ordinals.get(String(row.id))),
+    }));
   } catch (error) {
     if (!missingColumn(error, 'family_key')) throw error;
     const rows = await db
@@ -2326,8 +2477,12 @@ export async function listTemplates(db: D1Database): Promise<Array<Record<string
                 requires_countersignature, requires_verification, approved_at, archived_at, created_at
          FROM document_templates ORDER BY category, title, created_at DESC`,
       )
-      .all();
-    return rows.results ?? [];
+      .all<Record<string, unknown>>();
+    const ordinals = familyVersionOrdinals(rows.results ?? []);
+    return (rows.results ?? []).map((row) => ({
+      ...row,
+      version_label: displayVersion(row.version, ordinals.get(String(row.id))),
+    }));
   }
 }
 
@@ -2352,9 +2507,11 @@ export interface DocumentRevisionImpact {
   templateId: string;
   title: string;
   newVersion: string;
+  newVersionLabel: string;
   previousTemplateId: string | null;
   previousTitle: string | null;
   previousVersion: string | null;
+  previousVersionLabel: string | null;
   status: 'pending_approval' | 'owner_review_required' | 'resigning_recommended' | 'reviewed';
   review: {
     acknowledgedAt: string | null;
@@ -2401,7 +2558,7 @@ export async function listDocumentUpdates(
     .prepare(
       `SELECT n.id, n.title, n.version, n.status, n.created_at, n.approved_at,
               n.supersedes_template_id,
-              o.title AS previous_title, o.version AS previous_version
+              o.id AS previous_id, o.title AS previous_title, o.version AS previous_version
        FROM document_templates n
        LEFT JOIN document_templates o ON o.id = n.supersedes_template_id
        WHERE n.supersedes_template_id IS NOT NULL
@@ -2409,6 +2566,11 @@ export async function listDocumentUpdates(
        ORDER BY n.created_at DESC LIMIT 200`,
     )
     .all<Record<string, unknown>>();
+  const familyRows = await db
+    .prepare('SELECT id, family_key, created_at FROM document_templates')
+    .all<Record<string, unknown>>()
+    .catch(() => ({ results: [] as Array<Record<string, unknown>> }));
+  const ordinals = familyVersionOrdinals(familyRows.results ?? []);
   const updates: DocumentRevisionImpact[] = [];
   for (const row of revisions.results ?? []) {
     const templateId = String(row.id);
@@ -2503,9 +2665,13 @@ export async function listDocumentUpdates(
       templateId,
       title: String(row.title ?? ''),
       newVersion: String(row.version ?? ''),
+      newVersionLabel: displayVersion(row.version, ordinals.get(templateId)),
       previousTemplateId: previousId || null,
       previousTitle: row.previous_title ? String(row.previous_title) : null,
       previousVersion: row.previous_version ? String(row.previous_version) : null,
+      previousVersionLabel: row.previous_version
+        ? displayVersion(row.previous_version, ordinals.get(String(row.previous_id ?? '')))
+        : null,
       status,
       review: {
         acknowledgedAt: reviewRow?.created_at ? String(reviewRow.created_at) : null,
@@ -2563,13 +2729,21 @@ export async function listBundleItems(
 ): Promise<Array<Record<string, unknown>>> {
   const rows = await db
     .prepare(
-      `SELECT i.*, t.title, t.version, t.status AS template_status
+      `SELECT i.*, t.title, t.version, t.status AS template_status, t.family_key, t.created_at AS template_created_at
        FROM document_bundle_items i JOIN document_templates t ON t.id = i.template_id
        WHERE i.bundle_id = ? ORDER BY i.sort_order, t.title`,
     )
     .bind(bundleId)
-    .all();
-  return rows.results ?? [];
+    .all<Record<string, unknown>>();
+  const familyRows = await db
+    .prepare('SELECT id, family_key, created_at FROM document_templates')
+    .all<Record<string, unknown>>()
+    .catch(() => ({ results: [] as Array<Record<string, unknown>> }));
+  const ordinals = familyVersionOrdinals(familyRows.results ?? []);
+  return (rows.results ?? []).map((row) => ({
+    ...row,
+    version_label: displayVersion(row.version, ordinals.get(String(row.template_id))),
+  }));
 }
 
 export async function listSigningRequests(
@@ -2633,26 +2807,31 @@ export async function getSigningRequestDetails(
   requestId: string,
 ): Promise<Record<string, unknown> | null> {
   const request = await db
-    .prepare(
-      `SELECT id, bundle_id, bundle_code, bundle_version, subject_type, customer_id,
-              team_member_id, property_id, booking_request_id, appointment_id, recurring_plan_id,
-              booking_reference, service_code, status, requirement_snapshot_json,
-              token_expires_at, branch_id, signer_email, executed_at, executed_sha256,
-              counter_signature_name, counter_signed_at, created_by_admin_user_id, created_at, updated_at
-       FROM signing_requests WHERE id = ? LIMIT 1`,
-    )
+    .prepare('SELECT * FROM signing_requests WHERE id = ? LIMIT 1')
     .bind(requestId)
     .first<Record<string, unknown>>();
   if (!request) return null;
   const signatures = await db
     .prepare(
-      `SELECT s.*, t.title, t.category FROM document_signatures s
+      `SELECT s.*, t.title, t.category, t.family_key, t.created_at AS template_created_at
+       FROM document_signatures s
        JOIN document_templates t ON t.id = s.template_id
        WHERE s.signing_request_id = ? ORDER BY t.title`,
     )
     .bind(requestId)
-    .all();
-  return { request, signatures: signatures.results ?? [] };
+    .all<Record<string, unknown>>();
+  const familyRows = await db
+    .prepare('SELECT id, family_key, created_at FROM document_templates')
+    .all<Record<string, unknown>>()
+    .catch(() => ({ results: [] as Array<Record<string, unknown>> }));
+  const ordinals = familyVersionOrdinals(familyRows.results ?? []);
+  return {
+    request,
+    signatures: (signatures.results ?? []).map((row) => ({
+      ...row,
+      version_label: displayVersion(row.template_version, ordinals.get(String(row.template_id))),
+    })),
+  };
 }
 
 export async function getExecutedCopy(

@@ -39,6 +39,20 @@ import '../styles/signing.css';
         </div>
         <div class="signing-dialog__body" data-document-dialog-body></div>
       </dialog>
+
+      <dialog
+        class="signing-dialog signing-signature-dialog"
+        data-signature-dialog
+        aria-labelledby="signature-dialog-title"
+      >
+        <div class="signing-dialog__head">
+          <h2 id="signature-dialog-title">X — Adopt your signature</h2>
+          <button class="signing-btn signing-btn--ghost" type="button" data-modal-cancel>
+            Cancel
+          </button>
+        </div>
+        <div class="signing-dialog__body" data-signature-dialog-body></div>
+      </dialog>
     </main>
     <script>
       import '../scripts/document-sign';

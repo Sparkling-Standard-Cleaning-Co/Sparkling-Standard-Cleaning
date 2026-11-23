@@ -64,6 +64,12 @@ export interface InvoiceData {
   paymentMethods?: string[];
   /** Server-issued Stripe payment link, when one exists. */
   paymentUrl?: string;
+  /** Optional review invitation, only after a verified completed service. */
+  review?: {
+    url: string;
+    eligible: boolean;
+    branchName?: string;
+  };
   contact: InvoiceContact;
 }
 
@@ -252,6 +258,17 @@ function buildHtml(data: InvoiceData, totals: InvoiceTotals): string {
     ? `<p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:${PALETTE.inkSoft};white-space:pre-line;">${escapeHtml(data.notes)}</p>`
     : '';
 
+  const review =
+    data.review?.eligible && data.review.url && /^https:\/\//i.test(data.review.url)
+      ? `<tr>
+                  <td style="padding:16px 0 0;">
+                    <p style="margin:0 0 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${PALETTE.muted};">Share your experience</p>
+                    <p style="margin:0;font-size:13px;line-height:1.6;color:${PALETTE.inkSoft};">Thank you for choosing Sparkling Standard${data.review.branchName ? ` ${escapeHtml(data.review.branchName)}` : ''}. If you would like to share your experience, a Google review helps other neighbors find us. There is no obligation.</p>
+                    <p style="margin:6px 0 0;font-size:13px;"><a href="${escapeHtml(data.review.url)}" style="color:${PALETTE.rose};">Leave a Google review</a></p>
+                  </td>
+                </tr>`
+      : '';
+
   const legalLine = data.contact.legalName
     ? `<p style="margin:2px 0;font-size:11px;color:${PALETTE.muted};">Legal entity: ${escapeHtml(data.contact.legalName)}</p>`
     : `<p style="margin:2px 0;font-size:11px;color:${PALETTE.muted};">${escapeHtml(placeholder('Legal entity'))}</p>`;
@@ -368,6 +385,7 @@ function buildHtml(data: InvoiceData, totals: InvoiceTotals): string {
                 </tr>`
                     : ''
                 }
+                ${review}
               </table>
 
               <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="margin:24px 0 0;border-top:1px solid ${PALETTE.border};">
@@ -442,6 +460,14 @@ function buildText(data: InvoiceData, totals: InvoiceTotals): string {
     lines.push('');
     lines.push('NOTES / SCOPE');
     lines.push(data.notes);
+  }
+  if (data.review?.eligible && data.review.url && /^https:\/\//i.test(data.review.url)) {
+    lines.push('');
+    lines.push('SHARE YOUR EXPERIENCE');
+    lines.push(
+      `Thank you for choosing Sparkling Standard${data.review.branchName ? ` ${data.review.branchName}` : ''}. If you would like to share your experience, a Google review helps other neighbors find us. There is no obligation.`,
+    );
+    lines.push(data.review.url);
   }
   lines.push('');
   for (const line of contactLines(data.contact)) lines.push(line);

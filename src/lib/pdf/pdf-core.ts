@@ -52,6 +52,34 @@ export function wrap(value: string, maxWidth: number, size: number, bold = false
   return lines;
 }
 
+export type PdfFont =
+  | 'sans'
+  | 'sans-bold'
+  | 'serif'
+  | 'serif-bold'
+  | 'sans-italic'
+  | 'serif-italic';
+
+const PDF_FONT_NAMES: Record<PdfFont, string> = {
+  sans: '/F1',
+  'sans-bold': '/F2',
+  serif: '/F3',
+  'serif-bold': '/F4',
+  'sans-italic': '/F5',
+  'serif-italic': '/F6',
+};
+
+export function textFont(
+  value: string,
+  x: number,
+  y: number,
+  size: number,
+  font: PdfFont,
+  color = INK,
+): string {
+  return `BT ${color} rg ${PDF_FONT_NAMES[font]} ${size} Tf 1 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)} Tm (${escapePdf(value)}) Tj ET\n`;
+}
+
 export function text(value: string, x: number, y: number, size: number, bold = false, color = INK): string {
   return `BT ${color} rg ${bold ? '/F2' : '/F1'} ${size} Tf 1 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)} Tm (${escapePdf(value)}) Tj ET\n`;
 }
@@ -66,17 +94,21 @@ export function rule(y: number, color = BORDER): string {
 
 export function assemblePdf(pageContents: string[]): Uint8Array {
   const objects: string[] = [];
-  const pageIds = pageContents.map((_, index) => 5 + index * 2);
+  const pageIds = pageContents.map((_, index) => 9 + index * 2);
   objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
   objects[2] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageContents.length} >>`;
   objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
   objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+  objects[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>';
+  objects[6] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>';
+  objects[7] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>';
+  objects[8] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Italic /Encoding /WinAnsiEncoding >>';
   pageContents.forEach((stream, index) => {
-    const pageId = 5 + index * 2;
+    const pageId = 9 + index * 2;
     const contentId = pageId + 1;
     objects[pageId] =
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] ` +
-      `/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`;
+      `/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R /F5 7 0 R /F6 8 0 R >> >> /Contents ${contentId} 0 R >>`;
     objects[contentId] = `<< /Length ${stream.length} >>\nstream\n${stream}endstream`;
   });
 

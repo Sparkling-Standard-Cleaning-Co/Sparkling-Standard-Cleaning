@@ -126,6 +126,7 @@ import {
             </div>
             <div class="admin-nav__group"><span class="admin-nav__label">Sales &amp; Marketing</span>
               <button type="button" data-admin-nav="leads">Leads &amp; Inquiries</button>
+              <button type="button" data-admin-nav="reviews">Google Reviews</button>
               <button type="button" data-admin-nav="promotions">Promotions &amp; Discounts</button>
             </div>
             <div class="admin-nav__group"><span class="admin-nav__label">Finance</span>
@@ -180,8 +181,24 @@ import {
 
           <section class="admin-view" data-admin-view="calendar" hidden>
             <div class="admin-card">
-              <h2 class="admin-section-title">Next seven days</h2>
-              <p class="admin-muted">Operational board for scheduling and staffing. Later confirmed appointments remain intact below.</p>
+              <div class="admin-detail-head">
+                <div>
+                  <h2 class="admin-section-title">Seven-day operations calendar</h2>
+                  <p class="admin-muted">Appointments are shown in Central Time. Use the week controls and filters to focus the board.</p>
+                </div>
+                <div class="admin-actions">
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="calendar-prev-week">Previous</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="calendar-today">Today</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="calendar-next-week">Next</button>
+                </div>
+              </div>
+              <p class="admin-muted" data-admin-week-label></p>
+              <div class="admin-calendar-filters">
+                <label>Employee <select data-admin-week-employee><option value="">All employees</option></select></label>
+                <label>Service <select data-admin-week-service><option value="">All services</option></select></label>
+                <label>Status <select data-admin-week-status><option value="">Active appointments</option><option value="confirmed">Confirmed</option><option value="pending">Pending</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Canceled</option><option value="all">All statuses</option></select></label>
+                <label>Branch <select data-admin-week-branch><option value="">All branches</option><option value="branch_pensacola">Pensacola</option><option value="branch_tampa">Tampa Bay</option></select></label>
+              </div>
               <div data-admin-week-board></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
@@ -200,14 +217,37 @@ import {
                   <option value="all">All / historical</option>
                 </select>
                 <input name="q" type="search" placeholder="Search reference, customer, address" aria-label="Search requests" />
+                <label>Service <input name="service" placeholder="Deep, recurring, move-out" aria-label="Filter loaded requests by service" /></label>
+                <label>From <input name="from" type="date" aria-label="Filter loaded requests from date" /></label>
+                <label>To <input name="to" type="date" aria-label="Filter loaded requests to date" /></label>
                 <button class="btn btn--secondary btn--small" type="submit">Search</button>
               </form>
+              <div class="admin-bulk-toolbar" data-admin-request-bulk hidden>
+                <strong data-admin-request-bulk-count>0 selected</strong>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-select-visible">Select all visible</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-select-filtered">Select all filtered results</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-clear-selection">Clear selection</button>
+                <span class="admin-bulk-toolbar__spacer"></span>
+                <button class="btn btn--primary btn--small" type="button" data-admin-action="request-bulk" data-operation="approve">Approve eligible</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-action="request-bulk" data-operation="archive">Archive</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-bulk" data-operation="restore">Restore</button>
+                <button class="btn btn--danger btn--small" type="button" data-admin-action="request-bulk" data-operation="deny">Deny (no email)</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-bulk" data-operation="mark_test">Mark as test</button>
+                <button class="btn btn--danger btn--small" type="button" data-admin-action="request-bulk" data-operation="delete_test">Delete eligible test records</button>
+              </div>
               <div data-admin-requests></div>
             </div>
             <div data-admin-request-detail style="margin-top:1rem;" hidden></div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Upcoming appointments</h2>
+              <div class="admin-calendar-filters">
+                <label>View <select data-admin-appointment-status><option value="active" selected>Confirmed + pending</option><option value="confirmed">Confirmed</option><option value="pending">Pending</option><option value="cancelled">Canceled</option><option value="completed">Completed</option><option value="all">All / history</option></select></label>
+                <label>Period <select data-admin-appointment-range><option value="30" selected>Next 30 days</option><option value="60">Next 60 days</option><option value="90">Next 90 days</option><option value="all">All future</option></select></label>
+                <label>Employee <select data-admin-appointment-employee><option value="">All employees</option></select></label>
+                <label>Service <select data-admin-appointment-service><option value="">All services</option></select></label>
+              </div>
               <div data-admin-appointments></div>
+              <div data-admin-appointments-pagination style="margin-top:.75rem;"></div>
             </div>
           </section>
 
@@ -229,6 +269,7 @@ import {
             <div class="admin-card">
               <h2 class="admin-section-title">Customers</h2>
               <form class="admin-inline-form" data-admin-customer-search>
+                <label>View <select name="status" aria-label="Customer view"><option value="active" selected>Active customers</option><option value="archived">Archived customers</option><option value="deleted">Deleted / anonymized records</option><option value="">All customers</option></select></label>
                 <label>Search <input name="q" type="search" placeholder="Name, email or phone" /></label>
                 <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="name">Name</option><option value="status">Status</option></select></label>
                 <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
@@ -298,10 +339,16 @@ import {
                   <label><input type="checkbox" name="firstClean" value="yes" /> First clean / overdue reset</label>
                   <label><input type="checkbox" name="specialty" value="yes" /> Specialty work requiring review</label>
                 </div>
-                <fieldset class="admin-field--wide" data-manual-extras>
-                  <legend>Extras and bundles</legend>
-                  <div class="admin-form admin-form--grid" data-manual-addon-list></div>
-                  <div class="admin-form admin-form--grid" data-manual-bundle-list style="margin-top:.5rem;"></div>
+                <fieldset class="admin-field--wide admin-extras" data-manual-extras>
+                  <legend>Extras &amp; add-ons</legend>
+                  <details class="admin-extras__details">
+                    <summary data-manual-extras-summary>Choose extras</summary>
+                    <label>Search extras <input type="search" data-manual-addon-search placeholder="Kitchen, windows, organization…" /></label>
+                    <div class="admin-extras__selected" data-manual-extras-selected></div>
+                    <div class="admin-extras__list" data-manual-addon-list></div>
+                    <h4>Bundles</h4>
+                    <div class="admin-extras__list" data-manual-bundle-list></div>
+                  </details>
                 </fieldset>
                 <label>Cleaning date <input name="date" type="date" data-manual-date required /></label>
                 <label>Crew size <select name="crewSize" data-manual-crew><option value="1">One cleaner</option><option value="2">Two cleaners</option></select></label>
@@ -390,10 +437,16 @@ import {
                 </div>
                 <label>Promotion <select name="promotionCode" data-quick-promotion><option value="">Automatic eligible benefit</option></select></label>
                 <p class="admin-field--wide admin-muted" data-quick-benefit-note></p>
-                <fieldset class="admin-field--wide">
-                  <legend>Extras and bundles</legend>
-                  <div class="admin-form admin-form--grid" data-quick-addon-list></div>
-                  <div class="admin-form admin-form--grid" data-quick-bundle-list style="margin-top:.5rem;"></div>
+                <fieldset class="admin-field--wide admin-extras" data-quick-extras>
+                  <legend>Extras &amp; add-ons</legend>
+                  <details class="admin-extras__details">
+                    <summary data-quick-extras-summary>Choose extras</summary>
+                    <label>Search extras <input type="search" data-quick-addon-search placeholder="Kitchen, windows, organization…" /></label>
+                    <div class="admin-extras__selected" data-quick-extras-selected></div>
+                    <div class="admin-extras__list" data-quick-addon-list></div>
+                    <h4>Bundles</h4>
+                    <div class="admin-extras__list" data-quick-bundle-list></div>
+                  </details>
                 </fieldset>
                 <label class="admin-field--wide">Internal notes <textarea name="notes" rows="2" maxlength="2000"></textarea></label>
                 <div class="admin-field--wide admin-actions">
@@ -435,12 +488,17 @@ import {
           <section class="admin-view" data-admin-view="recurring" hidden>
             <div class="admin-card">
               <h2 class="admin-section-title">Recurring cleaning plans</h2>
+              <div class="admin-calendar-filters">
+                <label>View <select data-admin-recurring-status><option value="active" selected>Active and paused</option><option value="active-only">Active only</option><option value="paused">Paused only</option><option value="cancelled">Canceled</option><option value="all">All plans</option></select></label>
+              </div>
               <div data-admin-recurring-notice></div>
               <div data-admin-recurring></div>
               <div data-admin-recurring-occurrences style="margin-top:1rem;"></div>
-              <h2 class="admin-section-title" style="margin-top:1.25rem;">Worker history</h2>
-              <p class="admin-muted">Daily recurring worker runs. Failed runs remain visible for diagnosis; conflicts are not deleted.</p>
-              <div data-admin-recurring-runs></div>
+              <details class="admin-detail-toggle" style="margin-top:1.25rem;">
+                <summary>Operational worker history</summary>
+                <p class="admin-muted">Daily recurring worker runs. Failed runs remain visible for diagnosis; conflicts are not deleted.</p>
+                <div data-admin-recurring-runs></div>
+              </details>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Create a recurring plan</h2>
@@ -481,7 +539,14 @@ import {
               </div>
               <p class="admin-status-message" data-dispatch-result role="status" aria-live="polite"></p>
               <div class="admin-dispatch-kpis" data-dispatch-kpis></div>
-              <form class="admin-form admin-form--grid" data-dispatch-settings style="margin-top:1rem;">
+              <nav class="admin-dispatch-tabs" aria-label="Dispatch workspace">
+                <button type="button" data-dispatch-tab="board" aria-current="page">Dispatch Board</button>
+                <button type="button" data-dispatch-tab="team">Team Schedule</button>
+                <button type="button" data-dispatch-tab="coverage">Coverage &amp; Conflicts</button>
+                <button type="button" data-dispatch-tab="settings">Dispatch Settings</button>
+                <button type="button" data-dispatch-tab="history">Operational History</button>
+              </nav>
+              <form class="admin-form admin-form--grid" data-dispatch-settings data-dispatch-section="settings" style="margin-top:1rem;">
                 <label>Automation mode
                   <select name="mode">
                     <option value="analysis_only">Analysis only</option>
@@ -502,8 +567,8 @@ import {
                   <button class="btn btn--primary btn--small" type="button" data-admin-action="dispatch-run-auto">Run automatic assignment</button>
                 </div>
               </form>
-              <details class="admin-detail-toggle" style="margin-top:1rem;">
-                <summary>Optimizer weights</summary>
+              <details class="admin-detail-toggle" style="margin-top:1rem;" data-dispatch-section="settings">
+                <summary>Advanced optimizer weights</summary>
                 <form class="admin-form admin-form--grid" data-dispatch-weights>
                   <label>Travel minutes <input name="travel" type="number" min="0" step="0.1" /></label>
                   <label>Travel miles <input name="miles" type="number" min="0" step="0.1" /></label>
@@ -514,18 +579,18 @@ import {
                   <button class="btn btn--secondary btn--small" type="submit">Save weights</button>
                 </form>
               </details>
-              <h3 style="margin-top:1rem;">Coverage queue</h3>
-              <div data-admin-dispatch-unassigned></div>
-              <h3>Reassignment recommendations</h3>
-              <div data-admin-dispatch-recommendations></div>
-              <h3>Coverage exceptions</h3>
-              <div data-admin-dispatch-exceptions></div>
-              <h3>Employee lanes</h3>
-              <div data-admin-dispatch-lanes></div>
-              <h3>Dispatch decision log</h3>
-              <div data-admin-dispatch-log></div>
+              <h3 style="margin-top:1rem;" data-dispatch-section="board">Unassigned jobs</h3>
+              <div data-admin-dispatch-unassigned data-dispatch-section="board"></div>
+              <h3 data-dispatch-section="coverage">Reassignment recommendations</h3>
+              <div data-admin-dispatch-recommendations data-dispatch-section="coverage"></div>
+              <h3 data-dispatch-section="coverage">Coverage exceptions</h3>
+              <div data-admin-dispatch-exceptions data-dispatch-section="coverage"></div>
+              <h3 data-dispatch-section="team">Employee lanes</h3>
+              <div data-admin-dispatch-lanes data-dispatch-section="team"></div>
+              <h3 data-dispatch-section="history">Dispatch decision log</h3>
+              <div data-admin-dispatch-log data-dispatch-section="history"></div>
             </div>
-            <div class="admin-card" style="margin-top:1rem;">
+            <div class="admin-card" style="margin-top:1rem;" data-dispatch-section="team">
               <h2 class="admin-section-title">Employee Dispatch Profile</h2>
               <p class="admin-muted">Private origins are visible only to the owner and are never shown to customers or coworkers. Automatic assignment stays blocked until qualifications, equipment and transport are complete.</p>
               <form class="admin-form admin-form--grid" data-dispatch-profile>
@@ -595,12 +660,12 @@ import {
                 <button class="btn btn--secondary btn--small" type="submit">Save dispatch profile</button>
               </form>
             </div>
-            <div class="admin-card">
+            <div class="admin-card" data-dispatch-section="board">
               <h2 class="admin-section-title">Jobs</h2>
               <div data-admin-jobs></div>
               <div data-admin-checklist style="margin-top:1rem;"></div>
             </div>
-            <div class="admin-card" style="margin-top:1rem;">
+            <div class="admin-card" style="margin-top:1rem;" data-dispatch-section="team">
               <h2 class="admin-section-title">Team</h2>
               <div data-admin-team></div>
               <form class="admin-inline-form" data-admin-team-create style="margin-top:1rem;">
@@ -720,50 +785,62 @@ import {
               <div data-admin-documents-templates></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Add a document template</h2>
+              <h2 class="admin-section-title">Create or upload a document</h2>
+              <p class="admin-muted">Create a document in the visual editor, or upload an owner-approved PDF. Internal family keys, versions and technical identifiers are generated automatically.</p>
               <div class="admin-grid">
                 <form class="admin-form" data-document-template-text>
-                  <h3>Approved text agreement</h3>
-                  <label>Title <input name="title" required maxlength="200" /></label>
-                  <label>Category <input name="category" maxlength="80" placeholder="residential, employee, commercial" /></label>
-                  <label>Version <input name="version" value="1.0" maxlength="40" /></label>
-                  <label>Signer <select name="signerParty"><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
-                  <label>Family key <input name="familyKey" maxlength="120" placeholder="residential-one-time" /></label>
-                  <label>Effective date <input name="effectiveDate" type="date" /></label>
-                  <label>Legal review <select name="legalReviewStatus"><option value="not_reviewed">Not reviewed</option><option value="owner_review_required">Owner review required</option><option value="owner_approved">Owner approved</option><option value="attorney_review_required">Attorney review required</option><option value="attorney_reviewed">Attorney reviewed</option></select></label>
-                  <label>Agreement text <textarea name="contentText" rows="8" required maxlength="200000"></textarea></label>
-                  <p class="admin-muted">Supported variables include <code>&#123;&#123;customer.legal_name&#125;&#125;</code>, <code>&#123;&#123;property.address&#125;&#125;</code>, <code>&#123;&#123;booking.reference&#125;&#125;</code>, <code>&#123;&#123;service.scope&#125;&#125;</code>, <code>&#123;&#123;service.date&#125;&#125;</code>, <code>&#123;&#123;service.arrival_window&#125;&#125;</code>, <code>&#123;&#123;price.summary&#125;&#125;</code>, <code>&#123;&#123;price.line_items&#125;&#125;</code>, <code>&#123;&#123;price.tax&#125;&#125;</code>, <code>&#123;&#123;price.discount&#125;&#125;</code>, <code>&#123;&#123;payment.terms&#125;&#125;</code>, <code>&#123;&#123;cancellation.terms&#125;&#125;</code> and <code>&#123;&#123;document.version&#125;&#125;</code>. Booking, scope and price values come from the stored verified request; unresolved variables block sending.</p>
-                  <label>Packet notes <input name="packetNotes" maxlength="1000" placeholder="Internal review note" /></label>
-                  <label><input type="checkbox" name="requiresVerification" value="yes" /> Requires owner/admin verification or countersignature</label>
-                  <label><input type="checkbox" name="requiresCountersignature" value="yes" /> Requires an explicit owner countersignature</label>
-                  <button class="btn btn--secondary btn--small" type="submit">Save draft template</button>
+                  <h3>Create a Document</h3>
+                  <label>Document name <input name="title" required maxlength="200" placeholder="Residential Deep Cleaning Agreement" /></label>
+                  <label>Who signs it?
+                    <select name="signerParty">
+                      <option value="customer">Customer</option>
+                      <option value="employee">Employee</option>
+                      <option value="both">Customer and employee</option>
+                    </select>
+                  </label>
+                  <label>Category
+                    <select name="category">
+                      <option value="residential">Residential</option>
+                      <option value="commercial">Commercial</option>
+                      <option value="church">Church / facility</option>
+                      <option value="employee">Employee</option>
+                      <option value="general">General</option>
+                    </select>
+                  </label>
+                  <label>Legal review
+                    <select name="legalReviewStatus">
+                      <option value="not_reviewed">Not reviewed</option>
+                      <option value="owner_review_required">Owner review required</option>
+                      <option value="owner_approved" selected>Owner approved</option>
+                      <option value="attorney_review_required">Attorney review required</option>
+                      <option value="attorney_reviewed">Attorney reviewed</option>
+                    </select>
+                  </label>
+                  <button class="btn btn--primary btn--small" type="submit">Create a Document in the editor</button>
                 </form>
                 <form class="admin-form" data-document-template-upload enctype="multipart/form-data">
-                  <h3>Upload an approved PDF</h3>
-                  <label>Title <input name="title" required maxlength="200" /></label>
-                  <label>Category <input name="category" maxlength="80" /></label>
-                  <label>Version <input name="version" value="1.0" maxlength="40" /></label>
-                  <label>Signer <select name="signerParty"><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
-                  <label>PDF file <input name="file" type="file" accept="application/pdf" required /></label>
+                  <h3>Upload an Approved PDF</h3>
+                  <label>Document name <input name="title" required maxlength="200" /></label>
+                  <label>Who signs it?
+                    <select name="signerParty">
+                      <option value="customer">Customer</option>
+                      <option value="employee">Employee</option>
+                      <option value="both">Customer and employee</option>
+                    </select>
+                  </label>
+                  <label>Category
+                    <select name="category">
+                      <option value="residential">Residential</option>
+                      <option value="commercial">Commercial</option>
+                      <option value="church">Church / facility</option>
+                      <option value="employee">Employee</option>
+                      <option value="general">General</option>
+                    </select>
+                  </label>
+                  <label>Approved PDF <input name="file" type="file" accept="application/pdf" required /></label>
                   <label><input type="checkbox" name="requiresVerification" value="yes" /> Requires owner/admin verification or countersignature</label>
                   <label><input type="checkbox" name="requiresCountersignature" value="yes" /> Requires an explicit owner countersignature</label>
-                  <button class="btn btn--secondary btn--small" type="submit">Upload PDF template</button>
-                </form>
-                <form class="admin-form" data-document-template-edit hidden>
-                  <h3>Edit a draft template</h3>
-                  <input type="hidden" name="templateId" />
-                  <label>Title <input name="title" required maxlength="200" /></label>
-                  <label>Category <input name="category" maxlength="80" /></label>
-                  <label>Version <input name="version" maxlength="40" /></label>
-                  <label>Signer <select name="signerParty"><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
-                  <label>Family key <input name="familyKey" maxlength="120" readonly /></label>
-                  <label>Effective date <input name="effectiveDate" type="date" /></label>
-                  <label>Legal review <select name="legalReviewStatus"><option value="not_reviewed">Not reviewed</option><option value="owner_review_required">Owner review required</option><option value="owner_approved">Owner approved</option><option value="attorney_review_required">Attorney review required</option><option value="attorney_reviewed">Attorney reviewed</option></select></label>
-                  <label>Agreement text <textarea name="contentText" rows="10" maxlength="200000"></textarea></label>
-                  <label>Packet notes <input name="packetNotes" maxlength="1000" /></label>
-                  <label><input type="checkbox" name="requiresVerification" value="yes" /> Requires owner/admin verification or countersignature</label>
-                  <label><input type="checkbox" name="requiresCountersignature" value="yes" /> Requires an explicit owner countersignature</label>
-                  <div class="admin-actions"><button class="btn btn--primary btn--small" type="submit">Save draft changes</button><button class="btn btn--ghost btn--small" type="button" data-document-edit-cancel>Cancel</button></div>
+                  <button class="btn btn--secondary btn--small" type="submit">Upload approved PDF</button>
                 </form>
               </div>
               <div data-document-template-result style="margin-top:.6rem;"></div>
@@ -779,7 +856,7 @@ import {
               <input type="hidden" data-document-editor-id />
               <div class="admin-form admin-form--grid">
                 <label>Title <input data-document-editor-title maxlength="200" /></label>
-                <label>Version <input data-document-editor-version maxlength="40" /></label>
+                <label>Version <strong data-document-editor-version-display>Version 1.0</strong><input type="hidden" data-document-editor-version maxlength="40" /></label>
                 <label>Category <input data-document-editor-category maxlength="80" /></label>
                 <label>Signer <select data-document-editor-signer><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
                 <label>Effective date <input data-document-editor-effective type="date" /></label>
@@ -787,15 +864,79 @@ import {
                 <label><input type="checkbox" data-document-editor-verification /> Requires verification / countersignature</label>
                 <label><input type="checkbox" data-document-editor-countersignature /> Requires explicit owner countersignature</label>
               </div>
-              <div class="document-editor-toolbar admin-actions">
-                <button class="btn btn--ghost btn--small" type="button" data-document-editor-add="heading">+ Heading</button>
-                <button class="btn btn--ghost btn--small" type="button" data-document-editor-add="paragraph">+ Paragraph</button>
-                <button class="btn btn--ghost btn--small" type="button" data-document-editor-add="bullet">+ Bullet</button>
-                <button class="btn btn--ghost btn--small" type="button" data-document-editor-add="metadata">+ Metadata</button>
-                <button class="btn btn--ghost btn--small" type="button" data-document-editor-bold>Bold selection</button>
+              <div class="document-editor-toolbar admin-actions" role="toolbar" aria-label="Document formatting">
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="undo" title="Undo">Undo</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="redo" title="Redo">Redo</button>
+                <select data-editor-block aria-label="Paragraph style">
+                  <option value="p">Normal text</option>
+                  <option value="h1">Title</option>
+                  <option value="h2">Heading 1</option>
+                  <option value="h3">Heading 2</option>
+                  <option value="h4">Heading 3</option>
+                </select>
+                <select data-editor-font aria-label="Font family">
+                  <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+                  <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                  <option value="Arial, Helvetica, sans-serif">Arial</option>
+                  <option value="'Source Sans 3', Arial, sans-serif">Source Sans</option>
+                  <option value="'Courier New', monospace">Courier</option>
+                </select>
+                <select data-editor-size aria-label="Font size">
+                  <option value="">Size</option>
+                  <option value="9pt">9 pt</option>
+                  <option value="10pt">10 pt</option>
+                  <option value="11pt">11 pt</option>
+                  <option value="12pt">12 pt</option>
+                  <option value="14pt">14 pt</option>
+                  <option value="16pt">16 pt</option>
+                  <option value="18pt">18 pt</option>
+                  <option value="22pt">22 pt</option>
+                </select>
+                <input type="color" data-editor-color value="#2c2421" aria-label="Text color" />
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="bold" title="Bold"><strong>B</strong></button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="italic" title="Italic"><em>I</em></button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="underline" title="Underline"><u>U</u></button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="justifyLeft" title="Align left">Left</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="justifyCenter" title="Align center">Center</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="justifyRight" title="Align right">Right</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="insertUnorderedList" title="Bulleted list">Bullets</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="insertOrderedList" title="Numbered list">Numbers</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-insert-table title="Insert table">Table</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-page-break title="Insert page break">Page break</button>
+                <select data-editor-field aria-label="Insert dynamic field">
+                  <option value="">Insert field</option>
+                  <option value="{{customer.legal_name}}">Customer legal name</option>
+                  <option value="{{property.address}}">Property address</option>
+                  <option value="{{booking.reference}}">Booking reference</option>
+                  <option value="{{service.scope}}">Service scope</option>
+                  <option value="{{service.date}}">Service date</option>
+                  <option value="{{service.arrival_window}}">Arrival window</option>
+                  <option value="{{price.summary}}">Price summary</option>
+                  <option value="{{price.line_items}}">Price line items</option>
+                  <option value="{{price.tax}}">Tax</option>
+                  <option value="{{price.discount}}">Discount</option>
+                  <option value="{{payment.terms}}">Payment terms</option>
+                  <option value="{{cancellation.terms}}">Cancellation terms</option>
+                  <option value="{{document.version}}">Document version</option>
+                </select>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-insert-field>Insert</button>
+                <select data-editor-signature aria-label="Insert signature line">
+                  <option value="">Signature line</option>
+                  <option value="customer">Customer signature</option>
+                  <option value="employee">Employee signature</option>
+                </select>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-insert-signature>Place</button>
               </div>
               <div class="document-editor-layout">
-                <div class="document-editor-blocks" data-document-editor-blocks></div>
+                <div class="document-editor-canvas-pane">
+                  <label class="admin-muted" style="display:block;font-size:.75rem;">Document header (optional)</label>
+                  <input data-document-editor-header class="document-editor-header-input" maxlength="500" placeholder="Printed at the top of the document" />
+                  <div class="document-editor-surface-wrap">
+                    <div class="document-editor-surface" data-document-editor-canvas contenteditable="true" role="textbox" aria-multiline="true" aria-label="Document body"></div>
+                  </div>
+                  <label class="admin-muted" style="display:block;font-size:.75rem;">Document footer (optional)</label>
+                  <input data-document-editor-footer class="document-editor-footer-input" maxlength="500" placeholder="Printed at the end of the document" />
+                </div>
                 <div class="document-editor-preview-pane">
                   <div class="admin-composer__toolbar">
                     <strong style="font-size:.8rem;">Live document preview</strong>
@@ -1086,6 +1227,48 @@ import {
             </div>
           </section>
 
+          <section class="admin-view" data-admin-view="reviews" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Google review requests</h2>
+              <p class="admin-muted">
+                Requests are created only for a verified completed service, use the branch's official
+                review link, and respect the owner's delay and frequency settings. Nothing is sent
+                automatically from this screen without an explicit action. Customers are never
+                required to leave a review, and no incentive or positive-only screening is used.
+              </p>
+              <div class="admin-inline-form">
+                <label>Branch
+                  <select data-review-branch>
+                    <option value="">All branches</option>
+                    <option value="branch_pensacola">Pensacola</option>
+                    <option value="branch_tampa">Tampa Bay</option>
+                  </select>
+                </label>
+                <label>Status
+                  <select data-review-status>
+                    <option value="">All</option>
+                    <option value="queued">Queued</option>
+                    <option value="sent">Sent</option>
+                    <option value="suppressed">Suppressed</option>
+                    <option value="failed">Failed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </label>
+                <button class="btn btn--secondary btn--small" type="button" data-review-refresh>Refresh</button>
+              </div>
+              <div data-admin-review-list style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Queue a request for a completed appointment</h2>
+              <form class="admin-form" data-review-queue>
+                <label>Appointment ID <input name="appointmentId" required maxlength="100" placeholder="appt_..." /></label>
+                <p class="admin-muted">The server verifies the appointment is completed, belongs to a branch with an official review link, and has not exceeded the owner's frequency limit.</p>
+                <button class="btn btn--secondary btn--small" type="submit">Queue review request</button>
+              </form>
+              <p class="admin-status-message" data-review-status-message role="status" aria-live="polite"></p>
+            </div>
+          </section>
+
           <section class="admin-view" data-admin-view="finance" hidden>
             <div class="admin-grid" data-admin-finance-summary></div>
             <div class="admin-card" style="margin-top:1rem;">
@@ -1348,7 +1531,17 @@ import {
                   </select>
                 </label>
                 <label>Google Business Profile URL <input name="gbpUrl" type="url" maxlength="500" /></label>
+                <label>Google review link <input name="reviewUrl" type="url" maxlength="500" placeholder="https://g.page/r/.../review" /></label>
+                <label>Branch calendar ID <input name="calendarId" maxlength="300" autocomplete="off" placeholder="Server-side calendar ID" /></label>
+                <label>Calendar name <input name="calendarName" maxlength="200" placeholder="Sparkling Standard — Tampa Bookings" /></label>
               </div>
+              <fieldset class="admin-field--wide">
+                <legend>Review requests</legend>
+                <p class="admin-muted">Requests are only considered after a verified completed service. Automation stays off until the owner enables it and the branch has an official review link.</p>
+                <label><input type="checkbox" name="reviewRequestsEnabled" /> Enable automated review requests for this branch</label>
+                <label>Delay after completion (hours) <input name="reviewRequestDelayHours" type="number" min="1" max="720" step="1" /></label>
+                <label>Maximum requests per customer <input name="reviewRequestMaxPerCustomer" type="number" min="1" max="12" step="1" /></label>
+              </fieldset>
               <fieldset class="admin-field--wide">
                 <legend>Service availability</legend>
                 <div class="admin-grid">

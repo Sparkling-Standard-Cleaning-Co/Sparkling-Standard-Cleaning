@@ -1,4 +1,8 @@
 import { renderDocumentHtml } from '../lib/documents/rich-text.ts';
+import {
+  formatPricingMoney,
+  type PricingSnapshot,
+} from '../lib/documents/pricing-snapshot.ts';
 
 interface SigningDocument {
   templateId: string;
@@ -34,6 +38,12 @@ interface SigningFieldDefinition {
   summaryLabel: string;
 }
 
+interface CustomerEmailStatus {
+  status: 'sent' | 'failed' | 'suppressed' | 'already_sent' | 'not_configured' | 'unavailable';
+  providerId?: string;
+  reason?: string;
+}
+
 interface SigningPayload {
   ok: boolean;
   request?: {
@@ -52,11 +62,13 @@ interface SigningPayload {
     propertyAddress?: string;
     bookingReference?: string;
     serviceCode?: string;
+    serviceLabel?: string;
     serviceDate?: string;
     arrivalWindow?: string;
     priceSummary?: string;
     paymentTerms?: string;
   };
+  pricing?: PricingSnapshot;
   customerFields?: {
     definitions?: SigningFieldDefinition[];
     values?: Record<string, string>;
@@ -66,7 +78,18 @@ interface SigningPayload {
   consentVersion?: string;
   resumeCheckoutUrl?: string;
   executedDownloadUrl?: string;
+  customerEmailStatus?: CustomerEmailStatus;
   error?: string;
+}
+
+interface AdoptedSignature {
+  value: string;
+  type: 'typed' | 'drawn';
+  imageData?: string;
+}
+
+interface AppliedSignature extends AdoptedSignature {
+  appliedAt: string;
 }
 
 const statusNode = document.querySelector<HTMLElement>('[data-document-status]');
@@ -75,6 +98,8 @@ const dialog = document.querySelector<HTMLDialogElement>('[data-document-dialog]
 const dialogTitle = document.querySelector<HTMLElement>('[data-document-dialog-title]');
 const dialogBody = document.querySelector<HTMLElement>('[data-document-dialog-body]');
 const dialogClose = document.querySelector<HTMLButtonElement>('[data-document-dialog-close]');
+const signatureDialog = document.querySelector<HTMLDialogElement>('[data-signature-dialog]');
+const signatureDialogBody = document.querySelector<HTMLElement>('[data-signature-dialog-body]');
 const params = new URLSearchParams(window.location.search);
 const token = params.get('token') ?? '';
 const returnParam = params.get('return') ?? '';
@@ -85,10 +110,12 @@ let step = 1;
 let documents: SigningDocument[] = [];
 let fields: SigningFieldDefinition[] = [];
 let fieldValues: Record<string, string> = {};
-let signatureMethod: 'typed' | 'drawn' = 'typed';
-let drawnSignature = '';
-let canvasInitialized = false;
+let adoptedSignature: AdoptedSignature | null = null;
+let appliedSignatures: Record<string, AppliedSignature> = {};
 let submitting = false;
+let canvasDrawing = false;
+let drawnTouched = false;
+let modalMethod: 'typed' | 'drawn' = 'typed';
 
 function esc(value: unknown): string {
   return String(value ?? '')
@@ -109,6 +136,20 @@ function unsignedRequired(): SigningDocument[] {
   return documents.filter((document) => document.required && !document.signed);
 }
 
+function needsSignature(document: SigningDocument): boolean {
+  return !document.signed;
+}
+
+function signatureProgress(): { applied: number; total: number } {
+  const signable = documents.filter((document) => needsSignature(document));
+  const applied = signable.filter((document) => Boolean(appliedSignatures[document.templateId])).length;
+  return { applied, total: signable.length };
+}
+
+function signerName(): string {
+  return content?.querySelector<HTMLInputElement>('input[name="signerName"]')?.value.trim() ?? '';
+}
+
 function isCompleted(): boolean {
   return documents.length === 0 || unsignedRequired().length === 0;
 }
@@ -117,26 +158,57 @@ function summaryValue(value: string | undefined): string {
   return value && value.trim() ? value.trim() : 'To be confirmed';
 }
 
-function renderSummary(payload: SigningPayload): string {
-  const context = payload.context ?? {};
-  const rows: Array<[string, string]> = [
-    ['Customer', summaryValue(context.customerName)],
-    ['Property', summaryValue(context.propertyAddress)],
-    ['Service', summaryValue(context.serviceCode)],
-    ['Booking reference', summaryValue(context.bookingReference)],
-    ['Service date', summaryValue(context.serviceDate)],
-    ['Arrival window', summaryValue(context.arrivalWindow)],
-    ['Price', summaryValue(context.priceSummary)],
-    ['Payment terms', summaryValue(context.paymentTerms)],
-  ];
-  const core = new Set(['Customer', 'Property', 'Service']);
-  return `<dl class="signing-summary">${rows
-    .filter(([label, value]) => value !== 'To be confirmed' || core.has(label))
-    .map(
-      ([label, value]) =>
-        `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`,
-    )
-    .join('')}</dl>`;
+function pricingRows(pricing: PricingSnapshot): Array<[string, string]> {
+  const rows: Array<[string, string]> = [];
+  if (pricing.serviceLabel) rows.push(['Service', pricing.serviceLabel]);
+  if (pricing.propertyAddress) rows.push(['Property', pricing.propertyAddress]);
+  if (pricing.frequency) rows.push(['Frequency', pricing.frequency.replaceAll('_', ' ')]);
+  if (pricing.serviceDate) rows.push(['Service date', pricing.serviceDate]);
+  if (pricing.arrivalWindow) rows.push(['Arrival window', pricing.arrivalWindow]);
+  return rows;
+}
+
+function renderPricing(payload: SigningPayload): string {
+  const pricing = payload.pricing;
+  if (!pricing) {
+    return `<dl class="signing-summary">${[
+      ['Customer', summaryValue(payload.context?.customerName)],
+      ['Property', summaryValue(payload.context?.propertyAddress)],
+      ['Service', summaryValue(payload.context?.serviceLabel || payload.context?.serviceCode)],
+      ['Booking reference', summaryValue(payload.context?.bookingReference)],
+      ['Service date', summaryValue(payload.context?.serviceDate)],
+      ['Arrival window', summaryValue(payload.context?.arrivalWindow)],
+      ['Price', summaryValue(payload.context?.priceSummary)],
+      ['Payment terms', summaryValue(payload.context?.paymentTerms)],
+    ]
+      .map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`)
+      .join('')}</dl>`;
+  }
+  const rows = pricingRows(pricing);
+  const lines = pricing.lines.length
+    ? `<div class="signing-price-lines">${pricing.lines
+        .map(
+          (line) =>
+            `<div class="signing-price-line${line.kind === 'discount' ? ' signing-price-line--credit' : ''}"><span>${esc(line.label)}</span><strong>${esc(formatPricingMoney(line.amountCents))}</strong></div>`,
+        )
+        .join('')}</div>`
+    : '';
+  const total = formatPricingMoney(pricing.totalCents);
+  const due = formatPricingMoney(pricing.amountDueNowCents);
+  const remaining = formatPricingMoney(pricing.remainingBalanceCents);
+  return `<div class="signing-price-panel">
+    ${rows.length ? `<dl class="signing-summary">${rows.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>` : ''}
+    ${pricing.scope ? `<div class="signing-price-block"><h3>Included scope</h3><p>${esc(pricing.scope)}</p></div>` : ''}
+    ${pricing.addOns && !/^none$/i.test(pricing.addOns) ? `<div class="signing-price-block"><h3>Add-ons</h3><p>${esc(pricing.addOns)}</p></div>` : ''}
+    ${lines}
+    <div class="signing-price-total">
+      ${total ? `<div><span>Final total</span><strong>${esc(total)}</strong></div>` : ''}
+      ${due && due !== total ? `<div><span>Amount due now</span><strong>${esc(due)}</strong></div>` : ''}
+      ${remaining && pricing.remainingBalanceCents ? `<div><span>Remaining balance</span><strong>${esc(remaining)}</strong></div>` : ''}
+    </div>
+    ${pricing.paymentTerms ? `<p class="signing-muted">${esc(pricing.paymentTerms)}</p>` : ''}
+    ${pricing.note ? `<p class="signing-muted">${esc(pricing.note)}</p>` : ''}
+  </div>`;
 }
 
 function fieldControl(field: SigningFieldDefinition, value: string): string {
@@ -196,37 +268,51 @@ function documentMeta(document: SigningDocument): string {
   const badges = [
     `<span class="signing-badge ${document.required ? 'signing-badge--required' : ''}">${document.required ? 'Required' : 'Optional'}</span>`,
     document.signed ? '<span class="signing-badge signing-badge--signed">Signed</span>' : '',
+    appliedSignatures[document.templateId]
+      ? '<span class="signing-badge signing-badge--signed">Signature applied</span>'
+      : '',
   ].join(' ');
   return `<div class="signing-document__head"><div><h3>${esc(document.title)}</h3></div><div>${badges}</div></div>`;
 }
 
 function documentActions(document: SigningDocument): string {
-  const read =
-    document.sourceKind === 'text'
-      ? `<button class="signing-btn signing-btn--secondary" type="button" data-document-read="${esc(document.templateId)}">Read document</button>`
-      : `<a class="signing-btn signing-btn--secondary" href="${esc(document.downloadUrl)}" target="_blank" rel="noopener">Open PDF</a>`;
-  if (document.signed) {
-    return `<div class="signing-document__actions">${read}<span class="signing-muted">Already signed. This document does not need another signature.</span></div>`;
+  if (document.sourceKind === 'text') {
+    return `<div class="signing-document__actions"><button class="signing-btn signing-btn--secondary" type="button" data-document-read="${esc(document.templateId)}">Read document</button></div>`;
   }
-  if (document.canResign) {
-    return `<div class="signing-document__actions">${read}</div><p class="signing-status" data-kind="error">This signature was rejected. Review the document and sign again below.</p>`;
-  }
-  return `<div class="signing-document__actions">${read}</div>`;
+  return `<div class="signing-document__actions"><a class="signing-btn signing-btn--secondary" href="${esc(document.downloadUrl)}" target="_blank" rel="noopener">Open PDF</a></div>`;
 }
 
-function documentAcknowledgment(document: SigningDocument): string {
-  if (document.signed) return '';
-  if (document.required) {
-    return `<label class="signing-ack"><input type="checkbox" name="ack-${esc(document.templateId)}" /><span>I have read and reviewed <strong>${esc(document.title)}</strong> and I agree to sign it electronically.</span></label>`;
+function signatureSlot(document: SigningDocument): string {
+  if (document.signed) {
+    return `<p class="signing-muted">Already signed. This document does not need another signature.</p>`;
   }
-  return `<label class="signing-ack"><input type="checkbox" name="opt-${esc(document.templateId)}" /><span>I also choose to review and sign the optional document <strong>${esc(document.title)}</strong>.</span></label>`;
+  const applied = appliedSignatures[document.templateId];
+  const label = document.required ? 'X — Sign here' : 'X — Sign this optional document';
+  return `<div class="signing-signature-slot${applied ? ' is-signed' : ''}${selectedNext(document) ? ' is-next' : ''}" role="button" tabindex="0" aria-label="${esc(label)}: ${esc(document.title)}" data-signature-slot="${esc(document.templateId)}">
+    <span class="signing-signature-slot__x" aria-hidden="true">X</span>
+    <span class="signing-signature-slot__copy">
+      <strong>${applied ? 'Signature applied' : label}</strong>
+      <small>${applied ? `Applied ${new Date(applied.appliedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Click this box to sign explicitly. Nothing is signed automatically.'}</small>
+    </span>
+    ${applied
+      ? applied.type === 'drawn' && applied.imageData
+        ? `<img class="signing-signature-slot__image" src="${esc(applied.imageData)}" alt="Your applied signature" />`
+        : `<span class="signing-signature-slot__value">${esc(applied.value)}</span>`
+      : ''}
+  </div>`;
+}
+
+function selectedNext(document: SigningDocument): boolean {
+  if (appliedSignatures[document.templateId] || document.signed) return false;
+  const firstUnsigned = documents.find((entry) => needsSignature(entry) && !appliedSignatures[entry.templateId]);
+  return firstUnsigned?.templateId === document.templateId;
 }
 
 function renderDocuments(): string {
   return documents
     .map(
       (document) =>
-        `<article class="signing-document" data-document-card="${esc(document.templateId)}">${documentMeta(document)}${documentActions(document)}${documentAcknowledgment(document)}</article>`,
+        `<article class="signing-document" data-document-card="${esc(document.templateId)}">${documentMeta(document)}${documentActions(document)}${signatureSlot(document)}</article>`,
     )
     .join('');
 }
@@ -235,7 +321,8 @@ function renderSigner(payload: SigningPayload): string {
   const context = payload.context ?? {};
   return `<div class="signing-card signing-signer-card">
     <h2>Your signature</h2>
-    <p class="signing-muted">Enter your name once. Your signature applies to every required document you reviewed above, and to any optional document you selected.</p>
+    <p class="signing-muted">Enter your legal name once. Each required box below must be clicked. The first signature opens the signature pad; later boxes apply the same adopted signature only when you click them.</p>
+    <p class="signing-muted" data-signature-change-row hidden><button class="signing-btn signing-btn--ghost signing-btn--inline" type="button" data-signature-change>Change adopted signature</button></p>
     <div class="signing-field">
       <label for="signing-name">Your full legal name</label>
       <input id="signing-name" name="signerName" type="text" autocomplete="name" value="${esc(context.customerName ?? '')}" required />
@@ -244,28 +331,11 @@ function renderSigner(payload: SigningPayload): string {
       <label for="signing-email">Your email</label>
       <input id="signing-email" name="signerEmail" type="email" autocomplete="email" value="${esc(context.customerEmail ?? '')}" required />
     </div>
-    <fieldset class="signing-field signing-field--wide" style="margin-top:.8rem;">
-      <legend>Signature method</legend>
-      <div class="signing-signature-method">
-        <label><input type="radio" name="signatureMethod" value="typed" checked /> Type my name</label>
-        <label><input type="radio" name="signatureMethod" value="drawn" /> Draw my signature</label>
-      </div>
-      <div class="signing-signature-preview" data-signature-typed>
-        <span data-signature-preview>Your signature preview</span>
-      </div>
-      <div class="signing-canvas-wrap" data-signature-drawn hidden>
-        <canvas class="signing-canvas" data-signature-canvas aria-label="Draw your signature"></canvas>
-        <div class="signing-canvas-actions">
-          <button class="signing-btn signing-btn--ghost" type="button" data-signature-clear>Clear drawing</button>
-          <span class="signing-muted">Draw with your finger, stylus, or mouse.</span>
-        </div>
-      </div>
-    </fieldset>
     <div class="signing-card" style="box-shadow:none;padding:.75rem;margin:.8rem 0;background:#fdf8f2;">
       <h3>Electronic records and signatures</h3>
       <p class="signing-disclosure">You need a current web browser, internet access, and the ability to view, print or save a PDF or text record. You may request a paper copy at any time by emailing <a href="mailto:admin@sparkling-standard.com?subject=Paper%20copy%20request">admin@sparkling-standard.com</a>. You may withdraw consent to future electronic records by written notice to the same address. Withdrawal does not affect a record you already signed. Keep your email address and phone number current.</p>
     </div>
-    <label class="signing-ack"><input type="checkbox" name="consent" /><span>I can access and retain these documents electronically, and I consent to use electronic signatures and electronic records. I understand my typed name is my legal signature.</span></label>
+    <label class="signing-ack"><input type="checkbox" name="consent" /><span>I can access and retain these documents electronically, and I consent to use electronic signatures and electronic records. I understand my adopted signature is my legal signature.</span></label>
     <p class="signing-muted">A signed copy and audit record are retained privately.</p>
   </div>`;
 }
@@ -275,24 +345,26 @@ function renderWizard(payload: SigningPayload): void {
   documents = payload.documents ?? [];
   fields = payload.customerFields?.definitions ?? [];
   fieldValues = { ...(payload.customerFields?.values ?? {}) };
+  appliedSignatures = {};
+  adoptedSignature = null;
   const required = unsignedRequired();
   const totalRequired = documents.filter((document) => document.required).length;
   content.hidden = false;
   content.innerHTML = `
     <h1 class="signing-title">${esc(payload.request?.bundleName || payload.request?.bundleCode || 'Your documents')}</h1>
-    <p class="signing-lead">Review the details, complete the access choices, and sign once. Required documents: ${totalRequired}. Already signed: ${totalRequired - required.length}.</p>
+    <p class="signing-lead">Review the details and price, complete the access choices, then click each signature box. Required documents: ${totalRequired}. Already signed: ${totalRequired - required.length}.</p>
     ${payload.request?.instructions ? `<div class="signing-card" style="margin-bottom:1rem;"><h2>Instructions from Sparkling Standard</h2><p style="white-space:pre-wrap;margin:0;line-height:1.55;">${esc(payload.request.instructions)}</p></div>` : ''}
     <nav class="signing-progress" aria-label="Signing steps">
-      <button type="button" data-signing-step="1" aria-current="step">1. Confirm details</button>
+      <button type="button" data-signing-step="1" aria-current="step">1. Details &amp; price</button>
       <button type="button" data-signing-step="2">2. Access &amp; instructions</button>
-      <button type="button" data-signing-step="3">3. Review &amp; sign</button>
+      <button type="button" data-signing-step="3">3. Sign documents</button>
     </nav>
     <section class="signing-panel" data-signing-panel="1">
       <div class="signing-card">
-        <h2>Confirm your details</h2>
+        <h2>Details and price</h2>
         <p class="signing-muted">These details come from your verified request. If anything is wrong, contact Sparkling Standard before signing.</p>
-        ${renderSummary(payload)}
-        <label class="signing-ack"><input type="checkbox" name="detailsConfirmed" /><span>The customer, property, service, and price details above are correct.</span></label>
+        ${renderPricing(payload)}
+        <label class="signing-ack"><input type="checkbox" name="detailsAcknowledged" /><span>I reviewed the service, property, schedule and the complete price above.</span></label>
       </div>
     </section>
     <section class="signing-panel" data-signing-panel="2" hidden>
@@ -301,8 +373,9 @@ function renderWizard(payload: SigningPayload): void {
     <section class="signing-panel" data-signing-panel="3" hidden>
       <div class="signing-review-grid">
         <div class="signing-card">
-          <h2>Review and acknowledge each document</h2>
-          <p class="signing-muted">Open each document and read it at your own pace. Required documents must be acknowledged. Optional documents are never preselected.</p>
+          <h2>Review and sign each document</h2>
+          <p class="signing-muted">Open each document and read it at your own pace. Each required signature box must be clicked explicitly. Optional documents are never preselected.</p>
+          <div class="signing-signature-progress" data-signature-progress role="status" aria-live="polite"></div>
           <div class="signing-documents">${renderDocuments()}</div>
         </div>
         ${renderSigner(payload)}
@@ -316,9 +389,6 @@ function renderWizard(payload: SigningPayload): void {
     </div>`;
 
   step = 1;
-  signatureMethod = 'typed';
-  drawnSignature = '';
-  canvasInitialized = false;
   wireWizard();
   updateStep();
 }
@@ -348,32 +418,250 @@ function wireWizard(): void {
   for (const button of content.querySelectorAll<HTMLButtonElement>('[data-document-read]')) {
     button.addEventListener('click', () => openDocument(button.dataset.documentRead ?? ''));
   }
-  content.querySelector('[data-signing-panel="3"]')?.addEventListener('change', (event) => {
-    const target = event.target as HTMLInputElement;
-    if (target.name === 'signatureMethod') {
-      signatureMethod = target.value === 'drawn' ? 'drawn' : 'typed';
-      updateSignatureMethod();
+  content.querySelector('[data-signing-panel="3"]')?.addEventListener('change', () => {
+    updateActionStatus();
+  });
+  content.querySelector('[data-signing-panel="3"]')?.addEventListener('input', () => {
+    updateActionStatus();
+  });
+  content.addEventListener('click', (event) => {
+    const slot = (event.target as HTMLElement).closest<HTMLElement>('[data-signature-slot]');
+    if (slot) {
+      void handleSlot(slot.dataset.signatureSlot ?? '');
+      return;
     }
-    if (target.name === 'signerName') updateTypedPreview();
-    updateActionStatus();
+    if ((event.target as HTMLElement).closest('[data-signature-change]')) {
+      void changeAdoptedSignature();
+    }
   });
-  content.querySelector('[data-signing-panel="3"]')?.addEventListener('input', (event) => {
-    const target = event.target as HTMLInputElement;
-    if (target.name === 'signerName') updateTypedPreview();
-    updateActionStatus();
+  content.addEventListener('keydown', (event) => {
+    const slot = (event.target as HTMLElement).closest<HTMLElement>('[data-signature-slot]');
+    if (slot && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      void handleSlot(slot.dataset.signatureSlot ?? '');
+    }
   });
-  content.querySelector<HTMLButtonElement>('[data-signature-clear]')?.addEventListener('click', () => {
-    const canvas = content?.querySelector<HTMLCanvasElement>('[data-signature-canvas]');
-    if (!canvas) return;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    drawnSignature = '';
-    updateActionStatus();
-  });
-  updateTypedPreview();
-  updateSignatureMethod();
+  updateSignatureProgress();
   updateActionStatus();
+}
+
+async function handleSlot(templateId: string): Promise<void> {
+  if (!templateId) return;
+  const document = documents.find((entry) => entry.templateId === templateId);
+  if (!document || document.signed) return;
+  if (!signerName()) {
+    message('Enter your full legal name before you sign any document.', 'error');
+    content?.querySelector<HTMLInputElement>('input[name="signerName"]')?.focus();
+    return;
+  }
+  if (!adoptedSignature) {
+    const adopted = await openSignatureDialog();
+    if (!adopted) return;
+    adoptedSignature = adopted;
+  }
+  applySignature(templateId, adoptedSignature);
+}
+
+async function changeAdoptedSignature(): Promise<void> {
+  const adopted = await openSignatureDialog();
+  if (!adopted) return;
+  adoptedSignature = adopted;
+  appliedSignatures = {};
+  redrawSignatureSlots();
+  updateSignatureChangeRow();
+  updateSignatureProgress();
+  updateActionStatus();
+  message('Your adopted signature changed. Click each X — Sign here box again.', 'ok');
+}
+
+function updateSignatureChangeRow(): void {
+  const row = content?.querySelector<HTMLElement>('[data-signature-change-row]');
+  if (row) row.hidden = !adoptedSignature;
+}
+
+function applySignature(templateId: string, signature: AdoptedSignature): void {
+  appliedSignatures[templateId] = {
+    ...signature,
+    appliedAt: new Date().toISOString(),
+  };
+  redrawSignatureSlots();
+  updateSignatureChangeRow();
+  updateSignatureProgress();
+  updateActionStatus();
+  const next = documents.find((entry) => needsSignature(entry) && !appliedSignatures[entry.templateId]);
+  if (next) {
+    const node = content?.querySelector<HTMLElement>(`[data-signature-slot="${CSS.escape(next.templateId)}"]`);
+    node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    node?.classList.add('is-next');
+    window.setTimeout(() => node?.classList.remove('is-highlighted'), 1800);
+  }
+}
+
+function redrawSignatureSlots(): void {
+  for (const document of documents) {
+    const card = content?.querySelector<HTMLElement>(`[data-document-card="${CSS.escape(document.templateId)}"]`);
+    if (!card) continue;
+    const existing = card.querySelector<HTMLElement>('[data-signature-slot]');
+    const markup = signatureSlot(document);
+    if (existing) {
+      existing.outerHTML = markup;
+    } else {
+      card.insertAdjacentHTML('beforeend', markup);
+    }
+  }
+}
+
+function renderSignatureDialog(): void {
+  if (!signatureDialogBody) return;
+  signatureDialogBody.innerHTML = `
+    <p class="signing-muted" style="margin-top:0">Sign once below. Your adopted signature will be applied only to the box you clicked. You can draw with a mouse, touchscreen or stylus, or type your legal name.</p>
+    <fieldset class="signing-field signing-field--wide">
+      <legend>Signature method</legend>
+      <div class="signing-signature-method">
+        <label><input type="radio" name="modalSignatureMethod" value="typed"${modalMethod === 'typed' ? ' checked' : ''} /> Type my name</label>
+        <label><input type="radio" name="modalSignatureMethod" value="drawn"${modalMethod === 'drawn' ? ' checked' : ''} /> Draw my signature</label>
+      </div>
+    </fieldset>
+    <div class="signing-signature-preview" data-modal-typed ${modalMethod === 'drawn' ? 'hidden' : ''}>
+      <span data-modal-preview></span>
+    </div>
+    <div class="signing-canvas-wrap" data-modal-drawn ${modalMethod === 'typed' ? 'hidden' : ''}>
+      <canvas class="signing-canvas signing-canvas--large" data-modal-canvas aria-label="Draw your signature"></canvas>
+      <div class="signing-canvas-actions">
+        <button class="signing-btn signing-btn--ghost" type="button" data-modal-clear>Clear</button>
+        <span class="signing-muted">Draw with your finger, stylus, or mouse.</span>
+      </div>
+    </div>
+    <div class="signing-signature-dialog__actions">
+      <button class="signing-btn signing-btn--ghost" type="button" data-modal-cancel>Cancel</button>
+      <button class="signing-btn signing-btn--primary" type="button" data-modal-adopt>Adopt Signature</button>
+    </div>`;
+  const input = signatureDialogBody.querySelector<HTMLInputElement>('input[name="modalSignatureMethod"][value="typed"]');
+  if (input) input.checked = modalMethod === 'typed';
+  updateModalPreview();
+  signatureDialogBody.querySelectorAll<HTMLInputElement>('input[name="modalSignatureMethod"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      modalMethod = radio.value === 'drawn' ? 'drawn' : 'typed';
+      const typed = signatureDialogBody?.querySelector<HTMLElement>('[data-modal-typed]');
+      const drawn = signatureDialogBody?.querySelector<HTMLElement>('[data-modal-drawn]');
+      if (typed) typed.hidden = modalMethod !== 'typed';
+      if (drawn) drawn.hidden = modalMethod !== 'drawn';
+      if (modalMethod === 'drawn') window.requestAnimationFrame(() => setupModalCanvas());
+    });
+  });
+  signatureDialogBody.querySelector<HTMLButtonElement>('[data-modal-clear]')?.addEventListener('click', () => {
+    const canvas = signatureDialogBody?.querySelector<HTMLCanvasElement>('[data-modal-canvas]');
+    const context = canvas?.getContext('2d');
+    if (canvas && context) context.clearRect(0, 0, canvas.width, canvas.height);
+    drawnTouched = false;
+    updateModalPreview();
+  });
+  signatureDialogBody.querySelector<HTMLButtonElement>('[data-modal-adopt]')?.addEventListener('click', () => {
+    const name = signerName();
+    if (!name) {
+      message('Enter your full legal name before adopting a signature.', 'error');
+      closeSignatureDialog(null);
+      content?.querySelector<HTMLInputElement>('input[name="signerName"]')?.focus();
+      return;
+    }
+    if (modalMethod === 'drawn') {
+      const canvas = signatureDialogBody?.querySelector<HTMLCanvasElement>('[data-modal-canvas]');
+      if (!canvas || !drawnTouched) {
+        message('Draw your signature before adopting it, or choose Type my name.', 'error');
+        return;
+      }
+      const imageData = canvas.toDataURL('image/png');
+      closeSignatureDialog({ value: name, type: 'drawn', imageData });
+      return;
+    }
+    closeSignatureDialog({ value: name, type: 'typed' });
+  });
+  if (modalMethod === 'drawn') window.requestAnimationFrame(() => setupModalCanvas());
+}
+
+function updateModalPreview(): void {
+  const preview = signatureDialogBody?.querySelector<HTMLElement>('[data-modal-preview]');
+  if (preview) preview.textContent = signerName() || 'Your signature preview';
+}
+
+function openSignatureDialog(): Promise<AdoptedSignature | null> {
+  if (!signatureDialog || signatureDialog.open) return Promise.resolve(null);
+  modalMethod = adoptedSignature?.type ?? 'typed';
+  drawnTouched = false;
+  renderSignatureDialog();
+  signatureDialog.showModal();
+  return new Promise((resolve) => {
+    signatureDialog.addEventListener(
+      'close',
+      () => {
+        const result = (signatureDialog as HTMLDialogElement & { __adopted?: AdoptedSignature | null }).__adopted ?? null;
+        (signatureDialog as HTMLDialogElement & { __adopted?: AdoptedSignature | null }).__adopted = null;
+        resolve(result);
+      },
+      { once: true },
+    );
+  });
+}
+
+function closeSignatureDialog(result: AdoptedSignature | null): void {
+  if (!signatureDialog) return;
+  (signatureDialog as HTMLDialogElement & { __adopted?: AdoptedSignature | null }).__adopted = result;
+  signatureDialog.close();
+}
+
+function setupModalCanvas(): void {
+  const canvas = signatureDialogBody?.querySelector<HTMLCanvasElement>('[data-modal-canvas]');
+  if (!canvas) return;
+  const ratio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(320, Math.round(rect.width || 640));
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round((rect.height || 220) * ratio);
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  context.scale(ratio, ratio);
+  context.lineWidth = 2.4;
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  context.strokeStyle = '#3f2b30';
+  const point = (event: PointerEvent): { x: number; y: number } => {
+    const bounds = canvas.getBoundingClientRect();
+    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+  };
+  canvas.addEventListener('pointerdown', (event) => {
+    canvasDrawing = true;
+    drawnTouched = true;
+    canvas.setPointerCapture(event.pointerId);
+    const p = point(event);
+    context.beginPath();
+    context.moveTo(p.x, p.y);
+    event.preventDefault();
+  });
+  canvas.addEventListener('pointermove', (event) => {
+    if (!canvasDrawing) return;
+    const p = point(event);
+    context.lineTo(p.x, p.y);
+    context.stroke();
+    event.preventDefault();
+  });
+  const finish = (event: PointerEvent): void => {
+    if (!canvasDrawing) return;
+    canvasDrawing = false;
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  };
+  canvas.addEventListener('pointerup', finish);
+  canvas.addEventListener('pointercancel', finish);
+  canvas.addEventListener('pointerleave', (event) => {
+    if (canvasDrawing && event.buttons === 0) finish(event);
+  });
+}
+
+function updateSignatureProgress(): void {
+  const node = content?.querySelector<HTMLElement>('[data-signature-progress]');
+  const progress = signatureProgress();
+  if (node) {
+    node.innerHTML = `<div class="signing-signature-progress__bar" aria-hidden="true"><span style="width:${progress.total ? Math.round((progress.applied / progress.total) * 100) : 100}%"></span></div><strong>${progress.applied} of ${progress.total} signatures applied</strong><span>${progress.applied === progress.total ? 'All signatures are applied.' : 'Click the next X — Sign here box.'}</span>`;
+  }
 }
 
 function updateStep(): void {
@@ -388,7 +676,7 @@ function updateStep(): void {
   const primary = content.querySelector<HTMLButtonElement>('[data-signing-primary]');
   if (primary) {
     primary.textContent =
-      step === 1 ? 'Continue to access choices' : step === 2 ? 'Continue to review' : 'Sign documents securely';
+      step === 1 ? 'Continue to access choices' : step === 2 ? 'Continue to sign documents' : 'Sign documents securely';
   }
   updateActionStatus();
 }
@@ -398,24 +686,22 @@ function updateActionStatus(): void {
   const status = content.querySelector<HTMLElement>('[data-signing-action-status]');
   if (!status) return;
   if (step === 1) {
-    status.textContent = 'Step 1 of 3: confirm the customer, property, service, and price.';
+    status.textContent = 'Step 1 of 3: confirm the customer, property, service and price.';
     return;
   }
   if (step === 2) {
     status.textContent = 'Step 2 of 3: complete the access and service instructions.';
     return;
   }
-  const required = unsignedRequired();
-  const acknowledged = required.filter((document) => {
-    const checkbox = content?.querySelector<HTMLInputElement>(`input[name="ack-${CSS.escape(document.templateId)}"]`);
-    return checkbox?.checked === true;
-  }).length;
+  const progress = signatureProgress();
   const consent = content.querySelector<HTMLInputElement>('input[name="consent"]')?.checked === true;
-  const signerName = content.querySelector<HTMLInputElement>('input[name="signerName"]')?.value.trim() ?? '';
-  const ready = required.length > 0 && acknowledged === required.length && consent && Boolean(signerName) && (signatureMethod === 'typed' || Boolean(drawnSignature));
+  const confirmed = content.querySelector<HTMLInputElement>('input[name="detailsAcknowledged"]')?.checked === true;
+  const name = Boolean(signerName());
+  const email = Boolean(content.querySelector<HTMLInputElement>('input[name="signerEmail"]')?.value.trim());
+  const ready = progress.total > 0 && progress.applied === progress.total && consent && confirmed && name && email;
   status.textContent = ready
-    ? `Ready to sign ${acknowledged} required document${acknowledged === 1 ? '' : 's'}.`
-    : `${acknowledged} of ${required.length} required documents acknowledged${consent ? '' : ' · electronic-record consent required'}.`;
+    ? `Ready to sign ${progress.applied} document${progress.applied === 1 ? '' : 's'}.`
+    : `${progress.applied} of ${progress.total} signatures applied${name ? '' : ' · legal name required'}${email ? '' : ' · email required'}${consent ? '' : ' · consent required'}${confirmed ? '' : ' · details confirmation required'}.`;
   const primary = content.querySelector<HTMLButtonElement>('[data-signing-primary]');
   if (primary) primary.disabled = step === 3 && !ready;
 }
@@ -423,13 +709,13 @@ function updateActionStatus(): void {
 function validateStep(target: number): boolean {
   if (!content) return false;
   if (target === 1) {
-    const confirmed = content.querySelector<HTMLInputElement>('input[name="detailsConfirmed"]');
-    if (!confirmed?.checked) {
-      message('Confirm that the customer, property, service, and price details are correct before continuing.', 'error');
-      confirmed?.focus();
+    const acknowledged = content.querySelector<HTMLInputElement>('input[name="detailsAcknowledged"]');
+    if (!acknowledged?.checked) {
+      message('Review and acknowledge the details and price before continuing.', 'error');
+      acknowledged?.focus();
       return false;
     }
-    message('Details confirmed.', 'ok');
+    message('Details and price acknowledged.', 'ok');
     return true;
   }
   if (target === 2) {
@@ -473,76 +759,6 @@ function collectFieldValues(): Record<string, string> {
   return values;
 }
 
-function updateTypedPreview(): void {
-  if (!content) return;
-  const name = content.querySelector<HTMLInputElement>('input[name="signerName"]')?.value.trim() ?? '';
-  const preview = content.querySelector<HTMLElement>('[data-signature-preview]');
-  if (preview) preview.textContent = name || 'Your signature preview';
-}
-
-function updateSignatureMethod(): void {
-  if (!content) return;
-  const typed = content.querySelector<HTMLElement>('[data-signature-typed]');
-  const drawn = content.querySelector<HTMLElement>('[data-signature-drawn]');
-  if (typed) typed.hidden = signatureMethod !== 'typed';
-  if (drawn) drawn.hidden = signatureMethod !== 'drawn';
-  if (signatureMethod === 'drawn' && !canvasInitialized) {
-    window.requestAnimationFrame(() => setupCanvas());
-  }
-}
-
-function setupCanvas(): void {
-  if (canvasInitialized) return;
-  const canvas = content?.querySelector<HTMLCanvasElement>('[data-signature-canvas]');
-  if (!canvas) return;
-  const ratio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-  const rect = canvas.getBoundingClientRect();
-  const width = Math.max(300, Math.round(rect.width || 560));
-  canvas.width = Math.round(width * ratio);
-  canvas.height = Math.round((rect.height || 144) * ratio);
-  const context = canvas.getContext('2d');
-  if (!context) return;
-  context.scale(ratio, ratio);
-  context.lineWidth = 2.2;
-  context.lineCap = 'round';
-  context.lineJoin = 'round';
-  context.strokeStyle = '#3f2b30';
-  let drawing = false;
-  const point = (event: PointerEvent): { x: number; y: number } => {
-    const bounds = canvas.getBoundingClientRect();
-    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
-  };
-  canvas.addEventListener('pointerdown', (event) => {
-    drawing = true;
-    canvas.setPointerCapture(event.pointerId);
-    const p = point(event);
-    context.beginPath();
-    context.moveTo(p.x, p.y);
-    event.preventDefault();
-  });
-  canvas.addEventListener('pointermove', (event) => {
-    if (!drawing) return;
-    const p = point(event);
-    context.lineTo(p.x, p.y);
-    context.stroke();
-    event.preventDefault();
-  });
-  const finish = (event: PointerEvent): void => {
-    if (!drawing) return;
-    drawing = false;
-    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
-    drawnSignature = canvas.toDataURL('image/png');
-    updateActionStatus();
-  };
-  canvas.addEventListener('pointerup', finish);
-  canvas.addEventListener('pointercancel', finish);
-  canvas.addEventListener('pointerleave', (event) => {
-    if (drawing && event.buttons === 0) finish(event);
-  });
-  drawnSignature = '';
-  canvasInitialized = true;
-}
-
 function openDocument(templateId: string): void {
   const document = documents.find((entry) => entry.templateId === templateId);
   if (!document || !dialog || !dialogTitle || !dialogBody) return;
@@ -557,6 +773,17 @@ dialogClose?.addEventListener('click', () => dialog?.close());
 dialog?.addEventListener('click', (event) => {
   if (event.target === dialog) dialog.close();
 });
+signatureDialog?.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  closeSignatureDialog(null);
+});
+signatureDialog?.addEventListener('click', (event) => {
+  if ((event.target as HTMLElement).closest('[data-modal-cancel]')) {
+    closeSignatureDialog(null);
+    return;
+  }
+  if (event.target === signatureDialog) closeSignatureDialog(null);
+});
 
 async function submit(): Promise<void> {
   if (!content || submitting) return;
@@ -570,15 +797,16 @@ async function submit(): Promise<void> {
     updateStep();
     return;
   }
-  const signerName = content.querySelector<HTMLInputElement>('input[name="signerName"]')?.value.trim() ?? '';
-  const signerEmail = content.querySelector<HTMLInputElement>('input[name="signerEmail"]')?.value.trim() ?? '';
+  const name = signerName();
+  const email = content.querySelector<HTMLInputElement>('input[name="signerEmail"]')?.value.trim() ?? '';
   const consent = content.querySelector<HTMLInputElement>('input[name="consent"]')?.checked === true;
-  if (!signerName) {
-    message('Enter your full legal name once before signing.', 'error');
+  const confirmed = content.querySelector<HTMLInputElement>('input[name="detailsAcknowledged"]')?.checked === true;
+  if (!name) {
+    message('Enter your full legal name before signing.', 'error');
     content.querySelector<HTMLInputElement>('input[name="signerName"]')?.focus();
     return;
   }
-  if (!signerEmail) {
+  if (!email) {
     message('Enter your email before signing.', 'error');
     content.querySelector<HTMLInputElement>('input[name="signerEmail"]')?.focus();
     return;
@@ -588,39 +816,30 @@ async function submit(): Promise<void> {
     content.querySelector<HTMLInputElement>('input[name="consent"]')?.focus();
     return;
   }
-  if (signatureMethod === 'drawn' && !drawnSignature) {
-    message('Draw your signature in the box before signing, or choose Type my name.', 'error');
-    content.querySelector<HTMLCanvasElement>('[data-signature-canvas]')?.focus();
+  if (!confirmed) {
+    message('Confirm the details and price before signing.', 'error');
+    content.querySelector<HTMLInputElement>('input[name="detailsConfirmed"]')?.focus();
     return;
   }
-  const signatures: Record<string, { value: string; type: string; imageData?: string }> = {};
+  const signatures: Record<string, { value: string; type: string; imageData?: string; appliedAt?: string }> = {};
   for (const document of documents) {
     if (document.signed) continue;
-    if (document.required) {
-      const acknowledged = content.querySelector<HTMLInputElement>(`input[name="ack-${CSS.escape(document.templateId)}"]`);
-      if (!acknowledged?.checked) {
-        message(`Acknowledge ${document.title} before signing.`, 'error');
-        acknowledged?.focus();
-        return;
-      }
-      signatures[document.templateId] = {
-        value: signerName,
-        type: signatureMethod,
-        ...(signatureMethod === 'drawn' && drawnSignature ? { imageData: drawnSignature } : {}),
-      };
-      continue;
+    const applied = appliedSignatures[document.templateId];
+    if (document.required && !applied) {
+      message(`Click the X — Sign here box for ${document.title}.`, 'error');
+      content.querySelector<HTMLElement>(`[data-signature-slot="${CSS.escape(document.templateId)}"]`)?.focus();
+      return;
     }
-    const optional = content.querySelector<HTMLInputElement>(`input[name="opt-${CSS.escape(document.templateId)}"]`);
-    if (optional?.checked) {
-      signatures[document.templateId] = {
-        value: signerName,
-        type: signatureMethod,
-        ...(signatureMethod === 'drawn' && drawnSignature ? { imageData: drawnSignature } : {}),
-      };
-    }
+    if (!applied) continue;
+    signatures[document.templateId] = {
+      value: name,
+      type: applied.type,
+      appliedAt: applied.appliedAt,
+      ...(applied.type === 'drawn' && applied.imageData ? { imageData: applied.imageData } : {}),
+    };
   }
   if (Object.keys(signatures).length === 0) {
-    message('Select at least one document to sign.', 'error');
+    message('Click at least one signature box before signing.', 'error');
     return;
   }
   submitting = true;
@@ -636,8 +855,8 @@ async function submit(): Promise<void> {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         token,
-        signerName,
-        signerEmail,
+        signerName: name,
+        signerEmail: email,
         consent,
         signatures,
         customerFields: collectFieldValues(),
@@ -654,8 +873,15 @@ async function submit(): Promise<void> {
       }
       throw new Error(result.error ?? 'signing_failed');
     }
-    message('Your documents are signed. Your private copy is retained.', 'ok');
-    await load();
+    message('Your documents are signed. Preparing the next step…', 'ok');
+    const fresh = await fetchPayload();
+    if (fresh?.resumeCheckoutUrl) {
+      const next = new URL(fresh.resumeCheckoutUrl, window.location.origin);
+      next.searchParams.set('signing_token', token);
+      window.location.replace(next.toString());
+      return;
+    }
+    renderSuccess(fresh ?? { ok: true });
   } catch (error) {
     submitting = false;
     message(
@@ -669,23 +895,40 @@ async function submit(): Promise<void> {
   }
 }
 
+function emailStatusCopy(status: CustomerEmailStatus | undefined): string {
+  if (!status) return 'Your signed copy is available to download below.';
+  if (status.status === 'sent' || status.status === 'already_sent') {
+    return 'A signed PDF was emailed to the address on this signing request and accepted by our email provider.';
+  }
+  if (status.status === 'not_configured') {
+    return 'Email delivery is not configured. Download your signed PDF below and keep it for your records.';
+  }
+  if (status.status === 'failed') {
+    return 'Email delivery could not be confirmed. Download your signed PDF below and keep it for your records.';
+  }
+  return 'Your signed copy is available to download below.';
+}
+
 function renderSuccess(payload: SigningPayload): void {
   if (!content) return;
-  const resume = payload.resumeCheckoutUrl
-    ? `<a class="signing-btn signing-btn--primary" href="${esc(payload.resumeCheckoutUrl)}">Continue to secure payment</a>`
-    : '';
+  const pricing = payload.pricing;
+  const total = formatPricingMoney(pricing?.totalCents ?? null);
   const executed = payload.executedDownloadUrl
-    ? `<a class="signing-btn signing-btn--secondary" href="${esc(payload.executedDownloadUrl)}" target="_blank" rel="noopener">Download your executed agreement (PDF)</a>`
+    ? `<a class="signing-btn signing-btn--primary" href="${esc(payload.executedDownloadUrl)}" target="_blank" rel="noopener">Download signed PDF</a>`
     : '';
-  const back = returnPath
+  const portal = '<a class="signing-btn signing-btn--secondary" href="/portal/">Open customer portal</a>';
+  const returnLink = returnPath
     ? `<a class="signing-btn signing-btn--ghost" href="${esc(returnPath)}">Return to your cleaning request</a>`
     : '';
   content.hidden = false;
   content.innerHTML = `<div class="signing-success">
     <div class="signing-success__mark" aria-hidden="true">✓</div>
     <h1 class="signing-title">All required documents are signed</h1>
-    <p class="signing-lead" style="margin-left:auto;margin-right:auto;">Your signed copy is retained privately by Sparkling Standard. You may close this page after saving your copy.</p>
-    <div class="signing-actions">${resume}${executed}${back}</div>
+    <p class="signing-lead" style="margin-left:auto;margin-right:auto;">Your signed copy is retained privately by Sparkling Standard.</p>
+    ${total ? `<div class="signing-success__amount"><span>Final total</span><strong>${esc(total)}</strong></div>` : ''}
+    <p class="signing-muted">${esc(emailStatusCopy(payload.customerEmailStatus))}</p>
+    <div class="signing-actions">${executed}${portal}</div>
+    ${returnLink ? `<p class="signing-muted">${returnLink}</p>` : ''}
     <p class="signing-muted">Need a paper copy or want to withdraw consent to future electronic records? Email <a href="mailto:admin@sparkling-standard.com?subject=Signed%20document%20request">admin@sparkling-standard.com</a>. A signed record already completed is not affected by a later withdrawal.</p>
   </div>`;
 }
@@ -693,20 +936,21 @@ function renderSuccess(payload: SigningPayload): void {
 function render(payload: SigningPayload): void {
   documents = payload.documents ?? [];
   if (isCompleted()) {
-    message('All required documents are signed. You may close this page.');
+    if (payload.resumeCheckoutUrl) {
+      const next = new URL(payload.resumeCheckoutUrl, window.location.origin);
+      next.searchParams.set('signing_token', token);
+      window.location.replace(next.toString());
+      return;
+    }
+    message('All required documents are signed.');
     renderSuccess(payload);
     return;
   }
-  message('Review your details, complete the access choices, and sign once.');
+  message('Review your details and price, complete the access choices, and sign each document.');
   renderWizard(payload);
 }
 
-async function load(): Promise<void> {
-  if (!token) {
-    message('This signing link is missing or invalid.', 'error');
-    return;
-  }
-  submitting = false;
+async function fetchPayload(): Promise<SigningPayload | null> {
   try {
     const query = new URLSearchParams({ token });
     if (returnPath) query.set('return', returnPath);
@@ -716,7 +960,7 @@ async function load(): Promise<void> {
     });
     const payload = (await response.json().catch(() => ({}))) as SigningPayload;
     if (!response.ok || !payload.ok) throw new Error(payload.error ?? 'signing_link_invalid');
-    render(payload);
+    return payload;
   } catch (error) {
     message(
       String((error as Error).message).includes('signing_link_invalid')
@@ -724,7 +968,18 @@ async function load(): Promise<void> {
         : 'We could not load your documents. Please try again or contact Sparkling Standard.',
       'error',
     );
+    return null;
   }
+}
+
+async function load(): Promise<void> {
+  if (!token) {
+    message('This signing link is missing or invalid.', 'error');
+    return;
+  }
+  submitting = false;
+  const payload = await fetchPayload();
+  if (payload) render(payload);
 }
 
 void load();

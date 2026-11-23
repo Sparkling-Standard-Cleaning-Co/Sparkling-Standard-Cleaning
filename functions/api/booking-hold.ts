@@ -3,6 +3,8 @@
 import { bookingConfig } from '../../src/config/booking.ts';
 import { availabilityForDate, type BookingEnv } from '../../src/lib/booking/service.ts';
 import { bookingStore, createBookingHold, type BookingStorageEnv } from '../../src/lib/booking/holds.ts';
+import { resolveServiceBranchStrict } from '../../src/lib/branches/registry.ts';
+import { reverseGeocode } from '../../src/lib/location/server-geocode.ts';
 import {
   PUBLIC_RATE_LIMITS,
   checkPublicRateLimit,
@@ -60,6 +62,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const destination = payload.destination as { lat?: unknown; lng?: unknown } | undefined;
   const lat = Number(destination?.lat);
   const lng = Number(destination?.lng);
+  let zip = typeof payload.zip === 'string' ? payload.zip.trim() : '';
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
     !Number.isFinite(Date.parse(start)) ||
@@ -75,6 +78,17 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
   const requestedStart = new Date(start).toISOString();
   const requestedEnd = new Date(end).toISOString();
+  if (!/^\d{5}$/.test(zip)) {
+    const reverse = await reverseGeocode(env, lat, lng).catch(() => null);
+    zip = reverse?.zip?.trim() ?? '';
+  }
+  const resolved = await resolveServiceBranchStrict(env.DB ?? null, { zip, state: null });
+  if (!resolved.branch) {
+    return json({ ok: false, error: 'service_area_inquiry_required' }, 409);
+  }
+  if (!resolved.branch.bookable) {
+    return json({ ok: false, error: 'branch_not_bookable' }, 409);
+  }
 
   // Two customers can select the same time in the same instant. The first hold
   // takes one cleaner; a conflicting second request re-reads availability so
@@ -85,6 +99,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       date,
       durationMinutes,
       destination: { lat, lng },
+      branchId: resolved.branch.id,
     });
     if (!availability.ok) {
       return json({ ok: false, error: availability.reason }, 409);
@@ -103,6 +118,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       destination: { lat, lng },
       locationText,
       reference,
+      branchId: resolved.branch.id,
       resourceIds: exact.resourceIds,
       crewSize: availability.crewSize,
     });
@@ -113,7 +129,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         expiresAt: created.hold.expiresAt,
         start: created.hold.start,
         end: created.hold.end,
-        timeZone: bookingConfig.timeZone,
+        timeZone: availability.timeZone,
         status: 'held',
         notice:
           'Temporary hold - not a confirmed appointment. Sparkling Standard confirms the booking personally.',

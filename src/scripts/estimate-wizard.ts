@@ -668,7 +668,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const ongoing = result.ongoing;
         if (ongoing) {
           liveOngoing.hidden = false;
-          liveOngoing.textContent = `After the required first-visit Deep Cleaning above, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are ${formatUsd(ongoing.perVisitPrice)} each.`;
+          const ongoingDiscount =
+            ongoing.pricing.discount?.source === 'supportive'
+              ? ' Community Support applies to these ongoing visits only and does not stack with the first-visit promotion.'
+              : '';
+          liveOngoing.textContent = `After the required first-visit Deep Cleaning above, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are ${formatUsd(ongoing.perVisitPrice)} each.${ongoingDiscount}`;
         } else {
           liveOngoing.hidden = true;
           liveOngoing.textContent = '';
@@ -1278,7 +1282,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const rhythm =
           FREQUENCY_RHYTHMS[result.ongoing.frequency] ?? result.ongoing.frequency;
         reservationOngoing.hidden = false;
-        reservationOngoing.textContent = `${formatUsd(result.ongoing.perVisitPrice)} — ${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)} Thereafter`;
+        const ongoingDiscount =
+          result.ongoing.pricing.discount?.source === 'supportive'
+            ? ' (Community Support applied to ongoing visits only)'
+            : '';
+        reservationOngoing.textContent = `${formatUsd(result.ongoing.perVisitPrice)} — ${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)} Thereafter${ongoingDiscount}`;
       } else {
         reservationOngoing.hidden = true;
         reservationOngoing.textContent = '';
@@ -2413,8 +2421,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
         return { ok: true, url: data.url };
       }
       if (data.error === 'documents_required' && data.signingUrl) {
+        // This is a successful handoff to signing, not a payment failure.
+        // Navigating immediately avoids a red error flash before the page changes.
         window.location.assign(data.signingUrl);
-        return { ok: false, error: data.error };
+        return { ok: true, url: data.signingUrl };
       }
       if (data.error) {
         console.warn('[secure-checkout]', data.error, data.reason ?? '');

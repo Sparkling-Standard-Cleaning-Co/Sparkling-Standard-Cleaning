@@ -26,6 +26,7 @@ export interface BookingHold {
   createdAt: string;
   expiresAt: string;
   status: 'held' | 'released' | 'confirmed';
+  branchId?: string;
   calendarEventId?: string;
   /** Assigned cleaning resources. Absent on legacy holds, which block all. */
   resourceIds?: string[];
@@ -200,6 +201,7 @@ export async function createBookingHold(
     destination: { lat: number; lng: number };
     locationText: string;
     reference: string;
+    branchId?: string;
     resourceIds: ReadonlyArray<string>;
     crewSize?: number;
   },
@@ -236,6 +238,7 @@ export async function createBookingHold(
     createdAt: new Date().toISOString(),
     expiresAt,
     status: 'held',
+    ...(input.branchId ? { branchId: input.branchId } : {}),
     resourceIds,
     crewSize,
   };

@@ -15,7 +15,7 @@ import {
   type BranchLifecycle,
   type BranchPublicConfig,
 } from '../../config/branches.ts';
-import { normalizeZip, zipReferenceFor } from '../../config/geography.ts';
+import { normalizeZip, zipReference, zipReferenceFor } from '../../config/geography.ts';
 
 export interface BranchRow {
   id: string;
@@ -38,6 +38,12 @@ export interface BranchRow {
   public_email: string;
   gbp_status: BranchPublicConfig['gbpStatus'];
   gbp_url: string;
+  review_url: string;
+  review_requests_enabled: number;
+  review_request_delay_hours: number;
+  review_request_max_per_customer: number;
+  calendar_id: string;
+  calendar_name: string;
   launch_note: string;
   service_area_json: string;
   hours_json: string;
@@ -45,6 +51,13 @@ export interface BranchRow {
 }
 
 const BRANCH_COLUMNS = `id, name, status, lifecycle_status, public_slug, public_name,
+  region_label, timezone, address_line1, city, state, postal_code, origin_lat, origin_lng,
+  origin_place_id, travel_limit_miles, public_phone, public_email, gbp_status,
+  gbp_url, review_url, review_requests_enabled, review_request_delay_hours,
+  review_request_max_per_customer, calendar_id, calendar_name, launch_note,
+  service_area_json, hours_json, services_json`;
+
+const LEGACY_BRANCH_COLUMNS = `id, name, status, lifecycle_status, public_slug, public_name,
   region_label, timezone, address_line1, city, state, postal_code, origin_lat, origin_lng,
   origin_place_id, travel_limit_miles, public_phone, public_email, gbp_status,
   gbp_url, launch_note, service_area_json, hours_json, services_json`;
@@ -91,6 +104,7 @@ export function branchRowToConfig(row: BranchRow): BranchPublicConfig | null {
     publicEmail: row.public_email || base.publicEmail,
     gbpStatus: row.gbp_status || base.gbpStatus,
     gbpUrl: row.gbp_url || base.gbpUrl,
+    reviewUrl: row.review_url || base.reviewUrl,
     launchNote: row.launch_note || base.launchNote,
   };
 }
@@ -101,7 +115,14 @@ export async function listBranchRows(db: D1Database | null | undefined): Promise
     const result = await db.prepare(`SELECT ${BRANCH_COLUMNS} FROM branches ORDER BY id`).all<BranchRow>();
     return result.results ?? [];
   } catch {
-    return [];
+    try {
+      const result = await db
+        .prepare(`SELECT ${LEGACY_BRANCH_COLUMNS} FROM branches ORDER BY id`)
+        .all<BranchRow>();
+      return result.results ?? [];
+    } catch {
+      return [];
+    }
   }
 }
 
@@ -113,7 +134,14 @@ export async function getBranchRow(db: D1Database | null | undefined, id: string
       .bind(id)
       .first<BranchRow>();
   } catch {
-    return null;
+    try {
+      return await db
+        .prepare(`SELECT ${LEGACY_BRANCH_COLUMNS} FROM branches WHERE id = ? LIMIT 1`)
+        .bind(id)
+        .first<BranchRow>();
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -146,24 +174,94 @@ export async function assertBookableBranch(
   return branch;
 }
 
-/** Resolve a public lead's service location to a branch, never trusting a raw browser value. */
+export type BranchResolutionReason =
+  | 'matched_zip'
+  | 'matched_requested'
+  | 'outside_service_area'
+  | 'ambiguous_service_area'
+  | 'location_missing';
+
+export interface BranchResolution {
+  branch: BranchPublicConfig | null;
+  reason: BranchResolutionReason;
+}
+
+/**
+ * Resolve a public lead's service location to a branch, never trusting a raw
+ * browser value and never silently defaulting an unknown location to
+ * Pensacola. An unknown ZIP or an unrecognised state is an out-of-area
+ * inquiry, not a Pensacola booking.
+ */
+export async function resolveServiceBranchStrict(
+  db: D1Database | null | undefined,
+  input: { requestedBranchId?: string | null; zip?: string | null; state?: string | null },
+): Promise<BranchResolution> {
+  const zip = normalizeZip(input.zip ?? null);
+  const pensacola = await effectiveBranch(db, BRANCH_PENSACOLA);
+  const tampa = await effectiveBranch(db, BRANCH_TAMPA);
+  if (zip) {
+    const inPensacola = Boolean(
+      pensacola &&
+        (zipReferenceFor(zip) ||
+          pensacola.serviceAreaZips.includes(zip) ||
+          branchConfigs[BRANCH_PENSACOLA].serviceAreaZips.includes(zip)),
+    );
+    const inTampa = Boolean(
+      tampa &&
+        (tampa.serviceAreaZips.includes(zip) ||
+          branchConfigs[BRANCH_TAMPA].serviceAreaZips.includes(zip)),
+    );
+    if (inPensacola && inTampa) {
+      return { branch: null, reason: 'ambiguous_service_area' };
+    }
+    if (inPensacola) return { branch: pensacola, reason: 'matched_zip' };
+    if (inTampa) return { branch: tampa, reason: 'matched_zip' };
+    return { branch: null, reason: 'outside_service_area' };
+  }
+  const state = (input.state ?? '').trim().toUpperCase();
+  if (state) {
+    return { branch: null, reason: 'outside_service_area' };
+  }
+  const requested = input.requestedBranchId?.trim() ?? '';
+  if (isBranchId(requested)) {
+    const branch = await effectiveBranch(db, requested);
+    if (branch) return { branch, reason: 'matched_requested' };
+  }
+  return { branch: null, reason: 'location_missing' };
+}
+
+/** Conservative coordinate fallback used only when a reverse geocode has no ZIP. */
+export async function resolveServiceBranchForPoint(
+  db: D1Database | null | undefined,
+  input: { lat: number; lng: number },
+): Promise<BranchResolution> {
+  if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {
+    return { branch: null, reason: 'location_missing' };
+  }
+  const tampa = await effectiveBranch(db, BRANCH_TAMPA);
+  const pensacola = await effectiveBranch(db, BRANCH_PENSACOLA);
+  const distance = (lat: number, lng: number): number =>
+    Math.hypot(lat - input.lat, (lng - input.lng) * Math.cos((input.lat * Math.PI) / 180));
+  if (tampa && distance(27.95, -82.45) <= 0.75) {
+    return { branch: tampa, reason: 'matched_zip' };
+  }
+  if (pensacola) {
+    let nearest = Number.POSITIVE_INFINITY;
+    for (const reference of Object.values(zipReference)) {
+      nearest = Math.min(nearest, distance(reference.lat, reference.lng));
+    }
+    if (nearest <= 0.75) return { branch: pensacola, reason: 'matched_zip' };
+  }
+  return { branch: null, reason: 'outside_service_area' };
+}
+
+/** Backward-compatible wrapper. Callers that need an out-of-area result must use the strict resolver. */
 export async function resolveServiceBranch(
   db: D1Database | null | undefined,
   input: { requestedBranchId?: string | null; zip?: string | null; state?: string | null },
 ): Promise<BranchPublicConfig> {
-  const requested = input.requestedBranchId?.trim() ?? '';
-  if (isBranchId(requested)) {
-    const branch = await effectiveBranch(db, requested);
-    if (branch) return branch;
-  }
-  const zip = normalizeZip(input.zip ?? null);
-  const pensacola = await effectiveBranch(db, BRANCH_PENSACOLA);
-  const tampa = await effectiveBranch(db, BRANCH_TAMPA);
-  if (zip && zipReferenceFor(zip) && pensacola) return pensacola;
-  if (zip && tampa?.serviceAreaZips.includes(zip)) return tampa;
-  const state = (input.state ?? '').trim().toUpperCase();
-  if ((state === 'FL' || state === 'AL') && pensacola) return pensacola;
-  return pensacola ?? branchConfigs[BRANCH_PENSACOLA];
+  const resolved = await resolveServiceBranchStrict(db, input);
+  return resolved.branch ?? branchConfigs[BRANCH_PENSACOLA];
 }
 
 export function branchPublicPayload(branch: BranchPublicConfig): Record<string, unknown> {
@@ -184,6 +282,7 @@ export function branchPublicPayload(branch: BranchPublicConfig): Record<string, 
     phone: branch.publicPhone,
     email: branch.publicEmail,
     gbp: { status: branch.gbpStatus, url: branch.gbpUrl },
+    ...(branch.reviewUrl ? { reviewUrl: branch.reviewUrl } : {}),
     launchNote: branch.launchNote,
   };
 }

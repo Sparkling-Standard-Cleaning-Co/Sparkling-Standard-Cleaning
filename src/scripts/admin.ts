@@ -9,7 +9,9 @@ import { loadBranchView } from './admin-branches';
 import './admin-address-autocomplete';
 import { PET_OPTIONS, PROPERTY_TYPE_OPTIONS, RESIDENTIAL_INPUT_LIMITS } from '../config/estimators/input-definitions';
 import { pricing } from '../config/pricing';
-import { renderDocumentHtml } from '../lib/documents/rich-text.ts';
+import { normalizeRichDocumentHtml, renderDocumentHtml } from '../lib/documents/rich-text.ts';
+import { displayVersion } from '../lib/documents/version-labels.ts';
+import { formatLaborAndSite } from '../lib/format/duration.ts';
 
 interface AdminActor {
   id: string;
@@ -111,6 +113,7 @@ const viewMeta: Record<string, [string, string]> = {
   reports: ['Reports', 'Operational and financial reporting.'],
   storage: ['Data & Storage', 'Database health, business-record counts, exports and photo retention.'],
   promotions: ['Promotions & Discounts', 'Owner-controlled codes, schedules, limits and redemption reporting.'],
+  reviews: ['Google Reviews', 'Completed-service review invitations, branch review links and owner controls.'],
   pricing: ['Pricing & Estimator Control', 'Published prices, draft changes, simulations and version history.'],
   branches: ['Branches & Launch', 'Pensacola live operations and Tampa Bay prelaunch readiness.'],
   settings: ['Settings & Audit', 'Access, security, configuration and audit history.'],
@@ -132,6 +135,7 @@ const navPermission: Record<string, string> = {
   reports: 'finance.read',
   pricing: 'settings.write',
   branches: 'settings.write',
+  reviews: 'settings.write',
 };
 
 function esc(value: unknown): string {
@@ -475,6 +479,7 @@ async function loadOverview(): Promise<void> {
   const data = await api<{
     counts?: Record<string, number>;
     alerts?: Array<Record<string, unknown>>;
+    alertHistory?: Array<Record<string, unknown>>;
     recentLeads?: Array<Record<string, unknown>>;
   }>('/api/admin/overview');
   const counts = data.counts ?? {};
@@ -493,24 +498,59 @@ async function loadOverview(): Promise<void> {
       ['Active gifts', counts.activeGifts ?? 0],
       ['Booking recovery', counts.failedCommitments ?? 0],
       ['Financial issues', counts.financialIssues ?? 0],
-      ['Failed recurring runs', counts.failedWorkerRuns ?? 0],
+      ['Active recurring failures', counts.failedWorkerRuns ?? 0],
+      ['Historical recurring failures', counts.failedWorkerRunsHistory ?? 0],
+      ['Checkout failures', counts.failedCheckouts ?? 0],
+      ['Abandoned checkouts', counts.abandonedCheckouts ?? 0],
     ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('');
   }
   const alerts = document.querySelector<HTMLElement>('[data-admin-alerts]');
   if (alerts) {
     const rows = data.alerts ?? [];
+    const history = data.alertHistory ?? [];
     alerts.innerHTML = rows.length
-      ? `<div class="admin-card"><h2 class="admin-section-title">Action required</h2>${rows
-          .map(
-            (alert) =>
-              `<p class="${String(alert.severity) === 'high' ? 'admin-error' : 'admin-muted'}">${esc(
-                alert.message,
-              )} <button class="btn btn--ghost btn--small" type="button" data-admin-action="overview-open" data-view="${esc(
-                alert.view,
-              )}">Open</button></p>`,
-          )
+      ? `<div class="admin-card"><h2 class="admin-section-title">Operational alerts</h2><p class="admin-muted">Each alert explains what happened, why, and what to do next. Resolving or dismissing an alert never changes the underlying financial or operational record.</p>${rows
+          .map((alert) => {
+            const key = String(alert.key ?? alert.kind ?? '');
+            const severity = String(alert.severity ?? 'medium');
+            const status = titleCase(String(alert.status ?? 'new'));
+            const records = Array.isArray(alert.records)
+              ? (alert.records as Array<Record<string, unknown>>)
+              : [];
+            return `<details class="admin-alert admin-alert--${esc(severity)}">
+              <summary><span class="admin-status">${esc(status)}</span> <strong>${esc(alert.title ?? alert.message ?? 'Operational alert')}</strong> <span class="admin-muted">${esc(alert.count ?? 0)} record(s)</span></summary>
+              <div class="admin-alert__body">
+                <p>${esc(alert.explanation ?? alert.message ?? '')}</p>
+                <dl class="admin-definition">
+                  <dt>First seen</dt><dd>${esc(alert.firstSeen ? dateTime(alert.firstSeen) : 'Not recorded')}</dd>
+                  <dt>Most recent</dt><dd>${esc(alert.lastSeen ? dateTime(alert.lastSeen) : 'Not recorded')}</dd>
+                  <dt>Root cause</dt><dd>${esc(alert.rootCause ?? 'Review the affected records for the exact cause.')}</dd>
+                  <dt>Recommended action</dt><dd>${esc(alert.recommendation ?? 'Open the affected area and review the records.')}</dd>
+                </dl>
+                ${records.length ? `<h4>Affected records</h4><ul class="admin-alert__records">${records.map((record) => `<li><strong>${esc(record.label ?? '')}</strong> <span class="admin-muted">${esc(record.detail ?? '')}</span>${record.id ? ` <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-open" data-id="${esc(record.id)}">Open</button>` : ''}</li>`).join('')}</ul>` : ''}
+                <div class="admin-actions">
+                  <button class="btn btn--primary btn--small" type="button" data-admin-action="overview-open" data-view="${esc(alert.view ?? 'overview')}" data-filter="${esc(alert.filter ?? '')}">Open affected area</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="overview-recheck">Recheck now</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="alert-action" data-key="${esc(key)}" data-alert-action="acknowledge" data-kind="${esc(alert.kind ?? '')}" data-title="${esc(alert.title ?? '')}">Acknowledge</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="alert-action" data-key="${esc(key)}" data-alert-action="investigate" data-kind="${esc(alert.kind ?? '')}" data-title="${esc(alert.title ?? '')}">Investigating</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="alert-action" data-key="${esc(key)}" data-alert-action="resolve" data-kind="${esc(alert.kind ?? '')}" data-title="${esc(alert.title ?? '')}">Resolve</button>
+                  ${actor?.role === 'owner' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="alert-action" data-key="${esc(key)}" data-alert-action="dismiss" data-kind="${esc(alert.kind ?? '')}" data-title="${esc(alert.title ?? '')}">Dismiss as non-actionable</button>` : ''}
+                </div>
+                <label class="admin-field--wide" style="display:block;margin-top:.5rem;">Resolution note (required when resolving)
+                  <input data-alert-note="${esc(key)}" maxlength="1000" placeholder="What was wrong and what fixed it?" />
+                </label>
+                ${alert.resolutionNote ? `<p class="admin-muted">Resolved: ${esc(alert.resolutionNote)}</p>` : ''}
+              </div>
+            </details>`;
+          })
           .join('')}</div>`
-      : '<p class="admin-muted">No operational exceptions are open.</p>';
+      : '<div class="admin-card"><h2 class="admin-section-title">Operational alerts</h2><p class="admin-muted">No operational exceptions are open.</p></div>';
+    if (history.length) {
+      alerts.insertAdjacentHTML(
+        'beforeend',
+        `<details class="admin-detail-toggle" style="margin-top:.75rem;"><summary>Resolved and dismissed alert history (${history.length})</summary>${history.map((entry) => `<div class="admin-record"><p><strong>${esc(entry.key)}</strong> <span class="admin-status">${esc(titleCase(String(entry.status)))}</span></p><p class="admin-muted">${esc(entry.note || 'No resolution note recorded.')} · ${esc(dateTime(entry.resolvedAt || entry.dismissedAt || entry.updatedAt || ''))}</p></div>`).join('')}</details>`,
+      );
+    }
   }
   const recent = document.querySelector<HTMLElement>('[data-admin-recent]');
   if (recent) {
@@ -547,32 +587,223 @@ function requestLocation(request: Record<string, unknown>): string {
   }
 }
 
+let weekOffset = 0;
+let weekAppointments: Array<Record<string, unknown>> = [];
+let weekEmployeeFilter = '';
+let weekServiceFilter = '';
+let weekStatusFilter = '';
+let weekBranchFilter = '';
+let loadedAppointments: Array<Record<string, unknown>> = [];
+let appointmentStatusFilter = 'active';
+let appointmentRangeFilter = '30';
+let appointmentEmployeeFilter = '';
+let appointmentServiceFilter = '';
+let appointmentPage = 0;
+const APPOINTMENT_PAGE_SIZE = 20;
+
+function centralTodayKey(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function addDateKey(key: string, days: number): string {
+  const date = new Date(`${key}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function weekDateKeys(): string[] {
+  const today = centralTodayKey();
+  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
+  const start = addDateKey(today, -weekday + weekOffset * 7);
+  return Array.from({ length: 7 }, (_, index) => addDateKey(start, index));
+}
+
+function appointmentService(request: Record<string, unknown>): string {
+  try {
+    const payload = JSON.parse(String(request.request_payload ?? '{}')) as Record<string, unknown>;
+    const raw = String(payload.service_label ?? payload.service_type ?? payload.serviceType ?? 'Cleaning');
+    return raw.replaceAll('_', ' ').replaceAll('-', ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+  } catch {
+    return 'Cleaning';
+  }
+}
+
+function appointmentReference(appointment: Record<string, unknown>): string {
+  const reference = String(appointment.reference ?? '').trim();
+  if (reference && !/^RECURRING-rec_/i.test(reference)) return reference;
+  const customer = [appointment.first_name, appointment.last_name].filter(Boolean).join(' ') || 'Recurring customer';
+  return `${customer} · ${appointmentService(appointment)}`;
+}
+
+function appointmentTimeRange(appointment: Record<string, unknown>): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  const start = new Date(String(appointment.start_at ?? ''));
+  const end = new Date(String(appointment.end_at ?? ''));
+  if (!Number.isFinite(start.getTime())) return 'Time not recorded';
+  return `${formatter.format(start)}${Number.isFinite(end.getTime()) ? ` — ${formatter.format(end)}` : ''}`;
+}
+
+function appointmentStatusClass(status: string): string {
+  if (status === 'confirmed') return 'is-confirmed';
+  if (status === 'pending') return 'is-pending';
+  if (status === 'in_progress') return 'is-progress';
+  if (status === 'completed') return 'is-completed';
+  if (status === 'cancelled' || status === 'no_show') return 'is-cancelled';
+  return 'is-neutral';
+}
+
+function weekFilteredAppointments(): Array<Record<string, unknown>> {
+  return weekAppointments.filter((appointment) => {
+    const status = String(appointment.status ?? '');
+    if (!weekStatusFilter && ['cancelled', 'no_show'].includes(status)) return false;
+    if (weekStatusFilter && weekStatusFilter !== 'all' && status !== weekStatusFilter) return false;
+    if (weekEmployeeFilter) {
+      const assigned = String(appointment.assigned_names ?? '');
+      if (!assigned.split(',').map((entry) => entry.trim()).includes(weekEmployeeFilter)) return false;
+    }
+    if (weekServiceFilter && appointmentService(appointment) !== weekServiceFilter) return false;
+    if (weekBranchFilter && String(appointment.branch_id ?? '') !== weekBranchFilter) return false;
+    return true;
+  });
+}
+
+function refreshWeekFilterOptions(): void {
+  const employeeSelect = document.querySelector<HTMLSelectElement>('[data-admin-week-employee]');
+  if (employeeSelect) {
+    const names = new Set<string>();
+    for (const appointment of weekAppointments) {
+      for (const name of String(appointment.assigned_names ?? '').split(',').map((entry) => entry.trim()).filter(Boolean)) {
+        names.add(name);
+      }
+    }
+    const current = employeeSelect.value;
+    employeeSelect.innerHTML = `<option value="">All employees</option>${[...names].sort().map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join('')}`;
+    employeeSelect.value = names.has(current) ? current : '';
+    weekEmployeeFilter = employeeSelect.value;
+  }
+  const serviceSelect = document.querySelector<HTMLSelectElement>('[data-admin-week-service]');
+  if (serviceSelect) {
+    const services = new Set(weekAppointments.map((appointment) => appointmentService(appointment)));
+    const current = serviceSelect.value;
+    serviceSelect.innerHTML = `<option value="">All services</option>${[...services].sort().map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join('')}`;
+    serviceSelect.value = services.has(current) ? current : '';
+    weekServiceFilter = serviceSelect.value;
+  }
+}
+
 function renderWeekBoard(appointments: Array<Record<string, unknown>>): void {
   const target = document.querySelector<HTMLElement>('[data-admin-week-board]');
   if (!target) return;
+  weekAppointments = appointments;
+  refreshWeekFilterOptions();
+  const days = weekDateKeys();
+  const filtered = weekFilteredAppointments();
   const byDay = new Map<string, Array<Record<string, unknown>>>();
-  for (const appointment of appointments) {
-    if (['cancelled', 'no_show'].includes(String(appointment.status))) continue;
+  for (const appointment of filtered) {
     const key = centralDateKey(appointment.start_at);
     if (!key) continue;
     const list = byDay.get(key) ?? [];
     list.push(appointment);
     byDay.set(key, list);
   }
-  const days: string[] = [];
-  for (let offset = 0; offset < 7; offset += 1) {
-    const day = new Date(Date.now() + offset * 86_400_000);
-    days.push(centralDateKey(day));
+  const label = document.querySelector<HTMLElement>('[data-admin-week-label]');
+  if (label) {
+    label.textContent = `${dateTime(`${days[0]}T12:00:00Z`)} – ${dateTime(`${days[6]}T12:00:00Z`)}${weekOffset === 0 ? ' · Current week' : ''}`;
   }
-  target.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Day</th><th>Jobs</th><th>Crew</th><th>First appointment</th><th>Latest</th></tr></thead><tbody>${days
-    .map((day) => {
-      const jobs = (byDay.get(day) ?? []).sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
-      const crew = jobs.reduce((total, job) => total + (Number(job.crew_size) || 1), 0);
-      const first = jobs[0];
-      const last = jobs[jobs.length - 1];
-      return `<tr><td>${esc(dateTime(day))}</td><td>${jobs.length}</td><td>${crew}</td><td>${first ? `${esc(dateTime(first.start_at))} · ${esc(first.reference)}` : '—'}</td><td>${last ? esc(dateTime(last.start_at)) : '—'}</td></tr>`;
-    })
-    .join('')}</tbody></table></div>`;
+  const today = centralTodayKey();
+  target.innerHTML = `<div class="admin-week-grid">${days.map((day) => {
+    const jobs = (byDay.get(day) ?? []).sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
+    const dayLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(new Date(`${day}T12:00:00Z`));
+    const dateLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' }).format(new Date(`${day}T12:00:00Z`));
+    return `<section class="admin-week-day${day === today ? ' is-today' : ''}">
+      <header><span>${esc(dayLabel)}</span><strong>${esc(dateLabel)}</strong>${day === today ? '<span class="admin-week-today">Today</span>' : ''}</header>
+      <div class="admin-week-day__jobs">${jobs.length ? jobs.map((appointment) => {
+        const status = String(appointment.status ?? 'pending');
+        const customer = [appointment.first_name, appointment.last_name].filter(Boolean).join(' ') || 'Unlinked customer';
+        const property = [appointment.line1, appointment.city].filter(Boolean).join(', ') || 'Property not linked';
+        return `<article class="admin-appointment-card ${appointmentStatusClass(status)}" tabindex="0" role="button" data-admin-action="appointment-open" data-request="${esc(appointment.booking_request_id ?? '')}" data-id="${esc(appointment.id)}" aria-label="${esc(`${appointmentTimeRange(appointment)} ${customer} ${appointmentService(appointment)}`)}">
+          <p class="admin-appointment-card__time">${esc(appointmentTimeRange(appointment))}</p>
+          <p class="admin-appointment-card__customer">${esc(customer)}</p>
+          <p class="admin-appointment-card__service">${esc(appointmentService(appointment))}</p>
+          <p class="admin-appointment-card__meta">Assigned: ${esc(String(appointment.assigned_names || 'Unassigned'))}</p>
+          <p class="admin-appointment-card__meta">${esc(property)}</p>
+          <span class="admin-appointment-card__status">${esc(titleCase(status.replaceAll('_', ' ')))}</span>
+          <span class="admin-appointment-card__ref">${esc(appointmentReference(appointment))}</span>
+        </article>`;
+      }).join('') : '<p class="admin-week-empty">No appointments</p>'}</div>
+    </section>`;
+  }).join('')}</div>`;
+}
+
+function renderUpcomingAppointments(): void {
+  const target = document.querySelector<HTMLElement>('[data-admin-appointments]');
+  if (!target) return;
+  const employeeSelect = document.querySelector<HTMLSelectElement>('[data-admin-appointment-employee]');
+  const serviceSelect = document.querySelector<HTMLSelectElement>('[data-admin-appointment-service]');
+  if (employeeSelect) {
+    const names = new Set<string>();
+    for (const appointment of loadedAppointments) {
+      for (const name of String(appointment.assigned_names ?? '').split(',').map((entry) => entry.trim()).filter(Boolean)) names.add(name);
+    }
+    const current = employeeSelect.value;
+    employeeSelect.innerHTML = `<option value="">All employees</option>${[...names].sort().map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join('')}`;
+    employeeSelect.value = names.has(current) ? current : '';
+    appointmentEmployeeFilter = employeeSelect.value;
+  }
+  if (serviceSelect) {
+    const services = new Set(loadedAppointments.map((appointment) => appointmentService(appointment)));
+    const current = serviceSelect.value;
+    serviceSelect.innerHTML = `<option value="">All services</option>${[...services].sort().map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join('')}`;
+    serviceSelect.value = services.has(current) ? current : '';
+    appointmentServiceFilter = serviceSelect.value;
+  }
+  const now = Date.now();
+  const limit = appointmentRangeFilter === 'all' ? null : now + Number(appointmentRangeFilter) * 86_400_000;
+  const rows = loadedAppointments.filter((appointment) => {
+    const status = String(appointment.status ?? '');
+    if (appointmentStatusFilter === 'active' && !['confirmed', 'pending', 'in_progress'].includes(status)) return false;
+    if (appointmentStatusFilter === 'confirmed' && status !== 'confirmed') return false;
+    if (appointmentStatusFilter === 'pending' && status !== 'pending') return false;
+    if (appointmentStatusFilter === 'cancelled' && !['cancelled', 'no_show'].includes(status)) return false;
+    if (appointmentStatusFilter === 'completed' && status !== 'completed') return false;
+    const start = Date.parse(String(appointment.start_at ?? ''));
+    if (!Number.isFinite(start)) return false;
+    if (appointmentStatusFilter !== 'all' && appointmentStatusFilter !== 'completed' && start < now - 86_400_000) return false;
+    if (limit !== null && start > limit) return false;
+    if (appointmentEmployeeFilter) {
+      const assigned = String(appointment.assigned_names ?? '').split(',').map((entry) => entry.trim());
+      if (!assigned.includes(appointmentEmployeeFilter)) return false;
+    }
+    if (appointmentServiceFilter && appointmentService(appointment) !== appointmentServiceFilter) return false;
+    return true;
+  }).sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
+  const totalPages = Math.max(1, Math.ceil(rows.length / APPOINTMENT_PAGE_SIZE));
+  appointmentPage = Math.min(Math.max(0, appointmentPage), totalPages - 1);
+  const pageRows = rows.slice(appointmentPage * APPOINTMENT_PAGE_SIZE, (appointmentPage + 1) * APPOINTMENT_PAGE_SIZE);
+  const pager = document.querySelector<HTMLElement>('[data-admin-appointments-pagination]');
+  if (pager) {
+    pager.innerHTML = rows.length > APPOINTMENT_PAGE_SIZE
+      ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="appointments-page" data-page="${appointmentPage - 1}"${appointmentPage === 0 ? ' disabled' : ''}>Previous</button><span class="admin-muted">Page ${appointmentPage + 1} of ${totalPages} · ${rows.length} appointments</span><button class="btn btn--ghost btn--small" type="button" data-admin-action="appointments-page" data-page="${appointmentPage + 1}"${appointmentPage >= totalPages - 1 ? ' disabled' : ''}>Next</button></div>`
+      : `<p class="admin-muted">${rows.length} appointment${rows.length === 1 ? '' : 's'} in this view.</p>`;
+  }
+  if (pageRows.length === 0) {
+    renderEmpty(target, 'No appointments match this view.');
+    return;
+  }
+  target.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Start</th><th>Customer</th><th>Service</th><th>Property</th><th>Assigned</th><th>Status</th><th>Reference</th></tr></thead><tbody>${pageRows.map((appointment) => {
+    const customer = [appointment.first_name, appointment.last_name].filter(Boolean).join(' ') || 'Unlinked customer';
+    const property = [appointment.line1, appointment.city].filter(Boolean).join(', ') || 'Not linked';
+    return `<tr><td>${esc(dateTime(appointment.start_at))}</td><td><button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-open" data-id="${esc(appointment.customer_id ?? '')}"${appointment.customer_id ? '' : ' disabled'}>${esc(customer)}</button></td><td>${esc(appointmentService(appointment))}</td><td>${esc(property)}</td><td>${esc(String(appointment.assigned_names || 'Unassigned'))}</td><td><span class="admin-status">${esc(titleCase(String(appointment.status ?? '').replaceAll('_', ' ')))}</span></td><td>${esc(appointmentReference(appointment))}</td></tr>`;
+  }).join('')}</tbody></table></div>`;
 }
 
 function requestStage(request: Record<string, unknown>): string {
@@ -603,34 +834,80 @@ function requestPayment(request: Record<string, unknown>): string {
   return `${label}${Number.isFinite(amount) && amount > 0 ? ` ? ${money(amount)}` : ''}${reference ? ` (${reference})` : ''}`;
 }
 
+const selectedRequestIds = new Set<string>();
+let visibleRequestIds: string[] = [];
+let filteredRequestIds: string[] = [];
+let loadedRequests: Array<Record<string, unknown>> = [];
+let requestServiceFilter = '';
+let requestFromFilter = '';
+let requestToFilter = '';
+let currentRequestView = 'actionable';
+
+function requestServiceLabel(request: Record<string, unknown>): string {
+  try {
+    const payload = JSON.parse(String(request.payload_json ?? '{}')) as Record<string, unknown>;
+    const raw = String(payload.service_label ?? payload.service_type ?? payload.serviceType ?? 'Cleaning');
+    return raw.replaceAll('_', ' ').replaceAll('-', ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+  } catch {
+    return 'Cleaning';
+  }
+}
+
+function updateRequestBulkToolbar(): void {
+  const toolbar = document.querySelector<HTMLElement>('[data-admin-request-bulk]');
+  if (!toolbar) return;
+  toolbar.hidden = selectedRequestIds.size === 0;
+  const count = toolbar.querySelector<HTMLElement>('[data-admin-request-bulk-count]');
+  if (count) count.textContent = `${selectedRequestIds.size} selected`;
+  for (const checkbox of document.querySelectorAll<HTMLInputElement>('[data-admin-request-select]')) {
+    checkbox.checked = selectedRequestIds.has(checkbox.value);
+  }
+  const allVisible = visibleRequestIds.length > 0 && visibleRequestIds.every((id) => selectedRequestIds.has(id));
+  const master = document.querySelector<HTMLInputElement>('[data-admin-request-select-all-visible]');
+  if (master) master.checked = allVisible;
+}
+
+function renderRequestRows(): void {
+  const target = document.querySelector<HTMLElement>('[data-admin-requests]');
+  if (!target) return;
+  const rows = loadedRequests.filter((request) => {
+    const service = requestServiceLabel(request).toLowerCase();
+    if (requestServiceFilter && !service.includes(requestServiceFilter)) return false;
+    const start = String(request.start_at ?? '').slice(0, 10);
+    if (requestFromFilter && start && start < requestFromFilter) return false;
+    if (requestToFilter && start && start > requestToFilter) return false;
+    return true;
+  });
+  filteredRequestIds = rows.map((request) => String(request.id));
+  visibleRequestIds = rows.slice(0, 200).map((request) => String(request.id));
+  if (rows.length === 0) {
+    renderEmpty(target, 'No requests match this view and filter.');
+    updateRequestBulkToolbar();
+    return;
+  }
+  target.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th><input type="checkbox" data-admin-request-select-all-visible aria-label="Select all visible requests" /></th><th>Start</th><th>Reference</th><th>Customer</th><th>Service</th><th>Property</th><th>Payment</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows.map((request) => {
+    const id = String(request.id);
+    return `<tr><td><input type="checkbox" data-admin-request-select value="${esc(id)}" aria-label="Select request ${esc(request.quote_reference ?? id)}" /></td><td>${esc(dateTime(request.start_at))}</td><td>${esc(request.quote_reference)}${Number(request.is_test) === 1 ? ' <span class="admin-status">Test</span>' : ''}</td><td>${esc([request.first_name, request.last_name].filter(Boolean).join(' ') || 'Unlinked request')}</td><td>${esc(requestServiceLabel(request))}</td><td>${esc(requestLocation(request))}</td><td>${esc(requestPayment(request))}</td><td><span class="admin-status">${esc(requestStage(request))}</span></td><td><button class="btn btn--ghost btn--small" type="button" data-admin-action="request-open" data-id="${esc(id)}">Open</button></td></tr>`;
+  }).join('')}</tbody></table></div>`;
+  updateRequestBulkToolbar();
+}
+
 async function loadCalendar(view = 'actionable', query = ''): Promise<void> {
+  currentRequestView = view;
   const data = await api<{ requests?: Array<Record<string, unknown>>; appointments?: Array<Record<string, unknown>> }>(
     `/api/admin/requests?view=${encodeURIComponent(view)}&q=${encodeURIComponent(query)}`,
   );
-  const requests = document.querySelector<HTMLElement>('[data-admin-requests]');
-  if (requests) {
-    renderTable(requests, ['Start', 'Reference', 'Customer', 'Property', 'Payment', 'Status', 'Action'], (data.requests ?? []).map((request) => [
-      esc(dateTime(request.start_at)),
-      esc(request.quote_reference),
-      esc([request.first_name, request.last_name].filter(Boolean).join(' ') || 'Unlinked request'),
-      esc(requestLocation(request)),
-      esc(requestPayment(request)),
-      `<span class="admin-status">${esc(requestStage(request))}</span>`,
-      `<button class="btn btn--ghost btn--small" type="button" data-admin-action="request-open" data-id="${esc(request.id)}">Open</button>`,
-    ]), query ? 'No requests match this search.' : 'No requests match this view.');
+  loadedRequests = data.requests ?? [];
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    '[data-admin-request-bulk] [data-operation="mark_test"], [data-admin-request-bulk] [data-operation="delete_test"]',
+  )) {
+    button.hidden = actor?.role !== 'owner';
   }
+  renderRequestRows();
   renderWeekBoard(data.appointments ?? []);
-  const appointments = document.querySelector<HTMLElement>('[data-admin-appointments]');
-  if (appointments) {
-    renderTable(appointments, ['Start', 'Reference', 'Customer', 'Property', 'Crew', 'Status'], (data.appointments ?? []).map((appointment) => [
-      esc(dateTime(appointment.start_at)),
-      esc(appointment.reference),
-      esc([appointment.first_name, appointment.last_name].filter(Boolean).join(' ')),
-      esc([appointment.line1, appointment.city].filter(Boolean).join(', ')),
-      esc(appointment.crew_size),
-      `<span class="admin-status">${esc(appointment.status)}</span>`,
-    ]), 'No appointments are recorded yet.');
-  }
+  loadedAppointments = data.appointments ?? [];
+  appointmentPage = 0;
+  renderUpcomingAppointments();
 }
 
 function payloadSummary(payload: Record<string, unknown>): string {
@@ -703,7 +980,7 @@ async function openRequest(requestId: string): Promise<void> {
 
   let customerOptions = '';
   try {
-    const customers = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?limit=200');
+    const customers = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?status=active&limit=200');
     customerOptions = (customers.customers ?? [])
       .map((customer) => {
         const label = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || customer.id;
@@ -907,7 +1184,7 @@ interface PageState {
 }
 
 const leadPage: PageState & { status: string; q: string } = { status: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
-const customerPage: PageState & { q: string } = { q: '', limit: 25, offset: 0, sort: 'created_at' };
+const customerPage: PageState & { q: string; status: string } = { q: '', status: 'active', limit: 25, offset: 0, sort: 'created_at' };
 const careerPage: PageState & { status: string; branch: string; q: string } = { status: '', branch: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
 const financePage: PageState & { status: string; q: string } = { status: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
 
@@ -954,7 +1231,7 @@ async function loadLeads(status = leadPage.status, query = leadPage.q): Promise<
 }
 
 async function loadCustomerOptions(): Promise<void> {
-  const data = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?limit=200');
+  const data = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?status=active&limit=200');
   const options = (data.customers ?? []).map((customer) => {
     const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || customer.id;
     return `<option value="${esc(customer.id)}">${esc(name)}${customer.email ? ` — ${esc(customer.email)}` : ''}</option>`;
@@ -973,6 +1250,7 @@ async function loadCustomers(query = customerPage.q): Promise<void> {
   }
   const params = new URLSearchParams({
     q: customerPage.q,
+    status: customerPage.status,
     limit: String(customerPage.limit),
     offset: String(customerPage.offset),
     sort: customerPage.sort,
@@ -983,8 +1261,22 @@ async function loadCustomers(query = customerPage.q): Promise<void> {
   if (!list) return;
   if (detail) { detail.hidden = true; detail.innerHTML = ''; }
   renderPager(document.querySelector<HTMLElement>('[data-admin-customers-pagination]'), data, 'customers-page');
-  if ((data.customers ?? []).length === 0) return renderEmpty(list, query ? 'No matching customers.' : 'No customers have been persisted yet.');
-  list.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Properties</th><th>Branch</th><th></th></tr></thead><tbody>${(data.customers ?? []).map((customer) => `<tr><td>${esc([customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name)}</td><td>${esc(customer.email)}</td><td>${esc(customer.phone)}</td><td>${esc(customer.property_count)}</td><td>${esc(customer.branch_name)}</td><td><button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-open" data-id="${esc(customer.id)}">Open</button></td></tr>`).join('')}</tbody></table></div>`;
+  if ((data.customers ?? []).length === 0) {
+    const label =
+      customerPage.status === 'deleted'
+        ? 'No deleted or anonymized customer records match this view.'
+        : customerPage.status === 'archived'
+          ? 'No archived customers match this view.'
+          : customerPage.status === 'active'
+            ? 'No active customers match this search.'
+            : 'No customers match this search.';
+    return renderEmpty(list, query ? 'No matching customers.' : label);
+  }
+  list.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Name</th><th>Status</th><th>Email</th><th>Phone</th><th>Properties</th><th>Branch</th><th></th></tr></thead><tbody>${(data.customers ?? []).map((customer) => {
+    const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || 'Customer';
+    const anonymized = name === 'Deleted Customer';
+    return `<tr><td>${esc(anonymized ? 'Anonymized customer record' : name)}</td><td><span class="admin-status">${esc(anonymized ? 'Deleted' : titleCase(String(customer.status ?? 'active')))}</span></td><td>${esc(anonymized ? 'Removed for privacy' : customer.email)}</td><td>${esc(anonymized ? 'Removed for privacy' : customer.phone)}</td><td>${esc(customer.property_count)}</td><td>${esc(customer.branch_name)}</td><td><button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-open" data-id="${esc(customer.id)}">Open</button></td></tr>`;
+  }).join('')}</tbody></table></div>`;
   void loadCustomerOptions();
 }
 
@@ -1113,10 +1405,13 @@ async function openCustomer(customerId: string): Promise<void> {
     : '';
   const email = contacts.find((contact) => contact.kind === 'email')?.value ?? customer.email ?? '';
   const phone = contacts.find((contact) => contact.kind === 'phone')?.value ?? customer.phone ?? '';
+  const anonymized =
+    String(customer.first_name ?? '').trim().toLowerCase() === 'deleted' &&
+    String(customer.last_name ?? '').trim().toLowerCase() === 'customer';
   detail.hidden = false;
   detail.innerHTML = `<div class="admin-card">
-    <div class="admin-detail-head"><h2 class="admin-section-title">${esc([customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || 'Customer')}</h2><div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-edit">Edit Customer</button><form class="admin-inline-form" data-form="customer-archive"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="targetStatus" value="${customer.status === 'archived' ? 'active' : 'archived'}" /><button class="btn btn--ghost btn--small" type="submit">${customer.status === 'archived' ? 'Restore Archived Customer' : 'Archive Customer'}</button></form>${actor?.role === 'owner' ? `<form class="admin-inline-form" data-form="customer-delete"><input type="hidden" name="customerId" value="${esc(customerId)}" /><button class="btn btn--danger btn--small" type="submit">Delete Customer</button></form>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-create">Close</button></div></div>
-    <dl class="admin-definition"><dt>Status</dt><dd>${esc(customer.status)}</dd><dt>Branch</dt><dd>${esc(customer.branch_name)}</dd><dt>Source</dt><dd>${esc(customer.source)}</dd><dt>Contacts</dt><dd>${contacts.map((contact) => `${esc(titleCase(contact.kind))}: ${esc(contact.value)}`).join('<br />') || '—'}</dd></dl>
+    <div class="admin-detail-head"><h2 class="admin-section-title">${esc(anonymized ? 'Anonymized customer record' : [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || 'Customer')}</h2><div class="admin-actions">${anonymized ? '' : `<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-edit">Edit Customer</button><form class="admin-inline-form" data-form="customer-archive"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="targetStatus" value="${customer.status === 'archived' ? 'active' : 'archived'}" /><button class="btn btn--ghost btn--small" type="submit">${customer.status === 'archived' ? 'Restore Archived Customer' : 'Archive Customer'}</button></form>`}${actor?.role === 'owner' && !anonymized ? `<form class="admin-inline-form" data-form="customer-delete"><input type="hidden" name="customerId" value="${esc(customerId)}" /><button class="btn btn--danger btn--small" type="submit">Delete Customer</button></form>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-create">Close</button></div></div>
+    <dl class="admin-definition"><dt>Status</dt><dd>${esc(anonymized ? 'Deleted and anonymized' : customer.status)}</dd>${customer.archived_at ? `<dt>Archived / deleted</dt><dd>${esc(dateTime(customer.archived_at))}</dd>` : ''}<dt>Branch</dt><dd>${esc(customer.branch_name)}</dd><dt>Source</dt><dd>${esc(customer.source)}</dd><dt>Contacts</dt><dd>${anonymized ? 'Removed for privacy' : contacts.map((contact) => `${esc(titleCase(contact.kind))}: ${esc(contact.value)}`).join('<br />') || '—'}</dd></dl>
     <h3>Properties</h3>
     ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}${Number(property.is_primary) === 1 ? ' · Primary' : ''}</strong>${propertyProfileSummary(property)}<details class="admin-detail-toggle"><summary>Edit property</summary><form class="admin-form" style="max-width:none" data-form="property-update"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="propertyId" value="${esc(property.id)}" />${propertyFields(property)}<label>Status <select name="status"><option value="active"${property.status !== 'archived' ? ' selected' : ''}>Active</option><option value="archived"${property.status === 'archived' ? ' selected' : ''}>Archived</option></select></label><button class="btn btn--secondary btn--small" type="submit">Save property</button></form></details></div>`).join('') || '<p class="admin-muted">No properties.</p>'}
     <details class="admin-detail-toggle"><summary>Add a property</summary><form class="admin-form" style="max-width:none" data-form="property-add"><input type="hidden" name="customerId" value="${esc(customerId)}" />${propertyFields({})}<button class="btn btn--secondary btn--small" type="submit">Add property</button></form></details>
@@ -1203,6 +1498,7 @@ async function removeCustomerBenefit(customerId: string, entitlementId: string):
 }
 
 let recurringSchedulingAvailable = true;
+let recurringStatusFilter = 'active';
 
 function recurringReasonLabel(reason: string): string {
   const labels: Record<string, string> = {
@@ -1311,23 +1607,42 @@ async function loadRecurring(): Promise<void> {
   const writable = can('job.write') && recurringEnabled;
   const target = document.querySelector<HTMLElement>('[data-admin-recurring]');
   if (target) {
-    renderTable(target, ['Customer', 'Property', 'Frequency', 'Window', 'Start', 'Duration', 'Price', 'Next visit', 'Sync', 'Status', 'Action'], (data.recurring ?? []).map((plan) => [
-      esc([plan.first_name, plan.last_name].filter(Boolean).join(' ')),
-      esc([plan.line1, plan.city].filter(Boolean).join(', ')),
+    const plans = (data.recurring ?? []).filter((plan) => {
+      const status = String(plan.status ?? '');
+      if (recurringStatusFilter === 'all') return true;
+      if (recurringStatusFilter === 'active-only') return status === 'active';
+      if (recurringStatusFilter === 'paused') return status === 'paused';
+      if (recurringStatusFilter === 'cancelled') return status === 'cancelled';
+      return status === 'active' || status === 'paused';
+    });
+    renderTable(target, ['Customer', 'Property', 'Service', 'Frequency', 'Window / start', 'Duration', 'Price', 'Next visit', 'Assigned', 'Sync', 'Status', 'Action'], plans.map((plan) => [
+      esc([plan.first_name, plan.last_name].filter(Boolean).join(' ') || 'Customer'),
+      esc([plan.line1, plan.city].filter(Boolean).join(', ') || 'Property not linked'),
+      esc(titleCase(String(plan.service_code ?? 'Residential cleaning').replaceAll('_', ' ').replaceAll('-', ' '))),
       esc(titleCase(plan.frequency)),
-      writable ? `<select class="admin-select" data-recurring-window="${esc(plan.id)}"><option value="">Not scheduled</option><option value="morning"${plan.window === 'morning' ? ' selected' : ''}>Morning</option><option value="afternoon"${plan.window === 'afternoon' ? ' selected' : ''}>Afternoon</option></select>` : esc(plan.window ? titleCase(String(plan.window)) : 'Not scheduled'),
-      writable ? `<input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(plan.start_time ?? '')}" data-recurring-start="${esc(plan.id)}" />` : esc(plan.start_time ?? '?'),
-      writable ? `<span class="admin-duration"><input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" aria-label="Duration in minutes" /><span class="admin-duration__unit" aria-hidden="true">min</span></span>` : esc(plan.duration_minutes ? durationLabel(plan.duration_minutes) : '?'),
+      writable
+        ? `<div class="admin-inline-form"><select class="admin-select" data-recurring-window="${esc(plan.id)}" aria-label="Preferred window"><option value="">Not scheduled</option><option value="morning"${plan.window === 'morning' ? ' selected' : ''}>Morning</option><option value="afternoon"${plan.window === 'afternoon' ? ' selected' : ''}>Afternoon</option></select><input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(plan.start_time ?? '')}" data-recurring-start="${esc(plan.id)}" aria-label="Preferred start time" /></div>`
+        : esc(plan.window ? `${titleCase(String(plan.window))}${plan.start_time ? ` · ${String(plan.start_time)}` : ''}` : 'Not scheduled'),
+      writable
+        ? `<span class="admin-duration"><input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" aria-label="Duration in minutes" /><span class="admin-duration__unit" aria-hidden="true">min</span></span>`
+        : esc(plan.duration_minutes ? durationLabel(plan.duration_minutes) : 'Not set'),
       esc(money(plan.ongoing_price_cents)),
-      esc(dateTime(plan.next_visit_date)),
-      `<span class="admin-status">${esc(titleCase(plan.sync_status ?? 'pending'))}</span>${
-        plan.sync_error
-          ? `<p class="admin-muted">${esc(recurringSyncDetail(plan.sync_error))}</p>`
-          : ''
-      }`,
-      writable ? `<select class="admin-select" data-recurring-status="${esc(plan.id)}">${['active', 'paused', 'cancelled', 'completed'].map((status) => `<option value="${status}"${status === plan.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select>` : `<span class="admin-status">${esc(titleCase(plan.status))}</span>`,
-      `<div class="admin-actions">${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-save" data-id="${esc(plan.id)}">Save</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrences" data-id="${esc(plan.id)}">Occurrences</button>${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-sync" data-id="${esc(plan.id)}">Sync</button>` : ''}</div>`,
-    ]), 'No recurring plans are recorded yet.');
+      esc(plan.next_visit_date ? dateTime(plan.next_visit_date) : 'Not scheduled'),
+      esc(String(plan.assigned_names || 'Unassigned')),
+      `<span class="admin-status">${esc(
+        String(plan.sync_status) === 'failed'
+          ? 'Needs retry'
+          : String(plan.sync_status) === 'pending'
+            ? 'Pending sync'
+            : String(plan.sync_status) === 'synced'
+              ? 'Synced'
+              : titleCase(String(plan.sync_status ?? 'Pending')),
+      )}</span>${plan.sync_error ? `<p class="admin-muted">${esc(recurringSyncDetail(plan.sync_error))}</p>` : ''}`,
+      writable
+        ? `<select class="admin-select" data-recurring-status="${esc(plan.id)}" aria-label="Plan status">${['active', 'paused', 'cancelled', 'completed'].map((status) => `<option value="${status}"${status === plan.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select>`
+        : `<span class="admin-status">${esc(titleCase(plan.status))}</span>`,
+      `<div class="admin-actions">${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-save" data-id="${esc(plan.id)}">Save</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrences" data-id="${esc(plan.id)}">View schedule</button>${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-sync" data-id="${esc(plan.id)}">Retry sync</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-open" data-id="${esc(plan.customer_id)}">Customer</button></div>`,
+    ]), recurringStatusFilter === 'cancelled' ? 'No canceled plans match this view.' : 'No recurring plans match this view.');
   }
   const runsTarget = document.querySelector<HTMLElement>('[data-admin-recurring-runs]');
   if (runsTarget) {
@@ -1475,14 +1790,12 @@ function localToday(offsetDays = 0): string {
 function renderManualOptionLists(): void {
   const addonList = document.querySelector<HTMLElement>('[data-manual-addon-list]');
   if (addonList && addonList.childElementCount === 0) {
-    addonList.innerHTML = pricing.addons.items
-      .map(
-        (addon) =>
-          `<label><input type="checkbox" data-manual-addon value="${esc(addon.id)}" /> ${esc(addon.label)}${
-            addon.customQuote ? ' <span class="admin-muted">(custom quote)</span>' : ''
-          }</label>`,
-      )
-      .join('');
+    addonList.innerHTML = extrasMarkup(
+      pricing.addons.items as unknown as Array<Record<string, unknown>>,
+      'data-manual-addon',
+    );
+    addonList.addEventListener('change', () => updateExtrasSummary('manual'));
+    updateExtrasSummary('manual');
   }
   const bundleList = document.querySelector<HTMLElement>('[data-manual-bundle-list]');
   if (bundleList && bundleList.childElementCount === 0) {
@@ -1702,15 +2015,16 @@ function renderManualQuote(quote: ManualQuoteView): void {
     }
   }
   target.innerHTML = `<div class="admin-card">
-    <h3>Estimate ${esc(quote.pricingVersion)}</h3>
+    <h3>Pricing estimate</h3>
     <p><strong>${esc(money(quote.totalCents))}</strong>${
       quote.range ? ` · typical range ${esc(money(Math.round(quote.range.low * 100)))}–${esc(money(Math.round(quote.range.high * 100)))}` : ''
     }</p>
-    <p class="admin-muted">${esc(quote.laborHours ?? '—')} labor hours · ${esc(quote.durationMinutes ?? '—')} minutes on site · ${esc(travelNote)}</p>
+    <p class="admin-muted">${esc(formatLaborAndSite(quote.laborHours, quote.durationMinutes))} · ${esc(travelNote)}</p>
     ${rows.length ? `<div class="admin-table-scroll"><table class="admin-table"><tbody>${rows.join('')}</tbody></table></div>` : ''}
     ${quote.ongoingPerVisitCents !== null ? `<p class="admin-muted">Ongoing (${esc(quote.ongoingFrequency)}): ${esc(money(quote.ongoingPerVisitCents))} per visit after the first deep clean.</p>` : ''}
     ${quote.tier ? `<p class="admin-muted">Facility tier ${esc(quote.tier)}</p>` : ''}
     ${docs}
+    <details class="admin-detail-toggle"><summary>Pricing diagnostics</summary><p class="admin-muted">Pricing version ${esc(quote.pricingVersion)}</p></details>
   </div>`;
 }
 
@@ -1945,12 +2259,74 @@ async function refreshManualCommitments(): Promise<void> {
   }
 }
 
+const ADDON_CATEGORY_LABELS: Record<string, string> = {
+  kitchen: 'Kitchen',
+  windows: 'Windows',
+  bath_laundry: 'Bathrooms & laundry',
+  organization: 'Organization',
+  pets: 'Pets',
+  interior_detail: 'Interior detail',
+  specialty: 'Specialty services',
+};
+
+function extrasMarkup(items: Array<Record<string, unknown>>, attribute: string): string {
+  const groups = new Map<string, Array<Record<string, unknown>>>();
+  for (const item of items) {
+    const category = String(item.category ?? 'other');
+    const list = groups.get(category) ?? [];
+    list.push(item);
+    groups.set(category, list);
+  }
+  return [...groups.entries()]
+    .map(
+      ([category, entries]) =>
+        `<fieldset class="admin-extras__group" data-extra-group><legend>${esc(ADDON_CATEGORY_LABELS[category] ?? titleCase(category.replaceAll('_', ' ')))}</legend>${entries
+          .map(
+            (item) =>
+              `<label class="admin-extra-card" data-extra-text="${esc(`${item.label ?? ''} ${item.blurb ?? ''}`.toLowerCase())}"><input type="checkbox" ${attribute} value="${esc(item.id)}" /><span><strong>${esc(item.label)}</strong>${item.blurb ? `<small>${esc(item.blurb)}</small>` : ''}<em>${item.customQuote ? 'Custom quote' : 'Priced in the estimate'}</em></span></label>`,
+          )
+          .join('')}</fieldset>`,
+    )
+    .join('');
+}
+
+function updateExtrasSummary(prefix: 'manual' | 'quick'): void {
+  const checked = [...document.querySelectorAll<HTMLInputElement>(`[data-${prefix}-addon]:checked`)];
+  const summary = document.querySelector<HTMLElement>(`[data-${prefix}-extras-summary]`);
+  const selected = document.querySelector<HTMLElement>(`[data-${prefix}-extras-selected]`);
+  if (summary) {
+    summary.textContent = checked.length
+      ? `${checked.length} extra${checked.length === 1 ? '' : 's'} selected`
+      : 'Choose extras';
+  }
+  if (selected) {
+    selected.innerHTML = checked.length
+      ? checked
+          .map((box) => {
+            const label = box.closest('label')?.querySelector('strong')?.textContent ?? box.value;
+            return `<span class="admin-extra-chip">${esc(label)} <button type="button" data-admin-action="extra-remove" data-target="${esc(box.value)}" data-prefix="${prefix}" aria-label="Remove ${esc(label)}">×</button></span>`;
+          })
+          .join('')
+      : '<span class="admin-muted">No extras selected.</span>';
+  }
+}
+
+function filterExtras(prefix: 'manual' | 'quick', query: string): void {
+  const value = query.trim().toLowerCase();
+  for (const card of document.querySelectorAll<HTMLElement>(`[data-${prefix}-addon-list] [data-extra-text]`)) {
+    card.hidden = Boolean(value) && !(card.dataset.extraText ?? '').includes(value);
+  }
+  for (const group of document.querySelectorAll<HTMLElement>(`[data-${prefix}-addon-list] [data-extra-group]`)) {
+    group.hidden = ![...group.querySelectorAll<HTMLElement>('[data-extra-text]')].some((card) => !card.hidden);
+  }
+}
+
 async function loadManualBooking(): Promise<void> {
   renderManualOptionLists();
   const customerSelect = manualField<HTMLSelectElement>('customerId');
   if (customerSelect) {
     customerSelect.innerHTML = '<option value="">Choose a customer</option>';
-    const data = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?limit=200');
+    const data = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?status=active&limit=200');
     for (const customer of data.customers ?? []) {
       customerSelect.insertAdjacentHTML(
         'beforeend',
@@ -2011,6 +2387,7 @@ interface QuickQuoteView {
 }
 
 let quickEstimateId = '';
+let quickEstimateNumber = '';
 let quickLastQuote: QuickQuoteView | null = null;
 let quickPropertyData: Array<Record<string, unknown>> = [];
 
@@ -2101,14 +2478,12 @@ function syncQuickEngine(): void {
 function renderQuickOptionLists(): void {
   const addonList = document.querySelector<HTMLElement>('[data-quick-addon-list]');
   if (addonList && addonList.childElementCount === 0) {
-    addonList.innerHTML = pricing.addons.items
-      .map(
-        (addon) =>
-          `<label><input type="checkbox" data-quick-addon value="${esc(addon.id)}" /> ${esc(addon.label)}${
-            addon.customQuote ? ' <span class="admin-muted">(custom quote)</span>' : ''
-          }</label>`,
-      )
-      .join('');
+    addonList.innerHTML = extrasMarkup(
+      pricing.addons.items as unknown as Array<Record<string, unknown>>,
+      'data-quick-addon',
+    );
+    addonList.addEventListener('change', () => updateExtrasSummary('quick'));
+    updateExtrasSummary('quick');
   }
   const bundleList = document.querySelector<HTMLElement>('[data-quick-bundle-list]');
   if (bundleList && bundleList.childElementCount === 0) {
@@ -2129,7 +2504,7 @@ function renderQuickOptionLists(): void {
 async function loadQuickCustomerOptions(): Promise<void> {
   const select = quickField<HTMLSelectElement>('customerId');
   if (!select) return;
-  const data = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?limit=200');
+  const data = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?status=active&limit=200');
   select.innerHTML = `<option value="">New inquiry</option>${(data.customers ?? [])
     .map((customer) => `<option value="${esc(customer.id)}">${esc(
       [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || 'Customer',
@@ -2213,7 +2588,15 @@ function renderQuickQuote(quote: QuickQuoteView): void {
   if (quote.ongoingPerVisitCents !== null) {
     rows.push([`Ongoing ${titleCase(quote.ongoingFrequency ?? 'visit')} visit`, money(quote.ongoingPerVisitCents)]);
   }
-  target.innerHTML = `<div class="admin-card"><h3>${esc(money(quote.totalCents))} ${quote.range ? `<span class="admin-muted">(${esc(money(quote.range.low))} - ${esc(money(quote.range.high))})</span>` : ''}</h3><p class="admin-muted">Pricing version ${esc(quote.pricingVersion)} · ${quote.laborHours !== null ? `${esc(quote.laborHours)} labor hour(s)` : 'scope review'}${quote.travel?.oneWayMiles !== null && quote.travel?.oneWayMiles !== undefined ? ` · ${esc(quote.travel.oneWayMiles)} mi one way${quote.travel.verified ? ' verified' : ' preliminary'}` : ''}</p>${quote.entitlement ? `<p class="admin-muted">${esc(quote.entitlement.label)} ${esc(quote.entitlement.percent)}% account benefit applied.</p>` : ''}<div class="admin-table-scroll"><table class="admin-table"><tbody>${rows.map(([label, value]) => `<tr><td>${esc(label)}</td><td style="text-align:right">${esc(value)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  const estimateLabel = quickEstimateNumber ? `Estimate #${quickEstimateNumber}` : 'Estimate';
+  target.innerHTML = `<div class="admin-card">
+    <h3>${esc(estimateLabel)}</h3>
+    <p><strong>${esc(money(quote.totalCents))}</strong>${quote.range ? ` <span class="admin-muted">(${esc(money(quote.range.low))} - ${esc(money(quote.range.high))})</span>` : ''}</p>
+    <p class="admin-muted">${esc(formatLaborAndSite(quote.laborHours, quote.durationMinutes))}${quote.travel?.oneWayMiles !== null && quote.travel?.oneWayMiles !== undefined ? ` · ${esc(quote.travel.oneWayMiles)} mi one way${quote.travel.verified ? ' verified' : ' preliminary'}` : ''}</p>
+    ${quote.entitlement ? `<p class="admin-muted">${esc(quote.entitlement.label)} ${esc(quote.entitlement.percent)}% account benefit applied.</p>` : ''}
+    <div class="admin-table-scroll"><table class="admin-table"><tbody>${rows.map(([label, value]) => `<tr><td>${esc(label)}</td><td style="text-align:right">${esc(value)}</td></tr>`).join('')}</tbody></table></div>
+    <details class="admin-detail-toggle"><summary>Pricing diagnostics</summary><p class="admin-muted">Pricing version ${esc(quote.pricingVersion)}</p></details>
+  </div>`;
 }
 
 async function quickCalculate(): Promise<QuickQuoteView | null> {
@@ -2237,14 +2620,15 @@ async function quickCalculate(): Promise<QuickQuoteView | null> {
 async function quickSave(status: 'saved' | 'draft'): Promise<void> {
   const target = document.querySelector<HTMLElement>('[data-quick-result]');
   try {
-    const result = await api<{ id: string; status: string; quote: QuickQuoteView }>('/api/admin/quick-estimates', {
+    const result = await api<{ id: string; status: string; estimateNumber?: string; quote: QuickQuoteView }>('/api/admin/quick-estimates', {
       method: 'POST',
       body: JSON.stringify({ action: 'save', status, ...quickPayload() }),
     });
     quickEstimateId = result.id;
+    quickEstimateNumber = result.estimateNumber ?? quickEstimateNumber;
     quickLastQuote = result.quote;
     renderQuickQuote(result.quote);
-    if (target) target.insertAdjacentHTML('afterbegin', `<p class="admin-status-message" role="status">Estimate ${status === 'draft' ? 'draft' : ''} saved. Reference ${esc(result.id)}.</p>`);
+    if (target) target.insertAdjacentHTML('afterbegin', `<p class="admin-status-message" role="status">${esc(quickEstimateNumber ? `Estimate #${quickEstimateNumber}` : 'Estimate')} ${status === 'draft' ? 'draft ' : ''}saved.</p>`);
     await loadQuickList();
   } catch (error) {
     if (target) target.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
@@ -2257,7 +2641,8 @@ async function loadQuickList(status = '', q = ''): Promise<void> {
   const data = await api<{ estimates?: Array<Record<string, unknown>> }>(
     `/api/admin/quick-estimates?view=list&status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}`,
   );
-  renderTable(target, ['Updated', 'Customer', 'Service', 'Address', 'Total', 'Status', 'Actions'], (data.estimates ?? []).map((estimate) => [
+  renderTable(target, ['Estimate #', 'Updated', 'Customer', 'Service', 'Address', 'Total', 'Status', 'Actions'], (data.estimates ?? []).map((estimate) => [
+    esc(estimate.estimate_number ? `#${estimate.estimate_number}` : 'Not assigned'),
     esc(dateTime(estimate.updated_at)),
     esc([estimate.customer_name, estimate.customer_email].filter(Boolean).join(' - ') || [estimate.first_name, estimate.last_name].filter(Boolean).join(' ') || 'Inquiry'),
     esc(titleCase(estimate.engine ?? '')),
@@ -2276,6 +2661,7 @@ async function openQuickEstimate(id: string): Promise<void> {
   const input = data.input;
   if (!record || !input) return;
   quickEstimateId = String(record.id);
+  quickEstimateNumber = String(record.estimate_number ?? '');
   const form = quickForm();
   if (!form) return;
   const set = (name: string, value: unknown): void => {
@@ -2330,6 +2716,7 @@ async function quickDiscard(): Promise<void> {
   await api('/api/admin/quick-estimates', { method: 'POST', body: JSON.stringify({ action: 'discard', id: quickEstimateId }) });
   await loadQuickList();
   quickEstimateId = '';
+  quickEstimateNumber = '';
   quickForm()?.reset();
   const target = document.querySelector<HTMLElement>('[data-quick-result]');
   if (target) target.innerHTML = '<p class="admin-muted">Estimate discarded.</p>';
@@ -2578,6 +2965,22 @@ function setDispatchProfile(memberId: string): void {
   }
 }
 
+function showDispatchTab(tab: string): void {
+  const active = ['board', 'team', 'coverage', 'settings', 'history'].includes(tab) ? tab : 'board';
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-dispatch-tab]')) {
+    if (button.dataset.dispatchTab === active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  for (const section of document.querySelectorAll<HTMLElement>('[data-dispatch-section]')) {
+    section.hidden = section.dataset.dispatchSection !== active;
+  }
+}
+
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-dispatch-tab]')) {
+  button.addEventListener('click', () => showDispatchTab(button.dataset.dispatchTab ?? 'board'));
+}
+showDispatchTab('board');
+
 async function loadDispatch(): Promise<void> {
   const branchSelect = document.querySelector<HTMLSelectElement>('[data-dispatch-branch]');
   if (!branchSelect) return;
@@ -2637,13 +3040,16 @@ async function loadDispatch(): Promise<void> {
   }
   const unassigned = document.querySelector<HTMLElement>('[data-admin-dispatch-unassigned]');
   if (unassigned) {
-    renderTable(unassigned, ['When', 'Reference', 'Customer', 'Service', 'Crew', 'Action'], data.unassigned.map((job) => [
+    const ready = data.team.filter((member) => (member.readiness ?? []).length === 0);
+    renderTable(unassigned, ['When', 'Reference', 'Customer', 'Service', 'Crew', 'Assign'], data.unassigned.map((job) => [
       esc(dateTime(job.startAt, branchId)),
       esc(job.reference),
       esc(job.customer),
       esc(job.serviceCode),
       esc(job.crewSize),
-      '<span class="admin-muted">Use Jobs below</span>',
+      ready.length
+        ? `<div class="admin-actions"><select data-dispatch-assign-member="${esc(job.id)}" aria-label="Choose a cleaner for ${esc(job.reference)}"><option value="">Choose cleaner</option>${ready.map((member) => `<option value="${esc(member.id)}">${esc(member.name)}</option>`).join('')}</select><button class="btn btn--primary btn--small" type="button" data-admin-action="dispatch-assign" data-id="${esc(job.id)}">Assign</button></div>`
+        : '<span class="admin-muted">No dispatch-ready cleaner. Complete a team profile first.</span>',
     ]), 'No unassigned jobs in the dispatch window.');
   }
   const recommendations = document.querySelector<HTMLElement>('[data-admin-dispatch-recommendations]');
@@ -2947,6 +3353,24 @@ async function openChecklist(appointmentId: string): Promise<void> {
   const checklist = data.checklist.checklist as Record<string, unknown>;
   const items = data.checklist.items as Array<Record<string, unknown>>;
   target.innerHTML = `<h3>Checklist · ${esc(titleCase(checklist.status))}</h3>${items.map((item) => `<label class="admin-check"><input type="checkbox" data-checklist-item="${esc(item.id)}"${Number(item.completed) ? ' checked' : ''} /> ${esc(item.label)}</label>`).join('')}`;
+}
+
+async function loadReviews(): Promise<void> {
+  const branchId = document.querySelector<HTMLSelectElement>('[data-review-branch]')?.value ?? '';
+  const status = document.querySelector<HTMLSelectElement>('[data-review-status]')?.value ?? '';
+  const params = new URLSearchParams({ branchId, status });
+  const data = await api<{ requests?: Array<Record<string, unknown>> }>(`/api/admin/reviews?${params.toString()}`);
+  const target = document.querySelector<HTMLElement>('[data-admin-review-list]');
+  if (!target) return;
+  const requests = data.requests ?? [];
+  target.innerHTML = requests.length
+    ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Branch</th><th>Customer</th><th>Status</th><th>Scheduled</th><th>Sent</th><th>Recipient</th><th>Reason</th><th>Action</th></tr></thead><tbody>${requests
+        .map(
+          (request) =>
+            `<tr><td>${esc(request.branch_id)}</td><td>${esc(request.customer_id || '')}</td><td><span class="admin-status">${esc(titleCase(request.status))}</span></td><td>${esc(dateTime(request.scheduled_at))}</td><td>${esc(request.sent_at ? dateTime(request.sent_at) : '')}</td><td>${esc(request.recipient || '')}</td><td>${esc(request.suppressed_reason || request.error_detail || '')}</td><td>${String(request.status) === 'queued' ? `<button class="btn btn--primary btn--small" type="button" data-review-action="send" data-id="${esc(request.id)}">Send now</button> ` : ''}${['queued', 'failed'].includes(String(request.status)) ? `<button class="btn btn--ghost btn--small" type="button" data-review-action="cancel" data-id="${esc(request.id)}">Cancel</button>` : ''}</td></tr>`,
+        )
+        .join('')}</tbody></table></div>`
+    : '<p class="admin-muted">No review requests match this filter.</p>';
 }
 
 async function loadFinance(): Promise<void> {
@@ -3648,7 +4072,7 @@ async function loadDocuments(): Promise<void> {
       return [
         esc(template.title),
         esc(template.category),
-        esc(template.version),
+        esc(template.version_label ?? template.version),
         esc(titleCase(template.legal_review_status ?? 'not_reviewed')),
         `<span class="admin-status">${esc(titleCase(template.status))}</span>`,
         `<div class="admin-actions">${actions}</div>`,
@@ -3705,7 +4129,7 @@ async function loadDocuments(): Promise<void> {
     renderDocumentRequests();
   }
   for (const select of document.querySelectorAll<HTMLSelectElement>('[data-document-template-options]')) {
-    select.innerHTML = `<option value="">Choose a template</option>${templates.filter((template) => template.status === 'approved').map((template) => `<option value="${esc(template.id)}">${esc(template.title)} (v${esc(template.version)})</option>`).join('')}`;
+    select.innerHTML = `<option value="">Choose a template</option>${templates.filter((template) => template.status === 'approved').map((template) => `<option value="${esc(template.id)}">${esc(template.title)} (${esc(template.version_label ?? template.version)})</option>`).join('')}`;
   }
   for (const select of document.querySelectorAll<HTMLSelectElement>('[data-document-bundle-options]')) {
     select.innerHTML = `<option value="">Choose a packet</option>${bundles.map((bundle) => {
@@ -4181,9 +4605,12 @@ async function loadDocumentUpdates(): Promise<void> {
         const queue = customers.filter((customer) => customer.needsResigning);
         const actions =
           status === 'owner_review_required'
-            ? `<div class="admin-actions"><button class="btn btn--primary btn--small" type="button" data-admin-action="document-update-ack" data-id="${esc(update.templateId)}" data-material="yes">Acknowledge material change</button><button class="btn btn--secondary btn--small" type="button" data-admin-action="document-update-ack" data-id="${esc(update.templateId)}" data-material="no">Acknowledge formatting / nonmaterial</button></div>`
+            ? `<label class="admin-field--wide" style="display:block;margin:.65rem 0 .4rem;">Plain-English description of the changes
+                 <textarea data-document-update-note="${esc(update.templateId)}" rows="2" maxlength="1000" placeholder="Example: Added the updated cancellation notice and corrected the payment timing. No pricing terms changed.">${esc(review.note ?? '')}</textarea>
+               </label>
+               <div class="admin-actions"><button class="btn btn--primary btn--small" type="button" data-admin-action="document-update-ack" data-id="${esc(update.templateId)}" data-material="yes">Acknowledge material change</button><button class="btn btn--secondary btn--small" type="button" data-admin-action="document-update-ack" data-id="${esc(update.templateId)}" data-material="no">Acknowledge formatting / nonmaterial</button></div>`
             : review.acknowledgedAt
-              ? `<p class="admin-muted">Reviewed ${esc(dateTime(review.acknowledgedAt))}${review.materialChange === true ? ' - marked material' : review.materialChange === false ? ' - marked nonmaterial' : ''}.</p>`
+              ? `<p class="admin-muted">Reviewed ${esc(dateTime(review.acknowledgedAt))}${review.materialChange === true ? ' - marked material' : review.materialChange === false ? ' - marked nonmaterial' : ''}.${review.note ? ` ${esc(review.note)}` : ''}</p>`
               : '';
         const packetLabels = packets.length
           ? packets
@@ -4203,7 +4630,7 @@ async function loadDocumentUpdates(): Promise<void> {
               .join('')}</tbody></table></div>${queue.length > 50 ? '<p class="admin-muted">Only the first 50 matching records are shown here. Use the customer record for the full history.</p>' : ''}`
           : '<p class="admin-muted">No executed copies of the previous version require review.</p>';
         return `<div class="admin-record" style="margin-top:1rem;">
-          <p><strong>${esc(update.title)}</strong> ${esc(update.previousVersion ?? '')} &rarr; ${esc(update.newVersion)} <span class="admin-status">${esc(statusLabel)}</span></p>
+          <p><strong>${esc(update.title)}</strong> ${esc(update.previousVersionLabel ?? 'Version 1.0')} &rarr; ${esc(update.newVersionLabel ?? update.newVersion)} <span class="admin-status">${esc(statusLabel)}</span></p>
           <p class="admin-muted">${esc(String(counts.customers ?? 0))} customer(s) signed the previous version &middot; ${esc(String(counts.needingResigning ?? 0))} still need the new version &middot; ${esc(String(counts.upcomingAppointments ?? 0))} with an upcoming appointment.</p>
           <p class="admin-muted">Affected packets: ${packetLabels}</p>
           <details class="admin-detail-toggle"><summary>Re-signing queue (${queue.length})</summary>${queueRows}</details>
@@ -4234,39 +4661,6 @@ function prefillComposerFromUpdate(customerId: string, packetCode: string): void
 
 function documentEditForm(): HTMLFormElement | null {
   return document.querySelector<HTMLFormElement>('[data-document-template-edit]');
-}
-
-async function openTemplateEdit(templateId: string): Promise<void> {
-  const form = documentEditForm();
-  if (!form) return;
-  const data = await api<{ template?: Record<string, unknown> }>(
-    `/api/admin/documents?view=template&id=${encodeURIComponent(templateId)}`,
-  );
-  const template = data.template;
-  if (!template) {
-    setAppError('That template could not be loaded.');
-    return;
-  }
-  const set = (name: string, value: unknown): void => {
-    const field = form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
-    if (field) field.value = value === null || value === undefined ? '' : String(value);
-  };
-  set('templateId', template.id);
-  set('title', template.title);
-  set('category', template.category);
-  set('version', template.version);
-  set('signerParty', template.signer_party);
-  set('familyKey', template.family_key);
-  set('effectiveDate', template.effective_date ? String(template.effective_date).slice(0, 10) : '');
-  set('legalReviewStatus', template.legal_review_status ?? 'not_reviewed');
-  set('contentText', template.content_text);
-  set('packetNotes', template.packet_notes);
-  const verification = form.elements.namedItem('requiresVerification') as HTMLInputElement | null;
-  if (verification) verification.checked = Number(template.requires_verification) === 1;
-  const countersignature = form.elements.namedItem('requiresCountersignature') as HTMLInputElement | null;
-  if (countersignature) countersignature.checked = Number(template.requires_countersignature) === 1;
-  form.hidden = false;
-  form.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 async function showTemplateHistory(templateId: string): Promise<void> {
@@ -4425,7 +4819,7 @@ async function loadDocumentBundleItems(bundleId: string): Promise<void> {
   renderTable(target, ['Order', 'Document', 'Version', 'Stage', 'Condition', 'Required', 'Actions'], (data.items ?? []).map((item, index, all) => [
     esc(item.sort_order),
     esc(item.title),
-    esc(item.version),
+    esc(item.version_label ?? item.version),
     esc(titleCase(item.enforcement_stage)),
     esc([item.condition_key, item.condition_value].filter(Boolean).join(': ') || '—'),
     Number(item.required) ? 'Yes' : 'No',
@@ -4455,9 +4849,27 @@ async function openDocumentRequest(id: string): Promise<void> {
     : request.executed_at
       ? 'Pending first attempt'
       : 'Not sent until fully executed';
+  let pricingHtml = '';
+  try {
+    const pricing = JSON.parse(String(request.pricing_snapshot_json ?? '{}')) as Record<string, unknown>;
+    if (Number.isFinite(Number(pricing.totalCents))) {
+      const money = (value: unknown): string =>
+        Number.isFinite(Number(value))
+          ? `$${(Number(value) / 100).toFixed(2)}`
+          : 'Not recorded';
+      const lines = Array.isArray(pricing.lines)
+        ? (pricing.lines as Array<Record<string, unknown>>)
+            .map((line) => `${esc(line.label)}: ${money(line.amountCents)}`)
+            .join(' · ')
+        : '';
+      pricingHtml = `<div class="admin-record"><p><strong>Signed price</strong> ${money(pricing.totalCents)} · Amount due now ${money(pricing.amountDueNowCents)}${Number(pricing.remainingBalanceCents) ? ` · Remaining ${money(pricing.remainingBalanceCents)}` : ''}</p>${pricing.propertyAddress ? `<p class="admin-muted">${esc(String(pricing.propertyAddress))}</p>` : ''}${lines ? `<p class="admin-muted">${lines}</p>` : ''}</div>`;
+    }
+  } catch {
+    pricingHtml = '';
+  }
   target.hidden = false;
-  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">Signing request ${esc(request.bundle_code)}</h2><div class="admin-actions">${request.executed_at ? `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=executed&id=${encodeURIComponent(id)}">Executed copy</a>` : ''}${request.executed_at && ownerEmail?.status !== 'completed' ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-owner-email-retry" data-id="${esc(id)}">Retry owner email</button>` : ''}${awaiting ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-countersign" data-id="${esc(id)}">Countersign and verify</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-close">Close</button></div></div>
-    <dl class="admin-definition"><dt>Status</dt><dd>${esc(titleCase(request.status))}</dd><dt>Subject</dt><dd>${esc(request.subject_type)}</dd><dt>Branch</dt><dd>${esc(request.branch_id || '—')}</dd><dt>Bound signer</dt><dd>${esc(request.signer_email || 'not bound')}</dd><dt>Booking reference</dt><dd>${esc(request.booking_reference || '-')}</dd><dt>Countersigned</dt><dd>${request.counter_signed_at ? `${esc(request.counter_signature_name)} · ${esc(dateTime(request.counter_signed_at))}` : 'Not countersigned'}</dd><dt>Executed copy</dt><dd>${request.executed_at ? `${esc(dateTime(request.executed_at))} · SHA-256 ${esc(request.executed_sha256)}` : 'Not available until fully signed'}</dd><dt>Owner email</dt><dd>${esc(ownerEmailLabel)}</dd></dl>
+  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(request.packet_name || 'Signing request')}</h2><div class="admin-actions">${request.executed_at ? `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=executed&id=${encodeURIComponent(id)}">Executed copy</a>` : ''}${request.executed_at && ownerEmail?.status !== 'completed' ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-owner-email-retry" data-id="${esc(id)}">Retry owner email</button>` : ''}${awaiting ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-countersign" data-id="${esc(id)}">Countersign and verify</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-close">Close</button></div></div>
+    <dl class="admin-definition"><dt>Status</dt><dd>${esc(titleCase(request.status))}</dd><dt>Subject</dt><dd>${esc(request.subject_type)}</dd><dt>Branch</dt><dd>${esc(request.branch_id || '—')}</dd><dt>Bound signer</dt><dd>${esc(request.signer_email || 'not bound')}</dd><dt>Booking reference</dt><dd>${esc(request.booking_reference || '-')}</dd><dt>Countersigned</dt><dd>${request.counter_signed_at ? `${esc(request.counter_signature_name)} · ${esc(dateTime(request.counter_signed_at))}` : 'Not countersigned'}</dd><dt>Executed copy</dt><dd>${request.executed_at ? `${esc(dateTime(request.executed_at))} · signed copy retained privately` : 'Not available until fully signed'}</dd><dt>Owner email</dt><dd>${esc(ownerEmailLabel)}</dd></dl>${pricingHtml}
     ${signatures.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Document</th><th>Version</th><th>Signer</th><th>Status</th><th>Signed</th><th>Actions</th></tr></thead><tbody>${signatures.map((signature) => `<tr><td>${esc(signature.title)}</td><td>${esc(signature.template_version)}</td><td>${esc(signature.signer_name)}</td><td><span class="admin-status">${esc(titleCase(signature.status))}</span></td><td>${esc(dateTime(signature.signed_at))}</td><td><div class="admin-actions"><a class="btn btn--ghost btn--small" href="/api/admin/documents?view=download&signatureId=${encodeURIComponent(String(signature.id))}">Download</a>${signature.status === 'awaiting_verification' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-verify" data-id="${esc(signature.id)}">Verify</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-reject" data-id="${esc(signature.id)}">Reject</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No signatures yet.</p>'}</div>`;
 }
 
@@ -4821,6 +5233,7 @@ async function loadView(view: string): Promise<void> {
     if (view === 'reports') await loadReports();
     if (view === 'storage') await loadStorage();
     if (view === 'promotions') await loadPromotions();
+    if (view === 'reviews') await loadReviews();
     if (view === 'pricing') await loadPricingView();
     if (view === 'branches') await loadBranchView();
     if (view === 'settings') await loadSettings();
@@ -5085,6 +5498,7 @@ document.querySelector<HTMLFormElement>('[data-admin-customer-search]')?.addEven
   event.preventDefault();
   const data = new FormData(event.currentTarget as HTMLFormElement);
   customerPage.q = String(data.get('q') ?? '');
+  customerPage.status = String(data.get('status') ?? 'active');
   customerPage.sort = String(data.get('sort') ?? 'created_at');
   customerPage.limit = Number(data.get('pageSize') ?? 25) || 25;
   customerPage.offset = 0;
@@ -5102,10 +5516,119 @@ document.querySelector<HTMLFormElement>('[data-admin-finance-filter]')?.addEvent
   void loadFinance().catch((error) => setAppError(friendly(error)));
 });
 
+document.querySelector<HTMLElement>('[data-review-refresh]')?.addEventListener('click', () => {
+  void loadReviews().catch((error) => setAppError(friendly(error)));
+});
+document.querySelector<HTMLFormElement>('[data-review-queue]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget as HTMLFormElement);
+  const status = document.querySelector<HTMLElement>('[data-review-status-message]');
+  if (status) status.textContent = 'Checking eligibility...';
+  void api('/api/admin/reviews', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'queue', appointmentId: String(data.get('appointmentId') ?? '') }),
+  })
+    .then(() => {
+      if (status) status.textContent = 'Review request queued.';
+      return loadReviews();
+    })
+    .catch((error) => {
+      if (status) status.textContent = friendly(error);
+    });
+});
+document.querySelector<HTMLElement>('[data-admin-review-list]')?.addEventListener('click', (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-review-action]');
+  if (!button) return;
+  const id = button.dataset.id ?? '';
+  const action = button.dataset.reviewAction;
+  if (!id) return;
+  if (action === 'cancel') {
+    if (!window.confirm('Cancel this review request?')) return;
+    void api('/api/admin/reviews', { method: 'POST', body: JSON.stringify({ action: 'cancel', id }) })
+      .then(() => loadReviews())
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (action === 'send') {
+    if (!window.confirm('Send this review request now? This sends a real customer email.')) return;
+    void api('/api/admin/reviews', { method: 'POST', body: JSON.stringify({ action: 'send', id }) })
+      .then(() => loadReviews())
+      .catch((error) => setAppError(friendly(error)));
+  }
+});
+
+for (const prefix of ['manual', 'quick'] as const) {
+  document
+    .querySelector<HTMLInputElement>(`[data-${prefix}-addon-search]`)
+    ?.addEventListener('input', (event) => {
+      filterExtras(prefix, (event.target as HTMLInputElement).value);
+    });
+}
+
+document.addEventListener('click', (event) => {
+  const remove = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-action="extra-remove"]');
+  if (!remove) return;
+  const prefix = remove.dataset.prefix === 'quick' ? 'quick' : 'manual';
+  const target = remove.dataset.target ?? '';
+  const box = document.querySelector<HTMLInputElement>(`[data-${prefix}-addon][value="${CSS.escape(target)}"]`);
+  if (box) {
+    box.checked = false;
+    updateExtrasSummary(prefix);
+  }
+});
+
 document.querySelector<HTMLFormElement>('[data-admin-request-filter]')?.addEventListener('submit', (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget as HTMLFormElement);
+  requestServiceFilter = String(data.get('service') ?? '').trim().toLowerCase();
+  requestFromFilter = String(data.get('from') ?? '');
+  requestToFilter = String(data.get('to') ?? '');
+  selectedRequestIds.clear();
   void loadCalendar(String(data.get('view') ?? 'actionable'), String(data.get('q') ?? ''));
+});
+
+document.querySelector<HTMLSelectElement>('[data-admin-recurring-status]')?.addEventListener('change', (event) => {
+  recurringStatusFilter = (event.target as HTMLSelectElement).value;
+  void loadRecurring().catch((error) => setAppError(friendly(error)));
+});
+
+for (const [selector, setter] of [
+  ['[data-admin-appointment-status]', (value: string) => { appointmentStatusFilter = value; }],
+  ['[data-admin-appointment-range]', (value: string) => { appointmentRangeFilter = value; }],
+  ['[data-admin-appointment-employee]', (value: string) => { appointmentEmployeeFilter = value; }],
+  ['[data-admin-appointment-service]', (value: string) => { appointmentServiceFilter = value; }],
+] as Array<[string, (value: string) => void]>) {
+  document.querySelector<HTMLSelectElement>(selector)?.addEventListener('change', (event) => {
+    setter((event.target as HTMLSelectElement).value);
+    appointmentPage = 0;
+    renderUpcomingAppointments();
+  });
+}
+
+for (const [selector, setter] of [
+  ['[data-admin-week-employee]', (value: string) => { weekEmployeeFilter = value; }],
+  ['[data-admin-week-service]', (value: string) => { weekServiceFilter = value; }],
+  ['[data-admin-week-status]', (value: string) => { weekStatusFilter = value; }],
+  ['[data-admin-week-branch]', (value: string) => { weekBranchFilter = value; }],
+] as Array<[string, (value: string) => void]>) {
+  document.querySelector<HTMLSelectElement>(selector)?.addEventListener('change', (event) => {
+    setter((event.target as HTMLSelectElement).value);
+    renderWeekBoard(weekAppointments);
+  });
+}
+
+document.querySelector<HTMLElement>('[data-admin-requests]')?.addEventListener('change', (event) => {
+  const input = event.target as HTMLInputElement;
+  if (input.matches('[data-admin-request-select]')) {
+    if (input.checked) selectedRequestIds.add(input.value);
+    else selectedRequestIds.delete(input.value);
+    updateRequestBulkToolbar();
+    return;
+  }
+  if (input.matches('[data-admin-request-select-all-visible]')) {
+    if (input.checked) visibleRequestIds.forEach((id) => selectedRequestIds.add(id));
+    else visibleRequestIds.forEach((id) => selectedRequestIds.delete(id));
+    updateRequestBulkToolbar();
+  }
 });
 
 document.querySelector<HTMLFormElement>('[data-admin-lead-filter]')?.addEventListener('submit', (event) => {
@@ -5445,25 +5968,35 @@ function documentResult(message: string, kind: 'ok' | 'error' = 'ok'): void {
 
 document.querySelector<HTMLFormElement>('[data-document-template-text]')?.addEventListener('submit', (event) => {
   event.preventDefault();
-  const data = new FormData(event.currentTarget as HTMLFormElement);
-  void api('/api/admin/documents', {
+  const form = event.currentTarget as HTMLFormElement;
+  const data = new FormData(form);
+  const title = String(data.get('title') ?? '').trim();
+  if (!title) return;
+  void api<{ id?: string }>('/api/admin/documents', {
     method: 'POST',
     body: JSON.stringify({
       action: 'create_template',
-      title: data.get('title'),
+      title,
       category: data.get('category'),
-      version: data.get('version'),
+      version: '1.0',
       signerParty: data.get('signerParty'),
-      contentText: data.get('contentText'),
-      requiresVerification: data.get('requiresVerification') === 'yes',
-      requiresCountersignature: data.get('requiresCountersignature') === 'yes',
-      familyKey: data.get('familyKey'),
-      effectiveDate: data.get('effectiveDate'),
+      contentText: '<div class="doc-rich"><p></p></div>',
       legalReviewStatus: data.get('legalReviewStatus'),
-      packetNotes: data.get('packetNotes'),
     }),
-  }).then(() => {
-    documentResult('Draft template saved. Approve it before it can be required.');
+  }).then((created) => {
+    if (!created?.id) throw new Error('document_create_failed');
+    openDocumentEditor({
+      id: created.id,
+      title,
+      category: data.get('category'),
+      version: '1.0',
+      signer_party: data.get('signerParty'),
+      legal_review_status: data.get('legalReviewStatus'),
+      content_text: '<div class="doc-rich"><p></p></div>',
+      status: 'draft',
+    });
+    documentResult('New document created. Format it, save the draft, then approve it when ready.');
+    form.reset();
     return loadDocuments();
   }).catch((error) => documentResult(friendly(error), 'error'));
 });
@@ -5505,6 +6038,7 @@ document.querySelector<HTMLFormElement>('[data-document-template-upload]')?.addE
   const form = event.currentTarget as HTMLFormElement;
   const formData = new FormData(form);
   formData.set('action', 'upload_template');
+  formData.set('version', '1.0');
   const headers = new Headers({ Accept: 'application/json' });
   if (csrf) headers.set('X-CSRF-Token', csrf);
   void fetch('/api/admin/documents', { method: 'POST', headers, body: formData, credentials: 'same-origin' })
@@ -5707,6 +6241,19 @@ document.addEventListener('click', (event) => {
     });
     return;
   }
+  if (actionName === 'dispatch-assign') {
+    const memberSelect = document.querySelector<HTMLSelectElement>(
+      `[data-dispatch-assign-member="${CSS.escape(id)}"]`,
+    );
+    const memberId = memberSelect?.value ?? '';
+    if (!memberId) {
+      setAppError('Choose a dispatch-ready cleaner before assigning this job.');
+      return;
+    }
+    if (!window.confirm('Assign this cleaner to the unassigned job? The customer appointment time will not change.')) return;
+    void dispatchAction({ action: 'assign_job', appointmentId: id, teamMemberIds: [memberId] });
+    return;
+  }
   if (actionName === 'dispatch-retry-calendar') { void dispatchAction({ action: 'retry_calendar', decisionId: id }); return; }
   if (actionName === 'dispatch-approve') { void dispatchAction({ action: 'approve_recommendation', decisionId: id }); return; }
   if (actionName === 'dispatch-reject') { void dispatchAction({ action: 'reject_recommendation', decisionId: id }); return; }
@@ -5832,9 +6379,13 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'document-update-ack') {
     const materialChange = target.dataset.material === 'yes';
+    const note =
+      document.querySelector<HTMLTextAreaElement>(
+        `[data-document-update-note="${CSS.escape(id)}"]`,
+      )?.value.trim() ?? '';
     void api('/api/admin/documents', {
       method: 'POST',
-      body: JSON.stringify({ action: 'acknowledge_update', templateId: id, materialChange }),
+      body: JSON.stringify({ action: 'acknowledge_update', templateId: id, materialChange, note }),
     })
       .then(() => {
         documentResult(
@@ -5851,7 +6402,7 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'document-approve') void action('/api/admin/documents', { action: 'approve_template', templateId: id });
   if (actionName === 'document-retire') void action('/api/admin/documents', { action: 'retire_template', templateId: id });
-  if (actionName === 'document-edit') void openTemplateEdit(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'document-edit') void openDraftInEditor(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'document-revise') void startDocumentRevision(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'document-history') void showTemplateHistory(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'document-duplicate') {
@@ -6077,7 +6628,124 @@ document.addEventListener('click', (event) => {
   if (actionName === 'admin-revoke') void action('/api/admin/accounts', { action: 'revoke_user', userId: id });
   if (actionName === 'revoke-others') void action('/api/admin/accounts', { action: 'revoke_others' });
   if (actionName === 'manual-quote') void generateManualQuote();
-  if (actionName === 'overview-open') void loadView(target.dataset.view ?? 'overview');
+  if (actionName === 'overview-open') {
+    const view = target.dataset.view ?? 'overview';
+    const filter = target.dataset.filter ?? '';
+    void loadView(view)
+      .then(() => {
+        if (view === 'calendar' && filter === 'pending') {
+          const select = document.querySelector<HTMLSelectElement>('[data-admin-request-filter] select[name="view"]');
+          if (select) select.value = 'pending';
+          return loadCalendar('pending');
+        }
+        if (view === 'calendar' && filter === 'checkout') {
+          setAppError('Checkout sessions are classified in the alert. Abandoned checkouts are ordinary; inspect failed setup/provider sessions in Finance or the request detail.');
+        }
+        return undefined;
+      })
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'appointments-page') {
+    appointmentPage = Math.max(0, Number(target.dataset.page ?? 0) || 0);
+    renderUpcomingAppointments();
+  }
+  if (actionName === 'calendar-prev-week') {
+    weekOffset -= 1;
+    renderWeekBoard(weekAppointments);
+  }
+  if (actionName === 'calendar-next-week') {
+    weekOffset += 1;
+    renderWeekBoard(weekAppointments);
+  }
+  if (actionName === 'calendar-today') {
+    weekOffset = 0;
+    renderWeekBoard(weekAppointments);
+  }
+  if (actionName === 'appointment-open') {
+    const requestId = target.dataset.request ?? '';
+    if (requestId) {
+      void openRequest(requestId).catch((error) => setAppError(friendly(error)));
+    } else {
+      setAppError('This appointment is not linked to a reservation request. Open Jobs & Team to inspect the appointment.');
+    }
+  }
+  if (actionName === 'overview-recheck') {
+    void loadOverview().catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'request-select-visible') {
+    visibleRequestIds.forEach((id) => selectedRequestIds.add(id));
+    updateRequestBulkToolbar();
+  }
+  if (actionName === 'request-select-filtered') {
+    filteredRequestIds.forEach((id) => selectedRequestIds.add(id));
+    updateRequestBulkToolbar();
+  }
+  if (actionName === 'request-clear-selection') {
+    selectedRequestIds.clear();
+    updateRequestBulkToolbar();
+  }
+  if (actionName === 'request-bulk') {
+    const operation = target.dataset.operation ?? '';
+    const ids = [...selectedRequestIds];
+    if (ids.length === 0) return;
+    const destructive = operation === 'delete_test';
+    const message = destructive
+      ? `Delete ${ids.length} test request(s)? This is allowed only for nonfinancial records with no executed documents or appointments. This cannot be undone.`
+      : `Apply "${operation}" to ${ids.length} selected request(s)? Customer emails will not be sent automatically.`;
+    if (!window.confirm(message)) return;
+    void api<{ succeeded?: number; failed?: number; results?: Array<{ id: string; ok: boolean; error?: string }> }>(
+      '/api/admin/requests',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'bulk',
+          operation,
+          requestIds: ids,
+          confirm: true,
+        }),
+      },
+    )
+      .then((result) => {
+        const failed = result.results?.filter((entry) => !entry.ok) ?? [];
+        if (failed.length) {
+          setAppError(
+            `${result.succeeded ?? 0} updated, ${failed.length} skipped: ${failed
+              .slice(0, 4)
+              .map((entry) => `${entry.id.slice(0, 12)} ${entry.error ?? ''}`)
+              .join('; ')}`,
+          );
+        } else {
+          setSuccess(`${result.succeeded ?? 0} request(s) updated.`);
+        }
+        selectedRequestIds.clear();
+        return loadCalendar(currentRequestView);
+      })
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'alert-action') {
+    const key = target.dataset.key ?? '';
+    const alertAction = target.dataset.alertAction ?? '';
+    const note =
+      document.querySelector<HTMLInputElement>(
+        `[data-alert-note="${CSS.escape(key)}"]`,
+      )?.value.trim() ?? '';
+    if (alertAction === 'resolve' && !note) {
+      setAppError('Enter a short resolution note before resolving this alert.');
+      return;
+    }
+    void api('/api/admin/overview', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: alertAction,
+        alertKey: key,
+        note,
+        kind: target.dataset.kind ?? '',
+        title: target.dataset.title ?? '',
+      }),
+    })
+      .then(() => loadOverview())
+      .catch((error) => setAppError(friendly(error)));
+  }
   if (actionName === 'manual-manage-customer') {
     const customerId = manualField<HTMLSelectElement>('customerId')?.value ?? '';
     void loadView('customers')
@@ -6130,6 +6798,7 @@ document.querySelector<HTMLElement>('[data-admin-view="quick-estimate"]')?.addEv
     if (action === 'discard') void quickDiscard().catch((error) => setAppError(friendly(error)));
     if (action === 'reset') {
       quickEstimateId = '';
+      quickEstimateNumber = '';
       quickLastQuote = null;
       quickForm()?.reset();
       syncQuickEngine();
@@ -6195,6 +6864,7 @@ document.querySelector<HTMLFormElement>('[data-quick-convert]')?.addEventListene
   }).then((result) => {
     if (status) status.textContent = `Pending booking ${result.reference ?? ''} created. Confirm it from Calendar & Requests after required documents are signed.`;
     quickEstimateId = '';
+    quickEstimateNumber = '';
     return loadQuickList();
   }).catch((error) => {
     if (status) status.textContent = friendly(error);
@@ -6209,111 +6879,138 @@ document.querySelector<HTMLButtonElement>('[data-quick-convert-check]')?.addEven
 });
 
 void loadAuth();
-type DocumentEditorBlockType = 'title' | 'heading' | 'paragraph' | 'metadata' | 'bullet';
-interface DocumentEditorBlock {
-  type: DocumentEditorBlockType;
-  text: string;
-}
-let documentEditorBlocks: DocumentEditorBlock[] = [];
 let documentEditorId = '';
 
 function documentEditorInput(selector: string): HTMLInputElement | HTMLSelectElement | null {
   return document.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-document-editor] ${selector}`);
 }
 
-function parseDocumentEditorBlocks(content: string): DocumentEditorBlock[] {
-  const lines = String(content ?? '').replace(/\r\n/g, '\n').split('\n');
-  const blocks: DocumentEditorBlock[] = [];
-  for (const [index, raw] of lines.entries()) {
-    const trimmed = raw.trim();
-    if (!trimmed) continue;
-    let type: DocumentEditorBlockType = 'paragraph';
-    let text = trimmed;
-    if (/^#\s+/.test(trimmed)) { type = 'title'; text = trimmed.replace(/^#\s+/, ''); }
-    else if (/^##\s+/.test(trimmed)) { type = 'heading'; text = trimmed.replace(/^##\s+/, ''); }
-    else if (/^###\s+/.test(trimmed)) { type = 'heading'; text = trimmed.replace(/^###\s+/, ''); }
-    else if (/^>\s+/.test(trimmed)) { type = 'metadata'; text = trimmed.replace(/^>\s+/, ''); }
-    else if (/^[-*]\s+/.test(trimmed)) { type = 'bullet'; text = trimmed.replace(/^[-*]\s+/, ''); }
-    else if (/^#/.test(trimmed)) { type = 'title'; text = trimmed.replace(/^#+\s*/, ''); }
-    else if (index === 0) type = 'title';
-    else if (index === 1) type = 'heading';
-    else if (/^\d+\.\s+[A-Z]/.test(trimmed) && trimmed.length <= 120 && !/^\d+\.\d+/.test(trimmed)) type = 'heading';
-    else if (/^(document\s+[a-z0-9-]+\s*\|\s*version\s+|version\s+)/i.test(trimmed)) type = 'metadata';
-    if (text) blocks.push({ type, text });
-  }
-  return blocks;
+function documentEditorCanvas(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('[data-document-editor-canvas]');
 }
 
-function serializeDocumentEditorBlocks(): string {
-  const groups: string[] = [];
-  let bullets: string[] = [];
-  const flush = (): void => {
-    if (bullets.length) { groups.push(bullets.join('\n')); bullets = []; }
-  };
-  for (const block of documentEditorBlocks) {
-    const text = block.text.trim();
-    if (!text) continue;
-    if (block.type === 'bullet') { bullets.push(`- ${text}`); continue; }
-    flush();
-    if (block.type === 'title') groups.push(`# ${text}`);
-    else if (block.type === 'heading') groups.push(`## ${text}`);
-    else if (block.type === 'metadata') groups.push(`> ${text}`);
-    else groups.push(text);
-  }
-  flush();
-  return groups.join('\n\n');
+function documentEditorHeader(): HTMLInputElement | null {
+  return document.querySelector<HTMLInputElement>('[data-document-editor-header]');
 }
 
-function renderDocumentEditorBlocks(): void {
-  const target = document.querySelector<HTMLElement>('[data-document-editor-blocks]');
-  if (!target) return;
-  target.innerHTML = documentEditorBlocks.map((block, index) => `
-    <div class="document-block" data-editor-block="${index}">
-      <div class="document-block__head">
-        <span class="document-block__label">Block ${index + 1}</span>
-        <select class="document-block__type" data-editor-block-type>
-          <option value="title"${block.type === 'title' ? ' selected' : ''}>Title</option>
-          <option value="heading"${block.type === 'heading' ? ' selected' : ''}>Heading</option>
-          <option value="paragraph"${block.type === 'paragraph' ? ' selected' : ''}>Paragraph</option>
-          <option value="bullet"${block.type === 'bullet' ? ' selected' : ''}>Bullet</option>
-          <option value="metadata"${block.type === 'metadata' ? ' selected' : ''}>Metadata</option>
-        </select>
-        <button class="btn btn--ghost btn--small" type="button" data-editor-move="up"${index === 0 ? ' disabled' : ''}>Up</button>
-        <button class="btn btn--ghost btn--small" type="button" data-editor-move="down"${index === documentEditorBlocks.length - 1 ? ' disabled' : ''}>Down</button>
-        <button class="btn btn--ghost btn--small" type="button" data-editor-remove>Remove</button>
-      </div>
-      <textarea data-editor-block-text rows="${block.type === 'heading' || block.type === 'title' ? 2 : 4}">${esc(block.text)}</textarea>
-    </div>`).join('') || '<p class="admin-muted">No content blocks. Add a heading or paragraph.</p>';
-  renderDocumentEditorPreview();
+function documentEditorFooter(): HTMLInputElement | null {
+  return document.querySelector<HTMLInputElement>('[data-document-editor-footer]');
+}
+
+function richDocumentContent(): string {
+  const canvas = documentEditorCanvas();
+  const header = documentEditorHeader()?.value.trim() ?? '';
+  const footer = documentEditorFooter()?.value.trim() ?? '';
+  const parts: string[] = [];
+  if (header) parts.push(`<header>${esc(header)}</header>`);
+  parts.push(`<div class="doc-body">${canvas?.innerHTML ?? ''}</div>`);
+  if (footer) parts.push(`<footer>${esc(footer)}</footer>`);
+  return normalizeRichDocumentHtml(parts.join(''));
 }
 
 function renderDocumentEditorPreview(): void {
   const frame = document.querySelector<HTMLIFrameElement>('[data-document-editor-preview]');
   if (!frame) return;
-  const html = renderDocumentHtml(serializeDocumentEditorBlocks(), 'doc-rendered');
+  const html = renderDocumentHtml(richDocumentContent(), 'doc-rendered');
   frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>
     @page{size:Letter;margin:.7in .75in}
     body{margin:0;background:#f4ece3;color:#2d2428;font-family:Georgia,'Times New Roman',serif;font-size:11pt;line-height:1.55;padding:14px}
     .doc-rendered{background:#fff;border:1px solid #dccdbc;border-radius:4px;padding:.75in .8in;box-shadow:0 4px 14px rgba(72,42,38,.08);min-height:38rem}
+    .doc-rich header,.doc-rendered header{font-size:8.5pt;letter-spacing:.08em;text-transform:uppercase;color:#8c7a70;border-bottom:1px solid #e5d8c8;padding-bottom:4px;margin-bottom:12px}
+    .doc-rich footer,.doc-rendered footer{font-size:8.5pt;color:#8c7a70;border-top:1px solid #e5d8c8;padding-top:6px;margin-top:18px}
+    .doc-rich [data-doc-page-break]{border-top:2px dashed #c99fa3;margin:18px 0;height:0}
     .doc-title{font-size:18pt;color:#7a3547;margin:0 0 8px}
     .doc-heading{font-size:13pt;color:#7a3547;margin:18px 0 6px;border-bottom:1px solid #e5d8c8;padding-bottom:5px}
     .doc-meta{color:#75655f;font-size:8.5pt;margin:0 0 14px}
-    p{margin:0 0 9px}ul{margin:0 0 10px;padding-left:20px}
+    p{margin:0 0 9px}ul,ol{margin:0 0 10px;padding-left:20px}
+    table{width:100%;border-collapse:collapse;margin:8px 0}td,th{border:1px solid #dccdbc;padding:5px 6px;vertical-align:top}
     @media print{body{background:#fff;padding:0}.doc-rendered{border:0;box-shadow:none;padding:0;min-height:0}}
   </style></head><body>${html}</body></html>`;
 }
 
+function selectionInsideEditor(): boolean {
+  const canvas = documentEditorCanvas();
+  const selection = window.getSelection();
+  if (!canvas || !selection || selection.rangeCount === 0) return false;
+  const range = selection.getRangeAt(0);
+  return canvas.contains(range.commonAncestorContainer);
+}
+
+function styleSelection(style: string): void {
+  const canvas = documentEditorCanvas();
+  if (!canvas) return;
+  canvas.focus();
+  if (!selectionInsideEditor()) return;
+  document.execCommand('styleWithCSS', false, 'true');
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+  const range = selection.getRangeAt(0);
+  const span = document.createElement('span');
+  span.setAttribute('style', style);
+  try {
+    range.surroundContents(span);
+  } catch {
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+    range.selectNodeContents(span);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+}
+
+function runEditorCommand(command: string, value?: string): void {
+  const canvas = documentEditorCanvas();
+  if (!canvas) return;
+  canvas.focus();
+  if (!selectionInsideEditor()) {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(canvas);
+    range.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+  document.execCommand('styleWithCSS', false, 'true');
+  document.execCommand(command, false, value);
+  renderDocumentEditorPreview();
+}
+
 function openDocumentEditor(template: Record<string, unknown>, removed: string[] = [], reused = false): void {
   const editor = document.querySelector<HTMLElement>('[data-document-editor]');
-  if (!editor) return;
+  const canvas = documentEditorCanvas();
+  if (!editor || !canvas) return;
   documentEditorId = String(template.id ?? '');
-  documentEditorBlocks = parseDocumentEditorBlocks(String(template.content_text ?? ''));
+  const raw = String(template.content_text ?? '');
+  let header = '';
+  let footer = '';
+  if (raw.includes('doc-rich')) {
+    const doc = new DOMParser().parseFromString(raw, 'text/html');
+    header = doc.querySelector('header, [data-doc-header]')?.textContent?.trim() ?? '';
+    footer = doc.querySelector('footer, [data-doc-footer]')?.textContent?.trim() ?? '';
+    doc.querySelectorAll('header, [data-doc-header], footer, [data-doc-footer]').forEach((node) => node.remove());
+    const body = doc.querySelector('.doc-rich') ?? doc.body;
+    const bodyInner = body.querySelector(':scope > .doc-body') ?? body;
+    canvas.innerHTML = bodyInner.innerHTML;
+  } else {
+    canvas.innerHTML = renderDocumentHtml(raw, 'doc-rendered');
+  }
   const setValue = (selector: string, value: unknown): void => {
     const field = documentEditorInput(selector);
     if (field) field.value = value === null || value === undefined ? '' : String(value);
   };
+  const headerField = documentEditorHeader();
+  if (headerField) headerField.value = header;
+  const footerField = documentEditorFooter();
+  if (footerField) footerField.value = footer;
   setValue('[data-document-editor-title]', template.title);
   setValue('[data-document-editor-version]', template.version);
+  const versionDisplay = document.querySelector<HTMLElement>('[data-document-editor-version-display]');
+  if (versionDisplay) {
+    versionDisplay.textContent =
+      typeof template.version_label === 'string' && template.version_label
+        ? template.version_label
+        : displayVersion(template.version);
+  }
   setValue('[data-document-editor-category]', template.category);
   setValue('[data-document-editor-signer]', template.signer_party ?? 'customer');
   setValue('[data-document-editor-effective]', template.effective_date ? String(template.effective_date).slice(0, 10) : '');
@@ -6323,7 +7020,7 @@ function openDocumentEditor(template: Record<string, unknown>, removed: string[]
   const countersignature = documentEditorInput('[data-document-editor-countersignature]') as HTMLInputElement | null;
   if (countersignature) countersignature.checked = Number(template.requires_countersignature) === 1;
   editor.hidden = false;
-  renderDocumentEditorBlocks();
+  renderDocumentEditorPreview();
   const status = document.querySelector<HTMLElement>('[data-document-editor-status]');
   if (status) {
     status.textContent = reused
@@ -6335,6 +7032,14 @@ function openDocumentEditor(template: Record<string, unknown>, removed: string[]
   const compareResult = document.querySelector<HTMLElement>('[data-document-editor-compare-result]');
   if (compareResult) compareResult.innerHTML = '';
   editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function openDraftInEditor(templateId: string): Promise<void> {
+  const source = await api<{ template?: Record<string, unknown> }>(
+    `/api/admin/documents?view=template&id=${encodeURIComponent(templateId)}`,
+  );
+  if (!source.template) throw new Error('template_not_found');
+  openDocumentEditor(source.template);
 }
 
 async function startDocumentRevision(templateId: string): Promise<void> {
@@ -6378,7 +7083,7 @@ async function saveDocumentEditor(): Promise<void> {
         legalReviewStatus: documentEditorInput('[data-document-editor-review]')?.value ?? 'owner_approved',
         requiresVerification: (documentEditorInput('[data-document-editor-verification]') as HTMLInputElement | null)?.checked ?? false,
         requiresCountersignature: (documentEditorInput('[data-document-editor-countersignature]') as HTMLInputElement | null)?.checked ?? false,
-        contentText: serializeDocumentEditorBlocks(),
+        contentText: richDocumentContent(),
       }),
     });
     if (status) status.textContent = 'Draft revision saved. The published version and executed agreements are unchanged.';
@@ -6435,20 +7140,88 @@ function closeDocumentEditor(): void {
   const editor = document.querySelector<HTMLElement>('[data-document-editor]');
   if (editor) editor.hidden = true;
   documentEditorId = '';
-  documentEditorBlocks = [];
-}
-
-function addDocumentEditorBlock(type: DocumentEditorBlockType): void {
-  documentEditorBlocks.push({ type, text: type === 'heading' ? 'New section heading' : '' });
-  renderDocumentEditorBlocks();
 }
 
 function bindDocumentEditor(): void {
-  document.querySelectorAll<HTMLButtonElement>('[data-document-editor-add]').forEach((button) => {
-    if (button.dataset.bound === 'yes') return;
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-editor-command]')) {
+    if (button.dataset.bound === 'yes') continue;
     button.dataset.bound = 'yes';
-    button.addEventListener('click', () => addDocumentEditorBlock((button.dataset.documentEditorAdd ?? 'paragraph') as DocumentEditorBlockType));
+    button.addEventListener('click', () => runEditorCommand(button.dataset.editorCommand ?? ''));
+  }
+  document.querySelector<HTMLSelectElement>('[data-editor-block]')?.addEventListener('change', (event) => {
+    const value = (event.target as HTMLSelectElement).value;
+    if (value) runEditorCommand('formatBlock', value);
   });
+  document.querySelector<HTMLSelectElement>('[data-editor-font]')?.addEventListener('change', (event) => {
+    const value = (event.target as HTMLSelectElement).value;
+    if (value) runEditorCommand('fontName', value);
+  });
+  document.querySelector<HTMLSelectElement>('[data-editor-size]')?.addEventListener('change', (event) => {
+    const value = (event.target as HTMLSelectElement).value;
+    if (value) styleSelection(`font-size:${value}`);
+    renderDocumentEditorPreview();
+  });
+  document.querySelector<HTMLInputElement>('[data-editor-color]')?.addEventListener('change', (event) => {
+    runEditorCommand('foreColor', (event.target as HTMLInputElement).value);
+  });
+  document.querySelector<HTMLButtonElement>('[data-editor-insert-table]')?.addEventListener('click', () => {
+    const canvas = documentEditorCanvas();
+    if (!canvas) return;
+    canvas.focus();
+    document.execCommand('insertHTML', false, '<table><tbody><tr><td><strong>Column 1</strong></td><td><strong>Column 2</strong></td></tr><tr><td>&nbsp;</td><td>&nbsp;</td></tr></tbody></table><p><br></p>');
+    renderDocumentEditorPreview();
+  });
+  document.querySelector<HTMLButtonElement>('[data-editor-page-break]')?.addEventListener('click', () => {
+    const canvas = documentEditorCanvas();
+    if (!canvas) return;
+    canvas.focus();
+    document.execCommand('insertHTML', false, '<div data-doc-page-break="true"></div><p><br></p>');
+    renderDocumentEditorPreview();
+  });
+  document.querySelector<HTMLButtonElement>('[data-editor-insert-signature]')?.addEventListener('click', () => {
+    const select = document.querySelector<HTMLSelectElement>('[data-editor-signature]');
+    const party = select?.value === 'employee' ? 'employee' : select?.value === 'customer' ? 'customer' : '';
+    if (!party) return;
+    const canvas = documentEditorCanvas();
+    if (!canvas) return;
+    canvas.focus();
+    const label = party === 'employee' ? 'Employee signature' : 'Customer signature';
+    document.execCommand(
+      'insertHTML',
+      false,
+      `<p data-doc-signature="${party}"><strong>X — Sign here</strong><br />${label}: ______________________________</p><p><br></p>`,
+    );
+    renderDocumentEditorPreview();
+  });
+  document.querySelector<HTMLButtonElement>('[data-editor-insert-field]')?.addEventListener('click', () => {
+    const field = document.querySelector<HTMLSelectElement>('[data-editor-field]');
+    const value = field?.value ?? '';
+    if (!value) return;
+    const canvas = documentEditorCanvas();
+    if (!canvas) return;
+    canvas.focus();
+    document.execCommand('insertHTML', false, `<span>${esc(value)}</span>`);
+    renderDocumentEditorPreview();
+  });
+  const canvas = documentEditorCanvas();
+  if (canvas && canvas.dataset.bound !== 'yes') {
+    canvas.dataset.bound = 'yes';
+    let timer: number | undefined;
+    canvas.addEventListener('input', () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(renderDocumentEditorPreview, 180);
+    });
+    canvas.addEventListener('paste', (event) => {
+      event.preventDefault();
+      const text = event.clipboardData?.getData('text/plain') ?? '';
+      document.execCommand('insertText', false, text);
+    });
+  }
+  for (const field of [documentEditorHeader(), documentEditorFooter()]) {
+    if (!field || field.dataset.bound === 'yes') continue;
+    field.dataset.bound = 'yes';
+    field.addEventListener('input', renderDocumentEditorPreview);
+  }
   document.querySelector<HTMLButtonElement>('[data-document-editor-save]')?.addEventListener('click', () => void saveDocumentEditor());
   document.querySelector<HTMLButtonElement>('[data-document-editor-compare]')?.addEventListener('click', () => void compareDocumentEditor());
   document.querySelector<HTMLButtonElement>('[data-document-editor-publish]')?.addEventListener('click', () => void publishDocumentEditor());
@@ -6457,53 +7230,13 @@ function bindDocumentEditor(): void {
   document.querySelector<HTMLButtonElement>('[data-document-editor-print]')?.addEventListener('click', () => {
     document.querySelector<HTMLIFrameElement>('[data-document-editor-preview]')?.contentWindow?.print();
   });
-  document.querySelector<HTMLButtonElement>('[data-document-editor-bold]')?.addEventListener('click', () => {
-    const textarea = document.activeElement;
-    if (!(textarea instanceof HTMLTextAreaElement)) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const value = textarea.value;
-    textarea.value = `${value.slice(0, start)}**${value.slice(start, end)}**${value.slice(end)}`;
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  const blocks = document.querySelector<HTMLElement>('[data-document-editor-blocks]');
-  if (blocks && blocks.dataset.bound !== 'yes') {
-    blocks.dataset.bound = 'yes';
-    blocks.addEventListener('input', (event) => {
-      const field = event.target as HTMLTextAreaElement;
-      const row = field.closest<HTMLElement>('[data-editor-block]');
-      const index = Number(row?.dataset.editorBlock);
-      if (!row || !Number.isFinite(index) || !documentEditorBlocks[index]) return;
-      documentEditorBlocks[index].text = field.value;
-      renderDocumentEditorPreview();
-    });
-    blocks.addEventListener('change', (event) => {
-      const field = event.target as HTMLSelectElement;
-      if (!field.matches('[data-editor-block-type]')) return;
-      const row = field.closest<HTMLElement>('[data-editor-block]');
-      const index = Number(row?.dataset.editorBlock);
-      if (!row || !Number.isFinite(index) || !documentEditorBlocks[index]) return;
-      documentEditorBlocks[index].type = field.value as DocumentEditorBlockType;
-      renderDocumentEditorPreview();
-    });
-    blocks.addEventListener('click', (event) => {
-      const actionButton = (event.target as HTMLElement).closest<HTMLElement>('[data-editor-move], [data-editor-remove]');
-      const row = actionButton?.closest<HTMLElement>('[data-editor-block]');
-      const index = Number(row?.dataset.editorBlock);
-      if (!actionButton || !row || !Number.isFinite(index) || !documentEditorBlocks[index]) return;
-      if (actionButton.hasAttribute('data-editor-remove')) {
-        documentEditorBlocks.splice(index, 1);
-      } else {
-        const direction = actionButton.dataset.editorMove === 'up' ? -1 : 1;
-        const target = index + direction;
-        if (target < 0 || target >= documentEditorBlocks.length) return;
-        const [block] = documentEditorBlocks.splice(index, 1);
-        if (!block) return;
-        documentEditorBlocks.splice(target, 0, block);
-      }
-      renderDocumentEditorBlocks();
-    });
-  }
 }
 
 bindDocumentEditor();
+
+document.addEventListener('keydown', (event) => {
+  const card = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-action="appointment-open"]');
+  if (!card || (event.key !== 'Enter' && event.key !== ' ')) return;
+  event.preventDefault();
+  card.click();
+});

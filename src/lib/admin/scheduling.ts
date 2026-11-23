@@ -363,7 +363,13 @@ export async function listRecurring(
   const branch = scope(actor, 'r.branch_id');
   const result = await db
     .prepare(
-      `SELECT r.*, c.first_name, c.last_name, p.line1, p.city
+      `SELECT r.*, c.first_name, c.last_name, p.line1, p.city,
+              (SELECT GROUP_CONCAT(tm.display_name, ', ')
+                 FROM appointments a
+                 JOIN appointment_resources ar ON ar.appointment_id = a.id
+                 JOIN team_members tm ON tm.id = ar.team_member_id
+                WHERE a.recurring_plan_id = r.id AND a.start_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now')
+                  AND a.status IN ('pending','confirmed','in_progress')) AS assigned_names
        FROM recurring_plans r JOIN customers c ON c.id = r.customer_id
        JOIN properties p ON p.id = r.property_id
        WHERE 1 = 1 ${branch.sql} ORDER BY r.next_visit_date ASC LIMIT 200`,

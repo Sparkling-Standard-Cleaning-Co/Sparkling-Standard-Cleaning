@@ -1,5 +1,6 @@
-﻿import { bookingConfig } from '../../src/config/booking.ts';
-import { availabilityForRange, scheduleAvailabilityForRange, type BookingEnv } from '../../src/lib/booking/service.ts';
+﻿import { availabilityForRange, scheduleAvailabilityForRange, type BookingEnv } from '../../src/lib/booking/service.ts';
+import { resolveServiceBranchForPoint, resolveServiceBranchStrict } from '../../src/lib/branches/registry.ts';
+import { reverseGeocode } from '../../src/lib/location/server-geocode.ts';
 
 const hits = new Map<string, { count: number; reset: number }>();
 function json(body: unknown, status = 200): Response {
@@ -37,15 +38,42 @@ export async function onRequestGet(context: { request: Request; env: BookingEnv 
   const lng = Number(lngRaw);
   const hasPoint = latRaw !== null && lngRaw !== null && Number.isFinite(lat) && Number.isFinite(lng);
   if (!Number.isFinite(durationRaw)) return json({ ok: false, error: 'invalid_request' }, 400);
+  let zip = (url.searchParams.get('zip') ?? '').trim();
+  if (!/^\d{5}$/.test(zip) && hasPoint) {
+    const reverse = await reverseGeocode(env, lat, lng).catch(() => null);
+    zip = reverse?.zip?.trim() ?? '';
+  }
+  let resolved = await resolveServiceBranchStrict(env.DB ?? null, { zip, state: null });
+  if (!resolved.branch && !zip && hasPoint) {
+    resolved = await resolveServiceBranchForPoint(env.DB ?? null, { lat, lng });
+  }
+  if (!resolved.branch) {
+    return json({ ok: true, enabled: false, reason: 'service_area_inquiry_required', days: [] });
+  }
+  if (!resolved.branch.bookable) {
+    return json({ ok: true, enabled: false, reason: 'branch_not_bookable', days: [] });
+  }
   const result = hasPoint
-    ? await availabilityForRange(env, { from, to, durationMinutes: durationRaw, destination: { lat, lng } })
-    : await scheduleAvailabilityForRange(env, { from, to, durationMinutes: durationRaw });
+    ? await availabilityForRange(env, {
+        from,
+        to,
+        durationMinutes: durationRaw,
+        destination: { lat, lng },
+        branchId: resolved.branch.id,
+      })
+    : await scheduleAvailabilityForRange(env, {
+        from,
+        to,
+        durationMinutes: durationRaw,
+        branchId: resolved.branch.id,
+      });
   if (!result.ok) return json({ ok: true, enabled: false, reason: result.reason, days: [] });
   return json({
     ok: true,
     enabled: true,
     timeZone: result.timeZone,
-    timeZoneLabel: bookingConfig.timeZoneLabel,
+    timeZoneLabel: result.timeZone === 'America/New_York' ? 'Eastern Time' : 'Central Time',
+    branch: resolved.branch.id,
     from,
     to,
     days: result.days,

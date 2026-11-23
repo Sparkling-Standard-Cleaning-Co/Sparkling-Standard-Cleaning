@@ -65,6 +65,7 @@ export interface QuickEstimateRecord {
   customer_id: string | null;
   property_id: string | null;
   quote_reference: string;
+  estimate_number: string;
   pricing_version: string;
   promotion_code: string;
   input_json: string;
@@ -246,12 +247,30 @@ function scoped(
   return { sql: ' AND 1 = 0', bind: [] };
 }
 
+async function nextEstimateNumber(db: D1Database): Promise<string> {
+  const year = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+  }).format(new Date());
+  const prefix = `EST-${year}-`;
+  const row = await db
+    .prepare(
+      `SELECT MAX(CAST(substr(estimate_number, ?) AS INTEGER)) AS maximum
+       FROM quick_estimates WHERE estimate_number LIKE ?`,
+    )
+    .bind(prefix.length + 1, `${prefix}%`)
+    .first<{ maximum: number | null }>()
+    .catch(() => null);
+  const next = Number(row?.maximum ?? 0) + 1;
+  return `${prefix}${String(next).padStart(4, '0')}`;
+}
+
 export async function saveQuickEstimate(
   env: QuickEstimateEnv,
   db: D1Database,
   actor: AdminActor,
   raw: Record<string, unknown>,
-): Promise<{ id: string; status: string; quote: QuickEstimateQuote }> {
+): Promise<{ id: string; status: string; estimateNumber: string; quote: QuickEstimateQuote }> {
   const existingId = text(raw.id, 120);
   if (existingId) {
     const existing = await getQuickEstimate(db, actor, existingId);
@@ -265,13 +284,25 @@ export async function saveQuickEstimate(
   const id = existingId || `qe_${crypto.randomUUID()}`;
   const inputJson = JSON.stringify(calculated.input);
   const quoteJson = JSON.stringify(calculated.quote);
+  let estimateNumber = existingId
+    ? String(
+        (
+          await db
+            .prepare('SELECT estimate_number FROM quick_estimates WHERE id = ? LIMIT 1')
+            .bind(existingId)
+            .first<{ estimate_number: string }>()
+            .catch(() => null)
+        )?.estimate_number ?? '',
+      )
+    : await nextEstimateNumber(db);
+  if (!estimateNumber) estimateNumber = await nextEstimateNumber(db);
   if (existingId) {
     await db
       .prepare(
         `UPDATE quick_estimates
          SET status = ?, engine = ?, service_code = ?, customer_id = ?, property_id = ?,
-             quote_reference = ?, pricing_version = ?, promotion_code = ?, input_json = ?,
-             quote_json = ?, total_cents = ?, ongoing_cents = ?, customer_name = ?,
+             quote_reference = ?, estimate_number = ?, pricing_version = ?, promotion_code = ?,
+             input_json = ?, quote_json = ?, total_cents = ?, ongoing_cents = ?, customer_name = ?,
              customer_email = ?, customer_phone = ?, address_text = ?, notes = ?, updated_at = ?
          WHERE id = ?`,
       )
@@ -282,6 +313,7 @@ export async function saveQuickEstimate(
         calculated.input.customerId ?? null,
         calculated.input.propertyId ?? null,
         text(raw.reference, 120) || id,
+        estimateNumber,
         calculated.pricingVersion,
         calculated.input.promotionCode ?? '',
         inputJson,
@@ -298,38 +330,54 @@ export async function saveQuickEstimate(
       )
       .run();
   } else {
-    await db
-      .prepare(
-        `INSERT INTO quick_estimates
-         (id, created_by_admin_user_id, branch_id, status, engine, service_code, customer_id,
-          property_id, quote_reference, pricing_version, promotion_code, input_json, quote_json,
-          total_cents, ongoing_cents, customer_name, customer_email, customer_phone,
-          address_text, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        id,
-        actor.id,
-        calculated.input.branchId,
-        status,
-        calculated.input.engine,
-        calculated.quote.serviceCode,
-        calculated.input.customerId ?? null,
-        calculated.input.propertyId ?? null,
-        text(raw.reference, 120) || id,
-        calculated.pricingVersion,
-        calculated.input.promotionCode ?? '',
-        inputJson,
-        quoteJson,
-        calculated.quote.totalCents,
-        calculated.quote.ongoingPerVisitCents,
-        calculated.input.customerName,
-        calculated.input.customerEmail,
-        calculated.input.customerPhone,
-        calculated.addressText,
-        calculated.input.notes,
-      )
-      .run();
+    const bindValues = [
+      id,
+      actor.id,
+      calculated.input.branchId,
+      status,
+      calculated.input.engine,
+      calculated.quote.serviceCode,
+      calculated.input.customerId ?? null,
+      calculated.input.propertyId ?? null,
+      text(raw.reference, 120) || id,
+      calculated.pricingVersion,
+      calculated.input.promotionCode ?? '',
+      inputJson,
+      quoteJson,
+      calculated.quote.totalCents,
+      calculated.quote.ongoingPerVisitCents,
+      calculated.input.customerName,
+      calculated.input.customerEmail,
+      calculated.input.customerPhone,
+      calculated.addressText,
+      calculated.input.notes,
+    ];
+    try {
+      await db
+        .prepare(
+          `INSERT INTO quick_estimates
+           (id, created_by_admin_user_id, branch_id, status, engine, service_code, customer_id,
+            property_id, quote_reference, estimate_number, pricing_version, promotion_code,
+            input_json, quote_json, total_cents, ongoing_cents, customer_name, customer_email,
+            customer_phone, address_text, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(...bindValues.slice(0, 9), estimateNumber, ...bindValues.slice(9))
+        .run();
+    } catch (error) {
+      if (!(error instanceof Error) || !/estimate_number/i.test(error.message)) throw error;
+      await db
+        .prepare(
+          `INSERT INTO quick_estimates
+           (id, created_by_admin_user_id, branch_id, status, engine, service_code, customer_id,
+            property_id, quote_reference, pricing_version, promotion_code, input_json, quote_json,
+            total_cents, ongoing_cents, customer_name, customer_email, customer_phone,
+            address_text, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(...bindValues)
+        .run();
+    }
   }
   await audit(db, {
     actorUserId: actor.id,
@@ -338,7 +386,7 @@ export async function saveQuickEstimate(
     entityId: id,
     detail: `${calculated.quote.status}:${calculated.quote.totalCents ?? 'none'}:${calculated.pricingVersion}`,
   });
-  return { id, status, quote: calculated.quote };
+  return { id, status, estimateNumber, quote: calculated.quote };
 }
 
 export async function listQuickEstimates(
@@ -358,20 +406,25 @@ export async function listQuickEstimates(
     const like = `%${filters.q.slice(0, 120)}%`;
     binds.push(like, like, like, like, like);
   }
-  const rows = await db
-    .prepare(
-      `SELECT q.id, q.status, q.engine, q.service_code, q.customer_id, q.property_id,
-              q.quote_reference, q.pricing_version, q.total_cents, q.ongoing_cents,
-              q.customer_name, q.customer_email, q.customer_phone, q.address_text,
-              q.converted_request_id, q.created_at, q.updated_at,
-              c.first_name, c.last_name
-       FROM quick_estimates q
-       LEFT JOIN customers c ON c.id = q.customer_id
-       WHERE ${clauses.join(' AND ')}${branch.sql}
-       ORDER BY q.updated_at DESC LIMIT 100`,
-    )
-    .bind(...binds, ...branch.bind)
-    .all<Record<string, unknown>>();
+  const query = (estimateNumberColumn: string) =>
+    db
+      .prepare(
+        `SELECT q.id, q.status, q.engine, q.service_code, q.customer_id, q.property_id,
+                q.quote_reference, ${estimateNumberColumn} AS estimate_number, q.pricing_version,
+                q.total_cents, q.ongoing_cents, q.customer_name, q.customer_email, q.customer_phone,
+                q.address_text, q.converted_request_id, q.created_at, q.updated_at,
+                c.first_name, c.last_name
+         FROM quick_estimates q
+         LEFT JOIN customers c ON c.id = q.customer_id
+         WHERE ${clauses.join(' AND ')}${branch.sql}
+         ORDER BY q.updated_at DESC LIMIT 100`,
+      )
+      .bind(...binds, ...branch.bind)
+      .all<Record<string, unknown>>();
+  const rows = await query('q.estimate_number').catch(async (error) => {
+    if (!(error instanceof Error) || !/estimate_number/i.test(error.message)) throw error;
+    return query("''");
+  });
   return rows.results ?? [];
 }
 

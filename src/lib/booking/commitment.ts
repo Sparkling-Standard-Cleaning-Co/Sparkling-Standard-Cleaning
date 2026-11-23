@@ -11,6 +11,7 @@ import type { D1Database } from '../admin/d1.ts';
 import { audit, type AdminActor } from '../admin/operations.ts';
 import { evaluateDocumentGate } from '../documents/service.ts';
 import {
+  calendarEnvForBranchWithDb,
   createCalendarEvent,
   deleteCalendarEvent,
   findCalendarEventByReference,
@@ -71,6 +72,7 @@ export const SYSTEM_ACTOR: AdminActor = {
 export interface CommitmentInput {
   reference: string;
   holdId?: string;
+  branchId?: string;
   customerId?: string;
   propertyId?: string;
   customerName?: string;
@@ -118,26 +120,26 @@ function payload(value: unknown): Record<string, string> {
   }
 }
 
-function localDate(instant: string): string {
+function localDate(instant: string, timeZone: string = bookingConfig.timeZone): string {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: bookingConfig.timeZone,
+    timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   }).format(new Date(instant));
 }
 
-function localTime(instant: string): string {
+function localTime(instant: string, timeZone: string = bookingConfig.timeZone): string {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: bookingConfig.timeZone,
+    timeZone,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
   }).format(new Date(instant));
 }
 
-function windowFor(instant: string): 'morning' | 'afternoon' {
-  const [hour = 0] = localTime(instant).split(':').map(Number);
+function windowFor(instant: string, timeZone: string = bookingConfig.timeZone): 'morning' | 'afternoon' {
+  const [hour = 0] = localTime(instant, timeZone).split(':').map(Number);
   return hour < 12 ? 'morning' : 'afternoon';
 }
 
@@ -146,6 +148,7 @@ async function ensureCustomerAndProperty(
   input: CommitmentInput,
   requestRow: BookingRequestRow | null,
   holdLocation = '',
+  branchId = 'branch_pensacola',
 ): Promise<{ customerId: string; propertyId: string }> {
   let customerId = text(input.customerId, 100) || text(requestRow?.customer_id, 100);
   let propertyId = text(input.propertyId, 100) || text(requestRow?.property_id, 100);
@@ -167,9 +170,9 @@ async function ensureCustomerAndProperty(
     await db
       .prepare(
         `INSERT INTO customers (id, primary_branch_id, first_name, last_name, status, source)
-         VALUES (?, 'branch_pensacola', ?, ?, 'active', 'website')`,
+         VALUES (?, ?, ?, ?, 'active', 'website')`,
       )
-      .bind(customerId, parts[0] ?? '', parts.slice(1).join(' '))
+      .bind(customerId, branchId, parts[0] ?? '', parts.slice(1).join(' '))
       .run();
     await db
       .prepare(
@@ -196,11 +199,12 @@ async function ensureCustomerAndProperty(
           `INSERT INTO properties
            (id, customer_id, branch_id, label, line1, city, state, postal_code, latitude, longitude,
             precision, is_primary, status)
-           VALUES (?, ?, 'branch_pensacola', 'Service property', ?, ?, ?, ?, ?, ?, ?, 1, 'active')`,
+           VALUES (?, ?, ?, 'Service property', ?, ?, ?, ?, ?, ?, ?, 1, 'active')`,
         )
         .bind(
           propertyId,
           customerId,
+          branchId,
           line1,
           text(fields.address_city, 120),
           text(fields.address_state, 2) || 'FL',
@@ -249,6 +253,17 @@ export async function commitConfirmedBooking(
         .bind(input.reference)
         .first<BookingRequestRow>();
   const fields = payload(requestRow?.payload_json);
+  const branchId =
+    text(input.branchId, 80) ||
+    text(fields.branch_id, 80) ||
+    hold?.branchId ||
+    'branch_pensacola';
+  const timeZone = branchId === 'branch_tampa' ? 'America/New_York' : 'America/Chicago';
+  const calendarEnv =
+    (await calendarEnvForBranchWithDb(env, db, branchId)) ??
+    (Object.keys(overrides).length > 0
+      ? ({ ...env, GOOGLE_CALENDAR_ID: 'injected-test-calendar' } as typeof env)
+      : null);
   const reference = text(input.reference || requestRow?.quote_reference || hold?.reference, 120);
   if (!reference) return { ok: false, reason: 'reference_required' };
 
@@ -260,7 +275,7 @@ export async function commitConfirmedBooking(
     .bind(reference)
     .first<{ id: string; status: string }>();
   if (alreadyConfirmed?.status === 'confirmed') {
-    const eventId = await deps.findEvent(env, reference);
+    const eventId = calendarEnv ? await deps.findEvent(calendarEnv, reference) : null;
     if (eventId) {
       if (hold && bucket && hold.status !== 'confirmed') {
         await writeLedgerJson(bucket, holdKey(hold.id), {
@@ -292,7 +307,7 @@ export async function commitConfirmedBooking(
   let customerId: string;
   let propertyId: string;
   try {
-    const resolved = await ensureCustomerAndProperty(db, input, requestRow, hold?.locationText ?? '');
+    const resolved = await ensureCustomerAndProperty(db, input, requestRow, hold?.locationText ?? '', branchId);
     customerId = resolved.customerId;
     propertyId = resolved.propertyId;
   } catch (error) {
@@ -321,6 +336,7 @@ export async function commitConfirmedBooking(
   if (!gate.satisfied) {
     return { ok: false, reason: 'documents_required' };
   }
+  if (!calendarEnv) return { ok: false, reason: 'calendar_not_configured' };
 
   const start = text(hold?.start, 40) || text(fields.booking_slot_start, 40);
   const end = text(hold?.end, 40) || text(fields.booking_slot_end, 40);
@@ -336,13 +352,14 @@ export async function commitConfirmedBooking(
     return { ok: false, reason: 'destination_missing' };
   }
   const crewSize = Math.max(1, hold?.crewSize ?? hold?.resourceIds?.length ?? 1);
-  const existingEventId = await deps.findEvent(env, reference);
-  const existingEvent = existingEventId ? await deps.getEvent(env, existingEventId).catch(() => null) : null;
+  const existingEventId = await deps.findEvent(calendarEnv, reference);
+  const existingEvent = existingEventId ? await deps.getEvent(calendarEnv, existingEventId).catch(() => null) : null;
   const usableEvent = existingEvent && existingEvent.status !== 'cancelled' ? existingEvent : null;
   const availability = await deps.availability(env, {
-    date: localDate(start),
+    date: localDate(start, timeZone),
     durationMinutes: duration,
     destination,
+    branchId: branchId === 'branch_tampa' ? 'branch_tampa' : 'branch_pensacola',
     crewSize,
     ...(hold?.id ? { ignoreHoldId: hold.id } : {}),
     ...(usableEvent ? { excludeEventIds: [usableEvent.id] } : {}),
@@ -357,13 +374,13 @@ export async function commitConfirmedBooking(
   let eventId = usableEvent?.id;
   let createdEvent = false;
   if (!eventId) {
-    const created = await deps.createEvent(env, {
+    const created = await deps.createEvent(calendarEnv, {
       summary: `Sparkling Standard Cleaning - ${reference}`,
       description: `Confirmed cleaning booking ${reference}. Resources: ${resourceIds.join(', ')}.`,
       location: hold?.locationText ?? text(fields.service_address, 300),
       start,
       end,
-      timeZone: bookingConfig.timeZone,
+      timeZone,
       reference,
       resourceIds,
     });
@@ -395,16 +412,17 @@ export async function commitConfirmedBooking(
           `INSERT INTO appointments
            (id, branch_id, customer_id, property_id, booking_request_id, status, start_at, end_at,
             timezone, duration_minutes, crew_size, source, reference, notes)
-           VALUES (?, 'branch_pensacola', ?, ?, ?, 'confirmed', ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           appointmentId,
+          branchId,
           customerId,
           propertyId,
           requestRow?.id ?? null,
           start,
           end,
-          bookingConfig.timeZone,
+          timeZone,
           duration,
           resourceIds.length,
           text(input.source, 40) || 'website',
@@ -434,7 +452,7 @@ export async function commitConfirmedBooking(
     }
   } catch (error) {
     if (createdEvent && eventId) {
-      await deps.deleteEvent(env, eventId).catch(() => undefined);
+      await deps.deleteEvent(calendarEnv, eventId).catch(() => undefined);
     }
     return { ok: false, reason: `appointment_write_failed:${(error as Error).message}` };
   }
@@ -470,6 +488,7 @@ export async function commitConfirmedBooking(
     if (ongoingPrice > 0) {
       const recurring = await ensureRecurringPlan(env, db, {
         reference,
+        branchId,
         customerId,
         propertyId,
         serviceCode,
@@ -517,6 +536,7 @@ export async function ensureRecurringPlan(
   db: D1Database,
   input: {
     reference: string;
+    branchId?: string;
     customerId: string;
     propertyId: string;
     serviceCode: string;
@@ -563,8 +583,10 @@ export async function ensureRecurringPlan(
     };
   }
   const planId = `rec_${crypto.randomUUID()}`;
-  const startDate = localDate(input.start);
-  const startTime = localTime(input.start);
+  const planBranch = input.branchId ?? 'branch_pensacola';
+  const planTimeZone = planBranch === 'branch_tampa' ? 'America/New_York' : 'America/Chicago';
+  const startDate = localDate(input.start, planTimeZone);
+  const startTime = localTime(input.start, planTimeZone);
   const nextDate = occurrenceDate(startDate, input.frequency, 1);
   await db
     .prepare(
@@ -572,19 +594,20 @@ export async function ensureRecurringPlan(
        (id, customer_id, property_id, branch_id, service_code, frequency, status,
         ongoing_price_cents, start_date, next_visit_date, terms_version, window, start_time,
         duration_minutes, crew_size, first_duration_minutes, booking_reference, sync_status)
-       VALUES (?, ?, ?, 'branch_pensacola', ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
     )
     .bind(
       planId,
       input.customerId,
       input.propertyId,
+      planBranch,
       input.serviceCode,
       input.frequency,
       input.ongoingPriceCents,
       startDate,
       nextDate,
       input.termsVersion,
-      windowFor(input.start),
+      windowFor(input.start, planTimeZone),
       startTime,
       input.ongoingDuration,
       input.crewSize,

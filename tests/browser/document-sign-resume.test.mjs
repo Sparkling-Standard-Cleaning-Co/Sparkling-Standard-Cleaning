@@ -37,12 +37,12 @@ after(async () => {
   server?.kill();
 });
 
-test('the signing page forwards token, return and resume to the API', async () => {
+test('the signing page forwards token, return and resume and then transitions to payment', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
-  let requested = '';
+  const requested = [];
   await page.route('**/api/document-sign?**', async (route) => {
-    requested = route.request().url();
+    requested.push(route.request().url());
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -70,13 +70,17 @@ test('the signing page forwards token, return and resume to the API', async () =
         '/document-sign/?token=test-token&return=%2Festimate%2Fresidential%2F&resume=test-resume',
       { waitUntil: 'load' },
     );
-    await page.waitForFunction(() => document.querySelector('[data-document-status]')?.textContent?.includes('signed'));
-    const url = new URL(requested);
+    await page.waitForURL(/\/estimate\/payment-resume\//);
+    const url = new URL(requested[0]);
     assert.equal(url.searchParams.get('token'), 'test-token');
     assert.equal(url.searchParams.get('return'), '/estimate/residential/');
     assert.equal(url.searchParams.get('resume'), 'test-resume');
+    const destination = new URL(page.url());
+    assert.equal(destination.pathname, '/estimate/payment-resume/');
+    assert.equal(destination.searchParams.get('token'), 'test-resume');
+    assert.equal(destination.searchParams.get('signing_token'), 'test-token');
     assert.equal(
-      await page.getByRole('link', { name: /Continue to secure payment/i }).isVisible(),
+      await page.getByRole('button', { name: /Continue to secure payment/i }).isVisible(),
       true,
     );
   } finally {

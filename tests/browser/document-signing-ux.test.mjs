@@ -152,7 +152,7 @@ test('a customer can complete one mobile signing ceremony without repeated names
     await page.getByText('100 Example Street, Pensacola, FL 32502').waitFor({ state: 'visible' });
     assert.equal(await page.locator('input[name="signerName"]').count(), 1, 'one legal-name field only');
 
-    await page.locator('input[name="detailsConfirmed"]').check();
+    await page.locator('input[name="detailsAcknowledged"]').check();
     await page.locator('[data-signing-primary]').click();
     await page.getByRole('heading', { name: 'Access and service instructions' }).waitFor({ state: 'visible' });
     await page.locator('input[name="access_method"][value="customer_present"]').check();
@@ -163,8 +163,15 @@ test('a customer can complete one mobile signing ceremony without repeated names
     await page.locator('[data-document-dialog] .signing-doc-text').getByText(/RESIDENTIAL ACCESS AUTHORIZATION/).waitFor({ state: 'visible' });
     await page.locator('[data-document-dialog-close]').click();
 
-    await page.locator('input[name="ack-doc_access"]').check();
-    await page.locator('input[name="ack-doc_deep"]').check();
+    await page.locator('[data-signature-slot="doc_access"]').waitFor({ state: 'visible' });
+    assert.match(await page.locator('[data-signature-slot="doc_access"]').textContent(), /X — Sign here/);
+    await page.locator('[data-signature-slot="doc_access"]').click();
+    await page.locator('[data-signature-dialog]').waitFor({ state: 'visible' });
+    await page.locator('[data-modal-adopt]').click();
+    await page.locator('[data-signature-slot="doc_access"].is-signed').waitFor({ state: 'visible' });
+
+    await page.locator('[data-signature-slot="doc_deep"]').click();
+    await page.locator('[data-signature-slot="doc_deep"].is-signed').waitFor({ state: 'visible' });
     await page.locator('input[name="consent"]').check();
     await page.locator('[data-signing-primary]').click();
     await page.waitForFunction(() => Boolean(document.querySelector('[data-document-sign]')));
@@ -177,6 +184,8 @@ test('a customer can complete one mobile signing ceremony without repeated names
     assert.equal(submitted.signatures.doc_access.value, 'Jordan Example');
     assert.equal(submitted.signatures.doc_deep.value, 'Jordan Example');
     assert.equal(submitted.signatures.doc_access.type, 'typed');
+    assert.ok(submitted.signatures.doc_access.appliedAt);
+    assert.ok(submitted.signatures.doc_deep.appliedAt);
   } finally {
     await context.close();
   }

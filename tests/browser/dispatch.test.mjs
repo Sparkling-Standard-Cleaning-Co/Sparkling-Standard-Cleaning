@@ -140,6 +140,7 @@ test('the dispatch dashboard shows unassigned work, recommendations and employee
 test('selecting an employee loads the private dispatch profile for the owner', async () => {
   const { context, page } = await openAdmin();
   try {
+    await page.locator('[data-dispatch-tab="team"]').click();
     await page.selectOption('[data-dispatch-profile-select]', 'team_a');
     assert.equal(await page.inputValue('[data-dispatch-profile] input[name="addressLine1"]'), '100 Private Way');
     assert.equal(await page.inputValue('[data-dispatch-profile] input[name="latitude"]'), '30.42');
@@ -152,6 +153,7 @@ test('selecting an employee loads the private dispatch profile for the owner', a
 test('the owner can save dispatch controls and run automatic assignment', async () => {
   const { context, page, posts } = await openAdmin();
   try {
+    await page.locator('[data-dispatch-tab="settings"]').click();
     await page.check('[data-dispatch-settings] input[name="autoAssignEnabled"]');
     await page.uncheck('[data-dispatch-settings] input[name="paused"]');
     await page.selectOption('[data-dispatch-settings] select[name="mode"]', 'automatic_unassigned');
@@ -170,6 +172,7 @@ test('the owner can save dispatch controls and run automatic assignment', async 
 test('the owner can save an employee dispatch profile with services and transport', async () => {
   const { context, page, posts } = await openAdmin();
   try {
+    await page.locator('[data-dispatch-tab="team"]').click();
     await page.selectOption('[data-dispatch-profile-select]', 'team_a');
     assert.equal(await page.isChecked('[data-dispatch-profile] input[name="services"][value="standard"]'), true, 'standard qualification loaded');
     await page.check('[data-dispatch-profile] input[name="services"][value="deep"]');

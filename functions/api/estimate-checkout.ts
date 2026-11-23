@@ -1,4 +1,4 @@
-// POST /api/estimate-checkout â€” starts a Stripe-hosted Checkout Session for
+// POST /api/estimate-checkout — starts a Stripe-hosted Checkout Session for
 // an exact, server-verified residential/STR quote or an exact Tier A facility
 // quote.
 //
@@ -96,8 +96,14 @@ import {
   findReusableSigningRequest,
   rotateSigningRequestToken,
   sendSigningEmail,
+  updatePendingSigningRequestPricing,
 } from '../../src/lib/documents/service.ts';
 import { createCheckoutIntent, readCheckoutIntent } from '../../src/lib/documents/checkout-intent.ts';
+import {
+  createPricingSnapshot,
+  pricingServiceLabel,
+  type PricingSnapshot,
+} from '../../src/lib/documents/pricing-snapshot.ts';
 
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   DB?: import('../../src/lib/admin/d1.ts').D1Database;
@@ -343,6 +349,7 @@ export async function documentGateForCheckout(
   env: Env,
   fields: Record<string, string>,
   returnPath = '',
+  pricingSnapshot?: PricingSnapshot,
 ): Promise<{ satisfied: boolean; signingUrl?: string; error?: string }> {
   if (!legalPolicyConfig.activation.electronicSigning) return { satisfied: true };
   if (!env.DB) return { satisfied: true };
@@ -387,6 +394,9 @@ export async function documentGateForCheckout(
   };
   const pending = await findReusableSigningRequest(env.DB, context, gate);
   if (pending) {
+    if (pricingSnapshot) {
+      await updatePendingSigningRequestPricing(env.DB, pending.id, pricingSnapshot).catch(() => undefined);
+    }
     const rotated = await rotateSigningRequestToken(env.DB, null, pending.id);
     return {
       satisfied: false,
@@ -394,7 +404,9 @@ export async function documentGateForCheckout(
     };
   }
   try {
-    const created = await createSigningRequest(env.DB, context);
+    const created = await createSigningRequest(env.DB, context, {
+      ...(pricingSnapshot ? { pricingSnapshot } : {}),
+    });
     if (!created.token || !created.requestId) {
       return { satisfied: false, error: 'document_packet_unavailable' };
     }
@@ -419,6 +431,66 @@ export async function documentGateForCheckout(
     }
     throw error;
   }
+}
+
+/**
+ * Builds the exact pricing the customer is asked to sign before payment.
+ * The candidate is the same server-verified amount that will be sent to
+ * Stripe, so the agreement, the payment screen and the admin record agree.
+ */
+export function buildCheckoutPricingSnapshot(
+  fields: Record<string, string>,
+  candidate: VerifiedCandidate,
+): PricingSnapshot {
+  const lines = candidate.receipt.lines.map((line) => ({
+    label: line.label,
+    amountCents: line.kind === 'discount' ? -Math.abs(line.amountCents) : line.amountCents,
+    kind:
+      line.kind === 'discount'
+        ? ('discount' as const)
+        : line.kind === 'tax'
+          ? ('tax' as const)
+          : ('charge' as const),
+  }));
+  const charges = lines.filter((line) => line.kind === 'charge');
+  const discounts = lines.filter((line) => line.kind === 'discount');
+  const travelLine = candidate.receipt.lines.find((line) => line.kind === 'travel');
+  return createPricingSnapshot({
+    version: 1,
+    currency: 'USD',
+    source: 'checkout_verified',
+    capturedAt: new Date().toISOString(),
+    serviceCode: candidate.serviceType,
+    serviceLabel: pricingServiceLabel(candidate.serviceType, fields.frequency ?? ''),
+    frequency: fields.frequency ?? fields.ongoing_frequency ?? '',
+    propertyAddress:
+      candidate.receipt.serviceLocation ||
+      [fields.service_address, fields.address_city, fields.address_state, fields.zip]
+        .filter(Boolean)
+        .join(', '),
+    serviceDate: fields.preferred_date ?? fields.booking_slot_start?.slice(0, 10) ?? '',
+    arrivalWindow: fields.preferred_time ?? '',
+    scope: fields.service_scope ?? fields.service_details ?? '',
+    addOns: fields.addons ?? fields.extras_detail ?? '',
+    basePriceCents: charges.reduce((total, line) => total + line.amountCents, 0),
+    travelCents: travelLine ? travelLine.amountCents : null,
+    discountCents: Math.abs(discounts.reduce((total, line) => total + line.amountCents, 0)),
+    discountLabel: discounts.map((line) => line.label).join(', '),
+    taxCents: candidate.receipt.taxCents,
+    taxLabel:
+      candidate.receipt.taxCents > 0 && candidate.receipt.taxRatePercent
+        ? `Sales tax (${candidate.receipt.taxRatePercent}%${
+            candidate.receipt.taxJurisdiction ? ` - ${candidate.receipt.taxJurisdiction}` : ''
+          })`
+        : fields.tax_note || 'No sales tax applies to this service.',
+    totalCents: candidate.amountCents,
+    amountDueNowCents: candidate.amountCents,
+    remainingBalanceCents: 0,
+    paymentTerms:
+      'Payment is completed through the secure payment page. A signed copy is provided before payment.',
+    lines,
+    note: 'Verified by the Sparkling Standard checkout engine.',
+  });
 }
 
 function sanitizeFields(value: unknown): Record<string, string> {
@@ -525,11 +597,11 @@ function residentialReceiptLines(
 ): ReceiptLine[] {
   const breakdown = verification.breakdown;
   if (!breakdown) {
-    return [{ label: `Cleaning service â€” ${service}`, amountCents: totalCents, kind: 'charge' }];
+    return [{ label: `Cleaning service — ${service}`, amountCents: totalCents, kind: 'charge' }];
   }
   const lines: ReceiptLine[] = [
     {
-      label: `Cleaning service â€” ${service}`,
+      label: `Cleaning service — ${service}`,
       amountCents: cents(breakdown.basePrice) + cents(breakdown.roundingAdjustment),
       kind: 'charge',
     },
@@ -570,7 +642,7 @@ function facilityReceiptLines(
   const discount = cents(verification.discountAmount ?? 0);
   const lines: ReceiptLine[] = [
     {
-      label: `Cleaning service â€” ${service}`,
+      label: `Cleaning service — ${service}`,
       amountCents: cleaningAfterDiscount + discount,
       kind: 'charge',
     },
@@ -1154,7 +1226,7 @@ async function fulfillGiftOnlyOrder(
   }
   const notified = await notifyOwnerGiftOrder(
     env,
-    `PAID BY GIFT â€” ${input.candidate.reference}`,
+    `PAID BY GIFT — ${input.candidate.reference}`,
     {
       'Payment status': 'PAID IN FULL BY GIFT CERTIFICATE',
       'Gift code': input.giftCode,
@@ -1163,7 +1235,7 @@ async function fulfillGiftOnlyOrder(
       Service: serviceLabel({ service_type: input.candidate.serviceType }),
       Customer: snapshot?.customerName ?? 'name unavailable',
       Email: input.email,
-      'Photos outstanding': input.record.photosOutstanding ? 'yes â€” confirm after photos' : 'no',
+      'Photos outstanding': input.record.photosOutstanding ? 'yes — confirm after photos' : 'no',
       ...(bookingStatus
         ? {
             'Booking status':
@@ -1321,30 +1393,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   fields.booking_slot_end = hold.end;
   fields.booking_hold_expires_at = hold.expiresAt;
 
-  const documentGate = await documentGateForCheckout(env, fields, returnPath);
-  if (!documentGate.satisfied) {
-    if (documentGate.error) {
-      return json(
-        {
-          ok: false,
-          error: documentGate.error,
-          reason:
-            'A required agreement is not fully configured. Sparkling Standard must complete the document setup before payment can be accepted.',
-        },
-        409,
-      );
-    }
-    return json(
-      {
-        ok: false,
-        error: 'documents_required',
-        reason: 'Complete the required signed documents before payment.',
-        ...(documentGate.signingUrl ? { signingUrl: documentGate.signingUrl } : {}),
-      },
-      409,
-    );
-  }
-
   const pricingConfig = await requestPricingConfig(env.DB);
   let candidate =
     fields.request_type === 'facility_estimate'
@@ -1472,6 +1520,35 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         tax: candidate.tax,
         reference: candidate.reference,
         serviceType: candidate.serviceType,
+      },
+      409,
+    );
+  }
+
+  const documentGate = await documentGateForCheckout(
+    env,
+    fields,
+    returnPath,
+    buildCheckoutPricingSnapshot(fields, candidate),
+  );
+  if (!documentGate.satisfied) {
+    if (documentGate.error) {
+      return json(
+        {
+          ok: false,
+          error: documentGate.error,
+          reason:
+            'A required agreement is not fully configured. Sparkling Standard must complete the document setup before payment can be accepted.',
+        },
+        409,
+      );
+    }
+    return json(
+      {
+        ok: false,
+        error: 'documents_required',
+        reason: 'Complete the required signed documents before payment.',
+        ...(documentGate.signingUrl ? { signingUrl: documentGate.signingUrl } : {}),
       },
       409,
     );
@@ -1731,7 +1808,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('line_items[0][price_data][unit_amount]', String(chargeAmountCents));
   body.set(
     'line_items[0][price_data][product_data][name]',
-    `${estimatePaymentConfig.productLabel} â€” ${serviceLabel(fields)}`,
+    `${estimatePaymentConfig.productLabel} — ${serviceLabel(fields)}`,
   );
   body.set('line_items[0][price_data][product_data][description]', estimatePaymentConfig.checkoutNote);
   body.set('metadata[checkout_kind]', 'estimate_payment');

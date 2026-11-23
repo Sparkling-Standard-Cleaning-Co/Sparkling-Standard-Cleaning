@@ -1,4 +1,4 @@
-// Attribution integration tests â€” the full chain from a campaign landing page
+// Attribution integration tests — the full chain from a campaign landing page
 // through internal navigation to the lead payload the owner receives.
 // Run with: npm run test:browser on :4409.
 

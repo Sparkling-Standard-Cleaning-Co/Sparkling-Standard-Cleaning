@@ -54,11 +54,18 @@ const CUSTOMER_SORTS: Record<string, string> = {
 
 function customerFilters(actor: AdminActor, input: CustomerListInput): { sql: string; bind: unknown[] } {
   const q = text(input.q, 120);
-  const status = ['active', 'archived'].includes(input.status ?? '') ? input.status : '';
+  const requested = input.status ?? '';
+  const deleted = requested === 'deleted';
+  const status = deleted ? 'archived' : ['active', 'archived'].includes(requested) ? requested : '';
   const branch = scope(actor, 'c.primary_branch_id');
   return {
     sql: `WHERE c.source <> 'financial_system'
          AND (? = '' OR c.status = ?)
+         ${deleted
+           ? "AND c.first_name = 'Deleted' AND c.last_name = 'Customer'"
+           : status === 'archived'
+             ? "AND NOT (c.first_name = 'Deleted' AND c.last_name = 'Customer')"
+             : ''}
          AND (? = '' OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company_name LIKE ?
               OR EXISTS (SELECT 1 FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.normalized_value LIKE ?))
          ${branch.sql}`,

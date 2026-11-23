@@ -78,6 +78,19 @@ test('a claimed weekly arrangement discounts the first visit by exactly $100 —
   assert.ok(claimed.flags.some((flag) => flag.code === 'INITIAL_DEEP_CLEAN_REQUIRED'));
 });
 
+test('a claimed campaign owns the first visit while Community Support applies to eligible ongoing visits', () => {
+  const result = calculateEstimate(
+    input({ frequency: 'weekly', supportiveEligible: true }),
+    context(CLAIMED),
+  );
+  assert.equal(result.status, 'estimated');
+  assert.ok(result.ongoing);
+  assert.equal(result.pricing.discount?.source, 'campaign', 'the campaign owns the first-visit component');
+  assert.equal(result.ongoing.pricing.discount?.source, 'supportive', 'Community Support applies to the separate ongoing component');
+  assert.ok((result.ongoing.pricing.discount?.amount ?? 0) > 0);
+  assert.equal(result.ongoing.pricing.discount?.amount, Math.round(result.ongoing.pricing.basePrice * 0.1 * 100) / 100);
+});
+
 test('a monthly arrangement receives the campaign and prices the deep first visit', () => {
   const monthly = calculateEstimate(input({ frequency: 'monthly' }), context(CLAIMED));
   assert.equal(monthly.status, 'estimated');

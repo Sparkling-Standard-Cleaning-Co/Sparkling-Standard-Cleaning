@@ -1,5 +1,5 @@
-// Admin visual document editor: revision creation, block editing, live preview,
-// save, approval and publish. APIs are mocked.
+// Admin visual document editor: revision creation, Word-style formatting,
+// live preview, save, approval and publish. APIs are mocked.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -35,7 +35,7 @@ after(async () => {
   server?.kill();
 });
 
-test('the owner can revise an approved document in a visual block editor and publish it', async () => {
+test('the owner can revise an approved document in the visual editor and publish it', async () => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
   const page = await context.newPage();
   const posts = [];
@@ -68,6 +68,7 @@ test('the owner can revise an approved document in a visual block editor and pub
         title: 'Residential Deep Cleaning Agreement',
         category: 'residential',
         version: '2026-11-22.remediation.v1',
+        version_label: 'Version 1.0',
         status: 'approved',
         source_kind: 'text',
         signer_party: 'customer',
@@ -97,13 +98,14 @@ test('the owner can revise an approved document in a visual block editor and pub
         title: 'Residential Deep Cleaning Agreement',
         category: 'residential',
         version: '2026-11-22.remediation.v1',
+        version_label: 'Version 1.0',
         status: 'approved',
         source_kind: 'text',
         signer_party: 'customer',
         requires_verification: 0,
         requires_countersignature: 0,
         legal_review_status: 'owner_approved',
-        content_text: 'SPARKLING STANDARD CLEANING CO.\nResidential Deep Cleaning Agreement\nStandards That Sparkle.\nOWNER REVIEW DRAFT — NOT EFFECTIVE UNTIL APPROVED\n\n1. Parties and Incorporation\n1.1 Clause text.',
+        content_text: 'SPARKLING STANDARD CLEANING CO.\nResidential Deep Cleaning Agreement\nStandards That Sparkle.\n\n1. Parties and Incorporation\n1.1 Clause text.',
       };
     }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
@@ -119,8 +121,8 @@ test('the owner can revise an approved document in a visual block editor and pub
           ok: true,
           id: 'doc_rev_1',
           version: '2026-11-23.customer-release.v1',
-          contentText: '# SPARKLING STANDARD CLEANING CO.\n\n## Residential Deep Cleaning Agreement\n\nVersion 2026-11-23.customer-release.v1\n\n## 1. Parties and Incorporation\n\n1.1 Clause text.',
-          removed: ['OWNER REVIEW DRAFT — NOT EFFECTIVE UNTIL APPROVED'],
+          contentText: '<div class="doc-rich"><h2>Residential Deep Cleaning Agreement</h2><p>Version 1.1</p><h2>1. Parties and Incorporation</h2><p>1.1 Clause text.</p></div>',
+          removed: [],
           sourceTemplateId: 'doc_1',
         }),
       });
@@ -144,21 +146,36 @@ test('the owner can revise an approved document in a visual block editor and pub
     await page.getByRole('button', { name: /Edit & revise/i }).click();
     await page.locator('[data-document-editor]').waitFor({ state: 'visible' });
     assert.match(await page.inputValue('[data-document-editor-title]'), /Residential Deep Cleaning Agreement/);
-    assert.ok((await page.locator('[data-editor-block]').count()) >= 4);
-    assert.match(await page.textContent('[data-document-editor-status]') ?? '', /internal notice/i);
-    const preview = page.frameLocator('[data-document-editor-preview]');
-    await preview.getByText('Residential Deep Cleaning Agreement').waitFor({ state: 'visible' });
-    assert.equal(await preview.getByText(/OWNER REVIEW DRAFT/i).count(), 0);
+    assert.match(await page.textContent('[data-document-editor-version-display]') ?? '', /Version 1\.0/);
+    assert.doesNotMatch(await page.textContent('[data-document-editor-version-display]') ?? '', /remediation|customer-release/i);
+    await page.locator('[data-document-editor-canvas]').waitFor({ state: 'visible' });
+    assert.match(await page.locator('[data-document-editor-canvas]').innerHTML(), /Residential Deep Cleaning Agreement/);
+    assert.ok((await page.locator('[data-editor-command="bold"]').count()) === 1);
+    assert.ok((await page.locator('[data-editor-command="justifyCenter"]').count()) === 1);
+    assert.ok((await page.locator('[data-editor-insert-table]').count()) === 1);
+    assert.ok((await page.locator('[data-editor-page-break]').count()) === 1);
 
-    await page.locator('[data-editor-block] textarea').first().fill('SPARKLING STANDARD CLEANING CO.');
-    await page.locator('[data-document-editor-add="paragraph"]').click();
-    await page.locator('[data-editor-block]').last().locator('textarea').fill('A new explanatory paragraph.');
+    const preview = page.frameLocator('[data-document-editor-preview]');
+    await preview.getByText('Residential Deep Cleaning Agreement').first().waitFor({ state: 'visible' });
+
+    await page.locator('[data-document-editor-canvas]').evaluate((element) => {
+      element.innerHTML = '<h2>Residential Deep Cleaning Agreement</h2><p><strong>Bold clause</strong> and <em>italic clause</em> with <u>underlined text</u>.</p><p style="text-align:center;color:#8a4a52">A new explanatory paragraph.</p><table><tbody><tr><td>Item</td><td>Price</td></tr></tbody></table><div data-doc-page-break="true"></div><p>After the page break.</p>';
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.locator('[data-document-editor-header]').fill('Sparkling Standard LLC');
+    await page.locator('[data-document-editor-footer]').fill('Confidential customer copy');
     await page.locator('[data-document-editor-save]').click();
     await page.waitForFunction(() => document.querySelector('[data-document-editor-status]')?.textContent?.includes('Draft revision saved'));
     const saved = posts.find((entry) => entry.action === 'update_draft_template');
     assert.ok(saved);
+    assert.match(saved.contentText, /doc-rich/);
+    assert.match(saved.contentText, /<strong>Bold clause<\/strong>/);
+    assert.match(saved.contentText, /text-align:center/);
+    assert.match(saved.contentText, /<table>/);
+    assert.match(saved.contentText, /data-doc-page-break/);
+    assert.match(saved.contentText, /Sparkling Standard LLC/);
+    assert.match(saved.contentText, /Confidential customer copy/);
     assert.match(saved.contentText, /A new explanatory paragraph/);
-    assert.doesNotMatch(saved.contentText, /OWNER REVIEW DRAFT/i);
 
     await page.locator('[data-document-editor-publish]').click();
     await page.waitForFunction(() => document.querySelector('[data-document-editor-status]')?.textContent?.includes('Approved and published'));

@@ -1,4 +1,4 @@
-﻿// Owner-managed branch setup and launch lifecycle.
+// Owner-managed branch setup and launch lifecycle.
 //
 // Branch identities are code-owned. This module edits only the approved setup
 // fields for an existing branch and appends an immutable configuration version
@@ -66,6 +66,12 @@ export interface BranchSettings {
   services: Record<'residential' | 'str' | 'commercial' | 'church', ServiceMode>;
   gbpStatus: BranchPublicConfig['gbpStatus'];
   gbpUrl: string;
+  reviewUrl: string;
+  reviewRequestsEnabled: boolean;
+  reviewRequestDelayHours: number;
+  reviewRequestMaxPerCustomer: number;
+  calendarId: string;
+  calendarName: string;
   launchNote: string;
 }
 
@@ -146,22 +152,46 @@ export function rowToBranchSettings(row: BranchRow): BranchSettings | null {
     },
     gbpStatus: GBP_STATES.includes(row.gbp_status) ? row.gbp_status : base.gbpStatus,
     gbpUrl: row.gbp_url || base.gbpUrl,
+    reviewUrl: row.review_url || base.reviewUrl,
+    reviewRequestsEnabled: Number(row.review_requests_enabled ?? 0) === 1,
+    reviewRequestDelayHours: Number(row.review_request_delay_hours ?? 24),
+    reviewRequestMaxPerCustomer: Number(row.review_request_max_per_customer ?? 1),
+    calendarId: row.calendar_id || '',
+    calendarName: row.calendar_name || '',
     launchNote: row.launch_note || base.launchNote,
   };
 }
 
 export async function listBranchSettings(db: D1Database): Promise<BranchSettings[]> {
-  const rows = await db
-    .prepare(
-      `SELECT id, name, status, lifecycle_status, public_slug, public_name, region_label,
-              timezone, city, state, public_phone, public_email, gbp_status, gbp_url,
-              launch_note, service_area_json, hours_json, services_json,
-              address_line1, postal_code, origin_lat, origin_lng,
-              origin_place_id, travel_limit_miles
-       FROM branches ORDER BY CASE WHEN id = 'branch_pensacola' THEN 0 ELSE 1 END, id`,
-    )
-    .all<BranchRow>();
-  return (rows.results ?? []).flatMap((row) => {
+  let rows: BranchRow[] = [];
+  try {
+    const result = await db
+      .prepare(
+        `SELECT id, name, status, lifecycle_status, public_slug, public_name, region_label,
+                timezone, city, state, public_phone, public_email, gbp_status, gbp_url,
+                review_url, review_requests_enabled, review_request_delay_hours,
+                review_request_max_per_customer, calendar_id, calendar_name,
+                launch_note, service_area_json, hours_json, services_json,
+                address_line1, postal_code, origin_lat, origin_lng,
+                origin_place_id, travel_limit_miles
+         FROM branches ORDER BY CASE WHEN id = 'branch_pensacola' THEN 0 ELSE 1 END, id`,
+      )
+      .all<BranchRow>();
+    rows = result.results ?? [];
+  } catch {
+    const result = await db
+      .prepare(
+        `SELECT id, name, status, lifecycle_status, public_slug, public_name, region_label,
+                timezone, city, state, public_phone, public_email, gbp_status, gbp_url,
+                launch_note, service_area_json, hours_json, services_json,
+                address_line1, postal_code, origin_lat, origin_lng,
+                origin_place_id, travel_limit_miles
+         FROM branches ORDER BY CASE WHEN id = 'branch_pensacola' THEN 0 ELSE 1 END, id`,
+      )
+      .all<BranchRow>();
+    rows = result.results ?? [];
+  }
+  return rows.flatMap((row) => {
     const settings = rowToBranchSettings(row);
     return settings ? [settings] : [];
   });
@@ -231,6 +261,18 @@ function normalizeInput(input: Record<string, unknown>, existing: BranchSettings
   if (!GBP_STATES.includes(gbpStatus)) throw new BranchSettingsError('gbp_status_invalid');
   const gbpUrl = text(input.gbpUrl, 500);
   if (gbpUrl && !/^https:\/\//i.test(gbpUrl)) throw new BranchSettingsError('gbp_url_invalid');
+  const reviewUrl = text(input.reviewUrl, 500);
+  if (reviewUrl && !/^https:\/\//i.test(reviewUrl)) throw new BranchSettingsError('review_url_invalid');
+  const reviewRequestsEnabled =
+    input.reviewRequestsEnabled === true || input.reviewRequestsEnabled === 'true' || input.reviewRequestsEnabled === 'on';
+  const reviewRequestDelayHours = Math.min(
+    720,
+    Math.max(1, Math.round(Number(input.reviewRequestDelayHours ?? existing.reviewRequestDelayHours) || existing.reviewRequestDelayHours)),
+  );
+  const reviewRequestMaxPerCustomer = Math.min(
+    12,
+    Math.max(1, Math.round(Number(input.reviewRequestMaxPerCustomer ?? existing.reviewRequestMaxPerCustomer) || existing.reviewRequestMaxPerCustomer)),
+  );
   const originLatRaw = input.originLat === null || input.originLat === undefined || input.originLat === '' ? null : Number(input.originLat);
   const originLngRaw = input.originLng === null || input.originLng === undefined || input.originLng === '' ? null : Number(input.originLng);
   if (originLatRaw !== null && (!Number.isFinite(originLatRaw) || originLatRaw < -90 || originLatRaw > 90)) {
@@ -267,6 +309,12 @@ function normalizeInput(input: Record<string, unknown>, existing: BranchSettings
     services,
     gbpStatus,
     gbpUrl,
+    reviewUrl,
+    reviewRequestsEnabled,
+    reviewRequestDelayHours,
+    reviewRequestMaxPerCustomer,
+    calendarId: text(input.calendarId, 300),
+    calendarName: text(input.calendarName, 200),
     launchNote: text(input.launchNote, 1000),
   };
 
@@ -331,6 +379,12 @@ export async function saveBranchSettings(
     services: next.services,
     gbpStatus: next.gbpStatus,
     gbpUrl: next.gbpUrl,
+    reviewUrl: next.reviewUrl,
+    reviewRequestsEnabled: next.reviewRequestsEnabled,
+    reviewRequestDelayHours: next.reviewRequestDelayHours,
+    reviewRequestMaxPerCustomer: next.reviewRequestMaxPerCustomer,
+    calendarId: next.calendarId,
+    calendarName: next.calendarName,
     launchNote: next.launchNote,
   };
   const versionRow = await db
@@ -346,6 +400,8 @@ export async function saveBranchSettings(
         `UPDATE branches SET
            lifecycle_status = ?, public_slug = ?, public_name = ?, region_label = ?,
            timezone = ?, public_phone = ?, public_email = ?, gbp_status = ?, gbp_url = ?,
+           review_url = ?, review_requests_enabled = ?, review_request_delay_hours = ?,
+           review_request_max_per_customer = ?, calendar_id = ?, calendar_name = ?,
            address_line1 = ?, city = ?, state = ?, postal_code = ?, origin_lat = ?, origin_lng = ?,
            origin_place_id = ?, travel_limit_miles = ?,
            launch_note = ?, service_area_json = ?, hours_json = ?, services_json = ?,
@@ -362,6 +418,12 @@ export async function saveBranchSettings(
         next.publicEmail,
         next.gbpStatus,
         next.gbpUrl,
+        next.reviewUrl,
+        next.reviewRequestsEnabled ? 1 : 0,
+        next.reviewRequestDelayHours,
+        next.reviewRequestMaxPerCustomer,
+        next.calendarId,
+        next.calendarName,
         next.originAddress,
         next.originCity,
         next.originState,

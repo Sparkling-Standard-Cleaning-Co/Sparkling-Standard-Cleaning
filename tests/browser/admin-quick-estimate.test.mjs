@@ -286,9 +286,10 @@ test('the document packet builder opens a draft, previews unresolved variables a
   assert.match((await page.textContent('[data-admin-documents-bundles]')) ?? '', /Residential One-Time Packet/);
   await page.locator('[data-document-tab="library"]').first().click();
   await page.click('[data-admin-documents-templates] button[data-admin-action="document-edit"]');
-  await page.waitForSelector('[data-document-template-edit]:not([hidden])');
-  assert.equal(await page.inputValue('[data-document-template-edit] input[name="familyKey"]'), 'residential-one-time');
-  assert.match(await page.inputValue('[data-document-template-edit] textarea[name="contentText"]'), /customer\.first_name/);
+  await page.waitForSelector('[data-document-editor]:not([hidden])');
+  assert.match(await page.locator('[data-document-editor-canvas]').innerHTML(), /customer\.first_name/);
+  assert.match(await page.textContent('[data-document-editor-version-display]') ?? '', /Version 1\.0/);
+  assert.doesNotMatch(await page.textContent('[data-document-editor-version-display]') ?? '', /2026-11-19/);
 
   await page.locator('[data-document-tab="send"]').first().click();
   await page.evaluate(() => {

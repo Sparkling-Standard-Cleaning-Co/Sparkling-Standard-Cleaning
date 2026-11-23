@@ -20,6 +20,12 @@ interface BranchSettings {
   services: Record<'residential' | 'str' | 'commercial' | 'church', string>;
   gbpStatus: string;
   gbpUrl: string;
+  reviewUrl: string;
+  reviewRequestsEnabled: boolean;
+  reviewRequestDelayHours: number;
+  reviewRequestMaxPerCustomer: number;
+  calendarId: string;
+  calendarName: string;
   launchNote: string;
   originAddress: string;
   originCity: string;
@@ -82,6 +88,13 @@ function fillForm(): void {
   set('hoursLabel', branch.hoursLabel);
   set('gbpStatus', branch.gbpStatus);
   set('gbpUrl', branch.gbpUrl);
+  set('reviewUrl', branch.reviewUrl);
+  set('reviewRequestDelayHours', String(branch.reviewRequestDelayHours));
+  set('reviewRequestMaxPerCustomer', String(branch.reviewRequestMaxPerCustomer));
+  set('calendarId', branch.calendarId);
+  set('calendarName', branch.calendarName);
+  const reviewEnabled = field<HTMLInputElement>('reviewRequestsEnabled');
+  if (reviewEnabled) reviewEnabled.checked = branch.reviewRequestsEnabled === true;
   set('serviceAreaZips', branch.serviceAreaZips.join(', '));
   set('serviceResidential', branch.services.residential);
   set('serviceStr', branch.services.str);
@@ -196,6 +209,12 @@ async function save(): Promise<void> {
     hoursLabel: data.get('hoursLabel'),
     gbpStatus: data.get('gbpStatus'),
     gbpUrl: data.get('gbpUrl'),
+    reviewUrl: data.get('reviewUrl'),
+    reviewRequestsEnabled: data.get('reviewRequestsEnabled') === 'on',
+    reviewRequestDelayHours: data.get('reviewRequestDelayHours'),
+    reviewRequestMaxPerCustomer: data.get('reviewRequestMaxPerCustomer'),
+    calendarId: data.get('calendarId'),
+    calendarName: data.get('calendarName'),
     originAddress: data.get('addressLine1'),
     originCity: data.get('city'),
     originState: data.get('state'),

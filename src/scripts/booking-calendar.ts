@@ -459,6 +459,7 @@ export function initBookingCalendar(
         durationMinutes: String(PROVISIONAL_DURATION),
         lat: String(point.lat),
         lng: String(point.lng),
+        ...(context.zip ? { zip: context.zip } : {}),
       });
       const response = await fetch(`/api/availability?${params}`, {
         headers: { Accept: 'application/json' },
@@ -546,6 +547,7 @@ export function initBookingCalendar(
         to: range.to,
         durationMinutes: String(PROVISIONAL_DURATION),
         ...(point ? { lat: String(point.lat), lng: String(point.lng) } : {}),
+        ...(context.zip ? { zip: context.zip } : {}),
       });
       const response = await fetch(`/api/availability-month?${params}`, {
         headers: { Accept: 'application/json' },
@@ -828,6 +830,7 @@ export function initBookingCalendar(
             destination: input.destination,
             reference: input.reference,
             location: input.location,
+            ...(context.zip ? { zip: context.zip } : {}),
           }),
         });
         const holdData = (await hold.json().catch(() => ({}))) as {

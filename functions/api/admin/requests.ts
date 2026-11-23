@@ -368,11 +368,18 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
           OR p.line1 LIKE ? OR p.city LIKE ? OR p.postal_code LIKE ? OR r.payload_json LIKE ?)`
       : '';
     const searchBind = query ? Array.from({ length: 7 }, () => `%${query}%`) : [];
+    const bookingColumns = await db
+      .prepare('PRAGMA table_info(booking_requests)')
+      .all<{ name: string }>()
+      .catch(() => ({ results: [] as Array<{ name: string }> }));
+    const isTestSelect = (bookingColumns.results ?? []).some((row) => row.name === 'is_test')
+      ? 'r.is_test'
+      : '0 AS is_test';
     const [requests, appointments, reservationLeads] = await Promise.all([
       db.prepare(
         `SELECT r.id, r.customer_id, r.status, r.quote_reference, r.requested_date, r.start_at, r.end_at,
                 r.duration_minutes, r.payload_json, r.created_at, r.closed_at, r.closed_reason,
-                r.archived_at, r.duplicate_of_request_id, r.previous_status,
+                r.archived_at, r.duplicate_of_request_id, r.previous_status, ${isTestSelect},
                 r.payment_status, r.payment_reference, r.payment_amount_cents, r.paid_at,
                 c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
                 a.id AS appointment_id, a.status AS appointment_status,
@@ -387,12 +394,19 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       ).bind(...requestScope.bind, ...searchBind).all(),
       db.prepare(
         `SELECT a.id, a.status, a.start_at, a.end_at, a.reference, a.crew_size, a.source,
-                c.first_name, c.last_name, p.line1, p.city
+                a.duration_minutes, a.notes, a.customer_id, a.property_id, a.booking_request_id,
+                a.branch_id, c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
+                br.payload_json AS request_payload,
+                (SELECT GROUP_CONCAT(tm.display_name, ', ')
+                   FROM appointment_resources ar
+                   JOIN team_members tm ON tm.id = ar.team_member_id
+                  WHERE ar.appointment_id = a.id) AS assigned_names
          FROM appointments a
          LEFT JOIN customers c ON c.id = a.customer_id
          LEFT JOIN properties p ON p.id = a.property_id
+         LEFT JOIN booking_requests br ON br.id = a.booking_request_id
          WHERE a.start_at >= ? AND a.start_at <= ? ${appointmentScope.sql}
-         ORDER BY a.start_at ASC LIMIT 200`,
+         ORDER BY a.start_at ASC LIMIT 400`,
       ).bind(appointmentFrom, appointmentTo, ...appointmentScope.bind).all(),
       db.prepare(
         `SELECT l.id, l.status, l.quote_reference, l.created_at, c.first_name, c.last_name
@@ -633,9 +647,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         try {
           const result = await confirmManualBooking(context.env, db, actor, requestId, teamMemberIds);
           const confirmedRow = await requestRow(db, actor, requestId);
-          const email = confirmedRow
-            ? await sendForRequest(context, db, actor, confirmedRow, 'confirmation')
-            : { status: 'skipped_no_email', recipient: false };
+          const email = body.notify === false
+            ? { status: 'skipped_no_email', recipient: false }
+            : confirmedRow
+              ? await sendForRequest(context, db, actor, confirmedRow, 'confirmation')
+              : { status: 'skipped_no_email', recipient: false };
           return json({ ok: true, ...result, email });
         } catch (error) {
           return json(
@@ -691,9 +707,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           eventId,
         ).catch(() => null);
         const confirmedRow = await requestRow(db, actor, requestId);
-        const email = confirmedRow
-          ? await sendForRequest(context, db, actor, confirmedRow, 'confirmation')
-          : { status: 'skipped_no_email', recipient: false };
+        const email = body.notify === false
+          ? { status: 'skipped_no_email', recipient: false }
+          : confirmedRow
+            ? await sendForRequest(context, db, actor, confirmedRow, 'confirmation')
+            : { status: 'skipped_no_email', recipient: false };
         return json({
           ok: true,
           ...result,
@@ -1023,6 +1041,221 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       return json({ ok: true });
     }
 
+    if (action === 'bulk') {
+      const operation = text(body.operation, 40);
+      const ids = Array.isArray(body.requestIds)
+        ? body.requestIds.filter((value): value is string => typeof value === 'string').slice(0, 100)
+        : [];
+      if (body.confirm !== true) return json({ ok: false, error: 'bulk_confirmation_required' }, 400);
+      if (ids.length === 0) return json({ ok: false, error: 'bulk_selection_required' }, 400);
+      if (!['approve', 'archive', 'restore', 'deny', 'mark_test', 'delete_test'].includes(operation)) {
+        return json({ ok: false, error: 'bulk_operation_invalid' }, 400);
+      }
+      if ((operation === 'mark_test' || operation === 'delete_test') && actor.role !== 'owner') {
+        return json({ ok: false, error: 'owner_required' }, 403);
+      }
+      if (operation === 'mark_test' || operation === 'delete_test') {
+        const columns = await db
+          .prepare('PRAGMA table_info(booking_requests)')
+          .all<{ name: string }>()
+          .catch(() => ({ results: [] as Array<{ name: string }> }));
+        if (!(columns.results ?? []).some((row) => row.name === 'is_test')) {
+          return json({ ok: false, error: 'test_request_migration_required' }, 503);
+        }
+      }
+      const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+      for (const requestId of ids) {
+        try {
+          const row = await db
+            .prepare(
+              `SELECT r.*, a.id AS appointment_id, a.status AS appointment_status
+               FROM booking_requests r LEFT JOIN appointments a ON a.booking_request_id = r.id
+               WHERE r.id = ?${scoped(actor, 'r.branch_id').sql} LIMIT 1`,
+            )
+            .bind(requestId, ...scoped(actor, 'r.branch_id').bind)
+            .first<Record<string, unknown>>();
+          if (!row) {
+            results.push({ id: requestId, ok: false, error: 'request_not_found' });
+            continue;
+          }
+          if (operation === 'approve') {
+            if (row.archived_at || row.closed_at || String(row.status) !== 'pending') {
+              results.push({ id: requestId, ok: false, error: 'request_not_approvable' });
+              continue;
+            }
+            const innerHeaders = new Headers({
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              Origin: new URL(context.request.url).origin,
+            });
+            const cookie = context.request.headers.get('Cookie');
+            if (cookie) innerHeaders.set('Cookie', cookie);
+            const csrfToken = context.request.headers.get('X-CSRF-Token');
+            if (csrfToken) innerHeaders.set('X-CSRF-Token', csrfToken);
+            const innerResponse = await onRequestPost({
+              request: new Request(context.request.url, {
+                method: 'POST',
+                headers: innerHeaders,
+                body: JSON.stringify({
+                  action: 'confirm',
+                  requestId,
+                  notify: false,
+                }),
+              }),
+              env: context.env,
+            });
+            const innerData = (await innerResponse.json().catch(() => ({}))) as Record<string, unknown>;
+            if (innerResponse.ok && innerData.ok) {
+              results.push({ id: requestId, ok: true });
+            } else {
+              results.push({
+                id: requestId,
+                ok: false,
+                error: String(innerData.error ?? `approval_failed_${innerResponse.status}`).slice(0, 120),
+              });
+            }
+            continue;
+          }
+          if (operation === 'archive') {
+            if (row.archived_at) {
+              results.push({ id: requestId, ok: true });
+              continue;
+            }
+            await db
+              .prepare(
+                `UPDATE booking_requests SET archived_at = CURRENT_TIMESTAMP,
+                   previous_status = status, archived_by_admin_user_id = ?, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+              )
+              .bind(actor.id, requestId)
+              .run();
+            await audit(db, {
+              actorUserId: actor.id,
+              action: 'request.bulk_archived',
+              entityType: 'booking_request',
+              entityId: requestId,
+            });
+            results.push({ id: requestId, ok: true });
+            continue;
+          }
+          if (operation === 'restore') {
+            if (!row.archived_at) {
+              results.push({ id: requestId, ok: true });
+              continue;
+            }
+            await db
+              .prepare(
+                'UPDATE booking_requests SET archived_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+              )
+              .bind(requestId)
+              .run();
+            await audit(db, {
+              actorUserId: actor.id,
+              action: 'request.bulk_restored',
+              entityType: 'booking_request',
+              entityId: requestId,
+            });
+            results.push({ id: requestId, ok: true });
+            continue;
+          }
+          if (operation === 'deny') {
+            if (row.archived_at || row.closed_at) {
+              results.push({ id: requestId, ok: false, error: 'request_already_closed' });
+              continue;
+            }
+            if (String(row.status) !== 'pending' || row.appointment_id) {
+              results.push({ id: requestId, ok: false, error: 'request_not_deniable' });
+              continue;
+            }
+            if (String(row.payment_status ?? 'unpaid').startsWith('paid') || row.paid_at) {
+              results.push({ id: requestId, ok: false, error: 'paid_request_requires_refund_review' });
+              continue;
+            }
+            await db
+              .prepare(
+                `UPDATE booking_requests SET status = 'declined', closed_at = CURRENT_TIMESTAMP,
+                   closed_reason = ?, previous_status = 'pending', updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+              )
+              .bind('Declined by bulk action (no customer email sent)', requestId)
+              .run();
+            await audit(db, {
+              actorUserId: actor.id,
+              action: 'request.bulk_declined',
+              entityType: 'booking_request',
+              entityId: requestId,
+            });
+            results.push({ id: requestId, ok: true });
+            continue;
+          }
+          if (operation === 'mark_test') {
+            await db
+              .prepare(
+                `UPDATE booking_requests SET is_test = 1, test_marked_at = CURRENT_TIMESTAMP,
+                   test_marked_by_admin_user_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+              )
+              .bind(actor.id, requestId)
+              .run();
+            await audit(db, {
+              actorUserId: actor.id,
+              action: 'request.marked_test',
+              entityType: 'booking_request',
+              entityId: requestId,
+            });
+            results.push({ id: requestId, ok: true });
+            continue;
+          }
+          if (operation === 'delete_test') {
+            if (Number(row.is_test) !== 1) {
+              results.push({ id: requestId, ok: false, error: 'not_marked_test' });
+              continue;
+            }
+            if (String(row.payment_status ?? 'unpaid').startsWith('paid') || row.paid_at || row.payment_amount_cents) {
+              results.push({ id: requestId, ok: false, error: 'financial_record_retained' });
+              continue;
+            }
+            if (row.appointment_id || String(row.status) !== 'pending') {
+              results.push({ id: requestId, ok: false, error: 'operational_record_retained' });
+              continue;
+            }
+            const reference = String(row.quote_reference ?? '');
+            const linked = await Promise.all([
+              db.prepare('SELECT COUNT(*) AS n FROM signing_requests WHERE booking_reference = ?').bind(reference).first<{ n: number }>(),
+              db.prepare('SELECT COUNT(*) AS n FROM invoices WHERE customer_id = ?').bind(String(row.customer_id ?? '')).first<{ n: number }>(),
+              db.prepare('SELECT COUNT(*) AS n FROM payment_events WHERE quote_reference = ?').bind(reference).first<{ n: number }>().catch(() => null),
+              db.prepare('SELECT COUNT(*) AS n FROM booking_commitments WHERE request_id = ?').bind(requestId).first<{ n: number }>().catch(() => null),
+            ]);
+            if (linked.some((entry) => Number(entry?.n ?? 0) > 0)) {
+              results.push({ id: requestId, ok: false, error: 'linked_evidence_retained' });
+              continue;
+            }
+            await db.prepare('DELETE FROM booking_holds WHERE request_id = ?').bind(requestId).run().catch(() => undefined);
+            await db.prepare('DELETE FROM booking_requests WHERE id = ?').bind(requestId).run();
+            await audit(db, {
+              actorUserId: actor.id,
+              action: 'request.test_record_deleted',
+              entityType: 'booking_request',
+              entityId: requestId,
+              detail: `reference=${reference}`,
+            });
+            results.push({ id: requestId, ok: true });
+          }
+        } catch (error) {
+          results.push({
+            id: requestId,
+            ok: false,
+            error: error instanceof Error ? error.message.slice(0, 120) : 'bulk_item_failed',
+          });
+        }
+      }
+      return json({
+        ok: true,
+        operation,
+        succeeded: results.filter((entry) => entry.ok).length,
+        failed: results.filter((entry) => !entry.ok).length,
+        results,
+      });
+    }
     return json({ ok: false, error: 'invalid_action' }, 400);
   } catch (error) {
     return json(

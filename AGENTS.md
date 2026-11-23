@@ -110,6 +110,49 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   errors. The live Move-In / Move-Out packet generated 19 clean pages, all checked at 390px with no
   technical metadata or duplicate headings. No live charge, refund, customer message,
   commercial/facility activation or Tampa activation.
+- **Local unreleased work (2026-11-23 signing price, signature boxes, visual editor):** branch
+  `production-safe` from `fa559ce`; **not committed or deployed**. Adds migration
+  `0053_signing_pricing_snapshot.sql` (not applied to production), a persistent server-authoritative
+  pricing snapshot shown on the signing Details & price step, executed copies/PDFs and admin request
+  detail; visible per-document **X — Sign here** boxes with an adopt-once signature pad, progress and
+  next-signature navigation; direct post-signing transition to the payment page with signed-PDF
+  download, email status and portal access; the `Â€` mojibake repair; a Word-style WYSIWYG document
+  editor with sanitized rich HTML and PDF rendering; simplified Create a Document / Upload approved
+  PDF flows; conventional Version 1.0/1.1 labels; and a test-only Resend network guard. Tests never
+  send live email. Evidence: `docs/verification/2026-11-23-SIGNING-PRICING-EDITOR.md`. Production
+  remains on the current release above.
+- **Local unreleased work (2026-11-23 admin operations redesign):** branch `production-safe` from
+  `fa559ce`; **not committed or deployed**. Adds migration `0054_admin_operations.sql` (not applied):
+  human `EST-YYYY-NNNN` estimate numbers, test-request marking and durable `operational_alerts`.
+  Replaces the seven-day table with an interactive calendar; adds upcoming-appointment filters that
+  hide canceled occurrences by default; reservation bulk approve/archive/restore/deny/mark-test/delete
+  with server safety checks and no automatic customer email; actionable alert detail/lifecycle with
+  recheck, acknowledgement and resolution notes; active/archived/deleted customer views with restore
+  and anonymized-record protection; compact searchable extras; 15-minute friendly time formatting;
+  component-level campaign/Community Support allocation; recurring-plan cleanup; and a tabbed
+  Dispatch & Team workspace with direct click-to-assign for dispatch-ready employees. Verified:
+  unit 1,069 (1,068 pass, 1 pre-existing skip), browser 259/259, `astro check` 0 errors, 40 pages,
+  validation and 21-page smoke. Zero live Resend sends. Production counts verified at 14 pending
+  requests, 2 unsigned packets, 1 outstanding invoice, 0 active recurring failures (11 historical),
+  3 failed checkout sessions plus 8 abandoned sessions. Evidence:
+  `docs/verification/2026-11-23-ADMIN-OPERATIONS-REDESIGN.md`. Production remains unchanged.
+- **Local unreleased work (2026-11-23 branch calendars and review requests):** branch
+  `production-safe`; **not committed or deployed**. Adds migration
+  `0055_branch_calendars_reviews.sql` (not applied): branch `calendar_id`, `calendar_name`,
+  `review_url`, review delay/frequency settings and a private `review_requests` table. Branch
+  resolution now uses the service ZIP (plus reverse-geocoded ZIP and a conservative coordinate
+  fallback) and never silently defaults an unknown address to Pensacola; Tampa includes Spring
+  Hill `34609`. Branch-specific Google Calendar env values are
+  `GOOGLE_CALENDAR_ID_PENSACOLA` and `GOOGLE_CALENDAR_ID_TAMPA`; Tampa never borrows the
+  Pensacola calendar. Availability, holds, auto-confirm and commitment use the branch calendar
+  and timezone. Review requests are created only for verified completed appointments, require an
+  official branch review URL, deduplicate, respect a frequency cap and remain disabled by
+  default. Invoice/email/PDF review invitations appear only for completed services; Tampa has no
+  review URL and shows none. Admin gains branch calendar/review settings and a Google Reviews
+  queue. Verified: unit 1,075 (1,074 pass, 1 pre-existing skip), browser 260/260, `astro check`
+  0 errors, 40 pages, validation and migration-0055 integrity. Zero live Resend sends or calendar
+  writes. Evidence: `docs/verification/2026-11-23-BRANCH-CALENDARS-REVIEWS.md`. Production
+  remains unchanged.
 - **Prior release (2026-11-23 booking address and release evidence):** application code `285c748`,
   merged at `96a5b8f`, runtime deployment `bdd48b01-6a43-46bc-a56c-54e1e4ef4120`. Corrected the
   Bookings address to `booking@sparkling-standard.com`, applied migration `0052`, and recorded the
