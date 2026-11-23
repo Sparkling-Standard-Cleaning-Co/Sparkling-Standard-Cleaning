@@ -84,7 +84,24 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-22 isolated Preview end-to-end acceptance):** application code on
+- **Current release (2026-11-22 Pensacola residential legal release):** `production-safe` at
+  **`5c4ac41`**, live production deployment **`344ad883-c87a-4baf-b0f4-f34eef27988c`**. The 27
+  owner-approved legal templates are imported into production D1 (27 approved, 0 draft, 10
+  non-system packets, 83 items, 37 import audit records) and the four verified residential packets
+  are active: `customer.deep`, `customer.residential`, `customer.recurring`,
+  `customer.move_in_out`. Required customer documents are enforced at `before_payment`;
+  booking-specific agreements are `per_booking = 1`. The checkout Terms/Privacy links now open an
+  accessible in-page modal that preserves estimator state. **Admin → Documents & Agreements →
+  Document Updates** provides revision impact analysis, owner acknowledgement, notification and a
+  re-signing queue that prefills the existing composer; no automated customer contact. Facility
+  online payment is **disabled** in the browser and server until its own acceptance run; Tier A/B
+  preliminary numbers and request/invoice paths remain. STR, commercial, church, property
+  management, specialty and employee packets are imported **inactive**. Migration `0051` remains
+  unapplied. Unit **1,036** (1,035 pass, 1 pre-existing skip), browser **252/252**, `astro check` 0
+  errors, 40 pages, validate 2,563 links, smoke 21 pages. No release-created live charge, refund or
+  customer message. One live owner-initiated recurring signing request exists and is pending; it
+  was not touched. Evidence: `docs/verification/2026-11-22-RESIDENTIAL-LEGAL-RELEASE.md`.
+- **Prior release (2026-11-22 isolated Preview end-to-end acceptance):** application code on
   `release/2026-11-22-legal-signing-acceptance` completed a full isolated Preview acceptance run.
   A Preview-only exact-host E2E gate (no global `*.pages.dev` bypass; production rejected; ordinary
   Preview API calls remain `503 preview_read_only`) opened only the disposable E2E host. The
