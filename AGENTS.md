@@ -84,7 +84,8 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-23 operations and documents combined):** application code `274a5f5` on
+- **Current release (2026-11-23 operations and documents combined):** application code `038633e`
+  (release `274a5f5` plus the calendar layout polish) on
   `production-safe`, deployed by the GitHub-connected Cloudflare Pages pipeline and verified live on
   2026-11-23 (served admin asset
   `/_astro/index.astro_astro_type_script_index_0_lang.BEl23KQm.js` matches the verified build;
