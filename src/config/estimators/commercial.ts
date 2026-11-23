@@ -26,6 +26,13 @@ export interface CommercialTierConfig {
    */
   numericEstimatesEnabled: boolean;
   /**
+   * Automated Stripe checkout for facility services. Remains FALSE until the
+   * commercial/church document packets and their payment workflows pass a
+   * dedicated acceptance run. FALSE keeps the working request/invoice path and
+   * hides Pay Now; the server rejects direct facility checkout attempts.
+   */
+  facilityOnlinePaymentEnabled: boolean;
+  /**
    * LEGACY square-foot reference only. Runtime tiering is by workload hours
    * (`pricing.commercialPricing.tierAHours` / `tierBHours`), not square feet.
    */
@@ -49,6 +56,7 @@ export const commercialTierConfig: CommercialTierConfig = {
   // facility-verify.ts (server). Set false for a scope-review-only experience
   // with no numeric prices anywhere.
   numericEstimatesEnabled: true,
+  facilityOnlinePaymentEnabled: false,
   tierA_maxCleanableSqft: 2500,
   tierB_maxCleanableSqft: 6000,
   tierC_triggers: {

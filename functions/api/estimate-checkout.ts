@@ -17,6 +17,7 @@
 //  - No card data ever touches this site.
 
 import { legalPolicyConfig } from '../../src/config/legal-policy.ts';
+import { commercialTierConfig } from '../../src/config/estimators/commercial.ts';
 import {
   resolveStripeSecret,
   resolveStripeWebhookSecret,
@@ -1250,6 +1251,26 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (Object.keys(fields).length === 0) return json({ ok: false, error: 'invalid_request' }, 400);
   if (fields.terms_accepted !== 'yes' || fields.terms_version !== legalTerms.termsVersion) {
     return json({ ok: false, error: 'terms_required' }, 400);
+  }
+  if (
+    fields.request_type === 'facility_estimate' &&
+    !commercialTierConfig.facilityOnlinePaymentEnabled
+  ) {
+    await recordCheckoutFailure(
+      env,
+      fields,
+      'facility_payment_not_activated',
+      'Facility online payment is not activated until its document and payment workflow passes acceptance.',
+    );
+    return json(
+      {
+        ok: false,
+        error: 'facility_payment_not_activated',
+        reason:
+          'Facility visits are scheduled after personal review. Request the visit and Sparkling Standard will confirm the scope, time and payment options with you.',
+      },
+      409,
+    );
   }
   const returnPath =
     typeof payload.returnPath === 'string' && RETURN_PATHS.has(payload.returnPath)

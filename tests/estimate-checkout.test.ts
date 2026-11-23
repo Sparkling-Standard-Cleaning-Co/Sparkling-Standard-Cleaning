@@ -19,6 +19,7 @@ import {
   paymentReadiness,
 } from '../functions/api/estimate-checkout.ts';
 import { calculateFacilityPrice, calculateFacilityWorkload } from '../src/lib/estimate/commercial.ts';
+import { commercialTierConfig } from '../src/config/estimators/commercial.ts';
 import { calculateEstimate } from '../src/lib/estimate/calculate.ts';
 import { selectInstantAmount } from '../src/lib/estimate/quote.ts';
 import { travelConfig } from '../src/config/estimators/travel.ts';
@@ -72,6 +73,10 @@ function checkoutDb(): TestD1 {
   }
   return db;
 }
+
+// The enabled facility path remains covered even though production ships with
+// facility online payment disabled until its own acceptance run.
+(commercialTierConfig as { facilityOnlinePaymentEnabled: boolean }).facilityOnlinePaymentEnabled = true;
 
 let ip = 0;
 let secretSerial = 0;
@@ -1413,4 +1418,30 @@ test('pre-payment signing blocks checkout, then the resume token completes the s
   assert.equal(expiredHold.status, 400);
   assert.equal(((await expiredHold.json()) as { error?: string }).error, 'booking_hold_expired');
   assert.equal(provider.postCount(), 1, 'hold expiration is checked before any new Stripe session');
+});
+
+test('facility online payment fails closed until its activation gate is on', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub();
+  const { fields } = validFacilityInput();
+  const config = commercialTierConfig as { facilityOnlinePaymentEnabled: boolean };
+  const previous = config.facilityOnlinePaymentEnabled;
+  config.facilityOnlinePaymentEnabled = false;
+  try {
+    const response = await withFetch(provider.stub, () =>
+      onRequestPost({
+        request: jsonRequest({ fields, returnPath: '/estimate/commercial/' }),
+        env,
+      } as never),
+    );
+    assert.equal(response.status, 409);
+    assert.equal(
+      ((await response.json()) as { error?: string }).error,
+      'facility_payment_not_activated',
+    );
+    assert.equal(provider.postCount(), 0, 'no Stripe session is created');
+  } finally {
+    config.facilityOnlinePaymentEnabled = previous;
+  }
 });
