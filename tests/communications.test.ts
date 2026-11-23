@@ -11,10 +11,12 @@ import {
   deliveryHealth,
   extractTemplateVariables,
   listCommunicationVersions,
+  notificationRecipients,
   previewTemplate,
   readCommunicationSettings,
   recordNotificationDelivery,
   saveCommunicationSettings,
+  sendOperationalNotification,
   sendTestNotification,
   validateCommunicationSettings,
 } from '../src/lib/admin/communications.ts';
@@ -93,13 +95,97 @@ function actor(overrides: Partial<AdminActor> = {}): AdminActor {
 test('approved defaults route each event to its department and keep critical alerts fixed', () => {
   const settings = defaultCommunicationSettings();
   assert.deepEqual(settings.routing.booking_confirmation, ['bookings']);
+  assert.deepEqual(settings.routing.booking_request, ['bookings', 'owner']);
+  assert.deepEqual(settings.routing.booking_paid, ['bookings', 'billing']);
   assert.deepEqual(settings.routing.invoice_delivery, ['billing']);
-  assert.deepEqual(settings.routing.contact_inquiry, ['customerService']);
+  assert.deepEqual(settings.routing.contact_inquiry, ['customerService', 'owner']);
   assert.deepEqual(settings.routing.careers_application, ['hiring']);
+  assert.deepEqual(settings.routing.document_signing_request, ['bookings', 'admin']);
+  assert.deepEqual(settings.routing.document_executed, ['admin', 'owner']);
   assert.deepEqual(settings.routing.security_alert, ['admin', 'owner']);
   assert.deepEqual(settings.routing.backup_failure, ['admin', 'owner']);
   assert.equal(settings.replyTo.invoices, 'billing');
   assert.equal(settings.replyTo.bookingConfirmations, 'bookings');
+});
+
+test('settings saved before a new event existed stay valid and use the new default route', () => {
+  const settings = defaultCommunicationSettings();
+  const legacy = structuredClone(settings) as unknown as Record<string, unknown>;
+  const routing = legacy.routing as Record<string, unknown>;
+  delete routing.document_executed;
+  delete routing.booking_paid;
+  const validation = validateCommunicationSettings(legacy);
+  assert.equal(validation.ok, true);
+  assert.deepEqual(validation.settings.routing.document_executed, ['admin', 'owner']);
+  assert.deepEqual(validation.settings.routing.booking_paid, ['bookings', 'billing']);
+});
+
+test('operational notifications resolve department inboxes, send once per inbox and record each outcome', async () => {
+  const db = migratedDb();
+  const originalFetch = globalThis.fetch;
+  const sent: Array<Record<string, unknown>> = [];
+  const headers: Array<Record<string, string>> = [];
+  globalThis.fetch = (async (_input, init) => {
+    sent.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+    headers.push((init?.headers ?? {}) as Record<string, string>);
+    return new Response(JSON.stringify({ id: `email_${sent.length}` }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const booking = await sendOperationalNotification(db, { RESEND_API_KEY: 're_synthetic' }, {
+      eventKey: 'booking_request',
+      subject: 'New booking request',
+      text: 'Customer requested a cleaning appointment.',
+      idempotencyKey: 'lead-request-1',
+      relatedType: 'lead',
+      relatedId: 'lead_1',
+    });
+    assert.deepEqual(booking.recipients, ['booking@sparkling-standard.com', 'owner@sparkling-standard.com']);
+    assert.deepEqual(booking.departments, ['bookings', 'owner']);
+    assert.equal(booking.sent, 2);
+
+    const contact = await sendOperationalNotification(db, { RESEND_API_KEY: 're_synthetic' }, {
+      eventKey: 'contact_inquiry',
+      subject: 'Website message',
+      text: 'A customer asked a question.',
+      idempotencyKey: 'lead-contact-1',
+    });
+    assert.deepEqual(contact.recipients, ['customer-service@sparkling-standard.com', 'owner@sparkling-standard.com']);
+
+    const critical = await sendOperationalNotification(db, { RESEND_API_KEY: 're_synthetic' }, {
+      eventKey: 'security_alert',
+      subject: 'Security alert',
+      text: 'Synthetic test only.',
+      idempotencyKey: 'security-1',
+    });
+    assert.deepEqual(critical.recipients, [
+      'admin@sparkling-standard.com',
+      'owner@sparkling-standard.com',
+    ]);
+
+    assert.equal(new Set(headers.map((header) => header['Idempotency-Key'])).size, 6);
+    const rows = db.raw
+      .prepare("SELECT event_key, department, recipient, status FROM notification_delivery_events ORDER BY created_at")
+      .all() as Array<{ event_key: string; department: string; recipient: string; status: string }>;
+    assert.equal(rows.length, 6);
+    assert.ok(rows.some((row) => row.event_key === 'booking_request' && row.department === 'bookings' && row.status === 'sent'));
+    assert.ok(rows.some((row) => row.event_key === 'contact_inquiry' && row.department === 'customerService'));
+    assert.ok(rows.some((row) => row.event_key === 'security_alert' && row.department === 'owner'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('a disabled operational inbox is skipped while explicitly routed departments still receive', () => {
+  const settings = defaultCommunicationSettings();
+  settings.departments.bookings.enabled = false;
+  assert.deepEqual(
+    notificationRecipients(settings, 'booking_request').map((entry) => entry.department),
+    ['owner'],
+  );
+  assert.deepEqual(notificationRecipients(settings, 'contact_inquiry').map((entry) => entry.department), [
+    'customerService',
+    'owner',
+  ]);
 });
 
 test('validation rejects department address changes, owner reply-to and critical rerouting', () => {
@@ -227,7 +313,7 @@ test('delivery health separates application failures from delivery proof', async
   await recordNotificationDelivery(db, {
     eventKey: 'booking_confirmation',
     department: 'bookings',
-    recipient: 'bookings@sparkling-standard.com',
+    recipient: 'booking@sparkling-standard.com',
     status: 'failed',
     errorCode: 'http_422',
   });

@@ -81,3 +81,35 @@ test('a verified portal session renders only the customer appointments, invoices
     await page.waitForFunction(() => (document.querySelector('[data-portal-request-status]')?.textContent ?? '').includes('received'));
   } finally { await context.close(); }
 });
+
+test('the customer portal dashboard is usable on a phone without horizontal overflow', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
+  const page = await context.newPage();
+  await page.route('**/api/portal/auth*', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, authenticated: true, csrf: 'csrf-portal', name: 'Jordan Customer' }) });
+  });
+  await page.route('**/api/portal/data', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      ok: true, csrf: 'csrf-portal',
+      customer: { id: 'cust_1', first_name: 'Jordan', last_name: 'Customer', company_name: '', branch_name: 'Pensacola' },
+      contacts: [{ kind: 'email', value: 'jordan@example.test', is_primary: 1 }],
+      properties: [{ id: 'prop_1', label: 'Home', line1: '100 Synthetic Street', line2: '', city: 'Pensacola', state: 'FL', postal_code: '32502' }],
+      appointments: [{ id: 'appt_1', reference: 'SS-1001', status: 'confirmed', start_at: '2026-12-01T15:00:00.000Z', end_at: '2026-12-01T17:00:00.000Z', duration_minutes: 120 }],
+      recurring: [{ id: 'rp_1', frequency: 'biweekly', status: 'active', next_visit_date: '2026-12-15', ongoing_price_cents: 14500 }],
+      invoices: [{ id: 'inv_1', number: 'INV-1001', status: 'open', total_cents: 14500, balance_cents: 14500, due_date: '2026-12-05', payment_url: null }],
+      documents: { executed: [{ id: 'sr_1', bundle_code: 'packet.residential', packet_name: 'Residential packet', executed_at: '2026-11-20T12:00:00.000Z', executed_sha256: 'a'.repeat(64) }], signatures: [] },
+      requests: [{ id: 'preq_0', kind: 'question', status: 'received', created_at: '2026-11-20T12:00:00.000Z' }],
+      billingPortalEnabled: false,
+    }) });
+  });
+  try {
+    await page.goto(BASE + '/portal/?token=synthetic-token', { waitUntil: 'networkidle' });
+    await page.waitForSelector('[data-portal-dashboard]:not([hidden])');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(overflow <= 1, `no horizontal overflow at 390px (got ${overflow})`);
+    assert.match(await page.textContent('[data-portal-documents]') ?? '', /Residential packet/);
+    assert.match(await page.textContent('[data-portal-invoices]') ?? '', /INV-1001/);
+    const messageBox = await page.locator('[data-portal-request-form] textarea[name="message"]').boundingBox();
+    assert.ok(messageBox && messageBox.width <= 390, 'the customer request field stays inside the phone viewport');
+  } finally { await context.close(); }
+});

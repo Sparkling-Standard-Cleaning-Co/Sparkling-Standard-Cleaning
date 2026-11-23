@@ -22,7 +22,7 @@ import {
 import { buildGiftFulfillment, giftCertificateCodeFor } from '../../src/lib/gift/fulfillment.ts';
 import { commitGiftReservation, giftBucket, issueGiftCertificate, releaseGiftReservation, remainingCents } from '../../src/lib/gift/ledger.ts';
 import { buildGiftCertificateEmail } from '../../src/lib/gift/delivery.ts';
-import { DEPARTMENT_ADDRESSES, readCommunicationSettings } from '../../src/lib/admin/communications.ts';
+import { DEPARTMENT_ADDRESSES, readCommunicationSettings, sendOperationalNotification } from '../../src/lib/admin/communications.ts';
 import { activationInstant, centralToday, isValidCalendarDate } from '../../src/lib/gift/activation.ts';
 import {
   completePaymentEvent,
@@ -966,11 +966,23 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!receipt.sent && receipt.status.startsWith('failed')) {
       console.error(receipt.status);
     }
-    const sent = await notifyOwner(
-      env,
-      `PAID estimate - $${amount} - ${reference || 'reference unavailable'}`,
-      fields,
-    );
+    const paymentNotice = await sendOperationalNotification(env.DB ?? null, env, {
+      eventKey: duplicateBookingPayment ? 'payment_failed' : 'booking_paid',
+      subject: `PAID estimate - $${amount} - ${reference || 'reference unavailable'}`,
+      text: Object.entries(fields)
+        .map(([label, value]) => `${label}: ${value}`)
+        .join('\n'),
+      replyTo: DEPARTMENT_ADDRESSES.admin,
+      idempotencyKey: `stripe-paid-estimate-${eventId}`,
+      relatedType: 'stripe_event',
+      relatedId: eventId,
+    }).catch(() => ({ sent: 0 }));
+    const sent =
+      (await notifyOwner(
+        env,
+        `PAID estimate - $${amount} - ${reference || 'reference unavailable'}`,
+        fields,
+      )) || paymentNotice.sent > 0;
     if (!sent) {
       if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'notification_failed');
       return json({ ok: false, error: 'notification_failed' }, 500);
@@ -1148,11 +1160,23 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'customer_delivery_failed' }, 500);
   }
 
-  const sent = await notifyOwner(
-    env,
-    `PAID gift certificate - ${fulfillment['Gift value']} - ${seed.gift.recipientName}`,
-    fulfillment,
-  );
+  const giftNotice = await sendOperationalNotification(env.DB ?? null, env, {
+    eventKey: 'payment_received',
+    subject: `PAID gift certificate - ${fulfillment['Gift value']} - ${seed.gift.recipientName}`,
+    text: Object.entries(fulfillment)
+      .map(([label, value]) => `${label}: ${value}`)
+      .join('\n'),
+    replyTo: DEPARTMENT_ADDRESSES.admin,
+    idempotencyKey: `stripe-gift-paid-${eventId}`,
+    relatedType: 'stripe_event',
+    relatedId: eventId,
+  }).catch(() => ({ sent: 0 }));
+  const sent =
+    (await notifyOwner(
+      env,
+      `PAID gift certificate - ${fulfillment['Gift value']} - ${seed.gift.recipientName}`,
+      fulfillment,
+    )) || giftNotice.sent > 0;
   if (!sent) {
     if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'notification_failed');
     return json({ ok: false, error: 'notification_failed' }, 500);

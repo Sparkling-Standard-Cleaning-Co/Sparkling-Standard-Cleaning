@@ -112,6 +112,7 @@ test('the owner can review a revision and prefill the existing composer', async 
   try {
     await page.goto(BASE + '/admin/', { waitUntil: 'load' });
     await page.locator('[data-admin-nav="documents"]').click();
+    await page.locator('[data-document-tab="updates"]').first().click();
     const updatesCard = page.locator('[data-admin-document-updates]');
     await updatesCard.getByText('Residential Deep Cleaning Agreement').waitFor({ state: 'visible' });
     assert.match((await updatesCard.textContent()) ?? '', /Owner review required/);

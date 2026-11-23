@@ -140,7 +140,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
 - **Prior release (2026-11-20 bookings department and secure careers applications):** application code
   **`e7f18c6`** is live on `production-safe` (Cloudflare Pages production deployment
   `e5b8331e-380f-44bc-b3a7-c310b4d90c50`). Migration `0043` adds private career applications and
-  resume metadata. `bookings@sparkling-standard.com` is the sixth department address and is now the
+  resume metadata. `booking@sparkling-standard.com` is the sixth department address and is now the
   booking-confirmation reply-to; billing remains invoice/receipt reply-to. The careers page now has
   a secure application form for experienced and entry-level applicants, optional private PDF/DOCX
   resume storage, applicant acknowledgment, hiring notification, status lookup and an owner-only

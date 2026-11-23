@@ -2,7 +2,7 @@
 
 **Admin:** `/admin/` → **Documents & Agreements**
 **Public signing:** `/document-sign/?token=…`
-**Last verified:** 2026-11-19 (migrations `0038` applied to production D1)
+**Last verified:** 2026-11-22 (local verification; migration `0052` is additive and unapplied in production)
 
 The owner controls document templates, bundles, enforcement stages and signing
 status from the existing admin console. Policy is stored in D1; changing a
@@ -236,3 +236,83 @@ PDF upload/approval and the confirmation gate.
 Customers can download their own executed copies and signed PDFs from
 `/portal/`. The portal verifies the session's `customer_id` before any
 document lookup and records each download in `customer_portal_audit`.
+
+## 13. Admin document center (2026-11-22)
+
+Admin -> Documents & Agreements is divided into seven subviews:
+
+1. **Overview** — awaiting signature, completed, expired, ready packets, packets
+   with no approved documents, and document revisions needing review.
+2. **Send for Signature** — guided recipient search, service/property/transaction
+   selection, automatic packet selection, verified details, preview and send.
+3. **Signing Requests** — searchable/filterable request list with open, resend,
+   countersignature and executed-copy actions.
+4. **Document Library** — approved/draft templates and template creation.
+5. **Packets** — service packets, packet starters, document counts and readiness.
+6. **Versions & Updates** — owner revision review and re-signing queue.
+7. **Settings** — signing reminder settings.
+
+The guided composer never requires staff to type a `cust_`, `prop_`, `team_` or
+packet identifier. It searches the existing CRM, loads the customer's properties
+and recent reference/date/price, and uses human-readable service and packet
+labels. Raw identifiers remain available only under **Advanced**.
+
+## 14. Packet readiness and empty packets
+
+- A packet is routable only when it is `active`, is not a system starter, and has
+  at least one `approved` template.
+- An active packet with zero approved documents is shown as **No approved
+  documents** and cannot be selected in the send selector.
+- `createSigningRequest` rejects an explicitly selected empty packet with
+  `packet_has_no_documents`.
+- `previewPacket` returns `ready`, `approvedDocumentCount` and
+  `totalDocuments`, so the UI can distinguish an empty packet from a packet with
+  no applicable conditional documents.
+- System starter packets (codes beginning `packet.*`) remain in the library as
+  templates. They are not authoritative service packets and never override a
+  real `customer.*` or `employee.*` packet.
+- A later signature for a different booking, bundle or document version cannot
+  satisfy the current gate.
+
+## 15. Customer signing ceremony and service schedule
+
+The public signing page is a wide, mobile-first three-step ceremony:
+
+1. **Confirm details** — customer, property, service, date, arrival window,
+   price and payment terms are loaded from the verified request.
+2. **Access and instructions** — service-specific choices (access method,
+   day-of-service contact, entry/parking instructions, pets, restricted areas,
+   other instructions). Required access choices fail closed server-side.
+3. **Review and sign** — readable full-width document reader, per-document
+   acknowledgment, one legal-name field, typed or drawn signature, and one
+   explicit adoption action for every selected document.
+
+The customer enters their legal name once. Required documents each require an
+independent acknowledgment. Optional documents are never preselected. The
+e-sign consent remains a separate affirmative choice.
+
+Customer-provided access/instruction values are stored in
+`signing_requests.customer_fields_json` (migration
+`0052_signing_customer_fields.sql`), reproduced in the executed text record and
+the executed PDF under **Customer Instructions and Access Schedule**, and covered
+by the executed-copy hash. The approved agreement wording is not rewritten.
+Never collect a permanent master code, banking credential, or account password
+in these fields.
+
+If migration `0052` is not applied yet, signing still works, but the customer
+fields are not persisted and cannot appear in the executed evidence. Apply the
+additive migration before activating this part of the flow in production.
+
+## 16. Operational notifications for documents
+
+- A signing request creation is sent internally to the configured
+  `document_signing_request` departments (default: Bookings and Admin). The
+  secure signing token is never included in the internal notice.
+- A fully executed package is sent to `document_executed` departments (default:
+  Admin and Owner) with the executed copy attached.
+- A new document revision notification uses `document_revision` (default: Admin
+  and Owner).
+- These deliveries respect the owner-controlled routing in
+  **Communications & Notifications** and are recorded in
+  `notification_delivery_events`. Provider acceptance is not proof of inbox
+  delivery.

@@ -34,8 +34,19 @@ import type { Frequency } from '../../src/lib/estimate/types.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
 import { buildLeadReadiness } from '../../src/lib/forms/delivery-readiness.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
-import { describeCustomerEmailOutcome, sendCustomerConfirmation } from '../../src/lib/forms/customer-email.ts';
-import { DEPARTMENT_ADDRESSES, readCommunicationSettings } from '../../src/lib/admin/communications.ts';
+import {
+  DEFAULT_CUSTOMER_EMAIL_REPLY_TO,
+  describeCustomerEmailOutcome,
+  sendCustomerConfirmation,
+} from '../../src/lib/forms/customer-email.ts';
+import {
+  DEPARTMENT_ADDRESSES,
+  defaultCommunicationSettings,
+  notificationRecipients,
+  readCommunicationSettings,
+  recordNotificationDelivery,
+} from '../../src/lib/admin/communications.ts';
+import { EMAIL_ROUTING } from '../../src/config/email-routing.ts';
 import { schedulingConfig } from '../../src/config/scheduling.ts';
 import { legalTerms } from '../../src/config/legal.ts';
 import {
@@ -856,40 +867,102 @@ export async function onRequestPost(context: {
   let attachmentDelivery: 'none' | 'attached' | 'partial' | 'links_only' =
     verifiedPhotos.length > 0 ? 'links_only' : 'none';
 
-  // Photo leads use Resend for the owner notification because it supports real
-  // attachments on the existing free plan. Web3Forms remains the lead fallback
-  // whenever Resend is unavailable or rejects every attachment email.
-  if (verifiedPhotos.length > 0 && attachments.length > 0) {
-    if (env.RESEND_API_KEY) {
+  // Operational routing comes from the owner-controlled Communications settings.
+  // A booking/reservation reaches Bookings; a contact message reaches Customer
+  // Service. The owner address is only a fail-safe when every configured inbox
+  // is disabled or no database is available.
+  const communicationState = env.DB
+    ? await readCommunicationSettings(env.DB).catch(() => null)
+    : null;
+  const communicationSettings = communicationState?.settings ?? defaultCommunicationSettings();
+  const notificationEvent = clean.request_type === 'contact' ? 'contact_inquiry' : 'booking_request';
+  let recipients = notificationRecipients(communicationSettings, notificationEvent);
+  if (recipients.length === 0) {
+    recipients = [
+      {
+        department: 'owner',
+        address: env.OWNER_NOTIFICATION_EMAIL?.trim() || EMAIL_ROUTING.owner,
+      },
+    ];
+  }
+
+  if (env.RESEND_API_KEY) {
+    let accepted = 0;
+    let attempted = 0;
+    let providerUnavailable = false;
+    for (const recipient of recipients) {
+      if (verifiedPhotos.length > 0 && attachments.length === 0) {
+        await recordNotificationDelivery(env.DB ?? null, {
+          eventKey: notificationEvent,
+          department: recipient.department,
+          recipient: recipient.address,
+          status: 'failed',
+          errorCode: 'attachment_unavailable',
+          relatedType: 'lead',
+          ...(persistedLead?.leadId ? { relatedId: persistedLead.leadId } : {}),
+        }).catch(() => undefined);
+        continue;
+      }
+      attempted += 1;
       const messages = buildOwnerEmailMessages({
         notification,
         subject,
         requestId: attachmentRequestId,
         attachments,
         ...(env.RESEND_FROM_EMAIL?.trim() ? { from: env.RESEND_FROM_EMAIL.trim() } : {}),
-        ...(env.OWNER_NOTIFICATION_EMAIL?.trim() ? { to: env.OWNER_NOTIFICATION_EMAIL.trim() } : {}),
+        to: recipient.address,
         ...(replyTo ? { replyTo } : {}),
+        idempotencySuffix: recipient.department,
       });
-      const ownerEmail = await sendOwnerEmailMessages(messages, {
+      const outcome = await sendOwnerEmailMessages(messages, {
         RESEND_API_KEY: env.RESEND_API_KEY,
         ...(env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: env.RESEND_FROM_EMAIL } : {}),
       });
-      if (ownerEmail.status === 'accepted' || ownerEmail.status === 'partial') {
-        ownerDelivered = true;
-        attachmentDelivery = ownerEmail.status === 'accepted' ? 'attached' : 'partial';
-        if (ownerEmail.status === 'partial') console.error(describeOwnerEmailOutcome(ownerEmail));
-      } else {
-        console.error(describeOwnerEmailOutcome(ownerEmail));
-        notification['Photos - Attachment delivery'] =
-          ownerEmail.status === 'not_configured'
-            ? 'NOT CONFIGURED — email attachments were not sent. Use the private links below.'
-            : 'FAILED — the email provider did not accept the attachment email(s). Use the private links below.';
-      }
+      const delivered = outcome.status === 'accepted' || outcome.status === 'partial';
+      if (delivered) accepted += 1;
+      if (outcome.status === 'not_configured') providerUnavailable = true;
+      if (outcome.status === 'partial') console.error(describeOwnerEmailOutcome(outcome));
+      await recordNotificationDelivery(env.DB ?? null, {
+        eventKey: notificationEvent,
+        department: recipient.department,
+        recipient: recipient.address,
+        status: delivered ? 'sent' : outcome.status === 'not_configured' ? 'suppressed' : 'failed',
+        errorCode: delivered ? (outcome.status === 'partial' ? 'partial_delivery' : '') : outcome.status,
+        relatedType: 'lead',
+        ...(persistedLead?.leadId ? { relatedId: persistedLead.leadId } : {}),
+      }).catch(() => undefined);
+    }
+    if (accepted > 0) {
+      ownerDelivered = true;
+      attachmentDelivery = verifiedPhotos.length > 0
+        ? accepted === attempted
+          ? 'attached'
+          : 'partial'
+        : 'none';
     } else {
+      notification['Photos - Attachment delivery'] =
+        providerUnavailable || !env.RESEND_API_KEY
+          ? 'NOT CONFIGURED — department email was not sent. Use the private links below.'
+          : 'FAILED — the email provider did not accept the department notification(s). Use the private links below.';
+    }
+  } else {
+    for (const recipient of recipients) {
+      await recordNotificationDelivery(env.DB ?? null, {
+        eventKey: notificationEvent,
+        department: recipient.department,
+        recipient: recipient.address,
+        status: 'suppressed',
+        errorCode: 'resend_not_configured',
+        relatedType: 'lead',
+        ...(persistedLead?.leadId ? { relatedId: persistedLead.leadId } : {}),
+      }).catch(() => undefined);
+    }
+    if (verifiedPhotos.length > 0) {
       notification['Photos - Attachment delivery'] =
         'NOT CONFIGURED — RESEND_API_KEY is not set, so attachments were not sent. Use the private links below.';
     }
-  } else if (verifiedPhotos.length > 0) {
+  }
+  if (verifiedPhotos.length > 0 && attachments.length === 0) {
     notification['Photos - Attachment delivery'] =
       'FAILED — no photo content could be read for attachment. Use the private links below.';
   }
@@ -926,15 +999,12 @@ export async function onRequestPost(context: {
   }
   await updateLeadDelivery(env.DB ?? null, persistedLead?.leadId ?? null, 'sent');
 
-  // The owner notification was accepted (not necessarily inbox-delivered).
+  // The department notification was accepted (not necessarily inbox-delivered).
   // The customer confirmation is a best-effort second path; its failure never
   // turns a successful lead into a failed submission.
-  const communicationState = env.DB
-    ? await readCommunicationSettings(env.DB).catch(() => null)
-    : null;
   const bookingReplyTo = communicationState
     ? DEPARTMENT_ADDRESSES[communicationState.settings.replyTo.bookingConfirmations]
-    : undefined;
+    : DEFAULT_CUSTOMER_EMAIL_REPLY_TO;
   const customerEmail = await sendCustomerConfirmation(clean, {
     ...env,
     ...(bookingReplyTo ? { RESEND_REPLY_TO: bookingReplyTo } : {}),

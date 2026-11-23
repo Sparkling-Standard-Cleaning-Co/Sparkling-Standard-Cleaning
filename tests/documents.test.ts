@@ -669,6 +669,7 @@ import {
   duplicateBundle,
   duplicateTemplate,
   getTemplate,
+  listBundles,
   previewPacket,
   restoreTemplate,
   retireTemplate,
@@ -803,6 +804,118 @@ test('unresolved packet variables block sending and remain visible in preview', 
     /document_variables_missing:customer\.unknown_value/,
   );
   assert.equal((f.db.raw.prepare('SELECT COUNT(*) AS n FROM signing_requests').get() as { n: number }).n, 0);
+});
+
+test('an empty active packet is never routed, previewed as ready or sent explicitly', async () => {
+  const f = await fixture();
+  const empty = await createBundle(f.db, f.owner.id, {
+    code: 'customer.move_in_out',
+    name: 'Move-In / Move-Out Packet',
+    serviceCategory: 'move_in_out',
+    subjectType: 'customer',
+  });
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Move-Out Agreement');
+  const ready = await createBundle(f.db, f.owner.id, {
+    code: 'customer.move_in_out_ready',
+    name: 'Move-In / Move-Out Approved Packet',
+    serviceCategory: 'move_in_out',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: ready.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_payment',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'move-in-move-out',
+    bookingReference: 'SS-20261203-MOVE',
+  };
+
+  const routed = await activeRequirements(f.db, context);
+  assert.equal(routed.bundle?.code, 'customer.move_in_out_ready');
+  assert.deepEqual(routed.requirements.map((item) => item.templateId), [templateId]);
+
+  const emptyPreview = await previewPacket(f.db, context, { bundleId: empty.id });
+  assert.equal(emptyPreview?.ready, false);
+  assert.equal(emptyPreview?.approvedDocumentCount, 0);
+  assert.equal(emptyPreview?.totalDocuments, 0);
+
+  await assert.rejects(
+    () =>
+      createSigningRequest(f.db, context, {
+        createdByAdminUserId: f.owner.id,
+        bundleId: empty.id,
+      }),
+    /packet_has_no_documents/,
+  );
+  const request = await createSigningRequest(f.db, context, {
+    createdByAdminUserId: f.owner.id,
+    bundleId: ready.id,
+  });
+  assert.equal(request.required, true);
+
+  const listed = await listBundles(f.db);
+  const emptyRow = listed.find((bundle) => bundle.id === empty.id);
+  const readyRow = listed.find((bundle) => bundle.id === ready.id);
+  assert.equal(Number(emptyRow?.approved_document_count), 0);
+  assert.equal(Number(readyRow?.approved_document_count), 1);
+  assert.equal(Number(readyRow?.required_document_count), 1);
+});
+
+test('customer access instructions are stored once and included in executed evidence', async () => {
+  const f = await fixture();
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Residential Access Authorization');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.residential',
+    name: 'Residential documents',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_payment',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    bookingReference: 'SS-20261204-ACCESS',
+  };
+  const request = await createSigningRequest(f.db, context, { createdByAdminUserId: f.owner.id });
+  assert.equal(request.required, true);
+  const signed = await signSigningRequest(f.db, request.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'customer@example.test',
+    consent: true,
+    signatures: { [templateId]: { value: 'Synthetic Customer', type: 'typed' } },
+    customerFields: {
+      access_method: 'customer_present',
+      access_instructions: 'Park in the driveway. The front door will be unlocked.',
+      pets_present: true,
+      pets_details: 'One friendly dog will be in the back room.',
+    },
+    request: signingRequest(),
+  });
+  assert.equal(signed.status, 'signed');
+
+  const stored = f.db.raw
+    .prepare('SELECT customer_fields_json FROM signing_requests WHERE id = ?')
+    .get(String(request.requestId)) as { customer_fields_json: string };
+  assert.match(stored.customer_fields_json, /customer_present/);
+  assert.match(stored.customer_fields_json, /Park in the driveway/);
+  const executed = await getExecutedCopy(f.db, String(request.requestId));
+  assert.match(executed?.text ?? '', /CUSTOMER INSTRUCTIONS AND ACCESS SCHEDULE/);
+  assert.match(executed?.text ?? '', /Access method: I will be present/);
+  assert.match(executed?.text ?? '', /Access and parking instructions: Park in the driveway/);
+  assert.match(executed?.text ?? '', /Pets: Yes/);
+  assert.match(executed?.text ?? '', /Signature method: typed electronic signature/);
 });
 
 test('draft templates can be edited, duplicated and restored without changing approved content', async () => {

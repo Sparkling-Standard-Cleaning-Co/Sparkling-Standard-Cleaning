@@ -20,7 +20,7 @@ after(async () => { await browser?.close(); server?.kill(); });
 const settings = {
   schemaVersion: 1,
   departments: {
-    bookings: { address: 'bookings@sparkling-standard.com', enabled: true },
+    bookings: { address: 'booking@sparkling-standard.com', enabled: true },
     customerService: { address: 'customer-service@sparkling-standard.com', enabled: true },
     billing: { address: 'billing@sparkling-standard.com', enabled: true },
     hiring: { address: 'hiring@sparkling-standard.com', enabled: true },
@@ -80,16 +80,28 @@ test('the owner communications center renders routing, previews templates and ne
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, preview: { subject: 'Confirmed SS-EXAMPLE-1001', body: 'Hello Jordan Example', variables: ['customer_name', 'reference'] } }) });
         return;
       }
+      if (body.action === 'send_test') {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, status: 'sent', recipient: 'booking@sparkling-standard.com', eventId: 'notif_test' }) });
+        return;
+      }
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, version: 2 }) });
       return;
     }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
       ok: true, source: 'stored', valid: true, settings, metadata,
       versions: [{ version: 1, created_at: '2026-11-20T12:00:00.000Z', created_by: 'Owner', change_note: 'Initial' }],
-      health: { summary: { sent: 2 }, recent: [], leadFailures: [], bookingFailures: [], receiptFailures: [], note: 'Inbox confirmation required.' },
+      health: {
+        summary: { sent: 3 },
+        recent: [{ event_key: 'communications_test', department: 'bookings', recipient: 'booking@sparkling-standard.com', status: 'sent', provider: 'resend', error_code: '', attempts: 1, created_at: '2026-11-22T12:00:00.000Z' }],
+        leadFailures: [],
+        bookingFailures: [],
+        receiptFailures: [],
+        note: 'Inbox confirmation required.',
+      },
       provider: { provider: 'resend', resendConfigured: true, senderConfigured: true, replyToConfigured: true, note: 'Provider acceptance is not inbox proof.' },
     }) });
   });
+  page.on('dialog', (dialog) => dialog.accept());
   try {
     await page.goto(BASE + '/admin/', { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Communications & Notifications' }).click();
@@ -105,5 +117,20 @@ test('the owner communications center renders routing, previews templates and ne
     await page.waitForSelector('[data-communications-preview] .admin-record');
     assert.match(await page.textContent('[data-communications-preview]') ?? '', /Hello Jordan Example/);
     assert.ok(posts.some((body) => body.action === 'preview' && body.templateKey === 'booking_confirmation'));
+    assert.match(await page.textContent('[data-admin-communications-health]') ?? '', /communications_test|Bookings|sent/i);
+
+    await page.locator('[data-communication-route="booking_confirmation"][value="owner"]').check();
+    await page.fill('[data-communications-note]', 'Owner oversight for booking confirmations');
+    await page.locator('[data-communications-form] button[type="submit"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-communications-form-status]')?.textContent?.includes('Saved'));
+    const saved = posts.find((body) => body.action === 'save');
+    assert.ok(saved);
+    assert.ok(saved.settings.routing.booking_confirmation.includes('owner'));
+    assert.equal(saved.note, 'Owner oversight for booking confirmations');
+
+    await page.selectOption('[data-communications-test-department]', 'bookings');
+    await page.click('[data-admin-action="communications-test"]');
+    await page.waitForFunction(() => document.querySelector('[data-communications-test-status]')?.textContent?.includes('Provider accepted'));
+    assert.ok(posts.some((body) => body.action === 'send_test' && body.department === 'bookings'));
   } finally { await context.close(); }
 });

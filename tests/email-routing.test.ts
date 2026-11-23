@@ -9,7 +9,7 @@ import { DEFAULT_RECEIPT_EMAIL_REPLY_TO } from '../src/lib/forms/customer-receip
 
 test('department addresses are distinct and use the confirmed domain', () => {
   assert.equal(new Set([EMAIL_ROUTING.bookings, EMAIL_ROUTING.customerService, EMAIL_ROUTING.billing, EMAIL_ROUTING.hiring, EMAIL_ROUTING.admin, EMAIL_ROUTING.owner]).size, 6);
-  assert.equal(EMAIL_ROUTING.bookings, 'bookings@sparkling-standard.com');
+  assert.equal(EMAIL_ROUTING.bookings, 'booking@sparkling-standard.com');
   assert.equal(EMAIL_ROUTING.customerService, 'customer-service@sparkling-standard.com');
   assert.equal(EMAIL_ROUTING.billing, 'billing@sparkling-standard.com');
   assert.equal(EMAIL_ROUTING.hiring, 'hiring@sparkling-standard.com');

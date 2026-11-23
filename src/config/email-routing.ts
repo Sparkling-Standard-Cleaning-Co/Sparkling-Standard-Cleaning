@@ -4,7 +4,7 @@
  * for ownership, financial and critical security correspondence.
  */
 export const EMAIL_ROUTING = {
-  bookings: 'bookings@sparkling-standard.com',
+  bookings: 'booking@sparkling-standard.com',
   customerService: 'customer-service@sparkling-standard.com',
   billing: 'billing@sparkling-standard.com',
   hiring: 'hiring@sparkling-standard.com',

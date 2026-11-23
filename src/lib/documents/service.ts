@@ -13,6 +13,11 @@ import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 import { legalPolicyConfig } from '../../config/legal-policy.ts';
 import { buildBookingDocumentVariables } from './agreement-variables.ts';
 import { buildExecutedAgreementPdf } from './agreement-pdf.ts';
+import {
+  normalizeSigningFieldValues,
+  signingFieldSummary,
+  signingFieldsForRequest,
+} from './signing-fields.ts';
 
 export const SIGNING_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const ESIGN_CONSENT_VERSION = '2026-11-01.esign-consent.v1';
@@ -374,6 +379,20 @@ function conditionMatches(item: Record<string, unknown>, context: DocumentSubjec
   return true;
 }
 
+async function bundleHasApprovedDocuments(db: D1Database, bundleId: string): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 AS ready
+       FROM document_bundle_items i
+       JOIN document_templates t ON t.id = i.template_id
+       WHERE i.bundle_id = ? AND t.status = 'approved'
+       LIMIT 1`,
+    )
+    .bind(bundleId)
+    .first<{ ready: number }>();
+  return Boolean(row?.ready);
+}
+
 export async function resolveBundle(
   db: D1Database,
   context: DocumentSubjectContext,
@@ -393,25 +412,75 @@ export async function resolveBundle(
           ...(service === 'move_in_out' ? ['customer.residential'] : []),
         ];
   for (const code of [...new Set(candidates)]) {
-    const rows = await db
-      .prepare(
-        `SELECT * FROM document_bundles
-         WHERE code = ? AND subject_type = ? AND status = 'active' LIMIT 1`,
-      )
-      .bind(code, subject)
-      .all<Record<string, unknown>>();
-    const row = (rows.results ?? []).find((entry) => Number(entry.is_system) !== 1);
+    let row: Record<string, unknown> | null = null;
+    try {
+      row = await db
+        .prepare(
+          `SELECT b.* FROM document_bundles b
+           WHERE b.code = ? AND b.subject_type = ? AND b.status = 'active'
+             AND b.is_system = 0
+             AND EXISTS (
+               SELECT 1 FROM document_bundle_items i
+               JOIN document_templates t ON t.id = i.template_id
+               WHERE i.bundle_id = b.id AND t.status = 'approved'
+             )
+           LIMIT 1`,
+        )
+        .bind(code, subject)
+        .first<Record<string, unknown>>();
+    } catch (error) {
+      if (!missingColumn(error, 'is_system')) throw error;
+      row = await db
+        .prepare(
+          `SELECT b.* FROM document_bundles b
+           WHERE b.code = ? AND b.subject_type = ? AND b.status = 'active'
+             AND EXISTS (
+               SELECT 1 FROM document_bundle_items i
+               JOIN document_templates t ON t.id = i.template_id
+               WHERE i.bundle_id = b.id AND t.status = 'approved'
+             )
+           LIMIT 1`,
+        )
+        .bind(code, subject)
+        .first<Record<string, unknown>>();
+    }
     if (row) return row;
   }
-  const fallbackRows = await db
-    .prepare(
-      `SELECT * FROM document_bundles
-       WHERE subject_type = ? AND service_category = ? AND status = 'active'
-       ORDER BY created_at`,
-    )
-    .bind(subject, service)
-    .all<Record<string, unknown>>();
-  return (fallbackRows.results ?? []).find((entry) => Number(entry.is_system) !== 1) ?? null;
+  let fallbackRows: Array<Record<string, unknown>> = [];
+  try {
+    const result = await db
+      .prepare(
+        `SELECT b.* FROM document_bundles b
+         WHERE b.subject_type = ? AND b.service_category = ? AND b.status = 'active'
+           AND b.is_system = 0
+           AND EXISTS (
+             SELECT 1 FROM document_bundle_items i
+             JOIN document_templates t ON t.id = i.template_id
+             WHERE i.bundle_id = b.id AND t.status = 'approved'
+           )
+         ORDER BY b.created_at`,
+      )
+      .bind(subject, service)
+      .all<Record<string, unknown>>();
+    fallbackRows = result.results ?? [];
+  } catch (error) {
+    if (!missingColumn(error, 'is_system')) throw error;
+    const result = await db
+      .prepare(
+        `SELECT b.* FROM document_bundles b
+         WHERE b.subject_type = ? AND b.service_category = ? AND b.status = 'active'
+           AND EXISTS (
+             SELECT 1 FROM document_bundle_items i
+             JOIN document_templates t ON t.id = i.template_id
+             WHERE i.bundle_id = b.id AND t.status = 'approved'
+           )
+         ORDER BY b.created_at`,
+      )
+      .bind(subject, service)
+      .all<Record<string, unknown>>();
+    fallbackRows = result.results ?? [];
+  }
+  return fallbackRows[0] ?? null;
 }
 
 function missingColumn(error: unknown, column: string): boolean {
@@ -590,10 +659,42 @@ async function buildExecutedCopy(
     `Countersigned by: ${String(request.counter_signature_name ?? '') || 'not required'}`,
     '',
   ];
+  const fieldDefinitions = signingFieldsForRequest({
+    bundleCode: String(request.bundle_code ?? ''),
+    subjectType: String(request.subject_type ?? ''),
+  });
+  let fieldValues: Record<string, string> = {};
+  try {
+    const parsedFields = JSON.parse(String(request.customer_fields_json ?? '{}')) as unknown;
+    if (parsedFields && typeof parsedFields === 'object' && !Array.isArray(parsedFields)) {
+      fieldValues = Object.fromEntries(
+        Object.entries(parsedFields as Record<string, unknown>)
+          .filter(([, value]) => typeof value === 'string')
+          .map(([key, value]) => [key, String(value).slice(0, 2000)]),
+      );
+    }
+  } catch {
+    fieldValues = {};
+  }
+  const fieldRows = signingFieldSummary(fieldDefinitions, fieldValues);
+  if (fieldRows.length > 0) {
+    lines.push('CUSTOMER INSTRUCTIONS AND ACCESS SCHEDULE', '');
+    for (const row of fieldRows) lines.push(`${row.label}: ${row.value}`);
+    lines.push(
+      '',
+      'These customer-provided instructions are incorporated into the signed record. They do not change the approved agreement wording.',
+      '',
+    );
+  }
   for (const row of latest.values()) {
     const signature = (() => {
       try {
-        return JSON.parse(String(row.signature_json ?? '{}')) as { value?: string; consentVersion?: string };
+        return JSON.parse(String(row.signature_json ?? '{}')) as {
+          value?: string;
+          consentVersion?: string;
+          type?: string;
+          imageData?: string;
+        };
       } catch {
         return {};
       }
@@ -607,7 +708,9 @@ async function buildExecutedCopy(
       `Signed at: ${String(row.signed_at ?? '')}`,
       `Consent: ${String(row.consent_version ?? signature.consentVersion ?? '')}`,
       `Status: ${String(row.status ?? '')}`,
+      `Signature method: ${signature.type === 'drawn' ? 'drawn electronic signature with typed legal name' : 'typed electronic signature'}`,
       `Typed signature: ${String(signature.value ?? '')}`,
+      `Drawn signature image retained privately: ${signature.imageData ? 'yes' : 'no'}`,
       '',
     );
   }
@@ -704,6 +807,27 @@ export async function getExecutedAgreementPdf(
     }
   }
 
+  let fieldValues: Record<string, string> = {};
+  try {
+    const parsedFields = JSON.parse(String(request.customer_fields_json ?? '{}')) as unknown;
+    if (parsedFields && typeof parsedFields === 'object' && !Array.isArray(parsedFields)) {
+      fieldValues = Object.fromEntries(
+        Object.entries(parsedFields as Record<string, unknown>)
+          .filter(([, value]) => typeof value === 'string')
+          .map(([key, value]) => [key, String(value).slice(0, 2000)]),
+      );
+    }
+  } catch {
+    fieldValues = {};
+  }
+  const customerFields = signingFieldSummary(
+    signingFieldsForRequest({
+      bundleCode: String(request.bundle_code ?? ''),
+      subjectType: String(request.subject_type ?? ''),
+    }),
+    fieldValues,
+  ).map((row) => ({ label: row.label, value: row.value }));
+
   const pdf = buildExecutedAgreementPdf({
     requestId,
     bundleName: String(request.packet_name ?? request.bundle_code ?? ''),
@@ -715,6 +839,7 @@ export async function getExecutedAgreementPdf(
     propertyAddress,
     executedAt: String(request.executed_at ?? now()),
     countersignatureName: String(request.counter_signature_name ?? ''),
+    ...(customerFields.length ? { customerFields } : {}),
     signatures,
   });
   const bytes = pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer;
@@ -952,6 +1077,9 @@ export async function createSigningRequest(
     ...(options.bundleId ? { bundleId: options.bundleId } : {}),
   });
   if (!bundle) return { required: false, requirements: [] };
+  if (options.bundleId && !(await bundleHasApprovedDocuments(db, String(bundle.id)))) {
+    throw new AdminAuthError(409, 'packet_has_no_documents');
+  }
   const variableValues = {
     ...(await loadDocumentVariables(db, context)),
     ...(options.variables ?? {}),
@@ -1040,6 +1168,7 @@ export async function createSigningRequest(
 
 export interface PacketPreview {
   required: boolean;
+  ready: boolean;
   bundleId: string;
   bundleCode: string;
   bundleName: string;
@@ -1048,6 +1177,7 @@ export interface PacketPreview {
   requirements: Requirement[];
   missingVariables: string[];
   totalDocuments: number;
+  approvedDocumentCount: number;
   requiredDocuments: number;
 }
 
@@ -1064,6 +1194,16 @@ export async function previewPacket(
     ...(options.bundleId ? { bundleId: options.bundleId } : {}),
   });
   if (!bundle) return null;
+  const approved = await db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM document_bundle_items i
+       JOIN document_templates t ON t.id = i.template_id
+       WHERE i.bundle_id = ? AND t.status = 'approved'`,
+    )
+    .bind(String(bundle.id))
+    .first<{ count: number }>();
+  const approvedDocumentCount = Number(approved?.count ?? 0);
   const values = {
     ...(await loadDocumentVariables(db, context)),
     ...(options.variables ?? {}),
@@ -1071,6 +1211,7 @@ export async function previewPacket(
   const { requirements, missing } = await resolveRequirementVariables(rawRequirements, values);
   return {
     required: requirements.some((item) => item.required),
+    ready: approvedDocumentCount > 0,
     bundleId: String(bundle.id),
     bundleCode: String(bundle.code),
     bundleName: String(bundle.name ?? ''),
@@ -1079,6 +1220,7 @@ export async function previewPacket(
     requirements,
     missingVariables: missing,
     totalDocuments: requirements.length,
+    approvedDocumentCount,
     requiredDocuments: requirements.filter((item) => item.required).length,
   };
 }
@@ -1129,8 +1271,29 @@ export interface SignInput {
   signerName: string;
   signerEmail: string;
   consent: boolean;
-  signatures: Record<string, { value: string; initials?: string }>;
+  signatures: Record<string, { value: string; initials?: string; type?: string; imageData?: string }>;
+  customerFields?: unknown;
   request: Request;
+}
+
+function cleanSignatureEvidence(signature: { initials?: string; type?: string; imageData?: string }): {
+  initials: string;
+  type: 'typed' | 'drawn';
+  imageData: string;
+} {
+  const type = signature.type === 'drawn' ? 'drawn' : 'typed';
+  const imageData =
+    type === 'drawn' &&
+    typeof signature.imageData === 'string' &&
+    /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature.imageData) &&
+    signature.imageData.length <= 220_000
+      ? signature.imageData
+      : '';
+  return {
+    initials: text(signature.initials, 20),
+    type: imageData ? 'drawn' : 'typed',
+    imageData,
+  };
 }
 
 export async function signSigningRequest(
@@ -1149,6 +1312,26 @@ export async function signSigningRequest(
   const boundEmail = String(request.signer_email ?? '').trim().toLowerCase();
   if (boundEmail && signerEmail !== boundEmail) {
     throw new AdminAuthError(403, 'signer_email_mismatch');
+  }
+  const fieldDefinitions = signingFieldsForRequest({
+    bundleCode: request.bundle_code,
+    subjectType: request.subject_type,
+  });
+  if (input.customerFields !== undefined && fieldDefinitions.length > 0) {
+    const normalizedFields = normalizeSigningFieldValues(fieldDefinitions, input.customerFields);
+    if (normalizedFields.errors.length > 0) {
+      throw new AdminAuthError(400, `signing_fields_invalid:${normalizedFields.errors.join(',')}`);
+    }
+    const stored = JSON.stringify(normalizedFields.values);
+    try {
+      await db
+        .prepare('UPDATE signing_requests SET customer_fields_json = ?, updated_at = ? WHERE id = ?')
+        .bind(stored, now(), request.id)
+        .run();
+      (request as Record<string, unknown>).customer_fields_json = stored;
+    } catch (error) {
+      if (!missingColumn(error, 'customer_fields_json')) throw error;
+    }
   }
   const required = requirements.filter((item) => item.required);
   const submitted = Object.values(input.signatures).filter((signature) => text(signature?.value, 200));
@@ -1179,6 +1362,7 @@ export async function signSigningRequest(
     }
     const needsReview = requirement.requiresVerification || requirement.requiresCountersignature;
     const attempt = (attempts.get(requirement.templateId) ?? 0) + 1;
+    const evidence = cleanSignatureEvidence(signature);
     await db
       .prepare(
         `INSERT OR IGNORE INTO document_signatures
@@ -1198,9 +1382,10 @@ export async function signSigningRequest(
         signerName,
         signerEmail,
         JSON.stringify({
-          type: 'typed',
+          type: evidence.type,
           value: text(signature.value, 200),
-          initials: text(signature.initials, 20),
+          initials: evidence.initials,
+          ...(evidence.imageData ? { imageData: evidence.imageData } : {}),
           consentVersion: ESIGN_CONSENT_VERSION,
         }),
         ESIGN_CONSENT_VERSION,
@@ -1926,7 +2111,13 @@ export async function listBundles(db: D1Database): Promise<Array<Record<string, 
   const rows = await db
     .prepare(
       `SELECT b.*,
-              (SELECT COUNT(*) FROM document_bundle_items i WHERE i.bundle_id = b.id) AS document_count
+              (SELECT COUNT(*) FROM document_bundle_items i WHERE i.bundle_id = b.id) AS document_count,
+              (SELECT COUNT(*) FROM document_bundle_items i
+                 JOIN document_templates t ON t.id = i.template_id
+                 WHERE i.bundle_id = b.id AND t.status = 'approved') AS approved_document_count,
+              (SELECT COUNT(*) FROM document_bundle_items i
+                 JOIN document_templates t ON t.id = i.template_id
+                 WHERE i.bundle_id = b.id AND t.status = 'approved' AND i.required = 1) AS required_document_count
        FROM document_bundles b ORDER BY b.subject_type, b.name`,
     )
     .all();
@@ -2180,14 +2371,13 @@ export async function listSigningRequests(
     binds.push(filters.branchId);
   }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  const rows = await db
-    .prepare(
-      `SELECT sr.id, sr.bundle_id, sr.bundle_code, sr.bundle_version, sr.subject_type,
+  const baseSelect = `SELECT sr.id, sr.bundle_id, sr.bundle_code, sr.bundle_version, sr.subject_type,
               sr.customer_id, sr.team_member_id, sr.property_id, sr.booking_request_id,
               sr.appointment_id, sr.recurring_plan_id, sr.booking_reference, sr.service_code,
               sr.status, sr.requirement_snapshot_json, sr.token_expires_at,
               sr.branch_id, sr.signer_email, sr.executed_at, sr.executed_sha256,
               sr.counter_signature_name, sr.counter_signed_at,
+              %PACKET%
               sr.created_by_admin_user_id, sr.created_at, sr.updated_at,
               c.first_name, c.last_name, tm.display_name,
               (SELECT COUNT(*) FROM document_signatures s WHERE s.signing_request_id = sr.id) AS signed_count,
@@ -2197,11 +2387,21 @@ export async function listSigningRequests(
        LEFT JOIN customers c ON c.id = sr.customer_id
        LEFT JOIN team_members tm ON tm.id = sr.team_member_id
        ${where}
-       ORDER BY sr.created_at DESC LIMIT 200`,
-    )
-    .bind(...binds)
-    .all();
-  return rows.results ?? [];
+       ORDER BY sr.created_at DESC LIMIT 200`;
+  try {
+    const rows = await db
+      .prepare(baseSelect.replace('%PACKET%', 'sr.packet_name, sr.packet_instructions,'))
+      .bind(...binds)
+      .all();
+    return rows.results ?? [];
+  } catch (error) {
+    if (!missingColumn(error, 'packet_name')) throw error;
+    const rows = await db
+      .prepare(baseSelect.replace('%PACKET%', "'' AS packet_name, '' AS packet_instructions,"))
+      .bind(...binds)
+      .all();
+    return rows.results ?? [];
+  }
 }
 
 export async function getSigningRequestDetails(

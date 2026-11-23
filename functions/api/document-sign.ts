@@ -7,9 +7,15 @@ import {
   ESIGN_CONSENT_VERSION,
   getExecutedAgreementPdf,
   getSigningRequestByToken,
+  loadDocumentVariables,
   signSigningRequest,
+  type DocumentSubjectContext,
   type RequirementSnapshot,
 } from '../../src/lib/documents/service.ts';
+import {
+  normalizeSigningFieldValues,
+  signingFieldsForRequest,
+} from '../../src/lib/documents/signing-fields.ts';
 import {
   executedCopyKey,
   resolveSigningDownload,
@@ -255,6 +261,42 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         resumeCheckoutUrl = `/estimate/payment-resume/?token=${encodeURIComponent(resumeToken)}`;
       }
     }
+    const documentContext: DocumentSubjectContext = {
+      subjectType: request.subject_type,
+      ...(request.customer_id ? { customerId: String(request.customer_id) } : {}),
+      ...(request.team_member_id ? { teamMemberId: String(request.team_member_id) } : {}),
+      ...(request.property_id ? { propertyId: String(request.property_id) } : {}),
+      ...(request.booking_request_id ? { bookingRequestId: String(request.booking_request_id) } : {}),
+      ...(request.appointment_id ? { appointmentId: String(request.appointment_id) } : {}),
+      ...(request.recurring_plan_id ? { recurringPlanId: String(request.recurring_plan_id) } : {}),
+      ...(request.booking_reference ? { bookingReference: String(request.booking_reference) } : {}),
+      ...(request.service_code ? { serviceCode: String(request.service_code) } : {}),
+    };
+    let variables: Record<string, string> = {};
+    try {
+      variables = await loadDocumentVariables(db, documentContext);
+    } catch {
+      variables = {};
+    }
+    const fieldDefinitions = signingFieldsForRequest({
+      bundleCode: request.bundle_code,
+      subjectType: request.subject_type,
+    });
+    let customerFieldValues: Record<string, string> = {};
+    try {
+      const storedFields = JSON.parse(
+        String((request as Record<string, unknown>).customer_fields_json ?? '{}'),
+      ) as unknown;
+      if (storedFields && typeof storedFields === 'object' && !Array.isArray(storedFields)) {
+        customerFieldValues = Object.fromEntries(
+          Object.entries(storedFields as Record<string, unknown>)
+            .filter(([, value]) => typeof value === 'string')
+            .map(([key, value]) => [key, String(value).slice(0, 2000)]),
+        );
+      }
+    } catch {
+      customerFieldValues = {};
+    }
     return json({
       ok: true,
       request: {
@@ -266,6 +308,21 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         status: request.status,
         expiresAt: request.token_expires_at,
         instructions: String((request as Record<string, unknown>).packet_instructions ?? ''),
+      },
+      context: {
+        customerName: variables['customer.legal_name'] ?? '',
+        customerEmail: variables['customer.email'] ?? '',
+        propertyAddress: variables['property.address'] ?? '',
+        bookingReference: variables['booking.reference'] ?? '',
+        serviceCode: variables['service.code'] ?? '',
+        serviceDate: variables['service.date'] ?? '',
+        arrivalWindow: variables['service.arrival_window'] ?? '',
+        priceSummary: variables['price.summary'] ?? '',
+        paymentTerms: variables['payment.terms'] ?? '',
+      },
+      customerFields: {
+        definitions: fieldDefinitions,
+        values: customerFieldValues,
       },
       documents: requirements.map((requirement) => publicRequirement(requirement, latest, token)),
       signedTemplateIds: [...signed],
@@ -287,16 +344,38 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
   try {
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
-    const token = typeof body.token === 'string' ? body.token : '';
     const signatures =
       body.signatures && typeof body.signatures === 'object'
-        ? (body.signatures as Record<string, { value: string; initials?: string }>)
+        ? (body.signatures as Record<string, { value: string; initials?: string; type?: string; imageData?: string }>)
         : {};
+    const token = typeof body.token === 'string' ? body.token : '';
+    const resolved = await getSigningRequestByToken(db, token);
+    if (!resolved) return json({ ok: false, error: 'signing_link_invalid' }, 404);
+    const fieldDefinitions = signingFieldsForRequest({
+      bundleCode: resolved.request.bundle_code,
+      subjectType: resolved.request.subject_type,
+    });
+    let customerFields: Record<string, string> | undefined;
+    if (fieldDefinitions.length > 0) {
+      const normalized = normalizeSigningFieldValues(fieldDefinitions, body.customerFields);
+      if (normalized.errors.length > 0) {
+        return json(
+          {
+            ok: false,
+            error: 'signing_fields_invalid',
+            fields: normalized.errors,
+          },
+          400,
+        );
+      }
+      customerFields = normalized.values;
+    }
     const result = await signSigningRequest(db, token, {
       signerName: typeof body.signerName === 'string' ? body.signerName : '',
       signerEmail: typeof body.signerEmail === 'string' ? body.signerEmail : '',
       consent: body.consent === true,
       signatures,
+      ...(customerFields ? { customerFields } : {}),
       request: context.request,
     });
     if (result.status === 'signed') {

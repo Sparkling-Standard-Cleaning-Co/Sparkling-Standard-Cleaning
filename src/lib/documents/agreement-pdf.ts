@@ -47,6 +47,7 @@ export interface AgreementPdfInput {
   propertyAddress: string;
   executedAt: string;
   countersignatureName?: string;
+  customerFields?: Array<{ label: string; value: string }>;
   signatures: AgreementPdfSignature[];
 }
 
@@ -118,6 +119,28 @@ export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array 
     y -= LEADING;
   }
   y -= 6;
+
+  if (input.customerFields?.length) {
+    ensure(24);
+    commands += line('Customer Instructions and Access Schedule', LEFT, y, HEAD_SIZE, true, ROSE);
+    y -= 15;
+    write(
+      'The customer provided the following access and service instructions. These instructions are part of the signed record and do not change the approved agreement wording.',
+      LEFT,
+      8.4,
+      false,
+      MUTED,
+    );
+    for (const row of input.customerFields) {
+      ensure(LEADING);
+      commands += line(`${row.label}:`, LEFT, y, BODY_SIZE, true, INK);
+      y -= LEADING;
+      write(row.value, LEFT + 8, BODY_SIZE, false, INK, LEADING, RIGHT - LEFT - 8);
+    }
+    y -= 6;
+    commands += rule(y);
+    y -= 16;
+  }
 
   for (const signature of input.signatures) {
     ensure(24);

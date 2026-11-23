@@ -10,7 +10,7 @@ import { createCustomer, getCustomer } from '../../../src/lib/admin/crm.ts';
 import type { BookingEnv } from '../../../src/lib/booking/service.ts';
 import { onRequestPost as bookingAdminPost } from '../booking-admin.ts';
 import { sendBookingEmail, type BookingEmailKind } from '../../../src/lib/forms/booking-email.ts';
-import { DEPARTMENT_ADDRESSES, readCommunicationSettings } from '../../../src/lib/admin/communications.ts';
+import { DEPARTMENT_ADDRESSES, readCommunicationSettings, sendOperationalNotification } from '../../../src/lib/admin/communications.ts';
 import { updateCalendarEvent } from '../../../src/lib/booking/google-calendar.ts';
 import {
   beginBookingCommitment,
@@ -273,6 +273,29 @@ async function sendForRequest(
     outcome,
     actorId: actor.id,
   });
+  const eventKey = kind === 'confirmation' ? 'booking_confirmation' : 'booking_change';
+  await sendOperationalNotification(db, context.env, {
+    eventKey,
+    subject: `${kind === 'confirmation' ? 'Booking confirmed' : `Booking ${kind}`} - ${String(row.quote_reference ?? row.id ?? '')}`,
+    text: [
+      `Action: ${kind}`,
+      `Reference: ${String(row.quote_reference ?? row.id ?? '')}`,
+      `Customer: ${customerName || 'not recorded'}`,
+      `Customer email: ${email || 'not recorded'}`,
+      `Property: ${address || 'not recorded'}`,
+      `Date: ${overrides.dateLabel ?? dateLabel(row.start_at)}`,
+      `Time: ${overrides.timeLabel ?? timeLabel(row.start_at, row.end_at)}`,
+      `Service: ${serviceLabel(payload) || 'not recorded'}`,
+      ...(overrides.reason ? [`Reason: ${overrides.reason}`] : []),
+      `Customer email outcome: ${outcome.status}`,
+      '',
+      'Open Operations -> Calendar & Requests to review the booking.',
+      'This internal notice does not include the customer secure signing link.',
+    ].join('\n'),
+    idempotencyKey: `booking-${String(row.id ?? '')}-${kind}-${Date.now()}`,
+    relatedType: 'booking_request',
+    ...(row.id ? { relatedId: String(row.id) } : {}),
+  }).catch(() => undefined);
   return { ...outcome, recipient: Boolean(email) };
 }
 

@@ -13,6 +13,7 @@
 import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 import { AdminAuthError, audit, type AdminActor } from './operations.ts';
 import type { D1Database } from './d1.ts';
+import { sendAdminEmailDetailed, type AdminEmailAttachment } from './email.ts';
 
 export const DEPARTMENT_KEYS = [
   'bookings',
@@ -46,12 +47,20 @@ export const DEPARTMENT_ADDRESSES: Record<DepartmentKey, string> = {
 export const NOTIFICATION_EVENTS = [
   'booking_request',
   'booking_confirmation',
+  'booking_change',
   'booking_reminder',
+  'booking_paid',
   'invoice_delivery',
+  'payment_received',
+  'payment_failed',
   'payment_receipt',
   'contact_inquiry',
   'careers_application',
   'hiring_notification',
+  'document_signing_request',
+  'document_executed',
+  'document_revision',
+  'staff_assignment',
   'security_alert',
   'backup_failure',
   'owner_escalation',
@@ -67,7 +76,7 @@ export const EVENT_DEFINITIONS: Record<
   booking_request: {
     label: 'New booking or reservation request',
     critical: false,
-    defaults: ['bookings'],
+    defaults: ['bookings', 'owner'],
     description: 'Sent when a customer requests a cleaning appointment.',
   },
   booking_confirmation: {
@@ -76,17 +85,41 @@ export const EVENT_DEFINITIONS: Record<
     defaults: ['bookings'],
     description: 'Sent when the office confirms a booking.',
   },
+  booking_change: {
+    label: 'Booking change, decline, or cancellation',
+    critical: false,
+    defaults: ['bookings'],
+    description: 'An appointment was moved, declined, proposed, or cancelled and needs operational follow-up.',
+  },
   booking_reminder: {
     label: 'Appointment reminder',
     critical: false,
     defaults: ['bookings'],
     description: 'Scheduled reminder before a confirmed appointment.',
   },
+  booking_paid: {
+    label: 'Booking payment received',
+    critical: false,
+    defaults: ['bookings', 'billing'],
+    description: 'A reservation request was paid and needs scheduling or confirmation review.',
+  },
   invoice_delivery: {
     label: 'Invoice delivery',
     critical: false,
     defaults: ['billing'],
     description: 'Invoice email and payment-link delivery.',
+  },
+  payment_received: {
+    label: 'Payment or receipt recorded',
+    critical: false,
+    defaults: ['billing', 'bookings'],
+    description: 'A card payment, gift sale, or receipt record needs financial follow-up.',
+  },
+  payment_failed: {
+    label: 'Payment failure or dispute',
+    critical: false,
+    defaults: ['billing', 'admin'],
+    description: 'A failed, disputed, or duplicate payment needs review.',
   },
   payment_receipt: {
     label: 'Payment receipt',
@@ -97,7 +130,7 @@ export const EVENT_DEFINITIONS: Record<
   contact_inquiry: {
     label: 'General contact inquiry',
     critical: false,
-    defaults: ['customerService'],
+    defaults: ['customerService', 'owner'],
     description: 'Website contact form and customer-service correspondence.',
   },
   careers_application: {
@@ -111,6 +144,30 @@ export const EVENT_DEFINITIONS: Record<
     critical: false,
     defaults: ['hiring'],
     description: 'Internal hiring status and interview notices.',
+  },
+  document_signing_request: {
+    label: 'Agreement sent for signature',
+    critical: false,
+    defaults: ['bookings', 'admin'],
+    description: 'A customer or employee signing request was created or resent.',
+  },
+  document_executed: {
+    label: 'Agreement fully executed',
+    critical: false,
+    defaults: ['admin', 'owner'],
+    description: 'A complete, signed agreement package is ready in the private document system.',
+  },
+  document_revision: {
+    label: 'Document revision needs review',
+    critical: false,
+    defaults: ['admin', 'owner'],
+    description: 'A new legal document version needs owner review and acknowledgement.',
+  },
+  staff_assignment: {
+    label: 'Staff assignment or coverage exception',
+    critical: false,
+    defaults: ['bookings'],
+    description: 'A job assignment changed, or dispatch could not cover a confirmed job.',
   },
   security_alert: {
     label: 'Critical security alert',
@@ -419,12 +476,18 @@ export function validateCommunicationSettings(input: unknown): {
   const routingInput = isRecord(input.routing) ? input.routing : {};
   for (const key of NOTIFICATION_EVENTS) {
     const raw = routingInput[key];
+    // Settings saved before a new event existed remain valid: the new event
+    // starts on its approved default routing instead of invalidating the whole
+    // configuration and silently falling back to owner-only mail.
+    if (raw === undefined) continue;
     const requested = Array.isArray(raw)
       ? raw.map((entry) => text(entry, 40)).filter((entry): entry is DepartmentKey => (DEPARTMENT_KEYS as readonly string[]).includes(entry))
       : [];
     const unique = [...new Set(requested)];
     if (unique.length === 0) {
-      errors.push(`routing.${key}: choose at least one department`);
+      if (Array.isArray(raw) && raw.length === 0) {
+        errors.push(`routing.${key}: choose at least one department`);
+      }
       continue;
     }
     if (unique.length !== requested.length) errors.push(`routing.${key}: duplicate department`);
@@ -509,6 +572,141 @@ export async function readCommunicationSettings(db: D1Database): Promise<Communi
     return { settings: defaultCommunicationSettings(), source: 'stored', valid: false, errors: validation.errors };
   }
   return { settings: validation.settings, source: 'stored', valid: true, errors: [] };
+}
+
+export interface NotificationRecipient {
+  department: DepartmentKey;
+  address: string;
+}
+
+/**
+ * Resolves the enabled department inboxes for one operational event. Critical
+ * events always include the owner even if a stored configuration is malformed;
+ * ordinary events never silently substitute the owner for a disabled inbox.
+ */
+export function notificationRecipients(
+  settings: CommunicationSettings,
+  eventKey: NotificationEventKey,
+): NotificationRecipient[] {
+  if (!(NOTIFICATION_EVENTS as readonly string[]).includes(eventKey)) return [];
+  const definition = EVENT_DEFINITIONS[eventKey];
+  const configured: readonly DepartmentKey[] = definition.critical
+    ? ['admin', 'owner']
+    : settings.routing[eventKey] ?? definition.defaults;
+  const recipients: NotificationRecipient[] = [];
+  const seen = new Set<string>();
+  for (const key of [...new Set<DepartmentKey>(configured)]) {
+    if (!DEPARTMENT_KEYS.includes(key)) continue;
+    const department = settings.departments[key];
+    if (!department?.enabled) continue;
+    const address = (department.address || DEPARTMENT_ADDRESSES[key]).trim();
+    const normalized = address.toLowerCase();
+    if (!address || seen.has(normalized)) continue;
+    seen.add(normalized);
+    recipients.push({ department: key, address });
+  }
+  if (definition.critical && !recipients.some((entry) => entry.department === 'owner')) {
+    recipients.push({ department: 'owner', address: DEPARTMENT_ADDRESSES.owner });
+  }
+  return recipients;
+}
+
+export interface OperationalNotificationInput {
+  eventKey: NotificationEventKey;
+  subject: string;
+  text: string;
+  html?: string;
+  replyTo?: string;
+  attachments?: AdminEmailAttachment[];
+  relatedType?: string;
+  relatedId?: string;
+  idempotencyKey: string;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+/**
+ * Sends one operational notice to every department inbox configured for the
+ * event, records each provider outcome, and reports acceptance honestly.
+ * Callers must not treat provider acceptance as proof of inbox delivery.
+ */
+export async function sendOperationalNotification(
+  db: D1Database | null,
+  env: CommunicationEnv,
+  input: OperationalNotificationInput,
+): Promise<{
+  recipients: string[];
+  departments: DepartmentKey[];
+  sent: number;
+  failed: number;
+  suppressed: number;
+}> {
+  let settings: CommunicationSettings;
+  if (db) {
+    settings = (await readCommunicationSettings(db).catch(() => ({
+      settings: defaultCommunicationSettings(),
+      source: 'default' as const,
+      valid: false,
+      errors: [],
+    }))).settings;
+  } else {
+    settings = defaultCommunicationSettings();
+  }
+  const recipients = notificationRecipients(settings, input.eventKey);
+  const result = {
+    recipients: recipients.map((entry) => entry.address),
+    departments: recipients.map((entry) => entry.department),
+    sent: 0,
+    failed: 0,
+    suppressed: 0,
+  };
+  if (recipients.length === 0) return result;
+  const html =
+    input.html ??
+    `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#302429">${input.text
+      .split('\n')
+      .map((line) => (line.trim() ? `<p style="margin:0 0 8px">${escapeHtml(line)}</p>` : '<br />'))
+      .join('')}</div>`;
+  for (const [index, recipient] of recipients.entries()) {
+    const recipientKey = recipient.address.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 48) || String(index + 1);
+    const outcome = await sendAdminEmailDetailed(
+      env,
+      recipient.address,
+      { subject: input.subject.slice(0, 200), html, text: input.text },
+      `${input.idempotencyKey}/${recipientKey}`.slice(0, 200),
+      {
+        ...(input.replyTo ? { replyTo: input.replyTo } : {}),
+        ...(input.attachments ? { attachments: input.attachments } : {}),
+      },
+    );
+    if (!outcome.ok && outcome.error === 'not_configured') {
+      result.suppressed += 1;
+    } else if (outcome.ok) {
+      result.sent += 1;
+    } else {
+      result.failed += 1;
+    }
+    if (db) {
+      await recordNotificationDelivery(db, {
+        eventKey: input.eventKey,
+        department: recipient.department,
+        recipient: recipient.address,
+        status: outcome.ok ? 'sent' : outcome.error === 'not_configured' ? 'suppressed' : 'failed',
+        providerId: outcome.providerId,
+        errorCode: outcome.ok ? '' : outcome.error,
+        ...(input.relatedType ? { relatedType: input.relatedType } : {}),
+        ...(input.relatedId ? { relatedId: input.relatedId } : {}),
+      }).catch(() => undefined);
+    }
+  }
+  return result;
 }
 
 export async function saveCommunicationSettings(
@@ -622,7 +820,7 @@ export function communicationProviderStatus(env: CommunicationEnv): Record<strin
 }
 
 export async function recordNotificationDelivery(
-  db: D1Database,
+  db: D1Database | null,
   input: {
     eventKey: string;
     department: string;
@@ -637,6 +835,7 @@ export async function recordNotificationDelivery(
   },
 ): Promise<string> {
   const id = `notif_${crypto.randomUUID()}`;
+  if (!db) return id;
   const now = new Date().toISOString();
   await db
     .prepare(

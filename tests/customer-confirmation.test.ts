@@ -10,7 +10,7 @@ const business = {
   name: 'Sparkling Standard',
   founder: 'Hayli',
   phone: '(850) 426-8479',
-  email: 'bookings@sparkling-standard.com',
+  email: 'booking@sparkling-standard.com',
   website: 'sparkling-standard.com',
 };
 
@@ -159,7 +159,7 @@ test('the confirmation carries the owner-approved contact block and signature', 
   const confirmation = buildCustomerConfirmation(reservation, business);
   for (const body of [confirmation.html, confirmation.text]) {
     assert.match(body, /\(850\) 426-8479/);
-    assert.match(body, /bookings@sparkling-standard\.com/);
+    assert.match(body, /booking@sparkling-standard\.com/);
     assert.match(body, /sparkling-standard\.com/);
     assert.match(body, /Hayli/);
   }

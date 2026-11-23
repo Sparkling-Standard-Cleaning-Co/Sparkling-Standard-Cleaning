@@ -211,7 +211,10 @@ test('portal service requests are customer-scoped and routed to customer service
       kind: 'question', message: 'Please confirm the arrival window.',
     });
     assert.ok(created.id.startsWith('preq_'));
-    assert.deepEqual(recipients, ['customer-service@sparkling-standard.com']);
+    assert.deepEqual(recipients, [
+      'customer-service@sparkling-standard.com',
+      'owner@sparkling-standard.com',
+    ]);
     const row = db.raw.prepare('SELECT customer_id, message, status FROM customer_portal_requests WHERE id = ?').get(created.id) as Record<string, unknown>;
     assert.equal(row.customer_id, 'cust_a');
     assert.equal(row.status, 'received');

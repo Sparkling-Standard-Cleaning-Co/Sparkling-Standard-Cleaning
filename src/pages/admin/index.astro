@@ -648,23 +648,45 @@ import {
           </section>
 
           <section class="admin-view" data-admin-view="documents" hidden>
-            <div class="admin-card">
-              <h2 class="admin-section-title">Legal Approval Register</h2>
-              <p class="admin-muted">
-                Company records and draft agreements live in the owner master workspace, not in the public repository.
-                Open <strong>00 START HERE → START-HERE.html</strong> and then
-                <strong>01 COMPANY &amp; LEGAL → LEGAL-APPROVAL-REGISTER.md</strong>.
-              </p>
-              <p class="small text-muted">
-                Exact local path: <code>C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER\00 START HERE\START-HERE.html</code>
-              </p>
-              <p class="small text-muted">
-                Company documents, customer agreements, employee documents, policies and pending owner review are
-                separated there. Approved templates are the only documents this admin may send for signature; drafts
-                must never be sent to customers or employees.
-              </p>
-            </div>
-            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
+            <nav class="document-tabs" aria-label="Document center sections">
+              <button type="button" data-document-tab="overview" aria-current="page">Overview</button>
+              <button type="button" data-document-tab="send">Send for Signature</button>
+              <button type="button" data-document-tab="requests">Signing Requests</button>
+              <button type="button" data-document-tab="library">Document Library</button>
+              <button type="button" data-document-tab="packets">Packets</button>
+              <button type="button" data-document-tab="updates">Versions &amp; Updates</button>
+              <button type="button" data-document-tab="settings">Settings</button>
+            </nav>
+            <section class="document-panel" data-document-panel="overview">
+              <div class="admin-card">
+                <div class="admin-detail-head">
+                  <div>
+                    <h2 class="admin-section-title">Document center overview</h2>
+                    <p class="admin-muted">What needs attention now, then the safest next action.</p>
+                  </div>
+                  <button class="btn btn--secondary btn--small" type="button" data-document-tab="send">Send for signature</button>
+                </div>
+                <div data-document-overview></div>
+              </div>
+              <div class="admin-card" style="margin-top:1rem;">
+                <h2 class="admin-section-title">Legal Approval Register</h2>
+                <p class="admin-muted">
+                  Company records and draft agreements live in the owner master workspace, not in the public repository.
+                  Open <strong>00 START HERE → START-HERE.html</strong> and then
+                  <strong>01 COMPANY &amp; LEGAL → LEGAL-APPROVAL-REGISTER.md</strong>.
+                </p>
+                <p class="small text-muted">
+                  Exact local path: <code>C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER\00 START HERE\START-HERE.html</code>
+                </p>
+                <p class="small text-muted">
+                  Company documents, customer agreements, employee documents, policies and pending owner review are
+                  separated there. Approved templates are the only documents this admin may send for signature; drafts
+                  must never be sent to customers or employees.
+                </p>
+              </div>
+            </section>
+            <section class="document-panel" data-document-panel="settings" hidden>
+            <div class="admin-card" data-admin-owner-section>
               <h2 class="admin-section-title">Signing reminders</h2>
               <p class="admin-muted">Reminders never cancel an appointment or agreement. Signing links expire after seven days; an expired link is replaced only when a reminder can be delivered.</p>
               <form class="admin-form admin-form--grid" data-document-reminders>
@@ -675,10 +697,12 @@ import {
               </form>
               <p class="admin-status-message" data-document-reminders-status role="status" aria-live="polite"></p>
             </div>
-            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
+            </section>
+            <section class="document-panel" data-document-panel="updates" hidden>
+            <div class="admin-card" data-admin-owner-section>
               <div class="admin-detail-head">
                 <div>
-                  <h2 class="admin-section-title">Document Updates</h2>
+                  <h2 class="admin-section-title">Versions &amp; Updates</h2>
                   <p class="admin-muted">
                     New versions never overwrite an executed agreement. Review affected packets and customers here;
                     no re-signing request is sent automatically.
@@ -688,8 +712,10 @@ import {
               </div>
               <div data-admin-document-updates></div>
             </div>
-            <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Document templates</h2>
+            </section>
+            <section class="document-panel" data-document-panel="library" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Document library</h2>
               <p class="admin-muted">Only owner-approved templates can create a signing requirement. Draft and retired templates never block a workflow.</p>
               <div data-admin-documents-templates></div>
             </div>
@@ -742,9 +768,11 @@ import {
               </div>
               <div data-document-template-result style="margin-top:.6rem;"></div>
             </div>
-            <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Document bundles</h2>
-              <p class="admin-muted">A bundle defines exactly which approved documents apply to a service, customer or employee group. Conditions are optional.</p>
+            </section>
+            <section class="document-panel" data-document-panel="packets" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Packets</h2>
+              <p class="admin-muted">A packet defines exactly which approved documents apply to a service, customer or employee group. An active packet with no approved documents is never treated as ready and cannot be sent.</p>
               <div data-admin-documents-bundles></div>
               <form class="admin-form admin-form--grid" data-document-bundle-create style="margin-top:1rem;">
                 <label>Code <input name="code" required placeholder="packet.residential_one_time" /></label>
@@ -775,23 +803,98 @@ import {
               </form>
               <div data-document-bundle-items style="margin-top:1rem;"></div>
             </div>
-            <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Signing requests</h2>
-              <p class="admin-muted">Send a secure single-purpose link to a customer or employee. Signed versions are immutable and retained privately.</p>
+            </section>
+            <section class="document-panel" data-document-panel="send" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Send for signature</h2>
+              <p class="admin-muted">Search for the customer, choose the service and packet, review the automatically loaded details, then send one secure link. Internal IDs are never required.</p>
               <div class="admin-composer" data-document-composer>
                 <form class="admin-form admin-form--grid" data-document-send>
-                  <label>Packet <select name="bundleId" data-document-send-bundle><option value="">Automatic (service rules)</option></select></label>
-                  <label>Subject <select name="subjectType"><option value="customer">Customer</option><option value="employee">Employee</option></select></label>
-                  <label>Customer ID <input name="customerId" placeholder="cust_..." /></label>
-                  <label>Employee ID <input name="teamMemberId" placeholder="team_..." /></label>
-                  <label>Property ID <input name="propertyId" placeholder="prop_..." /></label>
-                  <label>Service code <input name="serviceCode" placeholder="residential-cleaning" /></label>
-                  <label>Frequency <input name="frequency" placeholder="weekly" /></label>
-                  <label>Booking reference <input name="bookingReference" placeholder="SS-..." /></label>
-                  <label>Recipient email <input name="email" type="email" /></label>
-                  <label class="admin-field--wide">Additional instructions <textarea name="instructions" rows="2" maxlength="2000"></textarea></label>
-                  <fieldset class="admin-field--wide"><legend>Admin-filled agreement values</legend>
-                    <p class="admin-muted">These values populate the approved document variables. Company identity, clauses and prices are locked to the approved template and the values you enter here.</p>
+                  <section class="document-send-step admin-field--wide">
+                    <h3>1. Choose the recipient</h3>
+                    <p class="admin-muted">Search by name, email, phone, or company. Internal IDs are filled automatically and never typed by staff.</p>
+                    <label>Search customers
+                      <input type="search" data-document-customer-search placeholder="Start typing a customer name, email, phone, or company" autocomplete="off" />
+                    </label>
+                    <div data-document-customer-results class="document-recipient-results"></div>
+                    <div data-document-selected-recipient class="document-selected-recipient" hidden></div>
+                    <input type="hidden" name="customerId" />
+                    <input type="hidden" name="teamMemberId" />
+                    <div class="admin-inline-form" style="margin-top:.5rem;">
+                      <label>Recipient type
+                        <select name="subjectType" data-document-subject-type>
+                          <option value="customer">Customer</option>
+                          <option value="employee">Employee</option>
+                        </select>
+                      </label>
+                      <label>Recipient email
+                        <input name="email" type="email" placeholder="Verified email for the signing link" />
+                      </label>
+                    </div>
+                    <div data-document-employee-picker hidden>
+                      <label>Employee
+                        <select data-document-employee-select>
+                          <option value="">Choose an employee</option>
+                        </select>
+                      </label>
+                    </div>
+                    <details class="admin-detail-toggle">
+                      <summary>Advanced: enter identifiers manually</summary>
+                      <div class="admin-form admin-form--grid" style="margin-top:.5rem;">
+                        <label>Customer ID <input name="manualCustomerId" placeholder="cust_..." /></label>
+                        <label>Employee ID <input name="manualTeamMemberId" placeholder="team_..." /></label>
+                        <label>Property ID <input name="manualPropertyId" placeholder="prop_..." /></label>
+                      </div>
+                    </details>
+                  </section>
+
+                  <section class="document-send-step admin-field--wide">
+                    <h3>2. Choose the service or transaction</h3>
+                    <p class="admin-muted">The packet is selected automatically from the service, and verified customer/property values load below.</p>
+                    <div class="admin-form admin-form--grid">
+                      <label>Service
+                        <select name="serviceCode" data-document-service>
+                          <option value="">Choose a service</option>
+                          <option value="residential-cleaning">Residential cleaning</option>
+                          <option value="recurring-residential">Recurring residential cleaning</option>
+                          <option value="residential-deep">Deep cleaning</option>
+                          <option value="move-in-move-out">Move-in / move-out cleaning</option>
+                          <option value="str-turnover">Short-term rental turnover</option>
+                          <option value="commercial-cleaning">Commercial cleaning</option>
+                          <option value="church-cleaning">Church / facility cleaning</option>
+                          <option value="property-management">Property management</option>
+                          <option value="specialty-addons">Specialty / add-ons</option>
+                          <option value="employee-onboarding">Employee onboarding</option>
+                        </select>
+                      </label>
+                      <label>Frequency
+                        <select name="frequency">
+                          <option value="one_time">One time</option>
+                          <option value="weekly">Weekly</option>
+                          <option value="biweekly">Every two weeks</option>
+                          <option value="monthly">Monthly</option>
+                        </select>
+                      </label>
+                      <label>Property
+                        <select name="propertyId" data-document-property>
+                          <option value="">No specific property</option>
+                        </select>
+                      </label>
+                      <label>Booking or estimate reference
+                        <input name="bookingReference" placeholder="SS-..." />
+                      </label>
+                      <label class="admin-field--wide">Document packet
+                        <select name="bundleId" data-document-send-bundle>
+                          <option value="">Automatic (service rules)</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div data-document-context-hint class="admin-muted"></div>
+                  </section>
+
+                  <section class="document-send-step admin-field--wide">
+                    <h3>3. Fill only the remaining details</h3>
+                    <p class="admin-muted">Company identity, approved clauses, and document versions are locked to the approved template. Values already known from the customer, property, or booking load automatically; unresolved fields are flagged before sending.</p>
                     <div class="admin-form admin-form--grid">
                       <label>Service scope <textarea name="serviceScope" rows="3" maxlength="8000"></textarea></label>
                       <label>Included additions <textarea name="serviceAdditions" rows="2" maxlength="4000"></textarea></label>
@@ -804,9 +907,20 @@ import {
                       <label>Discount <input name="priceDiscount" maxlength="1000" /></label>
                       <label>Payment terms <textarea name="paymentTerms" rows="2" maxlength="4000"></textarea></label>
                       <label>Cancellation terms <textarea name="cancellationTerms" rows="2" maxlength="4000"></textarea></label>
+                      <label class="admin-field--wide">Additional recipient instructions <textarea name="instructions" rows="2" maxlength="2000"></textarea></label>
                     </div>
-                  </fieldset>
-                  <div class="admin-field--wide admin-actions"><button class="btn btn--ghost btn--small" type="button" data-document-preview>Preview packet</button><button class="btn btn--ghost btn--small" type="button" data-document-save-draft>Save draft link</button><button class="btn btn--secondary btn--small" type="submit">Create and send signing link</button></div>
+                  </section>
+
+                  <section class="document-send-step admin-field--wide">
+                    <h3>4. Review and send</h3>
+                    <p class="admin-muted">Preview the actual rendered agreement, then send the secure link or save a draft link to share later. A packet with no approved documents or unresolved required details cannot be sent.</p>
+                    <div class="admin-actions">
+                      <button class="btn btn--secondary btn--small" type="button" data-document-preview>Preview agreement</button>
+                      <button class="btn btn--ghost btn--small" type="button" data-document-save-draft>Save draft link</button>
+                      <button class="btn btn--primary btn--small" type="submit">Create and send signing link</button>
+                    </div>
+                    <p class="admin-muted" data-document-send-readiness role="status" aria-live="polite"></p>
+                  </section>
                 </form>
                 <div class="admin-composer__preview" data-document-preview-pane>
                   <div class="admin-composer__toolbar">
@@ -820,9 +934,29 @@ import {
               </div>
               <div data-document-preview-result style="margin-top:.6rem;"></div>
               <div data-document-send-result style="margin-top:.6rem;"></div>
-              <div data-admin-documents-requests style="margin-top:1rem;"></div>
-              <div data-document-request-detail style="margin-top:1rem;" hidden></div>
             </div>
+            </section>
+            <section class="document-panel" data-document-panel="requests" hidden>
+              <div class="admin-card">
+                <h2 class="admin-section-title">Signing requests</h2>
+                <p class="admin-muted">Track every request, open the executed copy, countersign when required, and resend a secure link when necessary. Signed versions are immutable and retained privately.</p>
+                <div class="admin-inline-form" style="margin-top:.75rem;">
+                  <label>Search <input type="search" data-document-request-search placeholder="Customer, packet, or reference" /></label>
+                  <label>Status
+                    <select data-document-request-status>
+                      <option value="">All statuses</option>
+                      <option value="pending">Awaiting signature</option>
+                      <option value="partially_signed">Partially signed</option>
+                      <option value="signed">Completed</option>
+                      <option value="expired">Expired</option>
+                      <option value="void">Void</option>
+                    </select>
+                  </label>
+                </div>
+                <div data-admin-documents-requests style="margin-top:1rem;"></div>
+                <div data-document-request-detail style="margin-top:1rem;" hidden></div>
+              </div>
+            </section>
           </section>
 
           <section class="admin-view" data-admin-view="timekeeping" hidden>

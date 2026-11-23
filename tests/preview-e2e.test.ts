@@ -40,8 +40,9 @@ test('session tokens are host-bound, expiring and tamper-evident', async () => {
   assert.equal(await verifyE2ESession(TOKEN, HOST, session.value, now), true);
   assert.equal(await verifyE2ESession(TOKEN, OTHER_PREVIEW, session.value, now), false);
   assert.equal(await verifyE2ESession('different-secret', HOST, session.value, now), false);
+  const tampered = `${session.value.slice(0, -1)}${session.value.endsWith('0') ? '1' : '0'}`;
   assert.equal(
-    await verifyE2ESession(TOKEN, HOST, `${session.value.slice(0, -1)}0`, now),
+    await verifyE2ESession(TOKEN, HOST, tampered, now),
     false,
   );
   assert.equal(

@@ -303,11 +303,22 @@ test('a paid estimate sends an itemized customer receipt from the stored checkou
   );
   assert.equal(response.status, 200);
   assert.equal(notifications, 1);
-  assert.equal(receiptBodies.length, 1);
-  assert.match(String(receiptBodies[0]?.subject), /SS-20261029-ABC123/);
-  assert.match(String(receiptBodies[0]?.html), /Commercial Cleaning/);
-  assert.match(String(receiptBodies[0]?.html), /Escambia County/);
-  assert.match(String(receiptBodies[0]?.html), /\$150\.50/);
+  const departmentBodies = receiptBodies.filter((body) =>
+    String(body.subject).startsWith('PAID estimate'),
+  );
+  const customerReceipts = receiptBodies.filter((body) =>
+    String(body.subject).startsWith('Your Sparkling Standard Cleaning Co. receipt'),
+  );
+  assert.equal(customerReceipts.length, 1);
+  assert.equal(departmentBodies.length, 2);
+  assert.deepEqual(
+    [...new Set(departmentBodies.flatMap((body) => (Array.isArray(body.to) ? body.to : []) as string[]))].sort(),
+    ['billing@sparkling-standard.com', 'booking@sparkling-standard.com'],
+  );
+  assert.match(String(customerReceipts[0]?.subject), /SS-20261029-ABC123/);
+  assert.match(String(customerReceipts[0]?.html), /Commercial Cleaning/);
+  assert.match(String(customerReceipts[0]?.html), /Escambia County/);
+  assert.match(String(customerReceipts[0]?.html), /\$150\.50/);
 });
 async function reservedGift(
   ledger: FakeLedger,
@@ -397,9 +408,10 @@ test('a paid estimate commits its gift reservation and keeps the gift-adjusted t
   const response = await withFetch(
     async (url, init) => {
       if (String(url).includes('api.resend.com/emails')) {
-        receiptHtml = String(
-          (JSON.parse(String(init?.body ?? '{}')) as { html?: string }).html ?? '',
-        );
+        const body = JSON.parse(String(init?.body ?? '{}')) as { subject?: string; html?: string };
+        if (String(body.subject).startsWith('Your Sparkling Standard Cleaning Co. receipt')) {
+          receiptHtml = String(body.html ?? '');
+        }
         return jsonResponse({ id: 'email_gift_1' });
       }
       return jsonResponse({ success: true });
