@@ -90,6 +90,9 @@ const documents = staging.documents.map((doc) => {
   if (actual !== doc.contentSha256) {
     errors.push(`${doc.id}: staging text hash mismatch (expected ${doc.contentSha256}, got ${actual})`);
   }
+  if (/OWNER REVIEW DRAFT|NOT EFFECTIVE UNTIL APPROVED|REVIEW[- ]ONLY|INTERNAL DRAFT|DRAFT FOR OWNER/i.test(String(doc.contentText ?? ''))) {
+    errors.push(`${doc.id}: customer-facing content contains an internal review notice`);
+  }
   return doc;
 });
 if (errors.length) fail(`approved source verification failed:\n- ${errors.join('\n- ')}`);

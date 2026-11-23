@@ -116,6 +116,15 @@ test('owner-requested wording removals stay removed', () => {
   assert.match(cancellation, /will not charge both a cancellation fee and a failed-access fee/i);
 });
 
+test('the production legal import fails closed on internal review notices', () => {
+  const importer = fs.readFileSync(
+    path.join(ROOT, 'scripts', 'legal', 'prepare-production-import.mjs'),
+    'utf8',
+  );
+  assert.match(importer, /OWNER REVIEW DRAFT/);
+  assert.match(importer, /customer-facing content contains an internal review notice/);
+});
+
 test('the 27 active masters are complete, versioned and identify the approved brand', () => {
   const active = masterFiles();
   assert.equal(active.length, 27, 'expected 17 customer and 10 employee active masters');
