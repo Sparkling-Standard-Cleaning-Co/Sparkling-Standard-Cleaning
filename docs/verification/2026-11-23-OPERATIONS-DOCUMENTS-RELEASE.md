@@ -149,10 +149,14 @@ The document-branding renders remain in
 
 ## Deployment evidence
 
-- **Release commit:** `274a5f5` on `production-safe` (base `3fb0b8b`).
+- **Release commits:** `274a5f5` on `production-safe` (base `3fb0b8b`), followed
+  by the calendar-layout polish and rendered evidence in `038633e`.
 - **Remote push:** `3fb0b8b..274a5f5 production-safe -> production-safe`.
-- **GitHub Actions `validate` + `browser`:** run `45280087315` completed successfully
-  (`validate` 1m29s, `browser` 6m53s) on `production-safe`.
+- **GitHub Actions `validate` + `browser`:**
+  - Release run `45280087315` completed successfully (`validate` 1m29s,
+    `browser` 6m53s) on `production-safe`.
+  - Layout-polish run `45284434599` completed successfully (`validate` 1m5s,
+    `browser` 8m25s) on `production-safe`.
 - **Cloudflare Pages:** deployment triggered by the GitHub-connected
   `production-safe` push and verified live. The production `/admin/` document
   contains the new inline-customer and combined booking actions, and the served
