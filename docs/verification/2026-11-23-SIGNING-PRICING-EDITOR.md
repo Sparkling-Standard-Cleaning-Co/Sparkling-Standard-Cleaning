@@ -1,6 +1,6 @@
 # 2026-11-23 — Signing, pricing, and document editor corrections
 
-**Status:** implemented and verified locally; **not committed, merged, migrated, or deployed**.
+**Status:** deployed to production 2026-11-23 in release commit `1b6efba`; Cloudflare Pages deployment `0566590a-f5a8-4d6f-abff-5a26c06783dd`. Migration `0053` is applied.
 **Branch:** `production-safe`
 **Base:** `fa559ce`
 **Production:** unchanged at the start of this work (`fa559ce`, live runtime

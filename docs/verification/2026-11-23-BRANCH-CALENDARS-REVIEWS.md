@@ -1,7 +1,10 @@
 # Branch Calendars and Google Review Requests — 2026-11-23
 
-Status: **implemented locally, not committed or deployed.** Production remains on the
-2026-11-23 runtime deployment. Migrations `0053`, `0054` and `0055` are **not applied**.
+Status: **deployed to production 2026-11-23.** Release commit
+`1b6efba2c45a8c9a528b5f64a92c698d5286aa37`; Cloudflare Pages deployment
+`0566590a-f5a8-4d6f-abff-5a26c06783dd` on `production-safe`. Migrations `0051`-`0055`
+are applied; production D1 is at 55 migrations. Tampa remains non-bookable and review
+automation remains disabled.
 
 ## Implemented
 
@@ -32,16 +35,25 @@ Status: **implemented locally, not committed or deployed.** Production remains o
   and review delay/frequency controls.
 - Admin **Google Reviews** lists queued/sent/suppressed requests and supports queue/cancel.
 
-## Owner setup still required
+## Applied production configuration
 
-1. Apply migrations `0053`, `0054` and `0055` to production D1 in order.
-2. Set `GOOGLE_CALENDAR_ID_TAMPA` in Cloudflare to the dedicated Tampa calendar.
-3. Confirm the Pensacola calendar ID in `GOOGLE_CALENDAR_ID_PENSACOLA` (or keep the legacy
-   `GOOGLE_CALENDAR_ID`).
-4. Supply Tampa's official Google review URL before enabling Tampa review requests.
-5. Leave `review_requests_enabled` off until the owner approves the review email policy.
-6. Authorize Tampa public booking only after staffing, licensing, insurance, tax, capacity,
-   pricing, payment and fulfillment are verified.
+1. Migrations `0051`-`0055` are applied. `0052` was already present in production and its
+   migration record was reconciled only after verifying its column and index existed.
+2. `GOOGLE_CALENDAR_ID_TAMPA` is configured as a production Pages secret. The Pensacola
+   `GOOGLE_CALENDAR_ID` secret was not changed.
+3. Pensacola's existing official review URL remains
+   `https://g.page/r/CXAcv1Pp7OI2ECE/review`.
+4. Tampa review URL remains blank, so Tampa review invitations are suppressed.
+5. `review_requests_enabled` remains `0` for both branches.
+6. Tampa public booking remains disabled (`branch_tampa` lifecycle `setup`, status
+   `inactive`).
+
+## Remaining owner actions
+
+- Supply Tampa's official Google review URL before enabling Tampa review requests.
+- Approve the review email policy before enabling automation.
+- Authorize Tampa public booking only after staffing, licensing, insurance, tax, capacity,
+  pricing, payment and fulfillment are verified.
 
 ## Verification
 
@@ -51,5 +63,20 @@ Status: **implemented locally, not committed or deployed.** Production remains o
 - `npm run verify`: build 40 pages, 2,567 internal links, validation passed.
 - Migration `0055` test: additive, columns/table present, Pensacola review URL populated,
   Tampa blank, automation disabled, integrity and foreign keys clean.
-- No live Resend send, no live Google Calendar write, no migration applied, no charge,
-  refund or customer message.
+- Production D1 backup before migrations: 1,983,689 bytes, SHA-256
+  `c46819f8f078c3fc19f11ecda67c39c1cbc3496d6e275bb8dab011ee26e4205e`, restored in memory
+  with 50 migrations, 95 tables and 0 foreign-key violations. Post-migration backup:
+  1,992,845 bytes, SHA-256 `b948e3eba2d6aaaeeb6ca92100683e6ff9916339e9b0ef183e588aa0a3a16cb5`,
+  55 migrations, 100 tables, 0 foreign-key violations.
+- Production data preserved: 12 customers, 14 properties, 15 appointments, 2 invoices,
+  5 signing requests, 14 pending requests, 15 calendar links, 5 upcoming confirmed
+  appointments and 2 pending signatures.
+- Production Pensacola availability returned `enabled: true`, `America/Chicago`, 35 slots.
+  Tampa returned `enabled: false`, `branch_not_bookable`.
+- Production `/api/estimate-checkout` readiness is `enabled: true`, `mode: live`, all checks
+  true. `/api/lead-readiness` is ready. Homepage and admin return 200; admin is noindex.
+- Production responsive smoke at 390px and 1280px showed 0 horizontal overflow and 0 page
+  errors on the homepage, admin, and residential estimator.
+- Review requests in production: 0 queued, 0 sent. No review worker exists. No synthetic
+  review email, calendar write, charge, refund or customer message was created.
+- No live Resend send, no live Google Calendar write, no charge, refund or customer message.

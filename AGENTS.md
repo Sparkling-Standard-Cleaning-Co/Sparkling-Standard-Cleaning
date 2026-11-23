@@ -84,7 +84,21 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-23 signing, document correction, presentation cleanup, mobile and notifications):**
+- **Current release (2026-11-23 verified signing, admin operations, branch calendars and reviews):**
+  application code `1b6efba`, live Cloudflare Pages deployment
+  `0566590a-f5a8-4d6f-abff-5a26c06783dd` on `production-safe`. Production D1 is at 55 migrations;
+  `0051`-`0055` are applied (`0052` was already present and its tracking record was reconciled).
+  Adds signing pricing snapshots and executed-document presentation cleanup, the admin operations
+  redesign, branch-specific Pensacola/Tampa calendar routing and owner-gated Google review requests.
+  `GOOGLE_CALENDAR_ID_TAMPA` is configured; Pensacola availability returns live slots; Tampa remains
+  non-bookable; review automation is disabled and 0 review requests exist. Verified: unit 1,075
+  (1,074 pass, 1 pre-existing skip), browser 260/260, `astro check` 0 errors, 40 pages, validation,
+  smoke, production readiness, backup and migration checks. No live customer email, synthetic
+  calendar write, charge or refund was created. Evidence:
+  `docs/verification/2026-11-23-SIGNING-PRICING-EDITOR.md`,
+  `docs/verification/2026-11-23-ADMIN-OPERATIONS-REDESIGN.md`,
+  `docs/verification/2026-11-23-BRANCH-CALENDARS-REVIEWS.md`.
+- **Prior release (2026-11-23 signing, document correction, presentation cleanup, mobile and notifications):**
   application code `4fe7a64`, live runtime deployment
   **`05a8e6c3-e9bd-45ae-ad33-42aa821cae6b`**. Migration `0052` is applied to production D1
   (`signing_requests.customer_fields_json`, default `'{}'`, supporting index); the existing 11
@@ -110,19 +124,20 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   errors. The live Move-In / Move-Out packet generated 19 clean pages, all checked at 390px with no
   technical metadata or duplicate headings. No live charge, refund, customer message,
   commercial/facility activation or Tampa activation.
-- **Local unreleased work (2026-11-23 signing price, signature boxes, visual editor):** branch
-  `production-safe` from `fa559ce`; **not committed or deployed**. Adds migration
-  `0053_signing_pricing_snapshot.sql` (not applied to production), a persistent server-authoritative
+- **Release (2026-11-23 signing price, signature boxes, visual editor):** branch
+  `production-safe`; released in commit `1b6efba`, Cloudflare Pages deployment
+  `0566590a-f5a8-4d6f-abff-5a26c06783dd`. Adds migration
+  `0053_signing_pricing_snapshot.sql` (applied to production), a persistent server-authoritative
   pricing snapshot shown on the signing Details & price step, executed copies/PDFs and admin request
   detail; visible per-document **X — Sign here** boxes with an adopt-once signature pad, progress and
   next-signature navigation; direct post-signing transition to the payment page with signed-PDF
   download, email status and portal access; the `Â€` mojibake repair; a Word-style WYSIWYG document
   editor with sanitized rich HTML and PDF rendering; simplified Create a Document / Upload approved
   PDF flows; conventional Version 1.0/1.1 labels; and a test-only Resend network guard. Tests never
-  send live email. Evidence: `docs/verification/2026-11-23-SIGNING-PRICING-EDITOR.md`. Production
-  remains on the current release above.
-- **Local unreleased work (2026-11-23 admin operations redesign):** branch `production-safe` from
-  `fa559ce`; **not committed or deployed**. Adds migration `0054_admin_operations.sql` (not applied):
+  send live email. Evidence: `docs/verification/2026-11-23-SIGNING-PRICING-EDITOR.md`.
+- **Release (2026-11-23 admin operations redesign):** branch `production-safe`; released in commit
+  `1b6efba`, Cloudflare Pages deployment `0566590a-f5a8-4d6f-abff-5a26c06783dd`. Adds migration
+  `0054_admin_operations.sql` (applied):
   human `EST-YYYY-NNNN` estimate numbers, test-request marking and durable `operational_alerts`.
   Replaces the seven-day table with an interactive calendar; adds upcoming-appointment filters that
   hide canceled occurrences by default; reservation bulk approve/archive/restore/deny/mark-test/delete
@@ -135,10 +150,10 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   validation and 21-page smoke. Zero live Resend sends. Production counts verified at 14 pending
   requests, 2 unsigned packets, 1 outstanding invoice, 0 active recurring failures (11 historical),
   3 failed checkout sessions plus 8 abandoned sessions. Evidence:
-  `docs/verification/2026-11-23-ADMIN-OPERATIONS-REDESIGN.md`. Production remains unchanged.
-- **Local unreleased work (2026-11-23 branch calendars and review requests):** branch
-  `production-safe`; **not committed or deployed**. Adds migration
-  `0055_branch_calendars_reviews.sql` (not applied): branch `calendar_id`, `calendar_name`,
+  `docs/verification/2026-11-23-ADMIN-OPERATIONS-REDESIGN.md`.
+- **Release (2026-11-23 branch calendars and review requests):** branch `production-safe`; released
+  in commit `1b6efba`, Cloudflare Pages deployment `0566590a-f5a8-4d6f-abff-5a26c06783dd`. Adds
+  migration `0055_branch_calendars_reviews.sql` (applied): branch `calendar_id`, `calendar_name`,
   `review_url`, review delay/frequency settings and a private `review_requests` table. Branch
   resolution now uses the service ZIP (plus reverse-geocoded ZIP and a conservative coordinate
   fallback) and never silently defaults an unknown address to Pensacola; Tampa includes Spring
@@ -150,9 +165,11 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   default. Invoice/email/PDF review invitations appear only for completed services; Tampa has no
   review URL and shows none. Admin gains branch calendar/review settings and a Google Reviews
   queue. Verified: unit 1,075 (1,074 pass, 1 pre-existing skip), browser 260/260, `astro check`
-  0 errors, 40 pages, validation and migration-0055 integrity. Zero live Resend sends or calendar
-  writes. Evidence: `docs/verification/2026-11-23-BRANCH-CALENDARS-REVIEWS.md`. Production
-  remains unchanged.
+  0 errors, 40 pages, validation and migration-0055 integrity. Production D1 is at 55 migrations;
+  `GOOGLE_CALENDAR_ID_TAMPA` is configured; Pensacola availability returns live slots; Tampa
+  remains non-bookable; both review flags remain disabled and 0 review requests exist. Zero live
+  Resend sends, synthetic calendar writes, charges, refunds or customer messages. Evidence:
+  `docs/verification/2026-11-23-BRANCH-CALENDARS-REVIEWS.md`.
 - **Prior release (2026-11-23 booking address and release evidence):** application code `285c748`,
   merged at `96a5b8f`, runtime deployment `bdd48b01-6a43-46bc-a56c-54e1e4ef4120`. Corrected the
   Bookings address to `booking@sparkling-standard.com`, applied migration `0052`, and recorded the

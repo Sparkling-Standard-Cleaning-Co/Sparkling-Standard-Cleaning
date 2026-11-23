@@ -1,6 +1,6 @@
 # 2026-11-23 — Admin operations redesign
 
-**Status:** implemented and verified locally; **not committed, merged, migrated, or deployed**.
+**Status:** deployed to production 2026-11-23 in release commit `1b6efba`; Cloudflare Pages deployment `0566590a-f5a8-4d6f-abff-5a26c06783dd`. Migration `0054` is applied.
 **Branch:** `production-safe`
 **Base:** `fa559ce`
 **Production:** unchanged during this work.
