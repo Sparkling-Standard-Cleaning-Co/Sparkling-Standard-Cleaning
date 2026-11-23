@@ -68,7 +68,7 @@ All 27 approved templates were affected. Versions changed from
   clause text before and after, excluding the internal status/version metadata.
 - The 2026-11-22 Word/PDF masters are preserved unchanged. A corrected versioned
   library was created at:
-  `FINAL-APPROVAL-PACKAGE-2026-11-22\10-APPROVED-LIBRARY-2026-11-23\`
+  `FINAL-APPROVAL-PACKAGE-2026-11-22\10-APPROVED-LIBRARY-2026-11-23-PRESENTATION\`
   with 27 Word masters, 27 regenerated PDFs and a new hash index.
 - The corrected library's Word body, header and footer contain no internal
   notice. All 27 PDFs were text-extracted and checked: 0 draft notices, 27 with

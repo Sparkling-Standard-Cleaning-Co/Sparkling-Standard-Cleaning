@@ -84,9 +84,9 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-23 signing, document correction, mobile and notifications):**
-  application code `73ca827`, merged to `production-safe` at `d89b7f2`; live runtime deployment
-  **`1d1be069-9b26-42f1-a6f8-6d6d9f96cfc3`**. Migration `0052` is applied to production D1
+- **Current release (2026-11-23 signing, document correction, presentation cleanup, mobile and notifications):**
+  application code `4fe7a64`, live runtime deployment
+  **`05a8e6c3-e9bd-45ae-ad33-42aa821cae6b`**. Migration `0052` is applied to production D1
   (`signing_requests.customer_fields_json`, default `'{}'`, supporting index); the existing 11
   customers, 13 properties and 1 pending signing request were preserved. Customer signing is a wide,
   mobile-first three-step ceremony with interactive access/instructions, one legal-name entry, one
@@ -97,15 +97,19 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   `2026-11-23.customer-release.v1` / `2026-11-23.employee-release.v1`: the internal
   `OWNER REVIEW DRAFT — NOT EFFECTIVE UNTIL APPROVED` line was removed, every active packet now
   points to a clean approved version, and 0 approved templates contain the draft notice. The
-  previous versions are retired but preserved. A corrected 27-Word/27-PDF library is at
-  `FINAL-APPROVAL-PACKAGE-2026-11-22\10-APPROVED-LIBRARY-2026-11-23\`; the 2026-11-22 library is
-  preserved unchanged. Operational notifications route through Communications settings; the
-  Bookings address is **`booking@sparkling-standard.com`**. A production test to
+  previous versions are retired but preserved. Customer/employee PDFs, executed copies, emails,
+  signing pages and portal document lists no longer print request IDs, template IDs, version
+  strings, SHA-256 hashes, consent-version codes or technical execution metadata; backend hashes,
+  versions, signatures and audit evidence remain intact. A presentation-clean 27-Word/27-PDF
+  library is at `FINAL-APPROVAL-PACKAGE-2026-11-22\10-APPROVED-LIBRARY-2026-11-23-PRESENTATION\`;
+  earlier libraries are preserved. Operational notifications route through Communications settings;
+  the Bookings address is **`booking@sparkling-standard.com`**. A production test to
   `booking@sparkling-standard.com` was accepted by Resend
-  (`01a2067b-e5ef-725f-81ad-9ddc3f46ed53`). Unit **1,054** (1,053 pass, 1 pre-existing skip),
+  (`01a2067b-e5ef-725f-81ad-9ddc3f46ed53`). Unit **1,055** (1,054 pass, 1 pre-existing skip),
   browser **258/258**, production mobile checks at 320/390/430 show no horizontal overflow or JS
-  errors. No live charge, refund, customer message, commercial/facility activation or Tampa
-  activation.
+  errors. The live Move-In / Move-Out packet generated 19 clean pages, all checked at 390px with no
+  technical metadata or duplicate headings. No live charge, refund, customer message,
+  commercial/facility activation or Tampa activation.
 - **Prior release (2026-11-23 booking address and release evidence):** application code `285c748`,
   merged at `96a5b8f`, runtime deployment `bdd48b01-6a43-46bc-a56c-54e1e4ef4120`. Corrected the
   Bookings address to `booking@sparkling-standard.com`, applied migration `0052`, and recorded the
