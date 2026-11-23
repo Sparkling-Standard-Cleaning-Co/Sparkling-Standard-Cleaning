@@ -87,7 +87,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
 - **Current release (2026-11-23 operations and documents combined):** application code `274a5f5` on
   `production-safe`, deployed by the GitHub-connected Cloudflare Pages pipeline and verified live on
   2026-11-23 (served admin asset
-  `/_astro/index.astro_astro_type_script_index_0_lang.Dm2LDSLn.js` matches the verified build;
+  `/_astro/index.astro_astro_type_script_index_0_lang.BEl23KQm.js` matches the verified build;
   Cloudflare deployment ID was not retrievable because the installed CLI session belongs to an
   unrelated account). Adds the completed shared document-branding layer (branded editor frame,
   admin/customer renderer, embedded executed-PDF logo, footer/page numbers and legacy table

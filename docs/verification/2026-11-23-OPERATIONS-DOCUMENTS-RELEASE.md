@@ -133,6 +133,20 @@ saving. Established assignments are not silently changed.
 - Tampa public booking remains inactive.
 - Automated Google review email activation remains disabled.
 
+## Rendered evidence
+
+- `docs/verification/2026-11-23-operations-documents/calendar-desktop.png` —
+  seven-day calendar at 1440px with persistent Morning/Afternoon sections,
+  branch CT/ET labels, multiple-appointment cycling and appointment actions.
+- `docs/verification/2026-11-23-operations-documents/calendar-mobile.png` —
+  the same board at 390px with contained horizontal day navigation.
+- `docs/verification/2026-11-23-operations-documents/calendar-recurring-reschedule.png`
+  — the recurring reschedule dialog with occurrence-only and future-series
+  choices, branch timezone, crew and duration before confirmation.
+
+The document-branding renders remain in
+`docs/verification/2026-11-23-document-branding/`.
+
 ## Deployment evidence
 
 - **Release commit:** `274a5f5` on `production-safe` (base `3fb0b8b`).
@@ -143,7 +157,7 @@ saving. Established assignments are not silently changed.
   `production-safe` push and verified live. The production `/admin/` document
   contains the new inline-customer and combined booking actions, and the served
   admin script asset
-  `/_astro/index.astro_astro_type_script_index_0_lang.Dm2LDSLn.js` is byte-name
+  `/_astro/index.astro_astro_type_script_index_0_lang.BEl23KQm.js` is byte-name
   identical to the locally verified build.
 - **Migrations:** none added and none required. Production remains on the
   existing 55-migration schema; no schema change was made by this release.

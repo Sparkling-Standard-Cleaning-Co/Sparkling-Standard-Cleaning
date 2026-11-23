@@ -813,11 +813,11 @@ function appointmentCardMarkup(
   const hidden = current === index ? '' : ' hidden';
   const actions = can('booking.write')
     ? `<div class="admin-appointment-actions">
-        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="open" data-appointment-id="${esc(id)}">Open Booking</button>
+        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="open" data-appointment-id="${esc(id)}">Open</button>
         <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="customer" data-appointment-id="${esc(id)}"${appointment.customer_id ? '' : ' disabled'}>Customer</button>
-        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="reschedule" data-appointment-id="${esc(id)}">Reschedule</button>
+        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="reschedule" data-appointment-id="${esc(id)}">Move</button>
         <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="cancel" data-appointment-id="${esc(id)}">Cancel</button>
-        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="documents" data-appointment-id="${esc(id)}">Documents</button>
+        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="documents" data-appointment-id="${esc(id)}">Docs</button>
         <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="invoice" data-appointment-id="${esc(id)}">Invoice</button>
       </div>`
     : '';
@@ -831,6 +831,15 @@ function appointmentCardMarkup(
     <span class="admin-appointment-card__ref">${esc(appointmentReference(appointment))}</span>
     ${actions}
   </article>`;
+}
+
+function weekDateLabel(key: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(`${key}T12:00:00Z`));
 }
 
 function weekSectionMarkup(
@@ -878,7 +887,7 @@ function renderWeekBoard(appointments: Array<Record<string, unknown>>): void {
   const label = document.querySelector<HTMLElement>('[data-admin-week-label]');
   if (label) {
     const zone = weekBranchFilter ? appointmentZoneLabel(weekBranchFilter) : 'each branch’s local time';
-    label.textContent = `${dateTime(`${days[0]}T12:00:00Z`)} – ${dateTime(`${days[6]}T12:00:00Z`)} · ${zone}${weekOffset === 0 ? ' · Current week' : ''}`;
+    label.textContent = `${weekDateLabel(days[0] ?? centralTodayKey())} – ${weekDateLabel(days[6] ?? centralTodayKey())} · ${zone}${weekOffset === 0 ? ' · Current week' : ''}`;
   }
   const today = centralTodayKey();
   target.innerHTML = `<div class="admin-week-grid">${days.map((day) => {
@@ -1224,6 +1233,11 @@ document.addEventListener('submit', (event) => {
 });
 
 document.addEventListener('click', (event) => {
+  const calendarContainer = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-calendar-dialog]');
+  if (calendarContainer && event.target === calendarContainer) {
+    closeCalendarDialog();
+    return;
+  }
   const close = (event.target as HTMLElement).closest<HTMLElement>('[data-calendar-close]');
   if (close) {
     closeCalendarDialog();
