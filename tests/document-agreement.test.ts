@@ -310,14 +310,16 @@ test('pre-payment gate resolves variables, stores a resume intent and unlocks af
   assert.ok(raw.startsWith('%PDF-1.4'));
   assert.ok(raw.includes('Synthetic Customer'));
   assert.ok(raw.includes('END-MARKER-2026-11-22'), 'the executed PDF carries the complete signed text through the final clause');
-  assert.ok(raw.includes('Typed signature: Synthetic Customer'));
-  assert.ok(raw.includes('Consent version: 2026-11-01.esign-consent.v1'));
+  assert.ok(raw.includes('Signature: Synthetic Customer'));
+  assert.ok(!raw.includes('Consent version:'));
+  assert.ok(!/SHA-?256/i.test(raw));
   assert.equal(artifact?.sha256.length, 64);
   const stored = f.db.raw
     .prepare('SELECT signed_content_text, document_sha256, status FROM document_signatures WHERE signing_request_id = ?')
     .get(signed.requestId) as Record<string, unknown>;
   assert.equal(stored.status, 'signed');
-  assert.ok(raw.includes(String(stored.document_sha256)), 'the executed PDF contains the exact signed content hash');
+  assert.equal(String(stored.document_sha256).length, 64, 'the backend retains the exact signed content hash');
+  assert.ok(!raw.includes(String(stored.document_sha256)), 'the hash is not printed in the customer PDF');
   assert.match(String(stored.signed_content_text), /Full standard cleaning scope/);
   assert.equal(String(stored.document_sha256).length, 64);
 });

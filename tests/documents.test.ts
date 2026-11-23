@@ -915,7 +915,7 @@ test('customer access instructions are stored once and included in executed evid
   assert.match(executed?.text ?? '', /Access method: I will be present/);
   assert.match(executed?.text ?? '', /Access and parking instructions: Park in the driveway/);
   assert.match(executed?.text ?? '', /Pets: Yes/);
-  assert.match(executed?.text ?? '', /Signature method: typed electronic signature/);
+  assert.match(executed?.text ?? '', /Signature: Synthetic Customer/);
 });
 
 test('draft templates can be edited, duplicated and restored without changing approved content', async () => {

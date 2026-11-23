@@ -197,7 +197,7 @@ function documentMeta(document: SigningDocument): string {
     `<span class="signing-badge ${document.required ? 'signing-badge--required' : ''}">${document.required ? 'Required' : 'Optional'}</span>`,
     document.signed ? '<span class="signing-badge signing-badge--signed">Signed</span>' : '',
   ].join(' ');
-  return `<div class="signing-document__head"><div><h3>${esc(document.title)}</h3><p class="signing-document__meta">Version ${esc(document.version)}</p></div><div>${badges}</div></div>`;
+  return `<div class="signing-document__head"><div><h3>${esc(document.title)}</h3></div><div>${badges}</div></div>`;
 }
 
 function documentActions(document: SigningDocument): string {
@@ -266,7 +266,7 @@ function renderSigner(payload: SigningPayload): string {
       <p class="signing-disclosure">You need a current web browser, internet access, and the ability to view, print or save a PDF or text record. You may request a paper copy at any time by emailing <a href="mailto:admin@sparkling-standard.com?subject=Paper%20copy%20request">admin@sparkling-standard.com</a>. You may withdraw consent to future electronic records by written notice to the same address. Withdrawal does not affect a record you already signed. Keep your email address and phone number current.</p>
     </div>
     <label class="signing-ack"><input type="checkbox" name="consent" /><span>I can access and retain these documents electronically, and I consent to use electronic signatures and electronic records. I understand my typed name is my legal signature.</span></label>
-    <p class="signing-muted">Consent version ${esc(payload.consentVersion)}. A signed copy and audit record are retained privately.</p>
+    <p class="signing-muted">A signed copy and audit record are retained privately.</p>
   </div>`;
 }
 
@@ -546,7 +546,7 @@ function setupCanvas(): void {
 function openDocument(templateId: string): void {
   const document = documents.find((entry) => entry.templateId === templateId);
   if (!document || !dialog || !dialogTitle || !dialogBody) return;
-  dialogTitle.textContent = `${document.title} · version ${document.version}`;
+  dialogTitle.textContent = document.title;
   dialogBody.innerHTML = document.contentText
     ? renderDocumentHtml(document.contentText, 'signing-doc-text')
     : '<p class="signing-muted">This PDF document opens in a separate tab. Review it before acknowledging it.</p>';

@@ -185,6 +185,18 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
+function isTechnicalMetadata(value: string): boolean {
+  const text = value.trim();
+  return (
+    /^version\b/i.test(text) ||
+    /^document\b.*\bversion\b/i.test(text) ||
+    /^template\b/i.test(text) ||
+    /\bsha-?256\b/i.test(text) ||
+    /^consent version\b/i.test(text) ||
+    /^status\s*:/i.test(text)
+  );
+}
+
 function renderInline(value: string): string {
   return escapeHtml(value)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -207,6 +219,7 @@ export function renderDocumentHtml(content: string, className = 'document-render
       continue;
     }
     flushBullets();
+    if (block.type === 'metadata' && isTechnicalMetadata(block.text)) continue;
     if (block.type === 'title') output.push(`<h1 class="doc-title">${renderInline(block.text)}</h1>`);
     else if (block.type === 'heading') output.push(`<h2 class="doc-heading">${renderInline(block.text)}</h2>`);
     else if (block.type === 'metadata') output.push(`<p class="doc-meta">${renderInline(block.text)}</p>`);

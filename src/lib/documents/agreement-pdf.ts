@@ -73,6 +73,42 @@ function paragraphLines(value: string, maxWidth: number, size: number): string[]
   return result;
 }
 
+function humanDateTime(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/Chicago',
+    timeZoneName: 'short',
+  }).format(date);
+}
+
+function humanService(value: string): string {
+  const cleaned = String(value ?? '').replace(/[-_]+/g, ' ').trim();
+  if (!cleaned) return 'Cleaning service';
+  return cleaned.replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function normalizedTitle(value: string): string {
+  return String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function technicalMetadata(value: string): boolean {
+  const text = value.trim();
+  return (
+    /^version\b/i.test(text) ||
+    /^document\b.*\bversion\b/i.test(text) ||
+    /^template\b/i.test(text) ||
+    /\bsha-?256\b/i.test(text) ||
+    /^consent version\b/i.test(text) ||
+    /^status\s*:/i.test(text)
+  );
+}
+
 export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array {
   const pages: string[] = [];
   let commands = '';
@@ -97,25 +133,32 @@ export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array 
     }
   };
 
-  const writeDocumentContent = (value: string): void => {
+  const writeDocumentContent = (value: string, documentTitle: string): void => {
     const blocks = parseDocumentBlocks(stripInternalDraftNotices(value).content);
     if (blocks.length === 0) {
       write(value || 'Document content is retained in the signing record.');
       return;
     }
+    const titleKey = normalizedTitle(documentTitle);
     for (const block of blocks) {
       const content = plainDocumentText(block.text);
       if (!content) continue;
-      if (block.type === 'title') {
-        write(content, LEFT, 13.5, true, ROSE, 18);
-      } else if (block.type === 'heading') {
+      if (block.type === 'metadata' && technicalMetadata(content)) continue;
+      if (block.type === 'title') continue;
+      if (block.type === 'heading') {
+        const key = normalizedTitle(content);
+        if (key === titleKey || key === 'sparkling standard cleaning co') {
+          continue;
+        }
+      }
+      if (block.type === 'heading') {
         ensure(24);
         y -= 4;
         write(content, LEFT, HEAD_SIZE, true, ROSE, 15);
       } else if (block.type === 'metadata') {
         write(content, LEFT, 8.4, false, MUTED, 11.5);
       } else if (block.type === 'bullet') {
-        write(`• ${content}`, LEFT + 8, BODY_SIZE, false, INK, LEADING, RIGHT - LEFT - 8);
+        write(`- ${content}`, LEFT + 8, BODY_SIZE, false, INK, LEADING, RIGHT - LEFT - 8);
       } else {
         write(content, LEFT, BODY_SIZE, false, INK);
         y -= 2;
@@ -127,17 +170,16 @@ export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array 
   y -= 20;
   commands += line('Executed Agreement and Signature Record', LEFT, y, 19, true, INK);
   y -= 18;
-  commands += line(`Request ${input.requestId}  |  ${input.executedAt}`, LEFT, y, 8.4, false, MUTED);
-  y -= 16;
   commands += rule(y);
   y -= 18;
 
   const meta: Array<[string, string]> = [
-    ['Agreement', `${input.bundleName || input.bundleCode} (version ${input.bundleVersion})`],
+    ['Agreement', input.bundleName || 'Cleaning agreement'],
     ['Booking reference', input.bookingReference || 'Not applicable'],
-    ['Service', input.serviceCode || 'Cleaning service'],
+    ['Service', humanService(input.serviceCode)],
     ['Customer', input.customerName || 'Customer identified in the signed schedule'],
     ['Property', input.propertyAddress || 'Property identified in the signed schedule'],
+    ['Executed', humanDateTime(input.executedAt)],
   ];
   for (const [label, value] of meta) {
     ensure(LEADING);
@@ -169,25 +211,16 @@ export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array 
     y -= 16;
   }
 
+  let firstDocument = true;
   for (const signature of input.signatures) {
-    ensure(24);
+    if (!firstDocument) newPage();
+    firstDocument = false;
     commands += line(signature.title, LEFT, y, HEAD_SIZE, true, ROSE);
-    y -= 15;
-    commands += line(
-      `Template ${signature.templateId}  |  Version ${signature.version}  |  SHA-256 ${signature.contentSha256}`,
-      LEFT,
-      y,
-      7.6,
-      false,
-      MUTED,
-    );
-    y -= 14;
+    y -= 18;
     if (signature.sourceKind === 'pdf' && !signature.contentText.trim()) {
-      write(
-        'This document was signed as a separate PDF template. The exact template SHA-256 above is the signed content. The original PDF is retained privately and forms part of this record.',
-      );
+      write('This document was signed as a separate PDF. The original PDF is retained privately and forms part of this record.');
     } else {
-      writeDocumentContent(signature.contentText || 'Document content is retained in the signing record.');
+      writeDocumentContent(signature.contentText || 'Document content is retained in the signing record.', signature.title);
     }
     ensure(70);
     y -= 6;
@@ -195,31 +228,26 @@ export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array 
     y -= 14;
     commands += line('Electronic signature', LEFT, y, BODY_SIZE, true, INK);
     y -= LEADING;
-    commands += line(`Typed signature: ${signature.typedSignature || signature.signerName}`, LEFT + 8, y, BODY_SIZE, false, INK);
+    commands += line(`Signed by: ${signature.signerName}`, LEFT + 8, y, BODY_SIZE, false, INK);
     y -= LEADING;
-    commands += line(`Signer: ${signature.signerName} <${signature.signerEmail}>`, LEFT + 8, y, BODY_SIZE, false, INK);
+    commands += line(`Signature: ${signature.typedSignature || signature.signerName}`, LEFT + 8, y, BODY_SIZE, false, INK);
     y -= LEADING;
-    commands += line(`Signed at: ${signature.signedAt}  |  Status: ${signature.status}`, LEFT + 8, y, BODY_SIZE, false, MUTED);
-    y -= LEADING;
-    commands += line(`Consent version: ${signature.consentVersion}`, LEFT + 8, y, BODY_SIZE, false, MUTED);
+    commands += line(`Signed on: ${humanDateTime(signature.signedAt)}`, LEFT + 8, y, BODY_SIZE, false, MUTED);
     y -= 18;
     commands += rule(y);
     y -= 16;
   }
 
   ensure(90);
-  commands += line('Execution and audit record', LEFT, y, HEAD_SIZE, true, ROSE);
+  commands += line('Execution Record', LEFT, y, HEAD_SIZE, true, ROSE);
   y -= 15;
   const audit = [
-    `Signing request: ${input.requestId}`,
-    `Bundle: ${input.bundleCode} version ${input.bundleVersion}`,
-    `Executed at: ${input.executedAt}`,
+    `Executed: ${humanDateTime(input.executedAt)}`,
     `Customer: ${input.customerName || 'as recorded'}`,
     `Property: ${input.propertyAddress || 'as recorded'}`,
     `Booking reference: ${input.bookingReference || 'not applicable'}`,
     `Countersigned by: ${input.countersignatureName || 'not required'}`,
-    'Each signature is bound to the exact document version and SHA-256 shown above. The signing token, signer identity, consent version, timestamp and audit evidence are retained privately.',
-    'This executed copy is evidence of the signed record. It does not approve an incomplete, unapproved or placeholder-containing document.',
+    'This copy records the agreement text and electronic signatures shown above. Signature verification and audit evidence are retained privately by Sparkling Standard.',
   ];
   for (const entry of audit) {
     ensure(LEADING);

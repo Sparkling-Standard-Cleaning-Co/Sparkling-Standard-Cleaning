@@ -203,7 +203,8 @@ test('single-signature signing persists access fields, produces a PDF and retrie
   assert.match(stored.executed_copy_text, /CUSTOMER INSTRUCTIONS AND ACCESS SCHEDULE/);
   assert.match(stored.executed_copy_text, /Access method: I will be present/);
   assert.match(stored.executed_copy_text, /Pets: Yes/);
-  assert.match(stored.executed_copy_text, /Signature method: typed electronic signature/);
+  assert.match(stored.executed_copy_text, /Signature: Jordan Example/);
+  assert.doesNotMatch(stored.executed_copy_text, /SHA-?256|Version:|Consent|Signing request|Bundle:/i);
   assert.equal(stored.executed_sha256.length, 64);
 
   const executed = await getExecutedCopy(db, String(created.requestId));
@@ -284,7 +285,7 @@ test('single-signature signing persists access fields, produces a PDF and retrie
   assert.equal(portalDownload.headers.get('X-Executed-SHA256'), stored.executed_sha256);
   const portalText = await portalDownload.text();
   assert.match(portalText, /CUSTOMER INSTRUCTIONS AND ACCESS SCHEDULE/);
-  assert.match(portalText, /Type my name|typed electronic signature/i);
+  assert.match(portalText, /Signature: Jordan Example/i);
   const audit = db.raw
     .prepare("SELECT COUNT(*) AS n FROM customer_portal_audit WHERE customer_id = ? AND action = 'portal.document_downloaded'")
     .get(customerId) as { n: number };

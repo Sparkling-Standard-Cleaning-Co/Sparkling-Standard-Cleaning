@@ -4346,7 +4346,7 @@ function renderComposerPreview(preview: Record<string, unknown>): void {
     const rendered = text
       ? renderDocumentHtml(text, 'doc-rendered')
       : '<p>PDF template - use the Download action to review the source PDF.</p>';
-    return `<section class="doc" id="doc-${index}"><div class="doc-meta">Document ${index + 1} of ${requirements.length}</div><h1>${esc(String(item.title ?? 'Document'))}</h1><p class="doc-sub">Version ${esc(String(item.version ?? ''))} &middot; ${Number(item.required) ? 'Required' : 'Optional'} &middot; ${esc(titleCase(String(item.stage ?? 'optional')))}</p>${itemMissing.length ? `<p class="warn">Unresolved: ${itemMissing.map((key) => esc(key)).join(', ')}</p>` : ''}<div class="doc-text">${rendered}</div></section>`;
+    return `<section class="doc" id="doc-${index}"><div class="doc-meta">Document ${index + 1} of ${requirements.length}</div><h1>${esc(String(item.title ?? 'Document'))}</h1><p class="doc-sub">${Number(item.required) ? 'Required agreement' : 'Optional agreement'}</p>${itemMissing.length ? `<p class="warn">Unresolved: ${itemMissing.map((key) => esc(key)).join(', ')}</p>` : ''}<div class="doc-text">${rendered}</div></section>`;
   }).join('');
   const warning = contentProblems.length
     ? `<div class="warn banner">Internal review wording blocks customer delivery: ${contentProblems.map((term) => esc(term)).join(', ')}</div>`

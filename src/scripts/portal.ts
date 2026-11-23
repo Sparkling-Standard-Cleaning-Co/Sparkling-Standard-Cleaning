@@ -189,7 +189,7 @@ function render(snapshot: PortalSnapshot): void {
 
   const documentsTarget = document.querySelector<HTMLElement>('[data-portal-documents]');
   if (documentsTarget) {
-    const executedRows = executed.map((document) => `<div class="admin-record"><p><strong>${esc(document.packet_name || document.bundle_code)}</strong> - executed ${esc(date(document.executed_at))}</p><p class="admin-muted">SHA-256 ${esc(document.executed_sha256)}</p><a class="btn btn--ghost btn--small" href="/api/portal/document?kind=executed&id=${encodeURIComponent(document.id)}">Download executed copy</a></div>`).join('');
+    const executedRows = executed.map((document) => `<div class="admin-record"><p><strong>${esc(document.packet_name || document.bundle_code)}</strong> - executed ${esc(date(document.executed_at))}</p><a class="btn btn--ghost btn--small" href="/api/portal/document?kind=executed&id=${encodeURIComponent(document.id)}">Download executed copy</a></div>`).join('');
     const signatureRows = signatures.map((signature) => `<div class="admin-record"><p><strong>${esc(signature.title)}</strong> - ${esc(title(signature.status))} ${esc(date(signature.signed_at))}</p>${signature.downloadable ? `<a class="btn btn--ghost btn--small" href="/api/portal/document?kind=signature&id=${encodeURIComponent(signature.id)}">Download signed PDF</a>` : '<p class="admin-muted">The executed copy is available above.</p>'}</div>`).join('');
     documentsTarget.innerHTML = executedRows || signatureRows
       ? `${executedRows}${signatureRows}`

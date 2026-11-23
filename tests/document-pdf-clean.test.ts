@@ -43,7 +43,12 @@ test('the executed PDF never prints internal review notices or Markdown markers'
   const text = new TextDecoder('latin1').decode(pdf);
   assert.doesNotMatch(text, /OWNER REVIEW DRAFT|NOT EFFECTIVE UNTIL APPROVED/i);
   assert.doesNotMatch(text, /## 1\. Parties|# SPARKLING/);
+  assert.doesNotMatch(text, /SHA-?256|Template |Consent version|Signing request|status:/i);
+  assert.doesNotMatch(text, /Version 2026-11-23|\(version 1\)/i);
   assert.match(text, /1\. Parties and Incorporation/);
   assert.match(text, /1\.1 This Agreement is between Sparkling Standard LLC/);
   assert.match(text, /2\. Insurance/);
+  assert.match(text, /Signed by: Jordan Example/);
+  assert.match(text, /Signature: Jordan Example/);
+  assert.equal((text.match(/Residential Deep Cleaning Agreement/g) ?? []).length, 1);
 });

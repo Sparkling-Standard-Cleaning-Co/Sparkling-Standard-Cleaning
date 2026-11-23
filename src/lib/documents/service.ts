@@ -120,6 +120,27 @@ function now(): string {
   return new Date().toISOString();
 }
 
+function humanPresentationDate(value: unknown): string {
+  const raw = String(value ?? '');
+  const date = new Date(raw);
+  if (!Number.isFinite(date.getTime())) return raw;
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/Chicago',
+    timeZoneName: 'short',
+  }).format(date);
+}
+
+function humanPresentationService(value: unknown): string {
+  const cleaned = String(value ?? '').replace(/[-_]+/g, ' ').trim();
+  if (!cleaned) return 'Cleaning service';
+  return cleaned.replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 export async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -648,18 +669,56 @@ async function buildExecutedCopy(
     const current = latest.get(id);
     if (!current || attempt > (Number(current.attempt) || 1)) latest.set(id, row);
   }
+  let subjectName = '';
+  if (request.subject_type === 'employee' && request.team_member_id) {
+    const employee = await db
+      .prepare('SELECT display_name FROM team_members WHERE id = ? LIMIT 1')
+      .bind(String(request.team_member_id))
+      .first<{ display_name: string }>()
+      .catch(() => null);
+    subjectName = String(employee?.display_name ?? '');
+  } else if (request.customer_id) {
+    const customer = await db
+      .prepare('SELECT first_name, last_name, company_name FROM customers WHERE id = ? LIMIT 1')
+      .bind(String(request.customer_id))
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+    if (customer) {
+      subjectName =
+        String(customer.company_name ?? '').trim() ||
+        [String(customer.first_name ?? '').trim(), String(customer.last_name ?? '').trim()]
+          .filter(Boolean)
+          .join(' ');
+    }
+  }
+  if (!subjectName) {
+    subjectName = String([...latest.values()][0]?.signer_name ?? 'Customer');
+  }
+  let propertyAddress = '';
+  if (request.property_id) {
+    const property = await db
+      .prepare('SELECT line1, line2, city, state, postal_code FROM properties WHERE id = ? LIMIT 1')
+      .bind(String(request.property_id))
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+    if (property) {
+      propertyAddress = [property.line1, property.line2, property.city, property.state, property.postal_code]
+        .map((part) => (typeof part === 'string' ? part.trim() : ''))
+        .filter(Boolean)
+        .join(', ');
+    }
+  }
   const lines = [
     'SPARKLING STANDARD LLC',
     'EXECUTED DOCUMENT COPY',
     '',
-    `Signing request: ${String(request.id)}`,
-    `Bundle: ${String(request.bundle_code ?? '')} v${String(request.bundle_version ?? '')}`,
-    `Subject type: ${String(request.subject_type ?? '')}`,
-    `Customer: ${String(request.customer_id ?? '')}`,
-    `Employee: ${String(request.team_member_id ?? '')}`,
-    `Booking reference: ${String(request.booking_reference ?? '')}`,
-    `Service: ${String(request.service_code ?? '')}`,
-    `Executed at: ${now()}`,
+    `Customer: ${subjectName}`,
+    ...(propertyAddress ? [`Property: ${propertyAddress}`] : []),
+    ...(String(request.booking_reference ?? '').trim()
+      ? [`Booking reference: ${String(request.booking_reference)}`]
+      : []),
+    `Service: ${humanPresentationService(request.service_code)}`,
+    `Executed: ${humanPresentationDate(request.executed_at ?? now())}`,
     `Countersigned by: ${String(request.counter_signature_name ?? '') || 'not required'}`,
     '',
   ];
@@ -706,15 +765,9 @@ async function buildExecutedCopy(
     lines.push(
       '------------------------------------------------------------',
       `Document: ${String(row.title ?? row.template_id ?? '')}`,
-      `Version: ${String(row.template_version ?? '')}`,
-      `SHA-256: ${String(row.document_sha256 ?? '')}`,
-      `Signer: ${String(row.signer_name ?? '')} <${String(row.signer_email ?? '')}>`,
-      `Signed at: ${String(row.signed_at ?? '')}`,
-      `Consent: ${String(row.consent_version ?? signature.consentVersion ?? '')}`,
-      `Status: ${String(row.status ?? '')}`,
-      `Signature method: ${signature.type === 'drawn' ? 'drawn electronic signature with typed legal name' : 'typed electronic signature'}`,
-      `Typed signature: ${String(signature.value ?? '')}`,
-      `Drawn signature image retained privately: ${signature.imageData ? 'yes' : 'no'}`,
+      `Signed by: ${String(row.signer_name ?? '')}`,
+      `Signature: ${String(signature.value ?? row.signer_name ?? '')}`,
+      `Signed on: ${humanPresentationDate(row.signed_at)}`,
       '',
     );
   }

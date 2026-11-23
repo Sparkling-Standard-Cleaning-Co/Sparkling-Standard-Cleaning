@@ -29,6 +29,7 @@ interface ExecutedRequest {
   status: string;
   bundle_code: string;
   bundle_version: number;
+  packet_name: string;
   subject_type: string;
   subject_name: string;
   branch_name: string;
@@ -49,7 +50,7 @@ function escapeHtml(value: string): string {
 async function requestFor(db: D1Database, requestId: string): Promise<ExecutedRequest | null> {
   return db
     .prepare(
-      `SELECT sr.id, sr.status, sr.bundle_code, sr.bundle_version, sr.subject_type,
+      `SELECT sr.id, sr.status, sr.bundle_code, sr.bundle_version, sr.packet_name, sr.subject_type,
               sr.executed_copy_text, sr.executed_sha256, sr.executed_at,
               COALESCE(
                 NULLIF(TRIM(COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '')), ''),
@@ -139,17 +140,18 @@ async function sendOwnerEmail(
       },
     ];
   }
-  const subject = `Executed agreement - ${request.subject_name} - ${request.bundle_code || 'documents'}`;
-  const attachmentName = `executed-${request.id}.txt`;
+  const agreementName = String(request.packet_name || 'Executed agreement').trim() || 'Executed agreement';
+  const subject = `Executed agreement - ${request.subject_name} - ${agreementName}`;
+  const safeSubject = request.subject_name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'customer';
+  const attachmentName = `executed-agreement-${safeSubject}.txt`;
   const attachment = bytesToBase64(new TextEncoder().encode(request.executed_copy_text));
   const summary = [
     `Customer/employee: ${request.subject_name}`,
+    `Agreement: ${agreementName}`,
     `Branch: ${request.branch_name || 'not assigned'}`,
-    `Bundle: ${request.bundle_code} v${request.bundle_version}`,
-    `Executed at: ${request.executed_at ?? 'recorded'}`,
-    `Executed copy SHA-256: ${request.executed_sha256}`,
+    `Executed: ${request.executed_at ?? 'recorded'}`,
     '',
-    'The executed copy is attached. The immutable record remains in the Sparkling Standard documents system.',
+    'The executed copy is attached. The signed record and audit evidence are retained privately in the Sparkling Standard documents system.',
   ].join('\n');
   const html = `<p><strong>Executed document completed</strong></p><pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(summary)}</pre>`;
   let allDelivered = true;
