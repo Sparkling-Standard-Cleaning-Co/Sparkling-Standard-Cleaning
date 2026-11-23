@@ -279,21 +279,26 @@ test('the document packet builder opens a draft, previews unresolved variables a
   const { page, actions } = await openAdmin();
   await page.click('[data-admin-nav="documents"]');
   await page.waitForSelector('[data-admin-view="documents"]:not([hidden])');
+  await page.locator('[data-document-tab="library"]').first().click();
   await page.waitForSelector('[data-admin-documents-templates] button[data-admin-action="document-edit"]');
   assert.match((await page.textContent('[data-admin-documents-templates]')) ?? '', /Residential One-Time Agreement/);
+  await page.locator('[data-document-tab="packets"]').first().click();
   assert.match((await page.textContent('[data-admin-documents-bundles]')) ?? '', /Residential One-Time Packet/);
+  await page.locator('[data-document-tab="library"]').first().click();
   await page.click('[data-admin-documents-templates] button[data-admin-action="document-edit"]');
   await page.waitForSelector('[data-document-template-edit]:not([hidden])');
   assert.equal(await page.inputValue('[data-document-template-edit] input[name="familyKey"]'), 'residential-one-time');
   assert.match(await page.inputValue('[data-document-template-edit] textarea[name="contentText"]'), /customer\.first_name/);
 
-  await page.fill('[data-document-send] input[name="customerId"]', 'cust_1');
+  await page.locator('[data-document-tab="send"]').first().click();
+  await page.evaluate(() => {
+    const input = document.querySelector('[data-document-send] input[name="customerId"]');
+    if (input) input.value = 'cust_1';
+  });
   await page.selectOption('[data-document-send] select[name="bundleId"]', 'bundle_1');
   await page.fill('[data-document-send] textarea[name="serviceScope"]', 'Approved deep-cleaning scope.');
   await page.fill('[data-document-send] input[name="priceSummary"]', '$260.00');
-  await page.selectOption('[data-document-send] select[name="frequency"]', { label: 'weekly' }).catch(async () => {
-    await page.fill('[data-document-send] input[name="frequency"]', 'weekly');
-  });
+  await page.selectOption('[data-document-send] select[name="frequency"]', 'weekly');
   await page.click('[data-document-preview]');
   await page.waitForSelector('[data-document-preview-result] .admin-card');
   const previewText = await page.textContent('[data-document-preview-result]');

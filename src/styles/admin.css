@@ -262,3 +262,157 @@
 .admin-nav__group{display:grid;gap:.15rem;padding:.35rem 0 .45rem;border-bottom:1px solid rgba(255,255,255,.08)}
 .admin-nav__group:last-child{border-bottom:0}
 .admin-nav__label{padding:0 .7rem;font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(248,242,233,.55)}
+
+/* ---------- Document center ---------- */
+.document-tabs {
+  display: flex;
+  gap: .35rem;
+  overflow-x: auto;
+  padding: .35rem;
+  margin-bottom: 1rem;
+  border: 1px solid #eadfd3;
+  border-radius: .8rem;
+  background: #fffaf4;
+  scrollbar-width: thin;
+}
+.document-tabs button {
+  flex: 1 0 auto;
+  min-height: 2.6rem;
+  padding: .45rem .75rem;
+  border: 1px solid transparent;
+  border-radius: .55rem;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.document-tabs button[aria-current="page"] {
+  border-color: #d9bec2;
+  background: #f6e6e8;
+  color: var(--color-rose-deep);
+}
+.document-tabs button:focus-visible { outline: 3px solid var(--color-rose); outline-offset: 2px; }
+.document-panel[hidden] { display: none !important; }
+.document-overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .65rem; }
+.document-overview-card { border: 1px solid #eadfd3; border-radius: .7rem; padding: .75rem; background: #fbf7f1; }
+.document-overview-card strong { display: block; font-size: 1.5rem; color: var(--color-rose-deep); }
+.document-overview-card span { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-muted); }
+.document-overview-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .8rem; }
+.document-send-step { border: 0; border-top: 1px solid #eadfd3; padding: 1rem 0 0; margin: 0; min-width: 0; }
+.document-send-step:first-of-type { border-top: 0; padding-top: 0; }
+.document-send-step h3 { margin: 0 0 .25rem; font-size: 1rem; color: var(--color-rose-deep); }
+.document-recipient-results { display: grid; gap: .4rem; margin-top: .5rem; }
+.document-recipient-result {
+  display: grid;
+  gap: .1rem;
+  width: 100%;
+  text-align: left;
+  padding: .65rem .7rem;
+  border: 1px solid #e1d3c4;
+  border-radius: .6rem;
+  background: #fff;
+  font: inherit;
+  font-size: .86rem;
+  cursor: pointer;
+}
+.document-recipient-result:hover { border-color: #b98088; background: #fdf7f7; }
+.document-recipient-result strong { color: var(--color-ink); }
+.document-recipient-result span { color: var(--color-text-muted); font-size: .78rem; }
+.document-selected-recipient { margin-top: .6rem; padding: .7rem .8rem; border: 1px solid #d9bec2; border-radius: .7rem; background: #fdf7f7; }
+.document-selected-recipient dl { display: grid; grid-template-columns: minmax(6rem, .4fr) 1.6fr; gap: .2rem .7rem; margin: .4rem 0 0; font-size: .82rem; }
+.document-selected-recipient dt { color: var(--color-text-muted); }
+.document-selected-recipient dd { margin: 0; overflow-wrap: anywhere; }
+.document-selected-recipient__clear { margin-top: .45rem; }
+.document-send-readiness { min-height: 1.2rem; font-weight: 600; }
+.document-send-readiness[data-ready="no"] { color: #8b3a42; }
+.document-send-readiness[data-ready="yes"] { color: #2f6a45; }
+@media (max-width: 48rem) {
+  .document-tabs { border-radius: .6rem; }
+  .document-tabs button { min-height: 2.75rem; font-size: .78rem; }
+  .admin-composer__preview { min-height: 24rem; }
+  .document-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 30rem) {
+  .document-overview-grid { grid-template-columns: 1fr; }
+  .document-tabs button { flex: 0 0 auto; }
+}
+
+/* ---------- Mobile admin usability ---------- */
+@media (max-width: 48rem) {
+  .admin-sidebar {
+    align-items: flex-start;
+    padding: .6rem .65rem;
+  }
+  .admin-brand { flex: 1 1 100%; }
+  .admin-brand__mark { width: 2rem; height: 2rem; }
+  .admin-sidebar__meta { display: none; }
+  .admin-nav {
+    order: 3;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: .3rem;
+    padding-bottom: .2rem;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-nav__group {
+    display: flex;
+    flex: 0 0 auto;
+    gap: .3rem;
+    padding: 0;
+    border: 0;
+  }
+  .admin-nav__label { display: none; }
+  .admin-nav button {
+    flex: 0 0 auto;
+    min-height: 2.75rem;
+    min-width: 7.5rem;
+    padding: .5rem .65rem;
+    font-size: .78rem;
+    text-align: center;
+    white-space: nowrap;
+    background: rgba(255,255,255,.06);
+  }
+  .admin-nav button[aria-current="page"] { background: rgba(255,255,255,.16); }
+  .admin-main, .admin-workspace { padding: .85rem .65rem 4.5rem; }
+  .admin-topbar { flex-wrap: wrap; align-items: flex-start; }
+  .admin-topbar__actions { justify-content: flex-start; }
+  .admin-card { padding: .85rem; border-radius: .75rem; }
+  .admin-detail-head { flex-wrap: wrap; }
+  .admin-form, .admin-inline-form { max-width: none; }
+  .admin-form label, .admin-inline-form label { font-size: .82rem; }
+  .admin-form input:not([type="checkbox"]):not([type="radio"]),
+  .admin-form select,
+  .admin-form textarea,
+  .admin-inline-form input,
+  .admin-inline-form select {
+    min-height: 2.85rem;
+    font-size: 16px;
+  }
+  .admin-form .btn,
+  .admin-inline-form .btn,
+  .admin-actions .btn,
+  .document-tabs button {
+    min-height: 2.75rem;
+  }
+  .admin-table { min-width: 44rem; }
+  .admin-table-scroll { max-height: 60vh; -webkit-overflow-scrolling: touch; }
+  .admin-definition, .admin-detail dl, .admin-detail-toggle dl {
+    grid-template-columns: 1fr;
+    gap: .05rem;
+  }
+  .admin-definition dt, .admin-detail dt, .admin-detail-toggle dt { margin-top: .45rem; }
+  .admin-kpi__value { font-size: 1.5rem; }
+  .document-send-step .admin-form--grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 30rem) {
+  .admin-title { font-size: 1.3rem; }
+  .admin-grid { grid-template-columns: 1fr; }
+  .admin-card { padding: .75rem; }
+  .admin-nav button { min-width: 6.75rem; font-size: .74rem; }
+  .admin-actions .btn { flex: 1 1 auto; }
+}

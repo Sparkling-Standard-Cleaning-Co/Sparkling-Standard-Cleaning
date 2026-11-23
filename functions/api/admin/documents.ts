@@ -2,7 +2,7 @@
 // Policy changes are owner-only; managers may send and verify paperwork.
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
 import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
-import { sendAdminEmail } from '../../../src/lib/admin/email.ts';
+import { sendOperationalNotification } from '../../../src/lib/admin/communications.ts';
 import {
   acknowledgeDocumentUpdate,
   addBundleItem,
@@ -159,48 +159,36 @@ async function notifyDocumentRevision(
   if (!template) return;
   const previousId = text(template.supersedes_template_id, 100);
   const previous = previousId ? await getTemplate(db, previousId).catch(() => null) : null;
-  const recipient = (context.env.OWNER_NOTIFICATION_EMAIL ?? '').trim();
-  let sent = false;
-  if (recipient) {
-    const subject = `Document revision needs owner review: ${String(template.title ?? 'Document')}`;
-    const textBody = [
-      'A new legal document revision was created and is waiting for owner review.',
-      '',
-      `Document: ${String(template.title ?? '')}`,
-      `New version: ${String(template.version ?? '')}`,
-      previous ? `Previous version: ${String(previous.version ?? '')}` : 'Previous version: none linked',
-      `Status: ${String(template.status ?? '')}`,
-      '',
-      'Open Operations -> Documents & Agreements -> Document Updates to review the affected packets and customers.',
-      'No re-signing request is sent automatically.',
-      '',
-      'Sparkling Standard Operations',
-    ].join('\n');
-    const escapeHtml = (value: string): string =>
-      value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    sent = await sendAdminEmail(
-      context.env,
-      recipient,
-      {
-        subject,
-        html: `<p>${escapeHtml(textBody).replace(/\n/g, '<br />')}</p>`,
-        text: textBody,
-      },
-      `document-revision-${templateId}`,
-    ).catch(() => false);
-  }
+  const subject = `Document revision needs owner review: ${String(template.title ?? 'Document')}`;
+  const textBody = [
+    'A new legal document revision was created and is waiting for owner review.',
+    '',
+    `Document: ${String(template.title ?? '')}`,
+    `New version: ${String(template.version ?? '')}`,
+    previous ? `Previous version: ${String(previous.version ?? '')}` : 'Previous version: none linked',
+    `Status: ${String(template.status ?? '')}`,
+    '',
+    'Open Operations -> Documents & Agreements -> Versions & Updates to review the affected packets and customers.',
+    'No re-signing request is sent automatically.',
+    '',
+    'Sparkling Standard Operations',
+  ].join('\n');
+  const delivery = await sendOperationalNotification(db, context.env, {
+    eventKey: 'document_revision',
+    subject,
+    text: textBody,
+    idempotencyKey: `document-revision-${templateId}`,
+    relatedType: 'document_template',
+    relatedId: templateId,
+  }).catch(() => ({ sent: 0 }));
+  const sent = delivery.sent > 0;
   await audit(db, {
     actorUserId,
     action: 'documents.revision_notification',
     entityType: 'document_template',
     entityId: templateId,
     success: true,
-    detail: sent ? 'owner_email_sent' : 'owner_email_not_sent',
+    detail: sent ? 'department_email_sent' : 'department_email_not_sent',
   });
 }
 
@@ -580,6 +568,22 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             `documents-${created.requestId}-${created.token.slice(0, 12)}`,
           )
         : false;
+      await sendOperationalNotification(db, context.env, {
+        eventKey: 'document_signing_request',
+        subject: `Signing request created - ${created.bundleName || created.bundleCode || 'documents'}`,
+        text: [
+          `A signing request was ${draft ? 'saved as a draft' : 'created'} for ${created.bundleName || created.bundleCode || 'a document packet'}.`,
+          `Request: ${created.requestId}`,
+          `Recipient email: ${recipient ? 'provided' : 'not sent'}`,
+          `Customer email sent: ${emailSent ? 'yes (provider accepted)' : 'no'}`,
+          '',
+          'Open Operations -> Documents & Agreements -> Signing Requests to track completion.',
+          'The secure signing link is not included in this internal notice.',
+        ].join('\n'),
+        idempotencyKey: `document-signing-request-${created.requestId}`,
+        relatedType: 'signing_request',
+        ...(created.requestId ? { relatedId: created.requestId } : {}),
+      }).catch(() => undefined);
       return json({
         ok: true,
         required: true,

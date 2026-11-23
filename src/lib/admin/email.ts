@@ -14,6 +14,25 @@ export interface AdminEmail {
   text: string;
 }
 
+export interface AdminEmailAttachment {
+  filename: string;
+  content: string;
+  contentType?: string;
+}
+
+export interface AdminEmailOptions {
+  replyTo?: string;
+  attachments?: AdminEmailAttachment[];
+  from?: string;
+}
+
+export interface AdminEmailDelivery {
+  ok: boolean;
+  status: number;
+  providerId: string;
+  error: string;
+}
+
 function siteUrl(env: AdminEmailEnv): string {
   return (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
 }
@@ -204,14 +223,16 @@ export function buildSigningReminderEmail(
   };
 }
 
-export async function sendAdminEmail(
+export async function sendAdminEmailDetailed(
   env: AdminEmailEnv,
   to: string,
   email: AdminEmail,
   idempotencyKey: string,
-): Promise<boolean> {
+  options: AdminEmailOptions = {},
+): Promise<AdminEmailDelivery> {
   const key = env.RESEND_API_KEY?.trim();
-  if (!key || !to) return false;
+  if (!key) return { ok: false, status: 0, providerId: '', error: 'not_configured' };
+  if (!to) return { ok: false, status: 0, providerId: '', error: 'recipient_missing' };
   try {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -222,18 +243,60 @@ export async function sendAdminEmail(
       },
       body: JSON.stringify({
         from:
+          options.from?.trim() ||
           env.RESEND_FROM_EMAIL?.trim() ||
           'Sparkling Standard <notifications@sparkling-standard.com>',
-        ...(env.RESEND_REPLY_TO?.trim() ? { reply_to: env.RESEND_REPLY_TO.trim() } : {}),
+        ...(options.replyTo?.trim() || env.RESEND_REPLY_TO?.trim()
+          ? { reply_to: options.replyTo?.trim() || env.RESEND_REPLY_TO?.trim() }
+          : {}),
         to: [to],
         subject: email.subject,
         html: email.html,
         text: email.text,
+        ...(options.attachments?.length
+          ? {
+              attachments: options.attachments.map((attachment) => ({
+                filename: attachment.filename,
+                content: attachment.content,
+                ...(attachment.contentType ? { content_type: attachment.contentType } : {}),
+              })),
+            }
+          : {}),
       }),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(15_000),
     });
-    return response.ok;
-  } catch {
-    return false;
+    const payload = (await response.json().catch(() => ({}))) as { id?: string; message?: string };
+    if (response.ok) {
+      return {
+        ok: true,
+        status: response.status,
+        providerId: typeof payload.id === 'string' ? payload.id : '',
+        error: '',
+      };
+    }
+    return {
+      ok: false,
+      status: response.status,
+      providerId: '',
+      error: payload.message?.slice(0, 200) || `provider_${response.status}`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      providerId: '',
+      error: error instanceof Error ? error.name : 'network_error',
+    };
   }
+}
+
+export async function sendAdminEmail(
+  env: AdminEmailEnv,
+  to: string,
+  email: AdminEmail,
+  idempotencyKey: string,
+  options: AdminEmailOptions = {},
+): Promise<boolean> {
+  const outcome = await sendAdminEmailDetailed(env, to, email, idempotencyKey, options);
+  return outcome.ok;
 }

@@ -1,7 +1,7 @@
 // Pages Function fail-safe tests (deployment reliability).
 // Run with: npm test  (Node's built-in test runner + TypeScript type stripping)
 //
-// ── /api/lead ──────────────────────────────────────────────────────────────
+// â”€â”€ /api/lead â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // constructed requests and environments. They encode the deployment contract:
 //  - missing configuration fails safe (503) so the client can fall back,
 //  - malformed or spammy input is rejected (400),
@@ -45,7 +45,7 @@ async function withFetch<T>(
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-// ── /api/lead ──────────────────────────────────────────────────────────────
+// â”€â”€ /api/lead â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 test('lead: malformed JSON body is rejected', async () => {
   const response = await leadPost({
@@ -226,7 +226,7 @@ test('lead-readiness: the dedicated probe used by every form is secret-free', as
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
 });
 
-// ── /api/lead → customer confirmation (Resend, mocked) ─────────────────────
+// â”€â”€ /api/lead â†’ customer confirmation (Resend, mocked) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
 // The lead is delivered through Web3Forms first; the customer confirmation is
 // a second, independent path. No real email is sent: every provider call is
@@ -274,7 +274,7 @@ async function withRoutedFetch<T>(
   }
 }
 
-test('lead: a successful owner delivery sends exactly one branded customer confirmation', async () => {
+test('lead: a successful department delivery sends exactly one branded customer confirmation', async () => {
   await withRoutedFetch({}, async (calls) => {
     const response = await leadPost({
       request: jsonRequest({ subject: 'x', fields: customerFields }),
@@ -284,20 +284,30 @@ test('lead: a successful owner delivery sends exactly one branded customer confi
     assert.deepEqual(await response.json(), { ok: true });
 
     const resendCalls = calls.filter((call) => call.url.includes('api.resend.com'));
-    assert.equal(resendCalls.length, 1, 'no duplicate send for one server invocation');
-    const body = JSON.parse(String(resendCalls[0].init?.body)) as Record<string, unknown>;
+    assert.equal(resendCalls.length, 3, 'Bookings and Owner notices plus one customer confirmation');
+    const department = resendCalls.find((call) => {
+      const body = JSON.parse(String(call.init?.body)) as { to?: string[] };
+      return body.to?.includes('bookings@sparkling-standard.com');
+    });
+    assert.ok(department, 'the operational notice reaches Bookings');
+    const customer = resendCalls.find((call) => {
+      const body = JSON.parse(String(call.init?.body)) as { to?: string[] };
+      return body.to?.includes('synthetic@example.com');
+    });
+    assert.ok(customer, 'the customer confirmation is sent exactly once');
+    const body = JSON.parse(String(customer.init?.body)) as Record<string, unknown>;
     assert.deepEqual(body.to, ['synthetic@example.com'], 'correct recipient');
     assert.equal(body.subject, 'We received your Sparkling Standard request', 'correct subject');
     assert.match(String(body.html), /We received your request/, 'HTML body generated');
     assert.match(String(body.html), /Residential cleaning/);
     assert.match(String(body.text), /WE RECEIVED YOUR REQUEST/, 'plain-text body generated');
     assert.match(String(body.text), /100 S Baylen St, Pensacola, FL 32502/);
-    const headers = resendCalls[0].init?.headers as Record<string, string>;
+    const headers = customer.init?.headers as Record<string, string>;
     assert.equal(headers.Authorization, 'Bearer dummy-resend-key');
   });
 });
 
-test('lead: a Resend failure after owner delivery still returns a successful lead response', async () => {
+test('lead: a Resend failure falls back to Web3Forms and keeps the lead successful', async () => {
   const errors: string[] = [];
   const originalError = console.error;
   console.error = (...args: unknown[]) => {
@@ -309,16 +319,20 @@ test('lead: a Resend failure after owner delivery still returns a successful lea
         request: jsonRequest({ subject: 'x', fields: customerFields }),
         env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
       } as never);
-      assert.equal(response.status, 200, 'the lead stays successful');
+      assert.equal(response.status, 200, 'the Web3Forms fallback keeps the lead successful');
       assert.deepEqual(await response.json(), { ok: true });
-      assert.equal(calls.filter((call) => call.url.includes('api.resend.com')).length, 1);
+      const customerAttempts = calls.filter((call) => {
+        const body = JSON.parse(String(call.init?.body)) as { to?: string[] };
+        return call.url.includes('api.resend.com') && body.to?.includes('synthetic@example.com');
+      });
+      assert.ok(customerAttempts.length >= 1, 'the customer confirmation is attempted after fallback delivery');
     });
   } finally {
     console.error = originalError;
   }
   assert.ok(
-    errors.some((line) => line.includes('customer-confirmation: failed (provider 500)')),
-    'the failure is recorded server-side',
+    errors.some((line) => line.includes('customer-confirmation: failed')),
+    'the customer-confirmation failure is recorded server-side',
   );
   assert.ok(
     errors.every((line) => !line.includes('synthetic@example.com') && !line.includes('dummy-resend-key')),
@@ -326,20 +340,26 @@ test('lead: a Resend failure after owner delivery still returns a successful lea
   );
 });
 
-test('lead: owner-delivery failure never triggers a customer confirmation', async () => {
-  await withRoutedFetch({ web3forms: async () => jsonResponse({ success: false }, 500) }, async (calls) => {
-    const response = await leadPost({
-      request: jsonRequest({ subject: 'x', fields: customerFields }),
-      env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
-    } as never);
-    assert.equal(response.status, 502);
-    assert.deepEqual(await response.json(), { ok: false, error: 'provider_failed' });
-    assert.equal(
-      calls.filter((call) => call.url.includes('api.resend.com')).length,
-      0,
-      'a failed lead is never confirmed to the customer',
-    );
-  });
+test('lead: when every delivery channel fails the lead fails without a customer confirmation', async () => {
+  await withRoutedFetch(
+    {
+      web3forms: async () => jsonResponse({ success: false }, 500),
+      resend: async () => jsonResponse({ error: 'down' }, 500),
+    },
+    async (calls) => {
+      const response = await leadPost({
+        request: jsonRequest({ subject: 'x', fields: customerFields }),
+        env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
+      } as never);
+      assert.equal(response.status, 502);
+      assert.deepEqual(await response.json(), { ok: false, error: 'provider_failed' });
+      const customerAttempts = calls.filter((call) => {
+        const body = JSON.parse(String(call.init?.body)) as { to?: string[] };
+        return call.url.includes('api.resend.com') && body.to?.includes('synthetic@example.com');
+      });
+      assert.equal(customerAttempts.length, 0, 'a failed lead is never confirmed to the customer');
+    },
+  );
 });
 
 test('lead: a valid email is enforced and normalized before delivery', async () => {
@@ -353,7 +373,10 @@ test('lead: a valid email is enforced and normalized before delivery', async () 
     } as never);
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true });
-    const resend = calls.find((call) => call.url.includes('api.resend.com'));
+    const resend = calls.find((call) => {
+      const body = JSON.parse(String(call.init?.body)) as { to?: string[] };
+      return call.url.includes('api.resend.com') && body.to?.includes('customer@example.test');
+    });
     assert.ok(resend);
     const body = JSON.parse(String(resend.init?.body)) as { to?: string[] };
     assert.deepEqual(body.to, ['customer@example.test']);
@@ -389,22 +412,25 @@ test('lead: a recurring residential request must acknowledge the required Deep C
   });
 });
 
-test('lead: an acknowledged recurring request tells the owner the first visit is a Deep Cleaning', async () => {
+test('lead: an acknowledged recurring request tells the department the first visit is a Deep Cleaning', async () => {
   await withRoutedFetch({}, async (calls) => {
     const response = await leadPost({
       request: jsonRequest({ subject: 'x', fields: customerFields }),
       env: { WEB3FORMS_ACCESS_KEY: 'dummy-server-key', RESEND_API_KEY: 'dummy-resend-key' },
     } as never);
     assert.equal(response.status, 200);
-    const web3forms = calls.find((call) => call.url.includes('api.web3forms.com'));
-    assert.ok(web3forms);
-    const body = JSON.parse(String(web3forms.init?.body)) as Record<string, string>;
-    assert.match(body['Inquiry — Initial Deep Cleaning'] ?? '', /REQUIRED before recurring residential maintenance service/);
-    assert.equal(body['Summary — Action'], 'Initial Deep Cleaning required before recurring maintenance service');
+    const department = calls.find((call) => {
+      const body = JSON.parse(String(call.init?.body)) as { to?: string[] };
+      return call.url.includes('api.resend.com') && body.to?.includes('bookings@sparkling-standard.com');
+    });
+    assert.ok(department, 'the operational notice reaches Bookings');
+    const body = JSON.parse(String(department.init?.body)) as { text?: string };
+    assert.match(body.text ?? '', /REQUIRED before recurring residential maintenance service/);
+    assert.match(body.text ?? '', /Initial Deep Cleaning required before recurring maintenance service/);
   });
 });
 
-// ── /api/travel ─────────────────────────────────────────────────────────────
+// â”€â”€ /api/travel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 test('travel: missing origin returns origin_not_configured', async () => {
   const response = await travelPost({ request: jsonRequest({ zip: '32503' }), env: {} } as never);
@@ -558,7 +584,7 @@ test('travel: GET is method-not-allowed', async () => {
   assert.equal(response.status, 405);
 });
 
-// ── /api/travel with confirmed destination coordinates ──────────────────────
+// â”€â”€ /api/travel with confirmed destination coordinates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 test('travel: confirmed coordinates produce a labeled straight-line route without a provider', async () => {
   const response = await travelPost({
@@ -660,7 +686,7 @@ test('travel: a burst from one IP is throttled so the free allowance cannot be d
 });
 
 
-// ── /api/estimate-checkout ─────────────────────────────────────────────────
+// â”€â”€ /api/estimate-checkout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 test('estimate checkout: configuration probe stays disabled without Stripe', async () => {
   const response = await estimateCheckoutGet({

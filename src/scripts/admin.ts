@@ -234,6 +234,11 @@ function friendly(error: unknown): string {
     authorization_property_mismatch: 'The signed authorization is for a different property.',
     stripe_not_configured: 'Stripe is not configured.',
     electronic_signing_not_activated: 'Live electronic signing is not activated for this environment.',
+    packet_has_no_documents:
+      'This packet has no owner-approved documents. Add approved documents before sending it.',
+    packet_not_found: 'That document packet could not be found or is not active.',
+    document_variables_missing:
+      'Required agreement details are missing. Fill the highlighted fields or select the correct customer, booking, and property.',
     invoice_not_payable: 'This invoice is not payable in its current state.',
     invoice_not_sendable: 'Only open, partially paid or overdue invoices can be emailed.',
     invoice_paid: 'This invoice has no outstanding balance.',
@@ -3650,42 +3655,492 @@ async function loadDocuments(): Promise<void> {
   }
   const bundleTarget = document.querySelector<HTMLElement>('[data-admin-documents-bundles]');
   if (bundleTarget) {
-    renderTable(bundleTarget, ['Code', 'Name', 'Purpose', 'Type', 'Documents', 'Status', 'Actions'], bundles.map((bundle) => [
-      esc(bundle.code),
-      esc(bundle.name),
-      esc(titleCase(bundle.purpose ?? bundle.subject_type)),
-      esc(titleCase(bundle.packet_type ?? 'custom')),
-      esc(bundle.document_count),
-      `<span class="admin-status">${esc(titleCase(bundle.status))}</span>`,
-      `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-bundle-open" data-id="${esc(bundle.id)}">Manage documents</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-packet-preview" data-id="${esc(bundle.id)}">Preview</button>${actor?.role === 'owner' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-packet-duplicate" data-id="${esc(bundle.id)}">Duplicate</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="${bundle.status === 'active' ? 'document-packet-archive' : 'document-packet-restore'}" data-id="${esc(bundle.id)}">${bundle.status === 'active' ? 'Archive' : 'Restore'}</button>` : ''}</div>`,
-    ]), 'No document packets are configured yet.');
+    const serviceBundles = bundles.filter((bundle) => Number(bundle.is_system) !== 1);
+    const starterBundles = bundles.filter((bundle) => Number(bundle.is_system) === 1);
+    const bundleRows = (rows: Array<Record<string, unknown>>) => rows.map((bundle) => {
+      const approved = Number(bundle.approved_document_count ?? bundle.document_count ?? 0);
+      const required = Number(bundle.required_document_count ?? 0);
+      const ready = bundle.status === 'active' && approved > 0;
+      return [
+        esc(bundle.code),
+        esc(bundle.name),
+        esc(titleCase(bundle.purpose ?? bundle.subject_type)),
+        esc(titleCase(bundle.packet_type ?? 'custom')),
+        esc(`${approved} approved / ${required} required`),
+        `<span class="admin-status">${esc(ready ? 'Ready' : bundle.status === 'inactive' ? 'Archived' : 'No approved documents')}</span>`,
+        `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-bundle-open" data-id="${esc(bundle.id)}">Manage documents</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-packet-preview" data-id="${esc(bundle.id)}">Preview</button>${actor?.role === 'owner' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-packet-duplicate" data-id="${esc(bundle.id)}">Duplicate</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="${bundle.status === 'active' ? 'document-packet-archive' : 'document-packet-restore'}" data-id="${esc(bundle.id)}">${bundle.status === 'active' ? 'Archive' : 'Restore'}</button>` : ''}</div>`,
+      ];
+    });
+    bundleTarget.innerHTML = `
+      <h3 style="font-size:.95rem;margin:.3rem 0 .5rem;">Service packets</h3>
+      <p class="admin-muted" style="margin:0 0 .5rem;">Only an active packet with at least one owner-approved document can be sent or satisfy a gate.</p>
+      <div data-bundle-service></div>
+      <h3 style="font-size:.95rem;margin:1.2rem 0 .5rem;">Packet starters</h3>
+      <p class="admin-muted" style="margin:0 0 .5rem;">Reusable starters from the approved packet library. They remain visibly empty until approved documents are added, and they cannot be sent while empty.</p>
+      <div data-bundle-starters></div>`;
+    const serviceTarget = bundleTarget.querySelector<HTMLElement>('[data-bundle-service]');
+    if (serviceTarget) {
+      renderTable(
+        serviceTarget,
+        ['Code', 'Name', 'Purpose', 'Type', 'Documents', 'Readiness', 'Actions'],
+        bundleRows(serviceBundles),
+        'No service packets are configured yet.',
+      );
+    }
+    const starterTarget = bundleTarget.querySelector<HTMLElement>('[data-bundle-starters]');
+    if (starterTarget) {
+      renderTable(
+        starterTarget,
+        ['Code', 'Name', 'Purpose', 'Type', 'Documents', 'Readiness', 'Actions'],
+        bundleRows(starterBundles),
+        'No packet starters remain in the library.',
+      );
+    }
   }
   const requestTarget = document.querySelector<HTMLElement>('[data-admin-documents-requests]');
   if (requestTarget) {
-    renderTable(requestTarget, ['Subject', 'Bundle', 'Status', 'Signed', 'Awaiting verification', 'Created', 'Actions'], requests.map((request) => [
-      esc([request.first_name, request.last_name].filter(Boolean).join(' ') || request.display_name || request.subject_type),
-      esc(request.bundle_code),
-      `<span class="admin-status">${esc(titleCase(request.status))}</span>`,
-      esc(request.signed_count),
-      esc(request.awaiting_verification),
-      esc(dateTime(request.created_at)),
-      `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-open" data-id="${esc(request.id)}">Open</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-resend" data-id="${esc(request.id)}">Resend</button></div>`,
-    ]), 'No signing requests have been created yet.');
+    (window as unknown as { __ssRequests?: Array<Record<string, unknown>> }).__ssRequests = requests;
+    renderDocumentRequests();
   }
   for (const select of document.querySelectorAll<HTMLSelectElement>('[data-document-template-options]')) {
     select.innerHTML = `<option value="">Choose a template</option>${templates.filter((template) => template.status === 'approved').map((template) => `<option value="${esc(template.id)}">${esc(template.title)} (v${esc(template.version)})</option>`).join('')}`;
   }
   for (const select of document.querySelectorAll<HTMLSelectElement>('[data-document-bundle-options]')) {
-    select.innerHTML = `<option value="">Choose a bundle</option>${bundles.map((bundle) => `<option value="${esc(bundle.id)}">${esc(bundle.name)}</option>`).join('')}`;
+    select.innerHTML = `<option value="">Choose a packet</option>${bundles.map((bundle) => {
+      const approved = Number(bundle.approved_document_count ?? bundle.document_count ?? 0);
+      return `<option value="${esc(bundle.id)}">${esc(bundle.name)} (${approved} approved${Number(bundle.is_system) === 1 ? ' - starter' : ''})</option>`;
+    }).join('')}`;
   }
   for (const select of document.querySelectorAll<HTMLSelectElement>('[data-document-send-bundle]')) {
-    select.innerHTML = `<option value="">Automatic (service rules)</option>${bundles.filter((bundle) => bundle.status === 'active').map((bundle) => `<option value="${esc(bundle.id)}">${esc(bundle.name)} (${esc(bundle.code)})</option>`).join('')}`;
+    const readyBundles = bundles.filter(
+      (bundle) =>
+        bundle.status === 'active' &&
+        Number(bundle.is_system) !== 1 &&
+        Number(bundle.approved_document_count ?? bundle.document_count ?? 0) > 0,
+    );
+    select.innerHTML = `<option value="">Automatic (service rules)</option>${readyBundles.map((bundle) => `<option value="${esc(bundle.id)}">${esc(bundle.name)} (${esc(bundle.code)})</option>`).join('')}`;
   }
   (window as unknown as { __ssDocuments?: Array<Record<string, unknown>> }).__ssDocuments = templates;
   (window as unknown as { __ssPackets?: Array<Record<string, unknown>> }).__ssPackets = bundles;
+  setupDocumentComposer();
+  renderDocumentOverview(requests, bundles);
   if (actor?.role === 'owner') {
     await loadDocumentUpdates().catch(() => undefined);
   }
+}
+
+function showDocumentTab(name: string): void {
+  const allowed = new Set(['overview', 'send', 'requests', 'library', 'packets', 'updates', 'settings']);
+  const target = allowed.has(name) ? name : 'overview';
+  for (const button of document.querySelectorAll<HTMLElement>('[data-document-tab]')) {
+    if (button.dataset.documentTab === target) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  for (const panel of document.querySelectorAll<HTMLElement>('[data-document-panel]')) {
+    panel.hidden = panel.dataset.documentPanel !== target;
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const tab = (event.target as HTMLElement).closest<HTMLElement>('[data-document-tab]');
+  if (!tab) return;
+  event.preventDefault();
+  showDocumentTab(tab.dataset.documentTab ?? 'overview');
+  const view = document.querySelector<HTMLElement>('[data-admin-view="documents"]');
+  view?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+function renderDocumentRequests(): void {
+  const target = document.querySelector<HTMLElement>('[data-admin-documents-requests]');
+  if (!target) return;
+  const requests = (window as unknown as { __ssRequests?: Array<Record<string, unknown>> }).__ssRequests ?? [];
+  const query = (document.querySelector<HTMLInputElement>('[data-document-request-search]')?.value ?? '').trim().toLowerCase();
+  const status = document.querySelector<HTMLSelectElement>('[data-document-request-status]')?.value ?? '';
+  const filtered = requests.filter((request) => {
+    if (status && String(request.status) !== status) return false;
+    if (!query) return true;
+    const haystack = [
+      request.first_name,
+      request.last_name,
+      request.display_name,
+      request.packet_name,
+      request.bundle_code,
+      request.booking_reference,
+      request.signer_email,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(query);
+  });
+  renderTable(
+    target,
+    ['Recipient', 'Packet', 'Status', 'Signed', 'Verification', 'Created', 'Actions'],
+    filtered.map((request) => [
+      esc(
+        [request.first_name, request.last_name].filter(Boolean).join(' ') ||
+          request.display_name ||
+          request.signer_email ||
+          titleCase(String(request.subject_type ?? '')),
+      ),
+      esc(request.packet_name || request.bundle_code),
+      `<span class="admin-status">${esc(titleCase(request.status))}</span>`,
+      esc(`${Number(request.signed_count ?? 0)}`),
+      esc(Number(request.awaiting_verification ?? 0) ? `Awaiting review (${request.awaiting_verification})` : 'Clear'),
+      esc(dateTime(request.created_at)),
+      `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-open" data-id="${esc(request.id)}">Open</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-resend" data-id="${esc(request.id)}">Resend</button></div>`,
+    ]),
+    requests.length ? 'No signing requests match that search or status.' : 'No signing requests have been created yet.',
+  );
+}
+
+document.querySelector<HTMLInputElement>('[data-document-request-search]')?.addEventListener('input', renderDocumentRequests);
+document.querySelector<HTMLSelectElement>('[data-document-request-status]')?.addEventListener('change', renderDocumentRequests);
+
+async function renderDocumentOverview(
+  requests: Array<Record<string, unknown>>,
+  bundles: Array<Record<string, unknown>>,
+): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-document-overview]');
+  if (!target) return;
+  const count = (status: string) => requests.filter((request) => String(request.status) === status).length;
+  const awaiting = requests.filter((request) => ['pending', 'partially_signed'].includes(String(request.status))).length;
+  const readyPackets = bundles.filter(
+    (bundle) =>
+      bundle.status === 'active' &&
+      Number(bundle.is_system) !== 1 &&
+      Number(bundle.approved_document_count ?? bundle.document_count ?? 0) > 0,
+  ).length;
+  const emptyPackets = bundles.filter(
+    (bundle) =>
+      bundle.status === 'active' &&
+      Number(bundle.approved_document_count ?? bundle.document_count ?? 0) === 0,
+  ).length;
+  const signingAttention = count('signed');
+  const recent = requests.slice(0, 6);
+  target.innerHTML = `
+    <div class="document-overview-grid">
+      <button class="document-overview-card" type="button" data-document-tab="requests" style="text-align:left;cursor:pointer;"><strong>${awaiting}</strong><span>Awaiting signature</span></button>
+      <button class="document-overview-card" type="button" data-document-tab="requests" style="text-align:left;cursor:pointer;"><strong>${signingAttention}</strong><span>Completed requests</span></button>
+      <button class="document-overview-card" type="button" data-document-tab="requests" style="text-align:left;cursor:pointer;"><strong>${count('expired')}</strong><span>Expired links</span></button>
+      <button class="document-overview-card" type="button" data-document-tab="packets" style="text-align:left;cursor:pointer;"><strong>${readyPackets}</strong><span>Ready packets</span></button>
+      <button class="document-overview-card" type="button" data-document-tab="packets" style="text-align:left;cursor:pointer;"><strong>${emptyPackets}</strong><span>Packets needing documents</span></button>
+      <button class="document-overview-card" type="button" data-document-tab="updates" style="text-align:left;cursor:pointer;"><strong data-document-overview-updates>-</strong><span>Updated agreements to review</span></button>
+    </div>
+    <div class="document-overview-actions">
+      <button class="btn btn--primary btn--small" type="button" data-document-tab="send">Send for signature</button>
+      <button class="btn btn--secondary btn--small" type="button" data-document-tab="requests">View signing requests</button>
+      <button class="btn btn--ghost btn--small" type="button" data-document-tab="packets">Check packet readiness</button>
+    </div>
+    <h3 style="margin:1.1rem 0 .45rem;font-size:.95rem;">Recent signing activity</h3>
+    ${
+      recent.length
+        ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Recipient</th><th>Packet</th><th>Status</th><th>Created</th></tr></thead><tbody>${recent
+            .map(
+              (request) =>
+                `<tr><td>${esc([request.first_name, request.last_name].filter(Boolean).join(' ') || request.display_name || request.signer_email || titleCase(String(request.subject_type ?? '')))}</td><td>${esc(request.packet_name || request.bundle_code)}</td><td><span class="admin-status">${esc(titleCase(request.status))}</span></td><td>${esc(dateTime(request.created_at))}</td></tr>`,
+            )
+            .join('')}</tbody></table></div>`
+        : '<p class="admin-muted">No signing requests yet. Use Send for Signature to create the first one.</p>'
+    }`;
+  if (actor?.role === 'owner') {
+    const updateTarget = target.querySelector<HTMLElement>('[data-document-overview-updates]');
+    if (updateTarget) {
+      try {
+        const data = await api<{ updates?: Array<Record<string, unknown>> }>('/api/admin/documents?view=updates');
+        updateTarget.textContent = String(data.updates?.length ?? 0);
+      } catch {
+        updateTarget.textContent = '—';
+      }
+    }
+  }
+}
+
+function documentFormField(name: string): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null {
+  return document.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+    `[data-document-send] [name="${name}"]`,
+  );
+}
+
+function packetForService(serviceCode: string, subjectType: string): Record<string, unknown> | undefined {
+  if (subjectType === 'employee') {
+    return ((window as unknown as { __ssPackets?: Array<Record<string, unknown>> }).__ssPackets ?? []).find(
+      (bundle) =>
+        String(bundle.code) === 'employee.onboarding' &&
+        Number(bundle.approved_document_count ?? bundle.document_count ?? 0) > 0,
+    );
+  }
+  const map: Record<string, string> = {
+    'residential-deep': 'customer.deep',
+    'recurring-residential': 'customer.recurring',
+    'move-in-move-out': 'customer.move_in_out',
+    'residential-cleaning': 'customer.residential',
+    'str-turnover': 'customer.str',
+    'commercial-cleaning': 'customer.commercial',
+    'church-cleaning': 'customer.church',
+    'property-management': 'customer.property_management',
+    'specialty-addons': 'customer.specialty_addons',
+  };
+  const code = map[serviceCode];
+  if (!code) return undefined;
+  return ((window as unknown as { __ssPackets?: Array<Record<string, unknown>> }).__ssPackets ?? []).find(
+    (bundle) =>
+      String(bundle.code) === code &&
+      bundle.status === 'active' &&
+      Number(bundle.approved_document_count ?? bundle.document_count ?? 0) > 0,
+  );
+}
+
+function selectPacketForService(): void {
+  const subjectType = document.querySelector<HTMLSelectElement>('[data-document-subject-type]')?.value ?? 'customer';
+  const service = documentFormField('serviceCode')?.value ?? '';
+  const packetSelect = document.querySelector<HTMLSelectElement>('[data-document-send] select[name="bundleId"]');
+  if (!packetSelect) return;
+  const packet = packetForService(service, subjectType);
+  packetSelect.value = packet ? String(packet.id) : '';
+  updateDocumentSendReadiness();
+}
+
+function applyCustomerToComposer(detail: Record<string, unknown>): void {
+  const customer = (detail.customer ?? {}) as Record<string, unknown>;
+  const contacts = (detail.contacts ?? []) as Array<Record<string, unknown>>;
+  const properties = (detail.properties ?? []) as Array<Record<string, unknown>>;
+  const leads = (detail.leads ?? []) as Array<Record<string, unknown>>;
+  const estimates = (detail.estimates ?? []) as Array<Record<string, unknown>>;
+  const appointments = (detail.appointments ?? []) as Array<Record<string, unknown>>;
+  const recurring = (detail.recurringPlans ?? []) as Array<Record<string, unknown>>;
+  const quickEstimates = (detail.quickEstimates ?? []) as Array<Record<string, unknown>>;
+  const name =
+    String(customer.company_name ?? '').trim() ||
+    [customer.first_name, customer.last_name].filter(Boolean).join(' ');
+  const email = String(
+    contacts.find((contact) => contact.kind === 'email')?.value ?? '',
+  ).trim();
+  const phone = String(
+    contacts.find((contact) => contact.kind === 'phone')?.value ?? '',
+  ).trim();
+  const customerId = String(customer.id ?? '');
+  const customerIdField = document.querySelector<HTMLInputElement>('[data-document-send] input[name="customerId"]');
+  if (customerIdField) customerIdField.value = customerId;
+  const emailField = documentFormField('email');
+  if (emailField) emailField.value = email;
+  const selected = document.querySelector<HTMLElement>('[data-document-selected-recipient]');
+  if (selected) {
+    selected.hidden = false;
+    selected.innerHTML = `<strong>${esc(name || 'Customer')}</strong>${customer.company_name ? ` <span class="admin-muted">${esc(customer.first_name ?? '')} ${esc(customer.last_name ?? '')}</span>` : ''}<dl><dt>Email</dt><dd>${esc(email || 'No email on file')}</dd><dt>Phone</dt><dd>${esc(phone || '—')}</dd><dt>Properties</dt><dd>${esc(String(properties.length))}</dd></dl><button class="btn btn--ghost btn--small document-selected-recipient__clear" type="button" data-document-clear-recipient>Choose a different customer</button>`;
+  }
+  const propertySelect = document.querySelector<HTMLSelectElement>('[data-document-property]');
+  if (propertySelect) {
+    propertySelect.innerHTML = `<option value="">No specific property</option>${properties
+      .map((property) => {
+        const label = [property.label, property.line1, property.city, property.state]
+          .filter(Boolean)
+          .join(' — ');
+        return `<option value="${esc(property.id)}"${Number(property.is_primary) === 1 ? ' selected' : ''}>${esc(label)}</option>`;
+      })
+      .join('')}`;
+  }
+  const reference = String(leads[0]?.quote_reference ?? appointments[0]?.reference ?? '');
+  const referenceField = documentFormField('bookingReference');
+  if (referenceField && !referenceField.value && reference) referenceField.value = reference;
+  const dateField = documentFormField('serviceDate');
+  if (dateField && !dateField.value && appointments[0]?.start_at) {
+    dateField.value = String(appointments[0].start_at).slice(0, 10);
+  }
+  const arrivalField = documentFormField('arrivalWindow');
+  if (arrivalField && !arrivalField.value && appointments[0]?.start_at) {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: 'America/Chicago',
+    });
+    const start = new Date(String(appointments[0].start_at));
+    const end = appointments[0]?.end_at ? new Date(String(appointments[0].end_at)) : null;
+    if (Number.isFinite(start.getTime())) {
+      arrivalField.value = `${formatter.format(start)}${end && Number.isFinite(end.getTime()) ? ` – ${formatter.format(end)}` : ''} Central`;
+    }
+  }
+  const priceField = documentFormField('priceSummary');
+  if (priceField && !priceField.value && estimates[0]?.total_cents) {
+    priceField.value = `$${(Number(estimates[0].total_cents) / 100).toFixed(2)}`;
+  }
+  const serviceField = documentFormField('serviceCode');
+  if (serviceField && !serviceField.value) {
+    const suggestedService =
+      String(quickEstimates[0]?.service_code ?? '') ||
+      (recurring.length ? 'recurring-residential' : estimates.length ? 'residential-cleaning' : '');
+    if (suggestedService) serviceField.value = suggestedService;
+  }
+  if (recurring.length) {
+    const frequency = documentFormField('frequency');
+    if (frequency && recurring[0]?.frequency) frequency.value = String(recurring[0].frequency);
+  }
+  const hint = document.querySelector<HTMLElement>('[data-document-context-hint]');
+  if (hint) {
+    hint.textContent = [
+      `Loaded ${properties.length} propert${properties.length === 1 ? 'y' : 'ies'} for ${name || 'this customer'}.`,
+      reference ? `Latest reference ${reference}.` : '',
+      estimates[0]?.total_cents ? `Latest recorded estimate $${(Number(estimates[0].total_cents) / 100).toFixed(2)}.` : '',
+      'Confirm the service, packet, date, scope, and price before sending.',
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+  selectPacketForService();
+  updateDocumentSendReadiness();
+}
+
+async function chooseDocumentCustomer(customerId: string): Promise<void> {
+  const results = document.querySelector<HTMLElement>('[data-document-customer-results]');
+  if (results) results.textContent = 'Loading customer and property details…';
+  try {
+    const detail = await api<Record<string, unknown>>(`/api/admin/customers?id=${encodeURIComponent(customerId)}`);
+    if (results) results.innerHTML = '';
+    applyCustomerToComposer(detail);
+  } catch (error) {
+    if (results) results.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
+  }
+}
+
+function renderCustomerResults(customers: Array<Record<string, unknown>>): void {
+  const results = document.querySelector<HTMLElement>('[data-document-customer-results]');
+  if (!results) return;
+  results.innerHTML = customers.length
+    ? customers
+        .map((customer) => {
+          const name =
+            String(customer.company_name ?? '').trim() ||
+            [customer.first_name, customer.last_name].filter(Boolean).join(' ');
+          return `<button class="document-recipient-result" type="button" data-document-customer-id="${esc(customer.id)}"><strong>${esc(name || 'Customer')}</strong><span>${esc(customer.email || 'No email on file')} · ${esc(customer.phone || 'No phone')} · ${esc(customer.branch_name || 'No branch')}</span></button>`;
+        })
+        .join('')
+    : '<p class="admin-muted">No customer matched that search.</p>';
+}
+
+function updateDocumentSendReadiness(): void {
+  const target = document.querySelector<HTMLElement>('[data-document-send-readiness]');
+  if (!target) return;
+  const subjectType = document.querySelector<HTMLSelectElement>('[data-document-subject-type]')?.value ?? 'customer';
+  const customerId =
+    document.querySelector<HTMLInputElement>('[data-document-send] input[name="customerId"]')?.value ||
+    document.querySelector<HTMLInputElement>('[data-document-send] input[name="manualCustomerId"]')?.value ||
+    '';
+  const employeeId =
+    document.querySelector<HTMLInputElement>('[data-document-send] input[name="teamMemberId"]')?.value ||
+    document.querySelector<HTMLInputElement>('[data-document-send] input[name="manualTeamMemberId"]')?.value ||
+    '';
+  const email = documentFormField('email')?.value.trim() ?? '';
+  const service = documentFormField('serviceCode')?.value ?? '';
+  const packet = document.querySelector<HTMLSelectElement>('[data-document-send] select[name="bundleId"]')?.selectedOptions[0];
+  const packetLabel = packet?.value ? packet.textContent ?? '' : '';
+  const missing: string[] = [];
+  if (subjectType === 'customer' && !customerId) missing.push('choose a customer');
+  if (subjectType === 'employee' && !employeeId) missing.push('choose an employee');
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) missing.push('enter a valid recipient email');
+  if (subjectType === 'customer' && !service) missing.push('choose the service');
+  target.dataset.ready = missing.length ? 'no' : 'yes';
+  target.textContent = missing.length
+    ? `Before sending: ${missing.join(', ')}.`
+    : `Ready for preview. ${packetLabel ? `Packet: ${packetLabel}. ` : 'The packet will be selected from the service rules. '}Preview to confirm every required detail resolves.`;
+}
+
+async function loadDocumentEmployees(): Promise<void> {
+  const select = document.querySelector<HTMLSelectElement>('[data-document-employee-select]');
+  if (!select || select.dataset.loaded === 'yes') return;
+  try {
+    const data = await api<{ team?: Array<Record<string, unknown>> }>('/api/admin/operations?view=jobs');
+    const team = data.team ?? [];
+    select.innerHTML = `<option value="">Choose an employee</option>${team
+      .map((member) => `<option value="${esc(member.id)}" data-email="${esc(member.email ?? '')}">${esc(member.display_name)} · ${esc(member.email ?? '')}</option>`)
+      .join('')}`;
+    select.dataset.loaded = 'yes';
+  } catch {
+    select.innerHTML = '<option value="">Employee list unavailable</option>';
+  }
+}
+
+function setupDocumentComposer(): void {
+  const form = document.querySelector<HTMLFormElement>('[data-document-send]');
+  if (!form || form.dataset.ready === 'yes') return;
+  form.dataset.ready = 'yes';
+  let searchTimer: number | undefined;
+  document.querySelector<HTMLInputElement>('[data-document-customer-search]')?.addEventListener('input', (event) => {
+    const query = (event.target as HTMLInputElement).value.trim();
+    window.clearTimeout(searchTimer);
+    if (query.length < 2) {
+      const results = document.querySelector<HTMLElement>('[data-document-customer-results]');
+      if (results) results.innerHTML = '';
+      return;
+    }
+    searchTimer = window.setTimeout(async () => {
+      try {
+        const data = await api<{ customers?: Array<Record<string, unknown>> }>(
+          `/api/admin/customers?q=${encodeURIComponent(query)}&limit=8`,
+        );
+        renderCustomerResults(data.customers ?? []);
+      } catch (error) {
+        const results = document.querySelector<HTMLElement>('[data-document-customer-results]');
+        if (results) results.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
+      }
+    }, 250);
+  });
+  document.querySelector<HTMLElement>('[data-document-customer-results]')?.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLElement>('[data-document-customer-id]');
+    if (button?.dataset.documentCustomerId) void chooseDocumentCustomer(button.dataset.documentCustomerId);
+  });
+  document.querySelector<HTMLElement>('[data-document-selected-recipient]')?.addEventListener('click', (event) => {
+    if (!(event.target as HTMLElement).closest('[data-document-clear-recipient]')) return;
+    const hidden = document.querySelector<HTMLInputElement>('[data-document-send] input[name="customerId"]');
+    if (hidden) hidden.value = '';
+    const selected = document.querySelector<HTMLElement>('[data-document-selected-recipient]');
+    if (selected) {
+      selected.hidden = true;
+      selected.innerHTML = '';
+    }
+    const property = document.querySelector<HTMLSelectElement>('[data-document-property]');
+    if (property) property.innerHTML = '<option value="">No specific property</option>';
+    const email = documentFormField('email');
+    if (email) email.value = '';
+    updateDocumentSendReadiness();
+  });
+  document.querySelector<HTMLSelectElement>('[data-document-subject-type]')?.addEventListener('change', (event) => {
+    const subject = (event.target as HTMLSelectElement).value;
+    const employeePicker = document.querySelector<HTMLElement>('[data-document-employee-picker]');
+    if (employeePicker) employeePicker.hidden = subject !== 'employee';
+    const customerSearch = document.querySelector<HTMLInputElement>('[data-document-customer-search]');
+    if (customerSearch) customerSearch.disabled = subject === 'employee';
+    if (subject === 'employee') {
+      const customerId = document.querySelector<HTMLInputElement>('[data-document-send] input[name="customerId"]');
+      if (customerId) customerId.value = '';
+      void loadDocumentEmployees();
+      const service = documentFormField('serviceCode');
+      if (service) service.value = '';
+    } else {
+      const employeeId = document.querySelector<HTMLInputElement>('[data-document-send] input[name="teamMemberId"]');
+      if (employeeId) employeeId.value = '';
+    }
+    selectPacketForService();
+  });
+  document.querySelector<HTMLSelectElement>('[data-document-employee-select]')?.addEventListener('change', (event) => {
+    const option = (event.target as HTMLSelectElement).selectedOptions[0];
+    const id = (event.target as HTMLSelectElement).value;
+    const hidden = document.querySelector<HTMLInputElement>('[data-document-send] input[name="teamMemberId"]');
+    if (hidden) hidden.value = id;
+    const email = documentFormField('email');
+    if (email) email.value = option?.dataset.email ?? '';
+    const service = documentFormField('serviceCode');
+    if (service) service.value = '';
+    selectPacketForService();
+    updateDocumentSendReadiness();
+  });
+  document.querySelector<HTMLSelectElement>('[data-document-service]')?.addEventListener('change', selectPacketForService);
+  document.querySelector<HTMLSelectElement>('[data-document-property]')?.addEventListener('change', updateDocumentSendReadiness);
+  form.addEventListener('input', updateDocumentSendReadiness);
+  form.addEventListener('change', updateDocumentSendReadiness);
+  for (const manual of ['manualCustomerId', 'manualTeamMemberId', 'manualPropertyId']) {
+    form.querySelector<HTMLInputElement>(`[name="${manual}"]`)?.addEventListener('input', updateDocumentSendReadiness);
+  }
+  updateDocumentSendReadiness();
 }
 
 async function loadDocumentUpdates(): Promise<void> {
@@ -3847,9 +4302,9 @@ function documentSendPayload(): Record<string, unknown> {
   }
   return {
     subjectType: String(data.get('subjectType') ?? 'customer'),
-    customerId: String(data.get('customerId') ?? ''),
-    teamMemberId: String(data.get('teamMemberId') ?? ''),
-    propertyId: String(data.get('propertyId') ?? ''),
+    customerId: String(data.get('customerId') || data.get('manualCustomerId') || ''),
+    teamMemberId: String(data.get('teamMemberId') || data.get('manualTeamMemberId') || ''),
+    propertyId: String(data.get('propertyId') || data.get('manualPropertyId') || ''),
     serviceCode: String(data.get('serviceCode') ?? ''),
     frequency: String(data.get('frequency') ?? ''),
     bookingReference: String(data.get('bookingReference') ?? ''),
@@ -3937,8 +4392,10 @@ async function previewDocumentPacket(bundleId = ''): Promise<void> {
     }
     const requirements = (preview.requirements as Array<Record<string, unknown>>) ?? [];
     const missing = (preview.missingVariables as string[]) ?? [];
+    const approvedCount = Number(preview.approvedDocumentCount ?? preview.totalDocuments ?? 0);
+    const ready = preview.ready === undefined ? approvedCount > 0 : preview.ready === true;
     renderComposerPreview(preview);
-    target.innerHTML = `<div class="admin-card"><h3>${esc(preview.bundleName)}</h3><p class="admin-muted">${esc(preview.bundleCode)} v${esc(preview.bundleVersion)} - ${esc(preview.totalDocuments)} document(s), ${esc(preview.requiredDocuments)} required</p>${preview.instructions ? `<p>${esc(preview.instructions)}</p>` : ''}${missing.length ? `<p class="admin-error">Unresolved variables block sending: ${missing.map((key) => `<code>${esc(key)}</code>`).join(', ')}</p>` : '<p class="admin-status-message">All supported variables resolve for this draft.</p>'}${requirements.length ? '<p class="admin-muted">The live preview is open in the pane beside the form. Use the section selector to jump between documents.</p>' : '<p class="admin-muted">This packet has no documents yet. Add owner-approved templates below.</p>'}</div>`;
+    target.innerHTML = `<div class="admin-card"><h3>${esc(preview.bundleName)}</h3><p class="admin-muted">${esc(preview.bundleCode)} v${esc(preview.bundleVersion)} - ${esc(preview.approvedDocumentCount ?? preview.totalDocuments)} approved document(s), ${esc(preview.totalDocuments)} applicable, ${esc(preview.requiredDocuments)} required</p>${preview.instructions ? `<p>${esc(preview.instructions)}</p>` : ''}${!ready ? '<p class="admin-error">This packet has no approved documents and cannot be sent.</p>' : missing.length ? `<p class="admin-error">Unresolved variables block sending: ${missing.map((key) => `<code>${esc(key)}</code>`).join(', ')}</p>` : '<p class="admin-status-message">All supported variables resolve for this draft.</p>'}${requirements.length ? '<p class="admin-muted">The live preview is open in the pane beside the form. Use the section selector to jump between documents.</p>' : '<p class="admin-muted">This packet has no documents yet. Add owner-approved templates below.</p>'}</div>`;
   } catch (error) {
     if (target) target.textContent = friendly(error);
   }

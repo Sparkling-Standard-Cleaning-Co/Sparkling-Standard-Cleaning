@@ -6,6 +6,14 @@
 
 import type { D1Database } from '../admin/d1.ts';
 import { bytesToBase64 } from '../forms/owner-email.ts';
+import {
+  defaultCommunicationSettings,
+  notificationRecipients,
+  readCommunicationSettings,
+  recordNotificationDelivery,
+} from '../admin/communications.ts';
+import { EMAIL_ROUTING } from '../../config/email-routing.ts';
+import { sendAdminEmailDetailed } from '../admin/email.ts';
 
 export interface ExecutedDocumentEmailEnv {
   RESEND_API_KEY?: string;
@@ -120,7 +128,17 @@ async function sendOwnerEmail(
   }
   const key = env.RESEND_API_KEY?.trim();
   if (!key) return { sent: false, error: 'email_not_configured' };
-  const to = env.OWNER_NOTIFICATION_EMAIL?.trim() || 'owner@sparkling-standard.com';
+  const settingsState = await readCommunicationSettings(db).catch(() => null);
+  const settings = settingsState?.settings ?? defaultCommunicationSettings();
+  let recipients = notificationRecipients(settings, 'document_executed');
+  if (recipients.length === 0) {
+    recipients = [
+      {
+        department: 'owner',
+        address: env.OWNER_NOTIFICATION_EMAIL?.trim() || EMAIL_ROUTING.owner,
+      },
+    ];
+  }
   const subject = `Executed agreement - ${request.subject_name} - ${request.bundle_code || 'documents'}`;
   const attachmentName = `executed-${request.id}.txt`;
   const attachment = bytesToBase64(new TextEncoder().encode(request.executed_copy_text));
@@ -133,34 +151,35 @@ async function sendOwnerEmail(
     '',
     'The executed copy is attached. The immutable record remains in the Sparkling Standard documents system.',
   ].join('\n');
-  try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-        'Idempotency-Key': outbox.idempotency_key.slice(0, 200),
+  const html = `<p><strong>Executed document completed</strong></p><pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(summary)}</pre>`;
+  let allDelivered = true;
+  let lastError = '';
+  for (const recipient of recipients) {
+    const outcome = await sendAdminEmailDetailed(
+      env,
+      recipient.address,
+      { subject, html, text: summary },
+      `${outbox.idempotency_key}/${recipient.department}`,
+      {
+        attachments: [{ filename: attachmentName, content: attachment, contentType: 'text/plain' }],
       },
-      body: JSON.stringify({
-        from:
-          env.RESEND_FROM_EMAIL?.trim() ||
-          'Sparkling Standard <notifications@sparkling-standard.com>',
-        to: [to],
-        subject,
-        text: summary,
-        html: `<p><strong>Executed document completed</strong></p><pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(summary)}</pre>`,
-        attachments: [{ filename: attachmentName, content: attachment }],
-      }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!response.ok) return { sent: false, error: `provider_${response.status}` };
-    return { sent: true, error: '' };
-  } catch (error) {
-    return {
-      sent: false,
-      error: error instanceof Error ? error.name : 'provider_unavailable',
-    };
+    );
+    if (!outcome.ok) {
+      allDelivered = false;
+      lastError = outcome.error || 'provider_unavailable';
+    }
+    await recordNotificationDelivery(db, {
+      eventKey: 'document_executed',
+      department: recipient.department,
+      recipient: recipient.address,
+      status: outcome.ok ? 'sent' : outcome.error === 'not_configured' ? 'suppressed' : 'failed',
+      providerId: outcome.providerId,
+      errorCode: outcome.ok ? '' : outcome.error,
+      relatedType: 'signing_request',
+      relatedId: request.id,
+    }).catch(() => undefined);
   }
+  return { sent: allDelivered, error: allDelivered ? '' : lastError };
 }
 
 /**

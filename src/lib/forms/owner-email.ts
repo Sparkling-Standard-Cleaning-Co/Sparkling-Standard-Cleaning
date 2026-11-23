@@ -136,12 +136,15 @@ function buildPart(
   from: string,
   to: string,
   replyTo?: string,
+  idempotencySuffix?: string,
 ): OwnerEmailMessage {
   const rows = Object.entries(notification).filter(([, value]) => typeof value === 'string' && value.trim() !== '');
   const partLabel = partCount > 1 ? `Attachment set ${partIndex + 1} of ${partCount}` : 'Photo attachments';
   const attachmentNames = part.map((attachment) => attachment.filename).join(', ');
   const baseSubject = subject.trim().slice(0, 150) || 'Sparkling Standard request';
-  const emailSubject = `${partCount > 1 ? `[Photos ${partIndex + 1}/${partCount}] ` : '[Photos] '}${baseSubject} - ${requestId}`;
+  const photoPrefix =
+    part.length > 0 ? (partCount > 1 ? `[Photos ${partIndex + 1}/${partCount}] ` : '[Photos] ') : '';
+  const emailSubject = `${photoPrefix}${baseSubject} - ${requestId}`;
 
   const htmlRows = rows
     .map(
@@ -158,7 +161,7 @@ function buildPart(
 <p style="margin:0 0 4px;color:#b15a6f;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;">Sparkling Standard</p>
 <h1 style="margin:0 0 6px;color:#302429;font-family:Georgia,'Times New Roman',serif;font-size:21px;">New request — ${escapeHtml(requestId)}</h1>
 <p style="margin:0 0 14px;color:#4a3b40;font-size:13px;">${escapeHtml(partLabel)}${part.length > 0 ? `: ${escapeHtml(attachmentNames)}` : ''}</p>
-<p style="margin:0 0 14px;color:#4a3b40;font-size:13px;">This is the owner notification. The customer photos are attached as real files. Private time-limited links are also included below as a backup. If this is one of several attachment sets, all sets share request ID <strong>${escapeHtml(requestId)}</strong>.</p>
+    <p style="margin:0 0 14px;color:#4a3b40;font-size:13px;">This is an internal Sparkling Standard request notification. The customer photos are attached as real files. Private time-limited links are also included below as a backup. If this is one of several attachment sets, all sets share request ID <strong>${escapeHtml(requestId)}</strong>.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${htmlRows}</table>
 <p style="margin:16px 0 0;color:#8c7a70;font-size:11px;">Attachment acceptance by the email provider is not proof of inbox delivery. Do not forward customer photos outside Sparkling Standard.</p>
 </td></tr></table></td></tr></table>
@@ -183,7 +186,9 @@ function buildPart(
     html,
     text,
     attachments: part,
-    idempotencyKey: `owner-notification/${safeRequestId(requestId)}/part-${partIndex + 1}/v1`,
+    idempotencyKey: `owner-notification/${safeRequestId(requestId)}/part-${partIndex + 1}/v1${
+      idempotencySuffix ? `/${idempotencySuffix.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 48)}` : ''
+    }`,
   };
   if (replyTo) message.replyTo = replyTo;
   return message;
@@ -198,13 +203,14 @@ export function buildOwnerEmailMessages(options: {
   to?: string;
   replyTo?: string;
   budget?: number;
+  idempotencySuffix?: string;
 }): OwnerEmailMessage[] {
   const from = options.from || DEFAULT_CUSTOMER_EMAIL_FROM;
   const to = options.to || DEFAULT_OWNER_NOTIFICATION_EMAIL;
   const requestId = safeRequestId(options.requestId);
   const parts = splitOwnerAttachments(options.attachments, options.budget);
   if (parts.length === 0) {
-    return [buildPart(options.notification, options.subject, requestId, [], 0, 1, from, to, options.replyTo)];
+    return [buildPart(options.notification, options.subject, requestId, [], 0, 1, from, to, options.replyTo, options.idempotencySuffix)];
   }
   return parts.map((part, index) =>
     buildPart(
@@ -217,6 +223,7 @@ export function buildOwnerEmailMessages(options: {
       from,
       to,
       options.replyTo,
+      options.idempotencySuffix,
     ),
   );
 }

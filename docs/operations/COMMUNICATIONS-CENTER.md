@@ -63,7 +63,18 @@ destination mailbox.
 
 The configured routing/reply-to values are consumed by:
 
-- **Booking confirmations** (`functions/api/lead.ts`, `functions/api/admin/requests.ts`)
+- **Website leads and reservation requests** (`functions/api/lead.ts`) — a
+  booking/reservation uses `booking_request` (default: Bookings); a contact
+  message uses `contact_inquiry` (default: Customer Service). Photo
+  attachments are sent to every configured recipient; Web3Forms remains the
+  fallback when Resend fails.
+- **Booking confirmations, changes, declines and cancellations**
+  (`functions/api/admin/requests.ts`) — `booking_confirmation` or
+  `booking_change` (default: Bookings), while the customer receives the
+  branded booking email.
+- **Paid estimates and gift sales** (`functions/api/stripe-webhook.ts`) —
+  `booking_paid`, `payment_received` or `payment_failed` (defaults: Bookings,
+  Billing, Admin as applicable). Web3Forms remains a secondary owner channel.
 - **Careers** acknowledgment and hiring notification (`functions/api/careers-application.ts`)
 - **Invoice email** (`functions/api/admin/finance.ts`)
 - **Payment receipt copy** (`src/lib/invoicing/invoice-receipt.ts`) — Stripe
@@ -71,11 +82,28 @@ The configured routing/reply-to values are consumed by:
 - **Gift certificate delivery** (`functions/api/stripe-webhook.ts`)
 - **Customer portal sign-in and customer-service requests**
   (`src/lib/portal/service.ts`)
+- **Document signing request, executed agreement and revision review**
+  (`functions/api/admin/documents.ts`,
+  `src/lib/documents/notifications.ts`) — `document_signing_request` (default:
+  Bookings and Admin), `document_executed` and `document_revision` (default:
+  Admin and Owner). The secure signing token is not sent in an internal notice.
 
-Owner-only operational alerts remain bound to the configured owner notification
-address; the communications center does not expose that address publicly.
+Critical security and backup alerts always include both Admin and Owner. Other
+events route only to the departments the owner selected; a disabled department
+is never silently replaced by the owner address. If no operational inbox is
+enabled, the lead path falls back to the configured owner notification address
+so a real customer inquiry is not lost.
+
+## Operational delivery records
+
+`sendOperationalNotification()` in `src/lib/admin/communications.ts` resolves the
+enabled department addresses for an event, sends once per recipient with a
+recipient-specific idempotency key, and records each outcome in
+`notification_delivery_events`. The record is status evidence (provider
+accepted, failed, or suppressed), not proof of inbox delivery.
 
 ## Relevant files
+
 
 - `migrations/0044_communications.sql`
 - `src/lib/admin/communications.ts`
