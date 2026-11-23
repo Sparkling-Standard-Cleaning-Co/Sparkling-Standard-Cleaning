@@ -3683,6 +3683,96 @@ async function loadDocuments(): Promise<void> {
   }
   (window as unknown as { __ssDocuments?: Array<Record<string, unknown>> }).__ssDocuments = templates;
   (window as unknown as { __ssPackets?: Array<Record<string, unknown>> }).__ssPackets = bundles;
+  if (actor?.role === 'owner') {
+    await loadDocumentUpdates().catch(() => undefined);
+  }
+}
+
+async function loadDocumentUpdates(): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-admin-document-updates]');
+  if (!target) return;
+  if (actor?.role !== 'owner') {
+    target.innerHTML = '<p class="admin-muted">Only the owner can review document revisions.</p>';
+    return;
+  }
+  target.textContent = 'Loading document updates...';
+  try {
+    const data = await api<{ updates?: Array<Record<string, unknown>> }>(
+      '/api/admin/documents?view=updates',
+    );
+    const updates = data.updates ?? [];
+    if (!updates.length) {
+      target.innerHTML =
+        '<p class="admin-muted">No new document revisions are waiting for review.</p>';
+      return;
+    }
+    target.innerHTML = updates
+      .map((update) => {
+        const counts = (update.counts ?? {}) as Record<string, unknown>;
+        const review = (update.review ?? {}) as Record<string, unknown>;
+        const packets = (update.affectedPackets ?? []) as Array<Record<string, unknown>>;
+        const customers = (update.affectedCustomers ?? []) as Array<Record<string, unknown>>;
+        const status = String(update.status ?? '');
+        const statusLabel =
+          status === 'pending_approval'
+            ? 'Pending approval'
+            : status === 'owner_review_required'
+              ? 'Owner review required'
+              : status === 'resigning_recommended'
+                ? 'Re-signing recommended'
+                : 'Reviewed';
+        const queue = customers.filter((customer) => customer.needsResigning);
+        const actions =
+          status === 'owner_review_required'
+            ? `<div class="admin-actions"><button class="btn btn--primary btn--small" type="button" data-admin-action="document-update-ack" data-id="${esc(update.templateId)}" data-material="yes">Acknowledge material change</button><button class="btn btn--secondary btn--small" type="button" data-admin-action="document-update-ack" data-id="${esc(update.templateId)}" data-material="no">Acknowledge formatting / nonmaterial</button></div>`
+            : review.acknowledgedAt
+              ? `<p class="admin-muted">Reviewed ${esc(dateTime(review.acknowledgedAt))}${review.materialChange === true ? ' - marked material' : review.materialChange === false ? ' - marked nonmaterial' : ''}.</p>`
+              : '';
+        const packetLabels = packets.length
+          ? packets
+              .map(
+                (packet) =>
+                  `${esc(packet.name)} (${esc(packet.code)}${packet.status === 'active' ? '' : ' - inactive'})`,
+              )
+              .join(', ')
+          : 'No packet currently references this document.';
+        const queueRows = queue.length
+          ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Customer</th><th>Last signed</th><th>Next appointment</th><th>Action</th></tr></thead><tbody>${queue
+              .slice(0, 50)
+              .map(
+                (customer) =>
+                  `<tr><td>${esc(customer.name)}</td><td>${esc(dateTime(customer.lastSignedAt))}</td><td>${customer.nextAppointmentAt ? esc(dateTime(customer.nextAppointmentAt)) : '-'}</td><td><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-update-compose" data-customer="${esc(customer.customerId)}" data-packet="${esc(packets[0]?.code ?? '')}">Use in composer</button></td></tr>`,
+              )
+              .join('')}</tbody></table></div>${queue.length > 50 ? '<p class="admin-muted">Only the first 50 matching records are shown here. Use the customer record for the full history.</p>' : ''}`
+          : '<p class="admin-muted">No executed copies of the previous version require review.</p>';
+        return `<div class="admin-record" style="margin-top:1rem;">
+          <p><strong>${esc(update.title)}</strong> ${esc(update.previousVersion ?? '')} &rarr; ${esc(update.newVersion)} <span class="admin-status">${esc(statusLabel)}</span></p>
+          <p class="admin-muted">${esc(String(counts.customers ?? 0))} customer(s) signed the previous version &middot; ${esc(String(counts.needingResigning ?? 0))} still need the new version &middot; ${esc(String(counts.upcomingAppointments ?? 0))} with an upcoming appointment.</p>
+          <p class="admin-muted">Affected packets: ${packetLabels}</p>
+          <details class="admin-detail-toggle"><summary>Re-signing queue (${queue.length})</summary>${queueRows}</details>
+          ${actions}
+        </div>`;
+      })
+      .join('');
+  } catch (error) {
+    target.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
+  }
+}
+
+function prefillComposerFromUpdate(customerId: string, packetCode: string): void {
+  const form = document.querySelector<HTMLFormElement>('[data-document-send]');
+  if (!form) return;
+  const customerField = form.querySelector<HTMLInputElement>('input[name="customerId"]');
+  if (customerField && customerId) customerField.value = customerId;
+  const packetSelect = form.querySelector<HTMLSelectElement>('select[name="bundleId"]');
+  if (packetSelect && packetCode) {
+    const packet = (
+      window as unknown as { __ssPackets?: Array<Record<string, unknown>> }
+    ).__ssPackets?.find((entry) => entry.code === packetCode);
+    if (packet?.id) packetSelect.value = String(packet.id);
+  }
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  customerField?.focus({ preventScroll: true });
 }
 
 function documentEditForm(): HTMLFormElement | null {
@@ -5266,6 +5356,28 @@ document.addEventListener('click', (event) => {
   if (actionName === 'job-assign') {
     const select = document.querySelector<HTMLSelectElement>(`[data-job-team="${CSS.escape(id)}"]`);
     if (select?.value) void action('/api/admin/operations', { action: 'assign_team', appointmentId: id, teamMemberIds: [select.value] });
+  }
+  if (actionName === 'document-updates-refresh') {
+    void loadDocumentUpdates().catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'document-update-ack') {
+    const materialChange = target.dataset.material === 'yes';
+    void api('/api/admin/documents', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'acknowledge_update', templateId: id, materialChange }),
+    })
+      .then(() => {
+        documentResult(
+          materialChange
+            ? 'Revision acknowledged as a material change. Review the queue before sending any re-signing request.'
+            : 'Revision acknowledged as a formatting or nonmaterial change.',
+        );
+        return loadDocuments();
+      })
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'document-update-compose') {
+    prefillComposerFromUpdate(target.dataset.customer ?? '', target.dataset.packet ?? '');
   }
   if (actionName === 'document-approve') void action('/api/admin/documents', { action: 'approve_template', templateId: id });
   if (actionName === 'document-retire') void action('/api/admin/documents', { action: 'retire_template', templateId: id });

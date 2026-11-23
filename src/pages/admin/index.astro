@@ -675,6 +675,19 @@ import {
               </form>
               <p class="admin-status-message" data-document-reminders-status role="status" aria-live="polite"></p>
             </div>
+            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
+              <div class="admin-detail-head">
+                <div>
+                  <h2 class="admin-section-title">Document Updates</h2>
+                  <p class="admin-muted">
+                    New versions never overwrite an executed agreement. Review affected packets and customers here;
+                    no re-signing request is sent automatically.
+                  </p>
+                </div>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="document-updates-refresh">Refresh</button>
+              </div>
+              <div data-admin-document-updates></div>
+            </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Document templates</h2>
               <p class="admin-muted">Only owner-approved templates can create a signing requirement. Draft and retired templates never block a workflow.</p>

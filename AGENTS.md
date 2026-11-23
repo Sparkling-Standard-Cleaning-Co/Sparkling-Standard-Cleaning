@@ -498,6 +498,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Analytics, consent, event taxonomy, attribution | `src/scripts/consent-controller.ts`, `src/lib/analytics/`, `src/lib/attribution.ts` | `docs/analytics/ANALYTICS-SETUP.md`, `docs/analytics/GTM-CONTAINER-SETUP.md` |
 | Visual design, tokens, images, icons, OG image | `src/styles/`, `public/brand/`, `src/assets/images/` | `docs/design/DESIGN-SYSTEM.md`, `docs/design/IMAGE-GUIDE.md`, `docs/design/IMAGE-SOURCE-REGISTER.md` |
 | Document packet builder, variables and template lifecycle | `src/lib/documents/service.ts`, `functions/api/admin/documents.ts`, migration `0038`, `src/pages/admin/index.astro` | `docs/operations/DOCUMENT-MANAGEMENT.md` |
+| Document revisions, owner review and re-signing queue | `src/lib/documents/service.ts` (`listDocumentUpdates`, `acknowledgeDocumentUpdate`), `functions/api/admin/documents.ts` (`view=updates`, `acknowledge_update`), `src/scripts/admin.ts` | `docs/operations/DOCUMENT-MANAGEMENT.md` |
 | Admin Quick Estimate and promotions | `src/lib/admin/quick-estimate.ts`, `quick-estimate-document.ts`, `functions/api/admin/quick-estimates.ts`, migration `0039` | `docs/operations/QUICK-ESTIMATE.md` |
 | Branded legal templates, register and renderer | `docs/legal/`, `scripts/render-legal-docs.mjs`, `docs/brand/LOGO-AUTHORITY.md` | `docs/legal/LEGAL-DOCUMENT-REGISTER.md` |
 | Encrypted off-site backup and restore | `scripts/backup/`, `.github/workflows/backup.yml` | `docs/operations/OFFSITE-BACKUPS.md` |
