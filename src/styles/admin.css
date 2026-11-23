@@ -107,7 +107,7 @@
 
 .admin-sidebar__meta .btn { color: #f8f2e9; border-color: rgba(248,242,233,.45); }
 
-.admin-workspace { min-width: 0; padding: 1.5rem; }
+.admin-workspace { min-width: 0; padding: 1.5rem; overflow-x: clip; }
 .admin-section-title { font-family: var(--font-display); font-size: 1.1rem; margin: .1rem 0 .7rem; }
 .admin-inline-form { display: flex; flex-wrap: wrap; align-items: end; gap: .6rem; }
 .admin-inline-form label { display: grid; gap: .25rem; font-size: .78rem; font-weight: 600; min-width: 9rem; }
@@ -297,7 +297,7 @@
 .document-tabs button:focus-visible { outline: 3px solid var(--color-rose); outline-offset: 2px; }
 .document-panel[hidden] { display: none !important; }
 .document-overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .65rem; }
-.document-overview-card { border: 1px solid #eadfd3; border-radius: .7rem; padding: .75rem; background: #fbf7f1; }
+.document-overview-card { border: 1px solid #eadfd3; border-radius: .7rem; padding: .75rem; background: #fbf7f1; min-width: 0; overflow-wrap: anywhere; }
 .document-overview-card strong { display: block; font-size: 1.5rem; color: var(--color-rose-deep); }
 .document-overview-card span { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-muted); }
 .document-overview-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .8rem; }
