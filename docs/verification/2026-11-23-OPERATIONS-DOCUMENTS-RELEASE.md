@@ -176,4 +176,3 @@ saving. Established assignments are not silently changed.
   assert the real preview/confirmation flow.
 - No migration or historical data rewrite was necessary. Historical executed
   PDFs remain exactly as previously stored.
-
