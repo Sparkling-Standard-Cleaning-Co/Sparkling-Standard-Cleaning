@@ -5,9 +5,20 @@
 **Release commit:** `12d6123`
 **PR:** https://github.com/Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning/pull/5
 **Target:** `production-safe`
-**Status:** prepared only. No merge, production deployment or production migration has been performed.
+**Status:** DEPLOYED 2026-11-23. Application code `285c748`, `production-safe` merge `96a5b8f`,
+live runtime deployment `bdd48b01-6a43-46bc-a56c-54e1e4ef4120`. Migration `0052` is applied.
+No live charge, refund, customer message or commercial/facility activation was performed.
 
-## Current production baseline
+## Deployed release
+
+- Production-safe CI run `45107034177`: validate and browser passed.
+- Production `booking@sparkling-standard.com` test: HTTP 200, provider accepted, Resend ID
+  `01a2067b-e5ef-725f-81ad-9ddc3f46ed53`.
+- Production mobile checks at 320/390/430: no horizontal overflow or JS errors on the home,
+  residential estimator, portal, employee portal, admin gate and signing invalid-link pages.
+- Production checkout readiness: live mode, all checks true; no charge created.
+
+## Pre-deployment baseline
 
 - Live production deployment: `faaedb33-4588-413d-bba6-3bb85da88eac`
 - Source commit: `3e48739`
@@ -65,9 +76,10 @@ owner inbox confirmation remains required. The temporary test session was delete
 - Contains no `DROP`, `DELETE`, `TRUNCATE`, backfill or destructive statement.
 - Validated against an exported copy of production D1: all row counts unchanged; existing signing
   request and executed hash preserved; integrity `ok`; 0 foreign-key violations.
-- Not applied to production.
+- **Applied to production on 2026-11-23 after the verified backup.** Post-migration counts:
+  11 customers, 1 signing request, 0 signatures; column default `'{}'`; index present.
 
-Apply only inside the owner-authorized deployment window, after the pre-deployment backup:
+Applied command:
 
 ```
 npx wrangler@4 d1 execute sparkling-standard-operations --remote --file migrations/0052_signing_customer_fields.sql

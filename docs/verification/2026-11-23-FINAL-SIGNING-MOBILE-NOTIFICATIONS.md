@@ -11,7 +11,7 @@ the actual configured business inboxes:
 
 | Department | Recipient | HTTP | Recorded status | Resend message ID |
 | --- | --- | --- | --- | --- |
-| Bookings | `booking@sparkling-standard.com` | 200 | sent (provider accepted) | `01a2062d-95da-7b27-8548-22043b2ad378` |
+| Bookings | `booking@sparkling-standard.com` | 200 | sent (provider accepted) | `01a2067b-e5ef-725f-81ad-9ddc3f46ed53` |
 | Admin | `admin@sparkling-standard.com` | 200 | sent (provider accepted) | `01a2062d-97ac-72e5-9c65-98364488685f` |
 | Owner | `owner@sparkling-standard.com` | 200 | sent (provider accepted) | `01a2062d-998c-7af6-b0f0-4758e73ece82` |
 | Customer Service | `customer-service@sparkling-standard.com` | 200 | sent (provider accepted) | `01a2062d-9b2e-797e-97cc-d807d9e6e9f0` |
@@ -118,5 +118,22 @@ document handler:
 | `npm run smoke` | 21 pages |
 | Production email tests | 4 provider-accepted, 0 failures |
 | Migration production-copy validation | passed, no data loss |
-| Production migration | **not applied** |
-| Production deployment | **not performed** |
+| Production migration | **applied** |
+| Production deployment | **live** |
+
+## 7. Production deployment result
+
+- Application code: `285c748`
+- `production-safe` merge: `96a5b8f`
+- Live runtime deployment: `bdd48b01-6a43-46bc-a56c-54e1e4ef4120`
+- Migration `0052` applied to production D1: `customer_fields_json` present with default `'{}'`
+  and the supporting index; 11 customers, 1 signing request and 0 signatures preserved.
+- Final `booking@sparkling-standard.com` test: HTTP 200, provider accepted, Resend ID
+  `01a2067b-e5ef-725f-81ad-9ddc3f46ed53`.
+- Production mobile checks at 320/390/430: home, residential estimator, portal, employee portal,
+  admin gate and signing invalid-link page all loaded with no horizontal overflow and no JS errors.
+- Production `GET /api/document-sign?token=invalid` returned the expected `404
+  signing_link_invalid`.
+- Production checkout readiness returned live mode with every readiness check true; no charge was
+  created.
+- Production-safe CI run `45107034177`: validate and browser passed.
