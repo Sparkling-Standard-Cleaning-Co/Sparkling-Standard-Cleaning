@@ -135,4 +135,45 @@ saving. Established assignments are not silently changed.
 
 ## Deployment evidence
 
-Appended after the authorized production release.
+- **Release commit:** `274a5f5` on `production-safe` (base `3fb0b8b`).
+- **Remote push:** `3fb0b8b..274a5f5 production-safe -> production-safe`.
+- **GitHub Actions `validate` + `browser`:** run `45280087315` completed successfully
+  (`validate` 1m29s, `browser` 6m53s) on `production-safe`.
+- **Cloudflare Pages:** deployment triggered by the GitHub-connected
+  `production-safe` push and verified live. The production `/admin/` document
+  contains the new inline-customer and combined booking actions, and the served
+  admin script asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.Dm2LDSLn.js` is byte-name
+  identical to the locally verified build.
+- **Migrations:** none added and none required. Production remains on the
+  existing 55-migration schema; no schema change was made by this release.
+- **Production health:**
+  - `/api/booking-status`: `ok`, booking enabled, calendar configured and
+    connected (`Sparkling Standard - Pensacola Bookings`, `America/Chicago`),
+    travel origin configured.
+  - `/api/admin/auth`: `ok`, configured, no unauthenticated actor, no CSRF
+    exposed.
+  - Pensacola availability (live coordinates, 2026-12-05): live slots returned.
+  - Tampa: `/tampa/` returns **404**; Tampa availability returns
+    `branch_not_bookable` with no slots; the service-area page contains no Tampa
+    card. Tampa public booking remains inactive.
+- **No synthetic production writes:** verification made read-only HTTP requests
+  only. No customer email, Stripe charge/refund, Google Calendar write, customer
+  message, appointment mutation or destructive customer action was performed.
+- **Historical records:** no executed agreement, signature, price snapshot,
+  approved template or signing request was modified by this release. No template
+  was republished. Google review automation was not activated or changed.
+- **Residual verification gap:** the installed Cloudflare CLI session is
+  authenticated to an unrelated account, so the Cloudflare Pages deployment ID
+  and authenticated production D1 counts could not be queried from this session.
+  The deployment itself is proven by the live served release marker and the
+  matching asset hash above. Production data was not mutated.
+
+## Known operational notes
+
+- The reservation bulk defect is fixed and covered by a real-handler regression
+  test. The pre-existing browser test that mocked the endpoint was updated to
+  assert the real preview/confirmation flow.
+- No migration or historical data rewrite was necessary. Historical executed
+  PDFs remain exactly as previously stored.
+

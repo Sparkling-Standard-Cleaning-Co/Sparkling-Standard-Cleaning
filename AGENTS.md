@@ -84,7 +84,29 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-23 verified signing, admin operations, branch calendars and reviews):**
+- **Current release (2026-11-23 operations and documents combined):** application code `274a5f5` on
+  `production-safe`, deployed by the GitHub-connected Cloudflare Pages pipeline and verified live on
+  2026-11-23 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.Dm2LDSLn.js` matches the verified build;
+  Cloudflare deployment ID was not retrievable because the installed CLI session belongs to an
+  unrelated account). Adds the completed shared document-branding layer (branded editor frame,
+  admin/customer renderer, embedded executed-PDF logo, footer/page numbers and legacy table
+  rendering), fixes the production reservation-action defect (the real handler required a singular
+  `requestId` before reaching bulk actions, so every bulk POST returned `request_required`; browser
+  coverage had mocked the route), adds previewed eligibility and per-record outcomes, reversible
+  customer deletion as archiving with active-obligation warnings, Morning/Afternoon seven-day
+  calendar sections with `+N more`, branch-local CT/ET display, drag/drop proposals, occurrence-only
+  and future-series recurring changes, calendar cancellation and appointment actions, multi-cleaner
+  dispatch assignment, inline New Booking customer creation, combined save/send-agreements/invoice
+  booking actions, signing-request and booking duplicate suppression, and booking-detail invoice,
+  crew, branch and communication evidence. No migration was added or required; production remains
+  at 55 migrations. Verified: unit **1,081** (1,080 pass, 1 pre-existing skip), browser **267/267**,
+  `astro check` 0 errors, 40 pages, 2,569 links, smoke 21 pages. Pensacola availability returns live
+  slots; Tampa remains non-bookable with a 404 page; review automation remains disabled and
+  untouched. No production customer email, charge, calendar write or destructive customer mutation
+  was performed. Evidence: `docs/verification/2026-11-23-OPERATIONS-DOCUMENTS-RELEASE.md` and
+  `docs/verification/2026-11-23-DOCUMENT-BRANDING.md`.
+- **Prior release (2026-11-23 verified signing, admin operations, branch calendars and reviews):**
   application code `1b6efba`, live Cloudflare Pages deployment
   `0566590a-f5a8-4d6f-abff-5a26c06783dd` on `production-safe`. Production D1 is at 55 migrations;
   `0051`-`0055` are applied (`0052` was already present and its tracking record was reconciled).

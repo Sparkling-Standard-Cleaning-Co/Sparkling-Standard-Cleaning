@@ -317,7 +317,7 @@ additive migration before activating this part of the flow in production.
   `notification_delivery_events`. Provider acceptance is not proof of inbox
   delivery.
 
-## 17. Pricing, signature boxes and visual editor (2026-11-23, local)
+## 17. Pricing, signature boxes, visual editor and restored branding (2026-11-23, live `274a5f5`)
 
 Migration `0053_signing_pricing_snapshot.sql` adds
 `signing_requests.pricing_snapshot_json` (default `{}`). The snapshot is written
