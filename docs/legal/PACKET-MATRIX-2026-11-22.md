@@ -93,8 +93,8 @@ remaining workflow passes its own acceptance run.
 | 27 active documents complete | Yes |
 | Owner exact-version approval | **Recorded 2026-11-22** |
 | Approved-only manifest export | `APPROVED-VERSION-MANIFEST-2026-11-22.json` |
-| Template import into D1 | Performed by the controlled production release |
-| Packet/bundle activation | Four residential packets active; others imported inactive |
+| Template import into D1 | **Production: 27 approved, 0 draft, 83 items, 37 audit records** |
+| Packet/bundle activation | **Production: 4 residential active; 6 imported inactive** |
 | Signing link issuance | No real customer link issued during release verification |
 | Live Stripe charge | **Not performed** |
 

@@ -2,8 +2,12 @@
 
 **Release candidate:** `release/2026-11-22-legal-signing-acceptance`  
 **PR:** #1 → `production-safe`  
-**Status:** release candidate verified. **Do not merge, deploy, apply production
-migrations or activate live signing without separate owner authorization.**
+**Status:** released to production on 2026-11-22 under the owner's controlled
+residential release authorization. Production is `5c4ac41`, deployment
+`344ad883-c87a-4baf-b0f4-f34eef27988c`. The four verified residential packets
+are active; facility, STR, property-management, specialty and employee packets
+remain imported inactive. Evidence:
+`docs/verification/2026-11-22-RESIDENTIAL-LEGAL-RELEASE.md`.
 
 ## Preconditions
 
