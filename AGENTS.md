@@ -84,21 +84,32 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-23 signing, document admin, mobile and notifications):** application
-  code `285c748`, merged to `production-safe` at `96a5b8f`; live runtime deployment
-  **`bdd48b01-6a43-46bc-a56c-54e1e4ef4120`**. Migration `0052` is applied to production D1
+- **Current release (2026-11-23 signing, document correction, mobile and notifications):**
+  application code `73ca827`, merged to `production-safe` at `d89b7f2`; live runtime deployment
+  **`1d1be069-9b26-42f1-a6f8-6d6d9f96cfc3`**. Migration `0052` is applied to production D1
   (`signing_requests.customer_fields_json`, default `'{}'`, supporting index); the existing 11
   customers, 13 properties and 1 pending signing request were preserved. Customer signing is a wide,
   mobile-first three-step ceremony with interactive access/instructions, one legal-name entry, one
   adopted typed/drawn signature, executed PDF evidence and portal retrieval. Admin Documents &
   Agreements is split into seven subviews with customer search, auto-populated service/property
-  context and packet readiness. Operational notifications route through Communications settings;
-  the Bookings address is **`booking@sparkling-standard.com`** (corrected from the earlier
-  mistyped alias). A production test to `booking@sparkling-standard.com` was accepted by Resend
-  (`01a2067b-e5ef-725f-81ad-9ddc3f46ed53`). Unit **1,046** (1,045 pass, 1 pre-existing skip),
-  browser **257/257**, production mobile checks at 320/390/430 show no horizontal overflow or JS
+  context, packet readiness, a visual block editor with live print-ready preview, version comparison
+  and Approve & Publish. The 27 imported approved templates were corrected to
+  `2026-11-23.customer-release.v1` / `2026-11-23.employee-release.v1`: the internal
+  `OWNER REVIEW DRAFT — NOT EFFECTIVE UNTIL APPROVED` line was removed, every active packet now
+  points to a clean approved version, and 0 approved templates contain the draft notice. The
+  previous versions are retired but preserved. A corrected 27-Word/27-PDF library is at
+  `FINAL-APPROVAL-PACKAGE-2026-11-22\10-APPROVED-LIBRARY-2026-11-23\`; the 2026-11-22 library is
+  preserved unchanged. Operational notifications route through Communications settings; the
+  Bookings address is **`booking@sparkling-standard.com`**. A production test to
+  `booking@sparkling-standard.com` was accepted by Resend
+  (`01a2067b-e5ef-725f-81ad-9ddc3f46ed53`). Unit **1,054** (1,053 pass, 1 pre-existing skip),
+  browser **258/258**, production mobile checks at 320/390/430 show no horizontal overflow or JS
   errors. No live charge, refund, customer message, commercial/facility activation or Tampa
   activation.
+- **Prior release (2026-11-23 booking address and release evidence):** application code `285c748`,
+  merged at `96a5b8f`, runtime deployment `bdd48b01-6a43-46bc-a56c-54e1e4ef4120`. Corrected the
+  Bookings address to `booking@sparkling-standard.com`, applied migration `0052`, and recorded the
+  controlled release evidence.
 - **Prior release (2026-11-22 Pensacola residential legal release):** `production-safe` at
   **`5c4ac41`**, live production deployment **`344ad883-c87a-4baf-b0f4-f34eef27988c`**. The 27
   owner-approved legal templates are imported into production D1 (27 approved, 0 draft, 10
