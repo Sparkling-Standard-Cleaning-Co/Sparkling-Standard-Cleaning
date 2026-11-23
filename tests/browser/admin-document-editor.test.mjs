@@ -149,6 +149,8 @@ test('the owner can revise an approved document in the visual editor and publish
     assert.match(await page.textContent('[data-document-editor-version-display]') ?? '', /Version 1\.0/);
     assert.doesNotMatch(await page.textContent('[data-document-editor-version-display]') ?? '', /remediation|customer-release/i);
     await page.locator('[data-document-editor-canvas]').waitFor({ state: 'visible' });
+    await page.locator('.document-editor-brandbar img').waitFor({ state: 'visible' });
+    assert.match(await page.locator('.document-editor-brandbar').textContent(), /Sparkling Standard Cleaning Co\./);
     assert.match(await page.locator('[data-document-editor-canvas]').innerHTML(), /Residential Deep Cleaning Agreement/);
     assert.ok((await page.locator('[data-editor-command="bold"]').count()) === 1);
     assert.ok((await page.locator('[data-editor-command="justifyCenter"]').count()) === 1);
@@ -156,6 +158,8 @@ test('the owner can revise an approved document in the visual editor and publish
     assert.ok((await page.locator('[data-editor-page-break]').count()) === 1);
 
     const preview = page.frameLocator('[data-document-editor-preview]');
+    await preview.locator('.branded-document__logo').waitFor({ state: 'visible' });
+    assert.match(await preview.locator('.branded-document__name').textContent(), /Sparkling Standard Cleaning Co\./);
     await preview.getByText('Residential Deep Cleaning Agreement').first().waitFor({ state: 'visible' });
 
     await page.locator('[data-document-editor-canvas]').evaluate((element) => {

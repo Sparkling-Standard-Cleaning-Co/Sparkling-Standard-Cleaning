@@ -307,7 +307,7 @@ test('the document packet builder opens a draft, previews unresolved variables a
   assert.match(previewText ?? '', /Unresolved variables block sending/);
   assert.match(previewText ?? '', /live preview/);
   const frameText = await page.frameLocator('[data-document-preview-frame]').locator('body').innerText();
-  assert.match(frameText, /Residential One-Time Agreement/);
+  assert.match(frameText, /Residential One-Time Agreement/i);
   assert.match(frameText, /Unresolved variables/);
   assert.match(frameText, /customer\.first_name/);
   assert.ok(await page.isVisible('[data-document-save-draft]'));

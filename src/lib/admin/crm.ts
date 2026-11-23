@@ -3,6 +3,7 @@ import { AdminAuthError, audit } from './operations.ts';
 import type { D1Database, D1PreparedStatement } from './d1.ts';
 import { hasPropertyInput, normalizePropertyInput, type NormalizedProperty } from './property-profile.ts';
 import { defaultActiveBranch } from './branches.ts';
+import { resolveServiceBranchStrict } from '../branches/registry.ts';
 import { buildLeadNotification } from '../forms/lead-notification.ts';
 
 function now(): string {
@@ -194,9 +195,17 @@ export async function createCustomer(
   input: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const id = `cust_${crypto.randomUUID()}`;
+  let requestedBranch = customerBranch(actor, input.branchId);
+  if (!requestedBranch && actor.role === 'owner') {
+    const resolved = await resolveServiceBranchStrict(db, {
+      zip: text(input.postalCode, 10),
+      state: text(input.state, 2),
+    }).catch(() => null);
+    requestedBranch = resolved?.branch?.id ?? null;
+  }
   const branchId = await assertBranch(
     db,
-    customerBranch(actor, input.branchId) ?? (await defaultActiveBranch(db)),
+    requestedBranch ?? (await defaultActiveBranch(db)),
   );
   const first = text(input.firstName, 80);
   const last = text(input.lastName, 80);

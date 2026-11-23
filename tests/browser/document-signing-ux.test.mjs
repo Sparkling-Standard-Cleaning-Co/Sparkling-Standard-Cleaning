@@ -160,6 +160,8 @@ test('a customer can complete one mobile signing ceremony without repeated names
     await page.locator('[data-signing-primary]').click();
 
     await page.getByRole('button', { name: 'Read document' }).first().click();
+    await page.locator('[data-document-dialog] .branded-document__logo').waitFor({ state: 'visible' });
+    assert.match(await page.locator('[data-document-dialog] .branded-document__name').textContent(), /Sparkling Standard Cleaning Co\./);
     await page.locator('[data-document-dialog] .signing-doc-text').getByText(/RESIDENTIAL ACCESS AUTHORIZATION/).waitFor({ state: 'visible' });
     await page.locator('[data-document-dialog-close]').click();
 

@@ -167,7 +167,23 @@ test('alerts, calendar, bulk requests and customer views are actionable', async 
     }),
   );
   await page.route('**/api/admin/requests', async (route) => {
-    bulkBody = route.request().postDataJSON();
+    const posted = route.request().postDataJSON();
+    if (posted?.action === 'bulk_preview') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          operation: posted.operation,
+          total: 1,
+          eligible: 1,
+          ineligible: 0,
+          results: [{ id: 'req_pending', ok: true }],
+        }),
+      });
+      return;
+    }
+    bulkBody = posted;
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -228,6 +244,10 @@ test('alerts, calendar, bulk requests and customer views are actionable', async 
     await page.locator('[data-admin-request-bulk]').waitFor({ state: 'visible' });
     assert.match(await page.locator('[data-admin-request-bulk-count]').textContent(), /1 selected/);
     await page.locator('[data-admin-request-bulk] [data-operation="archive"]').click();
+    const bulkDialog = page.locator('[data-admin-dialog][open]');
+    await bulkDialog.waitFor({ state: 'visible' });
+    assert.match(await page.locator('[data-admin-dialog-body]').textContent(), /1 eligible/);
+    await page.locator('[data-admin-dialog-confirm]').click();
     await page.waitForFunction(() => document.querySelector('[data-admin-success]')?.textContent?.includes('1 request'));
     assert.equal(bulkBody.action, 'bulk');
     assert.equal(bulkBody.operation, 'archive');

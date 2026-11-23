@@ -575,6 +575,14 @@
   margin: 0 auto;
 }
 
+/* The shared branded letterhead owns typography and spacing when present. */
+.signing-doc-text.branded-document {
+  white-space: normal;
+  max-width: 50rem;
+  font-size: 10.8pt;
+  line-height: 1.58;
+}
+
 .signing-success {
   text-align: center;
   max-width: 40rem;

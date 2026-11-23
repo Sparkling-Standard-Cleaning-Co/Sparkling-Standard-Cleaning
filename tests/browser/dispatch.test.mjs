@@ -118,7 +118,7 @@ async function openAdmin() {
   await page.goto(BASE + '/admin/', { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Jobs & Team' }).click();
   await page.waitForSelector('.admin-dispatch');
-  await page.waitForSelector('[data-admin-dispatch-unassigned] table');
+  await page.waitForSelector('[data-admin-dispatch-unassigned] .admin-dispatch-job-card');
   return { context, page, posts };
 }
 
@@ -164,6 +164,25 @@ test('the owner can save dispatch controls and run automatic assignment', async 
     await page.click('[data-admin-action="dispatch-run-auto"]');
     await page.waitForFunction(() => /assigned 1/.test(document.querySelector('[data-dispatch-result]')?.textContent ?? ''));
     assert.ok(posts.some((entry) => entry.action === 'run_automatic'));
+  } finally {
+    await context.close();
+  }
+});
+
+test('dispatch assignment can send a full multi-cleaner crew set', async () => {
+  const { context, page, posts } = await openAdmin();
+  try {
+    const boxes = page.locator('[data-dispatch-crew-member="appt_unassigned"]');
+    assert.equal(await boxes.count(), 2, 'both dispatch-ready employees are offered');
+    await boxes.nth(0).check();
+    await boxes.nth(1).check();
+    page.once('dialog', (dialog) => void dialog.accept());
+    await page.click('[data-admin-action="dispatch-assign"]');
+    await page.waitForFunction(() => /Dispatch updated/.test(document.querySelector('[data-dispatch-result]')?.textContent ?? ''));
+    const post = posts.find((entry) => entry.action === 'assign_job');
+    assert.ok(post);
+    assert.equal(post.appointmentId, 'appt_unassigned');
+    assert.deepEqual([...post.teamMemberIds].sort(), ['team_a', 'team_b']);
   } finally {
     await context.close();
   }

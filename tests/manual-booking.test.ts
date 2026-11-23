@@ -200,6 +200,23 @@ test('creating a manual booking persists a pending request, estimate, hold and c
   assert.equal(fields.quote_reference, created.reference);
 });
 
+test('repeating a manual booking submission is idempotent', async () => {
+  const { db, actor, env, quoteInput } = await fixture();
+  const input = { ...quoteInput, date: '2026-12-15', start: START, crewSize: 1 };
+  const first = await createManualBooking(env, db, actor, input, {
+    availability: slotAvailability([]),
+  });
+  const second = await createManualBooking(env, db, actor, input, {
+    availability: slotAvailability([]),
+  });
+  assert.equal(second.requestId, first.requestId, 'a repeat returns the existing pending booking');
+  assert.equal(second.reference, first.reference);
+  const count = db.raw
+    .prepare("SELECT COUNT(*) AS count FROM booking_requests WHERE hold_id LIKE 'manual_%'")
+    .get() as { count: number };
+  assert.equal(count.count, 1, 'no duplicate booking request is created');
+});
+
 test('confirming a manual booking writes appointment, crew, calendar link and commitment', async () => {
   const { db, actor, env, quoteInput } = await fixture();
   const events: Array<Record<string, unknown>> = [];

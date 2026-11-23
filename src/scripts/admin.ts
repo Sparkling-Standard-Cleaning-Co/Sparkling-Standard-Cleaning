@@ -10,6 +10,7 @@ import './admin-address-autocomplete';
 import { PET_OPTIONS, PROPERTY_TYPE_OPTIONS, RESIDENTIAL_INPUT_LIMITS } from '../config/estimators/input-definitions';
 import { pricing } from '../config/pricing';
 import { normalizeRichDocumentHtml, renderDocumentHtml } from '../lib/documents/rich-text.ts';
+import { DOCUMENT_BRAND_CSS, renderBrandedDocumentHtml } from '../lib/documents/branding.ts';
 import { displayVersion } from '../lib/documents/version-labels.ts';
 import { formatLaborAndSite } from '../lib/format/duration.ts';
 
@@ -198,6 +199,45 @@ function setAppError(message = ''): void {
   if (appError) appError.textContent = message;
 }
 
+interface AdminConfirmInput {
+  title: string;
+  body: string;
+  confirmLabel?: string;
+  danger?: boolean;
+}
+
+function adminConfirm(input: AdminConfirmInput): Promise<boolean> {
+  const dialog = document.querySelector<HTMLDialogElement>('[data-admin-dialog]');
+  if (!dialog || typeof dialog.showModal !== 'function') {
+    const plain = input.body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return Promise.resolve(window.confirm(`${input.title}\n\n${plain}`));
+  }
+  const title = dialog.querySelector<HTMLElement>('[data-admin-dialog-title]');
+  const body = dialog.querySelector<HTMLElement>('[data-admin-dialog-body]');
+  const confirmButton = dialog.querySelector<HTMLButtonElement>('[data-admin-dialog-confirm]');
+  const cancelButton = dialog.querySelector<HTMLButtonElement>('[data-admin-dialog-cancel]');
+  if (!title || !body || !confirmButton || !cancelButton) {
+    return Promise.resolve(window.confirm(input.title));
+  }
+  title.textContent = input.title;
+  body.innerHTML = input.body;
+  confirmButton.textContent = input.confirmLabel ?? 'Confirm';
+  confirmButton.classList.toggle('btn--danger', input.danger === true);
+  confirmButton.classList.toggle('btn--primary', input.danger !== true);
+  dialog.returnValue = 'cancel';
+  const previousFocus = document.activeElement as HTMLElement | null;
+  return new Promise((resolve) => {
+    const onClose = (): void => {
+      dialog.removeEventListener('close', onClose);
+      previousFocus?.focus?.();
+      resolve(dialog.returnValue === 'confirm');
+    };
+    dialog.addEventListener('close', onClose);
+    dialog.showModal();
+    cancelButton.focus();
+  });
+}
+
 function friendly(error: unknown): string {
   const code = error instanceof Error ? error.message : 'request_failed';
   const messages: Record<string, string> = {
@@ -272,6 +312,30 @@ function friendly(error: unknown): string {
     recurring_property_coordinates_missing:
       'The property has no usable map coordinates. Correct the saved property location, then use Sync.',
     contact_in_use: 'That email or phone belongs to another customer.',
+    customer_archived:
+      'This customer is archived. Restore the customer before creating a new booking.',
+    appointment_not_reschedulable:
+      'This appointment is not linked to a reservation request, so it cannot be moved here. Use the recurring schedule controls in Jobs & Team.',
+    appointment_not_cancellable:
+      'This appointment is not linked to a reservation request or recurring plan, so it cannot be cancelled here.',
+    recurring_occurrence_not_scheduled: 'That recurring visit is no longer in a schedulable state.',
+    recurring_occurrence_date_conflict: 'Another recurring visit already exists on that date.',
+    recurring_occurrence_time_required: 'Choose a valid new date and start time.',
+    recurring_occurrence_in_past: 'The new recurring date cannot be in the past.',
+    crew_not_feasible:
+      'That exact crew set is not feasible for this job. Review qualifications, availability, travel and crew size.',
+    crew_selection_invalid: 'Select between one and the maximum crew size.',
+    appointment_already_assigned:
+      'This appointment already has a crew. Use Jobs & Team to change an established assignment.',
+    active_request_must_close_or_cancel:
+      'An active request with a held or confirmed appointment must be closed or cancelled before it can be archived.',
+    request_not_approvable: 'Only pending, unclosed requests can be approved.',
+    request_not_deniable: 'Only pending requests without an appointment can be denied.',
+    paid_request_requires_refund_review:
+      'This request has a payment. Refund review is required before it can be denied.',
+    recurring_plan_records_are_not_test_data:
+      'Recurring-plan appointments cannot be marked as disposable test data.',
+    legal_hold_active: 'A legal hold prevents deletion of this customer’s records.',
   };
   return messages[code] ?? titleCase(code);
 }
@@ -565,17 +629,6 @@ async function loadOverview(): Promise<void> {
   }
 }
 
-function centralDateKey(value: unknown): string {
-  const date = new Date(String(value ?? ''));
-  if (!Number.isFinite(date.getTime())) return '';
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Chicago',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
-}
-
 function requestLocation(request: Record<string, unknown>): string {
   const joined = [request.line1, request.city].filter(Boolean).join(', ');
   if (joined) return joined;
@@ -640,16 +693,54 @@ function appointmentReference(appointment: Record<string, unknown>): string {
   return `${customer} · ${appointmentService(appointment)}`;
 }
 
-function appointmentTimeRange(appointment: Record<string, unknown>): string {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Chicago',
+function appointmentBranchZone(branchId: unknown): string {
+  return BRANCH_TIME_ZONES[String(branchId ?? '')] ?? 'America/Chicago';
+}
+
+function appointmentZoneLabel(branchId: unknown): string {
+  return String(branchId ?? '') === 'branch_tampa' ? 'ET' : 'CT';
+}
+
+function appointmentDateKey(value: unknown, branchId?: unknown): string {
+  const date = new Date(String(value ?? ''));
+  if (!Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: appointmentBranchZone(branchId),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function appointmentLocalHour(value: unknown, branchId?: unknown): number {
+  const date = new Date(String(value ?? ''));
+  if (!Number.isFinite(date.getTime())) return 12;
+  const hour = new Intl.DateTimeFormat('en-US', {
+    timeZone: appointmentBranchZone(branchId),
+    hour: 'numeric',
+    hourCycle: 'h23',
+  }).format(date);
+  return Number(hour) || 0;
+}
+
+function appointmentLocalTime(value: unknown, branchId?: unknown): string {
+  const date = new Date(String(value ?? ''));
+  if (!Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: appointmentBranchZone(branchId),
     hour: 'numeric',
     minute: '2-digit',
-  });
+  }).format(date);
+}
+
+function appointmentTimeRange(appointment: Record<string, unknown>): string {
   const start = new Date(String(appointment.start_at ?? ''));
   const end = new Date(String(appointment.end_at ?? ''));
   if (!Number.isFinite(start.getTime())) return 'Time not recorded';
-  return `${formatter.format(start)}${Number.isFinite(end.getTime()) ? ` — ${formatter.format(end)}` : ''}`;
+  const zone = appointmentZoneLabel(appointment.branch_id);
+  return `${appointmentLocalTime(start, appointment.branch_id)}${
+    Number.isFinite(end.getTime()) ? ` — ${appointmentLocalTime(end, appointment.branch_id)}` : ''
+  } ${zone}`;
 }
 
 function appointmentStatusClass(status: string): string {
@@ -700,16 +791,85 @@ function refreshWeekFilterOptions(): void {
   }
 }
 
+const weekAppointmentIndex = new Map<string, Record<string, unknown>>();
+const weekCycleIndices = new Map<string, number>();
+
+function appointmentRecurring(appointment: Record<string, unknown>): boolean {
+  return Boolean(appointment.recurring_plan_id || appointment.recurring_occurrence_id)
+    || /^RECURRING-rec_/i.test(String(appointment.reference ?? ''));
+}
+
+function appointmentCardMarkup(
+  appointment: Record<string, unknown>,
+  index: number,
+  sectionKey: string,
+): string {
+  const id = String(appointment.id ?? '');
+  weekAppointmentIndex.set(id, appointment);
+  const status = String(appointment.status ?? 'pending');
+  const customer = [appointment.first_name, appointment.last_name].filter(Boolean).join(' ') || 'Unlinked customer';
+  const property = [appointment.line1, appointment.city].filter(Boolean).join(', ') || 'Property not linked';
+  const current = weekCycleIndices.get(sectionKey) ?? 0;
+  const hidden = current === index ? '' : ' hidden';
+  const actions = can('booking.write')
+    ? `<div class="admin-appointment-actions">
+        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="open" data-appointment-id="${esc(id)}">Open Booking</button>
+        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="customer" data-appointment-id="${esc(id)}"${appointment.customer_id ? '' : ' disabled'}>Customer</button>
+        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="reschedule" data-appointment-id="${esc(id)}">Reschedule</button>
+        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="cancel" data-appointment-id="${esc(id)}">Cancel</button>
+        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="documents" data-appointment-id="${esc(id)}">Documents</button>
+        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="invoice" data-appointment-id="${esc(id)}">Invoice</button>
+      </div>`
+    : '';
+  return `<article class="admin-appointment-card ${appointmentStatusClass(status)}" tabindex="0" role="button" draggable="${can('booking.write') ? 'true' : 'false'}" data-week-appointment="${esc(id)}" data-week-section="${esc(sectionKey)}" data-week-index="${index}" data-admin-action="appointment-open" data-request="${esc(appointment.booking_request_id ?? '')}" aria-label="${esc(`${appointmentTimeRange(appointment)} ${customer} ${appointmentService(appointment)}${appointmentRecurring(appointment) ? ' recurring' : ''}`)}"${hidden}>
+    <p class="admin-appointment-card__time">${esc(appointmentTimeRange(appointment))}</p>
+    <p class="admin-appointment-card__customer">${esc(customer)}</p>
+    <p class="admin-appointment-card__service">${esc(appointmentService(appointment))}${appointmentRecurring(appointment) ? ' · Recurring' : ''}</p>
+    <p class="admin-appointment-card__meta">Crew: ${esc(String(appointment.assigned_names || 'Unassigned'))}</p>
+    <p class="admin-appointment-card__meta">${esc(property)}</p>
+    <span class="admin-appointment-card__status">${esc(titleCase(status.replaceAll('_', ' ')))}</span>
+    <span class="admin-appointment-card__ref">${esc(appointmentReference(appointment))}</span>
+    ${actions}
+  </article>`;
+}
+
+function weekSectionMarkup(
+  day: string,
+  label: string,
+  jobs: Array<Record<string, unknown>>,
+): string {
+  const sectionKey = `${day}-${label.toLowerCase()}`;
+  const current = Math.min(weekCycleIndices.get(sectionKey) ?? 0, Math.max(0, jobs.length - 1));
+  if (current !== (weekCycleIndices.get(sectionKey) ?? 0)) weekCycleIndices.set(sectionKey, current);
+  const popover = jobs.length > 1
+    ? `<div class="admin-week-popover" aria-hidden="true">${jobs
+        .map((job) => `<p><strong>${esc(appointmentLocalTime(job.start_at, job.branch_id))}</strong> ${esc(
+          [job.first_name, job.last_name].filter(Boolean).join(' ') || 'Unlinked customer',
+        )} — ${esc(appointmentService(job))}${appointmentRecurring(job) ? ' · Recurring' : ''}</p>`)
+        .join('')}</div>`
+    : '';
+  return `<div class="admin-week-section" data-week-drop="${esc(day)}">
+    <div class="admin-week-section__head"><span>${esc(label)}</span><span class="admin-week-section__count">${jobs.length}</span></div>
+    ${
+      jobs.length
+        ? `<div class="admin-week-stack">${jobs.map((job, index) => appointmentCardMarkup(job, index, sectionKey)).join('')}${popover}</div>
+           ${jobs.length > 1 ? `<button class="admin-week-more" type="button" data-week-cycle="${esc(sectionKey)}">+${jobs.length - 1} more</button>` : ''}`
+        : '<p class="admin-week-empty">No appointments</p>'
+    }
+  </div>`;
+}
+
 function renderWeekBoard(appointments: Array<Record<string, unknown>>): void {
   const target = document.querySelector<HTMLElement>('[data-admin-week-board]');
   if (!target) return;
   weekAppointments = appointments;
+  weekAppointmentIndex.clear();
   refreshWeekFilterOptions();
   const days = weekDateKeys();
   const filtered = weekFilteredAppointments();
   const byDay = new Map<string, Array<Record<string, unknown>>>();
   for (const appointment of filtered) {
-    const key = centralDateKey(appointment.start_at);
+    const key = appointmentDateKey(appointment.start_at, appointment.branch_id);
     if (!key) continue;
     const list = byDay.get(key) ?? [];
     list.push(appointment);
@@ -717,32 +877,422 @@ function renderWeekBoard(appointments: Array<Record<string, unknown>>): void {
   }
   const label = document.querySelector<HTMLElement>('[data-admin-week-label]');
   if (label) {
-    label.textContent = `${dateTime(`${days[0]}T12:00:00Z`)} – ${dateTime(`${days[6]}T12:00:00Z`)}${weekOffset === 0 ? ' · Current week' : ''}`;
+    const zone = weekBranchFilter ? appointmentZoneLabel(weekBranchFilter) : 'each branch’s local time';
+    label.textContent = `${dateTime(`${days[0]}T12:00:00Z`)} – ${dateTime(`${days[6]}T12:00:00Z`)} · ${zone}${weekOffset === 0 ? ' · Current week' : ''}`;
   }
   const today = centralTodayKey();
   target.innerHTML = `<div class="admin-week-grid">${days.map((day) => {
     const jobs = (byDay.get(day) ?? []).sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
+    const morning = jobs.filter((appointment) => appointmentLocalHour(appointment.start_at, appointment.branch_id) < 12);
+    const afternoon = jobs.filter((appointment) => appointmentLocalHour(appointment.start_at, appointment.branch_id) >= 12);
     const dayLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(new Date(`${day}T12:00:00Z`));
     const dateLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' }).format(new Date(`${day}T12:00:00Z`));
     return `<section class="admin-week-day${day === today ? ' is-today' : ''}">
       <header><span>${esc(dayLabel)}</span><strong>${esc(dateLabel)}</strong>${day === today ? '<span class="admin-week-today">Today</span>' : ''}</header>
-      <div class="admin-week-day__jobs">${jobs.length ? jobs.map((appointment) => {
-        const status = String(appointment.status ?? 'pending');
-        const customer = [appointment.first_name, appointment.last_name].filter(Boolean).join(' ') || 'Unlinked customer';
-        const property = [appointment.line1, appointment.city].filter(Boolean).join(', ') || 'Property not linked';
-        return `<article class="admin-appointment-card ${appointmentStatusClass(status)}" tabindex="0" role="button" data-admin-action="appointment-open" data-request="${esc(appointment.booking_request_id ?? '')}" data-id="${esc(appointment.id)}" aria-label="${esc(`${appointmentTimeRange(appointment)} ${customer} ${appointmentService(appointment)}`)}">
-          <p class="admin-appointment-card__time">${esc(appointmentTimeRange(appointment))}</p>
-          <p class="admin-appointment-card__customer">${esc(customer)}</p>
-          <p class="admin-appointment-card__service">${esc(appointmentService(appointment))}</p>
-          <p class="admin-appointment-card__meta">Assigned: ${esc(String(appointment.assigned_names || 'Unassigned'))}</p>
-          <p class="admin-appointment-card__meta">${esc(property)}</p>
-          <span class="admin-appointment-card__status">${esc(titleCase(status.replaceAll('_', ' ')))}</span>
-          <span class="admin-appointment-card__ref">${esc(appointmentReference(appointment))}</span>
-        </article>`;
-      }).join('') : '<p class="admin-week-empty">No appointments</p>'}</div>
+      <div class="admin-week-day__jobs">
+        ${weekSectionMarkup(day, 'Morning', morning)}
+        ${weekSectionMarkup(day, 'Afternoon', afternoon)}
+      </div>
     </section>`;
   }).join('')}</div>`;
 }
+
+function appointmentLocalHhmm(value: unknown, branchId?: unknown): string {
+  const date = new Date(String(value ?? ''));
+  if (!Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: appointmentBranchZone(branchId),
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
+}
+
+function zonedIso(date: string, time: string, timeZone: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  if (!year || !month || !day || !Number.isFinite(hour) || !Number.isFinite(minute)) return '';
+  const guess = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const offsetAt = (timestamp: number): number => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(timestamp));
+    const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    const asUtc = Date.UTC(
+      Number(map.year),
+      Number(map.month) - 1,
+      Number(map.day),
+      Number(map.hour) % 24,
+      Number(map.minute),
+      Number(map.second),
+    );
+    return asUtc - timestamp;
+  };
+  let utc = guess - offsetAt(guess);
+  utc = guess - offsetAt(utc);
+  return new Date(utc).toISOString();
+}
+
+function calendarDialogContainer(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('[data-admin-calendar-dialog]');
+}
+
+function closeCalendarDialog(): void {
+  const container = calendarDialogContainer();
+  if (container) container.innerHTML = '';
+}
+
+function openCalendarReschedule(appointment: Record<string, unknown>, proposedDate = ''): void {
+  const container = calendarDialogContainer();
+  if (!container || !can('booking.write')) return;
+  const branchId = appointment.branch_id;
+  const timeZone = appointmentBranchZone(branchId);
+  const date = proposedDate || appointmentDateKey(appointment.start_at, branchId) || appointmentDateKey(new Date(), branchId);
+  const time = appointmentLocalHhmm(appointment.start_at, branchId);
+  const recurring = appointmentRecurring(appointment);
+  const hasPlan = Boolean(appointment.recurring_plan_id && appointment.recurring_occurrence_id);
+  const customer = [appointment.first_name, appointment.last_name].filter(Boolean).join(' ') || 'Unlinked customer';
+  const property = [appointment.line1, appointment.city].filter(Boolean).join(', ') || 'Property not linked';
+  container.innerHTML = `<div class="admin-calendar-dialog-card" role="dialog" aria-modal="true" aria-labelledby="calendar-reschedule-title">
+    <div class="admin-detail-head"><h2 class="admin-section-title" id="calendar-reschedule-title">Reschedule appointment</h2><button class="btn btn--ghost btn--small" type="button" data-calendar-close>Close</button></div>
+    <dl class="admin-definition">
+      <dt>Customer</dt><dd>${esc(customer)}</dd>
+      <dt>Service</dt><dd>${esc(appointmentService(appointment))}${recurring ? ' · Recurring' : ''}</dd>
+      <dt>Property</dt><dd>${esc(property)}</dd>
+      <dt>Current</dt><dd>${esc(appointmentTimeRange(appointment))}</dd>
+      <dt>Duration</dt><dd>${esc(durationLabel(appointment.duration_minutes))}</dd>
+      <dt>Crew</dt><dd>${esc(String(appointment.assigned_names || 'Unassigned'))}</dd>
+      <dt>Branch time</dt><dd>${esc(timeZone)} (${esc(appointmentZoneLabel(branchId))})</dd>
+    </dl>
+    ${
+      hasPlan
+        ? `<div class="admin-calendar-scope"><p><strong>How would you like to change this recurring cleaning?</strong></p>
+            <label><input type="radio" name="calendar-recurring-scope" value="occurrence" checked /> <span><strong>This appointment only</strong><br /><span class="admin-muted">Preserves the recurrence rule and every other appointment.</span></span></label>
+            <label><input type="radio" name="calendar-recurring-scope" value="future" /> <span><strong>This appointment and future cleanings</strong><br /><span class="admin-muted">Applies the new date and time to the eligible future schedule. Completed and historical visits are never rewritten.</span></span></label>
+          </div>`
+        : ''
+    }
+    <form class="admin-form admin-form--grid" data-calendar-form="reschedule" data-appointment-id="${esc(String(appointment.id ?? ''))}">
+      <label>New date <input name="date" type="date" value="${esc(date)}" required /></label>
+      <label>Start time (${esc(appointmentZoneLabel(branchId))}) <input name="time" type="time" value="${esc(time)}" required /></label>
+      ${
+        recurring
+          ? '<p class="admin-field--wide admin-muted">Recurring changes are validated against the branch calendar, operating hours and existing crew assignments. No customer email is sent by this action.</p>'
+          : `<label class="admin-field--wide"><input type="checkbox" name="notify" value="yes" /> Email the customer after the move</label>`
+      }
+      <p class="admin-field--wide admin-muted">A drop or click is a proposal. The new date and exact start time are validated before anything changes.</p>
+      <div class="admin-actions admin-field--wide"><button class="btn btn--primary btn--small" type="submit">Review and move appointment</button><button class="btn btn--ghost btn--small" type="button" data-calendar-close>Cancel</button></div>
+    </form>
+    <p class="admin-error" data-calendar-error role="alert"></p>
+  </div>`;
+  container.querySelector<HTMLElement>('[data-calendar-error]')!.textContent = '';
+}
+
+function openCalendarCancel(appointment: Record<string, unknown>): void {
+  const container = calendarDialogContainer();
+  if (!container || !can('booking.write')) return;
+  const recurring = appointmentRecurring(appointment);
+  const hasPlan = Boolean(appointment.recurring_plan_id);
+  const customer = [appointment.first_name, appointment.last_name].filter(Boolean).join(' ') || 'Unlinked customer';
+  container.innerHTML = `<div class="admin-calendar-dialog-card" role="dialog" aria-modal="true" aria-labelledby="calendar-cancel-title">
+    <div class="admin-detail-head"><h2 class="admin-section-title" id="calendar-cancel-title">Cancel appointment</h2><button class="btn btn--ghost btn--small" type="button" data-calendar-close>Close</button></div>
+    <dl class="admin-definition">
+      <dt>Customer</dt><dd>${esc(customer)}</dd>
+      <dt>Service</dt><dd>${esc(appointmentService(appointment))}${recurring ? ' · Recurring' : ''}</dd>
+      <dt>Time</dt><dd>${esc(appointmentTimeRange(appointment))}</dd>
+      <dt>Crew</dt><dd>${esc(String(appointment.assigned_names || 'Unassigned'))}</dd>
+    </dl>
+    ${
+      hasPlan
+        ? `<div class="admin-calendar-scope"><p><strong>Cancel this occurrence or the whole recurring plan?</strong></p>
+            <label><input type="radio" name="calendar-cancel-scope" value="occurrence" checked /> <span><strong>This appointment only</strong><br /><span class="admin-muted">Cancels this visit and leaves the rest of the plan scheduled.</span></span></label>
+            <label><input type="radio" name="calendar-cancel-scope" value="plan" /> <span><strong>Cancel the entire recurring plan</strong><br /><span class="admin-muted">Stops future visits. Completed and historical visits are preserved.</span></span></label>
+          </div>`
+        : ''
+    }
+    <form class="admin-form" data-calendar-form="cancel" data-appointment-id="${esc(String(appointment.id ?? ''))}">
+      <label>Reason (optional) <input name="reason" maxlength="500" /></label>
+      <label><input type="checkbox" name="notify" value="yes" /> Email the customer about this cancellation</label>
+      <div class="admin-actions"><button class="btn btn--danger btn--small" type="submit">Review and cancel</button><button class="btn btn--ghost btn--small" type="button" data-calendar-close>Keep appointment</button></div>
+    </form>
+    <p class="admin-error" data-calendar-error role="alert"></p>
+  </div>`;
+}
+
+async function handleCalendarAppointmentAction(button: HTMLElement): Promise<void> {
+  const appointment = weekAppointmentIndex.get(button.dataset.appointmentId ?? '');
+  if (!appointment) return;
+  const action = button.dataset.adminAppointmentAction ?? '';
+  if (action === 'open') {
+    const requestId = String(appointment.booking_request_id ?? '');
+    if (requestId) {
+      await openRequest(requestId);
+    } else {
+      setAppError('This recurring appointment is not linked to a reservation request. Use Jobs & Team or Reschedule from this card.');
+    }
+    return;
+  }
+  if (action === 'customer') {
+    const customerId = String(appointment.customer_id ?? '');
+    if (!customerId) return;
+    await loadView('customers');
+    await openCustomer(customerId);
+    return;
+  }
+  if (action === 'documents') {
+    const requestId = String(appointment.booking_request_id ?? '');
+    if (requestId) {
+      await openRequest(requestId);
+      const detail = document.querySelector<HTMLElement>('[data-admin-request-detail]');
+      detail?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      setAppError('No reservation request is linked to this recurring appointment. Open Documents & Agreements to review the customer packet.');
+    }
+    return;
+  }
+  if (action === 'invoice') {
+    const requestId = String(appointment.booking_request_id ?? '');
+    if (requestId) {
+      await openRequest(requestId);
+      const cards = [...document.querySelectorAll<HTMLElement>('[data-admin-request-detail] h3')];
+      cards.find((heading) => heading.textContent?.trim() === 'Invoice')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      setAppError('Invoice actions are available from the customer record or Finance for recurring appointments without a reservation request.');
+    }
+    return;
+  }
+  if (action === 'reschedule') {
+    openCalendarReschedule(appointment);
+    return;
+  }
+  if (action === 'cancel') {
+    openCalendarCancel(appointment);
+  }
+}
+
+async function submitCalendarReschedule(form: HTMLFormElement): Promise<void> {
+  const appointment = weekAppointmentIndex.get(form.dataset.appointmentId ?? '');
+  const errorNode = form.parentElement?.querySelector<HTMLElement>('[data-calendar-error]') ?? null;
+  if (!appointment) return;
+  const data = new FormData(form);
+  const date = String(data.get('date') ?? '');
+  const time = String(data.get('time') ?? '');
+  const notify = data.get('notify') === 'yes';
+  const branchId = appointment.branch_id;
+  const timeZone = appointmentBranchZone(branchId);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) {
+    if (errorNode) errorNode.textContent = 'Choose a valid new date and start time.';
+    return;
+  }
+  const duration = Number(appointment.duration_minutes) || 120;
+  const start = zonedIso(date, time, timeZone);
+  const end = new Date(Date.parse(start) + duration * 60_000).toISOString();
+  const scope = (form.parentElement?.querySelector<HTMLInputElement>('input[name="calendar-recurring-scope"]:checked')?.value) ?? 'occurrence';
+  const recurring = appointmentRecurring(appointment);
+  const hasPlan = Boolean(appointment.recurring_plan_id && appointment.recurring_occurrence_id);
+  const customer = [appointment.first_name, appointment.last_name].filter(Boolean).join(' ') || 'Unlinked customer';
+  if (recurring && scope === 'future') {
+    const confirmed = await adminConfirm({
+      title: 'Change future recurring appointments?',
+      body: `<p>Move <strong>${esc(customer)}</strong> to <strong>${esc(date)} at ${esc(time)}</strong> (${esc(appointmentZoneLabel(branchId))}) beginning with this appointment.</p>
+      <p>The server will validate the branch calendar, operating hours, travel and crew feasibility. Eligible future occurrences are regenerated; completed and historical visits are preserved. Conflicts are reported before the plan is left inconsistent.</p>`,
+      confirmLabel: 'Change future schedule',
+    });
+    if (!confirmed) return;
+    try {
+      const result = await api<Record<string, unknown>>('/api/admin/operations', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'update_recurring',
+          planId: String(appointment.recurring_plan_id),
+          startDate: date,
+          startTime: time,
+        }),
+      });
+      closeCalendarDialog();
+      await loadCalendar(currentRequestView);
+      const sync = result.sync as { created?: number; cancelled?: number; errors?: unknown[] } | undefined;
+      setSuccess(
+        `Recurring schedule updated${sync ? ` · ${Number(sync.created ?? 0)} future visit(s) scheduled · ${Number(sync.cancelled ?? 0)} superseded` : ''}.`,
+      );
+    } catch (error) {
+      if (errorNode) errorNode.textContent = friendly(error);
+    }
+    return;
+  }
+  const confirmed = await adminConfirm({
+    title: 'Move this appointment?',
+    body: `<p><strong>${esc(customer)}</strong> · ${esc(appointmentService(appointment))}</p><p>${esc(appointmentTimeRange(appointment))} → <strong>${esc(date)} at ${esc(time)} ${esc(appointmentZoneLabel(branchId))}</strong></p><p>Duration ${esc(durationLabel(duration))} · Crew ${esc(String(appointment.assigned_names || 'Unassigned'))}</p><p>The server will re-validate the slot, calendar, operating hours and crew availability before saving.</p>${notify ? '<p><strong>A customer reschedule email will be sent.</strong></p>' : ''}`,
+    confirmLabel: 'Move appointment',
+  });
+  if (!confirmed) return;
+  try {
+    if (hasPlan) {
+      await api('/api/admin/operations', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'update_occurrence',
+          planId: String(appointment.recurring_plan_id),
+          occurrenceId: String(appointment.recurring_occurrence_id),
+          occurrenceAction: 'reschedule',
+          date,
+          startTime: time,
+        }),
+      });
+    } else {
+      const requestId = String(appointment.booking_request_id ?? '');
+      if (!requestId) throw new Error('appointment_not_reschedulable');
+      await api('/api/admin/requests', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'reschedule', requestId, date, start, end, notify }),
+      });
+    }
+    closeCalendarDialog();
+    await loadCalendar(currentRequestView);
+    setSuccess('Appointment moved.');
+  } catch (error) {
+    if (errorNode) errorNode.textContent = friendly(error);
+  }
+}
+
+async function submitCalendarCancel(form: HTMLFormElement): Promise<void> {
+  const appointment = weekAppointmentIndex.get(form.dataset.appointmentId ?? '');
+  const errorNode = form.parentElement?.querySelector<HTMLElement>('[data-calendar-error]') ?? null;
+  if (!appointment) return;
+  const data = new FormData(form);
+  const reason = String(data.get('reason') ?? '').trim();
+  const notify = data.get('notify') === 'yes';
+  const scope = (form.parentElement?.querySelector<HTMLInputElement>('input[name="calendar-cancel-scope"]:checked')?.value) ?? 'occurrence';
+  const customer = [appointment.first_name, appointment.last_name].filter(Boolean).join(' ') || 'Unlinked customer';
+  const planCancel = scope === 'plan';
+  const confirmed = await adminConfirm({
+    title: planCancel ? 'Cancel the entire recurring plan?' : 'Cancel this appointment?',
+    body: `<p><strong>${esc(customer)}</strong> · ${esc(appointmentService(appointment))}</p><p>${esc(appointmentTimeRange(appointment))}</p>${
+      planCancel
+        ? '<p>Future recurring visits will be cancelled. Completed and historical appointments, signed agreements and financial records are preserved.</p>'
+        : '<p>Only this appointment is cancelled. Cancellation history is preserved.</p>'
+    }${notify ? '<p><strong>A customer cancellation email will be sent.</strong></p>' : '<p>No customer email will be sent.</p>'}`,
+    confirmLabel: planCancel ? 'Cancel plan' : 'Cancel appointment',
+    danger: true,
+  });
+  if (!confirmed) return;
+  try {
+    if (planCancel) {
+      await api('/api/admin/operations', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'update_recurring', planId: String(appointment.recurring_plan_id), status: 'cancelled' }),
+      });
+    } else if (appointment.recurring_plan_id && appointment.recurring_occurrence_id) {
+      await api('/api/admin/operations', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'update_occurrence',
+          planId: String(appointment.recurring_plan_id),
+          occurrenceId: String(appointment.recurring_occurrence_id),
+          occurrenceAction: 'skip',
+        }),
+      });
+    } else {
+      const requestId = String(appointment.booking_request_id ?? '');
+      if (!requestId) throw new Error('appointment_not_cancellable');
+      await api('/api/admin/requests', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'cancel', requestId, reason, notify }),
+      });
+    }
+    closeCalendarDialog();
+    await loadCalendar(currentRequestView);
+    setSuccess(planCancel ? 'Recurring plan cancelled. History was preserved.' : 'Appointment cancelled.');
+  } catch (error) {
+    if (errorNode) errorNode.textContent = friendly(error);
+  }
+}
+
+document.addEventListener('submit', (event) => {
+  const form = event.target as HTMLFormElement;
+  const kind = form.dataset.calendarForm;
+  if (!kind) return;
+  event.preventDefault();
+  void (kind === 'reschedule' ? submitCalendarReschedule(form) : submitCalendarCancel(form));
+});
+
+document.addEventListener('click', (event) => {
+  const close = (event.target as HTMLElement).closest<HTMLElement>('[data-calendar-close]');
+  if (close) {
+    closeCalendarDialog();
+    return;
+  }
+  const cycle = (event.target as HTMLElement).closest<HTMLElement>('[data-week-cycle]');
+  if (cycle) {
+    const key = cycle.dataset.weekCycle ?? '';
+    const section = cycle.closest('.admin-week-section');
+    if (!section) return;
+    const cards = [...section.querySelectorAll<HTMLElement>('[data-week-appointment]')];
+    if (cards.length < 2) return;
+    const next = ((weekCycleIndices.get(key) ?? 0) + 1) % cards.length;
+    weekCycleIndices.set(key, next);
+    cards.forEach((card, index) => {
+      card.hidden = index !== next;
+    });
+    cycle.textContent = next === 0 ? `+${cards.length - 1} more` : `Next · ${next + 1} of ${cards.length}`;
+    return;
+  }
+  const appointmentAction = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-appointment-action]');
+  if (appointmentAction) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    void handleCalendarAppointmentAction(appointmentAction);
+  }
+});
+
+document.addEventListener('dragstart', (event) => {
+  const card = (event.target as HTMLElement).closest<HTMLElement>('[data-week-appointment]');
+  if (!card || card.getAttribute('draggable') !== 'true') return;
+  const id = card.dataset.weekAppointment ?? '';
+  if (!id || !event.dataTransfer) return;
+  event.dataTransfer.setData('text/plain', id);
+  event.dataTransfer.effectAllowed = 'move';
+  card.classList.add('is-dragging');
+});
+
+document.addEventListener('dragend', (event) => {
+  const card = (event.target as HTMLElement).closest<HTMLElement>('[data-week-appointment]');
+  card?.classList.remove('is-dragging');
+  for (const zone of document.querySelectorAll<HTMLElement>('[data-week-drop]')) {
+    zone.classList.remove('is-drop-target');
+  }
+});
+
+document.addEventListener('dragover', (event) => {
+  const zone = (event.target as HTMLElement).closest<HTMLElement>('[data-week-drop]');
+  if (!zone) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  zone.classList.add('is-drop-target');
+});
+
+document.addEventListener('dragleave', (event) => {
+  const zone = (event.target as HTMLElement).closest<HTMLElement>('[data-week-drop]');
+  if (zone && !zone.contains(event.relatedTarget as Node | null)) zone.classList.remove('is-drop-target');
+});
+
+document.addEventListener('drop', (event) => {
+  const zone = (event.target as HTMLElement).closest<HTMLElement>('[data-week-drop]');
+  if (!zone) return;
+  event.preventDefault();
+  zone.classList.remove('is-drop-target');
+  const id = event.dataTransfer?.getData('text/plain') ?? '';
+  const appointment = weekAppointmentIndex.get(id);
+  if (!appointment) return;
+  openCalendarReschedule(appointment, zone.dataset.weekDrop ?? '');
+});
 
 function renderUpcomingAppointments(): void {
   const target = document.querySelector<HTMLElement>('[data-admin-appointments]');
@@ -1047,6 +1597,13 @@ async function openRequest(requestId: string): Promise<void> {
   const checkoutFailure = String(payload.checkout_failure_reason ?? payload.checkout_error ?? '').trim();
   const checkoutCard = `<div class="admin-card" style="margin-top:1rem;"><h3>Payment &amp; checkout</h3><dl class="admin-definition"><dt>Payment state</dt><dd>${esc(requestPayment(request))}</dd><dt>Checkout readiness</dt><dd>${checkout?.enabled ? 'Ready' : 'Unavailable'}</dd><dt>Recurring scheduling</dt><dd>${checkout?.recurringScheduling ? 'Enabled' : 'Disabled - recurring checkout is blocked'}</dd><dt>Last checkout issue</dt><dd>${esc(checkoutFailure || 'No failed checkout is recorded for this request.')}</dd><dt>Last issue time</dt><dd>${esc(dateTime(payload.checkout_failure_at || '', request.branch_id))}</dd></dl></div>`;
 
+  const invoice = (data.invoice ?? null) as Record<string, unknown> | null;
+  const invoiceCard = `<div class="admin-card" style="margin-top:1rem;"><h3>Invoice</h3>${
+    invoice
+      ? `<dl class="admin-definition"><dt>Number</dt><dd>${esc(invoice.number)}</dd><dt>Status</dt><dd>${esc(titleCase(invoice.status))}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(String(invoice.due_date ?? '—'))}</dd></dl><div class="admin-actions">${can('finance.read') ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="request-open-invoice" data-invoice-id="${esc(invoice.id)}">Open in Finance</button>` : ''}</div>`
+      : `<p class="admin-muted">No invoice exists for this booking. Creating an invoice uses the agreed estimate price and does not email the customer or charge a card.</p>${can('finance.write') ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="request-create-invoice" data-id="${esc(requestId)}">Create Invoice</button>` : ''}`
+  }</div>`;
+
   const actions = can('booking.write')
     ? pending
       ? `<div class="admin-card" style="margin-top:1rem;">
@@ -1151,6 +1708,8 @@ async function openRequest(requestId: string): Promise<void> {
       <dt>Property</dt><dd>${esc([request.line1, request.city, request.state, request.postal_code].filter(Boolean).join(', ') || String(payload.locationText ?? '—'))}</dd>
       <dt>Service</dt><dd>${esc(String(payload.service_label ?? payload.serviceType ?? payload.service ?? '—'))}</dd>
       <dt>Estimate / price</dt><dd>${esc(String(payload.price ?? payload.expectedPrice ?? payload.total ?? '—'))}</dd>
+      <dt>Branch</dt><dd>${esc(request.branch_id ? `${titleCase(String(request.branch_id).replace('branch_', ''))} · ${appointmentBranchZone(request.branch_id)}` : '—')}</dd>
+      <dt>Crew</dt><dd>${esc(request.assigned_names || 'Unassigned')}</dd>
       <dt>Calendar event</dt><dd>${esc(request.calendar_event_id || '—')}</dd>
       <dt>Appointment</dt><dd>${esc(request.appointment_reference || '—')}</dd>
     </dl>
@@ -1162,7 +1721,7 @@ async function openRequest(requestId: string): Promise<void> {
     <h3 style="margin-top:1rem;">Customer email history</h3>
     ${notificationRows}
     ${email ? `<form class="admin-inline-form" data-form="request-notify" style="margin-top:.75rem;"><input type="hidden" name="requestId" value="${esc(requestId)}" /><button class="btn btn--ghost btn--small" type="submit">Resend last customer email</button></form>` : ''}
-  </div>${association}${checkoutCard}${actions}${lifecycleActions}${archiveAction}${reopenAction}`;
+  </div>${association}${checkoutCard}${invoiceCard}${actions}${lifecycleActions}${archiveAction}${reopenAction}`;
 }
 
 async function submitRequestAction(body: Record<string, unknown>): Promise<void> {
@@ -1373,8 +1932,12 @@ function renderCustomerCreate(): void {
   detail.innerHTML = `<div class="admin-card"><h2 class="admin-section-title">New customer</h2>${customerForm()}</div>`;
 }
 
-async function openCustomer(customerId: string): Promise<void> {
-  const data = await api<Record<string, unknown>>(`/api/admin/customers?id=${encodeURIComponent(customerId)}`);
+const customerObligations = new Map<
+  string,
+  { appointments: number; plans: number; invoices: number; documents: number }
+>();
+
+async function openCustomer(customerId: string): Promise<void> {  const data = await api<Record<string, unknown>>(`/api/admin/customers?id=${encodeURIComponent(customerId)}`);
   const detail = document.querySelector<HTMLElement>('[data-admin-customer-detail]');
   if (!detail) return;
   const customer = (data.customer ?? {}) as Record<string, unknown>;
@@ -1408,6 +1971,19 @@ async function openCustomer(customerId: string): Promise<void> {
   const anonymized =
     String(customer.first_name ?? '').trim().toLowerCase() === 'deleted' &&
     String(customer.last_name ?? '').trim().toLowerCase() === 'customer';
+  const obligationNow = Date.now();
+  customerObligations.set(customerId, {
+    appointments: appointments.filter((appointment) => {
+      const status = String(appointment.status ?? '');
+      const start = Date.parse(String(appointment.start_at ?? ''));
+      return ['pending', 'confirmed', 'in_progress'].includes(status) && Number.isFinite(start) && start >= obligationNow - 86_400_000;
+    }).length,
+    plans: recurringPlans.filter((plan) => ['active', 'paused'].includes(String(plan.status ?? ''))).length,
+    invoices: invoices.filter((invoice) => Number(invoice.balance_cents ?? 0) > 0 && !['paid', 'void'].includes(String(invoice.status ?? ''))).length,
+    documents: documentRequests.filter((request) =>
+      ['prepared', 'sent', 'viewed', 'partially_signed'].includes(String(request.status ?? '')),
+    ).length,
+  });
   detail.hidden = false;
   detail.innerHTML = `<div class="admin-card">
     <div class="admin-detail-head"><h2 class="admin-section-title">${esc(anonymized ? 'Anonymized customer record' : [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || 'Customer')}</h2><div class="admin-actions">${anonymized ? '' : `<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-edit">Edit Customer</button><form class="admin-inline-form" data-form="customer-archive"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="targetStatus" value="${customer.status === 'archived' ? 'active' : 'archived'}" /><button class="btn btn--ghost btn--small" type="submit">${customer.status === 'archived' ? 'Restore Archived Customer' : 'Archive Customer'}</button></form>`}${actor?.role === 'owner' && !anonymized ? `<form class="admin-inline-form" data-form="customer-delete"><input type="hidden" name="customerId" value="${esc(customerId)}" /><button class="btn btn--danger btn--small" type="submit">Delete Customer</button></form>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-create">Close</button></div></div>
@@ -1423,6 +1999,7 @@ async function openCustomer(customerId: string): Promise<void> {
     <h3>Notes</h3>${notes.map((note) => `<div class="admin-record"><p>${esc(note.body)}</p><p class="admin-muted">${esc(dateTime(note.created_at))}</p></div>`).join('') || '<p class="admin-muted">No notes.</p>'}
     <form class="admin-form" data-form="note-add" style="max-width:none;"><input type="hidden" name="customerId" value="${esc(customerId)}" /><label>Add note <textarea name="body" rows="3" required></textarea></label><button class="btn btn--secondary btn--small" type="submit">Add note</button></form>
     <details class="admin-detail-toggle" data-customer-edit><summary>Edit customer</summary>${customerForm({ ...customer, email, phone })}</details>
+    ${actor?.role === 'owner' && !anonymized ? `<details class="admin-detail-toggle"><summary>Privacy erasure (irreversible)</summary><p class="admin-muted">Use only for a verified legal or privacy erasure request. Ordinary removal from active operations is the Delete action, which archives the customer and preserves their history.</p><form class="admin-form" data-form="customer-erase" style="max-width:none"><input type="hidden" name="customerId" value="${esc(customerId)}" /><p class="admin-error">This permanently deletes identifiers or anonymizes retained financial and signed history. It cannot be undone.</p><button class="btn btn--danger btn--small" type="submit">Permanently erase identifiers</button></form></details>` : ''}
   </div>`;
   if (!can('customer.write')) {
     for (const form of detail.querySelectorAll<HTMLElement>('[data-form]')) form.hidden = true;
@@ -1762,6 +2339,7 @@ let manualContext: { customer: Record<string, unknown>; properties: Array<Record
 let manualQuote: ManualQuoteView | null = null;
 let manualAvailabilityResult: ManualAvailabilityView | null = null;
 let manualCreated: ManualCreatedView | null = null;
+let manualSaving = false;
 
 function manualForm(): HTMLFormElement | null {
   return document.querySelector<HTMLFormElement>('[data-manual-booking-form]');
@@ -1879,6 +2457,65 @@ function applyManualProperty(): void {
   renderManualSlots();
 }
 
+async function createManualCustomer(): Promise<void> {
+  setAppError();
+  const form = manualForm();
+  const resultNode = document.querySelector<HTMLElement>('[data-manual-customer-result]');
+  if (!form || !resultNode) return;
+  const data = new FormData(form);
+  const field = (name: string): string => String(data.get(name) ?? '').trim();
+  const firstName = field('newFirstName');
+  const lastName = field('newLastName');
+  const email = field('newEmail');
+  const addressLine1 = field('newAddressLine1');
+  if (!firstName && !lastName) {
+    setAppError('Enter the new customer’s name.');
+    return;
+  }
+  if (!email) {
+    setAppError('An email address is required to send agreements and invoices.');
+    return;
+  }
+  if (!addressLine1) {
+    setAppError('Enter the service address for the new customer.');
+    return;
+  }
+  resultNode.textContent = 'Creating customer…';
+  try {
+    const created = await api<{ id?: string }>('/api/admin/customers', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'create',
+        firstName,
+        lastName,
+        email,
+        phone: field('newPhone'),
+        addressLine1,
+        city: field('newCity'),
+        state: field('newState') || 'FL',
+        postalCode: field('newPostalCode'),
+        source: 'admin_booking',
+      }),
+    });
+    const customerId = String(created.id ?? '');
+    if (!customerId) throw new Error('customer_create_failed');
+    const select = manualField<HTMLSelectElement>('customerId');
+    if (select) {
+      select.insertAdjacentHTML(
+        'beforeend',
+        `<option value="${esc(customerId)}">${esc([firstName, lastName].filter(Boolean).join(' ') || email)} — ${esc(email)}</option>`,
+      );
+      select.value = customerId;
+    }
+    await loadManualContext(customerId);
+    resultNode.textContent = 'Customer created and selected. Continue the booking below.';
+    setSuccess('Customer created without losing the estimate details.');
+  } catch (error) {
+    resultNode.textContent = '';
+    setAppError(friendly(error));
+  }
+}
+
 async function loadManualContext(customerId: string): Promise<void> {
   manualContext = null;
   manualQuote = null;
@@ -1895,6 +2532,13 @@ async function loadManualContext(customerId: string): Promise<void> {
     customer: (data.customer ?? {}) as Record<string, unknown>,
     properties: (data.properties as Array<Record<string, unknown>>) ?? [],
   };
+  const branchId = String(manualContext.customer.primary_branch_id ?? '');
+  const branchNode = document.querySelector<HTMLElement>('[data-manual-branch]');
+  if (branchNode) {
+    branchNode.textContent = branchId
+      ? `Branch: ${titleCase(branchId.replace('branch_', ''))} · ${appointmentBranchZone(branchId)} (${appointmentZoneLabel(branchId)}). Appointment times use this branch's local timezone.`
+      : 'Branch and timezone are determined from the customer and service address.';
+  }
   populateManualProperties();
   const only = manualContext.properties[0];
   if (only) {
@@ -2118,20 +2762,60 @@ function renderManualCreated(): void {
   </div>`;
 }
 
-async function saveManualBooking(confirmNow: boolean): Promise<void> {
+type ManualBookingMode = 'save' | 'confirm' | 'documents' | 'documents-invoice';
+
+async function saveManualBooking(mode: ManualBookingMode): Promise<void> {
   setAppError();
+  if (manualSaving) return;
   if (!manualQuote || manualQuote.status !== 'priced') {
     setAppError('Generate a priced estimate before saving the booking.');
     return;
   }
-  const start = manualField<HTMLSelectElement>('slot')?.value ?? '';
-  const selected = manualField<HTMLSelectElement>('slot')?.selectedOptions[0];
+  const slotSelect = manualField<HTMLSelectElement>('slot');
+  const start = slotSelect?.value ?? '';
+  const selected = slotSelect?.selectedOptions[0];
   const end = selected?.getAttribute('data-slot-end') ?? '';
   const date = manualField<HTMLInputElement>('date')?.value ?? '';
   if (!start || !end || !date) {
     setAppError('Choose an available appointment time first.');
     return;
   }
+  const customer = manualContext?.customer ?? {};
+  const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Customer';
+  const email = String(customer.email ?? '');
+  const propertyId = manualField<HTMLSelectElement>('propertyId')?.value ?? '';
+  const property = manualContext?.properties.find((entry) => entry.id === propertyId);
+  const propertyLabel = property
+    ? [property.label, property.line1, property.city].filter(Boolean).join(' — ')
+    : 'Selected property';
+  const branchId = String(customer.primary_branch_id ?? '');
+  const timeLabel = selected?.textContent?.split('—')[0]?.trim() ?? '';
+  const serviceLabel = manualField<HTMLSelectElement>('serviceType')?.selectedOptions[0]?.textContent ?? 'Cleaning';
+  const documents = manualQuote.documentsRequired.map((item) => item.title).filter(Boolean);
+  if (mode !== 'save' && mode !== 'confirm') {
+    const intent =
+      mode === 'documents'
+        ? `<p>A secure signing invitation will be prepared and emailed to <strong>${esc(email || 'no email on file')}</strong>.</p>
+           <p>Required documents: ${documents.length ? esc(documents.join(', ')) : 'none active for this booking'}.</p>`
+        : `<p>A secure signing invitation will be prepared and emailed to <strong>${esc(email || 'no email on file')}</strong>, and a pre-service invoice <strong>draft</strong> will be created.</p>
+           <p>Required documents: ${documents.length ? esc(documents.join(', ')) : 'none active for this booking'}.</p>
+           <p>The invoice will not be emailed and no card will be charged. Sending the invoice is a separate explicit action in Finance.</p>`;
+    const confirmed = await adminConfirm({
+      title: mode === 'documents' ? 'Book and send agreements?' : 'Book, send agreements and prepare an invoice?',
+      body: `<dl class="admin-definition">
+          <dt>Customer</dt><dd>${esc(customerName)}</dd>
+          <dt>Recipient</dt><dd>${esc(email || 'No email on file')}</dd>
+          <dt>Property</dt><dd>${esc(propertyLabel)}</dd>
+          <dt>Branch</dt><dd>${esc(branchId ? `${titleCase(branchId.replace('branch_', ''))} · ${appointmentBranchZone(branchId)}` : 'Not recorded')}</dd>
+          <dt>Service</dt><dd>${esc(serviceLabel)}</dd>
+          <dt>Appointment</dt><dd>${esc(timeLabel)}</dd>
+          <dt>Price</dt><dd>${esc(manualQuote.totalCents === null ? 'Review required' : money(manualQuote.totalCents))}</dd>
+        </dl>${intent}`,
+      confirmLabel: mode === 'documents' ? 'Book & send agreements' : 'Book, send & prepare invoice',
+    });
+    if (!confirmed) return;
+  }
+  manualSaving = true;
   try {
     const created = await api<ManualCreatedView>('/api/admin/bookings', {
       method: 'POST',
@@ -2148,9 +2832,34 @@ async function saveManualBooking(confirmNow: boolean): Promise<void> {
     });
     manualCreated = created;
     renderManualCreated();
-    if (confirmNow) await confirmManualBooking(created.requestId);
+    if (mode === 'confirm') {
+      await confirmManualBooking(created.requestId);
+      return;
+    }
+    if (mode === 'save') {
+      setSuccess(`Booking ${created.reference} saved. Required agreements remain visibly outstanding until sent and signed.`);
+      return;
+    }
+    const documentsSent = await sendManualDocuments(created.requestId, true);
+    let invoiceCreated = true;
+    if (mode === 'documents-invoice') {
+      invoiceCreated = await createManualInvoice(created.requestId, false, true);
+    }
+    if (documentsSent && invoiceCreated) {
+      setSuccess(
+        mode === 'documents'
+          ? `Booking ${created.reference} saved and agreement invitation prepared.`
+          : `Booking ${created.reference} saved, agreement invitation prepared and invoice draft created. The invoice was not sent.`,
+      );
+    } else {
+      setAppError(
+        `Booking ${created.reference} was saved, but ${!documentsSent ? 'the agreement invitation' : 'the invoice draft'} did not complete. Use the follow-up actions on the booking; do not recreate the booking.`,
+      );
+    }
   } catch (error) {
     setAppError(friendly(error));
+  } finally {
+    manualSaving = false;
   }
 }
 
@@ -2174,11 +2883,17 @@ async function confirmManualBooking(requestId: string): Promise<void> {
   }
 }
 
-async function sendManualDocuments(_requestId: string): Promise<void> {
-  setAppError();
-  if (!manualQuote) return;
+async function sendManualDocuments(_requestId: string, quiet = false): Promise<boolean> {
+  if (!quiet) setAppError();
+  if (!manualQuote) return false;
   try {
-    const result = await api<{ required?: boolean; signingUrl?: string; emailSent?: boolean; message?: string }>(
+    const result = await api<{
+      required?: boolean;
+      signingUrl?: string;
+      emailSent?: boolean;
+      duplicate?: boolean;
+      message?: string;
+    }>(
       '/api/admin/documents',
       {
         method: 'POST',
@@ -2196,19 +2911,23 @@ async function sendManualDocuments(_requestId: string): Promise<void> {
     );
     const target = document.querySelector<HTMLElement>('[data-manual-booking-followup]');
     if (target) {
-      target.innerHTML = result.required
-        ? `<p class="admin-muted">${result.emailSent ? 'Signing email sent.' : 'Email was not sent; share this private link with the customer.'} <a href="${esc(
-            result.signingUrl,
-          )}">${esc(result.signingUrl)}</a></p>`
-        : `<p class="admin-muted">${esc(result.message ?? 'No approved document requirements are active for this booking.')}</p>`;
+      target.innerHTML = result.duplicate
+        ? `<p class="admin-muted">${esc(result.message ?? 'An active signing request already exists for this booking. Use Resend in Documents & Agreements if a fresh link is needed.')}</p>`
+        : result.required
+          ? `<p class="admin-muted">${result.emailSent ? 'Signing email sent.' : 'Email was not sent; share this private link with the customer.'} <a href="${esc(
+              result.signingUrl,
+            )}">${esc(result.signingUrl)}</a></p>`
+          : `<p class="admin-muted">${esc(result.message ?? 'No approved document requirements are active for this booking.')}</p>`;
     }
+    return true;
   } catch (error) {
-    setAppError(friendly(error));
+    if (!quiet) setAppError(friendly(error));
+    return false;
   }
 }
 
-async function createManualInvoice(requestId: string, paymentLink: boolean): Promise<void> {
-  setAppError();
+async function createManualInvoice(requestId: string, paymentLink: boolean, quiet = false): Promise<boolean> {
+  if (!quiet) setAppError();
   try {
     const result = await api<{
       invoice?: { id: string; number: string };
@@ -2222,12 +2941,14 @@ async function createManualInvoice(requestId: string, paymentLink: boolean): Pro
     if (target) {
       target.innerHTML = `<p class="admin-status-message" role="status">Invoice ${esc(
         result.invoice?.number ?? '',
-      )} created.${result.paymentLink?.url ? ` Payment link: <a href="${esc(result.paymentLink.url)}">${esc(result.paymentLink.url)}</a>` : ''}${
+      )} created as a draft. It has not been emailed and no charge was made.${result.paymentLink?.url ? ` Payment link: <a href="${esc(result.paymentLink.url)}">${esc(result.paymentLink.url)}</a>` : ''}${
         result.paymentLinkError ? ` Payment link unavailable: ${esc(titleCase(result.paymentLinkError))}.` : ''
       }</p>`;
     }
+    return true;
   } catch (error) {
-    setAppError(friendly(error));
+    if (!quiet) setAppError(friendly(error));
+    return false;
   }
 }
 
@@ -3041,16 +3762,22 @@ async function loadDispatch(): Promise<void> {
   const unassigned = document.querySelector<HTMLElement>('[data-admin-dispatch-unassigned]');
   if (unassigned) {
     const ready = data.team.filter((member) => (member.readiness ?? []).length === 0);
-    renderTable(unassigned, ['When', 'Reference', 'Customer', 'Service', 'Crew', 'Assign'], data.unassigned.map((job) => [
-      esc(dateTime(job.startAt, branchId)),
-      esc(job.reference),
-      esc(job.customer),
-      esc(job.serviceCode),
-      esc(job.crewSize),
-      ready.length
-        ? `<div class="admin-actions"><select data-dispatch-assign-member="${esc(job.id)}" aria-label="Choose a cleaner for ${esc(job.reference)}"><option value="">Choose cleaner</option>${ready.map((member) => `<option value="${esc(member.id)}">${esc(member.name)}</option>`).join('')}</select><button class="btn btn--primary btn--small" type="button" data-admin-action="dispatch-assign" data-id="${esc(job.id)}">Assign</button></div>`
-        : '<span class="admin-muted">No dispatch-ready cleaner. Complete a team profile first.</span>',
-    ]), 'No unassigned jobs in the dispatch window.');
+    unassigned.innerHTML = data.unassigned.length
+      ? `<p class="admin-muted">Select the full crew for each job. The server validates the exact crew set, qualifications, travel, branch and time before assigning. Customer appointment times never change.</p><div class="admin-dispatch-unassigned">${data.unassigned
+          .map((job) => {
+            const crewSize = Math.max(1, Number(job.crewSize ?? 1));
+            const options = ready.length
+              ? `<div class="admin-dispatch-crew" data-dispatch-crew="${esc(String(job.id))}">${ready
+                  .map(
+                    (member) =>
+                      `<label><input type="checkbox" data-dispatch-crew-member="${esc(String(job.id))}" value="${esc(member.id)}" /> <span><strong>${esc(member.name)}</strong> <span class="admin-muted">${esc(titleCase(member.role))} · ${esc(member.workdayStart ?? '07:00')}–${esc(member.workdayEnd ?? '18:00')}</span></span></label>`,
+                  )
+                  .join('')}</div><button class="btn btn--primary btn--small" type="button" data-admin-action="dispatch-assign" data-id="${esc(String(job.id))}">Assign selected crew</button>`
+              : '<span class="admin-muted">No dispatch-ready cleaner. Complete a team profile first.</span>';
+            return `<div class="admin-dispatch-job-card"><div><strong>${esc(String(job.reference ?? ''))}</strong><p class="admin-muted">${esc(dateTime(job.startAt, branchId))} · ${esc(String(job.customer ?? 'Customer'))} · ${esc(String(job.location ?? ''))} · ${esc(String(job.serviceCode ?? ''))} · crew ${crewSize}</p></div>${options}</div>`;
+          })
+          .join('')}</div>`
+      : '<p class="admin-muted">No unassigned jobs in the dispatch window.</p>';
   }
   const recommendations = document.querySelector<HTMLElement>('[data-admin-dispatch-recommendations]');
   if (recommendations) {
@@ -4738,9 +5465,9 @@ function renderComposerPreview(preview: Record<string, unknown>): void {
     const text = String(item.contentText ?? '').trim();
     const itemMissing = (item.missingVariables as string[] | undefined) ?? [];
     const rendered = text
-      ? renderDocumentHtml(text, 'doc-rendered')
+      ? renderBrandedDocumentHtml(text, { variant: 'preview' })
       : '<p>PDF template - use the Download action to review the source PDF.</p>';
-    return `<section class="doc" id="doc-${index}"><div class="doc-meta">Document ${index + 1} of ${requirements.length}</div><h1>${esc(String(item.title ?? 'Document'))}</h1><p class="doc-sub">${Number(item.required) ? 'Required agreement' : 'Optional agreement'}</p>${itemMissing.length ? `<p class="warn">Unresolved: ${itemMissing.map((key) => esc(key)).join(', ')}</p>` : ''}<div class="doc-text">${rendered}</div></section>`;
+    return `<section class="doc" id="doc-${index}"><div class="doc-preview-label">Document ${index + 1} of ${requirements.length} · ${esc(String(item.title ?? 'Document'))} · ${Number(item.required) ? 'Required agreement' : 'Optional agreement'}</div>${itemMissing.length ? `<p class="warn">Unresolved: ${itemMissing.map((key) => esc(key)).join(', ')}</p>` : ''}${rendered}</section>`;
   }).join('');
   const warning = contentProblems.length
     ? `<div class="warn banner">Internal review wording blocks customer delivery: ${contentProblems.map((term) => esc(term)).join(', ')}</div>`
@@ -4749,20 +5476,13 @@ function renderComposerPreview(preview: Record<string, unknown>): void {
       : '<div class="ok banner">All supported values resolve for this draft.</div>';
   frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>
     @page{size:Letter;margin:.7in .75in}
-    body{margin:0;background:#f4ece3;color:#2d2428;font-family:Georgia,'Times New Roman',serif;font-size:11pt;line-height:1.55}
+    body{margin:0;background:#f4ece3;padding:14px}
     .banner{padding:8px 12px;border-radius:8px;font-family:Segoe UI,Arial,sans-serif;font-size:9pt;margin:0 0 12px}
     .warn{background:#fff3d8;border:1px solid #e7cf9a;color:#6b4e12}.ok{background:#e8f4ec;border:1px solid #b9dbc6;color:#245c3c}
-    section.doc{background:#fff;border:1px solid #dccdbc;border-radius:4px;padding:.75in .8in;margin:0 0 18px;box-shadow:0 4px 14px rgba(72,42,38,.08)}
-    .doc-meta{font-family:Segoe UI,Arial,sans-serif;font-size:8pt;letter-spacing:.08em;text-transform:uppercase;color:#8a6d38}
-    h1{font-size:20pt;color:#7a3547;margin:4px 0 2px}
-    .doc-sub{font-family:Segoe UI,Arial,sans-serif;font-size:8.5pt;color:#75655f;margin:0 0 14px;border-bottom:1px solid #e5d8c8;padding-bottom:8px}
-    .doc-text{white-space:normal;overflow-wrap:anywhere;font-size:10.5pt}
-    .doc-text .doc-title{font-size:18pt;color:#7a3547;margin:0 0 8px}
-    .doc-text .doc-heading{font-size:13pt;color:#7a3547;margin:18px 0 6px;border-bottom:1px solid #e5d8c8;padding-bottom:5px}
-    .doc-text .doc-meta{color:#75655f;font-size:8.5pt;margin:0 0 14px;text-transform:none;letter-spacing:0}
-    .doc-text p{margin:0 0 9px}
-    .doc-text ul{margin:0 0 10px;padding-left:20px}
-    @media print{body{background:#fff}section.doc{border:0;box-shadow:none;margin:0;padding:0;break-after:page}}
+    ${DOCUMENT_BRAND_CSS}
+    section.doc{margin:0 0 18px;break-after:page}
+    .doc-preview-label{max-width:50rem;margin:0 auto 6px;font-family:Segoe UI,Arial,sans-serif;font-size:8pt;letter-spacing:.08em;text-transform:uppercase;color:#8a6d38}
+    @media print{body{background:#fff;padding:0}section.doc{margin:0;break-after:page}}
   </style></head><body>${warning}${body || '<p>No approved documents matched this packet and context.</p>'}</body></html>`;
   frame.onload = () => applyComposerZoom();
 }
@@ -5479,6 +6199,33 @@ for (const button of navButtons) button.addEventListener('click', () => void loa
 manualField<HTMLSelectElement>('customerId')?.addEventListener('change', (event) => {
   void loadManualContext((event.target as HTMLSelectElement).value).catch((error) => setAppError(friendly(error)));
 });
+document.querySelector<HTMLInputElement>('[data-manual-customer-search]')?.addEventListener('input', (event) => {
+  const term = (event.target as HTMLInputElement).value.trim().toLowerCase();
+  const select = manualField<HTMLSelectElement>('customerId');
+  if (!select) return;
+  let visible = 0;
+  for (const option of select.options) {
+    if (!option.value) continue;
+    const match = !term || option.text.toLowerCase().includes(term);
+    option.hidden = !match;
+    option.disabled = !match;
+    if (match) visible += 1;
+  }
+  if (term && visible === 0) {
+    select.insertAdjacentHTML('beforeend', '<option value="" disabled data-manual-no-match>No active customers match this filter — create one below</option>');
+  } else {
+    select.querySelector('[data-manual-no-match]')?.remove();
+  }
+});
+document.querySelector<HTMLInputElement>('[data-manual-customer-search]')?.addEventListener('search', (event) => {
+  if ((event.target as HTMLInputElement).value === '') {
+    document.querySelector('[data-manual-no-match]')?.remove();
+    for (const option of manualField<HTMLSelectElement>('customerId')?.options ?? []) {
+      option.hidden = false;
+      option.disabled = false;
+    }
+  }
+});
 manualField<HTMLSelectElement>('propertyId')?.addEventListener('change', () => applyManualProperty());
 manualField<HTMLSelectElement>('engine')?.addEventListener('change', () => syncManualEngine());
 for (const name of ['date', 'crewSize']) {
@@ -5698,11 +6445,55 @@ document.addEventListener('submit', (event) => {
     void api('/api/admin/customers', {
       method: 'POST',
       body: JSON.stringify({ action: targetStatus === 'active' ? 'restore' : 'archive', customerId }),
-    }).then(() => openCustomer(customerId)).catch((error) => setAppError(friendly(error)));
+    })
+      .then(async () => {
+        setSuccess(targetStatus === 'active' ? 'Customer restored to active operations.' : 'Customer moved to the archive.');
+        await loadCustomers();
+        await openCustomer(customerId);
+      })
+      .catch((error) => setAppError(friendly(error)));
   }
   if (kind === 'customer-delete') {
     const customerId = value('customerId');
-    const confirmation = window.prompt('Type DELETE to permanently delete this customer. Records with financial or booking history will be anonymized instead.');
+    const obligations = customerObligations.get(customerId);
+    const warnings = [
+      obligations?.appointments ? `${obligations.appointments} upcoming appointment(s)` : '',
+      obligations?.plans ? `${obligations.plans} recurring plan(s)` : '',
+      obligations?.invoices ? `${obligations.invoices} invoice(s) with a balance` : '',
+      obligations?.documents ? `${obligations.documents} unsigned or partially signed agreement(s)` : '',
+    ].filter(Boolean);
+    void (async () => {
+      const confirmed = await adminConfirm({
+        title: 'Are you sure you want to delete this customer?',
+        body: `<p>This will move them to your archive. Their historical records will be preserved.</p>${
+          warnings.length
+            ? `<p><strong>Active obligations remain in place:</strong></p><ul class="admin-confirm-list">${warnings
+                .map((warning) => `<li>${esc(warning)}</li>`)
+                .join('')}</ul><p>Archiving does not cancel appointments, recurring plans, invoices or signed agreements. Resolve them separately if required.</p>`
+            : ''
+        }`,
+        confirmLabel: 'Delete',
+        danger: true,
+      });
+      if (!confirmed) return;
+      try {
+        await api('/api/admin/customers', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'archive', customerId }),
+        });
+        selectedRequestIds.clear();
+        setSuccess('Customer moved to the archive. Historical records were preserved and can be restored.');
+        const detail = document.querySelector<HTMLElement>('[data-admin-customer-detail]');
+        if (detail) { detail.hidden = true; detail.innerHTML = ''; }
+        await loadCustomers();
+      } catch (error) {
+        setAppError(friendly(error));
+      }
+    })();
+  }
+  if (kind === 'customer-erase') {
+    const customerId = value('customerId');
+    const confirmation = window.prompt('Type DELETE to permanently erase this customer. Retained financial and signed history will be anonymized. This cannot be undone.');
     if (confirmation === 'DELETE') {
       void api<Record<string, unknown>>('/api/admin/customers', {
         method: 'POST',
@@ -6242,16 +7033,16 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (actionName === 'dispatch-assign') {
-    const memberSelect = document.querySelector<HTMLSelectElement>(
-      `[data-dispatch-assign-member="${CSS.escape(id)}"]`,
-    );
-    const memberId = memberSelect?.value ?? '';
-    if (!memberId) {
-      setAppError('Choose a dispatch-ready cleaner before assigning this job.');
+    const memberIds = [...document.querySelectorAll<HTMLInputElement>(
+      `[data-dispatch-crew-member="${CSS.escape(id)}"]:checked`,
+    )].map((input) => input.value);
+    if (memberIds.length === 0) {
+      setAppError('Select at least one dispatch-ready cleaner for this job.');
       return;
     }
-    if (!window.confirm('Assign this cleaner to the unassigned job? The customer appointment time will not change.')) return;
-    void dispatchAction({ action: 'assign_job', appointmentId: id, teamMemberIds: [memberId] });
+    const names = memberIds.map((memberId) => dispatchMemberName(memberId)).join(', ');
+    if (!window.confirm(`Assign ${names} as the crew for this unassigned job? The server will validate the exact crew set, travel, branch and calendar. Customer appointment times will not change.`)) return;
+    void dispatchAction({ action: 'assign_job', appointmentId: id, teamMemberIds: memberIds });
     return;
   }
   if (actionName === 'dispatch-retry-calendar') { void dispatchAction({ action: 'retry_calendar', decisionId: id }); return; }
@@ -6519,6 +7310,30 @@ document.addEventListener('click', (event) => {
   if (actionName === 'job-checklist') void openChecklist(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'checklist-create') void action('/api/admin/operations', { action: 'create_checklist', appointmentId: id }).then(() => openChecklist(id));
   if (actionName === 'invoice-open') void openInvoice(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'request-create-invoice') {
+    void (async () => {
+      try {
+        const result = await api<{ invoice?: { id: string; number: string } }>('/api/admin/bookings', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'invoice', requestId: id, paymentLink: false }),
+        });
+        setSuccess(`Invoice ${result.invoice?.number ?? ''} created from the agreed price. It has not been emailed and no charge was made.`);
+        await openRequest(id);
+      } catch (error) {
+        setAppError(friendly(error));
+      }
+    })();
+    return;
+  }
+  if (actionName === 'request-open-invoice') {
+    const invoiceId = target.dataset.invoiceId ?? '';
+    if (invoiceId) {
+      void loadView('finance')
+        .then(() => openInvoice(invoiceId))
+        .catch((error) => setAppError(friendly(error)));
+    }
+    return;
+  }
   if (actionName === 'customer-billing-portal') {
     setAppError();
     void api<{ url?: string }>('/api/admin/finance', {
@@ -6688,39 +7503,87 @@ document.addEventListener('click', (event) => {
     const operation = target.dataset.operation ?? '';
     const ids = [...selectedRequestIds];
     if (ids.length === 0) return;
-    const destructive = operation === 'delete_test';
-    const message = destructive
-      ? `Delete ${ids.length} test request(s)? This is allowed only for nonfinancial records with no executed documents or appointments. This cannot be undone.`
-      : `Apply "${operation}" to ${ids.length} selected request(s)? Customer emails will not be sent automatically.`;
-    if (!window.confirm(message)) return;
-    void api<{ succeeded?: number; failed?: number; results?: Array<{ id: string; ok: boolean; error?: string }> }>(
-      '/api/admin/requests',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'bulk',
-          operation,
-          requestIds: ids,
-          confirm: true,
-        }),
-      },
-    )
-      .then((result) => {
-        const failed = result.results?.filter((entry) => !entry.ok) ?? [];
+    const labels: Record<string, string> = {
+      approve: 'Approve',
+      archive: 'Archive',
+      restore: 'Restore',
+      deny: 'Deny',
+      mark_test: 'Mark as test',
+      delete_test: 'Delete',
+    };
+    const label = labels[operation] ?? titleCase(operation);
+    void (async () => {
+      try {
+        const preview = await api<{
+          total?: number;
+          eligible?: number;
+          ineligible?: number;
+          results?: Array<{ id: string; ok: boolean; error?: string }>;
+        }>('/api/admin/requests', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'bulk_preview', operation, requestIds: ids }),
+        });
+        const eligible = Number(preview.eligible ?? 0);
+        const ineligible = Number(preview.ineligible ?? 0);
+        const reasons = new Map<string, number>();
+        for (const entry of preview.results ?? []) {
+          if (entry.ok) continue;
+          const reason = entry.error ?? 'ineligible';
+          reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+        }
+        const reasonList = [...reasons.entries()]
+          .map(([reason, count]) => `<li>${esc(titleCase(reason.replaceAll('_', ' ')))} (${count})</li>`)
+          .join('');
+        const confirmed = await adminConfirm({
+          title: `${label} selected requests?`,
+          body: `<p><strong>${ids.length} selected</strong> · ${eligible} eligible · ${ineligible} protected/ineligible</p>${
+            reasonList ? `<ul class="admin-confirm-list">${reasonList}</ul>` : ''
+          }<p>${
+            operation === 'delete_test'
+              ? 'Permanent deletion is limited to unmarked nontransactional test records. Financial, operational and signed evidence is always retained.'
+              : 'Customer emails are not sent automatically. Historical records and active obligations are preserved.'
+          }</p>`,
+          confirmLabel: `${label} ${eligible}`,
+          danger: operation === 'deny' || operation === 'delete_test',
+        });
+        if (!confirmed) return;
+        if (eligible === 0) {
+          setAppError('Nothing in this selection is eligible for that action. Review the protection reasons.');
+          return;
+        }
+        const result = await api<{
+          succeeded?: number;
+          failed?: number;
+          results?: Array<{ id: string; ok: boolean; error?: string }>;
+        }>('/api/admin/requests', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'bulk', operation, requestIds: ids, confirm: true }),
+        });
+        const failed = (result.results ?? []).filter((entry) => !entry.ok);
+        const resultNode = document.querySelector<HTMLElement>('[data-admin-request-bulk-result]');
+        if (resultNode) {
+          resultNode.innerHTML = `<ul class="admin-result-list"><li><strong>${result.succeeded ?? 0} completed</strong> · ${
+            result.failed ?? 0
+          } skipped</li>${failed
+            .slice(0, 25)
+            .map((entry) => {
+              const match = loadedRequests.find((row) => String(row.id) === entry.id);
+              const reference = String(match?.quote_reference ?? entry.id);
+              return `<li class="is-failed">${esc(reference)} — ${esc(titleCase(String(entry.error ?? 'failed').replaceAll('_', ' ')))}</li>`;
+            })
+            .join('')}</ul>`;
+        }
         if (failed.length) {
-          setAppError(
-            `${result.succeeded ?? 0} updated, ${failed.length} skipped: ${failed
-              .slice(0, 4)
-              .map((entry) => `${entry.id.slice(0, 12)} ${entry.error ?? ''}`)
-              .join('; ')}`,
-          );
+          setAppError(`${result.succeeded ?? 0} updated, ${failed.length} skipped. The reasons are listed above.`);
         } else {
           setSuccess(`${result.succeeded ?? 0} request(s) updated.`);
         }
         selectedRequestIds.clear();
-        return loadCalendar(currentRequestView);
-      })
-      .catch((error) => setAppError(friendly(error)));
+        await loadCalendar(currentRequestView);
+      } catch (error) {
+        setAppError(friendly(error));
+      }
+    })();
   }
   if (actionName === 'alert-action') {
     const key = target.dataset.key ?? '';
@@ -6753,8 +7616,11 @@ document.addEventListener('click', (event) => {
       .catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'manual-availability') void checkManualAvailability();
-  if (actionName === 'manual-create') void saveManualBooking(false);
-  if (actionName === 'manual-create-confirm') void saveManualBooking(true);
+  if (actionName === 'manual-create-customer') void createManualCustomer();
+  if (actionName === 'manual-create') void saveManualBooking('save');
+  if (actionName === 'manual-create-confirm') void saveManualBooking('confirm');
+  if (actionName === 'manual-create-documents') void saveManualBooking('documents');
+  if (actionName === 'manual-create-send-invoice') void saveManualBooking('documents-invoice');
   if (actionName === 'manual-confirm') void confirmManualBooking(id);
   if (actionName === 'manual-send-documents') void sendManualDocuments(id);
   if (actionName === 'manual-invoice') void createManualInvoice(id, false);
@@ -6911,20 +7777,13 @@ function richDocumentContent(): string {
 function renderDocumentEditorPreview(): void {
   const frame = document.querySelector<HTMLIFrameElement>('[data-document-editor-preview]');
   if (!frame) return;
-  const html = renderDocumentHtml(richDocumentContent(), 'doc-rendered');
+  const html = renderBrandedDocumentHtml(richDocumentContent(), { variant: 'preview' });
   frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>
     @page{size:Letter;margin:.7in .75in}
-    body{margin:0;background:#f4ece3;color:#2d2428;font-family:Georgia,'Times New Roman',serif;font-size:11pt;line-height:1.55;padding:14px}
-    .doc-rendered{background:#fff;border:1px solid #dccdbc;border-radius:4px;padding:.75in .8in;box-shadow:0 4px 14px rgba(72,42,38,.08);min-height:38rem}
-    .doc-rich header,.doc-rendered header{font-size:8.5pt;letter-spacing:.08em;text-transform:uppercase;color:#8c7a70;border-bottom:1px solid #e5d8c8;padding-bottom:4px;margin-bottom:12px}
-    .doc-rich footer,.doc-rendered footer{font-size:8.5pt;color:#8c7a70;border-top:1px solid #e5d8c8;padding-top:6px;margin-top:18px}
-    .doc-rich [data-doc-page-break]{border-top:2px dashed #c99fa3;margin:18px 0;height:0}
-    .doc-title{font-size:18pt;color:#7a3547;margin:0 0 8px}
-    .doc-heading{font-size:13pt;color:#7a3547;margin:18px 0 6px;border-bottom:1px solid #e5d8c8;padding-bottom:5px}
-    .doc-meta{color:#75655f;font-size:8.5pt;margin:0 0 14px}
-    p{margin:0 0 9px}ul,ol{margin:0 0 10px;padding-left:20px}
-    table{width:100%;border-collapse:collapse;margin:8px 0}td,th{border:1px solid #dccdbc;padding:5px 6px;vertical-align:top}
-    @media print{body{background:#fff;padding:0}.doc-rendered{border:0;box-shadow:none;padding:0;min-height:0}}
+    body{margin:0;background:#f4ece3;padding:14px}
+    ${DOCUMENT_BRAND_CSS}
+    .branded-document{min-height:38rem;border:1px solid #dccdbc;border-radius:4px}
+    @media print{body{background:#fff;padding:0}.branded-document{border:0;box-shadow:none;min-height:0}}
   </style></head><body>${html}</body></html>`;
 }
 

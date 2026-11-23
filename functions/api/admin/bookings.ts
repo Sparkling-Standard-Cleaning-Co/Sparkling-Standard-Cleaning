@@ -67,6 +67,7 @@ async function contextFor(
     .bind(customerId, ...branch.bind)
     .first<Record<string, unknown>>();
   if (!customer) throw new AdminAuthError(404, 'customer_not_found');
+  if (String(customer.status ?? '') !== 'active') throw new AdminAuthError(409, 'customer_archived');
   const properties = await db
     .prepare(
       `SELECT id, label, line1, line2, city, state, postal_code, latitude, longitude, precision,

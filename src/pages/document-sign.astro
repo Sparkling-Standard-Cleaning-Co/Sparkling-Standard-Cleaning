@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import '../styles/employee.css';
 import '../styles/signing.css';
+import { DOCUMENT_BRAND_CSS } from '../lib/documents/branding.ts';
 ---
 
 <!doctype html>
@@ -12,6 +13,7 @@ import '../styles/signing.css';
     <meta name="robots" content="noindex, nofollow" />
     <meta name="theme-color" content="#8a4a52" />
     <title>Sign Documents | Sparkling Standard</title>
+    <style is:inline set:html={DOCUMENT_BRAND_CSS}></style>
   </head>
   <body class="signing-body">
     <main class="signing-shell">

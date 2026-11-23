@@ -1,4 +1,4 @@
-import { renderDocumentHtml } from '../lib/documents/rich-text.ts';
+import { renderBrandedDocumentHtml } from '../lib/documents/branding.ts';
 import {
   formatPricingMoney,
   type PricingSnapshot,
@@ -764,7 +764,7 @@ function openDocument(templateId: string): void {
   if (!document || !dialog || !dialogTitle || !dialogBody) return;
   dialogTitle.textContent = document.title;
   dialogBody.innerHTML = document.contentText
-    ? renderDocumentHtml(document.contentText, 'signing-doc-text')
+    ? renderBrandedDocumentHtml(document.contentText, { variant: 'signing', className: 'signing-doc-text' })
     : '<p class="signing-muted">This PDF document opens in a separate tab. Review it before acknowledging it.</p>';
   dialog.showModal();
 }

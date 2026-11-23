@@ -5,11 +5,12 @@
 // between paragraphs, and `**bold**` inline. The stored content remains the
 // source of truth; renderers must never show the internal markers.
 
-export type DocumentBlockType = 'title' | 'heading' | 'paragraph' | 'metadata' | 'bullet';
+export type DocumentBlockType = 'title' | 'heading' | 'paragraph' | 'metadata' | 'bullet' | 'table';
 
 export interface DocumentBlock {
   type: DocumentBlockType;
   text: string;
+  rows?: string[][];
 }
 
 const INTERNAL_NOTICE_PATTERNS: RegExp[] = [
@@ -105,10 +106,32 @@ export function unresolvedDocumentVariables(content: string): string[] {
 export function parseDocumentBlocks(content: string): DocumentBlock[] {
   const lines = normalize(content).split('\n');
   const blocks: DocumentBlock[] = [];
-  for (const [index, raw] of lines.entries()) {
+  const metadataLine = /^\*{0,2}(Document ID|Version|Status|Legal review|Effective date|Applies to|Brand|Contact|Legal entity)\*{0,2}\s*:/i;
+  const parseCells = (value: string): string[] => {
+    const trimmed = value.trim();
+    const inner = trimmed.startsWith('|') ? trimmed.slice(1) : trimmed;
+    const withoutEnd = inner.endsWith('|') ? inner.slice(0, -1) : inner;
+    return withoutEnd.split('|').map((cell) => cell.trim());
+  };
+  for (let index = 0; index < lines.length; index += 1) {
+    const raw = lines[index] ?? '';
     const line = raw.trimEnd();
     const trimmed = line.trim();
     if (!trimmed) continue;
+    const next = (lines[index + 1] ?? '').trim();
+    if (trimmed.includes('|') && /^\|?\s*:?-{3,}/.test(next)) {
+      const rows: string[][] = [parseCells(trimmed)];
+      index += 2;
+      while (index < lines.length) {
+        const row = (lines[index] ?? '').trim();
+        if (!row || !row.includes('|')) break;
+        rows.push(parseCells(row));
+        index += 1;
+      }
+      index -= 1;
+      blocks.push({ type: 'table', text: '', rows });
+      continue;
+    }
     let type: DocumentBlockType = 'paragraph';
     let text = trimmed;
     if (/^#\s+/.test(trimmed)) {
@@ -129,6 +152,8 @@ export function parseDocumentBlocks(content: string): DocumentBlock[] {
     } else if (/^#/.test(trimmed)) {
       type = 'title';
       text = trimmed.replace(/^#+\s*/, '');
+    } else if (metadataLine.test(trimmed)) {
+      type = 'metadata';
     } else if (index === 0) {
       type = 'title';
     } else if (index === 1) {
@@ -159,6 +184,14 @@ export function serializeDocumentBlocks(blocks: DocumentBlock[]): string {
     }
   };
   for (const block of blocks) {
+    if (block.type === 'table' && block.rows?.length) {
+      flushBullets();
+      const rows = block.rows.map((row) => `| ${row.join(' | ')} |`);
+      const columns = Math.max(1, ...block.rows.map((row) => row.length));
+      rows.splice(1, 0, `| ${Array.from({ length: columns }, () => '---').join(' | ')} |`);
+      groups.push(rows.join('\n'));
+      continue;
+    }
     const text = String(block?.text ?? '').trim();
     if (!text) continue;
     if (block.type === 'bullet') {
@@ -214,14 +247,15 @@ function escapeHtml(value: string): string {
 }
 
 function isTechnicalMetadata(value: string): boolean {
-  const text = value.trim();
+  const text = value.trim().replace(/^\*{0,2}/, '').trim();
   return (
     /^version\b/i.test(text) ||
     /^document\b.*\bversion\b/i.test(text) ||
     /^template\b/i.test(text) ||
     /\bsha-?256\b/i.test(text) ||
     /^consent version\b/i.test(text) ||
-    /^status\s*:/i.test(text)
+    /^status\s*:/i.test(text) ||
+    /^\*{0,2}(document id|legal review|effective date|applies to|brand|contact|legal entity)\*{0,2}\s*:/i.test(text)
   );
 }
 
@@ -424,6 +458,15 @@ export function renderDocumentHtml(content: string, className = 'document-render
       continue;
     }
     flushBullets();
+    if (block.type === 'table' && block.rows?.length) {
+      const [header = [], ...body] = block.rows;
+      const head = `<thead><tr>${header.map((cell) => `<th>${renderInline(cell)}</th>`).join('')}</tr></thead>`;
+      const rows = body
+        .map((row) => `<tr>${row.map((cell) => `<td>${renderInline(cell)}</td>`).join('')}</tr>`)
+        .join('');
+      output.push(`<table class="doc-table">${head}<tbody>${rows}</tbody></table>`);
+      continue;
+    }
     if (block.type === 'metadata' && isTechnicalMetadata(block.text)) continue;
     if (block.type === 'title') output.push(`<h1 class="doc-title">${renderInline(block.text)}</h1>`);
     else if (block.type === 'heading') output.push(`<h2 class="doc-heading">${renderInline(block.text)}</h2>`);

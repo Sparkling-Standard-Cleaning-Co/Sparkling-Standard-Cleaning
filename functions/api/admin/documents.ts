@@ -631,6 +631,39 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             paymentTerms: variables['payment.terms'] ?? '',
           })
         : undefined;
+      const existingRequest = text(body.bookingReference, 120)
+        ? await db
+            .prepare(
+              `SELECT id FROM signing_requests
+               WHERE booking_reference = ? AND status IN ('pending','partially_signed')
+                 AND (? = '' OR customer_id = ?)
+               ORDER BY created_at DESC LIMIT 1`,
+            )
+            .bind(
+              text(body.bookingReference, 120),
+              text(documentContext.customerId, 100),
+              text(documentContext.customerId, 100),
+            )
+            .first<{ id: string }>()
+        : null;
+      if (existingRequest) {
+        await audit(db, {
+          actorUserId: actor.id,
+          action: 'documents.signing_request_duplicate_suppressed',
+          entityType: 'signing_request',
+          entityId: existingRequest.id,
+          detail: text(body.bookingReference, 120),
+        });
+        return json({
+          ok: true,
+          required: true,
+          duplicate: true,
+          requestId: existingRequest.id,
+          emailSent: false,
+          message:
+            'An active signing request already exists for this booking. No duplicate invitation or email was created. Use Resend in Documents & Agreements if the customer needs a fresh link.',
+        });
+      }
       const created = await createSigningRequest(db, documentContext, {
         createdByAdminUserId: actor.id,
         ...(text(body.bundleId, 100) ? { bundleId: text(body.bundleId, 100) } : {}),

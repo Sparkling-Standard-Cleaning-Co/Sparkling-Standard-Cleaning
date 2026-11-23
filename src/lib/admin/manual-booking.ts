@@ -874,6 +874,32 @@ export async function createManualBooking(
   const teamMemberIds = await resolveCrew(db, input.teamMemberIds ?? [], exact.resourceIds);
   if (teamMemberIds.length === 0) throw new AdminAuthError(409, 'crew_unresolved');
 
+  const existing = await db
+    .prepare(
+      `SELECT id, hold_id, quote_reference FROM booking_requests
+       WHERE customer_id = ? AND property_id = ? AND start_at = ? AND status = 'pending'
+         AND hold_id LIKE 'manual_%' AND created_at >= datetime('now', '-15 minutes')
+       ORDER BY created_at DESC LIMIT 1`,
+    )
+    .bind(input.customerId, input.propertyId, exact.start)
+    .first<{ id: string; hold_id: string; quote_reference: string }>();
+  if (existing) {
+    await audit(db, {
+      actorUserId: actor.id,
+      action: 'booking.manual_duplicate_suppressed',
+      entityType: 'booking_request',
+      entityId: existing.id,
+      detail: existing.quote_reference,
+    });
+    return {
+      requestId: existing.id,
+      holdId: existing.hold_id,
+      reference: existing.quote_reference,
+      quote,
+      appointmentId: null,
+    };
+  }
+
   const reference = `MB-${input.date.replaceAll('-', '')}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
   quote.fields.preferred_date = input.date;
   quote.fields.preferred_time = new Intl.DateTimeFormat('en-US', {

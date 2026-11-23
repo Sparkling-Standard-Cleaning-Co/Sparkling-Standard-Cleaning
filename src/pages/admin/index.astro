@@ -235,6 +235,7 @@ import {
                 <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-bulk" data-operation="mark_test">Mark as test</button>
                 <button class="btn btn--danger btn--small" type="button" data-admin-action="request-bulk" data-operation="delete_test">Delete eligible test records</button>
               </div>
+              <div data-admin-request-bulk-result role="status" aria-live="polite"></div>
               <div data-admin-requests></div>
             </div>
             <div data-admin-request-detail style="margin-top:1rem;" hidden></div>
@@ -291,9 +292,26 @@ import {
                 this estimate only and never rewrite the profile.
               </p>
               <form class="admin-form admin-form--grid" data-manual-booking-form style="max-width:none">
+                <label>Find customer <input type="search" data-manual-customer-search placeholder="Filter by name, email or phone" /></label>
                 <label>Customer <select name="customerId" data-manual-customer required><option value="">Choose a customer</option></select></label>
                 <label>Property <select name="propertyId" data-manual-property required><option value="">Choose a customer first</option></select></label>
-                <p class="admin-field--wide admin-muted">Need a new customer or another property? <button class="btn btn--ghost btn--small" type="button" data-admin-action="manual-manage-customer">Open the customer record</button></p>
+                <p class="admin-field--wide admin-muted" data-manual-branch>Branch and timezone are determined from the customer and service address.</p>
+                <details class="admin-detail-toggle admin-field--wide" data-manual-new-customer>
+                  <summary>Create a new customer without losing this booking</summary>
+                  <p class="admin-muted">Duplicate email and phone numbers are rejected by the server. The customer is assigned to the active branch for the verified address.</p>
+                  <div class="admin-form admin-form--grid">
+                    <label>First name <input name="newFirstName" required /></label>
+                    <label>Last name <input name="newLastName" /></label>
+                    <label>Email <input name="newEmail" type="email" /></label>
+                    <label>Phone <input name="newPhone" /></label>
+                    <label class="admin-field--wide">Service address <input name="newAddressLine1" autocomplete="off" /></label>
+                    <label>City <input name="newCity" /></label>
+                    <label>State <input name="newState" value="FL" maxlength="2" /></label>
+                    <label>ZIP <input name="newPostalCode" maxlength="10" /></label>
+                    <div class="admin-field--wide admin-actions"><button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-create-customer">Create customer and continue</button></div>
+                    <p class="admin-field--wide" data-manual-customer-result role="status" aria-live="polite"></p>
+                  </div>
+                </details>
                 <label>Booking type
                   <select name="engine" data-manual-engine>
                     <option value="residential">Residential cleaning</option>
@@ -361,8 +379,10 @@ import {
                 <label>Available appointment start <select name="slot" data-manual-slots><option value="">Generate an estimate and check times first</option></select></label>
                 <div class="admin-field--wide" data-manual-staff></div>
                 <div class="admin-field--wide admin-actions">
-                  <button class="btn btn--primary btn--small" type="button" data-admin-action="manual-create">Save Pending Booking</button>
-                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-create-confirm">Create Booking and Confirm</button>
+                  <button class="btn btn--primary btn--small" type="button" data-admin-action="manual-create">Save Booking</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-create-documents">Book &amp; Send Agreements</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-create-send-invoice">Book, Send Agreements &amp; Invoice</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="manual-create-confirm">Book &amp; Confirm</button>
                 </div>
               </form>
               <div data-manual-booking-result style="margin-top:1rem;"></div>
@@ -929,10 +949,31 @@ import {
               </div>
               <div class="document-editor-layout">
                 <div class="document-editor-canvas-pane">
+                  <div class="document-editor-brandbar" aria-label="Branded letterhead applied to this document">
+                    <img src="/brand/sparkling-standard-circular-logo-1024.png" alt="" width="42" height="42" />
+                    <div>
+                      <strong>Sparkling Standard Cleaning Co.</strong>
+                      <span>Standards That Sparkle.</span>
+                    </div>
+                    <small>Branded letterhead, footer and page numbers are applied automatically.</small>
+                  </div>
                   <label class="admin-muted" style="display:block;font-size:.75rem;">Document header (optional)</label>
                   <input data-document-editor-header class="document-editor-header-input" maxlength="500" placeholder="Printed at the top of the document" />
                   <div class="document-editor-surface-wrap">
-                    <div class="document-editor-surface" data-document-editor-canvas contenteditable="true" role="textbox" aria-multiline="true" aria-label="Document body"></div>
+                    <div class="document-editor-surface">
+                      <div class="document-editor-page-brand" aria-hidden="true">
+                        <img src="/brand/sparkling-standard-circular-logo-1024.png" alt="" width="42" height="42" />
+                        <div>
+                          <strong>Sparkling Standard Cleaning Co.</strong>
+                          <span>Standards That Sparkle.</span>
+                        </div>
+                      </div>
+                      <div class="document-editor-canvas" data-document-editor-canvas contenteditable="true" role="textbox" aria-multiline="true" aria-label="Document body"></div>
+                      <div class="document-editor-page-footer" aria-hidden="true">
+                        <span>Sparkling Standard LLC · Standards That Sparkle.</span>
+                        <span>Confidential customer copy</span>
+                      </div>
+                    </div>
                   </div>
                   <label class="admin-muted" style="display:block;font-size:.75rem;">Document footer (optional)</label>
                   <input data-document-editor-footer class="document-editor-footer-input" maxlength="500" placeholder="Printed at the end of the document" />
@@ -1722,6 +1763,17 @@ import {
         </div>
       </div>
     </main>
+    <dialog class="admin-dialog" data-admin-dialog aria-labelledby="admin-dialog-title">
+      <form method="dialog">
+        <h2 id="admin-dialog-title" data-admin-dialog-title>Confirm action</h2>
+        <div class="admin-dialog__body" data-admin-dialog-body></div>
+        <div class="admin-actions admin-dialog__actions">
+          <button class="btn btn--ghost btn--small" value="cancel" data-admin-dialog-cancel>Cancel</button>
+          <button class="btn btn--primary btn--small" value="confirm" data-admin-dialog-confirm>Confirm</button>
+        </div>
+      </form>
+    </dialog>
+    <div data-admin-calendar-dialog></div>
     <script>
       import '../../scripts/admin';
     </script>

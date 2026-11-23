@@ -1940,6 +1940,152 @@ test('closed and archived requests stay searchable and can be reopened', async (
   assert.equal(reopenedRow.archived_at, null);
 });
 
+test('bulk reservation actions reach the real handler, preview eligibility and persist outcomes', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'bulk-owner@example.test',
+    name: 'Bulk Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const actor = await readOpsActor(db, request(`ss_ops=${session.token}`));
+  assert.ok(actor);
+  db.raw
+    .prepare(
+      `INSERT INTO booking_requests
+       (id, hold_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+       VALUES (?, ?, ?, ?, '2026-11-10', ?, ?, 120, '{}')`,
+    )
+    .run('BR-BULK-CLOSED', 'hold-bulk-1', 'released', 'SS-BULK-1', '2026-11-10T14:00:00.000Z', '2026-11-10T16:00:00.000Z');
+  db.raw
+    .prepare(
+      `INSERT INTO booking_requests
+       (id, hold_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+       VALUES (?, ?, 'pending', ?, '2026-11-11', ?, ?, 120, '{}')`,
+    )
+    .run('BR-BULK-ACTIVE', 'hold-bulk-2', 'SS-BULK-2', '2026-11-11T14:00:00.000Z', '2026-11-11T16:00:00.000Z');
+  const headers = {
+    Cookie: `ss_ops=${session.token}`,
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': actor!.csrf,
+  };
+  const post = (payload: Record<string, unknown>) =>
+    adminRequestsPost({
+      request: new Request('https://example.test/api/admin/requests', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      }),
+      env: { DB: db },
+    } as never);
+
+  const previewResponse = await post({
+    action: 'bulk_preview',
+    operation: 'archive',
+    requestIds: ['BR-BULK-CLOSED', 'BR-BULK-ACTIVE'],
+  });
+  assert.equal(previewResponse.status, 200, 'bulk actions no longer require a single requestId');
+  const preview = (await previewResponse.json()) as {
+    eligible: number;
+    ineligible: number;
+    results: Array<{ id: string; ok: boolean; error?: string }>;
+  };
+  assert.equal(preview.eligible, 1);
+  assert.equal(preview.ineligible, 1);
+  assert.equal(
+    preview.results.find((entry) => entry.id === 'BR-BULK-ACTIVE')?.error,
+    'active_request_must_close_or_cancel',
+  );
+
+  const archived = await post({
+    action: 'bulk',
+    operation: 'archive',
+    confirm: true,
+    requestIds: ['BR-BULK-CLOSED', 'BR-BULK-ACTIVE'],
+  });
+  assert.equal(archived.status, 200);
+  const archivedBody = (await archived.json()) as {
+    succeeded: number;
+    failed: number;
+    results: Array<{ id: string; ok: boolean; error?: string }>;
+  };
+  assert.equal(archivedBody.succeeded, 1);
+  assert.equal(archivedBody.failed, 1, 'an active obligation is protected from archiving');
+  const rows = db.raw
+    .prepare("SELECT id, archived_at FROM booking_requests WHERE id IN ('BR-BULK-CLOSED','BR-BULK-ACTIVE') ORDER BY id")
+    .all() as Array<{ id: string; archived_at: string | null }>;
+  assert.ok(rows.find((row) => row.id === 'BR-BULK-CLOSED')?.archived_at);
+  assert.equal(rows.find((row) => row.id === 'BR-BULK-ACTIVE')?.archived_at, null);
+  const auditRows = db.raw
+    .prepare("SELECT COUNT(*) AS n FROM admin_audit WHERE action = 'request.bulk_archived' AND entity_id = 'BR-BULK-CLOSED'")
+    .get() as { n: number };
+  assert.equal(auditRows.n, 1, 'the persisted operation is audited');
+
+  const restored = await post({
+    action: 'bulk',
+    operation: 'restore',
+    confirm: true,
+    requestIds: ['BR-BULK-CLOSED'],
+  });
+  assert.equal(restored.status, 200);
+  const restoredRow = db.raw
+    .prepare('SELECT archived_at FROM booking_requests WHERE id = ?')
+    .get('BR-BULK-CLOSED') as { archived_at: string | null };
+  assert.equal(restoredRow.archived_at, null);
+
+  const protectedArchive = await post({ action: 'archive', requestId: 'BR-BULK-ACTIVE' });
+  assert.equal(protectedArchive.status, 409, 'an individual archive cannot bypass an active obligation');
+  const denied = await post({
+    action: 'bulk',
+    operation: 'deny',
+    confirm: true,
+    requestIds: ['BR-BULK-ACTIVE'],
+  });
+  assert.equal(denied.status, 200);
+  const deniedRow = db.raw
+    .prepare('SELECT status, closed_at FROM booking_requests WHERE id = ?')
+    .get('BR-BULK-ACTIVE') as { status: string; closed_at: string | null };
+  assert.equal(deniedRow.status, 'declined');
+  assert.ok(deniedRow.closed_at);
+
+  const archivedAfterDeny = await post({ action: 'archive', requestId: 'BR-BULK-ACTIVE' });
+  assert.equal(archivedAfterDeny.status, 200, 'a closed record can be archived individually');
+  const archivedAfterDenyRow = db.raw
+    .prepare('SELECT archived_at FROM booking_requests WHERE id = ?')
+    .get('BR-BULK-ACTIVE') as { archived_at: string | null };
+  assert.ok(archivedAfterDenyRow.archived_at);
+
+  db.raw
+    .prepare(
+      `INSERT INTO booking_requests
+       (id, hold_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+       VALUES ('BR-BULK-TEST', 'hold-bulk-3', 'pending', 'SS-BULK-TEST', '2026-11-12', '2026-11-12T14:00:00.000Z', '2026-11-12T16:00:00.000Z', 120, '{}')`,
+    )
+    .run();
+  const marked = await post({
+    action: 'bulk',
+    operation: 'mark_test',
+    confirm: true,
+    requestIds: ['BR-BULK-TEST'],
+  });
+  assert.equal(marked.status, 200);
+  const testRow = db.raw
+    .prepare('SELECT is_test FROM booking_requests WHERE id = ?')
+    .get('BR-BULK-TEST') as { is_test: number };
+  assert.equal(testRow.is_test, 1);
+  const deletedTest = await post({
+    action: 'bulk',
+    operation: 'delete_test',
+    confirm: true,
+    requestIds: ['BR-BULK-TEST'],
+  });
+  assert.equal(deletedTest.status, 200);
+  const gone = db.raw
+    .prepare("SELECT COUNT(*) AS n FROM booking_requests WHERE id = 'BR-BULK-TEST'")
+    .get() as { n: number };
+  assert.equal(gone.n, 0, 'an eligible test record is actually deleted');
+});
+
 test('customers archive, restore and permanently delete when no history blocks it', async () => {
   const db = migratedDb();
   const owner = await enrollOwner(db, {

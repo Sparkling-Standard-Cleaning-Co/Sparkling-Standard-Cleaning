@@ -16,6 +16,8 @@ import {
   RIGHT,
   ROSE,
   assemblePdf,
+  image,
+  rightText,
   rule,
   text,
   textFont,
@@ -23,6 +25,8 @@ import {
   wrap,
   type PdfFont,
 } from '../pdf/pdf-core.ts';
+import { BRAND_LOGO } from './brand-logo.ts';
+import { DOCUMENT_BRAND } from './branding.ts';
 import {
   isRichDocumentHtml,
   parseDocumentBlocks,
@@ -70,6 +74,8 @@ export interface AgreementPdfInput {
 const BODY_SIZE = 9.2;
 const LEADING = 12.4;
 const HEAD_SIZE = 11.2;
+const GOLD = '0.62 0.47 0.21';
+const GOLD_RULE = '0.78 0.64 0.41';
 
 function line(value: string, x: number, y: number, size: number, bold = false, color = INK): string {
   return text(value, x, y, size, bold, color);
@@ -113,14 +119,15 @@ function normalizedTitle(value: string): string {
 }
 
 function technicalMetadata(value: string): boolean {
-  const text = value.trim();
+  const text = value.trim().replace(/^\*{0,2}/, '').trim();
   return (
     /^version\b/i.test(text) ||
     /^document\b.*\bversion\b/i.test(text) ||
     /^template\b/i.test(text) ||
     /\bsha-?256\b/i.test(text) ||
     /^consent version\b/i.test(text) ||
-    /^status\s*:/i.test(text)
+    /^status\s*:/i.test(text) ||
+    /^\*{0,2}(document id|legal review|effective date|applies to|brand|contact|legal entity)\*{0,2}\s*:/i.test(text)
   );
 }
 
@@ -426,11 +433,36 @@ export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array 
   let commands = '';
   let y = PAGE_HEIGHT - 58;
 
+  const brandFooter = (): string =>
+    image('BrandLogo', LEFT, 26, 16, 16) +
+    text(`${DOCUMENT_BRAND.name} | ${DOCUMENT_BRAND.slogan}`, LEFT + 22, 34, 7.2, false, MUTED) +
+    text('Confidential customer copy', LEFT + 22, 24, 6.8, false, MUTED) +
+    rightText('Page __PAGENO__', RIGHT, 30, 7.2, false, MUTED);
+
+  const brandHeader = (first: boolean): void => {
+    const top = PAGE_HEIGHT - 40;
+    const logoSize = first ? 44 : 22;
+    commands += image('BrandLogo', LEFT, top - logoSize, logoSize, logoSize);
+    const textX = LEFT + logoSize + 12;
+    commands += line(DOCUMENT_BRAND.name, textX, top - 8, first ? 14 : 9, true, ROSE);
+    commands += line(DOCUMENT_BRAND.slogan, textX, top - 20, first ? 7.5 : 6.5, false, GOLD);
+    commands += rightText(DOCUMENT_BRAND.phone, RIGHT, top - 8, 7.2, false, MUTED);
+    commands += rightText(DOCUMENT_BRAND.email, RIGHT, top - 18, 6.4, false, MUTED);
+    commands += rightText('sparkling-standard.com', RIGHT, top - 27, 6.4, false, MUTED);
+    if (first) {
+      commands += line('Executed Agreement and Signature Record', LEFT, top - 54, 17, true, INK);
+      commands += rule(top - 64, GOLD_RULE);
+      y = top - 82;
+    } else {
+      commands += rule(top - 30, GOLD_RULE);
+      y = top - 44;
+    }
+  };
+
   const newPage = () => {
-    pages.push(commands + `0.55 0.48 0.44 rg BT /F1 8 Tf ${LEFT} 38 Td (Sparkling Standard LLC - confidential) Tj ET\n` +
-      `0.55 0.48 0.44 rg BT /F1 8 Tf ${RIGHT - 70} 38 Td (Page __PAGENO__) Tj ET\n`);
+    pages.push(commands + brandFooter());
     commands = '';
-    y = PAGE_HEIGHT - 58;
+    brandHeader(false);
   };
 
   const ensure = (height: number) => {
@@ -555,6 +587,29 @@ export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array 
     }
     const titleKey = normalizedTitle(documentTitle);
     for (const block of blocks) {
+      if (block.type === 'table' && block.rows?.length) {
+        const columnCount = Math.max(...block.rows.map((row) => row.length));
+        const cellWidth = (RIGHT - LEFT) / Math.max(1, columnCount);
+        for (const row of block.rows) {
+          const cellLines = row.map((cell) => wrapRichRuns(inlineRuns(cell), cellWidth - 8, 8.6));
+          const rowHeight = Math.max(1, ...cellLines.map((lines) => lines.length)) * 11.5 + 4;
+          ensure(rowHeight + 6);
+          const rowTop = y;
+          for (let column = 0; column < columnCount; column += 1) {
+            const lines = cellLines[column] ?? [];
+            let cellY = rowTop;
+            for (const line of lines) {
+              commands += writeRichLine(line, LEFT + column * cellWidth + 4, cellY, 8.6, 'left', cellWidth - 8);
+              cellY -= 11.5;
+            }
+            commands += `${MUTED} RG 0.5 w ${(LEFT + (column + 1) * cellWidth).toFixed(2)} ${(rowTop + 4).toFixed(2)} m ${(LEFT + (column + 1) * cellWidth).toFixed(2)} ${(rowTop - rowHeight + 4).toFixed(2)} l S\n`;
+          }
+          commands += `${MUTED} RG 0.5 w ${LEFT.toFixed(2)} ${(rowTop - rowHeight + 4).toFixed(2)} m ${RIGHT.toFixed(2)} ${(rowTop - rowHeight + 4).toFixed(2)} l S\n`;
+          y -= rowHeight;
+        }
+        y -= 4;
+        continue;
+      }
       const content = plainDocumentText(block.text);
       if (!content) continue;
       if (block.type === 'metadata' && technicalMetadata(content)) continue;
@@ -580,12 +635,7 @@ export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array 
     }
   };
 
-  commands += line('SPARKLING STANDARD', LEFT, y, 15, true, ROSE);
-  y -= 20;
-  commands += line('Executed Agreement and Signature Record', LEFT, y, 19, true, INK);
-  y -= 18;
-  commands += rule(y);
-  y -= 18;
+  brandHeader(true);
 
   const meta: Array<[string, string]> = [
     ['Agreement', input.bundleName || 'Cleaning agreement'],
@@ -703,5 +753,5 @@ export function buildExecutedAgreementPdf(input: AgreementPdfInput): Uint8Array 
     `0.55 0.48 0.44 rg BT /F1 8 Tf ${RIGHT - 70} 38 Td (Page __PAGENO__) Tj ET\n`);
 
   const numbered = pages.map((page, index) => page.replaceAll('__PAGENO__', `${index + 1} of ${pages.length}`));
-  return assemblePdf(numbered);
+  return assemblePdf(numbered, [{ name: 'BrandLogo', width: BRAND_LOGO.width, height: BRAND_LOGO.height, hexData: BRAND_LOGO.hexData }]);
 }

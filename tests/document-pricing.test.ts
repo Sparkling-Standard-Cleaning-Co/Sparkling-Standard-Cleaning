@@ -347,7 +347,7 @@ test('the executed PDF renders the signed price and rich formatting', () => {
   assert.match(raw, /0\.541 0\.290 0\.322 rg/);
   assert.match(raw, /\(Item\)/);
   assert.match(raw, /\(Price\)/);
-  assert.match(raw, /Kids \[9 0 R 11 0 R\]/);
+  assert.match(raw, /Kids \[10 0 R 12 0 R\]/);
   assert.match(raw, /\(After\)/);
   assert.match(raw, /\(break\.\)/);
 });

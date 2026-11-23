@@ -328,7 +328,7 @@ total, amount due now, remaining balance and payment terms. The signing page's
 **Details & price** step, the executed text copy, the executed PDF and the admin
 request detail all read the same snapshot.
 
-The signing ceremony now shows a visible **X — Sign here** box for every
+The signing ceremony now shows a visible **X ï¿½ Sign here** box for every
 unsigned document. The first box opens the signature pad (typed or drawn;
 Clear, Cancel, Adopt Signature); later boxes apply the adopted signature only
 when clicked. Each application is recorded with an `appliedAt` timestamp in
@@ -347,8 +347,18 @@ page breaks, dynamic fields, signature-line placement, optional headers and
 footers, live preview, print/PDF, draft saving, compare and Approve & Publish.
 Rich HTML is sanitized server-side (no scripts, event handlers, links, images,
 iframes, forms or external URLs). Legacy Markdown masters remain readable.
-Owner-facing version labels are conventional (`Version 1.0`, `Version 1.1`, …);
+Owner-facing version labels are conventional (`Version 1.0`, `Version 1.1`, .);
 internal version strings and hashes are retained for audit and signatures.
+
+**Branding is applied at render time, not stored in the legal template.** The
+approved circular logo, letterhead, company identity, brand colours, typography,
+footer and page numbers come from `src/lib/documents/branding.ts`. The admin
+editor shows a non-editable branded page frame; the live preview, customer
+signing screen and executed PDF use the same identity. Legacy Markdown tables
+render as real tables in HTML and PDF, and technical metadata lines are excluded
+from customer-facing output. Historical signed snapshots are never rewritten.
+Evidence and side-by-side renders:
+`docs/verification/2026-11-23-DOCUMENT-BRANDING.md`.
 
 Automated tests must never call live Resend. `npm test` preloads
 `tests/helpers/no-live-email.mjs`, which blocks `api.resend.com` unless

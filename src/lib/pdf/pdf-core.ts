@@ -92,9 +92,29 @@ export function rule(y: number, color = BORDER): string {
   return `${color} RG 0.6 w ${LEFT} ${y.toFixed(2)} m ${RIGHT} ${y.toFixed(2)} l S\n`;
 }
 
-export function assemblePdf(pageContents: string[]): Uint8Array {
+export interface PdfImage {
+  /** Resource name used by page content, e.g. BrandLogo. */
+  name: string;
+  width: number;
+  height: number;
+  /** Hex-encoded zlib IDAT data from a non-interlaced 8-bit RGB PNG. */
+  hexData: string;
+}
+
+export function image(
+  name: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): string {
+  return `q ${width.toFixed(2)} 0 0 ${height.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /${name} Do Q\n`;
+}
+
+export function assemblePdf(pageContents: string[], images: PdfImage[] = []): Uint8Array {
   const objects: string[] = [];
-  const pageIds = pageContents.map((_, index) => 9 + index * 2);
+  const firstPageId = 9 + images.length;
+  const pageIds = pageContents.map((_, index) => firstPageId + index * 2);
   objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
   objects[2] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageContents.length} >>`;
   objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
@@ -103,12 +123,25 @@ export function assemblePdf(pageContents: string[]): Uint8Array {
   objects[6] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>';
   objects[7] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>';
   objects[8] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Italic /Encoding /WinAnsiEncoding >>';
+  images.forEach((image, index) => {
+    const objectId = 9 + index;
+    const stream = `${image.hexData}>\n`;
+    objects[objectId] =
+      `<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} ` +
+      `/ColorSpace /DeviceRGB /BitsPerComponent 8 ` +
+      `/Filter [/ASCIIHexDecode /FlateDecode] ` +
+      `/DecodeParms [null << /Predictor 15 /Colors 3 /BitsPerComponent 8 /Columns ${image.width} >>] ` +
+      `/Length ${stream.length} >>\nstream\n${stream}endstream`;
+  });
+  const xObjectResources = images.length
+    ? ` /XObject << ${images.map((entry, index) => `/${entry.name} ${9 + index} 0 R`).join(' ')} >>`
+    : '';
   pageContents.forEach((stream, index) => {
-    const pageId = 9 + index * 2;
+    const pageId = firstPageId + index * 2;
     const contentId = pageId + 1;
     objects[pageId] =
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] ` +
-      `/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R /F5 7 0 R /F6 8 0 R >> >> /Contents ${contentId} 0 R >>`;
+      `/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R /F5 7 0 R /F6 8 0 R >>${xObjectResources} >> /Contents ${contentId} 0 R >>`;
     objects[contentId] = `<< /Length ${stream.length} >>\nstream\n${stream}endstream`;
   });
 
