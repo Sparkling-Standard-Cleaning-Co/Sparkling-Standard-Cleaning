@@ -9,6 +9,7 @@ import { loadBranchView } from './admin-branches';
 import './admin-address-autocomplete';
 import { PET_OPTIONS, PROPERTY_TYPE_OPTIONS, RESIDENTIAL_INPUT_LIMITS } from '../config/estimators/input-definitions';
 import { pricing } from '../config/pricing';
+import { renderDocumentHtml } from '../lib/documents/rich-text.ts';
 
 interface AdminActor {
   id: string;
@@ -3636,6 +3637,7 @@ async function loadDocuments(): Promise<void> {
       const owner = actor?.role === 'owner';
       const actions = [
         template.status === 'draft' && owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-edit" data-id="${esc(template.id)}">Edit</button>` : '',
+        template.status === 'approved' && owner && template.source_kind === 'text' ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-revise" data-id="${esc(template.id)}">Edit &amp; revise</button>` : '',
         template.status === 'draft' && owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-approve" data-id="${esc(template.id)}">Approve</button>` : '',
         owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-duplicate" data-id="${esc(template.id)}">Duplicate</button>` : '',
         `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=template-download&id=${encodeURIComponent(String(template.id))}">Download</a>`,
@@ -4331,6 +4333,7 @@ function renderComposerPreview(preview: Record<string, unknown>): void {
   if (!frame) return;
   const requirements = (preview.requirements as Array<Record<string, unknown>>) ?? [];
   const missing = (preview.missingVariables as string[]) ?? [];
+  const contentProblems = (preview.contentProblems as string[]) ?? [];
   const sectionSelect = document.querySelector<HTMLSelectElement>('[data-document-preview-section]');
   if (sectionSelect) {
     sectionSelect.innerHTML = requirements.length
@@ -4340,11 +4343,16 @@ function renderComposerPreview(preview: Record<string, unknown>): void {
   const body = requirements.map((item, index) => {
     const text = String(item.contentText ?? '').trim();
     const itemMissing = (item.missingVariables as string[] | undefined) ?? [];
-    return `<section class="doc" id="doc-${index}"><div class="doc-meta">Document ${index + 1} of ${requirements.length}</div><h1>${esc(String(item.title ?? 'Document'))}</h1><p class="doc-sub">Version ${esc(String(item.version ?? ''))} &middot; ${Number(item.required) ? 'Required' : 'Optional'} &middot; ${esc(titleCase(String(item.stage ?? 'optional')))}</p>${itemMissing.length ? `<p class="warn">Unresolved: ${itemMissing.map((key) => esc(key)).join(', ')}</p>` : ''}<div class="doc-text">${esc(text || 'PDF template - use the Download action to review the source PDF.')}</div></section>`;
+    const rendered = text
+      ? renderDocumentHtml(text, 'doc-rendered')
+      : '<p>PDF template - use the Download action to review the source PDF.</p>';
+    return `<section class="doc" id="doc-${index}"><div class="doc-meta">Document ${index + 1} of ${requirements.length}</div><h1>${esc(String(item.title ?? 'Document'))}</h1><p class="doc-sub">Version ${esc(String(item.version ?? ''))} &middot; ${Number(item.required) ? 'Required' : 'Optional'} &middot; ${esc(titleCase(String(item.stage ?? 'optional')))}</p>${itemMissing.length ? `<p class="warn">Unresolved: ${itemMissing.map((key) => esc(key)).join(', ')}</p>` : ''}<div class="doc-text">${rendered}</div></section>`;
   }).join('');
-  const warning = missing.length
-    ? `<div class="warn banner">Unresolved variables block sending: ${missing.map((key) => esc(key)).join(', ')}</div>`
-    : '<div class="ok banner">All supported values resolve for this draft.</div>';
+  const warning = contentProblems.length
+    ? `<div class="warn banner">Internal review wording blocks customer delivery: ${contentProblems.map((term) => esc(term)).join(', ')}</div>`
+    : missing.length
+      ? `<div class="warn banner">Unresolved variables block sending: ${missing.map((key) => esc(key)).join(', ')}</div>`
+      : '<div class="ok banner">All supported values resolve for this draft.</div>';
   frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>
     @page{size:Letter;margin:.7in .75in}
     body{margin:0;background:#f4ece3;color:#2d2428;font-family:Georgia,'Times New Roman',serif;font-size:11pt;line-height:1.55}
@@ -4354,7 +4362,12 @@ function renderComposerPreview(preview: Record<string, unknown>): void {
     .doc-meta{font-family:Segoe UI,Arial,sans-serif;font-size:8pt;letter-spacing:.08em;text-transform:uppercase;color:#8a6d38}
     h1{font-size:20pt;color:#7a3547;margin:4px 0 2px}
     .doc-sub{font-family:Segoe UI,Arial,sans-serif;font-size:8.5pt;color:#75655f;margin:0 0 14px;border-bottom:1px solid #e5d8c8;padding-bottom:8px}
-    .doc-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:10.5pt}
+    .doc-text{white-space:normal;overflow-wrap:anywhere;font-size:10.5pt}
+    .doc-text .doc-title{font-size:18pt;color:#7a3547;margin:0 0 8px}
+    .doc-text .doc-heading{font-size:13pt;color:#7a3547;margin:18px 0 6px;border-bottom:1px solid #e5d8c8;padding-bottom:5px}
+    .doc-text .doc-meta{color:#75655f;font-size:8.5pt;margin:0 0 14px;text-transform:none;letter-spacing:0}
+    .doc-text p{margin:0 0 9px}
+    .doc-text ul{margin:0 0 10px;padding-left:20px}
     @media print{body{background:#fff}section.doc{border:0;box-shadow:none;margin:0;padding:0;break-after:page}}
   </style></head><body>${warning}${body || '<p>No approved documents matched this packet and context.</p>'}</body></html>`;
   frame.onload = () => applyComposerZoom();
@@ -5839,6 +5852,7 @@ document.addEventListener('click', (event) => {
   if (actionName === 'document-approve') void action('/api/admin/documents', { action: 'approve_template', templateId: id });
   if (actionName === 'document-retire') void action('/api/admin/documents', { action: 'retire_template', templateId: id });
   if (actionName === 'document-edit') void openTemplateEdit(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'document-revise') void startDocumentRevision(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'document-history') void showTemplateHistory(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'document-duplicate') {
     void api('/api/admin/documents', { method: 'POST', body: JSON.stringify({ action: 'duplicate_template', templateId: id }) })
@@ -6195,3 +6209,301 @@ document.querySelector<HTMLButtonElement>('[data-quick-convert-check]')?.addEven
 });
 
 void loadAuth();
+type DocumentEditorBlockType = 'title' | 'heading' | 'paragraph' | 'metadata' | 'bullet';
+interface DocumentEditorBlock {
+  type: DocumentEditorBlockType;
+  text: string;
+}
+let documentEditorBlocks: DocumentEditorBlock[] = [];
+let documentEditorId = '';
+
+function documentEditorInput(selector: string): HTMLInputElement | HTMLSelectElement | null {
+  return document.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-document-editor] ${selector}`);
+}
+
+function parseDocumentEditorBlocks(content: string): DocumentEditorBlock[] {
+  const lines = String(content ?? '').replace(/\r\n/g, '\n').split('\n');
+  const blocks: DocumentEditorBlock[] = [];
+  for (const [index, raw] of lines.entries()) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    let type: DocumentEditorBlockType = 'paragraph';
+    let text = trimmed;
+    if (/^#\s+/.test(trimmed)) { type = 'title'; text = trimmed.replace(/^#\s+/, ''); }
+    else if (/^##\s+/.test(trimmed)) { type = 'heading'; text = trimmed.replace(/^##\s+/, ''); }
+    else if (/^###\s+/.test(trimmed)) { type = 'heading'; text = trimmed.replace(/^###\s+/, ''); }
+    else if (/^>\s+/.test(trimmed)) { type = 'metadata'; text = trimmed.replace(/^>\s+/, ''); }
+    else if (/^[-*]\s+/.test(trimmed)) { type = 'bullet'; text = trimmed.replace(/^[-*]\s+/, ''); }
+    else if (/^#/.test(trimmed)) { type = 'title'; text = trimmed.replace(/^#+\s*/, ''); }
+    else if (index === 0) type = 'title';
+    else if (index === 1) type = 'heading';
+    else if (/^\d+\.\s+[A-Z]/.test(trimmed) && trimmed.length <= 120 && !/^\d+\.\d+/.test(trimmed)) type = 'heading';
+    else if (/^(document\s+[a-z0-9-]+\s*\|\s*version\s+|version\s+)/i.test(trimmed)) type = 'metadata';
+    if (text) blocks.push({ type, text });
+  }
+  return blocks;
+}
+
+function serializeDocumentEditorBlocks(): string {
+  const groups: string[] = [];
+  let bullets: string[] = [];
+  const flush = (): void => {
+    if (bullets.length) { groups.push(bullets.join('\n')); bullets = []; }
+  };
+  for (const block of documentEditorBlocks) {
+    const text = block.text.trim();
+    if (!text) continue;
+    if (block.type === 'bullet') { bullets.push(`- ${text}`); continue; }
+    flush();
+    if (block.type === 'title') groups.push(`# ${text}`);
+    else if (block.type === 'heading') groups.push(`## ${text}`);
+    else if (block.type === 'metadata') groups.push(`> ${text}`);
+    else groups.push(text);
+  }
+  flush();
+  return groups.join('\n\n');
+}
+
+function renderDocumentEditorBlocks(): void {
+  const target = document.querySelector<HTMLElement>('[data-document-editor-blocks]');
+  if (!target) return;
+  target.innerHTML = documentEditorBlocks.map((block, index) => `
+    <div class="document-block" data-editor-block="${index}">
+      <div class="document-block__head">
+        <span class="document-block__label">Block ${index + 1}</span>
+        <select class="document-block__type" data-editor-block-type>
+          <option value="title"${block.type === 'title' ? ' selected' : ''}>Title</option>
+          <option value="heading"${block.type === 'heading' ? ' selected' : ''}>Heading</option>
+          <option value="paragraph"${block.type === 'paragraph' ? ' selected' : ''}>Paragraph</option>
+          <option value="bullet"${block.type === 'bullet' ? ' selected' : ''}>Bullet</option>
+          <option value="metadata"${block.type === 'metadata' ? ' selected' : ''}>Metadata</option>
+        </select>
+        <button class="btn btn--ghost btn--small" type="button" data-editor-move="up"${index === 0 ? ' disabled' : ''}>Up</button>
+        <button class="btn btn--ghost btn--small" type="button" data-editor-move="down"${index === documentEditorBlocks.length - 1 ? ' disabled' : ''}>Down</button>
+        <button class="btn btn--ghost btn--small" type="button" data-editor-remove>Remove</button>
+      </div>
+      <textarea data-editor-block-text rows="${block.type === 'heading' || block.type === 'title' ? 2 : 4}">${esc(block.text)}</textarea>
+    </div>`).join('') || '<p class="admin-muted">No content blocks. Add a heading or paragraph.</p>';
+  renderDocumentEditorPreview();
+}
+
+function renderDocumentEditorPreview(): void {
+  const frame = document.querySelector<HTMLIFrameElement>('[data-document-editor-preview]');
+  if (!frame) return;
+  const html = renderDocumentHtml(serializeDocumentEditorBlocks(), 'doc-rendered');
+  frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>
+    @page{size:Letter;margin:.7in .75in}
+    body{margin:0;background:#f4ece3;color:#2d2428;font-family:Georgia,'Times New Roman',serif;font-size:11pt;line-height:1.55;padding:14px}
+    .doc-rendered{background:#fff;border:1px solid #dccdbc;border-radius:4px;padding:.75in .8in;box-shadow:0 4px 14px rgba(72,42,38,.08);min-height:38rem}
+    .doc-title{font-size:18pt;color:#7a3547;margin:0 0 8px}
+    .doc-heading{font-size:13pt;color:#7a3547;margin:18px 0 6px;border-bottom:1px solid #e5d8c8;padding-bottom:5px}
+    .doc-meta{color:#75655f;font-size:8.5pt;margin:0 0 14px}
+    p{margin:0 0 9px}ul{margin:0 0 10px;padding-left:20px}
+    @media print{body{background:#fff;padding:0}.doc-rendered{border:0;box-shadow:none;padding:0;min-height:0}}
+  </style></head><body>${html}</body></html>`;
+}
+
+function openDocumentEditor(template: Record<string, unknown>, removed: string[] = [], reused = false): void {
+  const editor = document.querySelector<HTMLElement>('[data-document-editor]');
+  if (!editor) return;
+  documentEditorId = String(template.id ?? '');
+  documentEditorBlocks = parseDocumentEditorBlocks(String(template.content_text ?? ''));
+  const setValue = (selector: string, value: unknown): void => {
+    const field = documentEditorInput(selector);
+    if (field) field.value = value === null || value === undefined ? '' : String(value);
+  };
+  setValue('[data-document-editor-title]', template.title);
+  setValue('[data-document-editor-version]', template.version);
+  setValue('[data-document-editor-category]', template.category);
+  setValue('[data-document-editor-signer]', template.signer_party ?? 'customer');
+  setValue('[data-document-editor-effective]', template.effective_date ? String(template.effective_date).slice(0, 10) : '');
+  setValue('[data-document-editor-review]', template.legal_review_status ?? 'owner_approved');
+  const verification = documentEditorInput('[data-document-editor-verification]') as HTMLInputElement | null;
+  if (verification) verification.checked = Number(template.requires_verification) === 1;
+  const countersignature = documentEditorInput('[data-document-editor-countersignature]') as HTMLInputElement | null;
+  if (countersignature) countersignature.checked = Number(template.requires_countersignature) === 1;
+  editor.hidden = false;
+  renderDocumentEditorBlocks();
+  const status = document.querySelector<HTMLElement>('[data-document-editor-status]');
+  if (status) {
+    status.textContent = reused
+      ? 'An existing draft revision was reopened. The published version is unchanged.'
+      : removed.length
+        ? `Revision created. Removed internal notice: ${removed.join('; ')}.`
+        : 'Revision created. The published version is unchanged until you approve and publish.';
+  }
+  const compareResult = document.querySelector<HTMLElement>('[data-document-editor-compare-result]');
+  if (compareResult) compareResult.innerHTML = '';
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function startDocumentRevision(templateId: string): Promise<void> {
+  const created = await api<{ id: string; version: string; contentText: string; removed?: string[]; reused?: boolean }>(
+    '/api/admin/documents',
+    { method: 'POST', body: JSON.stringify({ action: 'create_revision', templateId }) },
+  );
+  const source = await api<{ template?: Record<string, unknown> }>(
+    `/api/admin/documents?view=template&id=${encodeURIComponent(templateId)}`,
+  );
+  if (!source.template) throw new Error('template_not_found');
+  openDocumentEditor(
+    {
+      ...source.template,
+      id: created.id,
+      version: created.version,
+      content_text: created.contentText,
+      status: 'draft',
+      supersedes_template_id: templateId,
+    },
+    created.removed ?? [],
+    created.reused === true,
+  );
+}
+
+async function saveDocumentEditor(): Promise<void> {
+  if (!documentEditorId) return;
+  const status = document.querySelector<HTMLElement>('[data-document-editor-status]');
+  if (status) status.textContent = 'Saving draft revision…';
+  try {
+    await api('/api/admin/documents', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'update_draft_template',
+        templateId: documentEditorId,
+        title: documentEditorInput('[data-document-editor-title]')?.value ?? '',
+        version: documentEditorInput('[data-document-editor-version]')?.value ?? '',
+        category: documentEditorInput('[data-document-editor-category]')?.value ?? '',
+        signerParty: documentEditorInput('[data-document-editor-signer]')?.value ?? 'customer',
+        effectiveDate: documentEditorInput('[data-document-editor-effective]')?.value ?? '',
+        legalReviewStatus: documentEditorInput('[data-document-editor-review]')?.value ?? 'owner_approved',
+        requiresVerification: (documentEditorInput('[data-document-editor-verification]') as HTMLInputElement | null)?.checked ?? false,
+        requiresCountersignature: (documentEditorInput('[data-document-editor-countersignature]') as HTMLInputElement | null)?.checked ?? false,
+        contentText: serializeDocumentEditorBlocks(),
+      }),
+    });
+    if (status) status.textContent = 'Draft revision saved. The published version and executed agreements are unchanged.';
+    await loadDocuments();
+  } catch (error) {
+    if (status) status.textContent = friendly(error);
+  }
+}
+
+async function compareDocumentEditor(): Promise<void> {
+  if (!documentEditorId) return;
+  const target = document.querySelector<HTMLElement>('[data-document-editor-compare-result]');
+  if (target) target.textContent = 'Building comparison…';
+  try {
+    const result = await api<{
+      previous?: { title?: string; version?: string; content?: string; contentProblems?: string[] } | null;
+      next?: { title?: string; version?: string; content?: string; contentProblems?: string[] } | null;
+    }>('/api/admin/documents', { method: 'POST', body: JSON.stringify({ action: 'compare_revision', templateId: documentEditorId }) });
+    const previous = result.previous;
+    const next = result.next;
+    if (!target || !next) return;
+    const problems = [...(previous?.contentProblems ?? []), ...(next.contentProblems ?? [])];
+    target.innerHTML = `${problems.length ? `<p class="admin-error">Internal wording still detected: ${problems.map((entry) => esc(entry)).join(', ')}</p>` : '<p class="admin-status-message">No internal review notices detected in either version.</p>'}
+      <div class="document-compare">
+        <div><h4 style="font-size:.85rem;">Published ${esc(previous?.version ?? '')}</h4><pre>${esc(previous?.content ?? 'No previous version.')}</pre></div>
+        <div><h4 style="font-size:.85rem;">Draft ${esc(next.version ?? '')}</h4><pre>${esc(next.content ?? '')}</pre></div>
+      </div>`;
+  } catch (error) {
+    if (target) target.textContent = friendly(error);
+  }
+}
+
+async function publishDocumentEditor(): Promise<void> {
+  if (!documentEditorId) return;
+  if (!window.confirm('Approve and publish this revision? Every packet using the previous version will move to this version. Prior signers will be flagged for review. Executed agreements are not changed.')) return;
+  const status = document.querySelector<HTMLElement>('[data-document-editor-status]');
+  if (status) status.textContent = 'Publishing revision…';
+  try {
+    const result = await api<{ updatedPackets?: number; affectedCustomers?: number }>('/api/admin/documents', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'publish_revision', templateId: documentEditorId }),
+    });
+    if (status) {
+      status.textContent = `Approved and published. Packets updated: ${result.updatedPackets ?? 0}. Prior signers flagged: ${result.affectedCustomers ?? 0}.`;
+    }
+    await loadDocuments();
+    showDocumentTab('updates');
+  } catch (error) {
+    if (status) status.textContent = friendly(error);
+  }
+}
+
+function closeDocumentEditor(): void {
+  const editor = document.querySelector<HTMLElement>('[data-document-editor]');
+  if (editor) editor.hidden = true;
+  documentEditorId = '';
+  documentEditorBlocks = [];
+}
+
+function addDocumentEditorBlock(type: DocumentEditorBlockType): void {
+  documentEditorBlocks.push({ type, text: type === 'heading' ? 'New section heading' : '' });
+  renderDocumentEditorBlocks();
+}
+
+function bindDocumentEditor(): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-document-editor-add]').forEach((button) => {
+    if (button.dataset.bound === 'yes') return;
+    button.dataset.bound = 'yes';
+    button.addEventListener('click', () => addDocumentEditorBlock((button.dataset.documentEditorAdd ?? 'paragraph') as DocumentEditorBlockType));
+  });
+  document.querySelector<HTMLButtonElement>('[data-document-editor-save]')?.addEventListener('click', () => void saveDocumentEditor());
+  document.querySelector<HTMLButtonElement>('[data-document-editor-compare]')?.addEventListener('click', () => void compareDocumentEditor());
+  document.querySelector<HTMLButtonElement>('[data-document-editor-publish]')?.addEventListener('click', () => void publishDocumentEditor());
+  document.querySelector<HTMLButtonElement>('[data-document-editor-close]')?.addEventListener('click', closeDocumentEditor);
+  document.querySelector<HTMLButtonElement>('[data-document-editor-cancel]')?.addEventListener('click', closeDocumentEditor);
+  document.querySelector<HTMLButtonElement>('[data-document-editor-print]')?.addEventListener('click', () => {
+    document.querySelector<HTMLIFrameElement>('[data-document-editor-preview]')?.contentWindow?.print();
+  });
+  document.querySelector<HTMLButtonElement>('[data-document-editor-bold]')?.addEventListener('click', () => {
+    const textarea = document.activeElement;
+    if (!(textarea instanceof HTMLTextAreaElement)) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const value = textarea.value;
+    textarea.value = `${value.slice(0, start)}**${value.slice(start, end)}**${value.slice(end)}`;
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const blocks = document.querySelector<HTMLElement>('[data-document-editor-blocks]');
+  if (blocks && blocks.dataset.bound !== 'yes') {
+    blocks.dataset.bound = 'yes';
+    blocks.addEventListener('input', (event) => {
+      const field = event.target as HTMLTextAreaElement;
+      const row = field.closest<HTMLElement>('[data-editor-block]');
+      const index = Number(row?.dataset.editorBlock);
+      if (!row || !Number.isFinite(index) || !documentEditorBlocks[index]) return;
+      documentEditorBlocks[index].text = field.value;
+      renderDocumentEditorPreview();
+    });
+    blocks.addEventListener('change', (event) => {
+      const field = event.target as HTMLSelectElement;
+      if (!field.matches('[data-editor-block-type]')) return;
+      const row = field.closest<HTMLElement>('[data-editor-block]');
+      const index = Number(row?.dataset.editorBlock);
+      if (!row || !Number.isFinite(index) || !documentEditorBlocks[index]) return;
+      documentEditorBlocks[index].type = field.value as DocumentEditorBlockType;
+      renderDocumentEditorPreview();
+    });
+    blocks.addEventListener('click', (event) => {
+      const actionButton = (event.target as HTMLElement).closest<HTMLElement>('[data-editor-move], [data-editor-remove]');
+      const row = actionButton?.closest<HTMLElement>('[data-editor-block]');
+      const index = Number(row?.dataset.editorBlock);
+      if (!actionButton || !row || !Number.isFinite(index) || !documentEditorBlocks[index]) return;
+      if (actionButton.hasAttribute('data-editor-remove')) {
+        documentEditorBlocks.splice(index, 1);
+      } else {
+        const direction = actionButton.dataset.editorMove === 'up' ? -1 : 1;
+        const target = index + direction;
+        if (target < 0 || target >= documentEditorBlocks.length) return;
+        const [block] = documentEditorBlocks.splice(index, 1);
+        if (!block) return;
+        documentEditorBlocks.splice(target, 0, block);
+      }
+      renderDocumentEditorBlocks();
+    });
+  }
+}
+
+bindDocumentEditor();

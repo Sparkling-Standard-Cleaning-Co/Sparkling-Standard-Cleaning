@@ -768,6 +768,52 @@ import {
               </div>
               <div data-document-template-result style="margin-top:.6rem;"></div>
             </div>
+            <div class="admin-card document-editor" data-document-editor hidden style="margin-top:1rem;">
+              <div class="admin-detail-head">
+                <div>
+                  <h2 class="admin-section-title">Edit and revise document</h2>
+                  <p class="admin-muted">Edit the actual approved wording. Saving creates a draft revision; the published version and every executed agreement remain unchanged. <strong>Approve &amp; Publish</strong> moves the packet to the new version and flags prior signers for review.</p>
+                </div>
+                <button class="btn btn--ghost btn--small" type="button" data-document-editor-close>Close editor</button>
+              </div>
+              <input type="hidden" data-document-editor-id />
+              <div class="admin-form admin-form--grid">
+                <label>Title <input data-document-editor-title maxlength="200" /></label>
+                <label>Version <input data-document-editor-version maxlength="40" /></label>
+                <label>Category <input data-document-editor-category maxlength="80" /></label>
+                <label>Signer <select data-document-editor-signer><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
+                <label>Effective date <input data-document-editor-effective type="date" /></label>
+                <label>Legal review <select data-document-editor-review><option value="not_reviewed">Not reviewed</option><option value="owner_review_required">Owner review required</option><option value="owner_approved">Owner approved</option><option value="attorney_review_required">Attorney review required</option><option value="attorney_reviewed">Attorney reviewed</option></select></label>
+                <label><input type="checkbox" data-document-editor-verification /> Requires verification / countersignature</label>
+                <label><input type="checkbox" data-document-editor-countersignature /> Requires explicit owner countersignature</label>
+              </div>
+              <div class="document-editor-toolbar admin-actions">
+                <button class="btn btn--ghost btn--small" type="button" data-document-editor-add="heading">+ Heading</button>
+                <button class="btn btn--ghost btn--small" type="button" data-document-editor-add="paragraph">+ Paragraph</button>
+                <button class="btn btn--ghost btn--small" type="button" data-document-editor-add="bullet">+ Bullet</button>
+                <button class="btn btn--ghost btn--small" type="button" data-document-editor-add="metadata">+ Metadata</button>
+                <button class="btn btn--ghost btn--small" type="button" data-document-editor-bold>Bold selection</button>
+              </div>
+              <div class="document-editor-layout">
+                <div class="document-editor-blocks" data-document-editor-blocks></div>
+                <div class="document-editor-preview-pane">
+                  <div class="admin-composer__toolbar">
+                    <strong style="font-size:.8rem;">Live document preview</strong>
+                    <button class="btn btn--ghost btn--small" type="button" data-document-editor-print>Print / Save PDF</button>
+                  </div>
+                  <iframe class="document-editor-preview" data-document-editor-preview title="Live document preview" sandbox="allow-same-origin"></iframe>
+                  <p class="admin-muted" style="font-size:.72rem;margin:.4rem 0 0;">This preview mirrors the customer-facing rendering. The executed PDF is generated from the approved version at signing.</p>
+                </div>
+              </div>
+              <div class="admin-actions" style="margin-top:1rem;">
+                <button class="btn btn--secondary btn--small" type="button" data-document-editor-save>Save draft revision</button>
+                <button class="btn btn--ghost btn--small" type="button" data-document-editor-compare>Compare with published</button>
+                <button class="btn btn--primary btn--small" type="button" data-document-editor-publish>Approve &amp; Publish</button>
+                <button class="btn btn--ghost btn--small" type="button" data-document-editor-cancel>Cancel</button>
+              </div>
+              <p class="admin-status-message" data-document-editor-status role="status" aria-live="polite"></p>
+              <div data-document-editor-compare-result style="margin-top:.8rem;"></div>
+            </div>
             </section>
             <section class="document-panel" data-document-panel="packets" hidden>
             <div class="admin-card">

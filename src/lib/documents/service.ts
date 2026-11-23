@@ -18,6 +18,10 @@ import {
   signingFieldSummary,
   signingFieldsForRequest,
 } from './signing-fields.ts';
+import {
+  findInternalContentProblems,
+  prepareTemplateRevisionContent,
+} from './rich-text.ts';
 
 export const SIGNING_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const ESIGN_CONSENT_VERSION = '2026-11-01.esign-consent.v1';
@@ -1085,6 +1089,9 @@ export async function createSigningRequest(
     ...(options.variables ?? {}),
   };
   const { requirements, missing } = await resolveRequirementVariables(rawRequirements, variableValues);
+  for (const requirement of requirements) {
+    assertCustomerFacingDocumentContent(requirement.contentText);
+  }
   const required = requirements.filter((item) => item.required);
   if (required.length === 0) return { required: false, requirements };
   if (missing.length > 0) {
@@ -1176,6 +1183,7 @@ export interface PacketPreview {
   instructions: string;
   requirements: Requirement[];
   missingVariables: string[];
+  contentProblems: string[];
   totalDocuments: number;
   approvedDocumentCount: number;
   requiredDocuments: number;
@@ -1209,9 +1217,10 @@ export async function previewPacket(
     ...(options.variables ?? {}),
   };
   const { requirements, missing } = await resolveRequirementVariables(rawRequirements, values);
+  const contentProblems = [...new Set(requirements.flatMap((item) => findInternalContentProblems(item.contentText)))];
   return {
     required: requirements.some((item) => item.required),
-    ready: approvedDocumentCount > 0,
+    ready: approvedDocumentCount > 0 && contentProblems.length === 0,
     bundleId: String(bundle.id),
     bundleCode: String(bundle.code),
     bundleName: String(bundle.name ?? ''),
@@ -1219,6 +1228,7 @@ export async function previewPacket(
     instructions: text(options.instructions, 2000) || text(bundle.instructions, 2000),
     requirements,
     missingVariables: missing,
+    contentProblems,
     totalDocuments: requirements.length,
     approvedDocumentCount,
     requiredDocuments: requirements.filter((item) => item.required).length,
@@ -1312,6 +1322,9 @@ export async function signSigningRequest(
   const boundEmail = String(request.signer_email ?? '').trim().toLowerCase();
   if (boundEmail && signerEmail !== boundEmail) {
     throw new AdminAuthError(403, 'signer_email_mismatch');
+  }
+  for (const requirement of requirements) {
+    assertCustomerFacingDocumentContent(requirement.contentText);
   }
   const fieldDefinitions = signingFieldsForRequest({
     bundleCode: request.bundle_code,
@@ -1599,11 +1612,28 @@ export async function createTemplate(
   return { id };
 }
 
+/**
+ * Fails closed if an owner-approved template still contains an internal review
+ * notice. Unresolved variables are allowed in templates; they are resolved and
+ * checked before a signing request is issued.
+ */
+export function assertCustomerFacingDocumentContent(content: string): void {
+  const problems = findInternalContentProblems(content);
+  if (problems.length > 0) {
+    throw new AdminAuthError(409, `document_internal_notice:${problems.join(',')}`);
+  }
+}
+
 export async function approveTemplate(
   db: D1Database,
   actorUserId: string,
   templateId: string,
 ): Promise<void> {
+  const existing = await getTemplate(db, templateId);
+  if (!existing) throw new AdminAuthError(404, 'template_not_found');
+  if (String(existing.source_kind) === 'text') {
+    assertCustomerFacingDocumentContent(String(existing.content_text ?? ''));
+  }
   const result = await db
     .prepare(
       "UPDATE document_templates SET status = 'approved', approved_by_admin_user_id = ?, approved_at = ?, updated_at = ? WHERE id = ? AND status = 'draft'",
@@ -1617,6 +1647,147 @@ export async function approveTemplate(
     entityType: 'document_template',
     entityId: templateId,
   });
+}
+
+export async function createTemplateRevision(
+  db: D1Database,
+  actorUserId: string,
+  sourceTemplateId: string,
+  options: { version?: string; title?: string } = {},
+): Promise<{ id: string; version: string; contentText: string; removed: string[]; sourceTemplateId: string; reused?: boolean }> {
+  const source = await getTemplate(db, sourceTemplateId);
+  if (!source) throw new AdminAuthError(404, 'template_not_found');
+  if (String(source.status) !== 'approved') {
+    throw new AdminAuthError(409, 'template_not_approved');
+  }
+  if (String(source.source_kind) === 'pdf') {
+    throw new AdminAuthError(409, 'document_revision_pdf_not_supported');
+  }
+  const existingDraft = await db
+    .prepare(
+      "SELECT id, version, content_text FROM document_templates WHERE supersedes_template_id = ? AND status = 'draft' ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(sourceTemplateId)
+    .first<{ id: string; version: string; content_text: string }>();
+  if (existingDraft) {
+    return {
+      id: existingDraft.id,
+      version: existingDraft.version,
+      contentText: String(existingDraft.content_text ?? ''),
+      removed: [],
+      sourceTemplateId,
+      reused: true,
+    };
+  }
+  const familyKey = String(source.family_key ?? '');
+  const version =
+    text(options.version, 40) ||
+    (await (async () => {
+      const day = new Date().toISOString().slice(0, 10);
+      const count = await db
+        .prepare('SELECT COUNT(*) AS count FROM document_templates WHERE family_key = ?')
+        .bind(familyKey)
+        .first<{ count: number }>();
+      return `${day}.revision.${Number(count?.count ?? 0) + 1}`;
+    })());
+  const prepared = prepareTemplateRevisionContent(String(source.content_text ?? ''), version);
+  if (!prepared.content.trim()) throw new AdminAuthError(400, 'document_content_required');
+  const created = await createTemplate(db, actorUserId, {
+    title: text(options.title, 200) || String(source.title),
+    category: String(source.category ?? ''),
+    version,
+    contentText: prepared.content,
+    signerParty: (String(source.signer_party) as TemplateInput['signerParty']) ?? 'customer',
+    requiresCountersignature: Number(source.requires_countersignature) === 1,
+    requiresVerification: Number(source.requires_verification) === 1,
+    familyKey,
+    effectiveDate: String(source.effective_date ?? ''),
+    legalReviewStatus: String(source.legal_review_status ?? 'owner_approved'),
+    packetNotes: String(source.packet_notes ?? ''),
+    supersedesTemplateId: sourceTemplateId,
+  });
+  return {
+    id: created.id,
+    version,
+    contentText: prepared.content,
+    removed: prepared.removed,
+    sourceTemplateId,
+  };
+}
+
+/**
+ * Approves a draft revision and moves every packet from the previous approved
+ * template to the new version. The previous version is retained for history
+ * and existing signed records.
+ */
+export async function publishTemplateRevision(
+  db: D1Database,
+  actorUserId: string,
+  templateId: string,
+): Promise<{
+  previousTemplateId: string;
+  updatedPackets: number;
+  affectedCustomers: number;
+}> {
+  const draft = await getTemplate(db, templateId);
+  if (!draft) throw new AdminAuthError(404, 'template_not_found');
+  if (String(draft.status) !== 'draft') throw new AdminAuthError(409, 'template_not_draft');
+  const previousId = text(draft.supersedes_template_id, 100);
+  if (!previousId) throw new AdminAuthError(409, 'template_supersedes_required');
+  const previous = await getTemplate(db, previousId);
+  if (!previous) throw new AdminAuthError(404, 'previous_template_not_found');
+  assertCustomerFacingDocumentContent(String(draft.content_text ?? ''));
+  const packetRows = await db
+    .prepare('SELECT DISTINCT bundle_id FROM document_bundle_items WHERE template_id = ?')
+    .bind(previousId)
+    .all<{ bundle_id: string }>();
+  const packets = packetRows.results ?? [];
+  // Remove a conflicting duplicate of the new version in the same packet, then
+  // move the packet's approved item to the new version.
+  await db
+    .prepare(
+      `DELETE FROM document_bundle_items
+       WHERE template_id = ? AND bundle_id IN
+         (SELECT bundle_id FROM document_bundle_items WHERE template_id = ?)`,
+    )
+    .bind(templateId, previousId)
+    .run();
+  await db
+    .prepare('UPDATE document_bundle_items SET template_id = ? WHERE template_id = ?')
+    .bind(templateId, previousId)
+    .run();
+  await db
+    .prepare("UPDATE document_templates SET status = 'retired', archived_at = ?, updated_at = ? WHERE id = ?")
+    .bind(now(), now(), previousId)
+    .run();
+  await db
+    .prepare(
+      "UPDATE document_templates SET status = 'approved', approved_by_admin_user_id = ?, approved_at = ?, updated_at = ? WHERE id = ? AND status = 'draft'",
+    )
+    .bind(actorUserId, now(), now(), templateId)
+    .run();
+  const affected = await db
+    .prepare(
+      `SELECT COUNT(DISTINCT sr.customer_id) AS count
+       FROM document_signatures s
+       JOIN signing_requests sr ON sr.id = s.signing_request_id
+       WHERE s.template_id = ? AND sr.customer_id IS NOT NULL
+         AND s.status IN ('signed','awaiting_verification','verified')`,
+    )
+    .bind(previousId)
+    .first<{ count: number }>();
+  await audit(db, {
+    actorUserId,
+    action: 'documents.template_revision_published',
+    entityType: 'document_template',
+    entityId: templateId,
+    detail: `${previousId} -> ${templateId}; packets=${packets.length}`,
+  });
+  return {
+    previousTemplateId: previousId,
+    updatedPackets: packets.length,
+    affectedCustomers: Number(affected?.count ?? 0),
+  };
 }
 
 export async function retireTemplate(

@@ -1,3 +1,5 @@
+import { renderDocumentHtml } from '../lib/documents/rich-text.ts';
+
 interface SigningDocument {
   templateId: string;
   title: string;
@@ -67,7 +69,6 @@ interface SigningPayload {
   error?: string;
 }
 
-const root = document.querySelector<HTMLElement>('[data-document-sign]');
 const statusNode = document.querySelector<HTMLElement>('[data-document-status]');
 const content = document.querySelector<HTMLElement>('[data-document-content]');
 const dialog = document.querySelector<HTMLDialogElement>('[data-document-dialog]');
@@ -547,7 +548,7 @@ function openDocument(templateId: string): void {
   if (!document || !dialog || !dialogTitle || !dialogBody) return;
   dialogTitle.textContent = `${document.title} · version ${document.version}`;
   dialogBody.innerHTML = document.contentText
-    ? `<div class="signing-doc-text">${esc(document.contentText)}</div>`
+    ? renderDocumentHtml(document.contentText, 'signing-doc-text')
     : '<p class="signing-muted">This PDF document opens in a separate tab. Review it before acknowledging it.</p>';
   dialog.showModal();
 }

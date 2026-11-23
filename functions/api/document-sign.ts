@@ -16,6 +16,7 @@ import {
   normalizeSigningFieldValues,
   signingFieldsForRequest,
 } from '../../src/lib/documents/signing-fields.ts';
+import { findInternalContentProblems } from '../../src/lib/documents/rich-text.ts';
 import {
   executedCopyKey,
   resolveSigningDownload,
@@ -202,6 +203,9 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const resolved = await getSigningRequestByToken(db, token);
     if (!resolved) return json({ ok: false, error: 'signing_link_invalid' }, 404);
     const { request, requirements, signatures } = resolved;
+    if (requirements.some((requirement) => findInternalContentProblems(requirement.contentText).length > 0)) {
+      return json({ ok: false, error: 'document_content_internal_notice' }, 409);
+    }
     const latest = new Map<string, { attempt: number; status: string }>();
     for (const row of signatures) {
       const templateId = String(row.template_id ?? '');
