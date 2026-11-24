@@ -17,6 +17,7 @@ milestone); partial; deferred; blocked.
 | Review retry and manual status | High | No | Implemented | API/service tests, browser reviews suite | This release | Retry returns to queue; sending remains explicit. |
 | Customer File quick actions | Medium | No | Implemented | Browser admin suites, type check | This release | Opens existing workflows; does not duplicate them. |
 | Customer File review card | Medium | No | Implemented | Browser admin suites | This release | Read-only summary with link to Google Reviews controls. |
+| Active-first lead workspace | High | No | Implemented | `lead-default-filter.test.ts` | This release | Default excludes archived, lost and converted; All is explicit. |
 | Backup automation | High | Yes | Blocked | Read-only audit only | Not changed | Workflow absent from default branch; manual dispatch 404; encryption key unavailable in session. |
 | Fresh D1 export + restore proof | High | No | Implemented | `verify-d1-export.mjs` | 2026-11-24 export | Export is local private evidence, not committed. |
 | Branch consolidation | High | Yes | Plan only | Read-only divergence analysis | Not changed | `main` 125 behind; cutover requires owner approval. |
@@ -45,11 +46,11 @@ milestone); partial; deferred; blocked.
 
 ## Release identity
 
-- Application commit: `5a78eed`
-- Documentation commit at deployment: `132c54e`
-- Cloudflare Pages deployment: `82327071-b273-49ff-bbde-00046cffa564`
+- Application commit: `88a7927`
+- Documentation commits: `132c54e`, `1a81631`
+- Cloudflare Pages deployment: `c8503fed-1ada-4114-aaa9-b1a36de9f552`
 - Live verification: served admin asset
-  `/_astro/index.astro_astro_type_script_index_0_lang.BZxoxhkw.js`
-- GitHub CI: `45499824453` (validate and browser passed)
+  `/_astro/index.astro_astro_type_script_index_0_lang.alIZjPxx.js`
+- GitHub CI: `45502328100` (validate and browser passed)
 - Production migration: `0058` applied; 0 foreign-key violations
 - Release evidence: `docs/verification/2026-11-24-PLATFORM-CONSOLIDATION.md`

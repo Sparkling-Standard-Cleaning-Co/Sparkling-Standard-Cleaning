@@ -5,15 +5,15 @@
 | Item | Value |
 | --- | --- |
 | Start HEAD | `eeeb505` |
-| Application commit | `5a78eed` |
-| Documentation commit | `132c54e` |
+| Application commit | `88a7927` |
+| Documentation commits | `132c54e`, `1a81631` |
 | Branch | `production-safe` |
-| Cloudflare Pages deployment | `82327071-b273-49ff-bbde-00046cffa564` |
-| Deployment source | `132c54e` |
+| Cloudflare Pages deployment | `c8503fed-1ada-4114-aaa9-b1a36de9f552` |
+| Deployment source | `88a7927` |
 | Live site | `https://sparkling-standard.com` |
-| Verified served admin asset | `/_astro/index.astro_astro_type_script_index_0_lang.BZxoxhkw.js` |
+| Verified served admin asset | `/_astro/index.astro_astro_type_script_index_0_lang.alIZjPxx.js` |
 | Production migration | `0058_document_library_review_state.sql` |
-| GitHub CI | `45499824453` - validate and browser jobs passed |
+| GitHub CI | `45502328100` - validate and browser jobs passed |
 
 ## What changed
 
@@ -49,6 +49,12 @@
   Invoice, Send Agreement, Email and Call. Each opens the existing workflow with
   the customer context selected.
 
+### Lead workspace
+
+- Default view now shows active inquiries only and excludes archived, lost and
+  converted records unless the owner explicitly selects them.
+- Added explicit Lost and All records options.
+
 ## Verification
 
 | Check | Result |
@@ -56,7 +62,7 @@
 | `npm run check` | 0 errors, 0 warnings (11 hints) |
 | Unit suite | 1,114 tests; 1,113 pass; 0 fail; 1 pre-existing skip |
 | Browser suite (local) | 278/278 pass |
-| GitHub CI `45499824453` | validate passed; browser passed |
+| GitHub CI `45502328100` | validate passed; browser passed |
 | Build | 41 pages |
 | Validation | 2,631 internal links, SEO, marketing registry, QR decode, checklist leak checks passed |
 | Smoke | 21 pages |
@@ -93,8 +99,11 @@ SQLite, 57 migrations, 101 tables, 0 foreign-key violations.
 - `/api/admin/documents?view=library` and `/api/admin/reviews?view=state`
   return `401` without an authenticated session, not `500`, confirming the new
   functions are deployed and fail closed.
-- Deployment `82327071` was still propagating at the first check; after
-  propagation the custom domain served the new `BZxoxhkw.js` bundle.
+- Deployment `c8503fed` serves the `alIZjPxx.js` admin bundle containing the
+  document library, draft, history, review suppression, customer quick-action
+  and active-lead code.
+- The earlier `82327071` deployment was verified during propagation; the final
+  verified deployment is `c8503fed` on source `88a7927`.
 
 ## Not performed
 

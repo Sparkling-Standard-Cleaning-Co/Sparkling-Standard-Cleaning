@@ -85,9 +85,9 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
 - **Current release (2026-11-24 platform audit, document library and customer review suppression):**
-  application code `5a78eed` (documentation `132c54e`) on `production-safe`, Cloudflare Pages
-  deployment `82327071-b273-49ff-bbde-00046cffa564`, verified live on 2026-11-24 (served admin
-  asset `/_astro/index.astro_astro_type_script_index_0_lang.BZxoxhkw.js`). Migration `0058` adds
+  application code `88a7927` on `production-safe`, Cloudflare Pages
+  deployment `c8503fed-1ada-4114-aaa9-b1a36de9f552`, verified live on 2026-11-24 (served admin
+  asset `/_astro/index.astro_astro_type_script_index_0_lang.alIZjPxx.js`). Migration `0058` adds
   `document_family_state` and `customer_review_state`. The Document Library now shows one current
   approved version per family (27 current documents; 3 draft revisions and 28 retired versions are
   separated into drafts and History & archive), with guarded draft deletion, family archive/restore,
@@ -98,8 +98,9 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   estimate, invoice, agreement, email and call. Production integrity is clean (0 foreign-key
   violations, 0 orphans, 0 duplicate invoice numbers, 0 duplicate per-appointment invoices) and
   record counts are unchanged. Verified: unit **1,114** (1,113 pass, 1 pre-existing skip), browser
-  **278/278**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45499824453`
-  green. No customer email, charge, review invitation or production record was mutated. The audit
+  **278/278**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45502328100`
+  green. The Leads workspace now defaults to active records and excludes archived, lost and
+  converted inquiries unless explicitly selected. No customer email, charge, review invitation or production record was mutated. The audit
   also found the scheduled backup workflow is absent from the default branch and cannot be manually
   dispatched; branch cutover and master-workspace cleanup await owner approval. Evidence:
   `docs/verification/2026-11-24-PLATFORM-CONSOLIDATION.md` and `docs/audit/2026-11-24/`.

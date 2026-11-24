@@ -79,7 +79,7 @@ external decision or credential required.
 | --- | --- | --- |
 | Public marketing pages and SEO | verified | 41 pages, 2,631 links, SEO/validation/smoke passed. |
 | Estimator and four engines | verified | Full unit and browser suites pass; no pricing mathematics changed. |
-| Lead capture and notifications | inspected | Release A lead management and delivery evidence present; no live lead mutation. |
+| Lead capture and notifications | inspected | Release A lead management and delivery evidence present; the workspace now defaults to active records; no live lead mutation. |
 | Secure checkout and payments | inspected | Existing checkout suite passes; no live charge or refund performed. |
 | Document library | **rebuilt this release** | Active-only library, draft workspace, family history/archive, guarded draft deletion. |
 | Agreement signing and executed evidence | verified | Existing signing tests pass; published revisions still move packets transactionally. |
@@ -142,6 +142,8 @@ clean.
 - Review delivery retry and manual status controls.
 - Customer File quick actions with customer context carried into booking,
   estimate, invoice and agreement flows.
+- Active-first Leads workspace: archived, lost and converted records are hidden
+  by default and remain available through the explicit All or status filters.
 - Fresh production D1 export restore-verified (57 migrations, 101 tables, 0 FK
   violations) before applying migration 0058.
 
