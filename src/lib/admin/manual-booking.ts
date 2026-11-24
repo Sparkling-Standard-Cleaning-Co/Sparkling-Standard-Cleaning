@@ -781,7 +781,7 @@ function applyManualPricing(
   if (totalCents <= 0) throw new AdminAuthError(400, 'custom_price_invalid');
   if (!custom && discountCents === 0) return core;
   const discountLabel = discountCents > 0
-    ? `Administrator discount${input.discountReason ? ` — ${input.discountReason}` : ''}`
+    ? `Administrator discount${input.discountReason ? ` â€” ${input.discountReason}` : ''}`
     : null;
   const breakdown = core.breakdown
     ? {
@@ -1127,6 +1127,7 @@ export interface CreateCompletedServiceResult {
   totalCents: number;
   discountCents: number;
   linkedSigningRequestId: string | null;
+  existing?: boolean;
 }
 
 /**
@@ -1176,23 +1177,49 @@ export async function createCompletedService(
   const crew = await staffResourceSelection(db, input.teamMemberIds);
   const duplicate = await db
     .prepare(
-      `SELECT a.id FROM appointments a
+      `SELECT a.id, a.estimate_id, a.reference, a.start_at, a.timezone,
+              e.total_cents, e.service_code, e.discount_cents, e.input_snapshot_json
+       FROM appointments a
+       LEFT JOIN estimates e ON e.id = a.estimate_id
        WHERE a.customer_id = ? AND a.property_id = ? AND a.source = 'admin_completed'
-         AND date(a.start_at) = ? AND a.status = 'completed'
-         AND a.created_at >= datetime('now', '-15 minutes')
+         AND date(a.start_at) = ? AND a.status = 'completed' AND e.service_code = ?
        ORDER BY a.created_at DESC LIMIT 1`,
     )
-    .bind(input.customerId, input.propertyId, input.date)
-    .first<{ id: string }>();
+    .bind(input.customerId, input.propertyId, input.date, serviceCode)
+    .first<Record<string, unknown>>();
   if (duplicate) {
-    throw new AdminAuthError(409, 'completed_service_already_recorded');
+    const duplicateFields = (() => {
+      try {
+        return JSON.parse(String(duplicate.input_snapshot_json ?? '{}')) as Record<string, unknown>;
+      } catch {
+        return {} as Record<string, unknown>;
+      }
+    })();
+    await audit(db, {
+      actorUserId: actor.id,
+      action: 'booking.completed_service_reused',
+      entityType: 'appointment',
+      entityId: String(duplicate.id),
+      detail: String(duplicate.reference ?? ''),
+    });
+    return {
+      appointmentId: String(duplicate.id),
+      estimateId: String(duplicate.estimate_id ?? ''),
+      reference: String(duplicate.reference ?? ''),
+      serviceCode: String(duplicate.service_code ?? serviceCode),
+      serviceDate: String(duplicateFields.completed_service_date ?? input.date),
+      totalCents: Number(duplicate.total_cents ?? totalCents),
+      discountCents: Number(duplicate.discount_cents ?? 0),
+      linkedSigningRequestId: null,
+      existing: true,
+    };
   }
   const reference = `HC-${input.date.replaceAll('-', '')}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
   const duration = 120;
   const start = zonedTimeToUtc(input.date, '12:00', timeZone);
   const end = new Date(start.getTime() + duration * 60_000);
   const discountLabel = discountCents > 0
-    ? `Administrator discount${input.discountReason ? ` — ${input.discountReason}` : ''}`
+    ? `Administrator discount${input.discountReason ? ` â€” ${input.discountReason}` : ''}`
     : null;
   const quote: ManualQuote = {
     engine: input.engine,

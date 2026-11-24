@@ -169,7 +169,7 @@ const BRANCH_TIME_ZONES: Record<string, string> = {
 
 function dateTime(value: unknown, branchId?: unknown): string {
   const raw = String(value ?? '');
-  if (!raw) return '—';
+  if (!raw) return 'â€”';
   const parsed = new Date(raw.includes('T') ? raw : `${raw}T12:00:00`);
   if (!Number.isFinite(parsed.getTime())) return raw;
   return new Intl.DateTimeFormat('en-US', {
@@ -335,7 +335,7 @@ function friendly(error: unknown): string {
       'This request has a payment. Refund review is required before it can be denied.',
     recurring_plan_records_are_not_test_data:
       'Recurring-plan appointments cannot be marked as disposable test data.',
-    legal_hold_active: 'A legal hold prevents deletion of this customer’s records.',
+    legal_hold_active: 'A legal hold prevents deletion of this customerâ€™s records.',
   };
   return messages[code] ?? titleCase(code);
 }
@@ -445,7 +445,7 @@ function showApp(nextActor: AdminActor): void {
   if (app) app.hidden = false;
   setError();
   setAppError();
-  if (userEl) userEl.textContent = `${nextActor.name} · ${nextActor.role}`;
+  if (userEl) userEl.textContent = `${nextActor.name} Â· ${nextActor.role}`;
   if (roleEl) roleEl.textContent = nextActor.role;
   if (nextActor.canSelectBranch && branchViewWrap && branchViewSelect) {
     branchViewWrap.hidden = false;
@@ -612,7 +612,7 @@ async function loadOverview(): Promise<void> {
     if (history.length) {
       alerts.insertAdjacentHTML(
         'beforeend',
-        `<details class="admin-detail-toggle" style="margin-top:.75rem;"><summary>Resolved and dismissed alert history (${history.length})</summary>${history.map((entry) => `<div class="admin-record"><p><strong>${esc(entry.key)}</strong> <span class="admin-status">${esc(titleCase(String(entry.status)))}</span></p><p class="admin-muted">${esc(entry.note || 'No resolution note recorded.')} · ${esc(dateTime(entry.resolvedAt || entry.dismissedAt || entry.updatedAt || ''))}</p></div>`).join('')}</details>`,
+        `<details class="admin-detail-toggle" style="margin-top:.75rem;"><summary>Resolved and dismissed alert history (${history.length})</summary>${history.map((entry) => `<div class="admin-record"><p><strong>${esc(entry.key)}</strong> <span class="admin-status">${esc(titleCase(String(entry.status)))}</span></p><p class="admin-muted">${esc(entry.note || 'No resolution note recorded.')} Â· ${esc(dateTime(entry.resolvedAt || entry.dismissedAt || entry.updatedAt || ''))}</p></div>`).join('')}</details>`,
       );
     }
   }
@@ -634,9 +634,9 @@ function requestLocation(request: Record<string, unknown>): string {
   if (joined) return joined;
   try {
     const payload = JSON.parse(String(request.payload_json ?? '{}')) as Record<string, unknown>;
-    return String(payload.locationText ?? payload.location_text ?? 'Legacy request — address not linked');
+    return String(payload.locationText ?? payload.location_text ?? 'Legacy request â€” address not linked');
   } catch {
-    return 'Legacy request — address not linked';
+    return 'Legacy request â€” address not linked';
   }
 }
 
@@ -690,7 +690,7 @@ function appointmentReference(appointment: Record<string, unknown>): string {
   const reference = String(appointment.reference ?? '').trim();
   if (reference && !/^RECURRING-rec_/i.test(reference)) return reference;
   const customer = [appointment.first_name, appointment.last_name].filter(Boolean).join(' ') || 'Recurring customer';
-  return `${customer} · ${appointmentService(appointment)}`;
+  return `${customer} Â· ${appointmentService(appointment)}`;
 }
 
 function appointmentBranchZone(branchId: unknown): string {
@@ -739,7 +739,7 @@ function appointmentTimeRange(appointment: Record<string, unknown>): string {
   if (!Number.isFinite(start.getTime())) return 'Time not recorded';
   const zone = appointmentZoneLabel(appointment.branch_id);
   return `${appointmentLocalTime(start, appointment.branch_id)}${
-    Number.isFinite(end.getTime()) ? ` — ${appointmentLocalTime(end, appointment.branch_id)}` : ''
+    Number.isFinite(end.getTime()) ? ` â€” ${appointmentLocalTime(end, appointment.branch_id)}` : ''
   } ${zone}`;
 }
 
@@ -811,20 +811,21 @@ function appointmentCardMarkup(
   const property = [appointment.line1, appointment.city].filter(Boolean).join(', ') || 'Property not linked';
   const current = weekCycleIndices.get(sectionKey) ?? 0;
   const hidden = current === index ? '' : ' hidden';
+  const active = ['pending', 'confirmed', 'in_progress'].includes(status);
   const actions = can('booking.write')
     ? `<div class="admin-appointment-actions">
         <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="open" data-appointment-id="${esc(id)}">Open</button>
         <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="customer" data-appointment-id="${esc(id)}"${appointment.customer_id ? '' : ' disabled'}>Customer</button>
-        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="reschedule" data-appointment-id="${esc(id)}">Move</button>
-        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="cancel" data-appointment-id="${esc(id)}">Cancel</button>
+        ${active ? `<button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="reschedule" data-appointment-id="${esc(id)}">Move</button>
+        <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="cancel" data-appointment-id="${esc(id)}">Cancel</button>` : ''}
         <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="documents" data-appointment-id="${esc(id)}">Docs</button>
         <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="invoice" data-appointment-id="${esc(id)}">Invoice</button>
       </div>`
     : '';
-  return `<article class="admin-appointment-card ${appointmentStatusClass(status)}" tabindex="0" role="button" draggable="${can('booking.write') ? 'true' : 'false'}" data-week-appointment="${esc(id)}" data-week-section="${esc(sectionKey)}" data-week-index="${index}" data-admin-action="appointment-open" data-request="${esc(appointment.booking_request_id ?? '')}" aria-label="${esc(`${appointmentTimeRange(appointment)} ${customer} ${appointmentService(appointment)}${appointmentRecurring(appointment) ? ' recurring' : ''}`)}"${hidden}>
+  return `<article class="admin-appointment-card ${appointmentStatusClass(status)}" tabindex="0" role="button" draggable="${active && can('booking.write') ? 'true' : 'false'}" data-week-appointment="${esc(id)}" data-week-section="${esc(sectionKey)}" data-week-index="${index}" data-admin-action="appointment-open" data-request="${esc(appointment.booking_request_id ?? '')}" aria-label="${esc(`${appointmentTimeRange(appointment)} ${customer} ${appointmentService(appointment)}${appointmentRecurring(appointment) ? ' recurring' : ''}`)}"${hidden}>
     <p class="admin-appointment-card__time">${esc(appointmentTimeRange(appointment))}</p>
     <p class="admin-appointment-card__customer">${esc(customer)}</p>
-    <p class="admin-appointment-card__service">${esc(appointmentService(appointment))}${appointmentRecurring(appointment) ? ' · Recurring' : ''}</p>
+    <p class="admin-appointment-card__service">${esc(appointmentService(appointment))}${appointmentRecurring(appointment) ? ' Â· Recurring' : ''}</p>
     <p class="admin-appointment-card__meta">Crew: ${esc(String(appointment.assigned_names || 'Unassigned'))}</p>
     <p class="admin-appointment-card__meta">${esc(property)}</p>
     <span class="admin-appointment-card__status">${esc(titleCase(status.replaceAll('_', ' ')))}</span>
@@ -854,7 +855,7 @@ function weekSectionMarkup(
     ? `<div class="admin-week-popover" aria-hidden="true">${jobs
         .map((job) => `<p><strong>${esc(appointmentLocalTime(job.start_at, job.branch_id))}</strong> ${esc(
           [job.first_name, job.last_name].filter(Boolean).join(' ') || 'Unlinked customer',
-        )} — ${esc(appointmentService(job))}${appointmentRecurring(job) ? ' · Recurring' : ''}</p>`)
+        )} â€” ${esc(appointmentService(job))}${appointmentRecurring(job) ? ' Â· Recurring' : ''}</p>`)
         .join('')}</div>`
     : '';
   return `<div class="admin-week-section" data-week-drop="${esc(day)}">
@@ -886,8 +887,8 @@ function renderWeekBoard(appointments: Array<Record<string, unknown>>): void {
   }
   const label = document.querySelector<HTMLElement>('[data-admin-week-label]');
   if (label) {
-    const zone = weekBranchFilter ? appointmentZoneLabel(weekBranchFilter) : 'each branch’s local time';
-    label.textContent = `${weekDateLabel(days[0] ?? centralTodayKey())} – ${weekDateLabel(days[6] ?? centralTodayKey())} · ${zone}${weekOffset === 0 ? ' · Current week' : ''}`;
+    const zone = weekBranchFilter ? appointmentZoneLabel(weekBranchFilter) : 'each branchâ€™s local time';
+    label.textContent = `${weekDateLabel(days[0] ?? centralTodayKey())} â€“ ${weekDateLabel(days[6] ?? centralTodayKey())} Â· ${zone}${weekOffset === 0 ? ' Â· Current week' : ''}`;
   }
   const today = centralTodayKey();
   target.innerHTML = `<div class="admin-week-grid">${days.map((day) => {
@@ -973,7 +974,7 @@ function openCalendarReschedule(appointment: Record<string, unknown>, proposedDa
     <div class="admin-detail-head"><h2 class="admin-section-title" id="calendar-reschedule-title">Reschedule appointment</h2><button class="btn btn--ghost btn--small" type="button" data-calendar-close>Close</button></div>
     <dl class="admin-definition">
       <dt>Customer</dt><dd>${esc(customer)}</dd>
-      <dt>Service</dt><dd>${esc(appointmentService(appointment))}${recurring ? ' · Recurring' : ''}</dd>
+      <dt>Service</dt><dd>${esc(appointmentService(appointment))}${recurring ? ' Â· Recurring' : ''}</dd>
       <dt>Property</dt><dd>${esc(property)}</dd>
       <dt>Current</dt><dd>${esc(appointmentTimeRange(appointment))}</dd>
       <dt>Duration</dt><dd>${esc(durationLabel(appointment.duration_minutes))}</dd>
@@ -1014,7 +1015,7 @@ function openCalendarCancel(appointment: Record<string, unknown>): void {
     <div class="admin-detail-head"><h2 class="admin-section-title" id="calendar-cancel-title">Cancel appointment</h2><button class="btn btn--ghost btn--small" type="button" data-calendar-close>Close</button></div>
     <dl class="admin-definition">
       <dt>Customer</dt><dd>${esc(customer)}</dd>
-      <dt>Service</dt><dd>${esc(appointmentService(appointment))}${recurring ? ' · Recurring' : ''}</dd>
+      <dt>Service</dt><dd>${esc(appointmentService(appointment))}${recurring ? ' Â· Recurring' : ''}</dd>
       <dt>Time</dt><dd>${esc(appointmentTimeRange(appointment))}</dd>
       <dt>Crew</dt><dd>${esc(String(appointment.assigned_names || 'Unassigned'))}</dd>
     </dl>
@@ -1035,6 +1036,80 @@ function openCalendarCancel(appointment: Record<string, unknown>): void {
   </div>`;
 }
 
+async function openCalendarJob(appointmentId: string): Promise<void> {
+  const container = calendarDialogContainer();
+  if (!container) return;
+  const data = await api<{
+    job: Record<string, unknown>;
+    invoice: Record<string, unknown> | null;
+    documents: Array<Record<string, unknown>>;
+  }>(`/api/admin/bookings?view=job&appointmentId=${encodeURIComponent(appointmentId)}`);
+  const job = data.job;
+  const invoice = data.invoice;
+  const customer = [job.first_name, job.last_name].filter(Boolean).join(' ') || 'Customer';
+  const property = [job.property_label, job.line1, job.city, job.state, job.postal_code].filter(Boolean).join(', ');
+  const service = String(job.service_name ?? job.service_code ?? 'Cleaning service');
+  const documents = data.documents ?? [];
+  container.innerHTML = `<div class="admin-calendar-dialog-card" role="dialog" aria-modal="true" aria-labelledby="calendar-job-title">
+    <div class="admin-detail-head"><h2 class="admin-section-title" id="calendar-job-title">Job ${esc(String(job.reference ?? ''))}</h2><button class="btn btn--ghost btn--small" type="button" data-calendar-close>Close</button></div>
+    <dl class="admin-definition">
+      <dt>Customer</dt><dd>${esc(customer)}</dd>
+      <dt>Property</dt><dd>${esc(property || 'Not linked')}</dd>
+      <dt>Service</dt><dd>${esc(service)}</dd>
+      <dt>Status</dt><dd>${esc(titleCase(String(job.status ?? '').replaceAll('_', ' ')))}</dd>
+      <dt>Date</dt><dd>${esc(dateTime(job.start_at, job.branch_id))}</dd>
+      <dt>Agreed price</dt><dd>${esc(Number(job.total_cents) > 0 ? money(job.total_cents) : 'Not recorded')}</dd>
+      <dt>Crew</dt><dd>${esc(String(job.assigned_names || 'Unassigned'))}</dd>
+      <dt>Invoice</dt><dd>${invoice ? `${esc(invoice.number)} Â· ${esc(titleCase(String(invoice.status)))} Â· balance ${esc(money(invoice.balanceCents))}` : 'No invoice yet'}</dd>
+    </dl>
+    <h3>Documents &amp; agreements</h3>
+    ${documents.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Packet</th><th>Status</th><th>Executed</th><th></th></tr></thead><tbody>${documents.map((document) => `<tr><td>${esc(document.packet_name || document.bundle_code || 'Agreement')}</td><td>${esc(titleCase(String(document.status ?? '')))}</td><td>${esc(document.executed_at ? dateTime(document.executed_at) : 'â€”')}</td><td>${document.executed_at ? `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=executed&id=${encodeURIComponent(String(document.id))}">Executed copy</a>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No document request is linked to this job.</p>'}
+    <div class="admin-actions" style="margin-top:1rem;">
+      <button class="btn btn--secondary btn--small" type="button" data-calendar-job-action="customer" data-id="${esc(String(job.customer_id ?? ''))}">Open Customer</button>
+      <button class="btn btn--primary btn--small" type="button" data-calendar-job-action="invoice" data-id="${esc(appointmentId)}">${invoice ? 'Open Invoice' : 'Create Invoice'}</button>
+      <button class="btn btn--ghost btn--small" type="button" data-calendar-close>Close</button>
+    </div>
+  </div>`;
+}
+
+async function openCalendarJobInvoice(appointmentId: string): Promise<void> {
+  const data = await api<{
+    job: Record<string, unknown>;
+    invoice: Record<string, unknown> | null;
+  }>(`/api/admin/bookings?view=job&appointmentId=${encodeURIComponent(appointmentId)}`);
+  if (data.invoice) {
+    await loadView('finance');
+    await openInvoice(String(data.invoice.id));
+    return;
+  }
+  const job = data.job;
+  const customer = [job.first_name, job.last_name].filter(Boolean).join(' ') || 'Customer';
+  const service = String(job.service_name ?? job.service_code ?? 'Cleaning service');
+  const total = Number(job.total_cents);
+  if (!Number.isFinite(total) || total <= 0) {
+    setAppError('This job has no agreed price snapshot, so an invoice cannot be created automatically.');
+    return;
+  }
+  const confirmed = await adminConfirm({
+    title: 'Create the invoice for this completed job?',
+    body: `<p><strong>${esc(customer)}</strong> Â· ${esc(service)}</p><p>Completed ${esc(dateTime(job.start_at, job.branch_id))} Â· agreed service amount <strong>${esc(money(total))}</strong>.</p><p>The invoice will be linked to this existing job and will <strong>not</strong> be emailed or charged.</p>`,
+    confirmLabel: `Create ${money(total)} invoice`,
+  });
+  if (!confirmed) return;
+  try {
+    const result = await api<{ invoice?: { id: string; number?: string } }>('/api/admin/bookings', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'invoice_job', appointmentId, paymentLink: false }),
+    });
+    if (!result.invoice?.id) throw new Error('invoice_not_created');
+    setSuccess(`Invoice ${result.invoice.number ?? ''} created from the existing completed job.`);
+    await loadView('finance');
+    await openInvoice(result.invoice.id);
+  } catch (error) {
+    setAppError(friendly(error));
+  }
+}
+
 async function handleCalendarAppointmentAction(button: HTMLElement): Promise<void> {
   const appointment = weekAppointmentIndex.get(button.dataset.appointmentId ?? '');
   if (!appointment) return;
@@ -1044,7 +1119,7 @@ async function handleCalendarAppointmentAction(button: HTMLElement): Promise<voi
     if (requestId) {
       await openRequest(requestId);
     } else {
-      setAppError('This recurring appointment is not linked to a reservation request. Use Jobs & Team or Reschedule from this card.');
+      await openCalendarJob(String(appointment.id ?? ''));
     }
     return;
   }
@@ -1062,7 +1137,7 @@ async function handleCalendarAppointmentAction(button: HTMLElement): Promise<voi
       const detail = document.querySelector<HTMLElement>('[data-admin-request-detail]');
       detail?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
-      setAppError('No reservation request is linked to this recurring appointment. Open Documents & Agreements to review the customer packet.');
+      await openCalendarJob(String(appointment.id ?? ''));
     }
     return;
   }
@@ -1073,7 +1148,7 @@ async function handleCalendarAppointmentAction(button: HTMLElement): Promise<voi
       const cards = [...document.querySelectorAll<HTMLElement>('[data-admin-request-detail] h3')];
       cards.find((heading) => heading.textContent?.trim() === 'Invoice')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
-      setAppError('Invoice actions are available from the customer record or Finance for recurring appointments without a reservation request.');
+      await openCalendarJobInvoice(String(appointment.id ?? ''));
     }
     return;
   }
@@ -1129,7 +1204,7 @@ async function submitCalendarReschedule(form: HTMLFormElement): Promise<void> {
       await loadCalendar(currentRequestView);
       const sync = result.sync as { created?: number; cancelled?: number; errors?: unknown[] } | undefined;
       setSuccess(
-        `Recurring schedule updated${sync ? ` · ${Number(sync.created ?? 0)} future visit(s) scheduled · ${Number(sync.cancelled ?? 0)} superseded` : ''}.`,
+        `Recurring schedule updated${sync ? ` Â· ${Number(sync.created ?? 0)} future visit(s) scheduled Â· ${Number(sync.cancelled ?? 0)} superseded` : ''}.`,
       );
     } catch (error) {
       if (errorNode) errorNode.textContent = friendly(error);
@@ -1138,7 +1213,7 @@ async function submitCalendarReschedule(form: HTMLFormElement): Promise<void> {
   }
   const confirmed = await adminConfirm({
     title: 'Move this appointment?',
-    body: `<p><strong>${esc(customer)}</strong> · ${esc(appointmentService(appointment))}</p><p>${esc(appointmentTimeRange(appointment))} → <strong>${esc(date)} at ${esc(time)} ${esc(appointmentZoneLabel(branchId))}</strong></p><p>Duration ${esc(durationLabel(duration))} · Crew ${esc(String(appointment.assigned_names || 'Unassigned'))}</p><p>The server will re-validate the slot, calendar, operating hours and crew availability before saving.</p>${notify ? '<p><strong>A customer reschedule email will be sent.</strong></p>' : ''}`,
+    body: `<p><strong>${esc(customer)}</strong> Â· ${esc(appointmentService(appointment))}</p><p>${esc(appointmentTimeRange(appointment))} â†’ <strong>${esc(date)} at ${esc(time)} ${esc(appointmentZoneLabel(branchId))}</strong></p><p>Duration ${esc(durationLabel(duration))} Â· Crew ${esc(String(appointment.assigned_names || 'Unassigned'))}</p><p>The server will re-validate the slot, calendar, operating hours and crew availability before saving.</p>${notify ? '<p><strong>A customer reschedule email will be sent.</strong></p>' : ''}`,
     confirmLabel: 'Move appointment',
   });
   if (!confirmed) return;
@@ -1183,7 +1258,7 @@ async function submitCalendarCancel(form: HTMLFormElement): Promise<void> {
   const planCancel = scope === 'plan';
   const confirmed = await adminConfirm({
     title: planCancel ? 'Cancel the entire recurring plan?' : 'Cancel this appointment?',
-    body: `<p><strong>${esc(customer)}</strong> · ${esc(appointmentService(appointment))}</p><p>${esc(appointmentTimeRange(appointment))}</p>${
+    body: `<p><strong>${esc(customer)}</strong> Â· ${esc(appointmentService(appointment))}</p><p>${esc(appointmentTimeRange(appointment))}</p>${
       planCancel
         ? '<p>Future recurring visits will be cancelled. Completed and historical appointments, signed agreements and financial records are preserved.</p>'
         : '<p>Only this appointment is cancelled. Cancellation history is preserved.</p>'
@@ -1255,7 +1330,20 @@ document.addEventListener('click', (event) => {
     cards.forEach((card, index) => {
       card.hidden = index !== next;
     });
-    cycle.textContent = next === 0 ? `+${cards.length - 1} more` : `Next · ${next + 1} of ${cards.length}`;
+    cycle.textContent = next === 0 ? `+${cards.length - 1} more` : `Next Â· ${next + 1} of ${cards.length}`;
+    return;
+  }
+  const jobAction = (event.target as HTMLElement).closest<HTMLElement>('[data-calendar-job-action]');
+  if (jobAction) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const jobActionName = jobAction.dataset.calendarJobAction ?? '';
+    const jobId = jobAction.dataset.id ?? '';
+    if (jobActionName === 'customer' && jobId) {
+      void loadView('customers').then(() => openCustomer(jobId)).catch((error) => setAppError(friendly(error)));
+    } else if (jobActionName === 'invoice' && jobId) {
+      void openCalendarJobInvoice(jobId).catch((error) => setAppError(friendly(error)));
+    }
     return;
   }
   const appointmentAction = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-appointment-action]');
@@ -1356,7 +1444,7 @@ function renderUpcomingAppointments(): void {
   const pager = document.querySelector<HTMLElement>('[data-admin-appointments-pagination]');
   if (pager) {
     pager.innerHTML = rows.length > APPOINTMENT_PAGE_SIZE
-      ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="appointments-page" data-page="${appointmentPage - 1}"${appointmentPage === 0 ? ' disabled' : ''}>Previous</button><span class="admin-muted">Page ${appointmentPage + 1} of ${totalPages} · ${rows.length} appointments</span><button class="btn btn--ghost btn--small" type="button" data-admin-action="appointments-page" data-page="${appointmentPage + 1}"${appointmentPage >= totalPages - 1 ? ' disabled' : ''}>Next</button></div>`
+      ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="appointments-page" data-page="${appointmentPage - 1}"${appointmentPage === 0 ? ' disabled' : ''}>Previous</button><span class="admin-muted">Page ${appointmentPage + 1} of ${totalPages} Â· ${rows.length} appointments</span><button class="btn btn--ghost btn--small" type="button" data-admin-action="appointments-page" data-page="${appointmentPage + 1}"${appointmentPage >= totalPages - 1 ? ' disabled' : ''}>Next</button></div>`
       : `<p class="admin-muted">${rows.length} appointment${rows.length === 1 ? '' : 's'} in this view.</p>`;
   }
   if (pageRows.length === 0) {
@@ -1510,7 +1598,7 @@ async function loadRequestProperties(customerId: string, select: HTMLSelectEleme
     for (const property of (data.properties as Array<Record<string, unknown>>) ?? []) {
       select.insertAdjacentHTML(
         'beforeend',
-        `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' — '))}</option>`,
+        `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' â€” '))}</option>`,
       );
     }
   } catch {
@@ -1548,7 +1636,7 @@ async function openRequest(requestId: string): Promise<void> {
     customerOptions = (customers.customers ?? [])
       .map((customer) => {
         const label = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || customer.id;
-        return `<option value="${esc(customer.id)}"${customer.id === request.customer_id ? ' selected' : ''}>${esc(label)}${customer.email ? ` — ${esc(customer.email)}` : ''}</option>`;
+        return `<option value="${esc(customer.id)}"${customer.id === request.customer_id ? ' selected' : ''}>${esc(label)}${customer.email ? ` â€” ${esc(customer.email)}` : ''}</option>`;
       })
       .join('');
   } catch {
@@ -1562,7 +1650,7 @@ async function openRequest(requestId: string): Promise<void> {
         <form class="admin-form admin-form--grid" data-form="request-link">
           <input type="hidden" name="requestId" value="${esc(requestId)}" />
           <label>Existing customer <select name="customerId" data-request-customer required><option value="">Choose a customer</option>${customerOptions}</select></label>
-          <label>Property <select name="propertyId" data-request-property><option value="">No specific property</option>${properties.map((property) => `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' — '))}</option>`).join('')}</select></label>
+          <label>Property <select name="propertyId" data-request-property><option value="">No specific property</option>${properties.map((property) => `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' â€” '))}</option>`).join('')}</select></label>
           <button class="btn btn--secondary btn--small" type="submit">Link Customer</button>
         </form>
         <details class="admin-detail-toggle" style="margin-top:1rem;"><summary>Create a new customer</summary>
@@ -1594,15 +1682,15 @@ async function openRequest(requestId: string): Promise<void> {
     : `<div class="admin-card" style="margin-top:1rem;">
         <h3>Customer</h3>
         <dl class="admin-definition">
-          <dt>Name</dt><dd>${esc(customerName || '—')}</dd>
-          <dt>Contacts</dt><dd>${contacts.map((contact) => `${esc(titleCase(contact.kind))}: ${esc(contact.value)}`).join('<br />') || '—'}</dd>
-          <dt>Property</dt><dd>${esc([request.property_label, request.line1, request.city, request.state, request.postal_code].filter(Boolean).join(', ') || '—')}</dd>
+          <dt>Name</dt><dd>${esc(customerName || 'â€”')}</dd>
+          <dt>Contacts</dt><dd>${contacts.map((contact) => `${esc(titleCase(contact.kind))}: ${esc(contact.value)}`).join('<br />') || 'â€”'}</dd>
+          <dt>Property</dt><dd>${esc([request.property_label, request.line1, request.city, request.state, request.postal_code].filter(Boolean).join(', ') || 'â€”')}</dd>
         </dl>
         <details class="admin-detail-toggle"><summary>Change linked customer</summary>
           <form class="admin-form" data-form="request-link">
             <input type="hidden" name="requestId" value="${esc(requestId)}" />
             <label>Customer <select name="customerId" data-request-customer required><option value="">Choose a customer</option>${customerOptions}</select></label>
-            <label>Property <select name="propertyId" data-request-property><option value="">No specific property</option>${properties.map((property) => `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' — '))}</option>`).join('')}</select></label>
+            <label>Property <select name="propertyId" data-request-property><option value="">No specific property</option>${properties.map((property) => `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' â€” '))}</option>`).join('')}</select></label>
             <button class="btn btn--secondary btn--small" type="submit">Update Link</button>
           </form>
         </details>
@@ -1614,7 +1702,7 @@ async function openRequest(requestId: string): Promise<void> {
   const invoice = (data.invoice ?? null) as Record<string, unknown> | null;
   const invoiceCard = `<div class="admin-card" style="margin-top:1rem;"><h3>Invoice</h3>${
     invoice
-      ? `<dl class="admin-definition"><dt>Number</dt><dd>${esc(invoice.number)}</dd><dt>Status</dt><dd>${esc(titleCase(invoice.status))}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(String(invoice.due_date ?? '—'))}</dd></dl><div class="admin-actions">${can('finance.read') ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="request-open-invoice" data-invoice-id="${esc(invoice.id)}">Open in Finance</button>` : ''}</div>`
+      ? `<dl class="admin-definition"><dt>Number</dt><dd>${esc(invoice.number)}</dd><dt>Status</dt><dd>${esc(titleCase(invoice.status))}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(String(invoice.due_date ?? 'â€”'))}</dd></dl><div class="admin-actions">${can('finance.read') ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="request-open-invoice" data-invoice-id="${esc(invoice.id)}">Open in Finance</button>` : ''}</div>`
       : `<p class="admin-muted">No invoice exists for this booking. Creating an invoice uses the agreed estimate price and does not email the customer or charge a card.</p>${can('finance.write') ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="request-create-invoice" data-id="${esc(requestId)}">Create Invoice</button>` : ''}`
   }</div>`;
 
@@ -1647,7 +1735,7 @@ async function openRequest(requestId: string): Promise<void> {
       : confirmed
         ? `<div class="admin-card" style="margin-top:1rem;">
             <h3>Confirmed appointment actions</h3>
-            <dl class="admin-definition"><dt>Appointment</dt><dd>${esc(request.appointment_reference || '—')} · ${esc(request.appointment_status || '')}</dd><dt>Payment</dt><dd>${esc(requestPayment(request))}</dd>
+            <dl class="admin-definition"><dt>Appointment</dt><dd>${esc(request.appointment_reference || 'â€”')} Â· ${esc(request.appointment_status || '')}</dd><dt>Payment</dt><dd>${esc(requestPayment(request))}</dd>
       <dt>Calendar event</dt><dd>${esc(request.calendar_event_id || 'Not linked')}</dd></dl>
             <details class="admin-detail-toggle"><summary>Reschedule</summary>
               <form class="admin-form" data-form="request-reschedule">
@@ -1715,23 +1803,23 @@ async function openRequest(requestId: string): Promise<void> {
     </div>
     ${duplicates.length ? `<div class="admin-warning"><strong>Possible duplicate requests.</strong> ${duplicates.map((duplicate) => `${esc(duplicate.quote_reference)} (${esc(dateTime(duplicate.start_at))})`).join(', ')}. Nothing was merged or deleted. Review before confirming.</div>` : ''}
     <dl class="admin-definition">
-      <dt>Requested</dt><dd>${esc(dateTime(request.start_at, request.branch_id))} – ${esc(dateTime(request.end_at, request.branch_id))}</dd>
+      <dt>Requested</dt><dd>${esc(dateTime(request.start_at, request.branch_id))} â€“ ${esc(dateTime(request.end_at, request.branch_id))}</dd>
       <dt>Status</dt><dd>${esc(titleCase(status))}</dd>
       <dt>Customer</dt><dd>${esc(customerName || 'Not linked')}</dd>
-      <dt>Contact</dt><dd>${esc(email || '—')}</dd>
-      <dt>Property</dt><dd>${esc([request.line1, request.city, request.state, request.postal_code].filter(Boolean).join(', ') || String(payload.locationText ?? '—'))}</dd>
-      <dt>Service</dt><dd>${esc(String(payload.service_label ?? payload.serviceType ?? payload.service ?? '—'))}</dd>
-      <dt>Estimate / price</dt><dd>${esc(String(payload.price ?? payload.expectedPrice ?? payload.total ?? '—'))}</dd>
-      <dt>Branch</dt><dd>${esc(request.branch_id ? `${titleCase(String(request.branch_id).replace('branch_', ''))} · ${appointmentBranchZone(request.branch_id)}` : '—')}</dd>
+      <dt>Contact</dt><dd>${esc(email || 'â€”')}</dd>
+      <dt>Property</dt><dd>${esc([request.line1, request.city, request.state, request.postal_code].filter(Boolean).join(', ') || String(payload.locationText ?? 'â€”'))}</dd>
+      <dt>Service</dt><dd>${esc(String(payload.service_label ?? payload.serviceType ?? payload.service ?? 'â€”'))}</dd>
+      <dt>Estimate / price</dt><dd>${esc(String(payload.price ?? payload.expectedPrice ?? payload.total ?? 'â€”'))}</dd>
+      <dt>Branch</dt><dd>${esc(request.branch_id ? `${titleCase(String(request.branch_id).replace('branch_', ''))} Â· ${appointmentBranchZone(request.branch_id)}` : 'â€”')}</dd>
       <dt>Crew</dt><dd>${esc(request.assigned_names || 'Unassigned')}</dd>
-      <dt>Calendar event</dt><dd>${esc(request.calendar_event_id || '—')}</dd>
-      <dt>Appointment</dt><dd>${esc(request.appointment_reference || '—')}</dd>
+      <dt>Calendar event</dt><dd>${esc(request.calendar_event_id || 'â€”')}</dd>
+      <dt>Appointment</dt><dd>${esc(request.appointment_reference || 'â€”')}</dd>
     </dl>
     ${payloadSummary(payload)}
     <details class="admin-detail-toggle"><summary>Raw request data</summary><pre style="white-space:pre-wrap">${esc(JSON.stringify(payload, null, 2))}</pre></details>
-    <details class="admin-detail-toggle"><summary>Request audit trail (${auditRows.length})</summary><pre style="white-space:pre-wrap">${esc(auditRows.map((entry) => `${entry.created_at} · ${entry.action} · ${entry.success ? 'ok' : 'failed'}`).join('\n'))}</pre></details>
+    <details class="admin-detail-toggle"><summary>Request audit trail (${auditRows.length})</summary><pre style="white-space:pre-wrap">${esc(auditRows.map((entry) => `${entry.created_at} Â· ${entry.action} Â· ${entry.success ? 'ok' : 'failed'}`).join('\n'))}</pre></details>
     <h3 style="margin-top:1rem;">Documents &amp; agreements</h3>
-    ${documentRequests.length ? documentRequests.map((entry) => `<div class="admin-record"><p><strong>${esc(entry.bundle_code)}</strong> — ${esc(titleCase(entry.status))}</p><p class="admin-muted">Signed ${esc(entry.signed_count)} · Awaiting verification ${esc(entry.awaiting_verification)}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded for this booking.</p>'}
+    ${documentRequests.length ? documentRequests.map((entry) => `<div class="admin-record"><p><strong>${esc(entry.bundle_code)}</strong> â€” ${esc(titleCase(entry.status))}</p><p class="admin-muted">Signed ${esc(entry.signed_count)} Â· Awaiting verification ${esc(entry.awaiting_verification)}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded for this booking.</p>'}
     <h3 style="margin-top:1rem;">Customer email history</h3>
     ${notificationRows}
     ${email ? `<form class="admin-inline-form" data-form="request-notify" style="margin-top:.75rem;"><input type="hidden" name="requestId" value="${esc(requestId)}" /><button class="btn btn--ghost btn--small" type="submit">Resend last customer email</button></form>` : ''}
@@ -1797,7 +1885,7 @@ async function loadLeads(status = leadPage.status, query = leadPage.q): Promise<
     esc(lead.request_type),
     esc([lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'Unlinked'),
     esc(lead.quote_reference),
-    `${esc(lead.delivery_status)}${lead.last_delivery_error ? ` · ${esc(lead.last_delivery_error)}` : ''}`,
+    `${esc(lead.delivery_status)}${lead.last_delivery_error ? ` Â· ${esc(lead.last_delivery_error)}` : ''}`,
     can('lead.write') ? `<select class="admin-select" data-lead-status="${esc(lead.id)}">${['new', 'contacted', 'quoted', 'converted', 'lost', 'archived'].map((value) => `<option value="${value}"${value === lead.status ? ' selected' : ''}>${esc(titleCase(value))}</option>`).join('')}</select>` : `<span class="admin-status">${esc(titleCase(lead.status))}</span>`,
     `<div class="admin-actions">${can('lead.write') ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-save" data-id="${esc(lead.id)}">Save</button>${lead.delivery_status === 'failed' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-retry" data-id="${esc(lead.id)}">Retry email</button>` : ''}` : ''}</div><details class="admin-detail-toggle"><summary>View request</summary><dl>${leadDetails(lead.payload)}</dl></details>`,
   ]), 'No inquiries match this filter.');
@@ -1807,7 +1895,7 @@ async function loadCustomerOptions(): Promise<void> {
   const data = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?status=active&limit=200');
   const options = (data.customers ?? []).map((customer) => {
     const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || customer.id;
-    return `<option value="${esc(customer.id)}">${esc(name)}${customer.email ? ` — ${esc(customer.email)}` : ''}</option>`;
+    return `<option value="${esc(customer.id)}">${esc(name)}${customer.email ? ` â€” ${esc(customer.email)}` : ''}</option>`;
   }).join('');
   for (const select of document.querySelectorAll<HTMLSelectElement>('[data-admin-customer-options]')) {
     const current = select.value;
@@ -1916,7 +2004,7 @@ function propertyProfileSummary(property: Record<string, unknown>): string {
     pet,
   ].filter(Boolean);
   return `<p>${esc([property.line1, property.line2, property.city, property.state, property.postal_code].filter(Boolean).join(', '))}</p>
-    ${specs.length ? `<p class="admin-muted">${esc(specs.join(' · '))}</p>` : ''}
+    ${specs.length ? `<p class="admin-muted">${esc(specs.join(' Â· '))}</p>` : ''}
     ${property.access_notes ? `<p class="admin-muted"><strong>Access:</strong> ${esc(property.access_notes)}</p>` : ''}
     ${property.parking_notes ? `<p class="admin-muted"><strong>Parking:</strong> ${esc(property.parking_notes)}</p>` : ''}
     ${property.internal_notes ? `<p class="admin-muted"><strong>Internal property note:</strong> ${esc(property.internal_notes)}</p>` : ''}`;
@@ -1978,7 +2066,7 @@ async function openCustomer(customerId: string): Promise<void> {  const data = a
     : { entitlements: [], history: [] };
   const activeBenefit = (benefitData.entitlements ?? []).find((entry) => entry.status === 'active');
   const benefitsHtml = actor?.role === 'owner'
-    ? `<div class="admin-card" style="margin-top:1rem"><div class="admin-detail-head"><h3>Discounts &amp; Benefits</h3>${activeBenefit ? `<span class="admin-status">${esc(activeBenefit.code)} active · ${esc(activeBenefit.percent)}%</span>` : '<span class="admin-muted">No persistent benefit</span>'}</div><p class="admin-muted">Persistent benefits survive rebooking and recurring-plan regeneration. They never stack with Community Care.</p>${activeBenefit ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="benefit-remove" data-id="${esc(customerId)}" data-benefit-id="${esc(activeBenefit.id)}">Remove ${esc(activeBenefit.code)}</button></div>` : `<button class="btn btn--secondary btn--small" type="button" data-admin-action="benefit-preview" data-id="${esc(customerId)}" data-code="FRIENDS15">Preview FRIENDS15</button>`}<div data-customer-benefit-preview></div><h4>Benefit history</h4>${(benefitData.history ?? []).length ? (benefitData.history ?? []).slice(0, 10).map((entry) => `<div class="admin-record">${esc(entry.code)} · ${esc(titleCase(entry.action))} · ${esc(dateTime(entry.created_at))}</div>`).join('') : '<p class="admin-muted">No benefit history.</p>'}</div>`
+    ? `<div class="admin-card" style="margin-top:1rem"><div class="admin-detail-head"><h3>Discounts &amp; Benefits</h3>${activeBenefit ? `<span class="admin-status">${esc(activeBenefit.code)} active Â· ${esc(activeBenefit.percent)}%</span>` : '<span class="admin-muted">No persistent benefit</span>'}</div><p class="admin-muted">Persistent benefits survive rebooking and recurring-plan regeneration. They never stack with Community Care.</p>${activeBenefit ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="benefit-remove" data-id="${esc(customerId)}" data-benefit-id="${esc(activeBenefit.id)}">Remove ${esc(activeBenefit.code)}</button></div>` : `<button class="btn btn--secondary btn--small" type="button" data-admin-action="benefit-preview" data-id="${esc(customerId)}" data-code="FRIENDS15">Preview FRIENDS15</button>`}<div data-customer-benefit-preview></div><h4>Benefit history</h4>${(benefitData.history ?? []).length ? (benefitData.history ?? []).slice(0, 10).map((entry) => `<div class="admin-record">${esc(entry.code)} Â· ${esc(titleCase(entry.action))} Â· ${esc(dateTime(entry.created_at))}</div>`).join('') : '<p class="admin-muted">No benefit history.</p>'}</div>`
     : '';
   const email = contacts.find((contact) => contact.kind === 'email')?.value ?? customer.email ?? '';
   const phone = contacts.find((contact) => contact.kind === 'phone')?.value ?? customer.phone ?? '';
@@ -2001,15 +2089,15 @@ async function openCustomer(customerId: string): Promise<void> {  const data = a
   detail.hidden = false;
   detail.innerHTML = `<div class="admin-card">
     <div class="admin-detail-head"><h2 class="admin-section-title">${esc(anonymized ? 'Anonymized customer record' : [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || 'Customer')}</h2><div class="admin-actions">${anonymized ? '' : `<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-edit">Edit Customer</button><form class="admin-inline-form" data-form="customer-archive"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="targetStatus" value="${customer.status === 'archived' ? 'active' : 'archived'}" /><button class="btn btn--ghost btn--small" type="submit">${customer.status === 'archived' ? 'Restore Archived Customer' : 'Archive Customer'}</button></form>`}${actor?.role === 'owner' && !anonymized ? `<form class="admin-inline-form" data-form="customer-delete"><input type="hidden" name="customerId" value="${esc(customerId)}" /><button class="btn btn--danger btn--small" type="submit">Delete Customer</button></form>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-create">Close</button></div></div>
-    <dl class="admin-definition"><dt>Status</dt><dd>${esc(anonymized ? 'Deleted and anonymized' : customer.status)}</dd>${customer.archived_at ? `<dt>Archived / deleted</dt><dd>${esc(dateTime(customer.archived_at))}</dd>` : ''}<dt>Branch</dt><dd>${esc(customer.branch_name)}</dd><dt>Source</dt><dd>${esc(customer.source)}</dd><dt>Contacts</dt><dd>${anonymized ? 'Removed for privacy' : contacts.map((contact) => `${esc(titleCase(contact.kind))}: ${esc(contact.value)}`).join('<br />') || '—'}</dd></dl>
+    <dl class="admin-definition"><dt>Status</dt><dd>${esc(anonymized ? 'Deleted and anonymized' : customer.status)}</dd>${customer.archived_at ? `<dt>Archived / deleted</dt><dd>${esc(dateTime(customer.archived_at))}</dd>` : ''}<dt>Branch</dt><dd>${esc(customer.branch_name)}</dd><dt>Source</dt><dd>${esc(customer.source)}</dd><dt>Contacts</dt><dd>${anonymized ? 'Removed for privacy' : contacts.map((contact) => `${esc(titleCase(contact.kind))}: ${esc(contact.value)}`).join('<br />') || 'â€”'}</dd></dl>
     <h3>Properties</h3>
-    ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}${Number(property.is_primary) === 1 ? ' · Primary' : ''}</strong>${propertyProfileSummary(property)}<details class="admin-detail-toggle"><summary>Edit property</summary><form class="admin-form" style="max-width:none" data-form="property-update"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="propertyId" value="${esc(property.id)}" />${propertyFields(property)}<label>Status <select name="status"><option value="active"${property.status !== 'archived' ? ' selected' : ''}>Active</option><option value="archived"${property.status === 'archived' ? ' selected' : ''}>Archived</option></select></label><button class="btn btn--secondary btn--small" type="submit">Save property</button></form></details></div>`).join('') || '<p class="admin-muted">No properties.</p>'}
+    ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}${Number(property.is_primary) === 1 ? ' Â· Primary' : ''}</strong>${propertyProfileSummary(property)}<details class="admin-detail-toggle"><summary>Edit property</summary><form class="admin-form" style="max-width:none" data-form="property-update"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="propertyId" value="${esc(property.id)}" />${propertyFields(property)}<label>Status <select name="status"><option value="active"${property.status !== 'archived' ? ' selected' : ''}>Active</option><option value="archived"${property.status === 'archived' ? ' selected' : ''}>Archived</option></select></label><button class="btn btn--secondary btn--small" type="submit">Save property</button></form></details></div>`).join('') || '<p class="admin-muted">No properties.</p>'}
     <details class="admin-detail-toggle"><summary>Add a property</summary><form class="admin-form" style="max-width:none" data-form="property-add"><input type="hidden" name="customerId" value="${esc(customerId)}" />${propertyFields({})}<button class="btn btn--secondary btn--small" type="submit">Add property</button></form></details>
     ${benefitsHtml}
     <h3>History</h3><div class="admin-history">${leads.length ? `<p><strong>Requests:</strong> ${leads.map((lead) => `${esc(lead.request_type)} (${esc(lead.status)})`).join(', ')}</p>` : ''}${estimates.length ? `<p><strong>Estimates:</strong> ${estimates.map((estimate) => `${esc(estimate.quote_reference)} (${money(estimate.total_cents)})`).join(', ')}</p>` : ''}${appointments.length ? `<p><strong>Appointments:</strong> ${appointments.map((appointment) => `${esc(appointment.reference)} (${esc(appointment.status)})`).join(', ')}</p>` : ''}${recurringPlans.length ? `<p><strong>Recurring plans:</strong> ${recurringPlans.map((plan) => `${esc(titleCase(plan.frequency))} (${esc(plan.status)})`).join(', ')}</p>` : ''}${invoices.length ? `<p><strong>Invoices:</strong> ${invoices.map((invoice) => `${esc(invoice.number)} (${money(invoice.balance_cents)} balance)`).join(', ')}</p>` : ''}</div>
-    <h3>Quick Estimates</h3>${quickEstimates.length ? quickEstimates.map((estimate) => `<div class="admin-record"><p><strong>${esc(titleCase(estimate.engine))}</strong> · ${money(estimate.total_cents)} · ${esc(titleCase(estimate.status))}</p><p class="admin-muted">${esc(estimate.address_text || 'Address not recorded')} · ${esc(dateTime(estimate.created_at))}${estimate.converted_request_id ? ` · Converted to ${esc(estimate.converted_request_id)}` : ''}</p></div>`).join('') : '<p class="admin-muted">No Quick Estimates recorded.</p>'}
-    <h3>Gift certificates</h3>${gifts.length ? gifts.map((gift) => `<div class="admin-record"><p><strong>${esc(gift.code)}</strong> · ${esc(titleCase(gift.status))} · ${money(gift.balance_cents)} remaining</p><p class="admin-muted">${esc(titleCase(gift.role))} · ${money(gift.value_cents)} original value · ${esc(dateTime(gift.created_at))}</p></div>`).join('') : '<p class="admin-muted">No gift certificates for this customer.</p>'}
-    <h3>Documents &amp; agreements</h3>${documentRequests.length ? documentRequests.map((request) => `<div class="admin-record"><p><strong>${esc(request.packet_name || request.bundle_code)}</strong> — ${esc(titleCase(request.status))}</p><p class="admin-muted">Signed ${esc(request.signed_count)} · Awaiting verification ${esc(request.awaiting_verification)} · ${esc(dateTime(request.created_at))}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded.</p>'}
+    <h3>Quick Estimates</h3>${quickEstimates.length ? quickEstimates.map((estimate) => `<div class="admin-record"><p><strong>${esc(titleCase(estimate.engine))}</strong> Â· ${money(estimate.total_cents)} Â· ${esc(titleCase(estimate.status))}</p><p class="admin-muted">${esc(estimate.address_text || 'Address not recorded')} Â· ${esc(dateTime(estimate.created_at))}${estimate.converted_request_id ? ` Â· Converted to ${esc(estimate.converted_request_id)}` : ''}</p></div>`).join('') : '<p class="admin-muted">No Quick Estimates recorded.</p>'}
+    <h3>Gift certificates</h3>${gifts.length ? gifts.map((gift) => `<div class="admin-record"><p><strong>${esc(gift.code)}</strong> Â· ${esc(titleCase(gift.status))} Â· ${money(gift.balance_cents)} remaining</p><p class="admin-muted">${esc(titleCase(gift.role))} Â· ${money(gift.value_cents)} original value Â· ${esc(dateTime(gift.created_at))}</p></div>`).join('') : '<p class="admin-muted">No gift certificates for this customer.</p>'}
+    <h3>Documents &amp; agreements</h3>${documentRequests.length ? documentRequests.map((request) => `<div class="admin-record"><p><strong>${esc(request.packet_name || request.bundle_code)}</strong> â€” ${esc(titleCase(request.status))}</p><p class="admin-muted">Signed ${esc(request.signed_count)} Â· Awaiting verification ${esc(request.awaiting_verification)} Â· ${esc(dateTime(request.created_at))}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded.</p>'}
     <h3>Notes</h3>${notes.map((note) => `<div class="admin-record"><p>${esc(note.body)}</p><p class="admin-muted">${esc(dateTime(note.created_at))}</p></div>`).join('') || '<p class="admin-muted">No notes.</p>'}
     <form class="admin-form" data-form="note-add" style="max-width:none;"><input type="hidden" name="customerId" value="${esc(customerId)}" /><label>Add note <textarea name="body" rows="3" required></textarea></label><button class="btn btn--secondary btn--small" type="submit">Add note</button></form>
     <details class="admin-detail-toggle" data-customer-edit><summary>Edit customer</summary>${customerForm({ ...customer, email, phone })}</details>
@@ -2021,11 +2109,11 @@ async function openCustomer(customerId: string): Promise<void> {  const data = a
   if (can('finance.write')) {
     detail.insertAdjacentHTML(
       'beforeend',
-      `<div class="admin-card" style="margin-top:1rem;"><h3>Saved-card payment authorization</h3><p class="admin-muted">Create a one-time signing link. The customer signs before any card is saved; a saved card never authorizes a charge by itself.</p><form class="admin-form" data-form="payment-auth"><input type="hidden" name="customerId" value="${esc(customerId)}" /><label>Service <input name="serviceCode" value="residential-cleaning" required /></label><label>Property <select name="propertyId"><option value="">No specific property</option>${properties.map((property) => `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' — '))}</option>`).join('')}</select></label><label>Expected amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Maximum authorized (USD) <input name="maxAmount" type="number" min="0.01" step="0.01" required /></label><button class="btn btn--secondary btn--small" type="submit">Create signing link</button></form><div data-payment-auth-result></div></div>`,
+      `<div class="admin-card" style="margin-top:1rem;"><h3>Saved-card payment authorization</h3><p class="admin-muted">Create a one-time signing link. The customer signs before any card is saved; a saved card never authorizes a charge by itself.</p><form class="admin-form" data-form="payment-auth"><input type="hidden" name="customerId" value="${esc(customerId)}" /><label>Service <input name="serviceCode" value="residential-cleaning" required /></label><label>Property <select name="propertyId"><option value="">No specific property</option>${properties.map((property) => `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' â€” '))}</option>`).join('')}</select></label><label>Expected amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Maximum authorized (USD) <input name="maxAmount" type="number" min="0.01" step="0.01" required /></label><button class="btn btn--secondary btn--small" type="submit">Create signing link</button></form><div data-payment-auth-result></div></div>`,
     );
   }
   if (paymentAuthorizations.length > 0) {
-    const rows = paymentAuthorizations.map((authorization) => `<div class="admin-record"><strong>${esc(titleCase(authorization.status))}</strong> · ${esc(money(authorization.max_amount_cents))} max · signed ${esc(dateTime(authorization.signed_at))}<p class="admin-muted">SHA-256 ${esc(authorization.sha256)}</p><details class="admin-detail-toggle"><summary>View signed authorization</summary><pre style="white-space:pre-wrap">${esc(authorization.signed_content_text)}</pre></details></div>`).join('');
+    const rows = paymentAuthorizations.map((authorization) => `<div class="admin-record"><strong>${esc(titleCase(authorization.status))}</strong> Â· ${esc(money(authorization.max_amount_cents))} max Â· signed ${esc(dateTime(authorization.signed_at))}<p class="admin-muted">SHA-256 ${esc(authorization.sha256)}</p><details class="admin-detail-toggle"><summary>View signed authorization</summary><pre style="white-space:pre-wrap">${esc(authorization.signed_content_text)}</pre></details></div>`).join('');
     detail.insertAdjacentHTML('beforeend', `<div class="admin-card" style="margin-top:1rem;"><h3>Signed payment authorizations</h3>${rows}</div>`);
   }
 }
@@ -2033,7 +2121,7 @@ async function openCustomer(customerId: string): Promise<void> {  const data = a
 async function previewCustomerBenefit(customerId: string, code: string): Promise<void> {
   const target = document.querySelector<HTMLElement>('[data-customer-benefit-preview]');
   if (!target) return;
-  target.innerHTML = '<p class="admin-muted">Loading benefit preview…</p>';
+  target.innerHTML = '<p class="admin-muted">Loading benefit previewâ€¦</p>';
   try {
     const result = await api<{ preview: Record<string, unknown> }>(
       `/api/admin/entitlements?view=preview&customerId=${encodeURIComponent(customerId)}&code=${encodeURIComponent(code)}`,
@@ -2044,11 +2132,11 @@ async function previewCustomerBenefit(customerId: string, code: string): Promise
     const invoices = (preview.invoices as Array<Record<string, unknown>>) ?? [];
     const warnings = (preview.warnings as string[]) ?? [];
     target.innerHTML = `<div class="admin-card" style="margin-top:1rem;background:var(--color-surface-alt);">
-      <h4>${esc(preview.code)} preview — ${esc(preview.percent)}%</h4>
+      <h4>${esc(preview.code)} preview â€” ${esc(preview.percent)}%</h4>
       ${warnings.map((warning) => `<p class="admin-error">${esc(warning)}</p>`).join('')}
-      <h4>Recurring plans</h4>${plans.length ? plans.map((plan) => `<div class="admin-record">${esc(plan.frequency)} · ${esc(money(plan.currentPriceCents))} → ${esc(money(plan.discountedPriceCents))} per visit · ${esc(plan.futureAppointments)} future appointment(s)${plan.willApply ? '' : ' · already applied'}</div>`).join('') : '<p class="admin-muted">No active recurring plan.</p>'}
-      <h4>Upcoming unpaid appointments</h4>${appointments.length ? appointments.map((appointment) => `<div class="admin-record">${esc(appointment.reference)} · ${esc(dateTime(appointment.startAt))} · ${esc(appointment.status)}</div>`).join('') : '<p class="admin-muted">No upcoming pending/confirmed appointments.</p>'}
-      <h4>Issued invoices</h4>${invoices.length ? invoices.map((invoice) => `<div class="admin-record">${esc(invoice.number)} · ${esc(money(invoice.balanceCents))} balance · ${esc(invoice.action === 'apply' ? 'safe automatic discount' : invoice.action === 'excluded' ? 'historical / excluded' : 'manual adjustment required')}<p class="admin-muted">${esc(invoice.reason)}</p></div>`).join('') : '<p class="admin-muted">No appointment-linked invoices.</p>'}
+      <h4>Recurring plans</h4>${plans.length ? plans.map((plan) => `<div class="admin-record">${esc(plan.frequency)} Â· ${esc(money(plan.currentPriceCents))} â†’ ${esc(money(plan.discountedPriceCents))} per visit Â· ${esc(plan.futureAppointments)} future appointment(s)${plan.willApply ? '' : ' Â· already applied'}</div>`).join('') : '<p class="admin-muted">No active recurring plan.</p>'}
+      <h4>Upcoming unpaid appointments</h4>${appointments.length ? appointments.map((appointment) => `<div class="admin-record">${esc(appointment.reference)} Â· ${esc(dateTime(appointment.startAt))} Â· ${esc(appointment.status)}</div>`).join('') : '<p class="admin-muted">No upcoming pending/confirmed appointments.</p>'}
+      <h4>Issued invoices</h4>${invoices.length ? invoices.map((invoice) => `<div class="admin-record">${esc(invoice.number)} Â· ${esc(money(invoice.balanceCents))} balance Â· ${esc(invoice.action === 'apply' ? 'safe automatic discount' : invoice.action === 'excluded' ? 'historical / excluded' : 'manual adjustment required')}<p class="admin-muted">${esc(invoice.reason)}</p></div>`).join('') : '<p class="admin-muted">No appointment-linked invoices.</p>'}
       <p class="admin-muted">This preview does not modify records. Applying updates active plan prices and only safe open/unpaid invoices; other invoices require manual adjustment.</p>
       <button class="btn btn--primary btn--small" type="button" data-admin-action="benefit-apply" data-id="${esc(customerId)}" data-code="${esc(preview.code)}">Apply ${esc(preview.code)}</button>
     </div>`;
@@ -2128,7 +2216,7 @@ function recurringSyncDetail(value: unknown): string {
       const reason = entry.slice(separator + 1);
       return `${date}: ${recurringReasonLabel(reason)}`;
     })
-    .join(' · ');
+    .join(' Â· ');
 }
 
 async function createRecurringPlan(form: HTMLFormElement): Promise<void> {
@@ -2168,9 +2256,9 @@ async function createRecurringPlan(form: HTMLFormElement): Promise<void> {
     } else {
       const affected = (result.sync?.conflicts ?? [])
         .map((conflict) => `${conflict.date ?? 'date'}: ${recurringReasonLabel(conflict.reason ?? '')}`)
-        .join(' · ');
+        .join(' Â· ');
       setAppError(
-        `Recurring plan saved, but scheduling needs attention${affected ? ` — ${affected}` : ''}. The plan already exists; do not create it again. Use Sync to retry.`,
+        `Recurring plan saved, but scheduling needs attention${affected ? ` â€” ${affected}` : ''}. The plan already exists; do not create it again. Use Sync to retry.`,
       );
     }
   } catch (error) {
@@ -2213,7 +2301,7 @@ async function loadRecurring(): Promise<void> {
       esc(titleCase(plan.frequency)),
       writable
         ? `<div class="admin-inline-form"><select class="admin-select" data-recurring-window="${esc(plan.id)}" aria-label="Preferred window"><option value="">Not scheduled</option><option value="morning"${plan.window === 'morning' ? ' selected' : ''}>Morning</option><option value="afternoon"${plan.window === 'afternoon' ? ' selected' : ''}>Afternoon</option></select><input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(plan.start_time ?? '')}" data-recurring-start="${esc(plan.id)}" aria-label="Preferred start time" /></div>`
-        : esc(plan.window ? `${titleCase(String(plan.window))}${plan.start_time ? ` · ${String(plan.start_time)}` : ''}` : 'Not scheduled'),
+        : esc(plan.window ? `${titleCase(String(plan.window))}${plan.start_time ? ` Â· ${String(plan.start_time)}` : ''}` : 'Not scheduled'),
       writable
         ? `<span class="admin-duration"><input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" aria-label="Duration in minutes" /><span class="admin-duration__unit" aria-hidden="true">min</span></span>`
         : esc(plan.duration_minutes ? durationLabel(plan.duration_minutes) : 'Not set'),
@@ -2271,8 +2359,8 @@ async function loadRecurringOccurrences(planId: string): Promise<void> {
     (data.occurrences ?? []).map((occurrence) => [
       esc(dateTime(occurrence.occurrence_date)),
       esc(titleCase(occurrence.status)),
-      esc(occurrence.appointment_reference || '—'),
-      esc(occurrence.sync_error || occurrence.appointment_status || '—'),
+      esc(occurrence.appointment_reference || 'â€”'),
+      esc(occurrence.sync_error || occurrence.appointment_status || 'â€”'),
       recurringSchedulingAvailable && can('job.write')
         ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrence-skip" data-plan="${esc(
             planId,
@@ -2296,7 +2384,7 @@ async function loadPropertiesFor(customerId: string): Promise<void> {
   if (!customerId) return;
   const detail = await api<Record<string, unknown>>(`/api/admin/customers?id=${encodeURIComponent(customerId)}`);
   for (const property of (detail.properties as Array<Record<string, unknown>>) ?? []) {
-    select.insertAdjacentHTML('beforeend', `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' — '))}</option>`);
+    select.insertAdjacentHTML('beforeend', `<option value="${esc(property.id)}">${esc([property.label, property.line1, property.city].filter(Boolean).join(' â€” '))}</option>`);
   }
 }
 
@@ -2479,14 +2567,14 @@ function updateManualPricingSummary(): void {
     target.textContent = 'Generate a priced estimate or enter a custom agreed price to see the final amount.';
     return;
   }
-  const discountText = summary.discountCents > 0 ? ` · Discount −${money(summary.discountCents)}` : '';
-  target.textContent = `Pricing method: ${manualField<HTMLSelectElement>('pricingMethod')?.value === 'custom' ? 'custom agreed price' : 'calculated estimator price'} · Base ${money(summary.baseCents)}${discountText} · Final service amount ${money(summary.totalCents)} before separately applicable tax.`;
+  const discountText = summary.discountCents > 0 ? ` Â· Discount âˆ’${money(summary.discountCents)}` : '';
+  target.textContent = `Pricing method: ${manualField<HTMLSelectElement>('pricingMethod')?.value === 'custom' ? 'custom agreed price' : 'calculated estimator price'} Â· Base ${money(summary.baseCents)}${discountText} Â· Final service amount ${money(summary.totalCents)} before separately applicable tax.`;
 }
 
 async function loadManualCompletedCrew(): Promise<void> {
   const target = document.querySelector<HTMLElement>('[data-manual-staff]');
   if (!target || manualAppointmentType() !== 'completed') return;
-  target.innerHTML = '<p class="admin-muted">Loading team members…</p>';
+  target.innerHTML = '<p class="admin-muted">Loading team membersâ€¦</p>';
   try {
     const data = await api<{ team?: Array<Record<string, unknown>> }>('/api/admin/operations?view=team');
     const members = (data.team ?? []).filter((member) => String(member.status ?? '') === 'active');
@@ -2518,7 +2606,7 @@ async function loadManualAgreements(customerId: string): Promise<void> {
     for (const request of signed) {
       select.insertAdjacentHTML(
         'beforeend',
-        `<option value="${esc(String(request.id))}">${esc(String(request.packet_name ?? request.bundle_code ?? 'Signed agreement'))} — ${esc(dateTime(request.executed_at || request.updated_at))}</option>`,
+        `<option value="${esc(String(request.id))}">${esc(String(request.packet_name ?? request.bundle_code ?? 'Signed agreement'))} â€” ${esc(dateTime(request.executed_at || request.updated_at))}</option>`,
       );
     }
   } catch {
@@ -2573,7 +2661,7 @@ function populateManualProperties(): void {
         .map(
           (property) =>
             `<option value="${esc(property.id)}">${esc(
-              [property.label, property.line1, property.city].filter(Boolean).join(' — '),
+              [property.label, property.line1, property.city].filter(Boolean).join(' â€” '),
             )}</option>`,
         )
         .join('')}`
@@ -2618,7 +2706,7 @@ async function createManualCustomer(): Promise<void> {
   const email = field('newEmail');
   const addressLine1 = field('newAddressLine1');
   if (!firstName && !lastName) {
-    setAppError('Enter the new customer’s name.');
+    setAppError('Enter the new customerâ€™s name.');
     return;
   }
   if (!email) {
@@ -2629,7 +2717,7 @@ async function createManualCustomer(): Promise<void> {
     setAppError('Enter the service address for the new customer.');
     return;
   }
-  resultNode.textContent = 'Creating customer…';
+  resultNode.textContent = 'Creating customerâ€¦';
   try {
     const created = await api<{ id?: string }>('/api/admin/customers', {
       method: 'POST',
@@ -2652,7 +2740,7 @@ async function createManualCustomer(): Promise<void> {
     if (select) {
       select.insertAdjacentHTML(
         'beforeend',
-        `<option value="${esc(customerId)}">${esc([firstName, lastName].filter(Boolean).join(' ') || email)} — ${esc(email)}</option>`,
+        `<option value="${esc(customerId)}">${esc([firstName, lastName].filter(Boolean).join(' ') || email)} â€” ${esc(email)}</option>`,
       );
       select.value = customerId;
     }
@@ -2685,7 +2773,7 @@ async function loadManualContext(customerId: string): Promise<void> {
   const branchNode = document.querySelector<HTMLElement>('[data-manual-branch]');
   if (branchNode) {
     branchNode.textContent = branchId
-      ? `Branch: ${titleCase(branchId.replace('branch_', ''))} · ${appointmentBranchZone(branchId)} (${appointmentZoneLabel(branchId)}). Appointment times use this branch's local timezone.`
+      ? `Branch: ${titleCase(branchId.replace('branch_', ''))} Â· ${appointmentBranchZone(branchId)} (${appointmentZoneLabel(branchId)}). Appointment times use this branch's local timezone.`
       : 'Branch and timezone are determined from the customer and service address.';
   }
   populateManualProperties();
@@ -2757,7 +2845,7 @@ function renderManualSlots(): void {
   if (!select) return;
   if (!availability?.ok || availability.slots.length === 0) {
     select.innerHTML = `<option value="">${
-      availability && !availability.ok ? esc(titleCase(availability.reason ?? 'unavailable')) : 'No available times — choose another date or crew'
+      availability && !availability.ok ? esc(titleCase(availability.reason ?? 'unavailable')) : 'No available times â€” choose another date or crew'
     }</option>`;
     if (staffTarget) staffTarget.innerHTML = '';
     return;
@@ -2765,14 +2853,14 @@ function renderManualSlots(): void {
   select.innerHTML = availability.slots
     .map(
       (slot) =>
-        `<option value="${esc(slot.start)}" data-slot-end="${esc(slot.end)}">${esc(slot.label)} — ${
+        `<option value="${esc(slot.start)}" data-slot-end="${esc(slot.end)}">${esc(slot.label)} â€” ${
           slot.resourceIds.length
         } cleaner${slot.resourceIds.length === 1 ? '' : 's'}</option>`,
     )
     .join('');
   if (staffTarget) {
     staffTarget.innerHTML = availability.staff.length
-      ? `<p class="admin-muted">Preferred staff (optional — leave blank to use the server assignment)</p><div class="admin-form admin-form--grid">${availability.staff
+      ? `<p class="admin-muted">Preferred staff (optional â€” leave blank to use the server assignment)</p><div class="admin-form admin-form--grid">${availability.staff
           .map(
             (member) =>
               `<label><input type="checkbox" data-manual-staff-pick value="${esc(member.id)}" /> ${esc(
@@ -2811,7 +2899,7 @@ function renderManualQuote(quote: ManualQuoteView): void {
     }
     if (breakdown.discount) {
       rows.push(
-        `<tr><td>${esc(breakdown.discount.label)}</td><td>−${esc(money(Math.round(breakdown.discount.amount * 100)))}</td></tr>`,
+        `<tr><td>${esc(breakdown.discount.label)}</td><td>âˆ’${esc(money(Math.round(breakdown.discount.amount * 100)))}</td></tr>`,
       );
     }
     if (breakdown.travelAdjustment !== 0) {
@@ -2821,9 +2909,9 @@ function renderManualQuote(quote: ManualQuoteView): void {
   target.innerHTML = `<div class="admin-card">
     <h3>Pricing estimate</h3>
     <p><strong>${esc(money(quote.totalCents))}</strong>${
-      quote.range ? ` · typical range ${esc(money(Math.round(quote.range.low * 100)))}–${esc(money(Math.round(quote.range.high * 100)))}` : ''
+      quote.range ? ` Â· typical range ${esc(money(Math.round(quote.range.low * 100)))}â€“${esc(money(Math.round(quote.range.high * 100)))}` : ''
     }</p>
-    <p class="admin-muted">${esc(formatLaborAndSite(quote.laborHours, quote.durationMinutes))} · ${esc(travelNote)}</p>
+    <p class="admin-muted">${esc(formatLaborAndSite(quote.laborHours, quote.durationMinutes))} Â· ${esc(travelNote)}</p>
     ${rows.length ? `<div class="admin-table-scroll"><table class="admin-table"><tbody>${rows.join('')}</tbody></table></div>` : ''}
     ${quote.ongoingPerVisitCents !== null ? `<p class="admin-muted">Ongoing (${esc(quote.ongoingFrequency)}): ${esc(money(quote.ongoingPerVisitCents))} per visit after the first deep clean.</p>` : ''}
     ${quote.tier ? `<p class="admin-muted">Facility tier ${esc(quote.tier)}</p>` : ''}
@@ -2946,10 +3034,10 @@ async function saveManualBooking(mode: ManualBookingMode): Promise<void> {
   const propertyId = manualField<HTMLSelectElement>('propertyId')?.value ?? '';
   const property = manualContext?.properties.find((entry) => entry.id === propertyId);
   const propertyLabel = property
-    ? [property.label, property.line1, property.city].filter(Boolean).join(' — ')
+    ? [property.label, property.line1, property.city].filter(Boolean).join(' â€” ')
     : 'Selected property';
   const branchId = String(customer.primary_branch_id ?? '');
-  const timeLabel = selected?.textContent?.split('—')[0]?.trim() ?? '';
+  const timeLabel = selected?.textContent?.split('â€”')[0]?.trim() ?? '';
   const serviceLabel = manualField<HTMLSelectElement>('serviceType')?.selectedOptions[0]?.textContent ?? 'Cleaning';
   const documents = manualQuote.documentsRequired.map((item) => item.title).filter(Boolean);
   if (mode !== 'save' && mode !== 'confirm') {
@@ -2966,7 +3054,7 @@ async function saveManualBooking(mode: ManualBookingMode): Promise<void> {
           <dt>Customer</dt><dd>${esc(customerName)}</dd>
           <dt>Recipient</dt><dd>${esc(email || 'No email on file')}</dd>
           <dt>Property</dt><dd>${esc(propertyLabel)}</dd>
-          <dt>Branch</dt><dd>${esc(branchId ? `${titleCase(branchId.replace('branch_', ''))} · ${appointmentBranchZone(branchId)}` : 'Not recorded')}</dd>
+          <dt>Branch</dt><dd>${esc(branchId ? `${titleCase(branchId.replace('branch_', ''))} Â· ${appointmentBranchZone(branchId)}` : 'Not recorded')}</dd>
           <dt>Service</dt><dd>${esc(serviceLabel)}</dd>
           <dt>Appointment</dt><dd>${esc(timeLabel)}</dd>
           <dt>Price</dt><dd>${esc(manualQuote.totalCents === null ? 'Review required' : money(manualQuote.totalCents))}</dd>
@@ -3058,7 +3146,7 @@ async function saveCompletedService(createInvoiceAfter: boolean): Promise<void> 
     [manualContext?.customer.first_name, manualContext?.customer.last_name].filter(Boolean).join(' ') || 'Customer';
   const property = manualContext?.properties.find((entry) => entry.id === propertyId);
   const propertyLabel = property
-    ? [property.label, property.line1, property.city].filter(Boolean).join(' — ')
+    ? [property.label, property.line1, property.city].filter(Boolean).join(' â€” ')
     : 'Selected property';
   const serviceLabel = manualField<HTMLSelectElement>('serviceType')?.selectedOptions[0]?.textContent ?? 'Cleaning';
   const confirmed = await adminConfirm({
@@ -3223,9 +3311,9 @@ async function refreshManualCommitments(): Promise<void> {
       (data.commitments ?? []).map((row) => [
         esc(row.quote_reference ?? row.reference),
         esc(titleCase(row.state)),
-        esc([row.first_name, row.last_name].filter(Boolean).join(' ') || '—'),
+        esc([row.first_name, row.last_name].filter(Boolean).join(' ') || 'â€”'),
         esc(dateTime(row.start_at)),
-        esc(row.last_error || '—'),
+        esc(row.last_error || 'â€”'),
         esc(dateTime(row.updated_at)),
         `<button class="btn btn--ghost btn--small" type="button" data-admin-action="commitment-retry" data-id="${esc(
           row.booking_request_id ?? '',
@@ -3283,7 +3371,7 @@ function updateExtrasSummary(prefix: 'manual' | 'quick'): void {
       ? checked
           .map((box) => {
             const label = box.closest('label')?.querySelector('strong')?.textContent ?? box.value;
-            return `<span class="admin-extra-chip">${esc(label)} <button type="button" data-admin-action="extra-remove" data-target="${esc(box.value)}" data-prefix="${prefix}" aria-label="Remove ${esc(label)}">×</button></span>`;
+            return `<span class="admin-extra-chip">${esc(label)} <button type="button" data-admin-action="extra-remove" data-target="${esc(box.value)}" data-prefix="${prefix}" aria-label="Remove ${esc(label)}">Ã—</button></span>`;
           })
           .join('')
       : '<span class="admin-muted">No extras selected.</span>';
@@ -3311,7 +3399,7 @@ async function loadManualBooking(): Promise<void> {
         'beforeend',
         `<option value="${esc(customer.id)}">${esc(
           [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || customer.id,
-        )}${customer.email ? ` — ${esc(customer.email)}` : ''}</option>`,
+        )}${customer.email ? ` â€” ${esc(customer.email)}` : ''}</option>`,
       );
     }
   }
@@ -3323,10 +3411,10 @@ async function loadManualBooking(): Promise<void> {
     for (const promotion of promotionData.promotions ?? []) {
       if (String(promotion.displayStatus ?? promotion.status) !== 'active') continue;
       const discount = promotion.kind === 'percent' ? `${promotion.percent}%` : money(promotion.valueCents);
-      const services = Array.isArray(promotion.services) ? ` · ${promotion.services.join('/')}` : '';
+      const services = Array.isArray(promotion.services) ? ` Â· ${promotion.services.join('/')}` : '';
       promotionSelect.insertAdjacentHTML(
         'beforeend',
-        `<option value="${esc(promotion.code)}">${esc(promotion.code)} — ${esc(promotion.name)} (${esc(discount)}${esc(services)})</option>`,
+        `<option value="${esc(promotion.code)}">${esc(promotion.code)} â€” ${esc(promotion.name)} (${esc(discount)}${esc(services)})</option>`,
       );
     }
     if (current) promotionSelect.value = current;
@@ -3571,7 +3659,7 @@ function renderQuickQuote(quote: QuickQuoteView): void {
   target.innerHTML = `<div class="admin-card">
     <h3>${esc(estimateLabel)}</h3>
     <p><strong>${esc(money(quote.totalCents))}</strong>${quote.range ? ` <span class="admin-muted">(${esc(money(quote.range.low))} - ${esc(money(quote.range.high))})</span>` : ''}</p>
-    <p class="admin-muted">${esc(formatLaborAndSite(quote.laborHours, quote.durationMinutes))}${quote.travel?.oneWayMiles !== null && quote.travel?.oneWayMiles !== undefined ? ` · ${esc(quote.travel.oneWayMiles)} mi one way${quote.travel.verified ? ' verified' : ' preliminary'}` : ''}</p>
+    <p class="admin-muted">${esc(formatLaborAndSite(quote.laborHours, quote.durationMinutes))}${quote.travel?.oneWayMiles !== null && quote.travel?.oneWayMiles !== undefined ? ` Â· ${esc(quote.travel.oneWayMiles)} mi one way${quote.travel.verified ? ' verified' : ' preliminary'}` : ''}</p>
     ${quote.entitlement ? `<p class="admin-muted">${esc(quote.entitlement.label)} ${esc(quote.entitlement.percent)}% account benefit applied.</p>` : ''}
     <div class="admin-table-scroll"><table class="admin-table"><tbody>${rows.map(([label, value]) => `<tr><td>${esc(label)}</td><td style="text-align:right">${esc(value)}</td></tr>`).join('')}</tbody></table></div>
     <details class="admin-detail-toggle"><summary>Pricing diagnostics</summary><p class="admin-muted">Pricing version ${esc(quote.pricingVersion)}</p></details>
@@ -4028,11 +4116,11 @@ async function loadDispatch(): Promise<void> {
               ? `<div class="admin-dispatch-crew" data-dispatch-crew="${esc(String(job.id))}">${ready
                   .map(
                     (member) =>
-                      `<label><input type="checkbox" data-dispatch-crew-member="${esc(String(job.id))}" value="${esc(member.id)}" /> <span><strong>${esc(member.name)}</strong> <span class="admin-muted">${esc(titleCase(member.role))} · ${esc(member.workdayStart ?? '07:00')}–${esc(member.workdayEnd ?? '18:00')}</span></span></label>`,
+                      `<label><input type="checkbox" data-dispatch-crew-member="${esc(String(job.id))}" value="${esc(member.id)}" /> <span><strong>${esc(member.name)}</strong> <span class="admin-muted">${esc(titleCase(member.role))} Â· ${esc(member.workdayStart ?? '07:00')}â€“${esc(member.workdayEnd ?? '18:00')}</span></span></label>`,
                   )
                   .join('')}</div><button class="btn btn--primary btn--small" type="button" data-admin-action="dispatch-assign" data-id="${esc(String(job.id))}">Assign selected crew</button>`
               : '<span class="admin-muted">No dispatch-ready cleaner. Complete a team profile first.</span>';
-            return `<div class="admin-dispatch-job-card"><div><strong>${esc(String(job.reference ?? ''))}</strong><p class="admin-muted">${esc(dateTime(job.startAt, branchId))} · ${esc(String(job.customer ?? 'Customer'))} · ${esc(String(job.location ?? ''))} · ${esc(String(job.serviceCode ?? ''))} · crew ${crewSize}</p></div>${options}</div>`;
+            return `<div class="admin-dispatch-job-card"><div><strong>${esc(String(job.reference ?? ''))}</strong><p class="admin-muted">${esc(dateTime(job.startAt, branchId))} Â· ${esc(String(job.customer ?? 'Customer'))} Â· ${esc(String(job.location ?? ''))} Â· ${esc(String(job.serviceCode ?? ''))} Â· crew ${crewSize}</p></div>${options}</div>`;
           })
           .join('')}</div>`
       : '<p class="admin-muted">No unassigned jobs in the dispatch window.</p>';
@@ -4305,7 +4393,7 @@ async function loadJobs(): Promise<void> {
         const name = team.find((member) => member.id === memberId)?.display_name ?? crewNames[index] ?? memberId;
         return `<span class="admin-muted">${esc(name)}</span>${can('job.write') ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="job-unassign" data-id="${esc(job.id)}" data-member="${esc(memberId)}">Remove</button>` : ''}`;
       }).join(' ');
-      return `<div class="admin-record admin-job"><div><strong>${esc(dateTime(job.start_at))}</strong> — ${esc(job.reference)} — ${esc([job.first_name, job.last_name].filter(Boolean).join(' '))}<p class="admin-muted">${esc([job.line1, job.city].filter(Boolean).join(', '))}${crewDetail ? ` — ${crewDetail}` : ''}</p></div><div class="admin-actions">${can('job.write') ? `<select class="admin-select" data-job-status="${esc(job.id)}">${['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'].map((status) => `<option value="${status}"${status === job.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-save" data-id="${esc(job.id)}">Save</button><select class="admin-select" data-job-team="${esc(job.id)}"><option value="">Assign cleaner</option>${team.map((member) => `<option value="${esc(member.id)}">${esc(member.display_name)}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-assign" data-id="${esc(job.id)}">Add</button>` : `<span class="admin-status">${esc(titleCase(job.status))}</span>`}<button class="btn btn--secondary btn--small" type="button" data-admin-action="job-checklist" data-id="${esc(job.id)}">Checklist</button></div></div>`;
+      return `<div class="admin-record admin-job"><div><strong>${esc(dateTime(job.start_at))}</strong> â€” ${esc(job.reference)} â€” ${esc([job.first_name, job.last_name].filter(Boolean).join(' '))}<p class="admin-muted">${esc([job.line1, job.city].filter(Boolean).join(', '))}${crewDetail ? ` â€” ${crewDetail}` : ''}</p></div><div class="admin-actions">${can('job.write') ? `<select class="admin-select" data-job-status="${esc(job.id)}">${['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'].map((status) => `<option value="${status}"${status === job.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-save" data-id="${esc(job.id)}">Save</button><select class="admin-select" data-job-team="${esc(job.id)}"><option value="">Assign cleaner</option>${team.map((member) => `<option value="${esc(member.id)}">${esc(member.display_name)}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-assign" data-id="${esc(job.id)}">Add</button>` : `<span class="admin-status">${esc(titleCase(job.status))}</span>`}<button class="btn btn--secondary btn--small" type="button" data-admin-action="job-checklist" data-id="${esc(job.id)}">Checklist</button></div></div>`;
     }).join('') || '<div class="admin-empty">No jobs are recorded yet.</div>';
   }
   await loadDispatch().catch((error) => setAppError(friendly(error)));
@@ -4337,7 +4425,7 @@ async function openChecklist(appointmentId: string): Promise<void> {
   }
   const checklist = data.checklist.checklist as Record<string, unknown>;
   const items = data.checklist.items as Array<Record<string, unknown>>;
-  target.innerHTML = `<h3>Checklist · ${esc(titleCase(checklist.status))}</h3>${items.map((item) => `<label class="admin-check"><input type="checkbox" data-checklist-item="${esc(item.id)}"${Number(item.completed) ? ' checked' : ''} /> ${esc(item.label)}</label>`).join('')}`;
+  target.innerHTML = `<h3>Checklist Â· ${esc(titleCase(checklist.status))}</h3>${items.map((item) => `<label class="admin-check"><input type="checkbox" data-checklist-item="${esc(item.id)}"${Number(item.completed) ? ' checked' : ''} /> ${esc(item.label)}</label>`).join('')}`;
 }
 
 async function loadReviews(): Promise<void> {
@@ -4380,7 +4468,7 @@ async function loadFinance(): Promise<void> {
     const options = (data.services ?? [])
       .map(
         (service) =>
-          `<option value="${esc(service.code)}">${esc(service.name)}${Number(service.taxable) === 1 ? '' : ' — tax exempt'}</option>`,
+          `<option value="${esc(service.code)}">${esc(service.name)}${Number(service.taxable) === 1 ? '' : ' â€” tax exempt'}</option>`,
       )
       .join('');
     select.innerHTML = `<option value="">Choose a service</option>${options}<option value="move_in_out">Move-Out Cleaning</option><option value="move_in_out">Move-In Cleaning</option>`;
@@ -4444,7 +4532,7 @@ async function openInvoice(invoiceId: string): Promise<void> {
   const tipSection = `<h3>Optional gratuities</h3>${
     tipPayments.length
       ? `<dl class="admin-definition"><dt>Collected</dt><dd>${esc(money(tipSummary.collectedCents ?? 0))}</dd><dt>Allocated</dt><dd>${esc(money(tipSummary.allocatedCents ?? 0))}</dd><dt>Unallocated</dt><dd>${esc(money(tipSummary.unallocatedCents ?? 0))}</dd><dt>Refunded</dt><dd>${esc(money(tipSummary.refundedCents ?? 0))}</dd><dt>Recorded paid out</dt><dd>${esc(money(tipSummary.paidOutCents ?? 0))}</dd></dl>
-         ${tipPayments.map((payment) => `<div class="admin-record"><p><strong>${esc(money(payment.tip_cents))} gratuity</strong> · service ${esc(money(payment.service_cents))} · ${esc(titleCase(payment.status))}</p><p class="admin-muted">Collected ${esc(dateTime(payment.received_at))}${payment.stripe_payment_intent_id ? ` · ${esc(payment.stripe_payment_intent_id)}` : ''}</p>${
+         ${tipPayments.map((payment) => `<div class="admin-record"><p><strong>${esc(money(payment.tip_cents))} gratuity</strong> Â· service ${esc(money(payment.service_cents))} Â· ${esc(titleCase(payment.status))}</p><p class="admin-muted">Collected ${esc(dateTime(payment.received_at))}${payment.stripe_payment_intent_id ? ` Â· ${esc(payment.stripe_payment_intent_id)}` : ''}</p>${
            unallocatedTipPayments.some((entry) => entry.id === payment.id) && can('finance.write')
              ? `<form class="admin-form" data-form="tip-allocate"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><p class="admin-muted">Actual crew participation is not recorded, so this gratuity is unallocated. Select only the cleaners who performed the service.</p><div class="admin-form admin-form--grid">${teamForTips.map((member) => `<label><input type="checkbox" name="teamMemberIds" value="${esc(member.id)}" /> ${esc(member.display_name)}</label>`).join('')}</div><button class="btn btn--secondary btn--small" type="submit">Confirm participating cleaners</button></form>`
              : ''
@@ -4452,7 +4540,7 @@ async function openInvoice(invoiceId: string): Promise<void> {
          ${tipAllocations.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Cleaner</th><th>Allocated</th><th>Refunded</th><th>Status</th></tr></thead><tbody>${tipAllocations.map((allocation) => `<tr><td>${esc(allocation.team_member_name || 'Unallocated')}</td><td>${esc(money(allocation.amount_cents))}</td><td>${esc(money(allocation.refunded_cents))}</td><td>${esc(titleCase(allocation.status))}</td></tr>`).join('')}</tbody></table></div>` : ''}`
       : '<p class="admin-muted">No optional gratuity has been collected for this invoice. Tips are never required or added automatically.</p>'
   }`;
-  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(invoice.number)}</h2><span class="admin-status">${esc(titleCase(invoice.status))}</span></div><dl class="admin-definition"><dt>Customer</dt><dd>${esc([invoice.first_name, invoice.last_name].filter(Boolean).join(' '))}</dd><dt>Email</dt><dd>${esc(invoice.customer_email || 'Not recorded')}</dd><dt>Service</dt><dd>${esc(invoice.service_name || invoice.service_code || 'Not recorded')}</dd><dt>Service date</dt><dd>${esc(invoice.service_date ? dateTime(`${String(invoice.service_date)}T12:00:00Z`) : 'Not recorded')}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Paid</dt><dd>${esc(money(invoice.amount_paid_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(dateTime(invoice.due_date))}</dd></dl><h3>Lines</h3>${lines.map((line) => `<div class="admin-record">${esc(line.description)} · ${esc(money(line.total_cents))}</div>`).join('') || '<p class="admin-muted">No lines.</p>'}<h3>Payments</h3>${payments.map((payment) => `<div class="admin-record">${esc(titleCase(payment.provider))} · ${esc(money(payment.amount_cents))} · ${esc(payment.status)} · ${esc(dateTime(payment.created_at))}<details class="admin-detail-toggle"><summary>Record refund</summary><form class="admin-form" data-form="refund"><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Refund amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="reason" /></label><button class="btn btn--secondary btn--small" type="submit">Record refund</button></form></details></div>`).join('') || '<p class="admin-muted">No payments.</p>'}${tipSection}${Number(invoice.balance_cents) > 0 ? `<form class="admin-form" data-form="payment"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Payment method <select name="provider"><option value="cash">Cash</option><option value="check">Check</option><option value="external">External</option></select></label><label>Amount <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Reference <input name="reference" /></label><button class="btn btn--primary btn--small" type="submit">Record payment</button></form>` : ''}<form class="admin-form" data-form="credit"><input type="hidden" name="customerId" value="${esc(invoice.customer_id)}" /><label>Customer credit amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="source" /></label><button class="btn btn--secondary btn--small" type="submit">Add credit</button></form></div>`;
+  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(invoice.number)}</h2><span class="admin-status">${esc(titleCase(invoice.status))}</span></div><dl class="admin-definition"><dt>Customer</dt><dd>${esc([invoice.first_name, invoice.last_name].filter(Boolean).join(' '))}</dd><dt>Email</dt><dd>${esc(invoice.customer_email || 'Not recorded')}</dd><dt>Service</dt><dd>${esc(invoice.service_name || invoice.service_code || 'Not recorded')}</dd><dt>Service date</dt><dd>${esc(invoice.service_date ? dateTime(`${String(invoice.service_date)}T12:00:00Z`) : 'Not recorded')}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Paid</dt><dd>${esc(money(invoice.amount_paid_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(dateTime(invoice.due_date))}</dd></dl><h3>Lines</h3>${lines.map((line) => `<div class="admin-record">${esc(line.description)} Â· ${esc(money(line.total_cents))}</div>`).join('') || '<p class="admin-muted">No lines.</p>'}<h3>Payments</h3>${payments.map((payment) => `<div class="admin-record">${esc(titleCase(payment.provider))} Â· ${esc(money(payment.amount_cents))} Â· ${esc(payment.status)} Â· ${esc(dateTime(payment.created_at))}<details class="admin-detail-toggle"><summary>Record refund</summary><form class="admin-form" data-form="refund"><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Refund amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="reason" /></label><button class="btn btn--secondary btn--small" type="submit">Record refund</button></form></details></div>`).join('') || '<p class="admin-muted">No payments.</p>'}${tipSection}${Number(invoice.balance_cents) > 0 ? `<form class="admin-form" data-form="payment"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Payment method <select name="provider"><option value="cash">Cash</option><option value="check">Check</option><option value="external">External</option></select></label><label>Amount <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Reference <input name="reference" /></label><button class="btn btn--primary btn--small" type="submit">Record payment</button></form>` : ''}<form class="admin-form" data-form="credit"><input type="hidden" name="customerId" value="${esc(invoice.customer_id)}" /><label>Customer credit amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="source" /></label><button class="btn btn--secondary btn--small" type="submit">Add credit</button></form></div>`;
   const controls = document.querySelector<HTMLElement>('[data-admin-invoice-controls]');
   if (controls) {
     controls.innerHTML = `<a class="btn btn--secondary btn--small" href="/api/admin/invoice-document?id=${encodeURIComponent(invoiceId)}">Download invoice PDF</a>` +
@@ -4461,7 +4549,7 @@ async function openInvoice(invoiceId: string): Promise<void> {
       const latestReceipt = receipts[0];
       controls.insertAdjacentHTML(
         'beforeend',
-        `<p class="admin-muted">Payment receipt: ${esc(latestReceipt ? `${titleCase(latestReceipt.status)} · ${dateTime(latestReceipt.sent_at || latestReceipt.updated_at)}` : 'not sent')}</p><button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-receipt-resend" data-id="${esc(invoiceId)}">Resend payment receipt</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="invoice-tip-link" data-id="${esc(invoiceId)}">Create optional tip link</button>`,
+        `<p class="admin-muted">Payment receipt: ${esc(latestReceipt ? `${titleCase(latestReceipt.status)} Â· ${dateTime(latestReceipt.sent_at || latestReceipt.updated_at)}` : 'not sent')}</p><button class="btn btn--secondary btn--small" type="button" data-admin-action="invoice-receipt-resend" data-id="${esc(invoiceId)}">Resend payment receipt</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="invoice-tip-link" data-id="${esc(invoiceId)}">Create optional tip link</button>`,
       );
     }
     if (
@@ -4499,7 +4587,7 @@ async function openInvoice(invoiceId: string): Promise<void> {
     if (can('finance.write') && stripePayments.length > 0) {
       controls.insertAdjacentHTML(
         'beforeend',
-        `<details class="admin-detail-toggle"><summary>Execute Stripe refund</summary><form class="admin-form" data-form="stripe-refund"><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Stripe payment <select name="paymentId">${stripePayments.map((payment) => `<option value="${esc(payment.id)}">${esc(money(payment.amount_cents))} · ${esc(dateTime(payment.created_at))}</option>`).join('')}</select></label><label>Refund amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Your password (step-up) <input name="password" type="password" required /></label><button class="btn btn--secondary btn--small" type="submit">Execute Stripe refund</button></form></details>`,
+        `<details class="admin-detail-toggle"><summary>Execute Stripe refund</summary><form class="admin-form" data-form="stripe-refund"><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Stripe payment <select name="paymentId">${stripePayments.map((payment) => `<option value="${esc(payment.id)}">${esc(money(payment.amount_cents))} Â· ${esc(dateTime(payment.created_at))}</option>`).join('')}</select></label><label>Refund amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Your password (step-up) <input name="password" type="password" required /></label><button class="btn btn--secondary btn--small" type="submit">Execute Stripe refund</button></form></details>`,
       );
     }
     if (can('finance.write') && Number(invoice.balance_cents) > 0) {
@@ -4517,7 +4605,7 @@ async function openInvoice(invoiceId: string): Promise<void> {
           if (active.length === 0) return;
           controls.insertAdjacentHTML(
             'beforeend',
-            `<details class="admin-detail-toggle"><summary>Charge saved card after service</summary><form class="admin-form" data-form="offsession"><label>Signed authorization <select name="authorizationId">${active.map((authorization) => `<option value="${esc(authorization.id)}">${esc(money(authorization.max_amount_cents))} max · signed ${esc(dateTime(authorization.signed_at))}</option>`).join('')}</select></label><label>Your password (step-up) <input name="password" type="password" required /></label><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><button class="btn btn--secondary btn--small" type="submit">Charge authorized card</button></form></details>`,
+            `<details class="admin-detail-toggle"><summary>Charge saved card after service</summary><form class="admin-form" data-form="offsession"><label>Signed authorization <select name="authorizationId">${active.map((authorization) => `<option value="${esc(authorization.id)}">${esc(money(authorization.max_amount_cents))} max Â· signed ${esc(dateTime(authorization.signed_at))}</option>`).join('')}</select></label><label>Your password (step-up) <input name="password" type="password" required /></label><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><button class="btn btn--secondary btn--small" type="submit">Charge authorized card</button></form></details>`,
           );
         })
         .catch(() => undefined);
@@ -4538,7 +4626,7 @@ async function openInvoice(invoiceId: string): Promise<void> {
             )}" /><label>Credit <select name="creditId">${active
               .map(
                 (credit) =>
-                  `<option value="${esc(credit.id)}">${esc(credit.source || 'Credit')} — ${esc(
+                  `<option value="${esc(credit.id)}">${esc(credit.source || 'Credit')} â€” ${esc(
                     money(credit.remaining_cents),
                   )} remaining</option>`,
               )
@@ -5317,7 +5405,7 @@ async function renderDocumentOverview(
         const data = await api<{ updates?: Array<Record<string, unknown>> }>('/api/admin/documents?view=updates');
         updateTarget.textContent = String(data.updates?.length ?? 0);
       } catch {
-        updateTarget.textContent = '—';
+        updateTarget.textContent = 'â€”';
       }
     }
   }
@@ -5394,7 +5482,7 @@ function applyCustomerToComposer(detail: Record<string, unknown>): void {
   const selected = document.querySelector<HTMLElement>('[data-document-selected-recipient]');
   if (selected) {
     selected.hidden = false;
-    selected.innerHTML = `<strong>${esc(name || 'Customer')}</strong>${customer.company_name ? ` <span class="admin-muted">${esc(customer.first_name ?? '')} ${esc(customer.last_name ?? '')}</span>` : ''}<dl><dt>Email</dt><dd>${esc(email || 'No email on file')}</dd><dt>Phone</dt><dd>${esc(phone || '—')}</dd><dt>Properties</dt><dd>${esc(String(properties.length))}</dd></dl><button class="btn btn--ghost btn--small document-selected-recipient__clear" type="button" data-document-clear-recipient>Choose a different customer</button>`;
+    selected.innerHTML = `<strong>${esc(name || 'Customer')}</strong>${customer.company_name ? ` <span class="admin-muted">${esc(customer.first_name ?? '')} ${esc(customer.last_name ?? '')}</span>` : ''}<dl><dt>Email</dt><dd>${esc(email || 'No email on file')}</dd><dt>Phone</dt><dd>${esc(phone || 'â€”')}</dd><dt>Properties</dt><dd>${esc(String(properties.length))}</dd></dl><button class="btn btn--ghost btn--small document-selected-recipient__clear" type="button" data-document-clear-recipient>Choose a different customer</button>`;
   }
   const propertySelect = document.querySelector<HTMLSelectElement>('[data-document-property]');
   if (propertySelect) {
@@ -5402,7 +5490,7 @@ function applyCustomerToComposer(detail: Record<string, unknown>): void {
       .map((property) => {
         const label = [property.label, property.line1, property.city, property.state]
           .filter(Boolean)
-          .join(' — ');
+          .join(' â€” ');
         return `<option value="${esc(property.id)}"${Number(property.is_primary) === 1 ? ' selected' : ''}>${esc(label)}</option>`;
       })
       .join('')}`;
@@ -5424,7 +5512,7 @@ function applyCustomerToComposer(detail: Record<string, unknown>): void {
     const start = new Date(String(appointments[0].start_at));
     const end = appointments[0]?.end_at ? new Date(String(appointments[0].end_at)) : null;
     if (Number.isFinite(start.getTime())) {
-      arrivalField.value = `${formatter.format(start)}${end && Number.isFinite(end.getTime()) ? ` – ${formatter.format(end)}` : ''} Central`;
+      arrivalField.value = `${formatter.format(start)}${end && Number.isFinite(end.getTime()) ? ` â€“ ${formatter.format(end)}` : ''} Central`;
     }
   }
   const priceField = documentFormField('priceSummary');
@@ -5459,7 +5547,7 @@ function applyCustomerToComposer(detail: Record<string, unknown>): void {
 
 async function chooseDocumentCustomer(customerId: string): Promise<void> {
   const results = document.querySelector<HTMLElement>('[data-document-customer-results]');
-  if (results) results.textContent = 'Loading customer and property details…';
+  if (results) results.textContent = 'Loading customer and property detailsâ€¦';
   try {
     const detail = await api<Record<string, unknown>>(`/api/admin/customers?id=${encodeURIComponent(customerId)}`);
     if (results) results.innerHTML = '';
@@ -5478,7 +5566,7 @@ function renderCustomerResults(customers: Array<Record<string, unknown>>): void 
           const name =
             String(customer.company_name ?? '').trim() ||
             [customer.first_name, customer.last_name].filter(Boolean).join(' ');
-          return `<button class="document-recipient-result" type="button" data-document-customer-id="${esc(customer.id)}"><strong>${esc(name || 'Customer')}</strong><span>${esc(customer.email || 'No email on file')} · ${esc(customer.phone || 'No phone')} · ${esc(customer.branch_name || 'No branch')}</span></button>`;
+          return `<button class="document-recipient-result" type="button" data-document-customer-id="${esc(customer.id)}"><strong>${esc(name || 'Customer')}</strong><span>${esc(customer.email || 'No email on file')} Â· ${esc(customer.phone || 'No phone')} Â· ${esc(customer.branch_name || 'No branch')}</span></button>`;
         })
         .join('')
     : '<p class="admin-muted">No customer matched that search.</p>';
@@ -5518,7 +5606,7 @@ async function loadDocumentEmployees(): Promise<void> {
     const data = await api<{ team?: Array<Record<string, unknown>> }>('/api/admin/operations?view=jobs');
     const team = data.team ?? [];
     select.innerHTML = `<option value="">Choose an employee</option>${team
-      .map((member) => `<option value="${esc(member.id)}" data-email="${esc(member.email ?? '')}">${esc(member.display_name)} · ${esc(member.email ?? '')}</option>`)
+      .map((member) => `<option value="${esc(member.id)}" data-email="${esc(member.email ?? '')}">${esc(member.display_name)} Â· ${esc(member.email ?? '')}</option>`)
       .join('')}`;
     select.dataset.loaded = 'yes';
   } catch {
@@ -5781,7 +5869,7 @@ function renderComposerPreview(preview: Record<string, unknown>): void {
     const rendered = text
       ? renderBrandedDocumentHtml(text, { variant: 'preview' })
       : '<p>PDF template - use the Download action to review the source PDF.</p>';
-    return `<section class="doc" id="doc-${index}"><div class="doc-preview-label">Document ${index + 1} of ${requirements.length} · ${esc(String(item.title ?? 'Document'))} · ${Number(item.required) ? 'Required agreement' : 'Optional agreement'}</div>${itemMissing.length ? `<p class="warn">Unresolved: ${itemMissing.map((key) => esc(key)).join(', ')}</p>` : ''}${rendered}</section>`;
+    return `<section class="doc" id="doc-${index}"><div class="doc-preview-label">Document ${index + 1} of ${requirements.length} Â· ${esc(String(item.title ?? 'Document'))} Â· ${Number(item.required) ? 'Required agreement' : 'Optional agreement'}</div>${itemMissing.length ? `<p class="warn">Unresolved: ${itemMissing.map((key) => esc(key)).join(', ')}</p>` : ''}${rendered}</section>`;
   }).join('');
   const warning = contentProblems.length
     ? `<div class="warn banner">Internal review wording blocks customer delivery: ${contentProblems.map((term) => esc(term)).join(', ')}</div>`
@@ -5855,7 +5943,7 @@ async function loadDocumentBundleItems(bundleId: string): Promise<void> {
     esc(item.title),
     esc(item.version_label ?? item.version),
     esc(titleCase(item.enforcement_stage)),
-    esc([item.condition_key, item.condition_value].filter(Boolean).join(': ') || '—'),
+    esc([item.condition_key, item.condition_value].filter(Boolean).join(': ') || 'â€”'),
     Number(item.required) ? 'Yes' : 'No',
     `<div class="admin-actions">${index > 0 ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-item-move" data-dir="up" data-id="${esc(item.template_id)}" data-bundle="${esc(bundleId)}" data-stage="${esc(item.enforcement_stage)}" data-required="${Number(item.required) ? '1' : '0'}">Up</button>` : ''}${index < all.length - 1 ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-item-move" data-dir="down" data-id="${esc(item.template_id)}" data-bundle="${esc(bundleId)}" data-stage="${esc(item.enforcement_stage)}" data-required="${Number(item.required) ? '1' : '0'}">Down</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-item-remove" data-id="${esc(item.template_id)}" data-bundle="${esc(bundleId)}">Remove</button></div>`,
   ]), 'This bundle has no documents yet.');
@@ -5894,16 +5982,16 @@ async function openDocumentRequest(id: string): Promise<void> {
       const lines = Array.isArray(pricing.lines)
         ? (pricing.lines as Array<Record<string, unknown>>)
             .map((line) => `${esc(line.label)}: ${money(line.amountCents)}`)
-            .join(' · ')
+            .join(' Â· ')
         : '';
-      pricingHtml = `<div class="admin-record"><p><strong>Signed price</strong> ${money(pricing.totalCents)} · Amount due now ${money(pricing.amountDueNowCents)}${Number(pricing.remainingBalanceCents) ? ` · Remaining ${money(pricing.remainingBalanceCents)}` : ''}</p>${pricing.propertyAddress ? `<p class="admin-muted">${esc(String(pricing.propertyAddress))}</p>` : ''}${lines ? `<p class="admin-muted">${lines}</p>` : ''}</div>`;
+      pricingHtml = `<div class="admin-record"><p><strong>Signed price</strong> ${money(pricing.totalCents)} Â· Amount due now ${money(pricing.amountDueNowCents)}${Number(pricing.remainingBalanceCents) ? ` Â· Remaining ${money(pricing.remainingBalanceCents)}` : ''}</p>${pricing.propertyAddress ? `<p class="admin-muted">${esc(String(pricing.propertyAddress))}</p>` : ''}${lines ? `<p class="admin-muted">${lines}</p>` : ''}</div>`;
     }
   } catch {
     pricingHtml = '';
   }
   target.hidden = false;
   target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(request.packet_name || 'Signing request')}</h2><div class="admin-actions">${request.executed_at ? `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=executed&id=${encodeURIComponent(id)}">Executed copy</a>` : ''}${request.executed_at && ownerEmail?.status !== 'completed' ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-owner-email-retry" data-id="${esc(id)}">Retry owner email</button>` : ''}${awaiting ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-countersign" data-id="${esc(id)}">Countersign and verify</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-close">Close</button></div></div>
-    <dl class="admin-definition"><dt>Status</dt><dd>${esc(titleCase(request.status))}</dd><dt>Subject</dt><dd>${esc(request.subject_type)}</dd><dt>Branch</dt><dd>${esc(request.branch_id || '—')}</dd><dt>Bound signer</dt><dd>${esc(request.signer_email || 'not bound')}</dd><dt>Booking reference</dt><dd>${esc(request.booking_reference || '-')}</dd><dt>Countersigned</dt><dd>${request.counter_signed_at ? `${esc(request.counter_signature_name)} · ${esc(dateTime(request.counter_signed_at))}` : 'Not countersigned'}</dd><dt>Executed copy</dt><dd>${request.executed_at ? `${esc(dateTime(request.executed_at))} · signed copy retained privately` : 'Not available until fully signed'}</dd><dt>Owner email</dt><dd>${esc(ownerEmailLabel)}</dd></dl>${pricingHtml}
+    <dl class="admin-definition"><dt>Status</dt><dd>${esc(titleCase(request.status))}</dd><dt>Subject</dt><dd>${esc(request.subject_type)}</dd><dt>Branch</dt><dd>${esc(request.branch_id || 'â€”')}</dd><dt>Bound signer</dt><dd>${esc(request.signer_email || 'not bound')}</dd><dt>Booking reference</dt><dd>${esc(request.booking_reference || '-')}</dd><dt>Countersigned</dt><dd>${request.counter_signed_at ? `${esc(request.counter_signature_name)} Â· ${esc(dateTime(request.counter_signed_at))}` : 'Not countersigned'}</dd><dt>Executed copy</dt><dd>${request.executed_at ? `${esc(dateTime(request.executed_at))} Â· signed copy retained privately` : 'Not available until fully signed'}</dd><dt>Owner email</dt><dd>${esc(ownerEmailLabel)}</dd></dl>${pricingHtml}
     ${signatures.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Document</th><th>Version</th><th>Signer</th><th>Status</th><th>Signed</th><th>Actions</th></tr></thead><tbody>${signatures.map((signature) => `<tr><td>${esc(signature.title)}</td><td>${esc(signature.template_version)}</td><td>${esc(signature.signer_name)}</td><td><span class="admin-status">${esc(titleCase(signature.status))}</span></td><td>${esc(dateTime(signature.signed_at))}</td><td><div class="admin-actions"><a class="btn btn--ghost btn--small" href="/api/admin/documents?view=download&signatureId=${encodeURIComponent(String(signature.id))}">Download</a>${signature.status === 'awaiting_verification' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-verify" data-id="${esc(signature.id)}">Verify</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-signature-reject" data-id="${esc(signature.id)}">Reject</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No signatures yet.</p>'}</div>`;
 }
 
@@ -6105,7 +6193,7 @@ async function loadPromotions(): Promise<void> {
     [
       promotion.bookingDeadlineAt ? `Booking: ${esc(dateTime(promotion.bookingDeadlineAt))}` : '',
       promotion.serviceDeadlineAt ? `Service: ${esc(dateTime(promotion.serviceDeadlineAt))}` : '',
-    ].filter(Boolean).join(' · ') || '-',
+    ].filter(Boolean).join(' Â· ') || '-',
     `${esc(promotion.redeemedCount ?? 0)} / ${promotion.maxRedemptions ? esc(promotion.maxRedemptions) : 'unlimited'}`,
     `<span class="admin-status">${esc(titleCase(promotion.displayStatus ?? promotion.status))}</span>`,
     promotion.editable === false
@@ -6336,7 +6424,7 @@ mfaForm?.addEventListener('submit', async (event) => {
 
 document.querySelector<HTMLButtonElement>('[data-admin-mfa-resend]')?.addEventListener('click', () => {
   if (!mfaChallenge || mfaMethod !== 'email' || Date.now() < mfaResendAt) return;
-  if (mfaGateStatus) mfaGateStatus.textContent = 'Sending a new code…';
+  if (mfaGateStatus) mfaGateStatus.textContent = 'Sending a new codeâ€¦';
   void api<{ expiresAt?: string; resendAfterSeconds?: number }>('/api/admin/auth', {
     method: 'POST',
     body: JSON.stringify({ action: 'mfa_resend', challengeToken: mfaChallenge }),
@@ -6392,7 +6480,7 @@ forgotForm?.addEventListener('submit', async (event) => {
   setError();
   const data = new FormData(forgotForm);
   const submit = forgotForm.querySelector<HTMLButtonElement>('button[type="submit"]');
-  setStatusMessage(forgotStatus, 'Sending…');
+  setStatusMessage(forgotStatus, 'Sendingâ€¦');
   if (submit) submit.disabled = true;
   try {
     const result = await api<{ message?: string }>('/api/admin/auth', {
@@ -6529,7 +6617,7 @@ document.querySelector<HTMLInputElement>('[data-manual-customer-search]')?.addEv
     if (match) visible += 1;
   }
   if (term && visible === 0) {
-    select.insertAdjacentHTML('beforeend', '<option value="" disabled data-manual-no-match>No active customers match this filter — create one below</option>');
+    select.insertAdjacentHTML('beforeend', '<option value="" disabled data-manual-no-match>No active customers match this filter â€” create one below</option>');
   } else {
     select.querySelector('[data-manual-no-match]')?.remove();
   }
@@ -7903,7 +7991,7 @@ document.addEventListener('click', (event) => {
           .join('');
         const confirmed = await adminConfirm({
           title: `${label} selected requests?`,
-          body: `<p><strong>${ids.length} selected</strong> · ${eligible} eligible · ${ineligible} protected/ineligible</p>${
+          body: `<p><strong>${ids.length} selected</strong> Â· ${eligible} eligible Â· ${ineligible} protected/ineligible</p>${
             reasonList ? `<ul class="admin-confirm-list">${reasonList}</ul>` : ''
           }<p>${
             operation === 'delete_test'
@@ -7929,14 +8017,14 @@ document.addEventListener('click', (event) => {
         const failed = (result.results ?? []).filter((entry) => !entry.ok);
         const resultNode = document.querySelector<HTMLElement>('[data-admin-request-bulk-result]');
         if (resultNode) {
-          resultNode.innerHTML = `<ul class="admin-result-list"><li><strong>${result.succeeded ?? 0} completed</strong> · ${
+          resultNode.innerHTML = `<ul class="admin-result-list"><li><strong>${result.succeeded ?? 0} completed</strong> Â· ${
             result.failed ?? 0
           } skipped</li>${failed
             .slice(0, 25)
             .map((entry) => {
               const match = loadedRequests.find((row) => String(row.id) === entry.id);
               const reference = String(match?.quote_reference ?? entry.id);
-              return `<li class="is-failed">${esc(reference)} — ${esc(titleCase(String(entry.error ?? 'failed').replaceAll('_', ' ')))}</li>`;
+              return `<li class="is-failed">${esc(reference)} â€” ${esc(titleCase(String(entry.error ?? 'failed').replaceAll('_', ' ')))}</li>`;
             })
             .join('')}</ul>`;
         }
@@ -8296,7 +8384,7 @@ async function startDocumentRevision(templateId: string): Promise<void> {
 async function saveDocumentEditor(): Promise<void> {
   if (!documentEditorId) return;
   const status = document.querySelector<HTMLElement>('[data-document-editor-status]');
-  if (status) status.textContent = 'Saving draft revision…';
+  if (status) status.textContent = 'Saving draft revisionâ€¦';
   try {
     await api('/api/admin/documents', {
       method: 'POST',
@@ -8324,7 +8412,7 @@ async function saveDocumentEditor(): Promise<void> {
 async function compareDocumentEditor(): Promise<void> {
   if (!documentEditorId) return;
   const target = document.querySelector<HTMLElement>('[data-document-editor-compare-result]');
-  if (target) target.textContent = 'Building comparison…';
+  if (target) target.textContent = 'Building comparisonâ€¦';
   try {
     const result = await api<{
       previous?: { title?: string; version?: string; content?: string; contentProblems?: string[] } | null;
@@ -8348,7 +8436,7 @@ async function publishDocumentEditor(): Promise<void> {
   if (!documentEditorId) return;
   if (!window.confirm('Approve and publish this revision? Every packet using the previous version will move to this version. Prior signers will be flagged for review. Executed agreements are not changed.')) return;
   const status = document.querySelector<HTMLElement>('[data-document-editor-status]');
-  if (status) status.textContent = 'Publishing revision…';
+  if (status) status.textContent = 'Publishing revisionâ€¦';
   try {
     const result = await api<{ updatedPackets?: number; affectedCustomers?: number }>('/api/admin/documents', {
       method: 'POST',
@@ -8417,7 +8505,7 @@ function bindDocumentEditor(): void {
     document.execCommand(
       'insertHTML',
       false,
-      `<p data-doc-signature="${party}"><strong>X — Sign here</strong><br />${label}: ______________________________</p><p><br></p>`,
+      `<p data-doc-signature="${party}"><strong>X â€” Sign here</strong><br />${label}: ______________________________</p><p><br></p>`,
     );
     renderDocumentEditorPreview();
   });

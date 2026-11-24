@@ -105,6 +105,60 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         .all();
       return json({ ok: true, commitments: rows.results ?? [] });
     }
+    if (view === 'job') {
+      const actor = await requireActor(db, context.request, 'job.read');
+      const appointmentId = text(url.searchParams.get('appointmentId'), 120);
+      if (!appointmentId) return json({ ok: false, error: 'appointment_required' }, 400);
+      const branch = scope(actor, 'a.branch_id');
+      const job = await db
+        .prepare(
+          `SELECT a.id, a.status, a.source, a.reference, a.start_at, a.end_at, a.timezone,
+                  a.duration_minutes, a.crew_size, a.notes, a.customer_id, a.property_id,
+                  a.estimate_id, a.booking_request_id,
+                  c.first_name, c.last_name, c.company_name,
+                  p.label AS property_label, p.line1, p.city, p.state, p.postal_code,
+                  e.total_cents, e.service_code, e.discount_cents, e.subtotal_cents, e.input_snapshot_json,
+                  s.name AS service_name,
+                  i.id AS invoice_id, i.number AS invoice_number, i.status AS invoice_status,
+                  i.total_cents AS invoice_total_cents, i.balance_cents AS invoice_balance_cents,
+                  (SELECT GROUP_CONCAT(tm.display_name, ', ')
+                     FROM appointment_resources ar JOIN team_members tm ON tm.id = ar.team_member_id
+                    WHERE ar.appointment_id = a.id) AS assigned_names
+           FROM appointments a
+           JOIN customers c ON c.id = a.customer_id
+           LEFT JOIN properties p ON p.id = a.property_id
+           LEFT JOIN estimates e ON e.id = a.estimate_id
+           LEFT JOIN services s ON s.code = e.service_code
+           LEFT JOIN invoices i ON i.appointment_id = a.id
+           WHERE a.id = ?${branch.sql} LIMIT 1`,
+        )
+        .bind(appointmentId, ...branch.bind)
+        .first<Record<string, unknown>>();
+      if (!job) return json({ ok: false, error: 'appointment_not_found' }, 404);
+      const documents = await db
+        .prepare(
+          `SELECT id, packet_name, bundle_code, status, executed_at, created_at
+           FROM signing_requests
+           WHERE appointment_id = ? OR (customer_id = ? AND property_id = ?)
+           ORDER BY created_at DESC LIMIT 10`,
+        )
+        .bind(appointmentId, String(job.customer_id ?? ''), String(job.property_id ?? ''))
+        .all<Record<string, unknown>>();
+      return json({
+        ok: true,
+        job,
+        invoice: job.invoice_id
+          ? {
+              id: job.invoice_id,
+              number: job.invoice_number,
+              status: job.invoice_status,
+              totalCents: job.invoice_total_cents,
+              balanceCents: job.invoice_balance_cents,
+            }
+          : null,
+        documents: documents.results ?? [],
+      });
+    }
     if (view === 'availability') {
       const actor = await requireActor(db, context.request, 'booking.write');
       const availability = await manualAvailability(context.env, db, actor, {

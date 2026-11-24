@@ -15,7 +15,7 @@ import {
   quoteManualBooking,
 } from '../src/lib/admin/manual-booking.ts';
 import type { AvailabilityInput, AvailabilityServiceResult } from '../src/lib/booking/service.ts';
-import { onRequestPost as bookingsPost } from '../functions/api/admin/bookings.ts';
+import { onRequestGet as bookingsGet, onRequestPost as bookingsPost } from '../functions/api/admin/bookings.ts';
 import { createInvoice, getInvoice } from '../src/lib/admin/billing.ts';
 import {
   activeEntitlementForCustomer,
@@ -853,4 +853,66 @@ test('a scheduled booking honors the custom price and discount in its persisted 
   assert.equal(fields.custom_price, '275.00');
   assert.equal(fields.admin_agreed_price, '250.00');
   assert.equal(fields.admin_discount_reason, 'Returning customer');
+});
+
+test('a repeated completed-service submission reuses the job and its job invoice view exposes the linked invoice', async () => {
+  const { db, actor, env, quoteInput, session } = await fixture();
+  const input = {
+    ...quoteInput,
+    serviceType: 'move_out',
+    serviceLabel: 'Move-Out Cleaning',
+    completedDate: '2026-11-23',
+    teamMemberIds: ['team_hayli'],
+    pricingMethod: 'custom',
+    customPrice: 275,
+  };
+  const first = await createCompletedService(env, db, actor, input);
+  const second = await createCompletedService(env, db, actor, input);
+  assert.equal(second.existing, true);
+  assert.equal(second.appointmentId, first.appointmentId);
+  assert.equal(
+    (db.raw.prepare("SELECT COUNT(*) AS n FROM appointments WHERE source = 'admin_completed'").get() as { n: number }).n,
+    1,
+    'a retry never creates a second completed job',
+  );
+  const headers = { Cookie: `ss_ops=${session.token}` };
+  const before = await bookingsGet({
+    request: new Request(`https://example.test/api/admin/bookings?view=job&appointmentId=${encodeURIComponent(first.appointmentId)}`, { headers }),
+    env,
+  } as never);
+  assert.equal(before.status, 200);
+  const beforeBody = (await before.json()) as { invoice: unknown; job: Record<string, unknown> };
+  assert.equal(beforeBody.invoice, null);
+  assert.equal(beforeBody.job.total_cents, 27500);
+  const invoiceResponse = await bookingsPost({
+    request: new Request('https://example.test/api/admin/bookings', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json', 'X-CSRF-Token': session.csrf },
+      body: JSON.stringify({ action: 'invoice_job', appointmentId: first.appointmentId, paymentLink: false }),
+    }),
+    env,
+  } as never);
+  assert.equal(invoiceResponse.status, 200);
+  const invoiceBody = (await invoiceResponse.json()) as { invoice: { id: string; number: string } };
+  const after = await bookingsGet({
+    request: new Request(`https://example.test/api/admin/bookings?view=job&appointmentId=${encodeURIComponent(first.appointmentId)}`, { headers }),
+    env,
+  } as never);
+  assert.equal(after.status, 200);
+  const afterBody = (await after.json()) as { invoice: Record<string, unknown> };
+  assert.equal(afterBody.invoice.id, invoiceBody.invoice.id);
+  assert.equal(afterBody.invoice.balanceCents, 27500);
+  const retryService = await createCompletedService(env, db, actor, input);
+  assert.equal(retryService.appointmentId, first.appointmentId);
+  const retryInvoice = await bookingsPost({
+    request: new Request('https://example.test/api/admin/bookings', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json', 'X-CSRF-Token': session.csrf },
+      body: JSON.stringify({ action: 'invoice_job', appointmentId: retryService.appointmentId }),
+    }),
+    env,
+  } as never);
+  assert.equal(retryInvoice.status, 200);
+  const retryBody = (await retryInvoice.json()) as { invoice: { id: string } };
+  assert.equal(retryBody.invoice.id, invoiceBody.invoice.id);
 });
