@@ -84,7 +84,18 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-24 invoice email step-up removal):** application code `c696c50` on
+- **Current release (2026-11-24 admin operations Release A):** application code `e970ce0` on
+  `production-safe`, Cloudflare Pages deployment `b98bf961-091b-4d50-88b6-4d34f092b120`, verified live
+  on 2026-11-24 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.BoOU30tH.js`). Repairs alert affected-record
+  navigation (signing requests and invoices now open the correct detail), replaces the Google Reviews
+  manual appointment-ID form with a searchable completed-cleaning selector/status list/email preview
+  and owner-gated queue hooks, and adds lead detail, archive, restore, protected disposable deletion,
+  selection and bulk management. Verified: unit **1,101** (1,100 pass, 1 pre-existing skip), browser
+  **275/275**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45319043262` green.
+  No production lead, review email, document or customer record was mutated by verification. Evidence:
+  `docs/verification/2026-11-24-ADMIN-RELEASE-A.md`.
+- **Prior release (2026-11-24 invoice email step-up removal):** application code `c696c50` on
   `production-safe`, Cloudflare Pages deployment `96fa5ca0-7be0-4ffe-86d8-f0c0c028768d`, verified live
   on 2026-11-24 (served admin asset
   `/_astro/index.astro_astro_type_script_index_0_lang.CdcMTGKU.js`). Removes only the unnecessary MFA

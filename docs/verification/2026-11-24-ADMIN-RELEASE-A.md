@@ -75,3 +75,20 @@
 ## Deployment evidence
 
 Appended after the authorized production deployment.
+
+## Deployment evidence
+
+- Deployed application commit: `e970ce0` on `production-safe`.
+- Cloudflare Pages production deployment:
+  `b98bf961-091b-4d50-88b6-4d34f092b120`.
+- GitHub Actions `validate` + `browser`: run `45319043262` succeeded
+  (`validate` 1m30s, `browser` 6m41s).
+- Served production admin asset:
+  `/_astro/index.astro_astro_type_script_index_0_lang.BoOU30tH.js`.
+- Live `/admin/` contains the new completed-cleanings selector, review queue
+  controls and lead bulk toolbar.
+- No production lead, customer, appointment, invoice, review request, email or
+  document was created, sent or deleted by verification.
+
+- Live markers: `Completed cleanings`, `data-admin-lead-bulk` and `data-review-eligible-list` present.
+
