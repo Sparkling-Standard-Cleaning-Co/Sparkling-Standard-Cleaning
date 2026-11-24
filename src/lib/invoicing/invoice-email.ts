@@ -52,7 +52,7 @@ export function buildInvoiceEmail(
       <p style="margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;font-size:21px;font-weight:700;">Sparkling Standard Cleaning Co.</p>
       <p style="margin:0 0 24px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#6d5426;">Standards That Sparkle.</p>
       <p style="margin:0 0 14px;font-size:15px;">Hello ${escapeHtml(data.billedTo.contact || data.billedTo.company)},</p>
-      <p style="margin:0 0 18px;font-size:15px;line-height:1.65;">Your invoice <strong>${escapeHtml(data.invoiceNumber)}</strong> is attached as a PDF. The balance due is <strong>${escapeHtml(balance)}</strong>, due ${escapeHtml(due)}.</p>
+      <p style="margin:0 0 18px;font-size:15px;line-height:1.65;">Your invoice <strong>${escapeHtml(data.invoiceNumber)}</strong> is attached as a PDF.${data.serviceName ? ` Service: <strong>${escapeHtml(data.serviceName)}</strong>.` : ''}${data.serviceDate ? ` Service date: <strong>${escapeHtml(formatInvoiceDate(data.serviceDate))}</strong>.` : ''} The balance due is <strong>${escapeHtml(balance)}</strong>, due ${escapeHtml(due)}.</p>
       ${payLink}
       ${payLink ? '<p style="margin:0 0 18px;font-size:13px;line-height:1.65;color:#6f5f57;">The secure payment page also offers a completely optional gratuity for your cleaning team. It defaults to $0.00 and never affects your service, review or receipt.</p>' : ''}
       <p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:#4a3b40;">${escapeHtml(data.paymentTerms || 'Please reply to this email with any questions.')}</p>
@@ -66,6 +66,8 @@ export function buildInvoiceEmail(
     `Hello ${data.billedTo.contact || data.billedTo.company},`,
     '',
     `Your invoice ${data.invoiceNumber} is attached as a PDF.`,
+    ...(data.serviceName ? [`Service: ${data.serviceName}`] : []),
+    ...(data.serviceDate ? [`Service date: ${formatInvoiceDate(data.serviceDate)}`] : []),
     `Balance due: ${balance}`,
     `Due: ${due}`,
     ...(data.paymentUrl && /^https:\/\//i.test(data.paymentUrl) ? ['', `Pay online: ${data.paymentUrl}`, 'The secure payment page offers a completely optional gratuity; it defaults to $0.00.'] : []),

@@ -1,4 +1,4 @@
-﻿import { test, before, after } from 'node:test';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -126,6 +126,16 @@ async function openAdmin() {
       }),
     });
   });
+  await page.route('**/api/admin/operations?view=team', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        team: [{ id: 'team_hayli', display_name: 'Hayli', status: 'active' }],
+      }),
+    });
+  });
   await page.route('**/api/admin/documents*', async (route) => {
     const body = route.request().postDataJSON();
     posts.push({ route: 'documents', ...body });
@@ -202,6 +212,27 @@ async function openAdmin() {
         status: 201,
         contentType: 'application/json',
         body: JSON.stringify({ ok: true, requestId: 'req_manual_1', reference: 'MB-20261215-ABC123', quote }),
+      });
+    }
+    if (body.action === 'create_completed') {
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          appointmentId: 'appt_completed_1',
+          estimateId: 'est_completed_1',
+          reference: 'HC-20261123-COMPLETE',
+          serviceDate: body.completedDate,
+          totalCents: 27500,
+        }),
+      });
+    }
+    if (body.action === 'invoice_job') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, invoice: { id: 'inv_completed_1', number: 'INV-COMPLETED' } }),
       });
     }
     if (body.action === 'invoice') {
@@ -394,6 +425,52 @@ test('an unresolved recurring sync is shown as a readable conflict with its date
     const text = (await page.textContent('[data-admin-recurring]')) ?? '';
     assert.match(text, /Conflict/);
     assert.match(text, /2026-11-10: Travel route could not be established/i);
+  } finally {
+    await context.close();
+  }
+});
+
+test('the completed-service mode records a custom $275 historical job and creates one invoice', async () => {
+  const { context, page, posts } = await openAdmin();
+  try {
+    await page.getByRole('button', { name: 'New Booking' }).click();
+    await page.waitForFunction(() => {
+      const select = document.querySelector('[data-manual-customer]');
+      return select instanceof HTMLSelectElement && select.options.length > 1;
+    });
+    await page.selectOption('[data-manual-customer]', 'cust_1');
+    await page.waitForFunction(() => {
+      const select = document.querySelector('[data-manual-property]');
+      return select instanceof HTMLSelectElement && select.options.length > 1;
+    });
+    await page.selectOption('[data-manual-appointment-type]', 'completed');
+    await page.fill('[data-manual-completed-date]', '2026-11-23');
+    await page.fill('[data-manual-custom-price]', '275');
+    await page.selectOption('[data-manual-service]', 'move_out');
+    await page.waitForSelector('[data-manual-completed-crew]', { timeout: 5000 });
+    await page.check('[data-manual-completed-crew]');
+    assert.match((await page.textContent('[data-manual-pricing-summary]')) ?? '', /\$275\.00/);
+    assert.equal(await page.locator('[data-manual-scheduled-actions]').isHidden(), true);
+    assert.equal(await page.locator('[data-manual-completed-actions]').isVisible(), true);
+    await page.getByRole('button', { name: 'Save & Create Invoice' }).click();
+    const dialog = page.locator('[data-admin-dialog][open]');
+    await dialog.waitFor({ state: 'visible' });
+    assert.match((await page.locator('[data-admin-dialog-body]').textContent()) ?? '', /Move-Out Cleaning/);
+    assert.match((await page.locator('[data-admin-dialog-body]').textContent()) ?? '', /\$275\.00/);
+    await page.locator('[data-admin-dialog-confirm]').click();
+    await page.waitForFunction(() =>
+      document.querySelector('[data-admin-success]')?.textContent?.includes('Completed service and invoice created'),
+    );
+    const created = posts.find((entry) => entry.route === 'bookings' && entry.action === 'create_completed');
+    assert.ok(created, 'the completed-service API was called');
+    assert.equal(created.completedDate, '2026-11-23');
+    assert.equal(created.pricingMethod, 'custom');
+    assert.equal(created.customPrice, 275);
+    assert.deepEqual(created.teamMemberIds, ['team_hayli']);
+    const invoice = posts.find((entry) => entry.route === 'bookings' && entry.action === 'invoice_job');
+    assert.ok(invoice);
+    assert.equal(invoice.appointmentId, 'appt_completed_1');
+    assert.match((await page.textContent('[data-manual-booking-result]')) ?? '', /INV-COMPLETED/);
   } finally {
     await context.close();
   }

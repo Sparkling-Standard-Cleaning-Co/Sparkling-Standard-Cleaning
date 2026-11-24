@@ -320,11 +320,19 @@ import {
                     <option value="church">Church cleaning</option>
                   </select>
                 </label>
+                <label>Appointment type
+                  <select name="appointmentType" data-manual-appointment-type>
+                    <option value="scheduled">Schedule a cleaning</option>
+                    <option value="completed">Record completed cleaning</option>
+                  </select>
+                </label>
                 <label>Service
                   <select name="serviceType" data-manual-service>
                     <option value="standard">Residential maintenance</option>
                     <option value="deep">Deep cleaning</option>
-                    <option value="move_in_out">Move-in / move-out</option>
+                    <option value="move_out">Move-Out Cleaning</option>
+                    <option value="move_in">Move-In Cleaning</option>
+                    <option value="move_in_out">Move-in / Move-out Cleaning (combined)</option>
                   </select>
                 </label>
                 <label>Discounts &amp; Promotions
@@ -368,21 +376,59 @@ import {
                     <div class="admin-extras__list" data-manual-bundle-list></div>
                   </details>
                 </fieldset>
-                <label>Cleaning date <input name="date" type="date" data-manual-date required /></label>
-                <label>Crew size <select name="crewSize" data-manual-crew><option value="1">One cleaner</option><option value="2">Two cleaners</option></select></label>
+                <fieldset class="admin-field--wide admin-extras" data-manual-pricing>
+                  <legend>Pricing adjustments</legend>
+                  <div class="admin-form admin-form--grid">
+                    <label>Pricing method
+                      <select name="pricingMethod" data-manual-pricing-method>
+                        <option value="estimated">Use calculated estimator price</option>
+                        <option value="custom">Enter custom agreed price ($)</option>
+                      </select>
+                    </label>
+                    <label data-manual-custom-price-wrap hidden>Custom agreed price ($)
+                      <input name="customPrice" type="number" min="0.01" step="0.01" data-manual-custom-price />
+                    </label>
+                    <label>Customer discount
+                      <select name="discountType" data-manual-discount-type>
+                        <option value="none">No discount</option>
+                        <option value="percent">Percentage (%)</option>
+                        <option value="fixed">Fixed dollar amount ($)</option>
+                      </select>
+                    </label>
+                    <label data-manual-discount-value-wrap hidden>Discount value
+                      <input name="discountValue" type="number" min="0" step="0.01" data-manual-discount-value />
+                    </label>
+                    <label class="admin-field--wide" data-manual-discount-reason-wrap hidden>Discount reason (optional)
+                      <input name="discountReason" maxlength="300" />
+                    </label>
+                  </div>
+                </fieldset>
+                <p class="admin-field--wide admin-muted" data-manual-pricing-summary aria-live="polite"></p>
+                <label data-manual-schedule-date-wrap>Cleaning date <input name="date" type="date" data-manual-date required /></label>
+                <label data-manual-completed-date-wrap hidden>Completed service date <input name="completedDate" type="date" data-manual-completed-date /></label>
+                <label data-manual-completed-agreement-wrap hidden>Existing signed agreement
+                  <select name="signingRequestId" data-manual-signed-agreements>
+                    <option value="">No agreement link</option>
+                  </select>
+                </label>
+                <label data-manual-crew-size-wrap>Crew size <select name="crewSize" data-manual-crew><option value="1">One cleaner</option><option value="2">Two cleaners</option></select></label>
                 <label class="admin-field--wide">Internal booking notes <textarea name="notes" rows="2" maxlength="2000" placeholder="Access details, special instructions, or why this estimate differs from the saved profile."></textarea></label>
-                <div class="admin-field--wide admin-actions">
+                <div class="admin-field--wide admin-actions" data-manual-scheduled-pricing>
                   <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-quote">Generate Estimate and Check Times</button>
                   <button class="btn btn--ghost btn--small" type="button" data-admin-action="manual-availability">Check Available Times</button>
                 </div>
                 <div class="admin-field--wide" data-manual-quote-result aria-live="polite"></div>
-                <label>Available appointment start <select name="slot" data-manual-slots><option value="">Generate an estimate and check times first</option></select></label>
+                <label data-manual-slot-wrap>Available appointment start <select name="slot" data-manual-slots><option value="">Generate an estimate and check times first</option></select></label>
                 <div class="admin-field--wide" data-manual-staff></div>
-                <div class="admin-field--wide admin-actions">
+                <div class="admin-field--wide admin-actions" data-manual-scheduled-actions>
                   <button class="btn btn--primary btn--small" type="button" data-admin-action="manual-create">Save Booking</button>
                   <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-create-documents">Book &amp; Send Agreements</button>
                   <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-create-send-invoice">Book, Send Agreements &amp; Invoice</button>
                   <button class="btn btn--ghost btn--small" type="button" data-admin-action="manual-create-confirm">Book &amp; Confirm</button>
+                </div>
+                <div class="admin-field--wide admin-actions" data-manual-completed-actions hidden>
+                  <button class="btn btn--primary btn--small" type="button" data-admin-action="manual-completed-save">Save Completed Job</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-completed-invoice">Save &amp; Create Invoice</button>
                 </div>
               </form>
               <div data-manual-booking-result style="margin-top:1rem;"></div>
@@ -1330,8 +1376,9 @@ import {
               <h2 class="admin-section-title">Create an invoice</h2>
               <form class="admin-form" data-admin-invoice-create>
                 <label>Customer <select name="customerId" data-admin-customer-options required></select></label>
-                <label>Service <select name="serviceCode"><option value="residential-cleaning">Residential cleaning — due immediately</option><option value="commercial-cleaning">Commercial cleaning — Net 15</option><option value="church-cleaning">Church cleaning — Net 15</option></select></label>
-                <label>Description <input name="description" required /></label>
+                <label>Service <select name="serviceCode" data-admin-invoice-services required><option value="">Choose a service</option></select></label>
+                <label>Description (optional) <input name="description" placeholder="Defaults to the selected service" /></label>
+                <label>Service performed date (today or earlier) <input name="serviceDate" type="date" /></label>
                 <label>Amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label>
                 <label>Due date (optional — residential defaults to issue date; commercial/church default to Net 15) <input name="dueDate" type="date" /></label>
                 <button class="btn btn--primary" type="submit">Create Invoice</button>

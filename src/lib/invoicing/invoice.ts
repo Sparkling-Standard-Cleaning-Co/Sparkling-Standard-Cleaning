@@ -42,6 +42,8 @@ export interface InvoiceData {
   /** ISO date; unset renders an owner-completion placeholder. */
   dueDate?: string;
   billedTo: InvoiceParty;
+  serviceName?: string;
+  serviceDate?: string;
   serviceLocation?: string;
   poReference?: string;
   lineItems: InvoiceLineItem[];
@@ -342,6 +344,16 @@ function buildHtml(data: InvoiceData, totals: InvoiceTotals): string {
                           data.dueDate ? escapeHtml(formatInvoiceDate(data.dueDate)) : escapeHtml(placeholder('Due date'))
                         }</td>
                       </tr>
+                      ${
+                        data.serviceName
+                          ? `<tr><td style="padding:2px 0;font-size:13px;color:${PALETTE.muted};">Service</td><td style="padding:2px 0;font-size:13px;color:${PALETTE.ink};text-align:right;">${escapeHtml(data.serviceName)}</td></tr>`
+                          : ''
+                      }
+                      ${
+                        data.serviceDate
+                          ? `<tr><td style="padding:2px 0;font-size:13px;color:${PALETTE.muted};">Service date</td><td style="padding:2px 0;font-size:13px;color:${PALETTE.ink};text-align:right;">${escapeHtml(formatInvoiceDate(data.serviceDate))}</td></tr>`
+                          : ''
+                      }
                       <tr>
                         <td style="padding:2px 0;font-size:13px;color:${PALETTE.muted};">PO / reference</td>
                         <td style="padding:2px 0;font-size:13px;color:${PALETTE.ink};text-align:right;">${escapeHtml(data.poReference || '—')}</td>
@@ -414,6 +426,8 @@ function buildText(data: InvoiceData, totals: InvoiceTotals): string {
   lines.push(`${data.contact.name} — INVOICE ${data.invoiceNumber}`);
   lines.push(`Issue date: ${formatInvoiceDate(data.issueDate)}`);
   lines.push(`Due date: ${data.dueDate ? formatInvoiceDate(data.dueDate) : placeholder('Due date')}`);
+  if (data.serviceName) lines.push(`Service: ${data.serviceName}`);
+  if (data.serviceDate) lines.push(`Service date: ${formatInvoiceDate(data.serviceDate)}`);
   lines.push(`PO / reference: ${data.poReference || '—'}`);
   lines.push('');
   lines.push('BILLED TO');

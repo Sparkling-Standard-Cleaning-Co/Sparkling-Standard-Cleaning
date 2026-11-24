@@ -27,7 +27,8 @@ import Icon from '../components/Icon.astro';
           <p class="invoice-pay__greeting" data-pay-greeting></p>
           <dl class="invoice-pay__summary">
             <div><dt>Invoice</dt><dd data-pay-number>—</dd></div>
-            <div><dt>Cleaning service</dt><dd data-pay-service>—</dd></div>
+            <div data-pay-service-row><dt>Service</dt><dd data-pay-service-name>—</dd></div>
+            <div><dt>Service amount</dt><dd data-pay-service>—</dd></div>
             <div><dt>Optional gratuity</dt><dd data-pay-tip-line>$0.00</dd></div>
             <div class="invoice-pay__total"><dt>Total</dt><dd data-pay-total>—</dd></div>
           </dl>

@@ -41,11 +41,15 @@ export function buildAdminInvoice(input: {
   }
 
   const dueDate = String(invoice.due_date ?? '').slice(0, 10);
+  const serviceDate = String(invoice.service_date ?? '').slice(0, 10);
+  const serviceName = String(invoice.service_name ?? '').trim();
   const paymentUrl = String(invoice.payment_url ?? '').trim();
   const data: InvoiceData = {
     invoiceNumber: String(invoice.number ?? ''),
     issueDate: String(invoice.issue_date ?? '').slice(0, 10),
     dueDate,
+    ...(serviceDate ? { serviceDate } : {}),
+    ...(serviceName ? { serviceName } : {}),
     billedTo: {
       company: companyName || customerName || 'Customer',
       ...(companyName && customerName ? { contact: customerName } : {}),

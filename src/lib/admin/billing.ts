@@ -118,6 +118,7 @@ export async function getInvoice(
   const invoice = await db
     .prepare(
       `SELECT i.*, c.first_name, c.last_name, c.company_name,
+              COALESCE(NULLIF(i.service_label, ''), s.name) AS service_name,
               (SELECT value FROM customer_contacts
                WHERE customer_contacts.customer_id = c.id AND customer_contacts.kind = 'email'
                ORDER BY is_primary DESC, created_at ASC LIMIT 1) AS customer_email,
@@ -126,6 +127,7 @@ export async function getInvoice(
                ORDER BY is_primary DESC, created_at ASC LIMIT 1) AS customer_phone,
               p.line1, p.line2, p.city, p.state, p.postal_code
        FROM invoices i JOIN customers c ON c.id = i.customer_id
+       LEFT JOIN services s ON s.code = i.service_code
        LEFT JOIN properties p ON p.id = i.property_id
        WHERE i.id = ? ${branch.sql} LIMIT 1`,
     )
@@ -167,6 +169,15 @@ export async function createInvoice(
       return { id: existing.id, number: existing.number, totalCents: Number(existing.total_cents) };
     }
   }
+  if (appointmentId) {
+    const existing = await db
+      .prepare('SELECT id, number, total_cents FROM invoices WHERE appointment_id = ? LIMIT 1')
+      .bind(appointmentId)
+      .first<{ id: string; number: string; total_cents: number }>();
+    if (existing) {
+      return { id: existing.id, number: existing.number, totalCents: Number(existing.total_cents) };
+    }
+  }
   if (propertyId) {
     const property = await db.prepare('SELECT id FROM properties WHERE id = ? AND customer_id = ? LIMIT 1').bind(propertyId, customerId).first();
     if (!property) throw new AdminAuthError(400, 'invoice_property_invalid');
@@ -183,6 +194,26 @@ export async function createInvoice(
   if (lines.length === 0) throw new AdminAuthError(400, 'invoice_lines_required');
   const issueDate = text(input.issueDate, 10) || new Date().toISOString().slice(0, 10);
   const serviceCode = text(input.serviceCode, 80);
+  const serviceDate = text(input.serviceDate, 10);
+  const serviceLabel = text(input.serviceLabel, 120);
+  if (serviceCode) {
+    const service = await db
+      .prepare('SELECT code FROM services WHERE code = ? AND active = 1 LIMIT 1')
+      .bind(serviceCode)
+      .first();
+    if (!service) throw new AdminAuthError(400, 'invoice_service_invalid');
+  }
+  if (serviceDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) throw new AdminAuthError(400, 'invoice_service_date_invalid');
+    const timeZone = customer.primary_branch_id === 'branch_tampa' ? 'America/New_York' : 'America/Chicago';
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    if (serviceDate > today) throw new AdminAuthError(400, 'invoice_service_date_future');
+  }
   const dueDate = text(input.dueDate, 10) || dueDateFor(issueDate, serviceCode);
   let subtotal = 0;
   let discount = 0;
@@ -211,9 +242,9 @@ export async function createInvoice(
     .prepare(
       `INSERT INTO invoices
        (id, branch_id, customer_id, property_id, appointment_id, number, status, issue_date, due_date,
-        subtotal_cents, discount_cents, tax_cents, total_cents, amount_paid_cents, balance_cents,
+        service_code, service_label, service_date, subtotal_cents, discount_cents, tax_cents, total_cents, amount_paid_cents, balance_cents,
         booking_request_id, created_by_admin_user_id)
-       VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
     )
     .bind(
       invoiceId,
@@ -224,6 +255,9 @@ export async function createInvoice(
       number,
       issueDate,
       dueDate,
+      serviceCode,
+      serviceLabel || null,
+      serviceDate || null,
       subtotal,
       discount,
       tax,

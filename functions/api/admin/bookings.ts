@@ -15,6 +15,7 @@ import {
 import {
   cancelManualBooking,
   confirmManualBooking,
+  createCompletedService,
   createManualBooking,
   manualAvailability,
   quoteManualBooking,
@@ -137,10 +138,12 @@ async function invoiceForRequest(
 ): Promise<Record<string, unknown>> {
   const row = await db
     .prepare(
-      `SELECT r.*, a.id AS appointment_id, e.total_cents, e.service_code, e.labor_hours
+      `SELECT r.*, a.id AS appointment_id, e.total_cents, e.service_code, e.labor_hours,
+              s.name AS service_name
        FROM booking_requests r
        LEFT JOIN appointments a ON a.booking_request_id = r.id
        LEFT JOIN estimates e ON e.quote_reference = r.quote_reference
+       LEFT JOIN services s ON s.code = e.service_code
        WHERE r.id = ? LIMIT 1`,
     )
     .bind(requestId)
@@ -165,7 +168,7 @@ async function invoiceForRequest(
         lines: [
           {
             kind: 'service',
-            description: `Cleaning service — ${String(row.quote_reference ?? requestId)}`,
+            description: `${String(row.service_name ?? 'Cleaning service')} — ${String(row.quote_reference ?? requestId)}`,
             quantity: 1,
             unitAmountCents: total,
             totalCents: total,
@@ -192,16 +195,99 @@ async function invoiceForRequest(
   return { invoice, ...(paymentLink ? { paymentLink } : {}), ...(paymentLinkError ? { paymentLinkError } : {}) };
 }
 
+async function invoiceForAppointment(
+  env: Env,
+  db: NonNullable<ReturnType<typeof adminDb>>,
+  actor: AdminActor,
+  appointmentId: string,
+  paymentLinkRequested: boolean,
+): Promise<Record<string, unknown>> {
+  const row = await db
+    .prepare(
+      `SELECT a.*, e.total_cents, e.service_code, e.subtotal_cents, e.discount_cents, e.input_snapshot_json,
+              s.name AS service_name
+       FROM appointments a
+       LEFT JOIN estimates e ON e.id = a.estimate_id
+       LEFT JOIN services s ON s.code = e.service_code
+       WHERE a.id = ? LIMIT 1`,
+    )
+    .bind(appointmentId)
+    .first<Record<string, unknown>>();
+  if (!row) throw new AdminAuthError(404, 'appointment_not_found');
+  if (String(row.status) !== 'completed') throw new AdminAuthError(409, 'appointment_not_completed');
+  const total = Number(row.total_cents);
+  if (!Number.isFinite(total) || total <= 0) throw new AdminAuthError(409, 'appointment_not_priced');
+  const existing = await db
+    .prepare('SELECT id, number FROM invoices WHERE appointment_id = ? LIMIT 1')
+    .bind(appointmentId)
+    .first<{ id: string; number: string }>();
+  let invoice: { id: string; number: string; totalCents: number };
+  if (existing) {
+    invoice = { id: existing.id, number: existing.number, totalCents: total };
+  } else {
+    const timeZone = String(row.timezone ?? 'America/Chicago');
+    const serviceDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(String(row.start_at)));
+    let estimateFields: Record<string, unknown> = {};
+    try {
+      estimateFields = JSON.parse(String(row.input_snapshot_json ?? '{}')) as Record<string, unknown>;
+    } catch {
+      estimateFields = {};
+    }
+    const serviceName = String(estimateFields.service_label ?? row.service_name ?? 'Cleaning service');
+    invoice = await createInvoice(db, actor, {
+      customerId: String(row.customer_id),
+      propertyId: row.property_id ?? undefined,
+      appointmentId,
+      serviceCode: String(row.service_code ?? ''),
+      serviceLabel: serviceName,
+      serviceDate,
+      issueDate: new Date().toISOString().slice(0, 10),
+      lines: [
+        {
+          kind: 'service',
+          description: `${serviceName} — ${serviceDate} — ${String(row.reference ?? appointmentId)}`,
+          quantity: 1,
+          unitAmountCents: total,
+          totalCents: total,
+        },
+      ],
+      notes: 'Invoice generated from a recorded completed service at the agreed price. Tax and any final adjustment are confirmed on the final invoice.',
+    });
+  }
+  let paymentLink: Record<string, unknown> | null = null;
+  let paymentLinkError = '';
+  if (paymentLinkRequested) {
+    try {
+      paymentLink = { ...(await createInvoicePaymentLink(db, actor, invoice.id, env)) };
+    } catch (error) {
+      paymentLinkError = error instanceof AdminAuthError ? error.code : 'payment_link_failed';
+    }
+  }
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'booking.completed_invoice_created',
+    entityType: 'invoice',
+    entityId: invoice.id,
+    detail: `${appointmentId}:${paymentLinkRequested ? 'link' : 'no_link'}:${paymentLinkError}`,
+  });
+  return { invoice, ...(paymentLink ? { paymentLink } : {}), ...(paymentLinkError ? { paymentLinkError } : {}) };
+}
+
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const db = adminDb(context.env);
   if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
   try {
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = text(body.action, 40);
-    if (!['quote', 'create', 'confirm', 'cancel', 'reschedule', 'invoice', 'reconcile'].includes(action)) {
+    if (!['quote', 'create', 'create_completed', 'confirm', 'cancel', 'reschedule', 'invoice', 'invoice_job', 'reconcile'].includes(action)) {
       return json({ ok: false, error: 'invalid_action' }, 400);
     }
-    const permission = action === 'invoice' ? 'finance.write' : 'booking.write';
+    const permission = action === 'invoice' || action === 'invoice_job' ? 'finance.write' : 'booking.write';
     const actor = await requireActor(db, context.request, permission);
     requireCsrf(context.request, actor);
 
@@ -274,6 +360,22 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'create') {
       const created = await createManualBooking(context.env, db, actor, body);
       return json({ ok: true, ...created }, 201);
+    }
+    if (action === 'create_completed') {
+      const created = await createCompletedService(context.env, db, actor, body);
+      return json({ ok: true, ...created }, 201);
+    }
+    if (action === 'invoice_job') {
+      return json({
+        ok: true,
+        ...(await invoiceForAppointment(
+          context.env,
+          db,
+          actor,
+          text(body.appointmentId, 120),
+          body.paymentLink === true,
+        )),
+      });
     }
     if (action === 'confirm') {
       const teamMemberIds = Array.isArray(body.teamMemberIds)

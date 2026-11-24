@@ -38,7 +38,8 @@ export async function loadInvoiceTipView(
   const invoice = await db
     .prepare(
       `SELECT i.id, i.number, i.status, i.total_cents, i.amount_paid_cents, i.balance_cents,
-              i.due_date, i.appointment_id, i.customer_id, i.branch_id,
+              i.due_date, i.service_code, i.service_date, i.appointment_id, i.customer_id, i.branch_id,
+              COALESCE(NULLIF(i.service_label, ''), s.name) AS service_name,
               c.first_name, c.last_name, c.company_name,
               a.status AS appointment_status,
               (SELECT COALESCE(SUM(p.tip_cents), 0) FROM payments p
@@ -48,6 +49,7 @@ export async function loadInvoiceTipView(
                 WHERE p2.invoice_id = i.id AND r.status = 'succeeded') AS tip_refunded_cents
        FROM invoices i
        JOIN customers c ON c.id = i.customer_id
+       LEFT JOIN services s ON s.code = i.service_code
        LEFT JOIN appointments a ON a.id = i.appointment_id
        WHERE i.id = ? LIMIT 1`,
     )
@@ -69,6 +71,9 @@ export async function loadInvoiceTipView(
   return {
     invoiceId,
     invoiceNumber: String(invoice.number ?? ''),
+    serviceName: String(invoice.service_name ?? ''),
+    serviceDate: invoice.service_date ?? null,
+    serviceCode: invoice.service_code ?? null,
     status: String(invoice.status ?? ''),
     customerName,
     branchId: invoice.branch_id ?? null,

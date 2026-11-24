@@ -67,13 +67,25 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       offset: Number(url.searchParams.get('offset') ?? 0),
       sort: url.searchParams.get('sort') ?? 'created_at',
     };
-    const [invoices, total, summary] = await Promise.all([
+    const [invoices, total, summary, services] = await Promise.all([
       listInvoices(db, actor, input),
       countInvoices(db, actor, input),
       financeSummary(db, actor),
+      db
+        .prepare("SELECT code, name, category, taxable FROM services WHERE active = 1 ORDER BY category, name")
+        .all<Record<string, unknown>>(),
     ]);
     const bounds = invoicePageBounds(input);
-    return json({ ok: true, invoices, total, limit: bounds.limit, offset: bounds.offset, sort: bounds.sort, summary });
+    return json({
+      ok: true,
+      invoices,
+      total,
+      limit: bounds.limit,
+      offset: bounds.offset,
+      sort: bounds.sort,
+      summary,
+      services: services.results ?? [],
+    });
   } catch (error) {
     return json(
       { ok: false, error: error instanceof AdminAuthError ? error.code : 'finance_failed' },

@@ -2427,7 +2427,142 @@ function syncManualEngine(): void {
   const resultBox = document.querySelector<HTMLElement>('[data-manual-booking-result]');
   if (resultBox) resultBox.innerHTML = '';
   renderManualSlots();
+  syncManualAppointmentMode();
 }
+
+function manualAppointmentType(): 'scheduled' | 'completed' {
+  return manualField<HTMLSelectElement>('appointmentType')?.value === 'completed' ? 'completed' : 'scheduled';
+}
+
+function syncManualPricingFields(): void {
+  const method = manualField<HTMLSelectElement>('pricingMethod')?.value === 'custom' ? 'custom' : 'estimated';
+  const discountType = manualField<HTMLSelectElement>('discountType')?.value ?? 'none';
+  const customWrap = document.querySelector<HTMLElement>('[data-manual-custom-price-wrap]');
+  const discountWrap = document.querySelector<HTMLElement>('[data-manual-discount-value-wrap]');
+  const reasonWrap = document.querySelector<HTMLElement>('[data-manual-discount-reason-wrap]');
+  if (customWrap) customWrap.hidden = method !== 'custom';
+  if (discountWrap) discountWrap.hidden = discountType === 'none';
+  if (reasonWrap) reasonWrap.hidden = discountType === 'none';
+  updateManualPricingSummary();
+}
+
+function manualPricingSummary(): { baseCents: number; discountCents: number; totalCents: number } | null {
+  const method = manualField<HTMLSelectElement>('pricingMethod')?.value === 'custom' ? 'custom' : 'estimated';
+  if (method === 'estimated') {
+    if (!manualQuote || manualQuote.status !== 'priced' || manualQuote.totalCents === null) return null;
+    const discountCents = manualQuote.discountAmountCents ?? 0;
+    return {
+      baseCents: manualQuote.totalCents + discountCents,
+      discountCents,
+      totalCents: manualQuote.totalCents,
+    };
+  }
+  let baseCents = Math.round(Number(manualField<HTMLInputElement>('customPrice')?.value ?? 0) * 100);
+  if (!Number.isFinite(baseCents) || baseCents <= 0) baseCents = 0;
+  const discountType = manualField<HTMLSelectElement>('discountType')?.value ?? 'none';
+  const discountValue = Number(manualField<HTMLInputElement>('discountValue')?.value ?? 0);
+  let discountCents = 0;
+  if (discountType === 'percent' && Number.isFinite(discountValue)) {
+    discountCents = Math.round((baseCents * Math.min(100, Math.max(0, discountValue))) / 100);
+  } else if (discountType === 'fixed' && Number.isFinite(discountValue)) {
+    discountCents = Math.round(Math.max(0, discountValue) * 100);
+  }
+  discountCents = Math.min(discountCents, baseCents);
+  return { baseCents, discountCents, totalCents: baseCents - discountCents };
+}
+
+function updateManualPricingSummary(): void {
+  const target = document.querySelector<HTMLElement>('[data-manual-pricing-summary]');
+  if (!target) return;
+  const summary = manualPricingSummary();
+  if (!summary || summary.baseCents <= 0) {
+    target.textContent = 'Generate a priced estimate or enter a custom agreed price to see the final amount.';
+    return;
+  }
+  const discountText = summary.discountCents > 0 ? ` · Discount −${money(summary.discountCents)}` : '';
+  target.textContent = `Pricing method: ${manualField<HTMLSelectElement>('pricingMethod')?.value === 'custom' ? 'custom agreed price' : 'calculated estimator price'} · Base ${money(summary.baseCents)}${discountText} · Final service amount ${money(summary.totalCents)} before separately applicable tax.`;
+}
+
+async function loadManualCompletedCrew(): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-manual-staff]');
+  if (!target || manualAppointmentType() !== 'completed') return;
+  target.innerHTML = '<p class="admin-muted">Loading team members…</p>';
+  try {
+    const data = await api<{ team?: Array<Record<string, unknown>> }>('/api/admin/operations?view=team');
+    const members = (data.team ?? []).filter((member) => String(member.status ?? '') === 'active');
+    target.innerHTML = members.length
+      ? `<p class="admin-muted">Actual cleaners who performed the completed service (required)</p><div class="admin-form admin-form--grid">${members
+          .map(
+            (member) =>
+              `<label><input type="checkbox" data-manual-completed-crew value="${esc(String(member.id))}" /> ${esc(String(member.display_name ?? member.name ?? member.id))}</label>`,
+          )
+          .join('')}</div>`
+      : '<p class="admin-error">No active team members are available. Add the actual cleaners before recording a completed service.</p>';
+  } catch (error) {
+    target.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
+  }
+}
+
+async function loadManualAgreements(customerId: string): Promise<void> {
+  const select = manualField<HTMLSelectElement>('signingRequestId');
+  if (!select) return;
+  select.innerHTML = '<option value="">No agreement link</option>';
+  if (!customerId) return;
+  try {
+    const data = await api<{ requests?: Array<Record<string, unknown>> }>(
+      `/api/admin/documents?view=requests&customerId=${encodeURIComponent(customerId)}`,
+    );
+    const signed = (data.requests ?? []).filter(
+      (request) => String(request.status) === 'signed' || Boolean(request.executed_at),
+    );
+    for (const request of signed) {
+      select.insertAdjacentHTML(
+        'beforeend',
+        `<option value="${esc(String(request.id))}">${esc(String(request.packet_name ?? request.bundle_code ?? 'Signed agreement'))} — ${esc(dateTime(request.executed_at || request.updated_at))}</option>`,
+      );
+    }
+  } catch {
+    // Agreement linking is optional; the completed job can still be saved.
+  }
+}
+
+function syncManualAppointmentMode(): void {
+  const completed = manualAppointmentType() === 'completed';
+  const scheduleDateWrap = document.querySelector<HTMLElement>('[data-manual-schedule-date-wrap]');
+  const completedDateWrap = document.querySelector<HTMLElement>('[data-manual-completed-date-wrap]');
+  const completedAgreementWrap = document.querySelector<HTMLElement>('[data-manual-completed-agreement-wrap]');
+  const scheduledPricing = document.querySelector<HTMLElement>('[data-manual-scheduled-pricing]');
+  const quoteBox = document.querySelector<HTMLElement>('[data-manual-quote-result]');
+  const slotWrap = document.querySelector<HTMLElement>('[data-manual-slot-wrap]');
+  const scheduledActions = document.querySelector<HTMLElement>('[data-manual-scheduled-actions]');
+  const completedActions = document.querySelector<HTMLElement>('[data-manual-completed-actions]');
+  const crewSizeWrap = document.querySelector<HTMLElement>('[data-manual-crew-size-wrap]');
+  if (scheduleDateWrap) scheduleDateWrap.hidden = completed;
+  if (completedDateWrap) completedDateWrap.hidden = !completed;
+  if (completedAgreementWrap) completedAgreementWrap.hidden = !completed;
+  if (scheduledPricing) scheduledPricing.hidden = completed;
+  if (quoteBox) quoteBox.hidden = completed;
+  if (slotWrap) slotWrap.hidden = completed;
+  if (scheduledActions) scheduledActions.hidden = completed;
+  if (completedActions) completedActions.hidden = !completed;
+  if (crewSizeWrap) crewSizeWrap.hidden = completed;
+  const dateField = manualField<HTMLInputElement>('date');
+  if (dateField) dateField.required = !completed;
+  const completedDate = manualField<HTMLInputElement>('completedDate');
+  if (completedDate) {
+    completedDate.required = completed;
+    if (completed && !completedDate.value) completedDate.value = localToday(0);
+  }
+  if (completed) {
+    const method = manualField<HTMLSelectElement>('pricingMethod');
+    if (method && method.value !== 'custom') method.value = 'custom';
+    const price = manualField<HTMLInputElement>('customPrice');
+    if (price && !price.value) price.required = true;
+    void loadManualCompletedCrew();
+  }
+  syncManualPricingFields();
+}
+
 
 function populateManualProperties(): void {
   const select = manualField<HTMLSelectElement>('propertyId');
@@ -2560,6 +2695,8 @@ async function loadManualContext(customerId: string): Promise<void> {
     if (select) select.value = String(only.id);
     applyManualProperty();
   }
+  void loadManualAgreements(customerId);
+  syncManualAppointmentMode();
 }
 
 function manualPayload(): Record<string, unknown> {
@@ -2570,6 +2707,7 @@ function manualPayload(): Record<string, unknown> {
     customerId: manualField<HTMLSelectElement>('customerId')?.value ?? '',
     propertyId: manualField<HTMLSelectElement>('propertyId')?.value ?? '',
     serviceType: engine === 'str' ? 'str_turnover' : manualField<HTMLSelectElement>('serviceType')?.value ?? 'standard',
+    serviceLabel: manualField<HTMLSelectElement>('serviceType')?.selectedOptions[0]?.textContent?.trim() || undefined,
     promotionCode: manualField<HTMLSelectElement>('promotionCode')?.value || undefined,
     propertyType: manualField<HTMLSelectElement>('propertyType')?.value || undefined,
     squareFeet: manualNumber('squareFeet'),
@@ -2582,6 +2720,14 @@ function manualPayload(): Record<string, unknown> {
     lastClean: manualField<HTMLSelectElement>('lastClean')?.value || undefined,
     pets: manualField<HTMLSelectElement>('pets')?.value || undefined,
     supportiveEligible: manualChecked('supportiveEligible'),
+    appointmentType: manualAppointmentType(),
+    pricingMethod: manualField<HTMLSelectElement>('pricingMethod')?.value || 'estimated',
+    customPrice: manualNumber('customPrice'),
+    discountType: manualField<HTMLSelectElement>('discountType')?.value || 'none',
+    discountValue: manualNumber('discountValue'),
+    discountReason: manualField<HTMLInputElement>('discountReason')?.value ?? '',
+    completedDate: manualField<HTMLInputElement>('completedDate')?.value ?? '',
+    signingRequestId: manualField<HTMLSelectElement>('signingRequestId')?.value || undefined,
     addonIds: [...document.querySelectorAll<HTMLInputElement>('[data-manual-addon]:checked')].map((input) => input.value),
     facility: facility
       ? {
@@ -2870,6 +3016,104 @@ async function saveManualBooking(mode: ManualBookingMode): Promise<void> {
         `Booking ${created.reference} was saved, but ${!documentsSent ? 'the agreement invitation' : 'the invoice draft'} did not complete. Use the follow-up actions on the booking; do not recreate the booking.`,
       );
     }
+  } catch (error) {
+    setAppError(friendly(error));
+  } finally {
+    manualSaving = false;
+  }
+}
+
+function selectedCompletedCrew(): string[] {
+  return [...document.querySelectorAll<HTMLInputElement>('[data-manual-completed-crew]:checked')].map(
+    (input) => input.value,
+  );
+}
+
+async function saveCompletedService(createInvoiceAfter: boolean): Promise<void> {
+  setAppError();
+  if (manualSaving) return;
+  const customerId = manualField<HTMLSelectElement>('customerId')?.value ?? '';
+  const propertyId = manualField<HTMLSelectElement>('propertyId')?.value ?? '';
+  const completedDate = manualField<HTMLInputElement>('completedDate')?.value ?? '';
+  const customPrice = Number(manualField<HTMLInputElement>('customPrice')?.value ?? '');
+  const crew = selectedCompletedCrew();
+  if (!customerId || !propertyId) {
+    setAppError('Choose the customer and property for the completed service.');
+    return;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(completedDate)) {
+    setAppError('Enter the actual completed service date.');
+    return;
+  }
+  if (!Number.isFinite(customPrice) || customPrice <= 0) {
+    setAppError('Enter the agreed service price.');
+    return;
+  }
+  if (crew.length === 0) {
+    setAppError('Select the cleaner(s) who actually performed the completed service.');
+    return;
+  }
+  const pricing = manualPricingSummary();
+  const customerName =
+    [manualContext?.customer.first_name, manualContext?.customer.last_name].filter(Boolean).join(' ') || 'Customer';
+  const property = manualContext?.properties.find((entry) => entry.id === propertyId);
+  const propertyLabel = property
+    ? [property.label, property.line1, property.city].filter(Boolean).join(' — ')
+    : 'Selected property';
+  const serviceLabel = manualField<HTMLSelectElement>('serviceType')?.selectedOptions[0]?.textContent ?? 'Cleaning';
+  const confirmed = await adminConfirm({
+    title: createInvoiceAfter ? 'Record completed service and create invoice?' : 'Record completed service?',
+    body: `<dl class="admin-definition">
+        <dt>Customer</dt><dd>${esc(customerName)}</dd>
+        <dt>Property</dt><dd>${esc(propertyLabel)}</dd>
+        <dt>Service</dt><dd>${esc(serviceLabel)}</dd>
+        <dt>Completed date</dt><dd>${esc(completedDate)}</dd>
+        <dt>Agreed service price</dt><dd>${esc(money(customPrice * 100))}</dd>
+        <dt>Discount</dt><dd>${esc(money(pricing?.discountCents ?? 0))}</dd>
+        <dt>Final service amount</dt><dd><strong>${esc(money(pricing?.totalCents ?? customPrice * 100))}</strong> before separately applicable tax</dd>
+        <dt>Crew</dt><dd>${esc(crew.length)} cleaner${crew.length === 1 ? '' : 's'}</dd>
+      </dl><p>The job will be recorded as Completed with no future appointment, no Google Calendar event and no automatic signing packet.${createInvoiceAfter ? ' One invoice will be created at the agreed price and will not be sent automatically.' : ''}</p>`,
+    confirmLabel: createInvoiceAfter ? 'Save & create invoice' : 'Save completed job',
+  });
+  if (!confirmed) return;
+  manualSaving = true;
+  const target = document.querySelector<HTMLElement>('[data-manual-booking-result]');
+  try {
+    const created = await api<{
+      appointmentId: string;
+      reference: string;
+      serviceDate: string;
+      totalCents: number;
+      linkedSigningRequestId?: string | null;
+    }>('/api/admin/bookings', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'create_completed',
+        ...manualPayload(),
+        completedDate,
+        teamMemberIds: crew,
+        signingRequestId: manualField<HTMLSelectElement>('signingRequestId')?.value || undefined,
+        notes: manualField<HTMLTextAreaElement>('notes')?.value ?? '',
+      }),
+    });
+    let invoiceMarkup = '';
+    if (createInvoiceAfter) {
+      try {
+        const invoiced = await api<{ invoice?: { number?: string; id?: string } }>('/api/admin/bookings', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'invoice_job', appointmentId: created.appointmentId, paymentLink: false }),
+        });
+        invoiceMarkup = `<p class="admin-status-message" role="status">Invoice ${esc(invoiced.invoice?.number ?? '')} created as a draft at the agreed price. It has not been sent.</p>`;
+      } catch (error) {
+        invoiceMarkup = `<p class="admin-error">The completed job was saved, but the invoice was not created: ${esc(friendly(error))}. Retry from the job or Finance; do not duplicate the job.</p>`;
+      }
+    }
+    if (target) {
+      target.innerHTML = `<div class="admin-card"><h3>Completed service ${esc(created.reference)}</h3>
+        <dl class="admin-definition"><dt>Customer</dt><dd>${esc(customerName)}</dd><dt>Property</dt><dd>${esc(propertyLabel)}</dd><dt>Service</dt><dd>${esc(serviceLabel)}</dd><dt>Completed date</dt><dd>${esc(created.serviceDate)}</dd><dt>Service amount</dt><dd>${esc(money(created.totalCents))}</dd><dt>Crew</dt><dd>${esc(crew.length)} cleaner${crew.length === 1 ? '' : 's'}</dd><dt>Signed agreement</dt><dd>${created.linkedSigningRequestId ? 'Linked without altering evidence' : 'Not linked'}</dd></dl>
+        ${invoiceMarkup}<p class="admin-muted">This record is Completed and is not an active reservation. No calendar event or signing packet was created.</p></div>`;
+    }
+    setSuccess(createInvoiceAfter ? 'Completed service and invoice created.' : 'Completed service recorded.');
   } catch (error) {
     setAppError(friendly(error));
   } finally {
@@ -4122,8 +4366,28 @@ async function loadFinance(): Promise<void> {
     offset: String(financePage.offset),
     sort: financePage.sort,
   });
-  const data = await api<{ invoices?: Array<Record<string, unknown>>; total?: number; limit?: number; offset?: number; summary?: Record<string, Record<string, number>> }>(`/api/admin/finance?${params.toString()}`);
+  const data = await api<{
+    invoices?: Array<Record<string, unknown>>;
+    total?: number;
+    limit?: number;
+    offset?: number;
+    summary?: Record<string, Record<string, number>>;
+    services?: Array<Record<string, unknown>>;
+  }>(`/api/admin/finance?${params.toString()}`);
   const summary = data.summary ?? {};
+  for (const select of document.querySelectorAll<HTMLSelectElement>('[data-admin-invoice-services]')) {
+    const current = select.value;
+    const options = (data.services ?? [])
+      .map(
+        (service) =>
+          `<option value="${esc(service.code)}">${esc(service.name)}${Number(service.taxable) === 1 ? '' : ' — tax exempt'}</option>`,
+      )
+      .join('');
+    select.innerHTML = `<option value="">Choose a service</option>${options}<option value="move_in_out">Move-Out Cleaning</option><option value="move_in_out">Move-In Cleaning</option>`;
+    if (current && (data.services ?? []).some((service) => service.code === current)) select.value = current;
+  }
+  const serviceDateInput = document.querySelector<HTMLInputElement>('[data-admin-invoice-create] input[name="serviceDate"]');
+  if (serviceDateInput) serviceDateInput.max = localToday(0);
   renderPager(document.querySelector<HTMLElement>('[data-admin-invoices-pagination]'), data, 'invoices-page');
   const summaryTarget = document.querySelector<HTMLElement>('[data-admin-finance-summary]');
   if (summaryTarget) {
@@ -4188,7 +4452,7 @@ async function openInvoice(invoiceId: string): Promise<void> {
          ${tipAllocations.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Cleaner</th><th>Allocated</th><th>Refunded</th><th>Status</th></tr></thead><tbody>${tipAllocations.map((allocation) => `<tr><td>${esc(allocation.team_member_name || 'Unallocated')}</td><td>${esc(money(allocation.amount_cents))}</td><td>${esc(money(allocation.refunded_cents))}</td><td>${esc(titleCase(allocation.status))}</td></tr>`).join('')}</tbody></table></div>` : ''}`
       : '<p class="admin-muted">No optional gratuity has been collected for this invoice. Tips are never required or added automatically.</p>'
   }`;
-  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(invoice.number)}</h2><span class="admin-status">${esc(titleCase(invoice.status))}</span></div><dl class="admin-definition"><dt>Customer</dt><dd>${esc([invoice.first_name, invoice.last_name].filter(Boolean).join(' '))}</dd><dt>Email</dt><dd>${esc(invoice.customer_email || 'Not recorded')}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Paid</dt><dd>${esc(money(invoice.amount_paid_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(dateTime(invoice.due_date))}</dd></dl><h3>Lines</h3>${lines.map((line) => `<div class="admin-record">${esc(line.description)} · ${esc(money(line.total_cents))}</div>`).join('') || '<p class="admin-muted">No lines.</p>'}<h3>Payments</h3>${payments.map((payment) => `<div class="admin-record">${esc(titleCase(payment.provider))} · ${esc(money(payment.amount_cents))} · ${esc(payment.status)} · ${esc(dateTime(payment.created_at))}<details class="admin-detail-toggle"><summary>Record refund</summary><form class="admin-form" data-form="refund"><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Refund amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="reason" /></label><button class="btn btn--secondary btn--small" type="submit">Record refund</button></form></details></div>`).join('') || '<p class="admin-muted">No payments.</p>'}${tipSection}${Number(invoice.balance_cents) > 0 ? `<form class="admin-form" data-form="payment"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Payment method <select name="provider"><option value="cash">Cash</option><option value="check">Check</option><option value="external">External</option></select></label><label>Amount <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Reference <input name="reference" /></label><button class="btn btn--primary btn--small" type="submit">Record payment</button></form>` : ''}<form class="admin-form" data-form="credit"><input type="hidden" name="customerId" value="${esc(invoice.customer_id)}" /><label>Customer credit amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="source" /></label><button class="btn btn--secondary btn--small" type="submit">Add credit</button></form></div>`;
+  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(invoice.number)}</h2><span class="admin-status">${esc(titleCase(invoice.status))}</span></div><dl class="admin-definition"><dt>Customer</dt><dd>${esc([invoice.first_name, invoice.last_name].filter(Boolean).join(' '))}</dd><dt>Email</dt><dd>${esc(invoice.customer_email || 'Not recorded')}</dd><dt>Service</dt><dd>${esc(invoice.service_name || invoice.service_code || 'Not recorded')}</dd><dt>Service date</dt><dd>${esc(invoice.service_date ? dateTime(`${String(invoice.service_date)}T12:00:00Z`) : 'Not recorded')}</dd><dt>Total</dt><dd>${esc(money(invoice.total_cents))}</dd><dt>Paid</dt><dd>${esc(money(invoice.amount_paid_cents))}</dd><dt>Balance</dt><dd>${esc(money(invoice.balance_cents))}</dd><dt>Due</dt><dd>${esc(dateTime(invoice.due_date))}</dd></dl><h3>Lines</h3>${lines.map((line) => `<div class="admin-record">${esc(line.description)} · ${esc(money(line.total_cents))}</div>`).join('') || '<p class="admin-muted">No lines.</p>'}<h3>Payments</h3>${payments.map((payment) => `<div class="admin-record">${esc(titleCase(payment.provider))} · ${esc(money(payment.amount_cents))} · ${esc(payment.status)} · ${esc(dateTime(payment.created_at))}<details class="admin-detail-toggle"><summary>Record refund</summary><form class="admin-form" data-form="refund"><input type="hidden" name="paymentId" value="${esc(payment.id)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Refund amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="reason" /></label><button class="btn btn--secondary btn--small" type="submit">Record refund</button></form></details></div>`).join('') || '<p class="admin-muted">No payments.</p>'}${tipSection}${Number(invoice.balance_cents) > 0 ? `<form class="admin-form" data-form="payment"><input type="hidden" name="invoiceId" value="${esc(invoiceId)}" /><input type="hidden" name="idempotencyKey" value="${esc(crypto.randomUUID())}" /><label>Payment method <select name="provider"><option value="cash">Cash</option><option value="check">Check</option><option value="external">External</option></select></label><label>Amount <input name="amount" type="number" min="0.01" step="0.01" value="${(Number(invoice.balance_cents) / 100).toFixed(2)}" required /></label><label>Reference <input name="reference" /></label><button class="btn btn--primary btn--small" type="submit">Record payment</button></form>` : ''}<form class="admin-form" data-form="credit"><input type="hidden" name="customerId" value="${esc(invoice.customer_id)}" /><label>Customer credit amount <input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Reason <input name="source" /></label><button class="btn btn--secondary btn--small" type="submit">Add credit</button></form></div>`;
   const controls = document.querySelector<HTMLElement>('[data-admin-invoice-controls]');
   if (controls) {
     controls.innerHTML = `<a class="btn btn--secondary btn--small" href="/api/admin/invoice-document?id=${encodeURIComponent(invoiceId)}">Download invoice PDF</a>` +
@@ -6247,7 +6511,10 @@ document.querySelector<HTMLButtonElement>('[data-admin-logout]')?.addEventListen
 for (const button of navButtons) button.addEventListener('click', () => void loadView(button.dataset.adminNav ?? 'overview'));
 
 manualField<HTMLSelectElement>('customerId')?.addEventListener('change', (event) => {
-  void loadManualContext((event.target as HTMLSelectElement).value).catch((error) => setAppError(friendly(error)));
+  const customerId = (event.target as HTMLSelectElement).value;
+  void loadManualContext(customerId).catch((error) => setAppError(friendly(error)));
+  void loadManualAgreements(customerId);
+  syncManualAppointmentMode();
 });
 document.querySelector<HTMLInputElement>('[data-manual-customer-search]')?.addEventListener('input', (event) => {
   const term = (event.target as HTMLInputElement).value.trim().toLowerCase();
@@ -6278,6 +6545,12 @@ document.querySelector<HTMLInputElement>('[data-manual-customer-search]')?.addEv
 });
 manualField<HTMLSelectElement>('propertyId')?.addEventListener('change', () => applyManualProperty());
 manualField<HTMLSelectElement>('engine')?.addEventListener('change', () => syncManualEngine());
+manualField<HTMLSelectElement>('appointmentType')?.addEventListener('change', () => syncManualAppointmentMode());
+manualField<HTMLSelectElement>('pricingMethod')?.addEventListener('change', () => syncManualPricingFields());
+manualField<HTMLSelectElement>('discountType')?.addEventListener('change', () => syncManualPricingFields());
+for (const name of ['customPrice', 'discountValue']) {
+  manualField<HTMLInputElement>(name)?.addEventListener('input', () => updateManualPricingSummary());
+}
 for (const name of ['date', 'crewSize']) {
   manualField<HTMLInputElement | HTMLSelectElement>(name)?.addEventListener('change', () => {
     manualAvailabilityResult = null;
@@ -6798,7 +7071,22 @@ for (const form of [
     }
     if (form.matches('[data-admin-invoice-create]')) {
       const amount = Number(data.get('amount'));
-      void action('/api/admin/finance', { action: 'create_invoice', customerId: data.get('customerId'), serviceCode: data.get('serviceCode'), dueDate: data.get('dueDate'), lines: [{ kind: 'service', description: data.get('description'), quantity: 1, unitAmountCents: Math.round(amount * 100), totalCents: Math.round(amount * 100) }] });
+      const serviceSelect = form.querySelector<HTMLSelectElement>('select[name="serviceCode"]');
+      const serviceName = serviceSelect?.selectedOptions[0]?.textContent?.trim() ?? '';
+      const description = String(data.get('description') ?? '').trim() || serviceName;
+      if (!description) {
+        setAppError('Choose a service or enter a description.');
+        return;
+      }
+      void action('/api/admin/finance', {
+        action: 'create_invoice',
+        customerId: data.get('customerId'),
+        serviceCode: data.get('serviceCode'),
+        serviceLabel: serviceName,
+        serviceDate: data.get('serviceDate') || undefined,
+        dueDate: data.get('dueDate'),
+        lines: [{ kind: 'service', description, quantity: 1, unitAmountCents: Math.round(amount * 100), totalCents: Math.round(amount * 100) }],
+      });
     }
     if (form.matches('[data-admin-invite-create]')) {
       setAppError();
@@ -7700,6 +7988,8 @@ document.addEventListener('click', (event) => {
   if (actionName === 'manual-create-confirm') void saveManualBooking('confirm');
   if (actionName === 'manual-create-documents') void saveManualBooking('documents');
   if (actionName === 'manual-create-send-invoice') void saveManualBooking('documents-invoice');
+  if (actionName === 'manual-completed-save') void saveCompletedService(false);
+  if (actionName === 'manual-completed-invoice') void saveCompletedService(true);
   if (actionName === 'manual-confirm') void confirmManualBooking(id);
   if (actionName === 'manual-send-documents') void sendManualDocuments(id);
   if (actionName === 'manual-invoice') void createManualInvoice(id, false);

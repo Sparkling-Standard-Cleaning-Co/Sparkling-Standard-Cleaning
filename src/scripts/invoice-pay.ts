@@ -7,6 +7,9 @@ interface InvoiceLine {
 interface InvoicePayView {
   invoiceId: string;
   invoiceNumber: string;
+  serviceName?: string;
+  serviceDate?: string | null;
+  serviceCode?: string | null;
   customerName: string;
   serviceBalanceCents: number;
   serviceTotalCents: number;
@@ -32,6 +35,7 @@ const errorNode = document.querySelector<HTMLElement>('[data-pay-error]');
 const content = document.querySelector<HTMLElement>('[data-pay-content]');
 const greeting = document.querySelector<HTMLElement>('[data-pay-greeting]');
 const numberNode = document.querySelector<HTMLElement>('[data-pay-number]');
+const serviceNameNode = document.querySelector<HTMLElement>('[data-pay-service-name]');
 const serviceNode = document.querySelector<HTMLElement>('[data-pay-service]');
 const tipLine = document.querySelector<HTMLElement>('[data-pay-tip-line]');
 const totalNode = document.querySelector<HTMLElement>('[data-pay-total]');
@@ -135,6 +139,11 @@ function render(viewValue: InvoicePayView): void {
       : 'Here is your final payment summary.';
   }
   if (numberNode) numberNode.textContent = view.invoiceNumber;
+  if (serviceNameNode) {
+    serviceNameNode.textContent = view.serviceName
+      ? `${view.serviceName}${view.serviceDate ? ` · ${view.serviceDate}` : ''}`
+      : 'Cleaning service';
+  }
   if (serviceNode) {
     serviceNode.textContent = view.tipOnly
       ? 'Already paid'

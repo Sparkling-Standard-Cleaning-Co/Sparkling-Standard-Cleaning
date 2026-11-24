@@ -29,13 +29,14 @@ export async function loadInvoiceReceiptData(
 ): Promise<{ data: ReceiptData; paymentId: string } | null> {
   const invoice = await db
     .prepare(
-      `SELECT i.*, c.first_name, c.last_name, c.company_name,
+      `SELECT i.*, s.name AS service_name, c.first_name, c.last_name, c.company_name,
               (SELECT value FROM customer_contacts cc
                WHERE cc.customer_id = c.id AND cc.kind = 'email'
                ORDER BY cc.is_primary DESC, cc.created_at ASC LIMIT 1) AS customer_email,
               p.line1, p.line2, p.city, p.state, p.postal_code
        FROM invoices i
        JOIN customers c ON c.id = i.customer_id
+       LEFT JOIN services s ON s.code = i.service_code
        LEFT JOIN properties p ON p.id = i.property_id
        WHERE i.id = ? LIMIT 1`,
     )
@@ -85,7 +86,8 @@ export async function loadInvoiceReceiptData(
     paidAt: text(payment.received_at, 60) || new Date().toISOString(),
     service: tipOnly
       ? `Optional gratuity — ${text(invoice.number, 80)}`
-      : `Cleaning service — ${text(invoice.number, 80)}`,
+      : `${text(invoice.service_name, 120) || 'Cleaning service'} — ${text(invoice.number, 80)}`,
+    ...(text(invoice.service_date, 10) ? { serviceDate: text(invoice.service_date, 10) } : {}),
     ...(addressLines.length > 0 ? { serviceLocation: addressLines.join(', ') } : {}),
     ...(customerName ? { customerName } : {}),
     ...(text(invoice.customer_email, 200) ? { customerEmail: text(invoice.customer_email, 200) } : {}),

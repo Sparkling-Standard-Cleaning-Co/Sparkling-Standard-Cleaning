@@ -19,6 +19,7 @@ export interface ReceiptData {
   reference: string;
   paidAt: string;
   service: string;
+  serviceDate?: string;
   serviceLocation?: string;
   customerName?: string;
   customerEmail?: string;
@@ -86,6 +87,9 @@ function lineAmount(line: ReceiptLine): string {
 }
 
 export function buildReceipt(data: ReceiptData): BuiltReceipt {
+  const serviceDateLabel = data.serviceDate
+    ? new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(`${data.serviceDate}T12:00:00Z`))
+    : '';
   const rows = data.lines
     .map(
       (line) => `
@@ -165,7 +169,7 @@ export function buildReceipt(data: ReceiptData): BuiltReceipt {
             <td style="vertical-align:top;width:55%;">
               <p style="margin:0 0 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${PALETTE.muted};">Receipt</p>
               <p style="margin:0;font-size:14px;font-weight:700;color:${PALETTE.ink};">${escapeHtml(data.receiptNumber)}</p>
-              <p style="margin:8px 0 0;font-size:13px;color:${PALETTE.inkSoft};">${escapeHtml(data.service)}</p>
+              <p style="margin:8px 0 0;font-size:13px;color:${PALETTE.inkSoft};">${escapeHtml(data.service)}${serviceDateLabel ? ` · ${escapeHtml(serviceDateLabel)}` : ''}</p>
               ${locationBlock}
               ${customer}
             </td>
@@ -209,7 +213,7 @@ export function buildReceipt(data: ReceiptData): BuiltReceipt {
     'SPARKLING STANDARD CLEANING CO. — PAYMENT RECEIPT',
     `Receipt: ${data.receiptNumber}`,
     `Paid: ${formatDate(data.paidAt)}`,
-    `Service: ${data.service}`,
+    `Service: ${data.service}${serviceDateLabel ? ` (${serviceDateLabel})` : ''}`,
     data.serviceLocation ? `Service location: ${data.serviceLocation}` : '',
     data.customerName ? `Customer: ${data.customerName}` : '',
     data.customerEmail ? `Email: ${data.customerEmail}` : '',
