@@ -84,7 +84,20 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-24 tipping and completed-service hotfix):** application code `ae6ac57` on
+- **Current release (2026-11-24 completed-job invoice repair):** application code `eb4d7a5` on
+  `production-safe`, Cloudflare Pages deployment `ec52ed7b-4f72-41d0-9cee-812485e5d5d9`, verified live
+  on 2026-11-24 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.BWs9qs_3.js`). Repairs the P0 completed-job
+  workflow: adds a branch-scoped `GET /api/admin/bookings?view=job`, a real completed-job detail view,
+  working Open/Customer/Docs/Invoice calendar actions for jobs without a booking request, direct
+  creation/opening of the $275 invoice from the existing completed job, and safe reuse of an existing
+  completed job instead of a duplicate dead-end. Completed jobs no longer show Move/Cancel. Invoice
+  creation remains idempotent and Finance opens the created invoice immediately. Verified: unit
+  **1,099** (1,098 pass, 1 pre-existing skip), browser **273/273**, `astro check` 0 errors, 41 pages,
+  2,631 links, smoke 21 pages; CI `45306250368` green. The existing production job
+  `HC-20261123-0F3495` had no invoice; verification did not create it or modify the job. Evidence:
+  `docs/verification/2026-11-24-JOB-INVOICE-REPAIR.md`.
+- **Prior release (2026-11-24 tipping and completed-service hotfix):** application code `ae6ac57` on
   `production-safe`, Cloudflare Pages deployment `ef5ec9e2-47ba-4a6c-bf53-16381216835f`, verified live
   on 2026-11-24 (served admin asset
   `/_astro/index.astro_astro_type_script_index_0_lang.DAZVnrlk.js`). Adds optional customer tipping on

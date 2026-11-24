@@ -79,3 +79,28 @@ listing failure and not a bad $275 snapshot.
 - Francesca's job, customer, agreement, payment or calendar event was not
   modified.
 - No email was sent and no card was charged.
+
+## Deployment evidence
+
+- Deployed application commit: `eb4d7a5` on `production-safe`.
+- Cloudflare Pages production deployment:
+  `ec52ed7b-4f72-41d0-9cee-812485e5d5d9`.
+- GitHub Actions `validate` + `browser`: run `45306250368` succeeded
+  (`validate` 1m9s, `browser` 7m0s).
+- Served production admin asset:
+  `/_astro/index.astro_astro_type_script_index_0_lang.BWs9qs_3.js`, matching the
+  locally verified build.
+- Production data check after deployment: `HC-20261123-0F3495` remains
+  Completed with **0 invoices**; verification did not create Francesca's
+  invoice or modify the job.
+- The owner can now open the existing calendar job and click **Invoice** to
+  create/open the $275 invoice; repeated clicks open the same invoice.
+
+## Exact owner clicks
+
+1. Admin → Calendar & Requests.
+2. Monday, November 23 → Afternoon → Francesca's completed `HC-20261123-0F3495` card.
+3. Click **Invoice**. If no invoice exists, confirm **Create $275.00 invoice**.
+4. The invoice opens in Finance → Invoices & Payments; review it and send it.
+5. Clicking **Invoice** again opens the same invoice; it never creates a duplicate.
+   **Open** shows the job and linked executed agreement; **Docs** lists the agreement records; **Customer** opens Francesca's customer record.
