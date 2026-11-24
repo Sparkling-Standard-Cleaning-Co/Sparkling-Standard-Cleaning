@@ -1,5 +1,21 @@
 # Encrypted off-site backups and recovery
 
+**Status (2026-11-24 audit): the scheduled backup workflow is not running.**
+`backup.yml` exists on `production-safe` but not on the default branch (`main`).
+GitHub only registers scheduled/dispatchable workflows from the default branch, so
+`gh workflow run backup.yml` returns HTTP 404 and the daily schedule never fires.
+The newest local encrypted archive is `2026-11-21T21-10-15.ssbk`; it could not be
+verified in the audit session because the encryption key was not available.
+
+A fresh production D1 export was created and independently restore-verified on
+2026-11-24 (57 migrations, 101 tables, 0 foreign-key violations) before migration
+`0058`. That proves exportability, not scheduled off-site protection.
+
+**Required owner action:** approve the branch cutover in
+`docs/audit/2026-11-24/BRANCH-CONSOLIDATION-PLAN.md` (or otherwise expose
+`backup.yml` on the default branch), confirm the repository backup secrets, then
+authorize one controlled backup run and verify the encrypted archive.
+
 **Status (2026-11-19): first real manual backup created, encrypted, uploaded and
 restore-verified.** Cloudflare D1 and the local master workspace are covered.
 Application R2 documents/photos and the scheduled GitHub workflow still require
@@ -38,7 +54,7 @@ included explicitly.
 Inventory first:
 
 ```powershell
-npm run backup:inventory -- "C:\Users\thoma\Documents\Sparkling-Standard-Master" "C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER"
+npm run backup:inventory -- "C:\Users\thoma\Documents\Sparkling-Standard-Master" "C:\Users\thoma\Downloads\Sparkling-Standard-Master"
 ```
 
 Create a D1 export and a full local archive:

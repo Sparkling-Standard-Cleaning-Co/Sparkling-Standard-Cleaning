@@ -68,7 +68,33 @@ drop a requirement).
 The server enforces every stage. A date selection or temporary hold is never a
 confirmed booking.
 
-## 3a. Packet builder (2026-11-19)
+## 3a. Library, drafts and history (2026-11-24)
+
+The Document Library is now an operating library, not a version dump.
+
+- **Current documents** shows exactly one entry per document family: the
+  currently approved version. Retired and superseded versions never appear in
+  normal document selectors.
+- **Drafts** is the revision workspace. Editing an approved document creates or
+  reuses a draft; the approved version remains live and sendable until
+  **Approve & Publish** succeeds.
+- **History & archive** shows retired versions, signature usage, packet usage and
+  the audit trail. Owners can archive an obsolete document family and restore it
+  later.
+- **Archive protection:** a family cannot be archived while its template belongs
+  to an active packet. Remove it from the packet first.
+- **Draft deletion:** only a draft with no packet item, no signature and no
+  signing-request snapshot can be permanently deleted. The approved version,
+  executed copies and audit history are untouched.
+- **Publishing** moves packet items, retires the previous approved version and
+  approves the draft in one D1 batch when the runtime supports it. Executed
+  agreements are never rewritten.
+
+Migration `0058_document_library_review_state.sql` adds
+`document_family_state`. Template status and `archived_at` remain the historical
+evidence; family archiving is presentation and packet-selection control only.
+
+## 3b. Packet builder (2026-11-19)
 
 The Documents & Agreements section is now a complete packet builder, not only a
 template list:
