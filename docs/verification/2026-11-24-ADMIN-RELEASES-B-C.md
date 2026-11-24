@@ -79,5 +79,13 @@ Implemented:
 
 ## Deployment
 
-Pending at the time this evidence file was created. Final deployment ID, asset and
-live checks are recorded after the GitHub-connected Cloudflare Pages deployment.
+- Application commit: `0e6fbf9` on `production-safe` (combined with the customer
+  binding, review-delivery and encoding repairs).
+- Cloudflare Pages deployment: `451229c5-a69d-42c6-acc5-be0783f231bb`.
+- GitHub Actions run `45332084055`: `validate` and `browser` succeeded.
+- Served admin asset:
+  `/_astro/index.astro_astro_type_script_index_0_lang.TfTE3bRT.js`.
+- Live checks confirmed the photo list, communications structured editor and
+  customer-context UI targets; the served JavaScript is valid UTF-8 with no
+  mojibake markers.
+

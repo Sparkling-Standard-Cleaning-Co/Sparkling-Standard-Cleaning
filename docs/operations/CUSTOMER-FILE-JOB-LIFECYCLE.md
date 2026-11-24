@@ -93,6 +93,11 @@ Additional verified relationships:
 - **Release C (in progress):** communications use labeled automatic-field chips
   and structured wording rather than raw template code; delivery subject records
   remain customer/job-linked where the underlying mailer provides them.
+- **Customer binding and review delivery (2026-11-24):** Quick Estimate now loads
+  one customer context, clears stale contact/property/house data, ignores stale
+  responses and validates ownership server-side. The owner can send one review
+  invitation for a completed job while automation is off. No persisted customer,
+  property, job or invoice mismatch was found in production.
 
 ## Deferred implementation
 

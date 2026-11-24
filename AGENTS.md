@@ -84,7 +84,26 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-24 admin operations Release A):** application code `e970ce0` on
+- **Current release (2026-11-24 customer binding, review delivery and admin releases B/C):**
+  application code `0e6fbf9` on `production-safe`, Cloudflare Pages deployment
+  `451229c5-a69d-42c6-acc5-be0783f231bb`, verified live on 2026-11-24 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.TfTE3bRT.js`). Repairs Quick Estimate
+  customer switching so one context request loads canonical name/email/phone, only that
+  customer's properties and saved house characteristics, with stale-response guards and
+  server-side ownership checks. Adds owner **Send Review Invitation** for eligible completed
+  jobs even while automation is off, delivery-event recording and an optional non-deployed
+  review delivery worker. Completes admin Releases B/C: photo inventory/per-photo deletion,
+  per-record legal-hold protection, real retention subjects, honest backup state, structured
+  communications editor with labeled fields and readable errors, and removal of 240 mojibake
+  sequences from admin text. Production reconciliation found **0** persisted Quick Estimates
+  and **0** customer/property/job/invoice mismatches; the reported invoice is paid with a
+  sent receipt but has **0** review requests because Pensacola automation is off. Verified:
+  unit **1,106** (1,105 pass, 1 pre-existing skip), browser **277/277**, `astro check` 0 errors,
+  41 pages, 2,631 links, smoke 21 pages; CI `45332084055` green. No customer email, charge or
+  production record was mutated by verification. Evidence:
+  `docs/verification/2026-11-24-CUSTOMER-BINDING-REVIEW-DELIVERY.md` and
+  `docs/verification/2026-11-24-ADMIN-RELEASES-B-C.md`.
+- **Prior release (2026-11-24 admin operations Release A):** application code `e970ce0` on
   `production-safe`, Cloudflare Pages deployment `b98bf961-091b-4d50-88b6-4d34f092b120`, verified live
   on 2026-11-24 (served admin asset
   `/_astro/index.astro_astro_type_script_index_0_lang.BoOU30tH.js`). Repairs alert affected-record
@@ -679,6 +698,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | SEO, structured data, sitemap, robots, page ownership | `src/components/BaseHead.astro`, `src/lib/schema.ts`, page files | `docs/seo/SEO-STRATEGY.md`, `docs/operations/SEARCH-CONSOLE-SETUP.md` |
 | Department email routing | `src/config/email-routing.ts`, customer/invoice/receipt mailers, `src/pages/careers.astro` | `docs/operations/EMAIL-ROUTING.md` |
 | Communications & notifications center, backup alert escalation | `src/lib/admin/communications.ts`, `src/lib/admin/backup-monitor.ts`, `functions/api/admin/communications.ts`, `functions/api/internal/backup-status.ts`, migration `0044`, `workers/backup-monitor/` | `docs/operations/COMMUNICATIONS-CENTER.md` |
+| Google Reviews queue, owner send and optional delivery worker | `src/lib/reviews/service.ts`, `src/lib/reviews/email.ts`, `src/lib/reviews/delivery.ts`, `functions/api/admin/reviews.ts`, `workers/review-requests/` | `docs/operations/GOOGLE-REVIEWS.md` |
 | Customer portal (passwordless sessions, billing, documents, requests) | `src/lib/portal/service.ts`, `functions/api/portal/*`, `src/pages/portal/index.astro`, migration `0045` | `docs/operations/CUSTOMER-PORTAL.md` |
 | Retention registry, legal holds, Data Control exports | `functions/api/admin/storage.ts`, migration `0046` | `docs/operations/OFFSITE-BACKUPS.md` |
 | Document signing reminders and link lifetime | `src/lib/documents/reminders.ts`, `workers/document-reminders/`, migration `0047` | `docs/operations/DOCUMENT-MANAGEMENT.md` |

@@ -124,3 +124,20 @@ thank-you/review email with the Pensacola Google link.
 Automated review sending remains off. The optional worker is not deployed. Enabling
 it requires the owner to deploy the worker, set its secrets and enable the branch
 switch after a controlled acceptance test.
+
+## Deployment
+
+- Application commit: `0e6fbf9` on `production-safe`.
+- Cloudflare Pages deployment: `451229c5-a69d-42c6-acc5-be0783f231bb`.
+- GitHub Actions run `45332084055`: `validate` and `browser` succeeded.
+- Served admin asset:
+  `/_astro/index.astro_astro_type_script_index_0_lang.TfTE3bRT.js`.
+- Live admin HTML includes the customer-context note target, photo inventory and
+  communications editor. The live JavaScript contains the customer-binding guard,
+  owner review-send action and automation-off guidance. Its UTF-8 bytes contain no
+  mojibake markers.
+- Post-deployment production state: invoice `INV-20261124-458FE2` is still paid;
+  review requests remain **0**; Pensacola automation remains **off**; Quick
+  Estimates remain **0**.
+- No customer email was sent by this deployment or verification.
+
