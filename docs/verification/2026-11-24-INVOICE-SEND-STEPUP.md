@@ -61,3 +61,18 @@ link path.
   guarded.
 - No invoice was created, modified or sent in production by verification.
 - No card was charged.
+
+## Deployment evidence
+
+- Deployed application commit: `c696c50` on `production-safe`.
+- Cloudflare Pages production deployment:
+  `96fa5ca0-7be0-4ffe-86d8-f0c0c028768d`.
+- GitHub Actions `validate` + `browser`: run `45310443021` succeeded
+  (`validate` 1m33s, `browser` 6m42s).
+- Served production admin asset:
+  `/_astro/index.astro_astro_type_script_index_0_lang.CdcMTGKU.js`.
+- Live production UI (served assets with mocked authenticated API) shows the
+  branded invoice-send dialog with Francesca’s name/email, invoice number,
+  $275.00 amount and payment-link inclusion, with **0 native browser prompts**
+  at 390px.
+- No live customer email, invoice mutation or charge was created by verification.

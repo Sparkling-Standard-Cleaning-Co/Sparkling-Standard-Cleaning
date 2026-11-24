@@ -84,7 +84,20 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-24 completed-job invoice repair):** application code `eb4d7a5` on
+- **Current release (2026-11-24 invoice email step-up removal):** application code `c696c50` on
+  `production-safe`, Cloudflare Pages deployment `96fa5ca0-7be0-4ffe-86d8-f0c0c028768d`, verified live
+  on 2026-11-24 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.CdcMTGKU.js`). Removes only the unnecessary MFA
+  step-up from routine invoice email sending while preserving session, CSRF, permission, audit and all
+  high-risk step-up controls (payments, refunds, credits, invoice creation/mutation, payment links,
+  billing portal, receipt resend). Replaces the native email-code prompt with the branded confirmation
+  dialog showing customer, recipient, invoice number, amount and payment-link inclusion, with Cancel /
+  Confirm & Send, in-flight duplicate protection, retained retry idempotency keys and accurate success/
+  failure messages. Verified: unit **1,100** (1,099 pass, 1 pre-existing skip), browser **274/274**,
+  `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45310443021` green. Live production
+  UI shows the branded dialog with zero native prompts. No live customer email, invoice mutation or
+  charge was performed. Evidence: `docs/verification/2026-11-24-INVOICE-SEND-STEPUP.md`.
+- **Prior release (2026-11-24 completed-job invoice repair):** application code `eb4d7a5` on
   `production-safe`, Cloudflare Pages deployment `ec52ed7b-4f72-41d0-9cee-812485e5d5d9`, verified live
   on 2026-11-24 (served admin asset
   `/_astro/index.astro_astro_type_script_index_0_lang.BWs9qs_3.js`). Repairs the P0 completed-job
