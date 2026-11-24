@@ -43,5 +43,13 @@ milestone); partial; deferred; blocked.
 | Production orphan/duplicate checks | 0 orphans, 0 duplicate invoice numbers, 0 duplicate per-appointment invoices |
 | Review automation | Disabled on both branches; 1 historical sent request |
 
-Release commit, deployment id and live verification are recorded in
-`docs/verification/VERIFICATION.md` and the release evidence document.
+## Release identity
+
+- Application commit: `5a78eed`
+- Documentation commit at deployment: `132c54e`
+- Cloudflare Pages deployment: `82327071-b273-49ff-bbde-00046cffa564`
+- Live verification: served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.BZxoxhkw.js`
+- GitHub CI: `45499824453` (validate and browser passed)
+- Production migration: `0058` applied; 0 foreign-key violations
+- Release evidence: `docs/verification/2026-11-24-PLATFORM-CONSOLIDATION.md`
