@@ -4496,6 +4496,63 @@ async function loadFinance(): Promise<void> {
   await loadCustomerOptions();
 }
 
+const invoiceSendInFlight = new Set<string>();
+const invoiceSendKeys = new Map<string, string>();
+
+async function sendInvoiceWithConfirmation(invoiceId: string, includePaymentLink: boolean): Promise<void> {
+  if (invoiceSendInFlight.has(invoiceId)) return;
+  setAppError();
+  setSuccess();
+  const data = await api<{ invoice?: Record<string, unknown> }>(
+    `/api/admin/finance?id=${encodeURIComponent(invoiceId)}`,
+  ).catch((error) => {
+    setAppError(friendly(error));
+    return null;
+  });
+  const invoice = data?.invoice;
+  if (!invoice) return;
+  const customerName = [invoice.first_name, invoice.last_name].filter(Boolean).join(' ') || 'Customer';
+  const email = String(invoice.customer_email ?? '').trim();
+  const number = String(invoice.number ?? '');
+  const amount = money(invoice.balance_cents);
+  const confirmed = await adminConfirm({
+    title: 'Send this invoice?',
+    body: `<dl class="admin-definition">
+        <dt>Customer</dt><dd>${esc(customerName)}</dd>
+        <dt>Recipient</dt><dd>${esc(email || 'No email on file')}</dd>
+        <dt>Invoice</dt><dd>${esc(number)}</dd>
+        <dt>Amount due</dt><dd>${esc(amount)}</dd>
+        <dt>Secure payment link</dt><dd>${includePaymentLink ? 'Included in this email' : 'Not included — PDF only'}</dd>
+      </dl><p>${includePaymentLink ? 'The customer will receive a secure payment page with an optional gratuity defaulting to $0.00. No payment is taken by sending this invoice.' : 'The customer will receive the invoice PDF only.'}</p>`,
+    confirmLabel: includePaymentLink ? 'Confirm & Send Invoice' : 'Confirm & Send PDF',
+  });
+  if (!confirmed) return;
+  invoiceSendInFlight.add(invoiceId);
+  const idempotencyKey =
+    invoiceSendKeys.get(invoiceId) ||
+    `invoice-email-${invoiceId}-${crypto.randomUUID()}`;
+  invoiceSendKeys.set(invoiceId, idempotencyKey);
+  try {
+    const result = await api<{ status?: string }>('/api/admin/finance', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'email_invoice', invoiceId, includePaymentLink, idempotencyKey }),
+    });
+    invoiceSendKeys.delete(invoiceId);
+    setSuccess(
+      includePaymentLink
+        ? `Invoice ${number} sent to ${email || 'the customer'} with its secure payment link.`
+        : `Invoice ${number} sent to ${email || 'the customer'} with its PDF attached.`,
+    );
+    if (result.status && result.status !== 'sent') {
+      setAppError('The email provider did not confirm delivery. Review the invoice communication history.');
+    }
+  } catch (error) {
+    setAppError(friendly(error));
+  } finally {
+    invoiceSendInFlight.delete(invoiceId);
+  }
+}
+
 async function openInvoice(invoiceId: string): Promise<void> {
   const data = await api<Record<string, unknown>>(`/api/admin/finance?id=${encodeURIComponent(invoiceId)}`);
   const target = document.querySelector<HTMLElement>('[data-admin-invoice-detail]');
@@ -7841,24 +7898,10 @@ document.addEventListener('click', (event) => {
       .catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'invoice-email-link') {
-    setAppError();
-    setSuccess();
-    void api<{ status: string }>('/api/admin/finance', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'email_invoice', invoiceId: id, includePaymentLink: true, idempotencyKey: crypto.randomUUID() }),
-    })
-      .then(() => setSuccess('Invoice emailed with its PDF and secure payment link.'))
-      .catch((error) => setAppError(friendly(error)));
+    void sendInvoiceWithConfirmation(id, true);
   }
   if (actionName === 'invoice-email') {
-    setAppError();
-    setSuccess();
-    void api<{ status: string }>('/api/admin/finance', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'email_invoice', invoiceId: id, idempotencyKey: crypto.randomUUID() }),
-    })
-      .then(() => setSuccess('Invoice emailed with its PDF attached.'))
-      .catch((error) => setAppError(friendly(error)));
+    void sendInvoiceWithConfirmation(id, false);
   }
   if (actionName === 'mfa-start') {
     setAppError();

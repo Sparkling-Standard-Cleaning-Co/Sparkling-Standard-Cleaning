@@ -1476,7 +1476,7 @@ test('signed payment authorization gates saved-card setup and off-session chargi
   }
 });
 
-// â”€â”€ Owner password policy and self-service recovery (2026-10-30) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Owner password policy and self-service recovery (2026-10-30) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function authRequest(body: unknown, ip = '198.51.100.10', origin?: string): Request {
   const headers: Record<string, string> = {
@@ -2418,6 +2418,139 @@ test('resending an invoice receipt requires finance permission and matching bran
   assert.equal(financeResponse.status, 404);
   const row = db.raw.prepare('SELECT COUNT(*) AS count FROM payment_receipts WHERE invoice_id = ?').get(invoice.id) as { count: number };
   assert.equal(row.count, 0);
+});
+
+test('sending an invoice email does not require a fresh email-code step-up for an authenticated owner', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'invoice-send-no-stepup@example.test',
+    name: 'Invoice Send Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const enrollment = await startMfaEnrollment(db, owner.id, owner.email, MFA_KEY);
+  await enableMfa(db, owner.id, totpCode(enrollment.secret), MFA_KEY);
+  const session = await createOpsSession(db, owner.id, request());
+  const actor = await readOpsActor(db, request(`ss_ops=${session.token}`));
+  assert.ok(actor?.mfaEnabled);
+  assert.equal(actor?.stepUpAt, null);
+  const customer = await createCustomer(db, actor!, {
+    firstName: 'Invoice',
+    lastName: 'Recipient',
+    email: 'invoice-recipient@example.test',
+    addressLine1: '100 Invoice Street',
+    city: 'Pensacola',
+    state: 'FL',
+    postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor!, {
+    customerId: customer.id,
+    serviceCode: 'move_in_out',
+    serviceLabel: 'Move-Out Cleaning',
+    serviceDate: '2026-11-23',
+    lines: [{ kind: 'service', description: 'Move-Out Cleaning', quantity: 1, unitAmountCents: 27500, totalCents: 27500 }],
+  });
+  const originalFetch = globalThis.fetch;
+  let sends = 0;
+  globalThis.fetch = (async () => {
+    sends += 1;
+    return new Response(JSON.stringify({ id: 'email_invoice_sent_1' }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const response = await financePost({
+      request: new Request('https://example.test/api/admin/finance', {
+        method: 'POST',
+        headers: {
+          Cookie: `ss_ops=${session.token}`,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'email_invoice',
+          invoiceId: invoice.id,
+          idempotencyKey: 'invoice-send-no-stepup',
+        }),
+      }),
+      env: { DB: db, RESEND_API_KEY: 'synthetic', RESEND_FROM_EMAIL: 'owner@example.test' },
+    } as never);
+    assert.equal(response.status, 200);
+    assert.equal(((await response.json()) as { status?: string }).status, 'sent');
+    assert.equal(sends, 1);
+    const auditRow = db.raw
+      .prepare("SELECT action FROM admin_audit WHERE entity_id = ? AND action = 'invoice.emailed' ORDER BY created_at DESC LIMIT 1")
+      .get(invoice.id) as { action: string } | undefined;
+    assert.equal(auditRow?.action, 'invoice.emailed');
+
+    const noCsrf = await financePost({
+      request: new Request('https://example.test/api/admin/finance', {
+        method: 'POST',
+        headers: { Cookie: `ss_ops=${session.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'email_invoice', invoiceId: invoice.id }),
+      }),
+      env: { DB: db, RESEND_API_KEY: 'synthetic', RESEND_FROM_EMAIL: 'owner@example.test' },
+    } as never);
+    assert.equal(noCsrf.status, 403);
+    assert.equal(((await noCsrf.json()) as { error?: string }).error, 'csrf_failed');
+    assert.equal(sends, 1, 'a CSRF failure never sends a second email');
+
+    const stepUpStillRequired = await financePost({
+      request: new Request('https://example.test/api/admin/finance', {
+        method: 'POST',
+        headers: {
+          Cookie: `ss_ops=${session.token}`,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'create_invoice',
+          customerId: customer.id,
+          lines: [{ kind: 'service', description: 'High risk test', quantity: 1, unitAmountCents: 100, totalCents: 100 }],
+        }),
+      }),
+      env: { DB: db },
+    } as never);
+    assert.equal(stepUpStillRequired.status, 403);
+    assert.equal(((await stepUpStillRequired.json()) as { error?: string }).error, 'mfa_step_up_required');
+
+    db.raw
+      .prepare(
+        `INSERT INTO admin_users (id, role_id, email, password_hash, display_name, status)
+         VALUES ('admin_no_finance', 'manager', 'no-finance@example.test', 'unused', 'Synthetic Manager', 'active')`,
+      )
+      .run();
+    const managerSession = await createOpsSession(db, 'admin_no_finance', request());
+    const managerResponse = await financePost({
+      request: new Request('https://example.test/api/admin/finance', {
+        method: 'POST',
+        headers: {
+          Cookie: `ss_ops=${managerSession.token}`,
+          'X-CSRF-Token': managerSession.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'email_invoice', invoiceId: invoice.id }),
+      }),
+      env: { DB: db, RESEND_API_KEY: 'synthetic', RESEND_FROM_EMAIL: 'owner@example.test' },
+    } as never);
+    assert.equal(managerResponse.status, 403);
+    assert.equal(sends, 1, 'an unauthorized manager never sends the invoice');
+
+    db.raw.prepare('UPDATE admin_sessions SET expires_at = ? WHERE user_id = ?').run('2020-01-01T00:00:00.000Z', owner.id);
+    const expiredResponse = await financePost({
+      request: new Request('https://example.test/api/admin/finance', {
+        method: 'POST',
+        headers: {
+          Cookie: `ss_ops=${session.token}`,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'email_invoice', invoiceId: invoice.id }),
+      }),
+      env: { DB: db, RESEND_API_KEY: 'synthetic', RESEND_FROM_EMAIL: 'owner@example.test' },
+    } as never);
+    assert.equal(expiredResponse.status, 401);
+    assert.equal(sends, 1, 'an expired session never sends the invoice');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('verified property coordinates are stored, preserved and invalidated when the address changes', async () => {

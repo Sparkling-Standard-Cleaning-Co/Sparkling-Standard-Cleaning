@@ -292,7 +292,10 @@ test('an invoice can be downloaded as PDF and emailed from the admin', async () 
     const download = await controls.getByRole('link', { name: 'Download invoice PDF' }).getAttribute('href');
     assert.match(download, /\/api\/admin\/invoice-document\?id=invoice_1/);
     await controls.getByRole('button', { name: 'Email invoice PDF' }).click();
-    await page.waitForFunction(() => document.querySelector('[data-admin-success]')?.textContent?.includes('Invoice emailed'));
+    await page.locator('[data-admin-dialog][open]').waitFor({ state: 'visible' });
+    assert.match((await page.locator('[data-admin-dialog-body]').textContent()) ?? '', /invoice_1|customer@example\.test|\$125\.00/);
+    await page.locator('[data-admin-dialog-confirm]').click();
+    await page.waitForFunction(() => document.querySelector('[data-admin-success]')?.textContent?.includes('PDF attached'));
     assert.equal(financePosts.some((post) => post.action === 'email_invoice' && post.invoiceId === 'invoice_1'), true);
     assert.equal(await page.locator('[data-admin-app-error]').innerText(), '');
   } finally {
