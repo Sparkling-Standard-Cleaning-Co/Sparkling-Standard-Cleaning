@@ -261,8 +261,19 @@ import {
                 <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
                 <button class="btn btn--secondary btn--small" type="submit">Filter</button>
               </form>
+              <div class="admin-bulk-toolbar" data-admin-lead-bulk hidden>
+                <strong data-admin-lead-bulk-count>0 selected</strong>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-action="lead-select-visible">Select all visible</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-clear-selection">Clear selection</button>
+                <span class="admin-bulk-toolbar__spacer"></span>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-action="lead-bulk" data-operation="archive">Archive</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-bulk" data-operation="restore">Restore</button>
+                <button class="btn btn--danger btn--small" type="button" data-admin-action="lead-bulk" data-operation="delete">Delete disposable</button>
+              </div>
+              <div data-admin-lead-bulk-result role="status" aria-live="polite"></div>
               <div data-admin-leads style="margin-top:1rem;"></div>
               <div data-admin-leads-pagination style="margin-top:.75rem;"></div>
+              <div class="admin-detail" data-admin-lead-detail style="margin-top:1rem;" hidden></div>
             </div>
           </section>
 
@@ -1346,12 +1357,25 @@ import {
               <div data-admin-review-list style="margin-top:1rem;"></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Queue a request for a completed appointment</h2>
-              <form class="admin-form" data-review-queue>
-                <label>Appointment ID <input name="appointmentId" required maxlength="100" placeholder="appt_..." /></label>
-                <p class="admin-muted">The server verifies the appointment is completed, belongs to a branch with an official review link, and has not exceeded the owner's frequency limit.</p>
-                <button class="btn btn--secondary btn--small" type="submit">Queue review request</button>
-              </form>
+              <h2 class="admin-section-title">Completed cleanings</h2>
+              <p class="admin-muted">
+                Choose the completed cleaning by customer, service or address. The server verifies completion,
+                the branch review link, frequency limits and duplicate requests. No internal appointment ID is needed.
+              </p>
+              <div class="admin-inline-form">
+                <label>Search <input type="search" data-review-search placeholder="Customer, service or address" /></label>
+                <label>Invitation status
+                  <select data-review-eligible-filter>
+                    <option value="">All completed cleanings</option>
+                    <option value="not_invited">Not yet invited</option>
+                    <option value="queued">Queued</option>
+                    <option value="sent">Sent</option>
+                    <option value="failed">Failed</option>
+                    <option value="suppressed">Suppressed</option>
+                  </select>
+                </label>
+              </div>
+              <div data-review-eligible-list style="margin-top:1rem;"></div>
               <p class="admin-status-message" data-review-status-message role="status" aria-live="polite"></p>
             </div>
           </section>

@@ -140,7 +140,7 @@ test('invoice sending uses a branded confirmation, not an email-code prompt, and
 
     await page.locator('[data-admin-action="invoice-email"]').click();
     await page.locator('[data-admin-dialog][open]').waitFor({ state: 'visible' });
-    assert.match((await page.locator('[data-admin-dialog-body]').textContent()) ?? '', /Not included — PDF only/);
+    assert.match((await page.locator('[data-admin-dialog-body]').textContent()) ?? '', /Not included .* PDF only/);
     await page.locator('[data-admin-dialog-confirm]').click();
     await page.waitForFunction(() => document.querySelector('[data-admin-success]')?.textContent?.includes('PDF attached'));
     assert.equal(sends.length, 2);

@@ -44,6 +44,7 @@ import type { BookingEnv } from '../../src/lib/booking/service.ts';
 import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { applyInvoiceCheckoutPayment } from '../../src/lib/admin/stripe-reconcile.ts';
 import { deliverInvoiceReceipt } from '../../src/lib/invoicing/invoice-receipt.ts';
+import { queueReviewForAppointment } from '../../src/lib/reviews/service.ts';
 import { completeCheckoutSlotByAttempt, expireCheckoutSlotByAttempt } from '../../src/lib/payments/checkout-registry.ts';
 import { sendSigningEmail } from '../../src/lib/documents/service.ts';
 import { recordSavedCardSetup } from '../../src/lib/admin/stripe-billing.ts';
@@ -586,6 +587,22 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const receipt = await deliverInvoiceReceipt(env.DB, env, { invoiceId: result.invoiceId }).catch(() => ({
         status: "failed" as const,
       }));
+      if (result.kind === 'invoice_payment') {
+        const paidInvoice = await env.DB
+          .prepare('SELECT appointment_id FROM invoices WHERE id = ? LIMIT 1')
+          .bind(result.invoiceId)
+          .first<{ appointment_id: string | null }>();
+        const appointmentId = String(paidInvoice?.appointment_id ?? '');
+        if (appointmentId) {
+          const appointment = await env.DB
+            .prepare('SELECT status FROM appointments WHERE id = ? LIMIT 1')
+            .bind(appointmentId)
+            .first<{ status: string }>();
+          if (appointment?.status === 'completed') {
+            await queueReviewForAppointment(env.DB, appointmentId).catch(() => undefined);
+          }
+        }
+      }
       return json({ ok: true, received: true, invoice: result, receipt: receipt.status });
     } catch {
       return json({ ok: false, error: 'invoice_payment_reconciliation_failed' }, 500);

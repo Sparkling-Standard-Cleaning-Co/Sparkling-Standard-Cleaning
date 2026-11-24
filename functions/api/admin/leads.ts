@@ -1,9 +1,12 @@
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
 import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import {
+  archiveLead,
   countLeads,
+  deleteDisposableLead,
   leadPageBounds,
   listLeads,
+  restoreLead,
   retryLeadNotification,
   updateLead,
 } from '../../../src/lib/admin/crm.ts';
@@ -35,6 +38,35 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
   try {
     const actor = await requireActor(db, context.request, 'lead.read');
     const url = new URL(context.request.url);
+    const id = (url.searchParams.get('id') ?? '').trim();
+    if (id) {
+      const scope = actor.role === 'owner' ? '' : actor.branchId ? ' AND l.branch_id = ?' : ' AND 1 = 0';
+      const bind = actor.role === 'owner' ? [] : actor.branchId ? [actor.branchId] : [];
+      const lead = await db
+        .prepare(
+          `SELECT l.*, c.first_name, c.last_name, c.company_name, c.id AS linked_customer_id,
+                  p.line1, p.city, p.state, p.postal_code
+           FROM leads l
+           LEFT JOIN customers c ON c.id = l.customer_id
+           LEFT JOIN properties p ON p.id = l.property_id
+           WHERE l.id = ?${scope} LIMIT 1`,
+        )
+        .bind(id, ...bind)
+        .first<Record<string, unknown>>();
+      if (!lead) return json({ ok: false, error: 'lead_not_found' }, 404);
+      const auditRows = await db
+        .prepare(
+          `SELECT action, success, detail_json, created_at FROM admin_audit
+           WHERE entity_id = ? ORDER BY created_at DESC LIMIT 30`,
+        )
+        .bind(id)
+        .all();
+      return json({
+        ok: true,
+        lead: { ...lead, payload: payload(lead.payload_json) },
+        audit: auditRows.results ?? [],
+      });
+    }
     const input = {
       status: url.searchParams.get('status') ?? '',
       q: url.searchParams.get('q') ?? '',
@@ -78,6 +110,54 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         note: String(body.note ?? ''),
       });
       return json({ ok: true });
+    }
+    if (action === 'archive') {
+      await archiveLead(db, actor, leadId);
+      return json({ ok: true });
+    }
+    if (action === 'restore') {
+      await restoreLead(db, actor, leadId);
+      return json({ ok: true });
+    }
+    if (action === 'delete') {
+      await deleteDisposableLead(db, actor, leadId);
+      return json({ ok: true });
+    }
+    if (action === 'bulk') {
+      const operation = String(body.operation ?? '');
+      const ids = Array.isArray(body.leadIds)
+        ? body.leadIds.filter((value): value is string => typeof value === 'string').slice(0, 200)
+        : [];
+      if (!['archive', 'restore', 'delete'].includes(operation)) {
+        return json({ ok: false, error: 'bulk_operation_invalid' }, 400);
+      }
+      if (ids.length === 0) return json({ ok: false, error: 'bulk_selection_required' }, 400);
+      if (operation === 'delete' && actor.role !== 'owner') {
+        return json({ ok: false, error: 'owner_required' }, 403);
+      }
+      if (body.confirm !== true) return json({ ok: false, error: 'bulk_confirmation_required' }, 400);
+      const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+      for (const id of ids) {
+        try {
+          if (operation === 'archive') await archiveLead(db, actor, id);
+          else if (operation === 'restore') await restoreLead(db, actor, id);
+          else await deleteDisposableLead(db, actor, id);
+          results.push({ id, ok: true });
+        } catch (error) {
+          results.push({
+            id,
+            ok: false,
+            ...(error instanceof Error ? { error: error.message.slice(0, 120) } : {}),
+          });
+        }
+      }
+      return json({
+        ok: true,
+        operation,
+        succeeded: results.filter((entry) => entry.ok).length,
+        failed: results.filter((entry) => !entry.ok).length,
+        results,
+      });
     }
     if (action === 'retry_notification') {
       const result = await retryLeadNotification(db, actor, leadId, {

@@ -36,6 +36,7 @@ import type {
   PetSituation,
 } from '../estimate/types.ts';
 import { evaluateDocumentGate } from '../documents/service.ts';
+import { queueReviewForAppointment } from '../reviews/service.ts';
 import { availabilityForDate, type BookingEnv } from '../booking/service.ts';
 import {
   createCalendarEvent,
@@ -781,7 +782,7 @@ function applyManualPricing(
   if (totalCents <= 0) throw new AdminAuthError(400, 'custom_price_invalid');
   if (!custom && discountCents === 0) return core;
   const discountLabel = discountCents > 0
-    ? `Administrator discount${input.discountReason ? ` â€” ${input.discountReason}` : ''}`
+    ? `Administrator discount${input.discountReason ? ` Ã¢â‚¬â€ ${input.discountReason}` : ''}`
     : null;
   const breakdown = core.breakdown
     ? {
@@ -1219,7 +1220,7 @@ export async function createCompletedService(
   const start = zonedTimeToUtc(input.date, '12:00', timeZone);
   const end = new Date(start.getTime() + duration * 60_000);
   const discountLabel = discountCents > 0
-    ? `Administrator discount${input.discountReason ? ` â€” ${input.discountReason}` : ''}`
+    ? `Administrator discount${input.discountReason ? ` Ã¢â‚¬â€ ${input.discountReason}` : ''}`
     : null;
   const quote: ManualQuote = {
     engine: input.engine,
@@ -1359,6 +1360,7 @@ export async function createCompletedService(
       .run();
     linkedSigningRequestId = signingRequestId;
   }
+  await queueReviewForAppointment(db, appointmentId).catch(() => undefined);
   await audit(db, {
     actorUserId: actor.id,
     action: 'booking.completed_service_recorded',

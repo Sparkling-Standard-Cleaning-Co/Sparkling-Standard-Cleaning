@@ -21,6 +21,7 @@ import { onRequestGet as overviewGet } from '../functions/api/admin/overview.ts'
 import { onRequestPost as authPost } from '../functions/api/admin/auth.ts';
 import { onRequestGet as adminRequestsGet, onRequestPost as adminRequestsPost } from '../functions/api/admin/requests.ts';
 import { onRequestPost as accountsPost } from '../functions/api/admin/accounts.ts';
+import { onRequestGet as adminLeadsGet, onRequestPost as adminLeadsPost } from '../functions/api/admin/leads.ts';
 import { onRequestGet as operationsGet } from '../functions/api/admin/operations.ts';
 import { onRequestPost as operationsPost } from '../functions/api/admin/operations.ts';
 import { onRequestGet as customersGet } from '../functions/api/admin/customers.ts';
@@ -1476,7 +1477,7 @@ test('signed payment authorization gates saved-card setup and off-session chargi
   }
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Owner password policy and self-service recovery (2026-10-30) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Owner password policy and self-service recovery (2026-10-30) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
 
 function authRequest(body: unknown, ip = '198.51.100.10', origin?: string): Request {
   const headers: Record<string, string> = {
@@ -2595,4 +2596,69 @@ test('verified property coordinates are stored, preserved and invalidated when t
   assert.equal(updated.longitude, -87.22);
   assert.equal(updated.precision, 'street');
   assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM properties WHERE customer_id = ?').get(customer.id) as { n: number }).n, 1);
+});
+
+test('lead archive, restore and disposable deletion enforce history protections', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'lead-management@example.test',
+    name: 'Lead Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const actor = await readOpsActor(db, request(`ss_ops=${session.token}`));
+  assert.ok(actor);
+  const customer = await createCustomer(db, actor!, {
+    firstName: 'Linked', lastName: 'Customer', email: 'linked-lead@example.test',
+    addressLine1: '100 Lead Street', city: 'Pensacola', state: 'FL', postalCode: '32502',
+  });
+  db.raw.prepare(
+    `INSERT INTO leads (id, branch_id, customer_id, request_type, status, source, quote_reference, payload_json)
+     VALUES ('lead_linked', 'branch_pensacola', ?, 'reservation_request', 'new', 'website', 'SS-LINKED', '{"service_type":"deep"}')`,
+  ).run(customer.id);
+  db.raw.prepare(
+    `INSERT INTO leads (id, branch_id, request_type, status, source, quote_reference, payload_json)
+     VALUES ('lead_disposable', 'branch_pensacola', 'general_inquiry', 'lost', 'phone', '', '{"note":"synthetic"}')`,
+  ).run();
+  db.raw.prepare(
+    `INSERT INTO leads (id, branch_id, request_type, status, source, quote_reference, payload_json)
+     VALUES ('lead_archived', 'branch_pensacola', 'general_inquiry', 'archived', 'phone', '', '{}')`,
+  ).run();
+  const headers = {
+    Cookie: `ss_ops=${session.token}`,
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': actor!.csrf,
+  };
+  const post = (payload: Record<string, unknown>) =>
+    adminLeadsPost({
+      request: new Request('https://example.test/api/admin/leads', {
+        method: 'POST', headers, body: JSON.stringify(payload),
+      }),
+      env: { DB: db },
+    } as never);
+  const detail = await adminLeadsGet({
+    request: new Request('https://example.test/api/admin/leads?id=lead_linked', {
+      headers: { Cookie: `ss_ops=${session.token}` },
+    }),
+    env: { DB: db },
+  } as never);
+  assert.equal(detail.status, 200);
+  const detailBody = (await detail.json()) as { lead: Record<string, unknown> };
+  assert.equal((detailBody.lead.payload as Record<string, unknown>).service_type, 'deep');
+
+  assert.equal((await post({ action: 'archive', leadId: 'lead_linked' })).status, 200);
+  assert.equal((db.raw.prepare('SELECT status FROM leads WHERE id = ?').get('lead_linked') as { status: string }).status, 'archived');
+  assert.equal((await post({ action: 'restore', leadId: 'lead_archived' })).status, 200);
+  assert.equal((db.raw.prepare('SELECT status FROM leads WHERE id = ?').get('lead_archived') as { status: string }).status, 'new');
+  assert.equal((await post({ action: 'delete', leadId: 'lead_linked' })).status, 409);
+  assert.equal((await post({ action: 'delete', leadId: 'lead_disposable' })).status, 200);
+  assert.equal((db.raw.prepare("SELECT COUNT(*) AS n FROM leads WHERE id = 'lead_disposable'").get() as { n: number }).n, 0);
+
+  const bulk = await post({
+    action: 'bulk', operation: 'archive', confirm: true, leadIds: ['lead_linked', 'lead_archived'],
+  });
+  assert.equal(bulk.status, 200);
+  const bulkBody = (await bulk.json()) as { succeeded: number; failed: number };
+  assert.equal(bulkBody.succeeded, 2);
+  assert.equal(bulkBody.failed, 0);
 });

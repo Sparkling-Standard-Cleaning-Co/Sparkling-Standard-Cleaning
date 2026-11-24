@@ -581,6 +581,84 @@ export async function updateLead(
   await audit(db, { actorUserId: actor.id, action: 'lead.updated', entityType: 'lead', entityId: leadId, detail: status });
 }
 
+export async function leadArchiveEligibility(
+  db: D1Database,
+  actor: AdminActor,
+  leadId: string,
+  operation: 'archive' | 'restore' | 'delete',
+): Promise<{ ok: boolean; error?: string; row?: Record<string, unknown> }> {
+  const row = await db
+    .prepare(
+      `SELECT l.id, l.request_type, l.status, l.customer_id, l.quote_reference
+       FROM leads l WHERE l.id = ? ${scope(actor, 'l.branch_id').sql} LIMIT 1`,
+    )
+    .bind(leadId, ...scope(actor, 'l.branch_id').bind)
+    .first<Record<string, unknown>>();
+  if (!row) return { ok: false, error: 'lead_not_found' };
+  if (operation === 'restore') {
+    return String(row.status) === 'archived' ? { ok: true, row } : { ok: false, error: 'lead_not_archived', row };
+  }
+  if (operation === 'archive') {
+    return String(row.status) === 'archived' ? { ok: true, row } : { ok: true, row };
+  }
+  if (actor.role !== 'owner') return { ok: false, error: 'owner_required', row };
+  if (row.customer_id) return { ok: false, error: 'linked_customer_history_retained', row };
+  if (String(row.request_type) === 'reservation_request') {
+    return { ok: false, error: 'reservation_history_retained', row };
+  }
+  if (String(row.quote_reference ?? '').trim()) {
+    return { ok: false, error: 'quoted_inquiry_history_retained', row };
+  }
+  return { ok: true, row };
+}
+
+export async function archiveLead(
+  db: D1Database,
+  actor: AdminActor,
+  leadId: string,
+): Promise<void> {
+  const result = await leadArchiveEligibility(db, actor, leadId, 'archive');
+  if (!result.ok) throw new AdminAuthError(404, result.error ?? 'lead_not_found');
+  if (String(result.row?.status) !== 'archived') {
+    await db
+      .prepare("UPDATE leads SET status = 'archived', updated_at = ? WHERE id = ?")
+      .bind(now(), leadId)
+      .run();
+  }
+  await audit(db, { actorUserId: actor.id, action: 'lead.archived', entityType: 'lead', entityId: leadId });
+}
+
+export async function restoreLead(
+  db: D1Database,
+  actor: AdminActor,
+  leadId: string,
+): Promise<void> {
+  const result = await leadArchiveEligibility(db, actor, leadId, 'restore');
+  if (!result.ok) throw new AdminAuthError(409, result.error ?? 'lead_not_archived');
+  await db
+    .prepare("UPDATE leads SET status = 'new', updated_at = ? WHERE id = ?")
+    .bind(now(), leadId)
+    .run();
+  await audit(db, { actorUserId: actor.id, action: 'lead.restored', entityType: 'lead', entityId: leadId });
+}
+
+export async function deleteDisposableLead(
+  db: D1Database,
+  actor: AdminActor,
+  leadId: string,
+): Promise<void> {
+  const result = await leadArchiveEligibility(db, actor, leadId, 'delete');
+  if (!result.ok) throw new AdminAuthError(result.error === 'owner_required' ? 403 : 409, result.error ?? 'lead_not_deletable');
+  await db.prepare('DELETE FROM leads WHERE id = ?').bind(leadId).run();
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'lead.disposable_deleted',
+    entityType: 'lead',
+    entityId: leadId,
+    detail: 'No customer, reservation or quote history was linked.',
+  });
+}
+
 export async function retryLeadNotification(
   db: D1Database,
   actor: AdminActor,

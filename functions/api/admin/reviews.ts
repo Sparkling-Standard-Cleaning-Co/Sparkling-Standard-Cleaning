@@ -16,7 +16,7 @@ import {
   queueReviewForAppointment,
   reviewContextForAppointment,
 } from '../../../src/lib/reviews/service.ts';
-import { sendReviewRequestEmail, type ReviewEmailEnv } from '../../../src/lib/reviews/email.ts';
+import { buildReviewRequestEmail, sendReviewRequestEmail, type ReviewEmailEnv } from '../../../src/lib/reviews/email.ts';
 
 interface Env extends AdminDbEnv, ReviewEmailEnv {}
 
@@ -35,6 +35,59 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const url = new URL(context.request.url);
     const branchId = actor.role === 'owner' ? (url.searchParams.get('branchId') ?? '') : actor.branchId ?? '';
     const status = url.searchParams.get('status') ?? '';
+    if (url.searchParams.get('view') === 'preview') {
+      const appointmentId = (url.searchParams.get('appointmentId') ?? '').trim();
+      if (!appointmentId) return json({ ok: false, error: 'appointment_required' }, 400);
+      const reviewContext = await reviewContextForAppointment(db, appointmentId);
+      if (!reviewContext) return json({ ok: false, error: 'review_context_missing' }, 404);
+      if (!reviewContext.reviewUrl) return json({ ok: false, error: 'review_url_missing' }, 409);
+      const email = buildReviewRequestEmail({
+        customerName: reviewContext.customerName,
+        branchName: reviewContext.branchName,
+        reviewUrl: reviewContext.reviewUrl,
+      });
+      return json({ ok: true, ...email, recipient: reviewContext.customerEmail, branchName: reviewContext.branchName });
+    }
+    if (url.searchParams.get('view') === 'eligible') {
+      const query = (url.searchParams.get('q') ?? '').trim().slice(0, 120);
+      const scope = actor.role === 'owner'
+        ? { sql: '', bind: [] as unknown[] }
+        : actor.branchId
+          ? { sql: ' AND a.branch_id = ?', bind: [actor.branchId] }
+          : { sql: ' AND 1 = 0', bind: [] as unknown[] };
+      const search = query
+        ? ` AND (c.first_name LIKE ? OR c.last_name LIKE ? OR p.line1 LIKE ? OR p.city LIKE ?)`
+        : '';
+      const searchBind = query ? Array.from({ length: 4 }, () => `%${query}%`) : [];
+      const rows = await db
+        .prepare(
+          `SELECT a.id, a.start_at, a.status, a.customer_id, a.branch_id,
+                  c.first_name, c.last_name,
+                  p.line1, p.city, p.state, p.postal_code,
+                  e.service_code, COALESCE(NULLIF(e.input_snapshot_json, ''), '{}') AS input_snapshot_json,
+                  b.name AS branch_name, b.review_url, b.review_requests_enabled,
+                  (SELECT rr.id FROM review_requests rr WHERE rr.appointment_id = a.id
+                    ORDER BY rr.created_at DESC LIMIT 1) AS latest_request_id,
+                  (SELECT rr.status FROM review_requests rr WHERE rr.appointment_id = a.id
+                    ORDER BY rr.created_at DESC LIMIT 1) AS latest_status,
+                  (SELECT rr.sent_at FROM review_requests rr WHERE rr.appointment_id = a.id
+                    ORDER BY rr.created_at DESC LIMIT 1) AS latest_sent_at,
+                  (SELECT rr.suppressed_reason FROM review_requests rr WHERE rr.appointment_id = a.id
+                    ORDER BY rr.created_at DESC LIMIT 1) AS latest_reason,
+                  (SELECT COUNT(*) FROM review_requests rr
+                    WHERE rr.customer_id = a.customer_id AND rr.status = 'sent') AS customer_sent_count
+           FROM appointments a
+           LEFT JOIN customers c ON c.id = a.customer_id
+           LEFT JOIN properties p ON p.id = a.property_id
+           LEFT JOIN estimates e ON e.id = a.estimate_id
+           LEFT JOIN branches b ON b.id = a.branch_id
+           WHERE a.status = 'completed'${scope.sql}${search}
+           ORDER BY a.start_at DESC LIMIT 100`,
+        )
+        .bind(...scope.bind, ...searchBind)
+        .all<Record<string, unknown>>();
+      return json({ ok: true, appointments: rows.results ?? [], branchId });
+    }
     const requests = await listReviewRequests(db, { branchId, status, limit: 100 });
     return json({ ok: true, requests, branchId });
   } catch (error) {

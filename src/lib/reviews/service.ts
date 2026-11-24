@@ -249,11 +249,22 @@ export async function listReviewRequests(
   const status = text(input.status, 40);
   const rows = await db
     .prepare(
-      `SELECT id, branch_id, customer_id, appointment_id, invoice_id, status, recipient,
-              review_url, scheduled_at, sent_at, suppressed_reason, dedupe_key, created_at
-       FROM review_requests
-       WHERE (? = '' OR branch_id = ?) AND (? = '' OR status = ?)
-       ORDER BY created_at DESC LIMIT ?`,
+      `SELECT rr.id, rr.branch_id, rr.customer_id, rr.appointment_id, rr.invoice_id, rr.status,
+              rr.recipient, rr.review_url, rr.scheduled_at, rr.sent_at, rr.suppressed_reason,
+              rr.dedupe_key, rr.created_at,
+              c.first_name, c.last_name,
+              a.start_at AS appointment_start,
+              p.line1, p.city,
+              b.name AS branch_name,
+              e.service_code
+       FROM review_requests rr
+       LEFT JOIN customers c ON c.id = rr.customer_id
+       LEFT JOIN appointments a ON a.id = rr.appointment_id
+       LEFT JOIN properties p ON p.id = a.property_id
+       LEFT JOIN branches b ON b.id = rr.branch_id
+       LEFT JOIN estimates e ON e.id = a.estimate_id
+       WHERE (? = '' OR rr.branch_id = ?) AND (? = '' OR rr.status = ?)
+       ORDER BY rr.created_at DESC LIMIT ?`,
     )
     .bind(branchId, branchId, status, status, limit)
     .all<ReviewRequestRow>();
