@@ -1362,17 +1362,23 @@ import {
               <p class="admin-muted">
                 Choose the completed cleaning by customer, service or address. The server verifies completion,
                 the branch review link, frequency limits and duplicate requests. No internal appointment ID is needed.
+                Review eligibility follows the customer, not the appointment: a customer who already reviewed, opted out
+                or asked not to be contacted is not invited again automatically. Manual review status changes are owner
+                records and are never presented as Google-verified reviews.
               </p>
               <div class="admin-inline-form">
                 <label>Search <input type="search" data-review-search placeholder="Customer, service or address" /></label>
-                <label>Invitation status
+                <label>Review relationship
                   <select data-review-eligible-filter>
                     <option value="">All completed cleanings</option>
-                    <option value="not_invited">Not yet invited</option>
-                    <option value="queued">Queued</option>
-                    <option value="sent">Sent</option>
-                    <option value="failed">Failed</option>
-                    <option value="suppressed">Suppressed</option>
+                    <option value="not_invited">Never invited</option>
+                    <option value="queued">Invitation queued</option>
+                    <option value="sent">Invitation sent</option>
+                    <option value="failed">Delivery failed</option>
+                    <option value="unknown">Review status unknown</option>
+                    <option value="reviewed">Confirmed reviewed</option>
+                    <option value="do_not_ask">Do not ask again</option>
+                    <option value="opted_out">Customer opted out</option>
                   </select>
                 </label>
               </div>

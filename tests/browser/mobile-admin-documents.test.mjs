@@ -71,18 +71,34 @@ async function openAdmin(width, height = 844) {
     const url = new URL(route.request().url());
     const view = url.searchParams.get('view');
     let body = { ok: true };
-    if (view === 'templates') {
-      body.templates = [
-        {
-          id: 'doc_1',
-          title: 'Residential Deep Cleaning Agreement',
-          category: 'residential',
-          version: '2026-11-22',
-          status: 'approved',
-          legal_review_status: 'owner_approved',
-          signer_party: 'customer',
-        },
-      ];
+    if (view === 'library') {
+      body.library = {
+        families: [
+          {
+            familyKey: 'residential-deep',
+            title: 'Residential Deep Cleaning Agreement',
+            category: 'residential',
+            approvedTemplateId: 'doc_1',
+            approvedVersionLabel: 'Version 1.0',
+            approvedSourceKind: 'text',
+            approvedAt: '2026-11-22T12:00:00.000Z',
+            legalReviewStatus: 'owner_approved',
+            draftTemplateId: null,
+            draftVersionLabel: null,
+            draftUpdatedAt: null,
+            draftCount: 0,
+            retiredCount: 0,
+            versionCount: 1,
+            packetCount: 0,
+            activePacketCount: 0,
+            packetNames: [],
+            archivedAt: null,
+            state: 'active',
+          },
+        ],
+        drafts: [],
+        totals: { families: 1, approved: 1, drafts: 0, retired: 0, archivedFamilies: 0 },
+      };
     } else if (view === 'bundles') {
       body.bundles = [
         {

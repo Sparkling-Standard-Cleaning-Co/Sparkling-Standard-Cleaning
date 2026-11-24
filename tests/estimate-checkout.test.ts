@@ -1088,7 +1088,9 @@ test('checkout accepts a confirmed property pin for structural payment eligibili
          combinable = 0,
          supportive_stackable = excluded.supportive_stackable,
          status = 'active',
-         scope = 'cleaning'`,
+         scope = 'cleaning',
+         booking_deadline_at = NULL,
+         service_deadline_at = NULL`,
     )
     .run(
       `promo_${input.code.toLowerCase()}`,

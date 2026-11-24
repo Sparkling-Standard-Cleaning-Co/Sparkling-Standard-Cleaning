@@ -1,6 +1,7 @@
 import type { D1Database } from '../admin/d1.ts';
 import { audit } from '../admin/operations.ts';
 import {
+  customerReviewSuppressed,
   markReviewRequestSent,
   recordReviewDelivery,
   reviewContextForAppointment,
@@ -38,13 +39,13 @@ export async function processDueReviewRequests(
   const oldestDue = new Date(now.getTime() - maxDueAgeHours * 3_600_000).toISOString();
   const due = await db
     .prepare(
-      `SELECT id, appointment_id, recipient
+      `SELECT id, appointment_id, recipient, created_at
        FROM review_requests
        WHERE status = 'queued' AND scheduled_at <= ? AND scheduled_at >= ?
        ORDER BY scheduled_at ASC LIMIT ?`,
     )
     .bind(newestDue, oldestDue, limit)
-    .all<{ id: string; appointment_id: string | null; recipient: string }>();
+    .all<{ id: string; appointment_id: string | null; recipient: string; created_at: string }>();
 
   const result: ReviewDeliveryResult = { scanned: 0, sent: 0, failed: 0, skipped: 0 };
   for (const request of due.results ?? []) {
@@ -53,6 +54,18 @@ export async function processDueReviewRequests(
       ? await reviewContextForAppointment(db, request.appointment_id)
       : null;
     if (!context || !context.enabled || !context.customerEmail || !context.reviewUrl || context.appointmentStatus !== 'completed') {
+      result.skipped += 1;
+      continue;
+    }
+    const reviewStatus = context.customerReviewStatus ?? 'never_invited';
+    const lastInvited = context.customerReviewLastInvitedAt
+      ? Date.parse(context.customerReviewLastInvitedAt)
+      : Number.NaN;
+    const requestedAt = Date.parse(request.created_at);
+    if (
+      customerReviewSuppressed(reviewStatus) ||
+      (Number.isFinite(lastInvited) && Number.isFinite(requestedAt) && lastInvited >= requestedAt)
+    ) {
       result.skipped += 1;
       continue;
     }

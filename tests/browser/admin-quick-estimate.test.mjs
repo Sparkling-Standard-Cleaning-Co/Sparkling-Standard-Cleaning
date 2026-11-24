@@ -152,21 +152,49 @@ async function openAdmin() {
     const request = route.request();
     const url = new URL(request.url());
     const view = url.searchParams.get('view');
-    if (request.method() === 'GET' && view === 'templates') {
+    if (request.method() === 'GET' && view === 'library') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           ok: true,
-          templates: [{
-            id: 'doc_1',
-            title: 'Residential One-Time Agreement',
-            category: 'residential',
-            version: '2026-11-19.v1',
-            status: 'draft',
-            legal_review_status: 'owner_review_required',
-            family_key: 'residential-one-time',
-          }],
+          library: {
+            families: [{
+              familyKey: 'residential-one-time',
+              title: 'Residential One-Time Agreement',
+              category: 'residential',
+              approvedTemplateId: null,
+              approvedVersionLabel: null,
+              approvedSourceKind: 'text',
+              approvedAt: null,
+              legalReviewStatus: 'owner_review_required',
+              draftTemplateId: 'doc_1',
+              draftVersionLabel: 'Version 1.0',
+              draftUpdatedAt: '2026-11-19T12:00:00.000Z',
+              draftCount: 1,
+              retiredCount: 0,
+              versionCount: 1,
+              packetCount: 0,
+              activePacketCount: 0,
+              packetNames: [],
+              archivedAt: null,
+              state: 'draft_only',
+            }],
+            drafts: [{
+              id: 'doc_1',
+              title: 'Residential One-Time Agreement',
+              category: 'residential',
+              version: '2026-11-19.v1',
+              version_label: 'Version 1.0',
+              supersedes_template_id: '',
+              supersedes_version_label: null,
+              status: 'draft',
+              legal_review_status: 'owner_review_required',
+              updated_at: '2026-11-19T12:00:00.000Z',
+              created_at: '2026-11-19T12:00:00.000Z',
+            }],
+            totals: { families: 1, approved: 0, drafts: 1, retired: 0, archivedFamilies: 0 },
+          },
         }),
       });
       return;
@@ -280,12 +308,14 @@ test('the document packet builder opens a draft, previews unresolved variables a
   await page.click('[data-admin-nav="documents"]');
   await page.waitForSelector('[data-admin-view="documents"]:not([hidden])');
   await page.locator('[data-document-tab="library"]').first().click();
-  await page.waitForSelector('[data-admin-documents-templates] button[data-admin-action="document-edit"]');
   assert.match((await page.textContent('[data-admin-documents-templates]')) ?? '', /Residential One-Time Agreement/);
+  await page.locator('[data-document-library-tab="drafts"]').click();
+  await page.waitForSelector('[data-document-library-panel="drafts"]:not([hidden]) button[data-admin-action="document-edit"]');
   await page.locator('[data-document-tab="packets"]').first().click();
   assert.match((await page.textContent('[data-admin-documents-bundles]')) ?? '', /Residential One-Time Packet/);
   await page.locator('[data-document-tab="library"]').first().click();
-  await page.click('[data-admin-documents-templates] button[data-admin-action="document-edit"]');
+  await page.locator('[data-document-library-tab="drafts"]').click();
+  await page.click('[data-document-library-panel="drafts"] button[data-admin-action="document-edit"]');
   await page.waitForSelector('[data-document-editor]:not([hidden])');
   assert.match(await page.locator('[data-document-editor-canvas]').innerHTML(), /customer\.first_name/);
   assert.match(await page.textContent('[data-document-editor-version-display]') ?? '', /Version 1\.0/);

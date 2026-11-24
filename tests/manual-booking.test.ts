@@ -601,7 +601,8 @@ test('a selected database promotion carries through the manual quote', async () 
   db.raw.prepare(
     `UPDATE promotions SET name = 'Thanksgiving Special', kind = 'fixed', value_cents = 7500,
        services_json = '["deep"]', branches_json = '["branch_pensacola"]', min_purchase_cents = 20000,
-       first_visit_only = 1, status = 'active', terms_version = '2026-11-10.thanks75.v1'
+       first_visit_only = 1, status = 'active', terms_version = '2026-11-10.thanks75.v1',
+       booking_deadline_at = NULL, service_deadline_at = NULL, expires_at = '2099-12-31T23:59:59Z'
      WHERE code = 'THANKS75'`,
   ).run();
   const quote = await quoteManualBooking(env, db, actor, {

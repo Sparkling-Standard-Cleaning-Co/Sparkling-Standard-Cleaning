@@ -271,6 +271,9 @@ test('THANKS75 accepts the final eligible evening and rejects the next service d
   const thanks = promotions.find((promotion) => promotion.code === 'THANKS75');
   assert.ok(thanks);
   await updatePromotion(db, 'admin_test', String(thanks.id), { status: 'active' });
+  // Keep the booking window open so this test proves service-deadline behavior
+  // after the real 2026-11-24 booking deadline has passed.
+  db.raw.prepare("UPDATE promotions SET booking_deadline_at = '2099-01-01T00:00:00Z' WHERE code = 'THANKS75'").run();
   const accepted = await evaluatePromotionForQuote(db, {
     ...quote,
     code: 'THANKS75',
@@ -296,6 +299,7 @@ test('the $200 minimum is inclusive before any discount', async () => {
   const thanks = promotions.find((promotion) => promotion.code === 'THANKS75');
   assert.ok(thanks);
   await updatePromotion(db, 'admin_test', String(thanks.id), { status: 'active' });
+  db.raw.prepare("UPDATE promotions SET booking_deadline_at = '2099-01-01T00:00:00Z' WHERE code = 'THANKS75'").run();
   const accepted = await evaluatePromotionForQuote(db, {
     ...quote,
     code: 'THANKS75',
@@ -321,6 +325,7 @@ test('THANKS75 rejects standard, STR, Tampa and stacking', async () => {
   const thanks = promotions.find((promotion) => promotion.code === 'THANKS75');
   assert.ok(thanks);
   await updatePromotion(db, 'admin_test', String(thanks.id), { status: 'active' });
+  db.raw.prepare("UPDATE promotions SET booking_deadline_at = '2099-01-01T00:00:00Z' WHERE code = 'THANKS75'").run();
   const base = { ...quote, code: 'THANKS75', cleaningAmountCents: 30000, serviceDate: '2026-11-20' };
   assert.equal((await evaluatePromotionForQuote(db, { ...base, serviceType: 'standard' })).reason, 'promotion_service_ineligible');
   assert.equal((await evaluatePromotionForQuote(db, { ...base, serviceType: 'str_turnover' })).reason, 'promotion_service_ineligible');

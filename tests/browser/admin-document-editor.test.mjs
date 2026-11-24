@@ -62,17 +62,32 @@ test('the owner can revise an approved document in the visual editor and publish
     const url = new URL(route.request().url());
     const view = url.searchParams.get('view');
     let body = { ok: true };
-    if (view === 'templates') {
-      body.templates = [{
-        id: 'doc_1',
-        title: 'Residential Deep Cleaning Agreement',
-        category: 'residential',
-        version: '2026-11-22.remediation.v1',
-        version_label: 'Version 1.0',
-        status: 'approved',
-        source_kind: 'text',
-        signer_party: 'customer',
-      }];
+    if (view === 'library') {
+      body.library = {
+        families: [{
+          familyKey: 'residential-deep',
+          title: 'Residential Deep Cleaning Agreement',
+          category: 'residential',
+          approvedTemplateId: 'doc_1',
+          approvedVersionLabel: 'Version 1.0',
+          approvedSourceKind: 'text',
+          approvedAt: '2026-11-22T12:00:00.000Z',
+          legalReviewStatus: 'owner_approved',
+          draftTemplateId: null,
+          draftVersionLabel: null,
+          draftUpdatedAt: null,
+          draftCount: 0,
+          retiredCount: 0,
+          versionCount: 1,
+          packetCount: 1,
+          activePacketCount: 1,
+          packetNames: ['Residential Deep Cleaning Packet'],
+          archivedAt: null,
+          state: 'active',
+        }],
+        drafts: [],
+        totals: { families: 1, approved: 1, drafts: 0, retired: 0, archivedFamilies: 0 },
+      };
     } else if (view === 'bundles') {
       body.bundles = [{
         id: 'bundle_1',

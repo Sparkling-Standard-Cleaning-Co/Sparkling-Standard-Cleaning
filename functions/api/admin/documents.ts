@@ -7,11 +7,13 @@ import {
   acknowledgeDocumentUpdate,
   addBundleItem,
   approveTemplate,
+  archiveTemplateFamily,
   createBundle,
   createSigningRequest,
   createTemplate,
   createTemplateRevision,
   countersignSigningRequest,
+  deleteDraftTemplate,
   documentSubjectBranch,
   duplicateBundle,
   duplicateTemplate,
@@ -24,14 +26,17 @@ import {
   listBundles,
   listDocumentUpdates,
   listSigningRequests,
+  listTemplateLibrary,
   listTemplates,
   previewPacket,
   publishTemplateRevision,
   removeBundleItem,
   restoreTemplate,
+  restoreTemplateFamily,
   retireTemplate,
   rotateSigningRequestToken,
   sendSigningEmail,
+  templateFamilyHistory,
   templateHistory,
   updateBundle,
   updateDraftTemplate,
@@ -213,6 +218,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const url = new URL(context.request.url);
     const view = url.searchParams.get('view') ?? 'templates';
     if (view === 'templates') return json({ ok: true, templates: await listTemplates(db) });
+    if (view === 'library') return json({ ok: true, library: await listTemplateLibrary(db) });
+    if (view === 'family-history') {
+      const familyKey = (url.searchParams.get('familyKey') ?? '').trim();
+      if (!familyKey) return json({ ok: false, error: 'document_family_required' }, 400);
+      return json({ ok: true, history: await templateFamilyHistory(db, familyKey) });
+    }
     if (view === 'updates') {
       ownerOnly(actor);
       return json({ ok: true, updates: await listDocumentUpdates(db) });
@@ -556,6 +567,27 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       ownerOnly(actor);
       await retireTemplate(db, actor.id, text(body.templateId, 100));
       return json({ ok: true });
+    }
+    if (action === 'archive_family') {
+      ownerOnly(actor);
+      return json({
+        ok: true,
+        ...(await archiveTemplateFamily(db, actor.id, text(body.familyKey, 120))),
+      });
+    }
+    if (action === 'restore_family') {
+      ownerOnly(actor);
+      return json({
+        ok: true,
+        ...(await restoreTemplateFamily(db, actor.id, text(body.familyKey, 120))),
+      });
+    }
+    if (action === 'delete_draft') {
+      ownerOnly(actor);
+      return json({
+        ok: true,
+        ...(await deleteDraftTemplate(db, actor.id, text(body.templateId, 100))),
+      });
     }
     if (action === 'create_bundle') {
       ownerOnly(actor);

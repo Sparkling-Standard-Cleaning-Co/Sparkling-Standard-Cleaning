@@ -11,11 +11,15 @@ import {
 } from '../../../src/lib/admin/operations.ts';
 import {
   cancelReviewRequest,
+  customerReviewState,
+  customerReviewSuppressed,
   listReviewRequests,
   markReviewRequestSent,
   queueReviewForAppointment,
   recordReviewDelivery,
   reviewContextForAppointment,
+  setCustomerReviewState,
+  type CustomerReviewAction,
 } from '../../../src/lib/reviews/service.ts';
 import { buildReviewRequestEmail, sendReviewRequestEmail, type ReviewEmailEnv } from '../../../src/lib/reviews/email.ts';
 
@@ -49,6 +53,11 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       });
       return json({ ok: true, ...email, recipient: reviewContext.customerEmail, branchName: reviewContext.branchName });
     }
+    if (url.searchParams.get('view') === 'state') {
+      const customerId = (url.searchParams.get('customerId') ?? '').trim();
+      if (!customerId) return json({ ok: false, error: 'customer_required' }, 400);
+      return json({ ok: true, state: await customerReviewState(db, customerId) });
+    }
     if (url.searchParams.get('view') === 'eligible') {
       const query = (url.searchParams.get('q') ?? '').trim().slice(0, 120);
       const scope = actor.role === 'owner'
@@ -79,12 +88,17 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
                   (SELECT rr.suppressed_reason FROM review_requests rr WHERE rr.appointment_id = a.id
                     ORDER BY rr.created_at DESC LIMIT 1) AS latest_reason,
                   (SELECT COUNT(*) FROM review_requests rr
-                    WHERE rr.customer_id = a.customer_id AND rr.status = 'sent') AS customer_sent_count
+                    WHERE rr.customer_id = a.customer_id AND rr.status = 'sent') AS customer_sent_count,
+                  COALESCE(crs.status, 'never_invited') AS customer_review_status,
+                  COALESCE(crs.invitation_count, 0) AS customer_review_invitation_count,
+                  crs.last_invited_at AS customer_review_last_invited_at,
+                  crs.marked_reviewed_at AS customer_review_marked_at
            FROM appointments a
            LEFT JOIN customers c ON c.id = a.customer_id
            LEFT JOIN properties p ON p.id = a.property_id
            LEFT JOIN estimates e ON e.id = a.estimate_id
            LEFT JOIN branches b ON b.id = a.branch_id
+           LEFT JOIN customer_review_state crs ON crs.customer_id = c.id
            WHERE a.status = 'completed'${scope.sql}${search}
            ORDER BY a.start_at DESC LIMIT 100`,
         )
@@ -115,6 +129,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       if (!appointmentId) return json({ ok: false, error: 'appointment_required' }, 400);
       const result = await queueReviewForAppointment(db, appointmentId, {
         allowDisabled: actor.role === 'owner',
+        source: 'owner',
       });
       await audit(db, {
         actorUserId: actor.id,
@@ -137,6 +152,36 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       });
       return json({ ok: true });
     }
+    if (action === 'retry') {
+      const id = String(body.id ?? '').trim();
+      if (!id) return json({ ok: false, error: 'review_request_required' }, 400);
+      const row = await db
+        .prepare('SELECT id, customer_id, status FROM review_requests WHERE id = ? LIMIT 1')
+        .bind(id)
+        .first<{ id: string; customer_id: string | null; status: string }>();
+      if (!row) return json({ ok: false, error: 'review_request_not_found' }, 404);
+      if (row.status !== 'failed') return json({ ok: false, error: 'review_request_not_failed' }, 409);
+      if (row.customer_id) {
+        const state = await customerReviewState(db, row.customer_id);
+        if (state && customerReviewSuppressed(state.status)) {
+          return json({ ok: false, error: 'customer_review_suppressed', status: state.status }, 409);
+        }
+      }
+      await db
+        .prepare(
+          `UPDATE review_requests SET status = 'queued', scheduled_at = ?, sent_at = NULL,
+             error_detail = '', updated_at = ? WHERE id = ? AND status = 'failed'`,
+        )
+        .bind(new Date().toISOString(), new Date().toISOString(), id)
+        .run();
+      await audit(db, {
+        actorUserId: actor.id,
+        action: 'review.request_retried',
+        entityType: 'review_request',
+        entityId: id,
+      });
+      return json({ ok: true });
+    }
     if (action === 'send') {
       requireStepUp(actor);
       const id = String(body.id ?? '').trim();
@@ -153,6 +198,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const reviewContext = await reviewContextForAppointment(db, String(row.appointment_id ?? ''));
       if (!reviewContext || !reviewContext.customerEmail) {
         return json({ ok: false, error: 'review_context_missing' }, 409);
+      }
+      const reviewStatus = reviewContext.customerReviewStatus ?? 'never_invited';
+      if (customerReviewSuppressed(reviewStatus)) {
+        return json({ ok: false, error: 'customer_review_suppressed', status: reviewStatus }, 409);
+      }
+      if ((reviewContext.customerReviewInvitationCount ?? 0) > 0) {
+        return json({ ok: false, error: 'customer_already_invited' }, 409);
       }
       const result = await sendReviewRequestEmail({
         to: reviewContext.customerEmail,
@@ -177,6 +229,23 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         detail: result,
       });
       return json({ ok: result === 'sent', result }, result === 'sent' ? 200 : 502);
+    }
+    const customerActions: Record<string, CustomerReviewAction> = {
+      mark_reviewed: 'mark_reviewed',
+      mark_unknown: 'mark_unknown',
+      mark_eligible: 'mark_eligible',
+      do_not_ask: 'do_not_ask',
+      opt_out: 'opt_out',
+      clear_state: 'clear',
+    };
+    if (customerActions[action]) {
+      const customerId = String(body.customerId ?? '').trim();
+      if (!customerId) return json({ ok: false, error: 'customer_required' }, 400);
+      const state = await setCustomerReviewState(db, actor.id, customerId, customerActions[action]!, {
+        note: String(body.note ?? ''),
+        branchId: String(body.branchId ?? ''),
+      });
+      return json({ ok: true, state });
     }
     return json({ ok: false, error: 'review_action_invalid' }, 400);
   } catch (error) {

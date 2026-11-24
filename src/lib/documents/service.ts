@@ -1940,30 +1940,39 @@ export async function publishTemplateRevision(
     .bind(previousId)
     .all<{ bundle_id: string }>();
   const packets = packetRows.results ?? [];
-  // Remove a conflicting duplicate of the new version in the same packet, then
-  // move the packet's approved item to the new version.
-  await db
-    .prepare(
-      `DELETE FROM document_bundle_items
-       WHERE template_id = ? AND bundle_id IN
-         (SELECT bundle_id FROM document_bundle_items WHERE template_id = ?)`,
-    )
-    .bind(templateId, previousId)
-    .run();
-  await db
-    .prepare('UPDATE document_bundle_items SET template_id = ? WHERE template_id = ?')
-    .bind(templateId, previousId)
-    .run();
-  await db
-    .prepare("UPDATE document_templates SET status = 'retired', archived_at = ?, updated_at = ? WHERE id = ?")
-    .bind(now(), now(), previousId)
-    .run();
-  await db
-    .prepare(
-      "UPDATE document_templates SET status = 'approved', approved_by_admin_user_id = ?, approved_at = ?, updated_at = ? WHERE id = ? AND status = 'draft'",
-    )
-    .bind(actorUserId, now(), now(), templateId)
-    .run();
+  // Publish is one transaction when the runtime supports D1 batch: move packet
+  // items to the new version, retire the previous approved version and approve
+  // the draft together. The local test adapter falls back to sequential writes.
+  const timestamp = now();
+  const statements = [
+    db
+      .prepare(
+        `DELETE FROM document_bundle_items
+         WHERE template_id = ? AND bundle_id IN
+           (SELECT bundle_id FROM document_bundle_items WHERE template_id = ?)`,
+      )
+      .bind(templateId, previousId),
+    db
+      .prepare('UPDATE document_bundle_items SET template_id = ? WHERE template_id = ?')
+      .bind(templateId, previousId),
+    db
+      .prepare("UPDATE document_templates SET status = 'retired', archived_at = ?, updated_at = ? WHERE id = ? AND status = 'approved'")
+      .bind(timestamp, timestamp, previousId),
+    db
+      .prepare(
+        "UPDATE document_templates SET status = 'approved', approved_by_admin_user_id = ?, approved_at = ?, updated_at = ? WHERE id = ? AND status = 'draft'",
+      )
+      .bind(actorUserId, timestamp, timestamp, templateId),
+  ];
+  if (typeof db.batch === 'function') {
+    await db.batch(statements);
+  } else {
+    for (const statement of statements) await statement.run();
+  }
+  const published = await getTemplate(db, templateId);
+  if (String(published?.status ?? '') !== 'approved') {
+    throw new AdminAuthError(409, 'document_publish_failed');
+  }
   const affected = await db
     .prepare(
       `SELECT COUNT(DISTINCT sr.customer_id) AS count
@@ -2484,6 +2493,428 @@ export async function listTemplates(db: D1Database): Promise<Array<Record<string
       version_label: displayVersion(row.version, ordinals.get(String(row.id))),
     }));
   }
+}
+
+export interface TemplateLibraryFamily {
+  familyKey: string;
+  title: string;
+  category: string;
+  signerParty: string;
+  approvedTemplateId: string | null;
+  approvedVersion: string | null;
+  approvedVersionLabel: string | null;
+  approvedSourceKind: string;
+  approvedAt: string | null;
+  effectiveDate: string | null;
+  legalReviewStatus: string;
+  draftTemplateId: string | null;
+  draftVersionLabel: string | null;
+  draftUpdatedAt: string | null;
+  draftCount: number;
+  retiredCount: number;
+  versionCount: number;
+  packetCount: number;
+  activePacketCount: number;
+  packetNames: string[];
+  lastActivityAt: string;
+  archivedAt: string | null;
+  state: 'active' | 'draft_only' | 'no_approved' | 'archived';
+}
+
+export interface TemplateLibraryDraft extends Record<string, unknown> {
+  family_key: string;
+  version_label: string;
+  supersedes_version_label: string | null;
+}
+
+export interface TemplateLibrary {
+  families: TemplateLibraryFamily[];
+  drafts: TemplateLibraryDraft[];
+  totals: {
+    families: number;
+    approved: number;
+    drafts: number;
+    retired: number;
+    archivedFamilies: number;
+  };
+}
+
+function familyKeyOf(row: Record<string, unknown>): string {
+  return text(row.family_key, 120) || String(row.id ?? '');
+}
+
+function newestRow(rows: Array<Record<string, unknown>>): Record<string, unknown> | null {
+  if (rows.length === 0) return null;
+  const sorted = [...rows].sort((left, right) => {
+    const leftAt = String(left.approved_at ?? left.updated_at ?? left.created_at ?? '');
+    const rightAt = String(right.approved_at ?? right.updated_at ?? right.created_at ?? '');
+    if (leftAt !== rightAt) return leftAt.localeCompare(rightAt);
+    return String(left.created_at ?? '').localeCompare(String(right.created_at ?? ''));
+  });
+  return sorted[sorted.length - 1] ?? null;
+}
+
+/**
+ * Normal operational library: one row per document family with the current
+ * approved version. Drafts and retired versions are returned separately so the
+ * ordinary library never displays every historical version.
+ */
+export async function listTemplateLibrary(db: D1Database): Promise<TemplateLibrary> {
+  const templates = await listTemplates(db);
+  const ordinals = familyVersionOrdinals(templates);
+  const archived = new Map<string, string>();
+  try {
+    const stateRows = await db
+      .prepare('SELECT family_key, archived_at FROM document_family_state WHERE archived_at IS NOT NULL')
+      .all<{ family_key: string; archived_at: string }>();
+    for (const row of stateRows.results ?? []) archived.set(String(row.family_key), String(row.archived_at));
+  } catch {
+    // Rollout-safe: the library still renders if the family-state table has not
+    // been applied yet. Archiving becomes available once the migration lands.
+  }
+  const packetMap = new Map<string, { names: Set<string>; active: number; total: number }>();
+  try {
+    const packetRows = await db
+      .prepare(
+        `SELECT i.template_id, b.name, b.status
+         FROM document_bundle_items i
+         JOIN document_bundles b ON b.id = i.bundle_id`,
+      )
+      .all<{ template_id: string; name: string; status: string }>();
+    for (const row of packetRows.results ?? []) {
+      const entry = packetMap.get(String(row.template_id)) ?? { names: new Set<string>(), active: 0, total: 0 };
+      entry.names.add(String(row.name));
+      entry.total += 1;
+      if (String(row.status) === 'active') entry.active += 1;
+      packetMap.set(String(row.template_id), entry);
+    }
+  } catch {
+    // Packet usage is advisory in the library; a failure must not hide documents.
+  }
+
+  const groups = new Map<string, Array<Record<string, unknown>>>();
+  for (const template of templates) {
+    const family = familyKeyOf(template);
+    const rows = groups.get(family) ?? [];
+    rows.push(template);
+    groups.set(family, rows);
+  }
+
+  const families: TemplateLibraryFamily[] = [];
+  const drafts: TemplateLibraryDraft[] = [];
+  for (const [familyKey, rows] of groups) {
+    const approvedRows = rows.filter((row) => String(row.status) === 'approved');
+    const draftRows = rows
+      .filter((row) => String(row.status) === 'draft')
+      .sort((left, right) => String(right.updated_at ?? right.created_at ?? '').localeCompare(String(left.updated_at ?? left.created_at ?? '')));
+    const retiredRows = rows.filter((row) => String(row.status) === 'retired');
+    const current = newestRow(approvedRows);
+    const primaryDraft = draftRows[0] ?? null;
+    const titleRow = current ?? primaryDraft ?? rows[rows.length - 1] ?? {};
+    const packetNames = new Set<string>();
+    let packetCount = 0;
+    let activePacketCount = 0;
+    for (const row of rows) {
+      const entry = packetMap.get(String(row.id));
+      if (!entry) continue;
+      for (const name of entry.names) packetNames.add(name);
+      packetCount += entry.total;
+      activePacketCount += entry.active;
+    }
+    for (const draft of draftRows) {
+      const supersedes = String(draft.supersedes_template_id ?? '');
+      const source = templates.find((template) => String(template.id) === supersedes);
+      drafts.push({
+        ...draft,
+        family_key: familyKey,
+        version_label: displayVersion(draft.version, ordinals.get(String(draft.id))),
+        supersedes_version_label: source
+          ? displayVersion(source.version, ordinals.get(String(source.id)))
+          : null,
+      });
+    }
+    const archivedAt = archived.get(familyKey) ?? null;
+    const state: TemplateLibraryFamily['state'] = archivedAt
+      ? 'archived'
+      : current
+        ? 'active'
+        : draftRows.length > 0
+          ? 'draft_only'
+          : 'no_approved';
+    const lastActivityAt = rows
+      .map((row) => String(row.updated_at ?? row.approved_at ?? row.created_at ?? ''))
+      .sort()
+      .pop() ?? '';
+    families.push({
+      familyKey,
+      title: String(titleRow.title ?? 'Document'),
+      category: String(titleRow.category ?? 'general'),
+      signerParty: String(titleRow.signer_party ?? 'customer'),
+      approvedTemplateId: current ? String(current.id) : null,
+      approvedVersion: current ? String(current.version ?? '') : null,
+      approvedVersionLabel: current ? displayVersion(current.version, ordinals.get(String(current.id))) : null,
+      approvedSourceKind: String(current?.source_kind ?? 'text'),
+      approvedAt: current ? String(current.approved_at ?? '') || null : null,
+      effectiveDate: current ? String(current.effective_date ?? '') || null : null,
+      legalReviewStatus: String((current ?? primaryDraft ?? titleRow).legal_review_status ?? 'not_reviewed'),
+      draftTemplateId: primaryDraft ? String(primaryDraft.id) : null,
+      draftVersionLabel: primaryDraft ? displayVersion(primaryDraft.version, ordinals.get(String(primaryDraft.id))) : null,
+      draftUpdatedAt: primaryDraft ? String(primaryDraft.updated_at ?? primaryDraft.created_at ?? '') || null : null,
+      draftCount: draftRows.length,
+      retiredCount: retiredRows.length,
+      versionCount: rows.length,
+      packetCount,
+      activePacketCount,
+      packetNames: [...packetNames].sort(),
+      lastActivityAt,
+      archivedAt,
+      state,
+    });
+  }
+
+  families.sort((left, right) => {
+    const order: Record<TemplateLibraryFamily['state'], number> = {
+      active: 0,
+      draft_only: 1,
+      no_approved: 2,
+      archived: 3,
+    };
+    const byState = order[left.state] - order[right.state];
+    if (byState !== 0) return byState;
+    return left.title.localeCompare(right.title);
+  });
+  drafts.sort((left, right) => String(right.updated_at ?? right.created_at ?? '').localeCompare(String(left.updated_at ?? left.created_at ?? '')));
+
+  return {
+    families,
+    drafts,
+    totals: {
+      families: families.length,
+      approved: templates.filter((template) => String(template.status) === 'approved').length,
+      drafts: templates.filter((template) => String(template.status) === 'draft').length,
+      retired: templates.filter((template) => String(template.status) === 'retired').length,
+      archivedFamilies: families.filter((family) => family.state === 'archived').length,
+    },
+  };
+}
+
+export interface TemplateFamilyHistory {
+  familyKey: string;
+  archivedAt: string | null;
+  templates: Array<Record<string, unknown>>;
+  audit: Array<Record<string, unknown>>;
+  executedRequests: number;
+}
+
+export async function templateFamilyHistory(
+  db: D1Database,
+  familyKey: string,
+): Promise<TemplateFamilyHistory> {
+  const key = text(familyKey, 120);
+  if (!key) throw new AdminAuthError(400, 'document_family_required');
+  const rows = await db
+    .prepare('SELECT * FROM document_templates WHERE family_key = ? ORDER BY created_at ASC')
+    .bind(key)
+    .all<Record<string, unknown>>();
+  const templates = rows.results ?? [];
+  if (templates.length === 0) throw new AdminAuthError(404, 'document_family_not_found');
+  const ordinals = familyVersionOrdinals(templates);
+  const ids = templates.map((template) => String(template.id));
+  const placeholders = ids.map(() => '?').join(',');
+  const [signatureRows, packetRows, auditRows, executedRow] = await Promise.all([
+    db
+      .prepare(
+        `SELECT template_id, COUNT(*) AS signature_count, MAX(signed_at) AS last_signed_at
+         FROM document_signatures WHERE template_id IN (${placeholders}) GROUP BY template_id`,
+      )
+      .bind(...ids)
+      .all<{ template_id: string; signature_count: number; last_signed_at: string | null }>(),
+    db
+      .prepare(
+        `SELECT i.template_id, b.name, b.status
+         FROM document_bundle_items i JOIN document_bundles b ON b.id = i.bundle_id
+         WHERE i.template_id IN (${placeholders})`,
+      )
+      .bind(...ids)
+      .all<{ template_id: string; name: string; status: string }>(),
+    db
+      .prepare(
+        `SELECT action, success, detail_json, created_at FROM admin_audit
+         WHERE entity_type = 'document_template' AND entity_id IN (${placeholders})
+         ORDER BY created_at DESC LIMIT 200`,
+      )
+      .bind(...ids)
+      .all(),
+    db
+      .prepare(
+        `SELECT COUNT(DISTINCT sr.id) AS count
+         FROM signing_requests sr
+         JOIN document_signatures s ON s.signing_request_id = sr.id
+         WHERE s.template_id IN (${placeholders})`,
+      )
+      .bind(...ids)
+      .first<{ count: number }>(),
+  ]);
+  const signatures = new Map(
+    (signatureRows.results ?? []).map((row) => [
+      String(row.template_id),
+      { count: Number(row.signature_count ?? 0), lastSignedAt: row.last_signed_at ?? null },
+    ]),
+  );
+  const ours = new Map<string, string[]>();
+  for (const row of packetRows.results ?? []) {
+    const list = ours.get(String(row.template_id)) ?? [];
+    list.push(`${String(row.name)}${String(row.status) === 'active' ? '' : ' (archived packet)'}`);
+    ours.set(String(row.template_id), list);
+  }
+  let archivedAt: string | null = null;
+  try {
+    const stateRow = await db
+      .prepare('SELECT archived_at FROM document_family_state WHERE family_key = ? LIMIT 1')
+      .bind(key)
+      .first<{ archived_at: string | null }>();
+    archivedAt = stateRow?.archived_at ?? null;
+  } catch {
+    archivedAt = null;
+  }
+  return {
+    familyKey: key,
+    archivedAt,
+    templates: templates.map((template) => ({
+      ...template,
+      version_label: displayVersion(template.version, ordinals.get(String(template.id))),
+      signature_count: signatures.get(String(template.id))?.count ?? 0,
+      last_signed_at: signatures.get(String(template.id))?.lastSignedAt ?? null,
+      packet_names: ours.get(String(template.id)) ?? [],
+    })),
+    audit: auditRows.results ?? [],
+    executedRequests: Number(executedRow?.count ?? 0),
+  };
+}
+
+/** Archives a document family from the normal library without touching evidence. */
+export async function archiveTemplateFamily(
+  db: D1Database,
+  actorUserId: string,
+  familyKey: string,
+): Promise<{ familyKey: string; title: string }> {
+  const key = text(familyKey, 120);
+  if (!key) throw new AdminAuthError(400, 'document_family_required');
+  const rows = await db
+    .prepare('SELECT id, title, status FROM document_templates WHERE family_key = ?')
+    .bind(key)
+    .all<{ id: string; title: string; status: string }>();
+  const templates = rows.results ?? [];
+  if (templates.length === 0) throw new AdminAuthError(404, 'document_family_not_found');
+  const used = await db
+    .prepare(
+      `SELECT DISTINCT b.name FROM document_bundle_items i
+       JOIN document_bundles b ON b.id = i.bundle_id
+       JOIN document_templates t ON t.id = i.template_id
+       WHERE t.family_key = ? AND b.status = 'active' LIMIT 1`,
+    )
+    .bind(key)
+    .first<{ name: string }>();
+  if (used) throw new AdminAuthError(409, 'document_family_in_active_packet');
+  const title =
+    templates.find((template) => template.status === 'approved')?.title ??
+    templates[0]?.title ??
+    'Document';
+  const timestamp = now();
+  await db
+    .prepare(
+      `INSERT INTO document_family_state (family_key, title, archived_at, archived_by_admin_user_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(family_key) DO UPDATE SET
+         title = excluded.title,
+         archived_at = excluded.archived_at,
+         archived_by_admin_user_id = excluded.archived_by_admin_user_id,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(key, title, timestamp, actorUserId, timestamp, timestamp)
+    .run();
+  await audit(db, {
+    actorUserId,
+    action: 'documents.family_archived',
+    entityType: 'document_family',
+    entityId: key,
+    detail: title,
+  });
+  return { familyKey: key, title };
+}
+
+export async function restoreTemplateFamily(
+  db: D1Database,
+  actorUserId: string,
+  familyKey: string,
+): Promise<{ familyKey: string }> {
+  const key = text(familyKey, 120);
+  if (!key) throw new AdminAuthError(400, 'document_family_required');
+  const timestamp = now();
+  const result = await db
+    .prepare(
+      `UPDATE document_family_state SET archived_at = NULL, archived_by_admin_user_id = NULL, updated_at = ?
+       WHERE family_key = ?`,
+    )
+    .bind(timestamp, key)
+    .run();
+  if (!result.success) throw new AdminAuthError(400, 'document_family_restore_failed');
+  await audit(db, {
+    actorUserId,
+    action: 'documents.family_restored',
+    entityType: 'document_family',
+    entityId: key,
+  });
+  return { familyKey: key };
+}
+
+/**
+ * Permanently deletes a draft that has never been part of a packet, signature
+ * or signing request. Approved, retired and executed documents are never
+ * deletable through this path.
+ */
+export async function deleteDraftTemplate(
+  db: D1Database,
+  actorUserId: string,
+  templateId: string,
+): Promise<{ id: string; title: string; familyKey: string }> {
+  const template = await getTemplate(db, templateId);
+  if (!template) throw new AdminAuthError(404, 'template_not_found');
+  if (String(template.status) !== 'draft') throw new AdminAuthError(409, 'template_not_draft');
+  const usage = await db
+    .prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM document_bundle_items WHERE template_id = ?) AS packet_items,
+         (SELECT COUNT(*) FROM document_signatures WHERE template_id = ?) AS signatures,
+         (SELECT COUNT(*) FROM signing_requests
+            WHERE requirement_snapshot_json LIKE ?) AS signing_requests`,
+    )
+    .bind(templateId, templateId, `%${templateId}%`)
+    .first<{ packet_items: number; signatures: number; signing_requests: number }>();
+  if (
+    Number(usage?.packet_items ?? 0) > 0 ||
+    Number(usage?.signatures ?? 0) > 0 ||
+    Number(usage?.signing_requests ?? 0) > 0
+  ) {
+    throw new AdminAuthError(409, 'draft_in_use');
+  }
+  const familyKey = familyKeyOf(template);
+  await db.prepare('DELETE FROM document_templates WHERE id = ? AND status = ?').bind(templateId, 'draft').run();
+  await db
+    .prepare(
+      'DELETE FROM document_family_state WHERE family_key = ? AND NOT EXISTS (SELECT 1 FROM document_templates WHERE family_key = ?)',
+    )
+    .bind(familyKey, familyKey)
+    .run()
+    .catch(() => undefined);
+  await audit(db, {
+    actorUserId,
+    action: 'documents.template_draft_deleted',
+    entityType: 'document_family',
+    entityId: familyKey,
+    detail: `${String(template.title ?? '')} ${displayVersion(template.version)}`,
+  });
+  return { id: templateId, title: String(template.title ?? ''), familyKey };
 }
 
 export async function listBundles(db: D1Database): Promise<Array<Record<string, unknown>>> {

@@ -2113,8 +2113,10 @@ const customerObligations = new Map<
   string,
   { appointments: number; plans: number; invoices: number; documents: number }
 >();
+let openCustomerId = '';
 
 async function openCustomer(customerId: string): Promise<void> {  const data = await api<Record<string, unknown>>(`/api/admin/customers?id=${encodeURIComponent(customerId)}`);
+  openCustomerId = customerId;
   const detail = document.querySelector<HTMLElement>('[data-admin-customer-detail]');
   if (!detail) return;
   const customer = (data.customer ?? {}) as Record<string, unknown>;
@@ -2129,6 +2131,7 @@ async function openCustomer(customerId: string): Promise<void> {  const data = a
   const recurringPlans = (data.recurringPlans as Array<Record<string, unknown>>) ?? [];
   const quickEstimates = (data.quickEstimates as Array<Record<string, unknown>>) ?? [];
   const gifts = (data.gifts as Array<Record<string, unknown>>) ?? [];
+  const reviewState = (data.reviewState as Record<string, unknown> | null) ?? null;
   const documentRequests = (data.signingRequests as Array<Record<string, unknown>> | undefined)?.length
     ? (data.signingRequests as Array<Record<string, unknown>>)
     : await api<{ requests?: Array<Record<string, unknown>> }>(
@@ -2161,14 +2164,45 @@ async function openCustomer(customerId: string): Promise<void> {  const data = a
       ['prepared', 'sent', 'viewed', 'partially_signed'].includes(String(request.status ?? '')),
     ).length,
   });
+  const reviewStatusLabels: Record<string, string> = {
+    never_invited: 'Never invited',
+    queued: 'Invitation queued',
+    sent: 'Invitation sent',
+    failed: 'Delivery failed',
+    unknown: 'Review status unknown',
+    reviewed: 'Confirmed reviewed',
+    do_not_ask: 'Do not ask again',
+    opted_out: 'Customer opted out',
+  };
+  const reviewStatus = String(reviewState?.status ?? 'never_invited');
+  const reviewLabel = reviewStatusLabels[reviewStatus] ?? 'Never invited';
+  const reviewInvitations = Number(reviewState?.invitation_count ?? 0);
+  const reviewCard = `<div class="admin-card" style="margin-top:1rem;">
+    <div class="admin-detail-head"><div><h3 style="margin:0;">Review relationship</h3><p class="admin-muted" style="margin:.25rem 0 0;">Tracked per customer so repeat cleanings do not generate repetitive review requests.</p></div><span class="admin-status">${esc(reviewLabel)}</span></div>
+    <dl class="admin-definition"><dt>Invitations sent</dt><dd>${esc(String(reviewInvitations))}</dd><dt>Last invited</dt><dd>${esc(reviewState?.last_invited_at ? dateTime(reviewState.last_invited_at) : '—')}</dd><dt>Marked reviewed</dt><dd>${esc(reviewState?.marked_reviewed_at ? dateTime(reviewState.marked_reviewed_at) : '—')}</dd></dl>
+    <div class="admin-actions"><button class="btn btn--secondary btn--small" type="button" data-customer-quick="reviews">Manage review status</button></div>
+  </div>`;
+  const quickActions = anonymized
+    ? ''
+    : `<div class="admin-actions" style="flex-wrap:wrap;margin:.6rem 0 1rem;" data-customer-quick-actions>
+        <button class="btn btn--secondary btn--small" type="button" data-customer-quick="booking">New Booking</button>
+        <button class="btn btn--ghost btn--small" type="button" data-customer-quick="completed">Record Completed Cleaning</button>
+        <button class="btn btn--ghost btn--small" type="button" data-customer-quick="estimate">New Estimate</button>
+        <button class="btn btn--ghost btn--small" type="button" data-customer-quick="invoice">Create Invoice</button>
+        <button class="btn btn--ghost btn--small" type="button" data-customer-quick="agreement">Send Agreement</button>
+        ${email ? `<a class="btn btn--ghost btn--small" href="mailto:${esc(email)}">Email Customer</a>` : ''}
+        ${phone ? `<a class="btn btn--ghost btn--small" href="tel:${esc(String(phone).replace(/[^0-9+]/g, ''))}">Call Customer</a>` : ''}
+      </div>`;
   detail.hidden = false;
   detail.innerHTML = `<div class="admin-card">
     <div class="admin-detail-head"><h2 class="admin-section-title">${esc(anonymized ? 'Anonymized customer record' : [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.company_name || 'Customer')}</h2><div class="admin-actions">${anonymized ? '' : `<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-edit">Edit Customer</button><form class="admin-inline-form" data-form="customer-archive"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="targetStatus" value="${customer.status === 'archived' ? 'active' : 'archived'}" /><button class="btn btn--ghost btn--small" type="submit">${customer.status === 'archived' ? 'Restore Archived Customer' : 'Archive Customer'}</button></form>`}${actor?.role === 'owner' && !anonymized ? `<form class="admin-inline-form" data-form="customer-delete"><input type="hidden" name="customerId" value="${esc(customerId)}" /><button class="btn btn--danger btn--small" type="submit">Delete Customer</button></form>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-create">Close</button></div></div>
+    ${quickActions}
     <dl class="admin-definition"><dt>Status</dt><dd>${esc(anonymized ? 'Deleted and anonymized' : customer.status)}</dd>${customer.archived_at ? `<dt>Archived / deleted</dt><dd>${esc(dateTime(customer.archived_at))}</dd>` : ''}<dt>Branch</dt><dd>${esc(customer.branch_name)}</dd><dt>Source</dt><dd>${esc(customer.source)}</dd><dt>Contacts</dt><dd>${anonymized ? 'Removed for privacy' : contacts.map((contact) => `${esc(titleCase(contact.kind))}: ${esc(contact.value)}`).join('<br />') || '—'}</dd></dl>
     <h3>Properties</h3>
     ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}${Number(property.is_primary) === 1 ? ' · Primary' : ''}</strong>${propertyProfileSummary(property)}<details class="admin-detail-toggle"><summary>Edit property</summary><form class="admin-form" style="max-width:none" data-form="property-update"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="propertyId" value="${esc(property.id)}" />${propertyFields(property)}<label>Status <select name="status"><option value="active"${property.status !== 'archived' ? ' selected' : ''}>Active</option><option value="archived"${property.status === 'archived' ? ' selected' : ''}>Archived</option></select></label><button class="btn btn--secondary btn--small" type="submit">Save property</button></form></details></div>`).join('') || '<p class="admin-muted">No properties.</p>'}
     <details class="admin-detail-toggle"><summary>Add a property</summary><form class="admin-form" style="max-width:none" data-form="property-add"><input type="hidden" name="customerId" value="${esc(customerId)}" />${propertyFields({})}<button class="btn btn--secondary btn--small" type="submit">Add property</button></form></details>
     ${benefitsHtml}
+    ${anonymized ? '' : reviewCard}
     <h3>History</h3><div class="admin-history">${leads.length ? `<p><strong>Requests:</strong> ${leads.map((lead) => `${esc(lead.request_type)} (${esc(lead.status)})`).join(', ')}</p>` : ''}${estimates.length ? `<p><strong>Estimates:</strong> ${estimates.map((estimate) => `${esc(estimate.quote_reference)} (${money(estimate.total_cents)})`).join(', ')}</p>` : ''}${appointments.length ? `<p><strong>Appointments:</strong> ${appointments.map((appointment) => `${esc(appointment.reference)} (${esc(appointment.status)})`).join(', ')}</p>` : ''}${recurringPlans.length ? `<p><strong>Recurring plans:</strong> ${recurringPlans.map((plan) => `${esc(titleCase(plan.frequency))} (${esc(plan.status)})`).join(', ')}</p>` : ''}${invoices.length ? `<p><strong>Invoices:</strong> ${invoices.map((invoice) => `${esc(invoice.number)} (${money(invoice.balance_cents)} balance)`).join(', ')}</p>` : ''}</div>
     <h3>Quick Estimates</h3>${quickEstimates.length ? quickEstimates.map((estimate) => `<div class="admin-record"><p><strong>${esc(titleCase(estimate.engine))}</strong> · ${money(estimate.total_cents)} · ${esc(titleCase(estimate.status))}</p><p class="admin-muted">${esc(estimate.address_text || 'Address not recorded')} · ${esc(dateTime(estimate.created_at))}${estimate.converted_request_id ? ` · Converted to ${esc(estimate.converted_request_id)}` : ''}</p></div>`).join('') : '<p class="admin-muted">No Quick Estimates recorded.</p>'}
     <h3>Gift certificates</h3>${gifts.length ? gifts.map((gift) => `<div class="admin-record"><p><strong>${esc(gift.code)}</strong> · ${esc(titleCase(gift.status))} · ${money(gift.balance_cents)} remaining</p><p class="admin-muted">${esc(titleCase(gift.role))} · ${money(gift.value_cents)} original value · ${esc(dateTime(gift.created_at))}</p></div>`).join('') : '<p class="admin-muted">No gift certificates for this customer.</p>'}
@@ -2192,6 +2226,91 @@ async function openCustomer(customerId: string): Promise<void> {  const data = a
     detail.insertAdjacentHTML('beforeend', `<div class="admin-card" style="margin-top:1rem;"><h3>Signed payment authorizations</h3>${rows}</div>`);
   }
 }
+
+async function ensureCustomerSelectOption(
+  select: HTMLSelectElement,
+  customerId: string,
+): Promise<void> {
+  if ([...select.options].some((option) => option.value === customerId)) return;
+  const data = await api<Record<string, unknown>>(`/api/admin/customers?id=${encodeURIComponent(customerId)}`);
+  const customer = (data.customer ?? {}) as Record<string, unknown>;
+  const name =
+    [customer.first_name, customer.last_name].filter(Boolean).join(' ') ||
+    String(customer.company_name ?? '') ||
+    'Selected customer';
+  select.insertAdjacentHTML('beforeend', `<option value="${esc(customerId)}">${esc(name)}</option>`);
+}
+
+async function runCustomerQuickAction(customerId: string, action: string): Promise<void> {
+  if (!customerId) return;
+  if (action === 'booking' || action === 'completed') {
+    await loadView('new-booking');
+    const select = manualField<HTMLSelectElement>('customerId');
+    if (!select) return;
+    await ensureCustomerSelectOption(select, customerId);
+    select.value = customerId;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    if (action === 'completed') {
+      const type = manualField<HTMLSelectElement>('appointmentType');
+      if (type) {
+        type.value = 'completed';
+        type.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    manualForm()?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (action === 'estimate') {
+    await loadView('quick-estimate');
+    const select = quickField<HTMLSelectElement>('customerId');
+    if (!select) return;
+    await ensureCustomerSelectOption(select, customerId);
+    select.value = customerId;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    quickForm()?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (action === 'invoice') {
+    await loadView('finance');
+    const select = document.querySelector<HTMLSelectElement>(
+      '[data-admin-invoice-create] select[name="customerId"]',
+    );
+    if (!select) return;
+    await ensureCustomerSelectOption(select, customerId);
+    select.value = customerId;
+    document.querySelector<HTMLElement>('[data-admin-invoice-create]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (action === 'agreement') {
+    await loadView('documents');
+    showDocumentTab('send');
+    const detail = await api<Record<string, unknown>>(`/api/admin/customers?id=${encodeURIComponent(customerId)}`);
+    applyCustomerToComposer(detail);
+    document.querySelector<HTMLElement>('[data-document-send]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (action === 'reviews') {
+    await loadView('reviews');
+    const data = await api<Record<string, unknown>>(`/api/admin/customers?id=${encodeURIComponent(customerId)}`);
+    const customer = (data.customer ?? {}) as Record<string, unknown>;
+    const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ');
+    const search = document.querySelector<HTMLInputElement>('[data-review-search]');
+    if (search && name) {
+      search.value = name;
+      await loadReviewEligible();
+    }
+    document.querySelector<HTMLElement>('[data-review-eligible-list]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLElement>('[data-customer-quick]');
+  if (!button) return;
+  event.preventDefault();
+  void runCustomerQuickAction(openCustomerId, button.dataset.customerQuick ?? '').catch((error) =>
+    setAppError(friendly(error)),
+  );
+});
 
 async function previewCustomerBenefit(customerId: string, code: string): Promise<void> {
   const target = document.querySelector<HTMLElement>('[data-customer-benefit-preview]');
@@ -4619,9 +4738,23 @@ function reviewServiceLabel(row: Record<string, unknown>): string {
 }
 
 function reviewInvitationStatus(row: Record<string, unknown>): { label: string; key: string } {
-  const status = String(row.latest_status ?? '');
-  if (!status) return { label: 'Not invited', key: 'not_invited' };
-  return { label: titleCase(status.replaceAll('_', ' ')), key: status };
+  const state = String(row.customer_review_status ?? 'never_invited');
+  const count = Number(row.customer_review_invitation_count ?? 0);
+  const latest = String(row.latest_status ?? '');
+  if (state === 'reviewed') return { label: 'Confirmed reviewed', key: 'reviewed' };
+  if (state === 'do_not_ask') return { label: 'Do not ask again', key: 'do_not_ask' };
+  if (state === 'opted_out') return { label: 'Customer opted out', key: 'opted_out' };
+  if (latest === 'queued' || state === 'queued') return { label: 'Invitation queued', key: 'queued' };
+  if (latest === 'sent' || state === 'sent' || count > 0) return { label: 'Invitation sent', key: 'sent' };
+  if (latest === 'failed' || state === 'failed') return { label: 'Delivery failed', key: 'failed' };
+  if (state === 'unknown') return { label: 'Review status unknown', key: 'unknown' };
+  return { label: 'Never invited', key: 'never_invited' };
+}
+
+function reviewStateSelect(row: Record<string, unknown>): string {
+  const customerId = String(row.customer_id ?? '');
+  if (!customerId) return '';
+  return `<select class="admin-select" data-review-state-select="${esc(customerId)}" aria-label="Customer review status"><option value="">Review relationship…</option><option value="mark_reviewed">Mark as reviewed</option><option value="do_not_ask">Do not ask again</option><option value="opt_out">Customer opted out</option><option value="mark_unknown">Review status unknown</option><option value="mark_eligible">Mark eligible again</option></select><button class="btn btn--ghost btn--small" type="button" data-review-state-apply="${esc(customerId)}">Apply</button>`;
 }
 
 function renderReviewEligible(): void {
@@ -4630,15 +4763,15 @@ function renderReviewEligible(): void {
   const filter = document.querySelector<HTMLSelectElement>('[data-review-eligible-filter]')?.value ?? '';
   const rows = reviewEligibleRows.filter((row) => {
     const status = reviewInvitationStatus(row).key;
-    if (filter === 'not_invited') return status === 'not_invited';
-    if (filter && filter !== 'not_invited') return status === filter;
+    if (filter === 'not_invited') return status === 'never_invited';
+    if (filter) return status === filter;
     return true;
   });
   if (rows.length === 0) {
     renderEmpty(target, 'No completed cleanings match this search and invitation filter.');
     return;
   }
-  target.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Customer</th><th>Service</th><th>Completed</th><th>Property</th><th>Branch</th><th>Invitation</th><th>Last invited</th><th>Action</th></tr></thead><tbody>${rows
+  target.innerHTML = `<p class="admin-muted" style="margin:0 0 .5rem;">Review eligibility is tracked per customer. A customer already invited, reviewed or opted out is not asked again automatically. Marking a review manually records the owner's confirmation; it never claims that Google verified the review.</p><div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Customer</th><th>Service</th><th>Completed</th><th>Property</th><th>Branch</th><th>Review relationship</th><th>Invitation</th><th>Last invited</th><th>Actions</th></tr></thead><tbody>${rows
     .map((row) => {
       const customer = [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Customer';
       const property = [row.line1, row.city].filter(Boolean).join(', ') || 'Property not linked';
@@ -4646,17 +4779,20 @@ function renderReviewEligible(): void {
       const hasReviewUrl = Boolean(String(row.review_url ?? '').trim());
       const hasEmail = Boolean(String(row.customer_email ?? '').trim());
       const enabled = Number(row.review_requests_enabled ?? 0) === 1;
-      const canQueue = !row.latest_status && hasReviewUrl && hasEmail;
+      const suppressing = ['reviewed', 'do_not_ask', 'opted_out'].includes(status.key);
+      const canQueue = status.key === 'never_invited' && !suppressing && hasReviewUrl && hasEmail;
       const action = canQueue
         ? `<button class="btn btn--primary btn--small" type="button" data-review-send-id="${esc(String(row.id))}">Send Review Invitation</button>${enabled ? '' : '<p class="admin-muted" style="margin:.25rem 0 0;">Automation is off; this sends only after your confirmation.</p>'}`
-        : status.key === 'sent'
-          ? '<span class="admin-muted">Already invited</span>'
-          : !hasReviewUrl
-            ? '<span class="admin-muted">Review link not configured</span>'
-            : !hasEmail
-              ? '<span class="admin-muted">No customer email on file</span>'
-              : status.label;
-      return `<tr><td>${esc(customer)}</td><td>${esc(reviewServiceLabel(row))}</td><td>${esc(dateTime(row.start_at, row.branch_id))}</td><td>${esc(property)}</td><td>${esc(row.branch_name || row.branch_id)}</td><td><span class="admin-status">${esc(status.label)}</span></td><td>${esc(row.latest_sent_at ? dateTime(row.latest_sent_at) : '—')}</td><td><div class="admin-actions">${action}${hasReviewUrl ? ` <button class="btn btn--ghost btn--small" type="button" data-review-preview-id="${esc(String(row.id))}">Preview</button>` : ''}</div></td></tr>`;
+        : status.key === 'failed'
+          ? '<span class="admin-muted">Retry from the invitation list below</span>'
+          : status.key === 'queued'
+            ? '<span class="admin-muted">Queued — send when due</span>'
+            : !hasReviewUrl
+              ? '<span class="admin-muted">Review link not configured</span>'
+              : !hasEmail
+                ? '<span class="admin-muted">No customer email on file</span>'
+                : `<span class="admin-muted">${esc(status.label)}</span>`;
+      return `<tr><td>${esc(customer)}</td><td>${esc(reviewServiceLabel(row))}</td><td>${esc(dateTime(row.start_at, row.branch_id))}</td><td>${esc(property)}</td><td>${esc(row.branch_name || row.branch_id)}</td><td><span class="admin-status">${esc(status.label)}</span></td><td>${esc(status.key === 'never_invited' ? 'Eligible after completion' : status.label)}</td><td>${esc(row.latest_sent_at ? dateTime(row.latest_sent_at) : '—')}</td><td><div class="admin-actions">${action}${hasReviewUrl ? ` <button class="btn btn--ghost btn--small" type="button" data-review-preview-id="${esc(String(row.id))}">Preview</button>` : ''}<div class="admin-actions" style="margin-top:.35rem;flex-wrap:wrap;">${reviewStateSelect(row)}</div></div></td></tr>`;
     })
     .join('')}</tbody></table></div>`;
 }
@@ -4683,7 +4819,7 @@ async function loadReviews(): Promise<void> {
         .map((request) => {
           const customer = [request.first_name, request.last_name].filter(Boolean).join(' ') || 'Customer';
           const property = [request.line1, request.city].filter(Boolean).join(', ') || 'Property not linked';
-          return `<tr><td>${esc(customer)}</td><td>${esc(request.appointment_start ? dateTime(request.appointment_start) : '—')}</td><td>${esc(property)}</td><td>${esc(request.branch_name || request.branch_id)}</td><td><span class="admin-status">${esc(titleCase(request.status))}</span></td><td>${esc(request.scheduled_at ? dateTime(request.scheduled_at) : '')}</td><td>${esc(request.sent_at ? dateTime(request.sent_at) : '')}</td><td>${esc(request.suppressed_reason || request.error_detail || '')}</td><td>${String(request.status) === 'queued' ? `<button class="btn btn--primary btn--small" type="button" data-review-action="send" data-id="${esc(request.id)}">Send now</button> ` : ''}${['queued', 'failed'].includes(String(request.status)) ? `<button class="btn btn--ghost btn--small" type="button" data-review-action="cancel" data-id="${esc(request.id)}">Cancel</button>` : ''}</td></tr>`;
+          return `<tr><td>${esc(customer)}</td><td>${esc(request.appointment_start ? dateTime(request.appointment_start) : '—')}</td><td>${esc(property)}</td><td>${esc(request.branch_name || request.branch_id)}</td><td><span class="admin-status">${esc(titleCase(request.status))}</span></td><td>${esc(request.scheduled_at ? dateTime(request.scheduled_at) : '')}</td><td>${esc(request.sent_at ? dateTime(request.sent_at) : '')}</td><td>${esc(request.suppressed_reason || request.error_detail || '')}</td><td>${String(request.status) === 'queued' ? `<button class="btn btn--primary btn--small" type="button" data-review-action="send" data-id="${esc(request.id)}">Send now</button> ` : ''}${String(request.status) === 'failed' ? `<button class="btn btn--secondary btn--small" type="button" data-review-action="retry" data-id="${esc(request.id)}">Retry delivery</button> ` : ''}${['queued', 'failed'].includes(String(request.status)) ? `<button class="btn btn--ghost btn--small" type="button" data-review-action="cancel" data-id="${esc(request.id)}">Cancel</button>` : ''}</td></tr>`;
         })
         .join('')}</tbody></table></div>`
     : '<p class="admin-muted">No review requests match this filter.</p>';
@@ -5598,16 +5734,41 @@ async function loadSettings(): Promise<void> {
   renderPager(document.querySelector<HTMLElement>('[data-admin-audit-pagination]'), audit, 'audit-page');
 }
 
+interface DocumentLibraryFamily {
+  familyKey: string;
+  title: string;
+  category: string;
+  approvedTemplateId: string | null;
+  approvedVersionLabel: string | null;
+  approvedSourceKind: string;
+  approvedAt: string | null;
+  legalReviewStatus: string;
+  draftTemplateId: string | null;
+  draftVersionLabel: string | null;
+  draftUpdatedAt: string | null;
+  draftCount: number;
+  retiredCount: number;
+  versionCount: number;
+  packetCount: number;
+  activePacketCount: number;
+  packetNames: string[];
+  archivedAt: string | null;
+  state: 'active' | 'draft_only' | 'no_approved' | 'archived';
+}
+
 async function loadDocuments(): Promise<void> {
-  const [templateData, bundleData, requestData, reminderData] = await Promise.all([
-    api<{ templates?: Array<Record<string, unknown>> }>('/api/admin/documents?view=templates'),
+  const [libraryData, bundleData, requestData, reminderData] = await Promise.all([
+    api<{ library?: { families?: DocumentLibraryFamily[]; drafts?: Array<Record<string, unknown>>; totals?: Record<string, number> } }>(
+      '/api/admin/documents?view=library',
+    ),
     api<{ bundles?: Array<Record<string, unknown>> }>('/api/admin/documents?view=bundles'),
     api<{ requests?: Array<Record<string, unknown>> }>('/api/admin/documents?view=requests'),
     actor?.role === 'owner'
       ? api<{ settings?: { enabled?: boolean; firstHours?: number; secondHours?: number } }>('/api/admin/documents?view=reminder-settings')
       : Promise.resolve({ settings: undefined }),
   ]);
-  const templates = templateData.templates ?? [];
+  const families = libraryData.library?.families ?? [];
+  const drafts = libraryData.library?.drafts ?? [];
   const bundles = bundleData.bundles ?? [];
   const requests = requestData.requests ?? [];
   const reminderForm = document.querySelector<HTMLFormElement>('[data-document-reminders]');
@@ -5621,27 +5782,127 @@ async function loadDocuments(): Promise<void> {
   }
   const templateTarget = document.querySelector<HTMLElement>('[data-admin-documents-templates]');
   if (templateTarget) {
-    renderTable(templateTarget, ['Title', 'Category', 'Version', 'Legal review', 'Status', 'Actions'], templates.map((template) => {
-      const owner = actor?.role === 'owner';
-      const actions = [
-        template.status === 'draft' && owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-edit" data-id="${esc(template.id)}">Edit</button>` : '',
-        template.status === 'approved' && owner && template.source_kind === 'text' ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-revise" data-id="${esc(template.id)}">Edit &amp; revise</button>` : '',
-        template.status === 'draft' && owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-approve" data-id="${esc(template.id)}">Approve</button>` : '',
-        owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-duplicate" data-id="${esc(template.id)}">Duplicate</button>` : '',
-        `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=template-download&id=${encodeURIComponent(String(template.id))}">Download</a>`,
-        `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-history" data-id="${esc(template.id)}">History</button>`,
-        template.status === 'retired' && owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-restore" data-id="${esc(template.id)}">Restore</button>` : '',
-        template.status !== 'retired' && owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-retire" data-id="${esc(template.id)}">Retire</button>` : '',
-      ].filter(Boolean).join('');
-      return [
-        esc(template.title),
-        esc(template.category),
-        esc(template.version_label ?? template.version),
-        esc(titleCase(template.legal_review_status ?? 'not_reviewed')),
-        `<span class="admin-status">${esc(titleCase(template.status))}</span>`,
-        `<div class="admin-actions">${actions}</div>`,
-      ];
-    }), 'No document templates are configured yet.');
+    const owner = actor?.role === 'owner';
+    const activeFamilies = families.filter((family) => family.state === 'active');
+    const draftOnlyFamilies = families.filter((family) => family.state === 'draft_only');
+    const archivedFamilies = families.filter((family) => family.state === 'archived');
+    const draftRows = drafts;
+    templateTarget.innerHTML = `
+      <div class="admin-actions" role="tablist" aria-label="Document library sections" style="margin:0 0 .6rem;">
+        <button class="btn btn--secondary btn--small" type="button" role="tab" data-document-library-tab="active" aria-current="page">Current documents (${activeFamilies.length + draftOnlyFamilies.length})</button>
+        <button class="btn btn--ghost btn--small" type="button" role="tab" data-document-library-tab="drafts">Drafts (${draftRows.length})</button>
+        <button class="btn btn--ghost btn--small" type="button" role="tab" data-document-library-tab="archive">History &amp; archive (${archivedFamilies.length})</button>
+      </div>
+      <p class="admin-muted">One entry per document family shows the current approved version. Draft revisions and retired versions are kept out of the normal document selectors.</p>
+      <section data-document-library-panel="active">
+        <div data-document-library-active></div>
+        ${draftOnlyFamilies.length ? `<h3 style="font-size:.95rem;margin:1.2rem 0 .5rem;">Awaiting first approval</h3><p class="admin-muted" style="margin:0 0 .5rem;">These documents cannot be sent or satisfy a requirement until an owner approves them.</p><div data-document-library-pending></div>` : ''}
+      </section>
+      <section data-document-library-panel="drafts" hidden>
+        <h3 style="font-size:.95rem;margin:.3rem 0 .5rem;">Draft revisions</h3>
+        <p class="admin-muted" style="margin:0 0 .5rem;">Editing an approved document creates a draft here. The published version stays live until Approve &amp; Publish moves packets to the new version.</p>
+        <div data-document-library-drafts></div>
+      </section>
+      <section data-document-library-panel="archive" hidden>
+        <h3 style="font-size:.95rem;margin:.3rem 0 .5rem;">History and archive</h3>
+        <p class="admin-muted" style="margin:0 0 .5rem;">Retired versions and archived document families remain available for audit and executed-copy evidence. Archived families are hidden from the normal library and from packet selectors.</p>
+        <div data-document-family-history></div>
+        <div data-document-library-archive></div>
+      </section>`;
+    const activeTarget = templateTarget.querySelector<HTMLElement>('[data-document-library-active]');
+    if (activeTarget) {
+      renderTable(
+        activeTarget,
+        ['Document', 'Category', 'Current version', 'Approved', 'Working draft', 'Used in packets', 'Actions'],
+        activeFamilies.map((family) => {
+          const actions = [
+            owner && family.approvedTemplateId && family.approvedSourceKind === 'text'
+              ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-revise" data-id="${esc(family.approvedTemplateId)}">Edit &amp; revise</button>`
+              : '',
+            family.approvedTemplateId
+              ? `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=template-download&id=${encodeURIComponent(String(family.approvedTemplateId))}">Download</a>`
+              : '',
+            `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-family-history" data-family="${esc(family.familyKey)}">History</button>`,
+            owner
+              ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-family-archive" data-family="${esc(family.familyKey)}"${family.activePacketCount > 0 ? ' disabled title="Remove this document from active packets before archiving it."' : ''}>Archive</button>`
+              : '',
+          ].filter(Boolean).join('');
+          return [
+            esc(family.title),
+            esc(titleCase(family.category)),
+            esc(family.approvedVersionLabel ?? '—'),
+            esc(family.approvedAt ? dateTime(family.approvedAt) : '—'),
+            family.draftCount > 0
+              ? `<span class="admin-status">${esc(family.draftVersionLabel ?? 'Draft')} pending review</span>`
+              : '<span class="admin-muted">None</span>',
+            family.packetCount > 0
+              ? esc(`${family.packetNames.join(', ')}${family.activePacketCount ? '' : ' (archived packet)'}`)
+              : '<span class="admin-muted">Not in a packet</span>',
+            `<div class="admin-actions">${actions}</div>`,
+          ];
+        }),
+        'No approved documents are in the active library yet.',
+      );
+    }
+    const pendingTarget = templateTarget.querySelector<HTMLElement>('[data-document-library-pending]');
+    if (pendingTarget) {
+      renderTable(
+        pendingTarget,
+        ['Document', 'Category', 'Draft', 'Last edited', 'Actions'],
+        draftOnlyFamilies.map((family) => [
+          esc(family.title),
+          esc(titleCase(family.category)),
+          esc(family.draftVersionLabel ?? 'Draft'),
+          esc(dateTime(family.draftUpdatedAt ?? family.approvedAt ?? '')),
+          `<div class="admin-actions">${family.draftTemplateId ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-edit" data-id="${esc(family.draftTemplateId)}">Open draft</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-approve" data-id="${esc(family.draftTemplateId)}">Approve</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-family-history" data-family="${esc(family.familyKey)}">History</button></div>`,
+        ]),
+        'No documents are awaiting approval.',
+      );
+    }
+    const draftsTarget = templateTarget.querySelector<HTMLElement>('[data-document-library-drafts]');
+    if (draftsTarget) {
+      renderTable(
+        draftsTarget,
+        ['Document', 'Draft version', 'Based on', 'Last edited', 'Legal review', 'Actions'],
+        draftRows.map((draft) => {
+          const revision = Boolean(draft.supersedes_template_id);
+          const actions = [
+            `<button class="btn btn--secondary btn--small" type="button" data-admin-action="document-edit" data-id="${esc(draft.id)}">${revision ? 'Review &amp; publish' : 'Open draft'}</button>`,
+            !revision ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-approve" data-id="${esc(draft.id)}">Approve</button>` : '',
+            owner ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-delete-draft" data-id="${esc(draft.id)}">Delete draft</button>` : '',
+          ].filter(Boolean).join('');
+          return [
+            esc(draft.title),
+            esc(draft.version_label ?? draft.version),
+            esc(draft.supersedes_version_label ?? 'First approved version'),
+            esc(dateTime(draft.updated_at ?? draft.created_at ?? '')),
+            esc(titleCase(draft.legal_review_status ?? 'not_reviewed')),
+            `<div class="admin-actions">${actions}</div>`,
+          ];
+        }),
+        'No draft revisions. Editing an approved document creates a draft here.',
+      );
+    }
+    const archiveTarget = templateTarget.querySelector<HTMLElement>('[data-document-library-archive]');
+    if (archiveTarget) {
+      renderTable(
+        archiveTarget,
+        ['Document', 'Current approved', 'Versions', 'Retired', 'Library state', 'Actions'],
+        families
+          .filter((family) => family.state === 'archived' || family.retiredCount > 0)
+          .map((family) => [
+            esc(family.title),
+            esc(family.approvedVersionLabel ?? 'None'),
+            esc(String(family.versionCount)),
+            esc(String(family.retiredCount)),
+            family.state === 'archived'
+              ? `<span class="admin-status">Archived ${esc(family.archivedAt ? dateTime(family.archivedAt) : '')}</span>`
+              : '<span class="admin-muted">In library</span>',
+            `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-family-history" data-family="${esc(family.familyKey)}">Versions</button>${owner && family.state === 'archived' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-family-restore" data-family="${esc(family.familyKey)}">Restore family</button>` : ''}${owner && family.state !== 'archived' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-family-archive" data-family="${esc(family.familyKey)}"${family.activePacketCount > 0 ? ' disabled title="Remove this document from active packets before archiving it."' : ''}>Archive</button>` : ''}</div>`,
+          ]),
+        'No retired versions or archived families.',
+      );
+    }
   }
   const bundleTarget = document.querySelector<HTMLElement>('[data-admin-documents-bundles]');
   if (bundleTarget) {
@@ -5693,7 +5954,7 @@ async function loadDocuments(): Promise<void> {
     renderDocumentRequests();
   }
   for (const select of document.querySelectorAll<HTMLSelectElement>('[data-document-template-options]')) {
-    select.innerHTML = `<option value="">Choose a template</option>${templates.filter((template) => template.status === 'approved').map((template) => `<option value="${esc(template.id)}">${esc(template.title)} (${esc(template.version_label ?? template.version)})</option>`).join('')}`;
+    select.innerHTML = `<option value="">Choose a template</option>${families.filter((family) => family.state === 'active' && family.approvedTemplateId).map((family) => `<option value="${esc(family.approvedTemplateId)}">${esc(family.title)} (${esc(family.approvedVersionLabel ?? '')})</option>`).join('')}`;
   }
   for (const select of document.querySelectorAll<HTMLSelectElement>('[data-document-bundle-options]')) {
     select.innerHTML = `<option value="">Choose a packet</option>${bundles.map((bundle) => {
@@ -5710,7 +5971,7 @@ async function loadDocuments(): Promise<void> {
     );
     select.innerHTML = `<option value="">Automatic (service rules)</option>${readyBundles.map((bundle) => `<option value="${esc(bundle.id)}">${esc(bundle.name)} (${esc(bundle.code)})</option>`).join('')}`;
   }
-  (window as unknown as { __ssDocuments?: Array<Record<string, unknown>> }).__ssDocuments = templates;
+  (window as unknown as { __ssDocuments?: Array<Record<string, unknown>> }).__ssDocuments = families as unknown as Array<Record<string, unknown>>;
   (window as unknown as { __ssPackets?: Array<Record<string, unknown>> }).__ssPackets = bundles;
   setupDocumentComposer();
   renderDocumentOverview(requests, bundles);
@@ -5739,6 +6000,81 @@ document.addEventListener('click', (event) => {
   const view = document.querySelector<HTMLElement>('[data-admin-view="documents"]');
   view?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
+
+function showDocumentLibraryTab(name: string): void {
+  const target = ['active', 'drafts', 'archive'].includes(name) ? name : 'active';
+  for (const button of document.querySelectorAll<HTMLElement>('[data-document-library-tab]')) {
+    const selected = button.dataset.documentLibraryTab === target;
+    if (selected) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+    button.classList.toggle('btn--secondary', selected);
+    button.classList.toggle('btn--ghost', !selected);
+  }
+  for (const panel of document.querySelectorAll<HTMLElement>('[data-document-library-panel]')) {
+    panel.hidden = panel.dataset.documentLibraryPanel !== target;
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const tab = (event.target as HTMLElement).closest<HTMLElement>('[data-document-library-tab]');
+  if (!tab) return;
+  event.preventDefault();
+  showDocumentLibraryTab(tab.dataset.documentLibraryTab ?? 'active');
+});
+
+async function showFamilyHistory(familyKey: string): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-document-family-history]');
+  if (!target || !familyKey) return;
+  showDocumentLibraryTab('archive');
+  target.innerHTML = '<p class="admin-muted">Loading version history…</p>';
+  const data = await api<{
+    history?: {
+      familyKey?: string;
+      archivedAt?: string | null;
+      templates?: Array<Record<string, unknown>>;
+      audit?: Array<Record<string, unknown>>;
+      executedRequests?: number;
+    };
+  }>(`/api/admin/documents?view=family-history&familyKey=${encodeURIComponent(familyKey)}`);
+  const history = data.history ?? {};
+  const versions = history.templates ?? [];
+  const audit = history.audit ?? [];
+  const title = String(versions[versions.length - 1]?.title ?? 'Document');
+  const rows = versions
+    .map((version) => {
+      const status = String(version.status ?? 'draft');
+      const actions = [
+        `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=template-download&id=${encodeURIComponent(String(version.id))}">Download</a>`,
+        status === 'retired' && actor?.role === 'owner'
+          ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-restore" data-id="${esc(version.id)}">Restore as draft</button>`
+          : '',
+      ].filter(Boolean).join('');
+      return `<tr>
+        <td>${esc(version.version_label ?? version.version)}</td>
+        <td><span class="admin-status">${esc(titleCase(status))}</span></td>
+        <td>${esc(dateTime(version.created_at))}</td>
+        <td>${esc(version.approved_at ? dateTime(version.approved_at) : '—')}</td>
+        <td>${esc(String(version.signature_count ?? 0))}${version.last_signed_at ? `<span class="admin-muted"> · last ${esc(dateTime(version.last_signed_at))}</span>` : ''}</td>
+        <td>${esc(((version.packet_names as string[] | undefined) ?? []).join(', ') || 'Not in a packet')}</td>
+        <td><div class="admin-actions">${actions}</div></td>
+      </tr>`;
+    })
+    .join('');
+  target.innerHTML = `<div class="admin-card" style="margin-bottom:1rem;">
+    <div class="admin-detail-head">
+      <div>
+        <h3 style="margin:0;font-size:1rem;">${esc(title)} — version history</h3>
+        <p class="admin-muted" style="margin:.25rem 0 0;">${esc(String(versions.length))} version(s) · ${esc(String(history.executedRequests ?? 0))} signing request(s) reference this family · ${history.archivedAt ? `archived ${esc(dateTime(history.archivedAt))}` : 'in the active library'}.</p>
+      </div>
+      <button class="btn btn--ghost btn--small" type="button" data-admin-action="document-family-history-close">Close</button>
+    </div>
+    <div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Version</th><th>Status</th><th>Created</th><th>Approved</th><th>Signatures</th><th>Packets</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <details class="admin-detail-toggle" style="margin-top:.75rem;"><summary>Audit trail (${audit.length})</summary>
+      ${audit.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>When</th><th>Action</th><th>Result</th></tr></thead><tbody>${audit.map((entry) => `<tr><td>${esc(dateTime(entry.created_at))}</td><td>${esc(titleCase(String(entry.action ?? '').replace(/^documents\\./, '').replace(/_/g, ' ')))}</td><td>${Number(entry.success) ? 'Recorded' : 'Failed'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No audit events recorded for this family.</p>'}
+    </details>
+  </div>`;
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 function renderDocumentRequests(): void {
   const target = document.querySelector<HTMLElement>('[data-admin-documents-requests]');
@@ -7324,6 +7660,50 @@ document.querySelector<HTMLElement>('[data-admin-review-list]')?.addEventListene
         .catch((error) => setAppError(friendly(error)));
     });
   }
+  if (action === 'retry') {
+    void api('/api/admin/reviews', { method: 'POST', body: JSON.stringify({ action: 'retry', id }) })
+      .then(() => {
+        setReviewStatus('Review invitation returned to the queue. Use Send now to retry delivery.');
+        return loadReviews();
+      })
+      .catch((error) => setAppError(friendly(error)));
+  }
+});
+
+document.querySelector<HTMLElement>('[data-review-eligible-list]')?.addEventListener('click', (event) => {
+  const apply = (event.target as HTMLElement).closest<HTMLElement>('[data-review-state-apply]');
+  if (!apply) return;
+  const customerId = apply.dataset.reviewStateApply ?? '';
+  const select = document.querySelector<HTMLSelectElement>(`[data-review-state-select="${CSS.escape(customerId)}"]`);
+  const action = select?.value ?? '';
+  if (!customerId || !action) {
+    setReviewStatus('Choose a review relationship action first.');
+    return;
+  }
+  const labels: Record<string, string> = {
+    mark_reviewed: 'Mark this customer as having left a review? No further automatic review requests will be sent.',
+    do_not_ask: 'Stop all future review requests for this customer?',
+    opt_out: 'Record that this customer opted out of review requests?',
+    mark_unknown: 'Record the review status as unknown? Automatic invitations will remain suppressed until you mark them eligible.',
+    mark_eligible: 'Make this customer eligible for a future review invitation? Existing delivery history is preserved.',
+  };
+  void adminConfirm({
+    title: 'Update customer review status?',
+    body: `<p>${esc(labels[action] ?? 'Apply this review status?')}</p><p class="admin-muted">This changes future review invitations only. It never alters financial, service or signed-document records, and it does not claim Google verified a review unless you specifically mark one as reviewed.</p>`,
+    confirmLabel: 'Update review status',
+  }).then(async (confirmed) => {
+    if (!confirmed) return;
+    try {
+      await api('/api/admin/reviews', {
+        method: 'POST',
+        body: JSON.stringify({ action, customerId }),
+      });
+      setReviewStatus('Customer review status updated. Future review invitations follow this decision.');
+      await Promise.all([loadReviews(), loadReviewEligible()]);
+    } catch (error) {
+      setReviewStatus(friendly(error));
+    }
+  });
 });
 
 for (const prefix of ['manual', 'quick'] as const) {
@@ -8330,6 +8710,54 @@ document.addEventListener('click', (event) => {
     void api('/api/admin/documents', { method: 'POST', body: JSON.stringify({ action: 'restore_template', templateId: id }) })
       .then(() => { documentResult('Template restored to draft review.'); return loadDocuments(); })
       .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'document-family-history') {
+    void showFamilyHistory(target.dataset.family ?? '').catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'document-family-history-close') {
+    const panel = document.querySelector<HTMLElement>('[data-document-family-history]');
+    if (panel) panel.innerHTML = '';
+  }
+  if (actionName === 'document-family-archive') {
+    const familyKey = target.dataset.family ?? '';
+    void adminConfirm({
+      title: 'Archive this document family?',
+      body: '<p>The family will leave the normal document library and packet selectors. Approved versions, signed records and executed copies are preserved unchanged. Restore it from History &amp; archive when needed.</p>',
+      confirmLabel: 'Archive document family',
+    }).then((confirmed) => {
+      if (!confirmed) return;
+      return api('/api/admin/documents', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'archive_family', familyKey }),
+      })
+        .then(() => { documentResult('Document family archived. History and executed copies are preserved.'); return loadDocuments(); })
+        .catch((error) => setAppError(friendly(error)));
+    });
+  }
+  if (actionName === 'document-family-restore') {
+    const familyKey = target.dataset.family ?? '';
+    void api('/api/admin/documents', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'restore_family', familyKey }),
+    })
+      .then(() => { documentResult('Document family restored to the active library.'); return loadDocuments(); })
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'document-delete-draft') {
+    void adminConfirm({
+      title: 'Delete this draft?',
+      body: '<p>Only an unreferenced draft is deleted. The current approved document, packet links and every executed signature are untouched.</p>',
+      confirmLabel: 'Delete draft',
+      danger: true,
+    }).then((confirmed) => {
+      if (!confirmed) return;
+      return api('/api/admin/documents', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'delete_draft', templateId: id }),
+      })
+        .then(() => { documentResult('Draft deleted. The approved document remains unchanged.'); return loadDocuments(); })
+        .catch((error) => setAppError(friendly(error)));
+    });
   }
   if (actionName === 'document-bundle-open') void loadDocumentBundleItems(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'document-packet-preview') void previewDocumentPacket(id).catch((error) => setAppError(friendly(error)));

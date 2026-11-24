@@ -135,7 +135,7 @@ export async function getCustomer(
   if (!customer) return null;
   const canSeeNotes = actor.role === 'owner' || actor.role === 'manager';
   const canSeeFinance = actor.role === 'owner' || actor.permissions.includes('finance.read');
-  const [contacts, properties, notes, leads, estimates, appointments, recurring, invoices, paymentAuthorizations, signingRequests, gifts, quickEstimates] = await Promise.all([
+  const [contacts, properties, notes, leads, estimates, appointments, recurring, invoices, paymentAuthorizations, signingRequests, gifts, quickEstimates, reviewState] = await Promise.all([
     db.prepare('SELECT * FROM customer_contacts WHERE customer_id = ? ORDER BY is_primary DESC, created_at').bind(customerId).all(),
     db.prepare('SELECT * FROM properties WHERE customer_id = ? ORDER BY is_primary DESC, created_at').bind(customerId).all(),
     canSeeNotes
@@ -169,6 +169,8 @@ export async function getCustomer(
               converted_request_id, created_at, updated_at
        FROM quick_estimates WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
     ).bind(customerId).all().catch(() => ({ success: true, results: [] })),
+    db.prepare('SELECT * FROM customer_review_state WHERE customer_id = ? LIMIT 1')
+      .bind(customerId).first().catch(() => null),
   ]);
   return {
     customer,
@@ -186,6 +188,7 @@ export async function getCustomer(
     signingRequests: signingRequests.results ?? [],
     gifts: gifts.results ?? [],
     quickEstimates: quickEstimates.results ?? [],
+    reviewState,
   };
 }
 
