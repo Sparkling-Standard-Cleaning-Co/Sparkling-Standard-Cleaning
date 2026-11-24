@@ -1,0 +1,149 @@
+name: Encrypted off-site backup
+
+# This file is present on the default branch (main) so GitHub can schedule it.
+# The job checks out production-safe, which carries the working backup tooling.
+# It stays dormant until the owner adds the repository secrets listed in
+# docs/operations/OFFSITE-BACKUPS.md. It never sends a backup to a public artifact.
+
+on:
+  schedule:
+    - cron: '30 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: encrypted-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      R2_APP_API_TOKEN: ${{ secrets.R2_APP_API_TOKEN }}
+      R2_APP_ACCOUNT_ID: ${{ secrets.R2_APP_ACCOUNT_ID }}
+      D1_DATABASE_NAME: ${{ secrets.D1_DATABASE_NAME }}
+      BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+      BACKUP_R2_ENDPOINT: ${{ secrets.BACKUP_R2_ENDPOINT }}
+      BACKUP_R2_BUCKET: ${{ secrets.BACKUP_R2_BUCKET }}
+      BACKUP_R2_ACCESS_KEY_ID: ${{ secrets.BACKUP_R2_ACCESS_KEY_ID }}
+      BACKUP_R2_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_R2_SECRET_ACCESS_KEY }}
+      ONEDRIVE_CLIENT_ID: ${{ secrets.ONEDRIVE_CLIENT_ID }}
+      ONEDRIVE_REFRESH_TOKEN: ${{ secrets.ONEDRIVE_REFRESH_TOKEN }}
+      ONEDRIVE_FOLDER: ${{ secrets.ONEDRIVE_FOLDER }}
+      ONEDRIVE_TARGET_MODE: ${{ vars.ONEDRIVE_TARGET_MODE }}
+      ONEDRIVE_CAPACITY_BYTES: ${{ secrets.ONEDRIVE_CAPACITY_BYTES }}
+      BACKUP_RETENTION_APPLY: ${{ vars.BACKUP_RETENTION_APPLY }}
+      R2_APP_BACKUP: ${{ vars.R2_APP_BACKUP }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: production-safe
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require backup configuration
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || (echo "CLOUDFLARE_API_TOKEN missing" && exit 1)
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || (echo "CLOUDFLARE_ACCOUNT_ID missing" && exit 1)
+          test -n "$D1_DATABASE_NAME" || (echo "D1_DATABASE_NAME missing" && exit 1)
+          test -n "$BACKUP_ENCRYPTION_KEY" || (echo "BACKUP_ENCRYPTION_KEY missing" && exit 1)
+          test -n "$BACKUP_R2_BUCKET" || (echo "BACKUP_R2_BUCKET missing" && exit 1)
+          test -n "$ONEDRIVE_CLIENT_ID" || (echo "ONEDRIVE_CLIENT_ID missing" && exit 1)
+          test -n "$ONEDRIVE_REFRESH_TOKEN" || (echo "ONEDRIVE_REFRESH_TOKEN missing" && exit 1)
+      - name: Export production D1
+        run: |
+          mkdir -p backup-out
+          npx --yes wrangler@4 d1 export "$D1_DATABASE_NAME" --remote --output backup-out/d1.sql
+          test -s backup-out/d1.sql
+      - name: Verify the D1 export restores independently
+        run: node scripts/backup/verify-d1-export.mjs backup-out/d1.sql
+      - name: Select backup profile
+        run: |
+          PROFILE=daily
+          if [ "$(date -u +%u)" = "7" ]; then PROFILE=weekly; fi
+          if [ "$(date -u +%d)" = "01" ]; then PROFILE=monthly; fi
+          echo "BACKUP_PROFILE=$PROFILE" >> "$GITHUB_ENV"
+          node scripts/backup/metadata.mjs --out backup-out/metadata --d1 backup-out/d1.sql --profile "$PROFILE"
+      - name: Stage application R2 objects for weekly or monthly profile
+        if: env.BACKUP_PROFILE != 'daily' && vars.R2_APP_BACKUP == 'true'
+        run: node scripts/backup/r2-app-objects.mjs --out backup-out/r2-app
+      - name: Create and upload encrypted R2 backup
+        run: |
+          ARGS=(--d1 backup-out/d1.sql --source metadata=backup-out/metadata --out backup-out --upload)
+          if [ -d backup-out/r2-app ]; then ARGS+=(--source "app-r2=backup-out/r2-app"); fi
+          node scripts/backup/create.mjs "${ARGS[@]}"
+      - name: Independently download and verify the R2 copy
+        run: |
+          ARCHIVE=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write(r.archive)")
+          NAME=$(basename "$ARCHIVE")
+          R2_KEY=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write(r.upload.archive.key)")
+          mkdir -p backup-out/r2-roundtrip
+          node scripts/backup/r2-download.mjs --key "$R2_KEY" --out "backup-out/r2-roundtrip/$NAME"
+          node scripts/backup/verify.mjs "backup-out/r2-roundtrip/$NAME"
+      - name: Upload encrypted backup to personal OneDrive
+        run: |
+          ARCHIVE=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write(r.archive)")
+          node scripts/backup/onedrive.mjs upload --archive "$ARCHIVE"
+      - name: Independently download and verify the OneDrive copy
+        run: |
+          ARCHIVE=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write(r.archive)")
+          NAME=$(basename "$ARCHIVE")
+          mkdir -p backup-out/roundtrip
+          node scripts/backup/onedrive.mjs download --name "$NAME" --out "backup-out/roundtrip/$NAME"
+          node scripts/backup/verify.mjs "backup-out/roundtrip/$NAME"
+          RESTORE_DIR=$(mktemp -d)
+          node scripts/backup/restore.mjs "backup-out/roundtrip/$NAME" --out "$RESTORE_DIR/restore"
+      - name: Apply or preview encrypted backup retention
+        run: |
+          if [ "$BACKUP_RETENTION_APPLY" = "true" ]; then APPLY=--apply; else APPLY=; fi
+          node scripts/backup/retention.mjs --daily 30 --weekly 12 --monthly 12 $APPLY
+          if [ -n "$BACKUP_R2_ENDPOINT" ] && [ -n "$BACKUP_R2_ACCESS_KEY_ID" ]; then
+            node scripts/backup/retention-r2.mjs --prefix sparkling-standard/backups --daily 30 --weekly 12 --monthly 12 $APPLY
+          fi
+      - name: Verify the encrypted archive locally
+        run: |
+          ARCHIVE=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write(r.archive)")
+          node scripts/backup/verify.mjs "$ARCHIVE"
+      - name: Record the backup result
+        run: |
+          node -e "const r=require('./backup-out/last-backup.json'); console.log(JSON.stringify({createdAt:r.createdAt,fileCount:r.fileCount,plainBytes:r.plainBytes,archiveSha256:r.archiveSha256,uploaded:Boolean(r.upload)},null,2))"
+      - name: Report backup success to operations
+        if: success()
+        env:
+          OPS_ALERT_URL: ${{ secrets.OPS_ALERT_URL }}
+          OPS_ALERT_TOKEN: ${{ secrets.OPS_ALERT_TOKEN }}
+          RUN_KEY: github-backup-${{ github.run_id }}
+        run: |
+          if [ -z "$OPS_ALERT_URL" ] || [ -z "$OPS_ALERT_TOKEN" ]; then
+            echo "Backup status reporting is not configured; skipping."
+            exit 0
+          fi
+          SUMMARY=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write('Encrypted backup created: ' + r.fileCount + ' files, uploaded=' + Boolean(r.upload))")
+          jq -n --arg runKey "$RUN_KEY" --arg summary "$SUMMARY" \
+            '{runKey: $runKey, status: "success", summary: $summary}' > /tmp/backup-status.json
+          curl -fsS -X POST "$OPS_ALERT_URL/api/internal/backup-status" \
+            -H "Authorization: Bearer $OPS_ALERT_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/backup-status.json
+      - name: Report backup failure to operations
+        if: failure()
+        env:
+          OPS_ALERT_URL: ${{ secrets.OPS_ALERT_URL }}
+          OPS_ALERT_TOKEN: ${{ secrets.OPS_ALERT_TOKEN }}
+          RUN_KEY: github-backup-${{ github.run_id }}
+        run: |
+          if [ -z "$OPS_ALERT_URL" ] || [ -z "$OPS_ALERT_TOKEN" ]; then
+            echo "Backup status reporting is not configured; skipping."
+            exit 0
+          fi
+          jq -n --arg runKey "$RUN_KEY" \
+            '{runKey: $runKey, status: "failure", summary: "Encrypted backup workflow failed or did not complete."}' > /tmp/backup-status.json
+          curl -fsS -X POST "$OPS_ALERT_URL/api/internal/backup-status" \
+            -H "Authorization: Bearer $OPS_ALERT_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/backup-status.json
