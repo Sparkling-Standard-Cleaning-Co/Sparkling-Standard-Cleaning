@@ -84,7 +84,27 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-23 operations and documents combined):** application code `038633e`
+- **Current release (2026-11-24 tipping and completed-service hotfix):** application code `ae6ac57` on
+  `production-safe`, Cloudflare Pages deployment `ef5ec9e2-47ba-4a6c-bf53-16381216835f`, verified live
+  on 2026-11-24 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.DAZVnrlk.js`). Adds optional customer tipping on
+  existing invoice payments and secure tip-only links for fully prepaid completed jobs, with default
+  $0.00, server-calculated service/gratuity Stripe lines, separate service/tip ledger fields, equal
+  deterministic allocation to actual timekeeping participants (unallocated until confirmed), admin
+  allocation review, refund reversals and tip receipts. Separately adds admin custom agreed pricing,
+  percentage/fixed customer discounts and a Record completed cleaning mode that records a historical
+  Completed job with actual crew, no availability lookup, no Google Calendar event, no automatic
+  signing packet, optional linking of executed evidence, and idempotent invoice creation at the agreed
+  price. Invoice forms now load the canonical service catalog (including Move-Out/Move-In Cleaning) and
+  support a service performed date; invoices/PDF/email/receipt/payment page retain the selected service
+  and date. Migrations `0056_optional_tips.sql` and `0057_invoice_service_date.sql` applied; production
+  is at **57** migrations with no foreign-key violations. Verified: unit **1,098** (1,097 pass, 1
+  pre-existing skip), browser **272/272**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21
+  pages; CI `45292489558` and `45299825684` green. Live invoice-payment links (existing invoices) return
+  default tip $0.00 and correct tip-only behavior; no live charge, customer email, calendar event or
+  destructive mutation was created. Evidence: `docs/verification/2026-11-23-OPTIONAL-TIPS-RELEASE.md`
+  and `docs/verification/2026-11-23-HOTFIX-COMPLETED-SERVICE.md`.
+- **Prior release (2026-11-23 operations and documents combined):** application code `038633e`
   (release `274a5f5` plus the calendar layout polish) on
   `production-safe`, deployed by the GitHub-connected Cloudflare Pages pipeline and verified live on
   2026-11-23 (served admin asset

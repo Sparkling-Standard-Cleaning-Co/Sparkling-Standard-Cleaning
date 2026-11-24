@@ -97,7 +97,23 @@ links; smoke 21 pages.
 
 ## Deployment evidence
 
-Appended after the authorized production deployment.
+- Deployed application commit: `ae6ac57` on `production-safe`.
+- Cloudflare Pages production deployment: `ef5ec9e2-47ba-4a6c-bf53-16381216835f`.
+- GitHub Actions `validate` + `browser`: run `45299825684` succeeded
+  (`validate` 1m13s, `browser` 6m14s).
+- Served production admin asset:
+  `/_astro/index.astro_astro_type_script_index_0_lang.DAZVnrlk.js`.
+- Live `/admin/` contains Record completed cleaning, Pricing adjustments,
+  Custom agreed price, canonical invoice-service options and Service performed
+  date.
+- Production `/api/admin/auth` is configured and unauthenticated; estimate
+  checkout is enabled in live mode; booking status reports a connected calendar.
+- 57 production migrations; no foreign-key violations.
+- The live invoice-payment endpoint still returns the existing invoices with
+  default gratuity $0.00 and correct tip-only behavior.
+- No production customer record, invoice, payment, appointment, email, calendar
+  event or signing evidence was created, altered or deleted by verification.
+
 
 ## Not performed
 

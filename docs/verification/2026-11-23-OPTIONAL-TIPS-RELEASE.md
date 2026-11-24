@@ -89,6 +89,18 @@
 - No live Stripe session, charge, refund, customer email or invoice mutation was
   created by verification. Francesca's invoice/customer was not touched.
 
+## Deployment evidence
+
+- Deployed application commit: `46994ea` on `production-safe`.
+- Cloudflare Pages production deployment:
+  `9a36f399-e320-4034-900d-9910af3cc76e`.
+- GitHub Actions `validate` + `browser`: run `45292489558` succeeded.
+- The live admin-script asset matched the verified build, and the live
+  invoice-payment endpoint returned default tip **$0.00** for an existing
+  unpaid invoice and for a paid invoice in tip-only mode.
+- No live Stripe session, charge, refund, customer email or invoice mutation was
+  created during release verification.
+
 ## Operational note
 
 The owner should regenerate the invoice email/payment page link for any invoice
