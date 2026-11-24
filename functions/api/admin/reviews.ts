@@ -32,6 +32,16 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+function assertReviewBranch(
+  actor: { role: string; branchId: string | null },
+  branchId: unknown,
+): void {
+  if (actor.role === 'owner') return;
+  if (!actor.branchId || String(branchId ?? '') !== actor.branchId) {
+    throw new AdminAuthError(403, 'forbidden');
+  }
+}
+
 export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
   const db = adminDb(context.env);
   if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
@@ -56,6 +66,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     if (url.searchParams.get('view') === 'state') {
       const customerId = (url.searchParams.get('customerId') ?? '').trim();
       if (!customerId) return json({ ok: false, error: 'customer_required' }, 400);
+      const customer = await db
+        .prepare('SELECT primary_branch_id FROM customers WHERE id = ? LIMIT 1')
+        .bind(customerId)
+        .first<{ primary_branch_id: string | null }>();
+      if (!customer) return json({ ok: false, error: 'customer_not_found' }, 404);
+      assertReviewBranch(actor, customer.primary_branch_id);
       return json({ ok: true, state: await customerReviewState(db, customerId) });
     }
     if (url.searchParams.get('view') === 'eligible') {
@@ -127,6 +143,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'queue') {
       const appointmentId = String(body.appointmentId ?? '').trim();
       if (!appointmentId) return json({ ok: false, error: 'appointment_required' }, 400);
+      const appointment = await reviewContextForAppointment(db, appointmentId);
+      if (!appointment) return json({ ok: false, error: 'review_context_missing' }, 404);
+      assertReviewBranch(actor, appointment.branchId);
       const result = await queueReviewForAppointment(db, appointmentId, {
         allowDisabled: actor.role === 'owner',
         source: 'owner',
@@ -143,6 +162,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'cancel') {
       const id = String(body.id ?? '').trim();
       if (!id) return json({ ok: false, error: 'review_request_required' }, 400);
+      const row = await db
+        .prepare('SELECT branch_id FROM review_requests WHERE id = ? LIMIT 1')
+        .bind(id)
+        .first<{ branch_id: string }>();
+      if (!row) return json({ ok: false, error: 'review_request_not_found' }, 404);
+      assertReviewBranch(actor, row.branch_id);
       await cancelReviewRequest(db, id, String(body.reason ?? 'cancelled_by_owner'));
       await audit(db, {
         actorUserId: actor.id,
@@ -156,10 +181,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const id = String(body.id ?? '').trim();
       if (!id) return json({ ok: false, error: 'review_request_required' }, 400);
       const row = await db
-        .prepare('SELECT id, customer_id, status FROM review_requests WHERE id = ? LIMIT 1')
+        .prepare('SELECT id, customer_id, branch_id, status FROM review_requests WHERE id = ? LIMIT 1')
         .bind(id)
-        .first<{ id: string; customer_id: string | null; status: string }>();
+        .first<{ id: string; customer_id: string | null; branch_id: string; status: string }>();
       if (!row) return json({ ok: false, error: 'review_request_not_found' }, 404);
+      assertReviewBranch(actor, row.branch_id);
       if (row.status !== 'failed') return json({ ok: false, error: 'review_request_not_failed' }, 409);
       if (row.customer_id) {
         const state = await customerReviewState(db, row.customer_id);
@@ -194,6 +220,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         .bind(id)
         .first<Record<string, unknown>>();
       if (!row) return json({ ok: false, error: 'review_request_not_found' }, 404);
+      assertReviewBranch(actor, row.branch_id);
       if (String(row.status) !== 'queued') return json({ ok: false, error: 'review_request_not_queued' }, 409);
       const reviewContext = await reviewContextForAppointment(db, String(row.appointment_id ?? ''));
       if (!reviewContext || !reviewContext.customerEmail) {
@@ -241,6 +268,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (customerActions[action]) {
       const customerId = String(body.customerId ?? '').trim();
       if (!customerId) return json({ ok: false, error: 'customer_required' }, 400);
+      const customer = await db
+        .prepare('SELECT primary_branch_id FROM customers WHERE id = ? LIMIT 1')
+        .bind(customerId)
+        .first<{ primary_branch_id: string | null }>();
+      if (!customer) return json({ ok: false, error: 'customer_not_found' }, 404);
+      assertReviewBranch(actor, customer.primary_branch_id);
       const state = await setCustomerReviewState(db, actor.id, customerId, customerActions[action]!, {
         note: String(body.note ?? ''),
         branchId: String(body.branchId ?? ''),
