@@ -71,6 +71,7 @@ test('Tampa calendar configuration never borrows the Pensacola calendar', () => 
 test('review eligibility requires completion, consent-safe settings, and a real link', () => {
   assert.equal(reviewEligibility(baseReview).eligible, true);
   assert.equal(reviewEligibility({ ...baseReview, enabled: false }).reason, 'branch_review_requests_disabled');
+  assert.equal(reviewEligibility({ ...baseReview, enabled: false }, { allowDisabled: true }).eligible, true);
   assert.equal(reviewEligibility({ ...baseReview, reviewUrl: '' }).reason, 'review_url_missing');
   assert.equal(reviewEligibility({ ...baseReview, appointmentStatus: 'confirmed' }).reason, 'service_not_completed');
   assert.equal(reviewEligibility({ ...baseReview, source: 'test' }).reason, 'test_record');

@@ -782,7 +782,7 @@ function applyManualPricing(
   if (totalCents <= 0) throw new AdminAuthError(400, 'custom_price_invalid');
   if (!custom && discountCents === 0) return core;
   const discountLabel = discountCents > 0
-    ? `Administrator discount${input.discountReason ? ` Ã¢â‚¬â€ ${input.discountReason}` : ''}`
+    ? `Administrator discount${input.discountReason ? ` — ${input.discountReason}` : ''}`
     : null;
   const breakdown = core.breakdown
     ? {
@@ -1220,7 +1220,7 @@ export async function createCompletedService(
   const start = zonedTimeToUtc(input.date, '12:00', timeZone);
   const end = new Date(start.getTime() + duration * 60_000);
   const discountLabel = discountCents > 0
-    ? `Administrator discount${input.discountReason ? ` Ã¢â‚¬â€ ${input.discountReason}` : ''}`
+    ? `Administrator discount${input.discountReason ? ` — ${input.discountReason}` : ''}`
     : null;
   const quote: ManualQuote = {
     engine: input.engine,

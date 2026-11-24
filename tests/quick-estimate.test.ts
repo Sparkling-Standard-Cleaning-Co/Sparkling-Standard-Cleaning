@@ -271,3 +271,36 @@ test('unit, Google place identity and county travel with the saved Quick Estimat
   assert.equal(stored.formattedAddress, '1000 Bayou Blvd Apt 4, Pensacola, FL 32503, USA');
   assert.equal(record?.address_text, '1000 Bayou Blvd, Apt 4, Pensacola, FL 32503');
 });
+
+test('Quick Estimate rejects another customer property and a property without a customer', async () => {
+  const f = await fixture();
+  const second = await createCustomer(f.db, f.actor, {
+    firstName: 'Other', lastName: 'Customer', email: 'other-quick@example.test',
+    addressLine1: '9 Other Street', city: 'Pensacola', state: 'FL', postalCode: '32503',
+  });
+  const otherProperty = f.db.raw.prepare('SELECT id FROM properties WHERE customer_id = ? LIMIT 1').get(second.id) as { id: string };
+  await assert.rejects(
+    () => calculateQuickEstimate({ DB: f.db } as never, f.db, f.actor, {
+      ...residentialInput,
+      customerId: f.customerId,
+      propertyId: otherProperty.id,
+    }),
+    /property_not_found/,
+  );
+  await assert.rejects(
+    () => calculateQuickEstimate({ DB: f.db } as never, f.db, f.actor, {
+      ...residentialInput,
+      propertyId: otherProperty.id,
+    }),
+    /customer_property_required/,
+  );
+  await assert.rejects(
+    () => saveQuickEstimate({ DB: f.db } as never, f.db, f.actor, {
+      ...residentialInput,
+      customerId: f.customerId,
+      propertyId: otherProperty.id,
+    }),
+    /property_not_found/,
+  );
+  assert.equal((f.db.raw.prepare('SELECT COUNT(*) AS n FROM quick_estimates').get() as { n: number }).n, 0);
+});

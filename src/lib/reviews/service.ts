@@ -140,7 +140,7 @@ export function invoiceReviewInvitation(context: ReviewContext | null): {
 
 export function reviewEligibility(
   context: ReviewContext | null,
-  options: { now?: Date | undefined; existingCount?: number | undefined } = {},
+  options: { now?: Date | undefined; existingCount?: number | undefined; allowDisabled?: boolean | undefined } = {},
 ): ReviewEligibility {
   const empty = (reason: string): ReviewEligibility => ({
     eligible: false,
@@ -149,7 +149,7 @@ export function reviewEligibility(
     dedupeKey: '',
   });
   if (!context) return empty('review_context_missing');
-  if (!context.enabled) return empty('branch_review_requests_disabled');
+  if (!context.enabled && options.allowDisabled !== true) return empty('branch_review_requests_disabled');
   if (!context.reviewUrl) return empty('review_url_missing');
   if (!context.appointmentId) return empty('appointment_missing');
   if (context.appointmentStatus !== 'completed') return empty('service_not_completed');
@@ -169,7 +169,7 @@ export function reviewEligibility(
 export async function queueReviewRequest(
   db: D1Database,
   context: ReviewContext | null,
-  options: { now?: Date | undefined; force?: boolean | undefined } = {},
+  options: { now?: Date | undefined; force?: boolean | undefined; allowDisabled?: boolean | undefined } = {},
 ): Promise<{ queued: boolean; id?: string; reason: string; scheduledAt?: string }> {
   if (!context) return { queued: false, reason: 'review_context_missing' };
   const baseDedupeKey = context.appointmentId
@@ -200,6 +200,7 @@ export async function queueReviewRequest(
   const eligibility = reviewEligibility(context, {
     now: options.now,
     existingCount: Number(count?.count ?? 0),
+    allowDisabled: options.allowDisabled === true,
   });
   if (!eligibility.eligible && !options.force) {
     return { queued: false, reason: eligibility.reason };
@@ -235,9 +236,10 @@ export async function queueReviewRequest(
 export async function queueReviewForAppointment(
   db: D1Database,
   appointmentId: string,
+  options: { allowDisabled?: boolean | undefined } = {},
 ): Promise<{ queued: boolean; id?: string; reason: string }> {
   const context = await reviewContextForAppointment(db, appointmentId);
-  return queueReviewRequest(db, context);
+  return queueReviewRequest(db, context, options);
 }
 
 export async function listReviewRequests(
@@ -298,4 +300,29 @@ export async function markReviewRequestSent(
     )
     .bind(status, status === 'sent' ? now() : null, text(errorDetail, 500), now(), id)
     .run();
+}
+
+export async function recordReviewDelivery(
+  db: D1Database,
+  input: { requestId: string; recipient: string; status: 'sent' | 'failed' | 'suppressed'; error?: string },
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO notification_delivery_events
+       (id, event_key, department, channel, recipient, status, provider, error_code,
+        attempts, related_type, related_id, created_at, updated_at)
+       VALUES (?, 'review_request', 'customerService', 'email', ?, ?, 'resend', ?,
+               1, 'review_request', ?, ?, ?)`,
+    )
+    .bind(
+      `review_delivery_${crypto.randomUUID()}`,
+      text(input.recipient, 200),
+      input.status,
+      text(input.error ?? '', 200),
+      input.requestId,
+      now(),
+      now(),
+    )
+    .run()
+    .catch(() => undefined);
 }

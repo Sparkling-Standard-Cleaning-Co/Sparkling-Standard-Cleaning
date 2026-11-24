@@ -25,7 +25,7 @@ import { onRequestGet as adminLeadsGet, onRequestPost as adminLeadsPost } from '
 import { onRequestGet as operationsGet } from '../functions/api/admin/operations.ts';
 import { onRequestPost as operationsPost } from '../functions/api/admin/operations.ts';
 import { onRequestGet as customersGet } from '../functions/api/admin/customers.ts';
-import { onRequestGet as storageGet } from '../functions/api/admin/storage.ts';
+import { onRequestGet as storageGet, onRequestPost as storagePost } from '../functions/api/admin/storage.ts';
 
 const MFA_KEY = 'synthetic-mfa-encryption-key-32-bytes-minimum';
 
@@ -2661,4 +2661,79 @@ test('lead archive, restore and disposable deletion enforce history protections'
   const bulkBody = (await bulk.json()) as { succeeded: number; failed: number };
   assert.equal(bulkBody.succeeded, 2);
   assert.equal(bulkBody.failed, 0);
+});
+
+test('photo inventory and cleanup preserve legal-hold photos and delete eligible ones', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'photo-cleanup@example.test',
+    name: 'Photo Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const cookie = `ss_ops=${session.token}`;
+  db.raw
+    .prepare(
+      `INSERT INTO legal_holds (id, subject_type, subject_id, reason, status, created_by_admin_user_id, created_at)
+       VALUES ('hold_photo_test', 'photo_request', 'quote-held-1', 'Synthetic legal review', 'active', ?, ?)`,
+    )
+    .run(owner.id, new Date().toISOString());
+  const hash = '0123456789abcdef0123456789abcdef';
+  const keys = [
+    `leads/2026/01/quote-held-1/bathroom-${hash}.jpg`,
+    `leads/2026/01/quote-held-1/bathroom-${hash}.jpg.meta.json`,
+    `leads/2026/01/quote-free-1/kitchen-${hash}.jpg`,
+    `leads/2026/01/quote-free-1/kitchen-${hash}.jpg.meta.json`,
+  ];
+  const deleted: string[] = [];
+  const bucket = {
+    async list() {
+      return {
+        objects: [
+          { key: keys[0], uploaded: new Date('2026-01-01T12:00:00.000Z'), size: 1000 },
+          { key: keys[2], uploaded: new Date('2026-01-02T12:00:00.000Z'), size: 2000 },
+        ],
+        truncated: false,
+      };
+    },
+    async delete(input: string | string[]) {
+      deleted.push(...(Array.isArray(input) ? input : [input]));
+    },
+  };
+  const env = { DB: db, PHOTOS_BUCKET: bucket };
+  const inventory = await storageGet({
+    request: new Request('https://example.test/api/admin/storage?view=photos', { headers: { Cookie: cookie } }),
+    env,
+  } as never);
+  assert.equal(inventory.status, 200);
+  const inventoryBody = (await inventory.json()) as { photos?: Array<{ protected?: boolean; customer?: string }>; protectedCount?: number };
+  assert.equal(inventoryBody.protectedCount, 1);
+  assert.equal(inventoryBody.photos?.find((photo) => photo.customer === 'Unlinked photo' && photo.protected)?.protected, true);
+
+  const cleanup = await storagePost({
+    request: new Request('https://example.test/api/admin/storage', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'X-CSRF-Token': session.csrf, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'photo_cleanup', days: 30, dryRun: false }),
+    }),
+    env,
+  } as never);
+  assert.equal(cleanup.status, 200);
+  const cleanupBody = (await cleanup.json()) as { eligible?: number; protectedEligible?: number; deleted?: number };
+  assert.equal(cleanupBody.eligible, 2);
+  assert.equal(cleanupBody.protectedEligible, 1);
+  assert.equal(cleanupBody.deleted, 1);
+  assert.ok(deleted.includes(keys[2]), 'the eligible photo is deleted');
+  assert.ok(!deleted.includes(keys[0]), 'the legally held photo is preserved');
+
+  const heldDelete = await storagePost({
+    request: new Request('https://example.test/api/admin/storage', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'X-CSRF-Token': session.csrf, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'photo_delete', key: keys[0] }),
+    }),
+    env,
+  } as never);
+  assert.equal(heldDelete.status, 409);
+  assert.equal(((await heldDelete.json()) as { error?: string }).error, 'legal_hold_active');
 });

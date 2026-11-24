@@ -7,6 +7,7 @@ import {
   NOTIFICATION_EVENTS,
   REPLY_TO_KEYS,
   REPLY_TO_LABELS,
+  TEMPLATE_DEFINITIONS,
   TEMPLATE_KEYS,
   communicationProviderStatus,
   defaultCommunicationSettings,
@@ -40,7 +41,7 @@ function metadata(): Record<string, unknown> {
     departments: DEPARTMENT_KEYS.map((key) => ({ key, label: DEPARTMENT_LABELS[key] })),
     events: NOTIFICATION_EVENTS.map((key) => ({ key, ...EVENT_DEFINITIONS[key] })),
     replyTo: REPLY_TO_KEYS.map((key) => ({ key, label: REPLY_TO_LABELS[key] })),
-    templates: TEMPLATE_KEYS.map((key) => ({ key: key as TemplateKey })),
+    templates: TEMPLATE_KEYS.map((key) => ({ key: key as TemplateKey, label: TEMPLATE_DEFINITIONS[key].label, variables: TEMPLATE_DEFINITIONS[key].variables })),
   };
 }
 

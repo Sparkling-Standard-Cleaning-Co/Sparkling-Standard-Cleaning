@@ -4,11 +4,12 @@
 
 import { adminDb, type AdminDbEnv, type D1Database } from '../../../src/lib/admin/d1.ts';
 import { AdminAuthError, audit, requireActor, requireCsrf, requireStepUp } from '../../../src/lib/admin/operations.ts';
-import { isPhotoKey, isPhotoSidecarKey } from '../../../src/lib/photos.ts';
+import { isPhotoKey } from '../../../src/lib/photos.ts';
 
 interface R2Object {
   key: string;
   uploaded?: Date;
+  size?: number;
 }
 interface R2Bucket {
   list(options?: {
@@ -18,6 +19,140 @@ interface R2Bucket {
   }): Promise<{ objects: R2Object[]; truncated: boolean; cursor?: string }>;
   delete(keys: string | string[]): Promise<void>;
 }
+
+interface PhotoOwner {
+  ref: string;
+  leadId: string;
+  customerId: string;
+  propertyId: string;
+  customer: string;
+  property: string;
+  status: string;
+}
+
+const PHOTO_REF_PATTERN = /^leads\/\d{4}\/\d{2}\/([a-z0-9-]{8,40})\//;
+
+function photoRef(key: string): string {
+  return PHOTO_REF_PATTERN.exec(key)?.[1] ?? '';
+}
+
+function placeholders(values: string[]): string {
+  return values.map(() => '?').join(',');
+}
+
+async function photoOwners(db: D1Database, refs: string[]): Promise<Map<string, PhotoOwner>> {
+  const owners = new Map<string, PhotoOwner>();
+  const unique = [...new Set(refs.filter(Boolean))];
+  for (let index = 0; index < unique.length; index += 40) {
+    const chunk = unique.slice(index, index + 40);
+    try {
+      const rows = await db
+        .prepare(
+          `SELECT l.id, l.quote_reference, l.customer_id, l.property_id, l.status,
+                  TRIM(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,'')) AS customer_name,
+                  COALESCE(NULLIF(c.company_name,''), p.label, '') AS property_label
+           FROM leads l
+           LEFT JOIN customers c ON c.id = l.customer_id
+           LEFT JOIN properties p ON p.id = l.property_id
+           WHERE l.quote_reference IN (${placeholders(chunk)})`,
+        )
+        .bind(...chunk)
+        .all<Record<string, unknown>>();
+      for (const row of rows.results ?? []) {
+        const ref = String(row.quote_reference ?? '');
+        if (!ref || owners.has(ref)) continue;
+        owners.set(ref, {
+          ref,
+          leadId: String(row.id ?? ''),
+          customerId: String(row.customer_id ?? ''),
+          propertyId: String(row.property_id ?? ''),
+          customer: String(row.customer_name ?? '').trim() || 'Unlinked customer',
+          property: String(row.property_label ?? '').trim(),
+          status: String(row.status ?? ''),
+        });
+      }
+    } catch {
+      // Never delete or classify photos when ownership cannot be established.
+      throw new AdminAuthError(503, 'photo_ownership_unavailable');
+    }
+  }
+  return owners;
+}
+
+async function activeHoldSubjects(db: D1Database): Promise<Set<string>> {
+  try {
+    const rows = await db
+      .prepare("SELECT subject_id FROM legal_holds WHERE status = 'active'")
+      .all<{ subject_id: string }>();
+    return new Set((rows.results ?? []).map((row) => String(row.subject_id ?? '')).filter(Boolean));
+  } catch {
+    // Fail closed: if holds cannot be read, no photo may be deleted.
+    throw new AdminAuthError(503, 'legal_holds_unavailable');
+  }
+}
+
+function refProtected(ref: string, owner: PhotoOwner | undefined, held: Set<string>): boolean {
+  if (!ref) return true;
+  if (held.has(ref)) return true;
+  if (!owner) return false;
+  return held.has(owner.leadId) || held.has(owner.customerId) || held.has(owner.propertyId);
+}
+
+async function listPhotoObjects(bucket: R2Bucket | undefined): Promise<{
+  objects: R2Object[];
+  truncated: boolean;
+}> {
+  if (!bucket) throw new AdminAuthError(503, 'photo_storage_not_configured');
+  const objects: R2Object[] = [];
+  let cursor: string | undefined;
+  let pages = 0;
+  do {
+    const page = await bucket.list({ prefix: 'leads/', limit: 500, ...(cursor ? { cursor } : {}) });
+    objects.push(...page.objects.filter((object) => isPhotoKey(object.key)));
+    cursor = page.truncated ? page.cursor : undefined;
+    pages += 1;
+    if (pages >= 20) break;
+  } while (cursor);
+  return { objects, truncated: Boolean(cursor) };
+}
+
+async function photoInventory(db: D1Database, bucket: R2Bucket | undefined): Promise<{
+  configured: boolean;
+  photos: Array<Record<string, unknown>>;
+  total: number;
+  truncated: boolean;
+  protectedCount: number;
+}> {
+  if (!bucket) return { configured: false, photos: [], total: 0, truncated: false, protectedCount: 0 };
+  const { objects, truncated } = await listPhotoObjects(bucket);
+  const owners = await photoOwners(db, objects.map((object) => photoRef(object.key)));
+  const held = await activeHoldSubjects(db);
+  const photos = objects.map((object) => {
+    const ref = photoRef(object.key);
+    const owner = owners.get(ref);
+    const filename = object.key.split('/').pop() ?? '';
+    return {
+      key: object.key,
+      ref,
+      category: filename.split('-')[0] ?? '',
+      uploadedAt: object.uploaded instanceof Date ? object.uploaded.toISOString() : null,
+      bytes: Number(object.size ?? 0) || null,
+      customer: owner?.customer ?? 'Unlinked photo',
+      property: owner?.property ?? '',
+      leadId: owner?.leadId ?? '',
+      leadStatus: owner?.status ?? '',
+      protected: refProtected(ref, owner, held),
+    };
+  }).sort((a, b) => String(b.uploadedAt ?? '').localeCompare(String(a.uploadedAt ?? '')));
+  return {
+    configured: true,
+    photos: photos.slice(0, 300),
+    total: photos.length,
+    truncated: truncated || photos.length > 300,
+    protectedCount: photos.filter((photo) => photo.protected).length,
+  };
+}
+
 interface Env extends AdminDbEnv {
   PHOTOS_BUCKET?: R2Bucket;
   DOCUMENTS_BUCKET?: R2Bucket;
@@ -74,44 +209,68 @@ async function r2Summary(bucket: R2Bucket | undefined, prefixes: string[]): Prom
 }
 
 async function cleanupPhotos(
+  db: D1Database,
   bucket: R2Bucket | undefined,
   retentionDays: number,
   dryRun: boolean,
-): Promise<{ retentionDays: number; dryRun: boolean; scanned: number; eligible: number; deleted: number }> {
+): Promise<{
+  retentionDays: number;
+  dryRun: boolean;
+  scanned: number;
+  eligible: number;
+  protectedEligible: number;
+  deleted: number;
+}> {
   if (!bucket) throw new AdminAuthError(503, 'photo_storage_not_configured');
   const cutoff = Date.now() - retentionDays * 86_400_000;
   let cursor: string | undefined;
   let scanned = 0;
-  let eligible = 0;
-  let deleted = 0;
   let pages = 0;
-  const pending: string[] = [];
+  const photoObjects: R2Object[] = [];
+  const allKeys = new Set<string>();
   do {
     const page = await bucket.list({ prefix: 'leads/', limit: 500, ...(cursor ? { cursor } : {}) });
     for (const object of page.objects) {
+      allKeys.add(object.key);
       scanned += 1;
-      if (!isPhotoKey(object.key) && !isPhotoSidecarKey(object.key)) continue;
-      const uploaded = object.uploaded instanceof Date ? object.uploaded.getTime() : Number.NaN;
-      if (!Number.isFinite(uploaded) || uploaded >= cutoff) continue;
-      eligible += 1;
-      pending.push(object.key);
+      if (isPhotoKey(object.key)) photoObjects.push(object);
     }
     cursor = page.truncated ? page.cursor : undefined;
     pages += 1;
-    if (!dryRun) {
-      while (pending.length >= 200) {
-        await bucket.delete(pending.splice(0, 200));
-        deleted += 200;
-      }
-    }
     if (pages >= 20) break;
   } while (cursor);
-  if (!dryRun && pending.length > 0) {
-    const remaining = pending.splice(0);
-    await bucket.delete(remaining);
-    deleted += remaining.length;
+
+  const owners = await photoOwners(db, photoObjects.map((object) => photoRef(object.key)));
+  const held = await activeHoldSubjects(db);
+  let eligible = 0;
+  let protectedEligible = 0;
+  const pendingPhotos: string[] = [];
+  const pendingKeys: string[] = [];
+  for (const object of photoObjects) {
+    const uploaded = object.uploaded instanceof Date ? object.uploaded.getTime() : Number.NaN;
+    if (!Number.isFinite(uploaded) || uploaded >= cutoff) continue;
+    eligible += 1;
+    const ref = photoRef(object.key);
+    if (refProtected(ref, owners.get(ref), held)) {
+      protectedEligible += 1;
+      continue;
+    }
+    pendingPhotos.push(object.key);
+    pendingKeys.push(object.key);
+    const sidecar = `${object.key}.meta.json`;
+    if (allKeys.has(sidecar)) pendingKeys.push(sidecar);
   }
-  return { retentionDays, dryRun, scanned, eligible, deleted };
+
+  let deleted = 0;
+  if (!dryRun) {
+    for (let index = 0; index < pendingPhotos.length; index += 200) {
+      const batchPhotos = new Set(pendingPhotos.slice(index, index + 200));
+      const batch = pendingKeys.filter((key) => batchPhotos.has(key.replace(/\.meta\.json$/, '')));
+      await bucket.delete(batch);
+      deleted += batchPhotos.size;
+    }
+  }
+  return { retentionDays, dryRun, scanned, eligible, protectedEligible, deleted };
 }
 
 function csvValue(value: unknown): string {
@@ -220,6 +379,9 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         },
       });
     }
+    if (url.searchParams.get('view') === 'photos') {
+      return json({ ok: true, ...(await photoInventory(db, context.env.PHOTOS_BUCKET)) });
+    }
     let databaseBytes: number | null = null;
     try {
       const size = await db
@@ -243,9 +405,56 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       db.prepare('SELECT * FROM retention_policies ORDER BY record_type').all<Record<string, unknown>>().catch(() => ({ results: [] })),
       db.prepare('SELECT id, subject_type, subject_id, reason, status, created_at, released_at FROM legal_holds ORDER BY created_at DESC LIMIT 100').all<Record<string, unknown>>().catch(() => ({ results: [] })),
     ]);
+    let holdOptions: Array<{ type: string; id: string; label: string }> = [];
+    try {
+      const [customerRows, propertyRows, appointmentRows] = await Promise.all([
+        db.prepare(
+          `SELECT id, TRIM(COALESCE(first_name,'') || ' ' || COALESCE(last_name,'')) AS name, company_name
+           FROM customers WHERE status = 'active' ORDER BY last_name, first_name LIMIT 500`,
+        ).all<Record<string, unknown>>(),
+        db.prepare(
+          `SELECT p.id, COALESCE(NULLIF(p.label,''), p.line1, 'Property') AS label, p.city,
+                  TRIM(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,'')) AS customer_name
+           FROM properties p LEFT JOIN customers c ON c.id = p.customer_id
+           WHERE p.status = 'active' ORDER BY p.label LIMIT 500`,
+        ).all<Record<string, unknown>>(),
+        db.prepare(
+          `SELECT a.id, a.reference, a.start_at,
+                  TRIM(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,'')) AS customer_name
+           FROM appointments a LEFT JOIN customers c ON c.id = a.customer_id
+           WHERE a.status NOT IN ('canceled','cancelled') ORDER BY a.start_at DESC LIMIT 500`,
+        ).all<Record<string, unknown>>(),
+      ]);
+      const customerName = (value: unknown): string => String(value ?? '').trim() || 'Customer';
+      for (const row of customerRows.results ?? []) {
+        holdOptions.push({
+          type: 'customer',
+          id: String(row.id ?? ''),
+          label: `${customerName(row.name)}${row.company_name ? ` — ${String(row.company_name)}` : ''}`,
+        });
+      }
+      for (const row of propertyRows.results ?? []) {
+        holdOptions.push({
+          type: 'property',
+          id: String(row.id ?? ''),
+          label: `${customerName(row.customer_name)} — ${String(row.label ?? 'Property')}${row.city ? `, ${String(row.city)}` : ''}`,
+        });
+      }
+      for (const row of appointmentRows.results ?? []) {
+        holdOptions.push({
+          type: 'booking',
+          id: String(row.id ?? ''),
+          label: `${customerName(row.customer_name)} — ${String(row.reference ?? 'Booking')}${row.start_at ? ` (${new Date(String(row.start_at)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})` : ''}`,
+        });
+      }
+      holdOptions = holdOptions.filter((option) => option.id);
+    } catch {
+      holdOptions = [];
+    }
     return json({
       ok: true,
       branch: requestedBranch || 'all',
+      holdOptions,
       database: {
         configured: true,
         bytes: databaseBytes,
@@ -286,17 +495,30 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     requireStepUp(actor);
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = String(body.action ?? '');
+    if (action === 'photo_delete') {
+      const key = text(body.key, 300);
+      if (!isPhotoKey(key)) return json({ ok: false, error: 'photo_key_invalid' }, 400);
+      const ref = photoRef(key);
+      if (!context.env.PHOTOS_BUCKET) return json({ ok: false, error: 'photo_storage_not_configured' }, 503);
+      const owners = await photoOwners(db, [ref]);
+      const held = await activeHoldSubjects(db);
+      if (refProtected(ref, owners.get(ref), held)) {
+        return json({ ok: false, error: 'legal_hold_active' }, 409);
+      }
+      await context.env.PHOTOS_BUCKET?.delete([key, `${key}.meta.json`]);
+      await audit(db, {
+        actorUserId: actor.id,
+        action: 'storage.photo_deleted',
+        entityType: 'photo',
+        entityId: ref || 'unlinked',
+        detail: key.split('/').pop()?.split('-')[0] ?? '',
+      });
+      return json({ ok: true });
+    }
     if (action === 'photo_cleanup') {
       const dryRun = body.dryRun !== false;
-      if (!dryRun) {
-        const activeHolds = await db
-          .prepare("SELECT COUNT(*) AS n FROM legal_holds WHERE status = 'active'")
-          .first<{ n: number }>();
-        if (Number(activeHolds?.n ?? 0) > 0) {
-          return json({ ok: false, error: 'legal_hold_active' }, 409);
-        }
-      }
       const result = await cleanupPhotos(
+        db,
         context.env.PHOTOS_BUCKET,
         Math.min(365, Math.max(1, Number(body.days) || 30)),
         dryRun,
@@ -316,7 +538,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         action: result.dryRun ? 'storage.photo_cleanup_preview' : 'storage.photo_cleanup_run',
         entityType: 'storage',
         entityId: 'photos',
-        detail: `eligible=${result.eligible};deleted=${result.deleted}`,
+        detail: `eligible=${result.eligible};protected=${result.protectedEligible};deleted=${result.deleted}`,
       });
       return json({ ok: true, ...result });
     }

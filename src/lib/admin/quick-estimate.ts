@@ -204,6 +204,8 @@ export async function calculateQuickEstimate(
   }
   if (input.customerId) {
     await verifyCustomerProperty(db, actor, input.customerId, input.propertyId ?? '');
+  } else if (input.propertyId) {
+    throw new AdminAuthError(400, 'customer_property_required');
   }
   const destination = await addressDestination(env, {
     line1: input.addressLine1,

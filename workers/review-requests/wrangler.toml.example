@@ -1,0 +1,17 @@
+name = "sparkling-standard-review-requests"
+main = "src/index.ts"
+compatibility_date = "2026-11-24"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sparkling-standard-operations"
+database_id = "82af5623-e4a0-48c5-b5da-b3aea5e84105"
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Set these with `wrangler secret put`, never commit their values:
+# RESEND_API_KEY
+# RESEND_FROM_EMAIL
+# RESEND_REPLY_TO
+# REVIEW_MONITOR_TOKEN

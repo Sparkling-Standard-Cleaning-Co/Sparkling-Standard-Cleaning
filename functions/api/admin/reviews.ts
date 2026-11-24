@@ -14,6 +14,7 @@ import {
   listReviewRequests,
   markReviewRequestSent,
   queueReviewForAppointment,
+  recordReviewDelivery,
   reviewContextForAppointment,
 } from '../../../src/lib/reviews/service.ts';
 import { buildReviewRequestEmail, sendReviewRequestEmail, type ReviewEmailEnv } from '../../../src/lib/reviews/email.ts';
@@ -63,6 +64,9 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         .prepare(
           `SELECT a.id, a.start_at, a.status, a.customer_id, a.branch_id,
                   c.first_name, c.last_name,
+                  (SELECT value FROM customer_contacts
+                   WHERE customer_contacts.customer_id = c.id AND customer_contacts.kind = 'email'
+                   ORDER BY is_primary DESC, created_at ASC LIMIT 1) AS customer_email,
                   p.line1, p.city, p.state, p.postal_code,
                   e.service_code, COALESCE(NULLIF(e.input_snapshot_json, ''), '{}') AS input_snapshot_json,
                   b.name AS branch_name, b.review_url, b.review_requests_enabled,
@@ -109,7 +113,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'queue') {
       const appointmentId = String(body.appointmentId ?? '').trim();
       if (!appointmentId) return json({ ok: false, error: 'appointment_required' }, 400);
-      const result = await queueReviewForAppointment(db, appointmentId);
+      const result = await queueReviewForAppointment(db, appointmentId, {
+        allowDisabled: actor.role === 'owner',
+      });
       await audit(db, {
         actorUserId: actor.id,
         action: 'review.request_queued',
@@ -157,6 +163,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         idempotencyKey: `review-${id}`,
       });
       await markReviewRequestSent(db, id, result === 'sent' ? 'sent' : 'failed', result === 'sent' ? '' : result);
+      await recordReviewDelivery(db, {
+        requestId: id,
+        recipient: reviewContext.customerEmail,
+        status: result === 'sent' ? 'sent' : result === 'skipped_not_configured' ? 'suppressed' : 'failed',
+        error: result === 'sent' ? '' : result,
+      });
       await audit(db, {
         actorUserId: actor.id,
         action: 'review.request_sent',

@@ -66,9 +66,10 @@ test('Google Reviews is usable at phone width and shows the owner controls', asy
           appointments: [{
             id: 'appt_review_1', start_at: '2026-11-23T18:00:00.000Z', status: 'completed',
             first_name: 'Google', last_name: 'Customer', line1: '100 Review Street', city: 'Pensacola',
+            customer_email: 'customer@example.test',
             branch_id: 'branch_pensacola', branch_name: 'Pensacola', service_code: 'standard',
             input_snapshot_json: JSON.stringify({ service_label: 'Residential Cleaning' }),
-            review_url: 'https://g.page/r/CXAcv1Pp7OI2ECE/review', review_requests_enabled: 1,
+            review_url: 'https://g.page/r/CXAcv1Pp7OI2ECE/review', review_requests_enabled: 0,
             latest_status: null, latest_sent_at: null,
           }],
         }),
@@ -92,10 +93,11 @@ test('Google Reviews is usable at phone width and shows the owner controls', asy
   await page.locator('[data-admin-nav="reviews"]').click();
   await page.locator('[data-admin-view="reviews"]').waitFor({ state: 'visible' });
   await page.getByText('Google review requests').waitFor();
-  await page.getByText('Review Customer').waitFor();
+  await page.locator('[data-admin-review-list]').getByText('Review Customer').waitFor();
   await page.locator('[data-review-eligible-list]').getByText('Google Customer').waitFor();
   assert.equal(await page.locator('input[name="appointmentId"]').count(), 0, 'no manual appointment ID entry');
-  await page.getByRole('button', { name: 'Queue Review Invitation' }).waitFor();
+  await page.getByRole('button', { name: 'Send Review Invitation' }).waitFor();
+  assert.match(await page.locator('[data-review-eligible-list]').textContent() ?? '', /Automation is off/);
   await page.getByRole('button', { name: 'Preview' }).waitFor();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.ok(overflow <= 1, `horizontal overflow: ${overflow}px`);

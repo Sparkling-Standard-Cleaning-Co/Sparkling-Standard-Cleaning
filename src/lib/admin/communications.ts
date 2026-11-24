@@ -213,7 +213,7 @@ export const REPLY_TO_LABELS: Record<ReplyToKey, string> = {
   contact: 'General customer service',
 };
 
-const TEMPLATE_DEFINITIONS = {
+export const TEMPLATE_DEFINITIONS = {
   booking_confirmation: {
     label: 'Booking confirmation',
     variables: ['customer_name', 'reference', 'service_date', 'address', 'total'],

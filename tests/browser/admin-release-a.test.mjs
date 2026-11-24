@@ -144,6 +144,7 @@ test('Release A: alert navigation, review job selection and lead management work
           appointments: [{
             id: 'appt_review_1', start_at: '2026-11-23T18:00:00.000Z', status: 'completed', branch_id: 'branch_pensacola',
             first_name: 'Francesca', last_name: 'Customer', line1: '100 Bellview Street', city: 'Bellview',
+            customer_email: 'customer@example.test',
             service_code: 'move_in_out', input_snapshot_json: '{"service_label":"Move-Out Cleaning"}',
             branch_name: 'Pensacola', review_url: 'https://g.page/r/CXAcv1Pp7OI2ECE/review', review_requests_enabled: 1,
             latest_status: null, latest_sent_at: null,
@@ -154,8 +155,12 @@ test('Release A: alert navigation, review job selection and lead management work
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, requests: [] }) });
   });
   await page.route('**/api/admin/reviews', (route) => {
-    posts.push({ route: 'reviews', ...route.request().postDataJSON() });
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, queued: true }) });
+    const body = route.request().postDataJSON();
+    posts.push({ route: 'reviews', ...body });
+    if (body.action === 'queue') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, queued: true, id: 'rev_1', reason: 'queued' }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, result: 'sent' }) });
   });
   try {
     await page.goto(BASE + '/admin/', { waitUntil: 'load' });
@@ -185,11 +190,12 @@ test('Release A: alert navigation, review job selection and lead management work
     await page.locator('[data-admin-nav="reviews"]').click();
     assert.equal(await page.locator('input[name="appointmentId"]').count(), 0, 'no manual appointment ID entry remains');
     await page.locator('[data-review-eligible-list]').getByText('Francesca Customer').waitFor({ state: 'visible' });
-    await page.locator('[data-review-queue-id="appt_review_1"]').click();
+    await page.locator('[data-review-send-id="appt_review_1"]').click();
     await page.locator('[data-admin-dialog][open]').waitFor({ state: 'visible' });
     await page.locator('[data-admin-dialog-confirm]').click();
-    await page.waitForFunction(() => document.querySelector('[data-review-status-message]')?.textContent?.includes('queued'));
+    await page.waitForFunction(() => document.querySelector('[data-review-status-message]')?.textContent?.includes('accepted'));
     assert.ok(posts.some((post) => post.route === 'reviews' && post.action === 'queue' && post.appointmentId === 'appt_review_1'));
+    assert.ok(posts.some((post) => post.route === 'reviews' && post.action === 'send' && post.id === 'rev_1'));
     assert.equal(nativeDialogs.length, 0, 'no native browser prompts are used for these operations');
   } finally {
     await context.close();

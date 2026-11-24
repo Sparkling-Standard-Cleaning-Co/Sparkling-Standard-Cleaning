@@ -24,7 +24,7 @@ Rules:
    Never invent or shorten a Google review URL.
 2. Keep **Enable automated review requests** off until the owner approves the policy.
 3. Set the delay (default 24 hours) and maximum requests per customer (default 1).
-4. A request is eligible only when:
+4. Automated queueing requires:
    - the appointment is `completed`;
    - the record is not a test/preview record;
    - the customer has an email;
@@ -32,12 +32,24 @@ Rules:
    - the customer is below the frequency cap;
    - the same appointment has not already been queued.
 5. **Admin → Google Reviews** lists queued, sent, suppressed, failed and cancelled requests.
-   The owner can queue a request for a completed appointment, cancel one, or send a queued
-   request explicitly. Sending requires the normal owner session/step-up.
+   The owner can send a review invitation for an eligible completed job, cancel one, or
+   send a queued request explicitly. Owner-initiated sending requires an explicit
+   confirmation and the normal owner session/step-up. It does not require automation to
+   be enabled and never depends on a tip or review sentiment.
 6. Invoice, invoice email and invoice PDF show a review invitation only for a completed
    service with an official branch link. Tampa has no link and shows no invitation.
+7. The scheduled `workers/review-requests` worker is optional and not deployed by the
+   website release. It sends only due, recent queued requests, rechecks the branch switch
+   and records delivery outcomes. It cannot flush an old backlog when automation is
+   enabled later.
 
-Compliance:
+## Delivery evidence
+
+A provider acceptance is recorded as `sent`, not as inbox delivery. Delivery outcomes are
+written to `review_requests` and `notification_delivery_events`. A queued or accepted email
+is never described as received until the owner confirms the inbox.
+
+## Compliance
 
 - No incentive, discount, gift or entry is offered for a review.
 - No positive-only screening or satisfaction gate.

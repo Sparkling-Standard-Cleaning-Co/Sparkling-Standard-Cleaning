@@ -59,7 +59,10 @@ const metadata = {
     { key: 'security_alert', label: 'Critical security alert', critical: true, defaults: ['admin', 'owner'], description: 'Critical events.' },
   ],
   replyTo: [{ key: 'bookingConfirmations', label: 'Booking confirmations' }, { key: 'invoices', label: 'Invoice email' }],
-  templates: [{ key: 'booking_confirmation' }, { key: 'security_alert' }],
+  templates: [
+    { key: 'booking_confirmation', label: 'Booking confirmation', variables: ['customer_name', 'reference'] },
+    { key: 'security_alert', label: 'Critical security alert', variables: ['event_detail'] },
+  ],
 };
 
 test('the owner communications center renders routing, previews templates and never exposes owner as reply-to', async () => {
@@ -118,6 +121,13 @@ test('the owner communications center renders routing, previews templates and ne
     assert.match(await page.textContent('[data-communications-preview]') ?? '', /Hello Jordan Example/);
     assert.ok(posts.some((body) => body.action === 'preview' && body.templateKey === 'booking_confirmation'));
     assert.match(await page.textContent('[data-admin-communications-health]') ?? '', /communications_test|Bookings|sent/i);
+    assert.ok(await page.locator('[data-communications-body] .admin-email-token').count() >= 1, 'automatic fields render as labeled chips');
+    assert.equal((await page.textContent('[data-communications-body]') ?? '').includes('{{'), false, 'raw placeholder syntax is hidden');
+    const tokensBefore = await page.locator('[data-communications-body] .admin-email-token').count();
+    await page.selectOption('[data-communications-variable-select]', 'reference');
+    await page.click('[data-admin-action="communications-insert-variable"]');
+    assert.equal(await page.locator('[data-communications-body] .admin-email-token').count(), tokensBefore + 1);
+    assert.match(await page.textContent('[data-communications-template-guide]') ?? '', /Booking confirmation|Customer name/);
 
     await page.locator('[data-communication-route="booking_confirmation"][value="owner"]').check();
     await page.fill('[data-communications-note]', 'Owner oversight for booking confirmations');
@@ -130,6 +140,8 @@ test('the owner communications center renders routing, previews templates and ne
 
     await page.selectOption('[data-communications-test-department]', 'bookings');
     await page.click('[data-admin-action="communications-test"]');
+    await page.locator('[data-admin-dialog][open]').waitFor({ state: 'visible' });
+    await page.locator('[data-admin-dialog-confirm]').click();
     await page.waitForFunction(() => document.querySelector('[data-communications-test-status]')?.textContent?.includes('Provider accepted'));
     assert.ok(posts.some((body) => body.action === 'send_test' && body.department === 'bookings'));
   } finally { await context.close(); }

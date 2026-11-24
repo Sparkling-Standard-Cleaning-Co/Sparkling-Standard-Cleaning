@@ -462,6 +462,7 @@ import {
               <form class="admin-form admin-form--grid" data-quick-form style="max-width:none">
                 <label>Existing customer (optional) <select name="customerId" data-quick-customer><option value="">New inquiry</option></select></label>
                 <label>Property (optional) <select name="propertyId" data-quick-property><option value="">Choose a customer first</option></select></label>
+                <p class="admin-field--wide admin-muted" data-quick-customer-note role="status" aria-live="polite"></p>
                 <label>Branch <select name="branchId" data-quick-branch data-admin-address-branch><option value="branch_pensacola">Pensacola</option><option value="branch_tampa" disabled>Tampa Bay / Central Florida (inactive)</option></select></label>
                 <label>Contact name <input name="customerName" maxlength="200" /></label>
                 <label>Contact email <input name="customerEmail" type="email" maxlength="200" /></label>
@@ -1431,8 +1432,8 @@ import {
 
           <section class="admin-view" data-admin-view="storage" hidden>
             <div class="admin-card">
-              <h2 class="admin-section-title">Data &amp; Storage</h2>
-              <p class="admin-muted">Owner-only health, business-record counts, safe exports and photo-retention controls. Provider byte totals require Cloudflare account analytics; no universal capacity percentage is invented.</p>
+              <h2 class="admin-section-title">Storage &amp; data</h2>
+              <p class="admin-muted">See what is stored, download your business records, review customer photos and keep backups healthy. Customer photos are private and are only removed by an owner action or the 30-day cleanup.</p>
               <div class="admin-inline-form" style="margin-bottom:.75rem;">
                 <label>Branch filter
                   <select data-admin-storage-branch>
@@ -1453,10 +1454,15 @@ import {
               <p class="small text-muted" data-admin-storage-note></p>
               <div class="admin-actions" style="margin-top:1rem;">
                 <button class="btn btn--secondary btn--small" type="button" data-admin-action="storage-refresh">Refresh</button>
-                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-cleanup-preview">Preview Photo Cleanup</button>
-                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-cleanup-run">Delete Eligible Photos</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-cleanup-preview">Preview 30-day photo cleanup</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-cleanup-run">Delete photos older than 30 days</button>
               </div>
               <p class="admin-status-message" data-admin-storage-status role="status" aria-live="polite"></p>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Customer photos</h2>
+              <p class="admin-muted">Photos linked to a cleaning request. A legal hold protects the entire customer, property or request until it is released. Deleting a photo is permanent and audit-recorded.</p>
+              <div data-admin-photo-list><p class="admin-muted">Loading photos...</p></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Business records export</h2>
@@ -1479,25 +1485,38 @@ import {
               <p class="admin-muted">Records retention intent and legal holds only. Saving a policy never deletes or anonymizes a record. Permanent deletion remains a separate, explicit owner operation.</p>
               <div data-admin-retention></div>
               <form class="admin-form admin-form--grid" data-retention-policy style="margin-top:1rem;">
-                <label>Record type <input name="recordType" required maxlength="80" placeholder="customer_agreement" /></label>
-                <label>Retention months <input name="retentionMonths" type="number" min="0" max="600" required /></label>
+                <label>Record type
+                  <select name="recordType" required>
+                    <option value="">Choose a record type</option>
+                    <option value="customer_agreement">Signed customer agreements</option>
+                    <option value="customer_contact">Customer contact details</option>
+                    <option value="lead">Website inquiries</option>
+                    <option value="photo">Customer photos</option>
+                    <option value="appointment">Appointments and jobs</option>
+                    <option value="invoice">Invoices and payments</option>
+                  </select>
+                </label>
+                <label>Keep for (months) <input name="retentionMonths" type="number" min="0" max="600" required /></label>
                 <label>Status <select name="status"><option value="draft">Draft</option><option value="active">Active (owner approval)</option><option value="retired">Retired</option></select></label>
-                <label class="admin-field--wide">Description <input name="description" maxlength="1000" /></label>
-                <label><input type="checkbox" name="automaticCleanup" /> Eligible for future automatic cleanup review</label>
+                <label class="admin-field--wide">Plain-English description <input name="description" maxlength="1000" placeholder="Example: Keep signed cleaning agreements for seven years." /></label>
+                <label class="admin-field--wide"><input type="checkbox" name="automaticCleanup" /> Include in future automatic cleanup review (nothing is deleted automatically)</label>
                 <div class="admin-field--wide"><button class="btn btn--secondary btn--small" type="submit">Save retention policy</button></div>
               </form>
               <form class="admin-form admin-form--grid" data-legal-hold style="margin-top:1rem;">
-                <label>Subject type <input name="subjectType" required maxlength="60" placeholder="customer" /></label>
-                <label>Subject id <input name="subjectId" required maxlength="120" /></label>
-                <label class="admin-field--wide">Reason <textarea name="reason" rows="2" minlength="5" maxlength="1000" required></textarea></label>
+                <label class="admin-field--wide">Customer, property or booking to protect
+                  <select name="subjectChoice" data-admin-hold-options required>
+                    <option value="">Loading customers, properties and bookings...</option>
+                  </select>
+                </label>
+                <label class="admin-field--wide">Reason <textarea name="reason" rows="2" minlength="5" maxlength="1000" required placeholder="Example: legal review requested; preserve until released."></textarea></label>
                 <div class="admin-field--wide"><button class="btn btn--ghost btn--small" type="submit">Place legal hold</button></div>
               </form>
               <p class="admin-status-message" data-admin-retention-status role="status" aria-live="polite"></p>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Backup and cleanup status</h2>
+              <h2 class="admin-section-title">Photo cleanup history</h2>
               <div data-admin-storage-settings></div>
-              <p class="admin-muted" style="margin-top:.75rem;">Encrypted D1/R2 off-site backup uses the private master archive and CLI; the encrypted D1 restore has been verified. Full R2 object archive requires owner-provided S3 credentials or an approved destination.</p>
+              <p class="admin-muted" style="margin-top:.75rem;">A backup run record is not restore proof. Encrypted off-site backups are kept in the private master archive; the latest restore has been verified.</p>
             </div>
           </section>
           <section class="admin-view" data-admin-view="promotions" hidden>
@@ -1752,10 +1771,22 @@ import {
                 <div data-communications-routing></div>
                 <h3 class="admin-section-title" style="font-size:1rem;margin-top:1.25rem;">Reply-to department</h3>
                 <div data-communications-reply-to></div>
-                <h3 class="admin-section-title" style="font-size:1rem;margin-top:1.25rem;">Approved template</h3>
-                <label>Template <select data-communications-template-select></select></label>
-                <label>Subject <input data-communications-subject maxlength="200" /></label>
-                <label>Body <textarea data-communications-body rows="10" maxlength="6000"></textarea></label>
+                <h3 class="admin-section-title" style="font-size:1rem;margin-top:1.25rem;">Approved email wording</h3>
+                <label>Email type <select data-communications-template-select></select></label>
+                <div class="admin-record" style="margin:.75rem 0;" data-communications-template-guide></div>
+                <p class="admin-muted" style="margin:.15rem 0 .4rem;">Subject</p><div class="admin-email-editor__subject" contenteditable="true" role="textbox" aria-label="Email subject" data-communications-subject></div>
+                <p class="admin-muted" style="margin:.15rem 0 .4rem;">Message</p>
+                <div class="admin-email-editor">
+                  <div class="admin-email-editor__toolbar">
+                    <label>Insert an automatic field
+                      <select data-communications-variable-select></select>
+                    </label>
+                    <button class="btn btn--ghost btn--small" type="button" data-admin-action="communications-insert-variable">Insert field</button>
+                    <button class="btn btn--ghost btn--small" type="button" data-admin-action="communications-approved-wording">Load approved wording</button>
+                  </div>
+                  <div class="admin-email-editor__body" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Email message" data-communications-body></div>
+                </div>
+                <p class="admin-muted">Fields appear as labeled chips inside the message and fill automatically when the email is sent. Use Preview to see the completed example.</p>
                 <div class="admin-actions">
                   <button class="btn btn--ghost btn--small" type="button" data-admin-action="communications-preview">Preview</button>
                   <button class="btn btn--ghost btn--small" type="button" data-admin-action="communications-reset">Reset form to saved settings</button>
