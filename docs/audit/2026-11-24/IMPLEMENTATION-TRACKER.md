@@ -46,11 +46,11 @@ milestone); partial; deferred; blocked.
 
 ## Release identity
 
-- Application commit: `88a7927`
+- Application commit: `2a95955`
 - Documentation commits: `132c54e`, `1a81631`
-- Cloudflare Pages deployment: `c8503fed-1ada-4114-aaa9-b1a36de9f552`
+- Cloudflare Pages deployment: `103a481a-b6aa-4162-b2f1-e1654c964c55`
 - Live verification: served admin asset
   `/_astro/index.astro_astro_type_script_index_0_lang.alIZjPxx.js`
-- GitHub CI: `45502328100` (validate and browser passed)
+- GitHub CI: `45504337889` (validate and browser passed)
 - Production migration: `0058` applied; 0 foreign-key violations
 - Release evidence: `docs/verification/2026-11-24-PLATFORM-CONSOLIDATION.md`

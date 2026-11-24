@@ -5,15 +5,15 @@
 | Item | Value |
 | --- | --- |
 | Start HEAD | `eeeb505` |
-| Application commit | `88a7927` |
+| Application commit | `2a95955` |
 | Documentation commits | `132c54e`, `1a81631` |
 | Branch | `production-safe` |
-| Cloudflare Pages deployment | `c8503fed-1ada-4114-aaa9-b1a36de9f552` |
-| Deployment source | `88a7927` |
+| Cloudflare Pages deployment | `103a481a-b6aa-4162-b2f1-e1654c964c55` |
+| Deployment source | `2a95955` |
 | Live site | `https://sparkling-standard.com` |
 | Verified served admin asset | `/_astro/index.astro_astro_type_script_index_0_lang.alIZjPxx.js` |
 | Production migration | `0058_document_library_review_state.sql` |
-| GitHub CI | `45502328100` - validate and browser jobs passed |
+| GitHub CI | `45504337889` - validate and browser jobs passed |
 
 ## What changed
 
@@ -38,6 +38,7 @@
 - Automatic and owner-initiated invitations fail closed for reviewed,
   do-not-ask, opted-out and unknown relationships, and for recent invitations.
 - Delivery failure can be retried explicitly.
+- Review state reads and changes are branch-scoped for non-owner managers.
 - Invoice, invoice email and invoice PDF no longer include a review invitation
   after a prior invitation or suppression.
 - Review automation remains disabled for both branches.
@@ -62,7 +63,7 @@
 | `npm run check` | 0 errors, 0 warnings (11 hints) |
 | Unit suite | 1,114 tests; 1,113 pass; 0 fail; 1 pre-existing skip |
 | Browser suite (local) | 278/278 pass |
-| GitHub CI `45502328100` | validate passed; browser passed |
+| GitHub CI `45504337889` | validate passed; browser passed |
 | Build | 41 pages |
 | Validation | 2,631 internal links, SEO, marketing registry, QR decode, checklist leak checks passed |
 | Smoke | 21 pages |
@@ -103,7 +104,7 @@ SQLite, 57 migrations, 101 tables, 0 foreign-key violations.
   document library, draft, history, review suppression, customer quick-action
   and active-lead code.
 - The earlier `82327071` deployment was verified during propagation; the final
-  verified deployment is `c8503fed` on source `88a7927`.
+  verified deployment is `c8503fed` on source `2a95955`.
 
 ## Not performed
 
