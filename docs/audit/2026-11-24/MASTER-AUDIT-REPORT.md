@@ -44,7 +44,7 @@ designed.
 | Production tables | 101 (restore-verified export) |
 | Foreign-key violations | 0 |
 | Public build | 41 pages, 2,631 links |
-| Unit suite | 1,113 tests, 1,112 pass, 1 pre-existing skip |
+| Unit suite | 1,114 tests, 1,113 pass, 1 pre-existing skip |
 | Browser suite | 278/278 pass |
 
 Production records observed read-only:

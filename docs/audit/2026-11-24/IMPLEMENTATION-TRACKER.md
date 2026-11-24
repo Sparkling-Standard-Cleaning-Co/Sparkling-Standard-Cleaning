@@ -33,7 +33,7 @@ milestone); partial; deferred; blocked.
 | Check | Result |
 | --- | --- |
 | `npm run check` | 0 errors, 0 warnings (11 hints) |
-| Unit suite | 1,113 tests; 1,112 pass; 0 fail; 1 pre-existing skip |
+| Unit suite | 1,114 tests; 1,113 pass; 0 fail; 1 pre-existing skip |
 | Browser suite | 278/278 pass |
 | Build | 41 pages |
 | Validation | 2,631 links, SEO, QRs, checklist leak checks pass |

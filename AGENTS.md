@@ -97,7 +97,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   Customer File gains a review relationship card and quick actions for booking, completed service,
   estimate, invoice, agreement, email and call. Production integrity is clean (0 foreign-key
   violations, 0 orphans, 0 duplicate invoice numbers, 0 duplicate per-appointment invoices) and
-  record counts are unchanged. Verified: unit **1,113** (1,112 pass, 1 pre-existing skip), browser
+  record counts are unchanged. Verified: unit **1,114** (1,113 pass, 1 pre-existing skip), browser
   **278/278**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45499824453`
   green. No customer email, charge, review invitation or production record was mutated. The audit
   also found the scheduled backup workflow is absent from the default branch and cannot be manually

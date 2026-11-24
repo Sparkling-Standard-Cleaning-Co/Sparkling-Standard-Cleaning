@@ -255,7 +255,7 @@ import {
           <section class="admin-view" data-admin-view="leads" hidden>
             <div class="admin-card">
               <form class="admin-inline-form" data-admin-lead-filter>
-                <label>Status <select name="status"><option value="">All</option><option value="new">New</option><option value="contacted">Contacted</option><option value="quoted">Quoted</option><option value="converted">Converted</option><option value="lost">Lost</option><option value="archived">Archived</option></select></label>
+                <label>Status <select name="status"><option value="active" selected>Active (excludes archived, lost, converted)</option><option value="">All records</option><option value="new">New</option><option value="contacted">Contacted</option><option value="quoted">Quoted</option><option value="converted">Converted</option><option value="lost">Lost</option><option value="archived">Archived</option></select></label>
                 <label>Search <input name="q" type="search" placeholder="Name, reference, address" /></label>
                 <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="status">Status</option><option value="request_type">Request type</option></select></label>
                 <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>

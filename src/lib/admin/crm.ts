@@ -503,12 +503,17 @@ function leadFilters(actor: AdminActor, input: LeadListInput): { sql: string; bi
   const status = text(input.status, 30);
   const q = text(input.q, 120);
   const branch = scope(actor, 'l.branch_id');
+  const statusSql =
+    status === 'active'
+      ? "l.status NOT IN ('archived','lost','converted')"
+      : "(? = '' OR l.status = ?)";
+  const statusBind: unknown[] = status === 'active' ? [] : [status, status];
   return {
-    sql: `WHERE (? = '' OR l.status = ?)
+    sql: `WHERE ${statusSql}
          AND (? = '' OR l.quote_reference LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?
               OR p.line1 LIKE ? OR l.payload_json LIKE ?)
          ${branch.sql}`,
-    bind: [status, status, q, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind],
+    bind: [...statusBind, q, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind],
   };
 }
 

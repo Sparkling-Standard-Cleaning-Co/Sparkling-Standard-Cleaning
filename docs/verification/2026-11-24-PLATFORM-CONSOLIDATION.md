@@ -54,7 +54,7 @@
 | Check | Result |
 | --- | --- |
 | `npm run check` | 0 errors, 0 warnings (11 hints) |
-| Unit suite | 1,113 tests; 1,112 pass; 0 fail; 1 pre-existing skip |
+| Unit suite | 1,114 tests; 1,113 pass; 0 fail; 1 pre-existing skip |
 | Browser suite (local) | 278/278 pass |
 | GitHub CI `45499824453` | validate passed; browser passed |
 | Build | 41 pages |

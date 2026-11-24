@@ -1848,7 +1848,7 @@ interface PageState {
   sort: string;
 }
 
-const leadPage: PageState & { status: string; q: string } = { status: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
+const leadPage: PageState & { status: string; q: string } = { status: 'active', q: '', limit: 25, offset: 0, sort: 'created_at' };
 const customerPage: PageState & { q: string; status: string } = { q: '', status: 'active', limit: 25, offset: 0, sort: 'created_at' };
 const careerPage: PageState & { status: string; branch: string; q: string } = { status: '', branch: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
 const financePage: PageState & { status: string; q: string } = { status: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
