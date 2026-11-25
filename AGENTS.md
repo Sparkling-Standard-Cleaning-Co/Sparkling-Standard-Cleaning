@@ -84,7 +84,26 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-24/25 platform completion, change orders and backup correction):**
+- **Current release (2026-11-25 P0 customer fixes):** application code `ae77ac4` on
+  `production-safe`, Cloudflare Pages deployment
+  `53b472e6-7819-4da2-942e-bc5a0e91cede`, verified live on 2026-11-25. Public booking now exposes
+  explicit 15-minute starts only inside the owner-defined Morning 7:00-8:30 AM and Afternoon
+  12:30-2:30 PM windows, with unavailable starts visibly disabled instead of auto-selected;
+  `/api/availability` and `/api/booking-hold` enforce the windows server-side. New recurring
+  residential arrangements show "Your First Cleaning" with the calculated first-visit Deep
+  Cleaning price and following-visit rhythm; the optional Deep Cleaning reset appears only after a
+  one-time residential choice and never for recurring service. The signing access step derives the
+  booking contact server-side and offers Same as my booking contact (verified name and phone,
+  nothing retyped) or a different day-of-service contact, which requires name and phone and never
+  overwrites the customer profile. A returning recurring customer whose first Deep Cleaning is
+  already complete still has no authenticated public-estimator identity; that exception remains an
+  owner policy decision. Verified: unit **1,121** (1,120 pass, 1 pre-existing skip), browser
+  **280/280**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45653891203` green.
+  Live availability for 2026-11-30 returned only 7:30-8:30 AM and 12:30-2:30 PM starts; a synthetic
+  9:00 AM hold was rejected with `slot_outside_public_window`. No migration, customer email, charge,
+  booking, hold or real signing request was created or modified. Evidence:
+  `docs/verification/2026-11-25-P0-CUSTOMER-FIXES.md`.
+- **Prior release (2026-11-24/25 platform completion, change orders and backup correction):**
   application code `aaa4c83` on `production-safe`, Cloudflare Pages deployment
   `9cea2813-c777-4dd6-97ab-f8e62c2ea845`, verified live on 2026-11-25 (served admin asset
   `/_astro/index.astro_astro_type_script_index_0_lang.DLPf6bre.js`). Migrations `0059` and
