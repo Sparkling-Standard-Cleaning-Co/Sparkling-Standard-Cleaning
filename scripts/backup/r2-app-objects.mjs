@@ -41,6 +41,21 @@ async function listObjects(bucket) {
   const objects = [];
   let cursor = '';
   do {
+    if (useWorker) {
+      const name = bucket.includes('photo') ? 'photos' : 'documents';
+      const url = new URL(`${controlUrl}/app-objects/list`);
+      url.searchParams.set('bucket', name);
+      if (cursor) url.searchParams.set('cursor', cursor);
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${controlToken}` },
+      });
+      if (!response.ok) throw new Error(`list ${bucket}: HTTP ${response.status}`);
+      const body = await response.json();
+      if (!body.ok) throw new Error(`list ${bucket}: ${body.error || 'failed'}`);
+      objects.push(...(body.objects ?? []));
+      cursor = body.cursor || '';
+      continue;
+    }
     const url = new URL(`${base}/${encodeURIComponent(bucket)}/objects`);
     url.searchParams.set('per_page', '1000');
     if (cursor) url.searchParams.set('cursor', cursor);
@@ -56,8 +71,17 @@ async function listObjects(bucket) {
 }
 
 async function download(bucket, key, destination) {
-  const url = `${base}/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(key)}`;
-  const response = await fetch(url, { headers });
+  let response;
+  if (useWorker) {
+    const name = bucket.includes('photo') ? 'photos' : 'documents';
+    const url = new URL(`${controlUrl}/app-objects/get`);
+    url.searchParams.set('bucket', name);
+    url.searchParams.set('key', key);
+    response = await fetch(url, { headers: { Authorization: `Bearer ${controlToken}` } });
+  } else {
+    const url = `${base}/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(key)}`;
+    response = await fetch(url, { headers });
+  }
   if (!response.ok) throw new Error(`get ${bucket}/${key}: HTTP ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
   await fs.mkdir(path.dirname(destination), { recursive: true });
