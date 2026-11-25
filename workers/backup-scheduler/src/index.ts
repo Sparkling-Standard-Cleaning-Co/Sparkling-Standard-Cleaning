@@ -264,6 +264,7 @@ async function createJob(
   },
 ): Promise<{ job: Record<string, unknown>; duplicate?: boolean; error?: string; status?: number }> {
   if (!env.DB) return { job: {}, error: 'database_not_configured', status: 503 };
+  await syncRunningJob(env);
   const existing = await activeJob(env);
   if (existing) {
     return { job: backupJob(existing), duplicate: true, status: 409 };

@@ -18,6 +18,7 @@ async function readJson(file) {
 }
 
 const operation = arg('--operation', 'backup');
+const jobId = arg('--job-id', '');
 const status = arg('--status', 'failure') === 'success' ? 'success' : 'failure';
 const out = path.resolve(arg('--out', 'backup-out/report.json'));
 const error = arg('--error', '');
@@ -63,5 +64,5 @@ const detail = {
 };
 
 await fs.mkdir(path.dirname(out), { recursive: true });
-await fs.writeFile(out, JSON.stringify({ status, summary, ...detail }, null, 2));
-process.stdout.write(`${JSON.stringify({ status, summary, archiveName, archiveKey, archiveBytes, fileCount, r2Verified, oneDriveVerified, restorePassed })}\n`);
+await fs.writeFile(out, JSON.stringify({ jobId, status, summary, ...detail }, null, 2));
+process.stdout.write(`${JSON.stringify({ jobId, status, summary, archiveName, archiveKey, archiveBytes, fileCount, r2Verified, oneDriveVerified, restorePassed })}\n`);

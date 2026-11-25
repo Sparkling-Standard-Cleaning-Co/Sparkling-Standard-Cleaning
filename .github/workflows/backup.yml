@@ -164,7 +164,7 @@ jobs:
       - name: Report result to the admin control plane
         if: always()
         run: |
-          node scripts/backup/report.mjs --operation backup --status "${{ job.status }}" --out backup-out/report.json || true
+          node scripts/backup/report.mjs --operation backup --status "${{ job.status }}" --job-id "$BACKUP_JOB_ID" --out backup-out/report.json || true
           if [ -z "$BACKUP_CONTROL_URL" ] || [ -z "$BACKUP_CONTROL_TOKEN" ] || [ -z "$BACKUP_JOB_ID" ]; then
             echo "Admin control callback is not configured; skipping."
             exit 0

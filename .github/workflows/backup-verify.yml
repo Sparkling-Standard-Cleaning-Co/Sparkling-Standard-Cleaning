@@ -87,6 +87,7 @@ jobs:
           node scripts/backup/report.mjs \
             --operation "$VERIFY_OPERATION" \
             --status "${{ job.status }}" \
+            --job-id "$BACKUP_JOB_ID" \
             --archive-name "$ARCHIVE_NAME" \
             --archive-key "$ARCHIVE_KEY" \
             --out backup-out/report.json || true
