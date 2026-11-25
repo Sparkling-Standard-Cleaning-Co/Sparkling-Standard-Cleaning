@@ -62,7 +62,9 @@ async function main() {
   }
   entries.sort((a, b) => a.path.localeCompare(b.path));
 
-  const baseName = `sparkling-standard-backup-${stamp()}`;
+  const label = (argValues('--label')[0] ?? process.env.BACKUP_ARCHIVE_LABEL ?? '').trim().toLowerCase();
+  if (label && !/^[a-z0-9-]{1,20}$/.test(label)) throw new Error('Backup label is invalid.');
+  const baseName = `sparkling-standard-backup-${stamp()}${label ? `-${label}` : ''}`;
   const archivePath = path.join(outDir, `${baseName}.ssbk`);
   const result = await writeEncryptedArchive({
     entries,

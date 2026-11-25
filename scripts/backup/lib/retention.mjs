@@ -38,6 +38,7 @@ export function groupBundles(items) {
       id: base,
       name: base,
       date: parseBackupDate(base),
+      scope: /-(complete|database)$/i.exec(base)?.[1]?.toLowerCase() ?? 'legacy',
       files: [],
       bytes: 0,
       protected: false,
@@ -76,28 +77,34 @@ export function planRetention(items, options = {}) {
     return bt - at;
   });
   const kept = new Set();
-  const daily = new Set();
-  const weekly = new Set();
-  const monthly = new Set();
+  const scopeSets = new Map();
+  const newestByScope = new Map();
   for (const bundle of bundles) {
     if (!bundle.date) continue;
+    if (!newestByScope.has(bundle.scope)) newestByScope.set(bundle.scope, bundle.id);
+    const scopeState = scopeSets.get(bundle.scope) ?? {
+      daily: new Set(),
+      weekly: new Set(),
+      monthly: new Set(),
+    };
     const day = bundle.date.toISOString().slice(0, 10);
     const week = startOfIsoWeek(bundle.date);
     const month = monthKey(bundle.date);
-    if (daily.size < retention.daily && !daily.has(day)) {
-      daily.add(day);
+    if (scopeState.daily.size < retention.daily && !scopeState.daily.has(day)) {
+      scopeState.daily.add(day);
       kept.add(bundle.id);
     }
-    if (weekly.size < retention.weekly && !weekly.has(week)) {
-      weekly.add(week);
+    if (scopeState.weekly.size < retention.weekly && !scopeState.weekly.has(week)) {
+      scopeState.weekly.add(week);
       kept.add(bundle.id);
     }
-    if (monthly.size < retention.monthly && !monthly.has(month)) {
-      monthly.add(month);
+    if (scopeState.monthly.size < retention.monthly && !scopeState.monthly.has(month)) {
+      scopeState.monthly.add(month);
       kept.add(bundle.id);
     }
+    scopeSets.set(bundle.scope, scopeState);
   }
-  if (bundles.length > 0) kept.add(bundles[0].id);
+  for (const id of newestByScope.values()) kept.add(id);
   for (const bundle of bundles) {
     if (bundle.protected || legalHold.has(bundle.id) || legalHold.has(bundle.name)) kept.add(bundle.id);
   }

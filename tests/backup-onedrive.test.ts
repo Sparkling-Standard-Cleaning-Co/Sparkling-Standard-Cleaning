@@ -113,6 +113,18 @@ test('retention groups an archive with its manifest and checksum as one recovery
   assert.equal(plan.delete[0].id, 'sparkling-standard-backup-2026-11-20T08-30-00');
   assert.equal(plan.delete[0].files, 3);
 });
+test('retention keeps the newest complete and database backups independently', () => {
+  const items = [
+    { name: 'sparkling-standard-backup-2026-11-25T19-00-00-complete.ssbk', bytes: 400 },
+    { name: 'sparkling-standard-backup-2026-11-25T19-05-00-database.ssbk', bytes: 100 },
+    { name: 'sparkling-standard-backup-2026-11-25T18-00-00-complete.ssbk', bytes: 300 },
+  ];
+  const plan = planRetention(items, { daily: 1, weekly: 1, monthly: 1 });
+  assert.equal(plan.kept.some((bundle) => bundle.id.endsWith('-complete')), true);
+  assert.equal(plan.kept.some((bundle) => bundle.id.endsWith('-database')), true);
+  assert.equal(plan.delete.some((bundle) => bundle.id.includes('18-00-00')), true);
+});
+
 test('retention keeps the newest archive and protected recovery points under the approved buckets', () => {
   const items = [
     { name: 'sparkling-standard-backup-2026-11-21T08-30-00.ssbk', bytes: 100 },

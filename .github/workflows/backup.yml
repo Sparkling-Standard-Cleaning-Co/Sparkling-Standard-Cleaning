@@ -79,6 +79,7 @@ jobs:
       BACKUP_CONTROL_TOKEN: ${{ secrets.BACKUP_CONTROL_TOKEN }}
       BACKUP_JOB_ID: ${{ inputs.job_id }}
       BACKUP_SCOPE: ${{ inputs.scope }}
+      BACKUP_ARCHIVE_LABEL: ${{ inputs.scope }}
       INCLUDE_APP_OBJECTS: ${{ inputs.include_app_objects }}
       RETENTION_DAILY: ${{ inputs.retention_daily }}
       RETENTION_WEEKLY: ${{ inputs.retention_weekly }}
@@ -117,7 +118,7 @@ jobs:
         run: node scripts/backup/r2-app-objects.mjs --out backup-out/r2-app
       - name: Create and upload encrypted R2 backup
         run: |
-          ARGS=(--d1 backup-out/d1.sql --source metadata=backup-out/metadata --out backup-out --upload)
+          ARGS=(--d1 backup-out/d1.sql --source metadata=backup-out/metadata --out backup-out --label "$BACKUP_SCOPE" --upload)
           if [ -d backup-out/r2-app ]; then ARGS+=(--source "app-r2=backup-out/r2-app"); fi
           node scripts/backup/create.mjs "${ARGS[@]}"
       - name: Independently download and verify the R2 copy
