@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 // Download application R2 objects for encryption/off-site backup.
 //
 // Prefers the owner backup Worker, which reads application R2 through bucket
@@ -20,7 +20,7 @@ function arg(name, fallback = '') {
 
 const token = (process.env.R2_APP_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN)?.trim();
 const account = (process.env.R2_APP_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID)?.trim();
-const controlUrl = (process.env.BACKUP_CONTROL_URL || '').trim().replace(/\\/+$/, '');
+const controlUrl = (process.env.BACKUP_CONTROL_URL || '').trim().replace(/\/+$/, '');
 const controlToken = (process.env.BACKUP_CONTROL_TOKEN || '').trim();
 const useWorker = Boolean(controlUrl && controlToken);
 const buckets = (process.env.APP_R2_BUCKETS || 'sparkling-standard-documents,sparkling-standard-lead-photos')

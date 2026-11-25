@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Sparkling Standard backup control plane.
  *
  * This Worker is the server-side bridge between the owner-only admin screen and

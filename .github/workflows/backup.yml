@@ -1,4 +1,4 @@
-﻿name: Encrypted off-site backup
+name: Encrypted off-site backup
 
 # GitHub is the execution engine, but the Sparkling Standard admin backup
 # control plane is the owner's operating surface. Routine operation never

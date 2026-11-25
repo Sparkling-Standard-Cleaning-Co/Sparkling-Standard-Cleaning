@@ -1,4 +1,4 @@
-﻿# Copy to wrangler.toml and deploy:
+# Copy to wrangler.toml and deploy:
 #   npx wrangler deploy --config wrangler.toml
 #
 # Required secrets:
