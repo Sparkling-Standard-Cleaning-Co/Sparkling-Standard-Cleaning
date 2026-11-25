@@ -1,5 +1,13 @@
 # Encrypted off-site backups and recovery
 
+**Status (2026-11-25): the owner operates backups from Admin -> Data & Storage.** The
+centralized backup control center starts complete or database backups, monitors the
+GitHub execution, verifies R2 and OneDrive copies, lists encrypted archives, provides
+short-lived owner downloads, runs isolated restore tests, and configures schedule/retention.
+GitHub, Cloudflare and OneDrive remain underlying infrastructure only. See
+docs/verification/2026-11-25-CENTRALIZED-BACKUP-CONTROL.md. The legacy local Windows
+schedule remains an additional local recovery path.
+
 **Status (2026-11-25 correction): local scheduled backups are running and verified.**
 The previous audit checked only GitHub and incorrectly concluded that all backups
 were dormant. The Windows scheduled tasks were already active:

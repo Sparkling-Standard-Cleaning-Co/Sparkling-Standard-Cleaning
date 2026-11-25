@@ -1,4 +1,4 @@
-# AGENTS.md — Sparkling Standard Digital Operating System
+# AGENTS.md â€” Sparkling Standard Digital Operating System
 
 Authoritative operating instructions for every AI engineering agent (OpenCode and similar)
 working in this repository. Read this file fully before changing anything, then read the specific
@@ -19,7 +19,7 @@ When instructions conflict, resolve them in this order:
 Never let outdated documentation override verified current information. Never treat a focused
 hotfix instruction as the company's permanent engineering philosophy.
 
-## Engineering philosophy — solve the problem completely
+## Engineering philosophy â€” solve the problem completely
 
 Sparkling Standard is engineered to an exceptional professional standard. The objective is the
 highest-quality finished product that competes and grows, not the smallest possible diff or the
@@ -44,21 +44,21 @@ unrelated pages, and do not churn working systems without a concrete quality or 
 
 ### Quality dimensions for every meaningful change
 
-- **Design & presentation** — premium visual execution, typography, spacing, responsive layouts,
+- **Design & presentation** â€” premium visual execution, typography, spacing, responsive layouts,
   consistent branding, polished interaction states, finished details.
-- **Customer experience** — fewer questions, clicks, scrolls and confusing states; no dead ends;
+- **Customer experience** â€” fewer questions, clicks, scrolls and confusing states; no dead ends;
   conversion is exceptionally straightforward.
-- **Engineering** — cohesive architecture, maintainable modules, strict typing, appropriate
+- **Engineering** â€” cohesive architecture, maintainable modules, strict typing, appropriate
   abstraction, minimal duplication, reliable error handling, clear responsibilities.
-- **Accessibility** — keyboard operation, visible focus, readable errors, screen-reader support,
+- **Accessibility** â€” keyboard operation, visible focus, readable errors, screen-reader support,
   properly sized mobile controls, WCAG 2.2 AA expectations.
-- **Performance** — fast loading, efficient JavaScript, lazy loading where appropriate, correctly
+- **Performance** â€” fast loading, efficient JavaScript, lazy loading where appropriate, correctly
   sized media, protection from layout shifts.
-- **Security & privacy** — credentials, customer data, private operating coordinates, pricing
+- **Security & privacy** â€” credentials, customer data, private operating coordinates, pricing
   integrity and analytics consent are protected; server-enforced where it matters.
-- **Commercial effectiveness** — generate legitimate inquiries, communicate trust, explain
+- **Commercial effectiveness** â€” generate legitimate inquiries, communicate trust, explain
   differentiation honestly, remove friction from conversion.
-- **Operational maintainability** — the owner or a future developer can understand and safely
+- **Operational maintainability** â€” the owner or a future developer can understand and safely
   change the system without reverse-engineering it.
 
 Passing tests is a requirement, not proof of quality. UI changes need visual browser verification.
@@ -84,7 +84,24 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-25 urgent scheduling and HOLIDAY15 correction):** application code
+- **Current release (2026-11-25 centralized backup control and branch consolidation):** application code
+  3881a8f on production-safe and main (identical, zero divergence), Cloudflare Pages deployment
+  9b6f5cd7 with the current secrets, verified live on 2026-11-25. Admin -> Data & Storage is now the
+  owner's single backup control center: owner-only/CSRF/MFA-step-up actions start complete or database
+  backups in the background, monitor actual status, list encrypted archives, download through short-lived
+  signed links, independently verify R2 and OneDrive, run isolated restore tests, and configure the schedule
+  and retention. GitHub remains the execution engine; the owner never needs to open GitHub, Cloudflare or
+  OneDrive for routine work. Added migration 0062 (62 production migrations, 107 tables), a dedicated
+  backup Worker, the GitHub callback workflows, separate complete/database retention streams, and the existing
+  encryption key and OneDrive authorization were reused without exposing values. Verified live: a complete
+  backup (10,788,325 bytes, 227 files, R2 and OneDrive verified, isolated restore 106 tables), an admin
+  download with SSBA1 encryption header, and an admin restore test. Unit **1,125** (1,124 pass, 1 skip),
+  browser **282/282**, check 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI 45688412800 green. The
+  initial complete archive was superseded by the pre-fix same-day retention rule; no business records were
+  lost, the 2026-11-21 archive remains, and a fresh complete archive was created after the fix. Evidence:
+  docs/verification/2026-11-25-CENTRALIZED-BACKUP-CONTROL.md and
+  docs/verification/2026-11-25-backup-control/ .
+- **Prior release (2026-11-25 urgent scheduling and HOLIDAY15 correction):** application code
   `a0b94c8` (feature commit `bf2b81c`, display alignment `a0b94c8`) on `production-safe`,
   Cloudflare Pages deployment `643d14b8-2b4b-457c-9221-e1cec3d158ba`, verified live on
   2026-11-25. The compact hour/minute selector is restored; 7:00 and 7:15 AM are first-job
@@ -289,7 +306,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   context, packet readiness, a visual block editor with live print-ready preview, version comparison
   and Approve & Publish. The 27 imported approved templates were corrected to
   `2026-11-23.customer-release.v1` / `2026-11-23.employee-release.v1`: the internal
-  `OWNER REVIEW DRAFT — NOT EFFECTIVE UNTIL APPROVED` line was removed, every active packet now
+  `OWNER REVIEW DRAFT â€” NOT EFFECTIVE UNTIL APPROVED` line was removed, every active packet now
   points to a clean approved version, and 0 approved templates contain the draft notice. The
   previous versions are retired but preserved. Customer/employee PDFs, executed copies, emails,
   signing pages and portal document lists no longer print request IDs, template IDs, version
@@ -309,9 +326,9 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   `0566590a-f5a8-4d6f-abff-5a26c06783dd`. Adds migration
   `0053_signing_pricing_snapshot.sql` (applied to production), a persistent server-authoritative
   pricing snapshot shown on the signing Details & price step, executed copies/PDFs and admin request
-  detail; visible per-document **X — Sign here** boxes with an adopt-once signature pad, progress and
+  detail; visible per-document **X â€” Sign here** boxes with an adopt-once signature pad, progress and
   next-signature navigation; direct post-signing transition to the payment page with signed-PDF
-  download, email status and portal access; the `Â€` mojibake repair; a Word-style WYSIWYG document
+  download, email status and portal access; the `Ã‚â‚¬` mojibake repair; a Word-style WYSIWYG document
   editor with sanitized rich HTML and PDF rendering; simplified Create a Document / Upload approved
   PDF flows; conventional Version 1.0/1.1 labels; and a test-only Resend network guard. Tests never
   send live email. Evidence: `docs/verification/2026-11-23-SIGNING-PRICING-EDITOR.md`.
@@ -361,7 +378,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   are active: `customer.deep`, `customer.residential`, `customer.recurring`,
   `customer.move_in_out`. Required customer documents are enforced at `before_payment`;
   booking-specific agreements are `per_booking = 1`. The checkout Terms/Privacy links now open an
-  accessible in-page modal that preserves estimator state. **Admin → Documents & Agreements →
+  accessible in-page modal that preserves estimator state. **Admin â†’ Documents & Agreements â†’
   Document Updates** provides revision impact analysis, owner acknowledgement, notification and a
   re-signing queue that prefills the existing composer; no automated customer contact. Facility
   online payment is **disabled** in the browser and server until its own acceptance run; Tier A/B
@@ -630,12 +647,12 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
 - **Prior Initiative 6.6:** live at `0b907d4` (Cloudflare Pages deployment `26e3b9f8-7665-426f-8687-7f171588c865`); it completed the 13-page owner audit, approved homepage/Community Support/Deep Cleaning/Service Area copy, FL/AL state restriction, GPS loading, optional facility ZIP, centered facility intros, add-on bundles, and the original Pay Now/reservation path. Private legal records were organized in the master archive.
 - **Prior Initiative 6.5:** live at `298c1df` (deployment `f9b4f61a-58d1-4ff3-8535-c375af8789fc`); automatic estimator configuration, validation gate, pricing fingerprint and four-engine impact report remain intact; all calibration factors remain `1.00`.
 - **Prior Initiative 6.4:** live at `685031d` (deployment `f9dea1a0-5b55-4cd8-b09e-18efae73c68a`); the 18-county map, reading-glasses/red-white-blue icons, footer/navigation/copy corrections and four `1.00` calibration factors remain intact.
-- **Prior release status:** the 2026-10-03 release was **deployed to production** — `origin/main` =
+- **Prior release status:** the 2026-10-03 release was **deployed to production** â€” `origin/main` =
   `62a1a46` (the five-commit release `8b8dde4`/`03d6ba8`/`53a85aa`/`0f3c38c`/`5a4a024`, the
   documentation closeout `7a51efa`, the social integration `cdc4971`, the deployment-closeout
   `6ebc3fb` and the logo-only Follow Us redesign `62a1a46`), owner-authorized with live
-  acceptance checks passed (see `docs/verification/VERIFICATION.md`). Any new local work —
-  including later documentation follow-ups — stays unpublished until the owner authorizes another
+  acceptance checks passed (see `docs/verification/VERIFICATION.md`). Any new local work â€”
+  including later documentation follow-ups â€” stays unpublished until the owner authorizes another
   push.
 - **Marketing phase (2026-10-03):** the business is transitioning from development into active
   marketing. **Immediate execution priorities: film Hayli's founder introduction, produce the
@@ -644,14 +661,14 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   with its profile + review links captured; X active), the proposed "30 Days. 30 Details." content plan, the 30-day
   launch schedule and the owner account checklist are documented under `docs/marketing/`. The
   primary business objective is dependable weekly/biweekly residential customers. The owner's
-  pending marketing actions live in `docs/launch/OWNER-INPUT-REQUIRED.md` (M2–M7; M1 — the
-  software release — was deployed 2026-10-03).
+  pending marketing actions live in `docs/launch/OWNER-INPUT-REQUIRED.md` (M2â€“M7; M1 â€” the
+  software release â€” was deployed 2026-10-03).
 - **Formal launch checklist still outstanding (owner sign-off):** insurance/
   bonding/licensing claims, genuine reviews, final cancellation percentages, and any profile
   URLs not yet supplied. The legal entity spelling is owner-confirmed and supported by the
   Florida Articles certificate in the private master archive. `business.launch.productionApproved` remains `false` as the formal
   checklist gate; it does NOT reflect deployment state (the site is live).
-- Owner-confirmed facts: name, domain, phone `(850) 426-8479` (corrected 2026-10-02 — the
+- Owner-confirmed facts: name, domain, phone `(850) 426-8479` (corrected 2026-10-02 â€” the
   earlier `(850) 246-8479` was a typo and must never be reintroduced), email
   `owner@sparkling-standard.com`, founder Hayli, Stripe, Cloudflare DNS.
 
@@ -674,7 +691,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
   authorization.
 - **No fabricated business claims** (see rule above).
 - **No leaking** private operating coordinates, customer data, credentials, API keys, tokens or
-  session data — into code, logs, tests, commits, docs, analytics, notifications or reports.
+  session data â€” into code, logs, tests, commits, docs, analytics, notifications or reports.
 - **Sunshine Climate Solutions is a READ-ONLY architectural reference.** Never modify its
   repository; adapt patterns with applicable licenses/attribution preserved.
 - **No destructive Git operations** (force push, history rewrite, reset, clean) and no undocumented
@@ -691,29 +708,29 @@ Never publish unapproved promotional promises or activate binding pricing withou
 - `trailingSlash: 'always'`; canonical domain from `PUBLIC_SITE_URL`; sitemap excludes 404,
   payment-success, thank-you and leave-review.
 - **Single sources of truth** (never hard-code these facts elsewhere):
-  - `src/config/business.ts` — every business fact, contact channel, socials, launch flags,
+  - `src/config/business.ts` â€” every business fact, contact channel, socials, launch flags,
     publication flags.
-  - `src/config/estimators/pricing-values.ts` — raw owner-editable pricing, labor model, add-ons,
+  - `src/config/estimators/pricing-values.ts` â€” raw owner-editable pricing, labor model, add-ons,
     promotions, discounts and thresholds.
-  - `src/config/pricing.ts` — typed approval/notes wrapper consumed by the estimator.
-  - `src/config/estimators/input-definitions.ts` — customer input options and validation limits.
-  - `src/config/estimators/commercial.ts` — commercial/church pricing switch and tier triggers.
-  - `src/config/estimators/travel.ts` — shared client/server travel economics.
-  - `src/config/geography.ts` — ZIP→zone reference and zone policy (preliminary, not addresses).
-  - `src/config/marketing-links.ts` — inbound UTM links and QR assets.
+  - `src/config/pricing.ts` â€” typed approval/notes wrapper consumed by the estimator.
+  - `src/config/estimators/input-definitions.ts` â€” customer input options and validation limits.
+  - `src/config/estimators/commercial.ts` â€” commercial/church pricing switch and tier triggers.
+  - `src/config/estimators/travel.ts` â€” shared client/server travel economics.
+  - `src/config/geography.ts` â€” ZIPâ†’zone reference and zone policy (preliminary, not addresses).
+  - `src/config/marketing-links.ts` â€” inbound UTM links and QR assets.
 - **Content collections** (`src/content.config.ts`, Zod-validated): `services` (seven owning
   pages), `faqs`, `checklists` (`public | internal`; internal must never render publicly),
   `proof` (intentionally empty until genuine material exists), `reviews` (carries the three
-  authentic owner-supplied Google reviews since 2026-10-24 — never fabricate more), `site` (page copy).
+  authentic owner-supplied Google reviews since 2026-10-24 â€” never fabricate more), `site` (page copy).
 - Pages are thin wrappers. The estimator engine lives in `src/lib/estimate/`; travel logic in
   `src/lib/travel/`; address/location logic in `src/lib/location/`. Arithmetic never lives in pages.
 - The estimate flow collects a **confirmed destination**: GPS "Use My Current Location" first, with
   an expandable manual address section (closed by default), MapMap suggestions through
   `/api/geocode`, a manual fallback, and a lazy-loaded MapLibre GL + OpenFreeMap pin confirmation.
-  A confirmed pin is the only destination source — never let a ZIP centroid silently replace it.
+  A confirmed pin is the only destination source â€” never let a ZIP centroid silently replace it.
   GPS/manual modes are isolated: the selected method is the only source of the submitted address.
   A suggestion the provider only knows at street level opens the same pin confirmation and records
-  `pin_precision: 'street'` — the exact house number is never fabricated and travel stays preliminary.
+  `pin_precision: 'street'` â€” the exact house number is never fabricated and travel stays preliminary.
 - The **promotion engine** (`src/lib/estimate/promotions.ts`) is pure and shared by the browser
   estimator and server verification: at most ONE promotion per quote, owner-gated, term-gated,
   minimum-job floor enforced, specialty work excluded, customer-kind programs fail closed. Prepared
@@ -734,12 +751,12 @@ Never publish unapproved promotional promises or activate binding pricing withou
   a PROPOSAL: every priced reservation request is recalculated server-side
   (`src/lib/estimate/verify.ts` via `functions/api/lead.ts`); client price/coordinate/verdict
   fields are never trusted. A GPS destination without a resolvable ZIP is priced from its confirmed
-  pin and stays **preliminary** — never represented as a server-verified street address.
+  pin and stays **preliminary** â€” never represented as a server-verified street address.
 - Serverless functions live in `functions/api/` (Cloudflare Pages Functions) for geocoding, travel
   lookup, the lead relay and server-verified Stripe estimate payments. **Secrets only ever live
   in the function environment** (Cloudflare).
 - Styles: `src/styles/tokens.css` (design tokens), `global.css` (component styles), `fonts.css`
-  (generated). Use tokens only — never raw colors, spacing or font sizes.
+  (generated). Use tokens only â€” never raw colors, spacing or font sizes.
 - Analytics: nothing loads before an explicit analytics consent choice; Umami/GTM/GA4 are gated by
   the same consent controller. Event names are a closed taxonomy
   (`src/lib/analytics/events.ts`) with allowlisted payload keys. Never send names, emails, phones,
@@ -753,7 +770,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
   `node scripts/generate-brand-images.mjs` command aliases the same generator. Do not overwrite
   the approved icons with older artwork.
 
-## System map — where the source of truth lives
+## System map â€” where the source of truth lives
 
 | System | Source of truth | Detailed docs |
 | --- | --- | --- |
@@ -769,7 +786,7 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Promotions and Founding-10 (disabled) + three owner-approved add-on bundles | `src/lib/estimate/promotions.ts` + `src/config/estimators/pricing-values.ts` | `docs/launch/PROMOTION-PROPOSALS.md`, `docs/operations/ESTIMATE-CALCULATION-ORDER.md` |
 | Owner Pricing & Estimator Control (draft/publish/rollback, four-engine simulator) | `src/lib/pricing/` (`catalog.ts`, `snapshot.ts`, `store.ts`, `simulate.ts`), `functions/api/admin/pricing.ts`, `functions/api/pricing.ts`, `src/scripts/pricing-admin.ts`, migration `0026` | `docs/operations/PRICING-CONTROL-CENTER.md` |
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
-| Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `admin-invoice.ts`, `invoice-email.ts`, `pdf.ts`, `functions/api/admin/finance.ts`, `functions/api/admin/invoice-document.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` §4a |
+| Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `admin-invoice.ts`, `invoice-email.ts`, `pdf.ts`, `functions/api/admin/finance.ts`, `functions/api/admin/invoice-document.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` Â§4a |
 | Workforce intelligence and intelligent dispatch | `src/lib/dispatch/` (`engine.ts`, `repository.ts`, `service.ts`), `functions/api/admin/dispatch.ts`, `src/scripts/admin.ts`, `src/pages/admin/index.astro`, migration `0041` | `docs/operations/WORKFORCE-DISPATCH.md` |
 | Reservation window, statuses, ledger | `src/config/scheduling.ts` + `src/scripts/estimate-wizard.ts` | `docs/operations/RESERVATION-TRACKING.md` |
 | Gift certificates (sales live) | `src/config/gift-certificates.ts`, `src/lib/gift/`, `src/pages/gift-certificates/`, `src/pages/gift-admin.astro`, `functions/api/gift-checkout.ts`, `stripe-webhook.ts`, `gift-auth.ts`, `gift-admin.ts`, `gift-balance.ts`, `src/lib/gift/activation.ts`, `src/lib/admin/` | `docs/operations/GIFT-CERTIFICATES.md`, `docs/operations/R2-STORAGE-AND-BACKUP.md` |
@@ -794,21 +811,21 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Unified customer file and job lifecycle | `customers`, `properties`, `appointments`, `invoices`, `signing_requests`, `payments`, `communications`, `job_media` | `docs/operations/CUSTOMER-FILE-JOB-LIFECYCLE.md` |
 | Customer photo intake (private R2, metadata stripping, owner links, retention) | `functions/api/photo-upload.ts`, `photo-view.ts`, `photo-cleanup.ts`, `src/lib/photos.ts`, `src/lib/photo-files.ts`, `src/scripts/photo-uploads.ts`, `src/components/PhotoUploadSection.astro` | `docs/operations/PHOTO-UPLOADS.md` |`n| Photo privacy rules (marketing/field photography) | `docs/privacy/PHOTO-PRIVACY-SOP.md` |
 | UTM links and QR assets | `src/config/marketing-links.ts` | `docs/marketing/UTM-MASTER-LINKS.md`, `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md` |
-| Marketing strategy, growth engines, platform priorities | — | `docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md` (execution front door), `docs/marketing/GROWTH-SYSTEM.md` (spine: flywheel, weekly loop, roadmap; subsystems `COMPETITIVE-STRATEGY.md`, `CONTENT-ENGINE.md`, `FIELD-CONTENT-CAPTURE.md`, `VIDEO-DIRECTING-SHEETS.md`, `CUSTOMER-LIFECYCLE.md`, `ACQUISITION-CHANNELS.md`, `LOCAL-AUTHORITY.md`, `ECONOMIC-MODEL.md`), `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`, `docs/marketing/CONTENT-OPERATING-SYSTEM.md` |
+| Marketing strategy, growth engines, platform priorities | â€” | `docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md` (execution front door), `docs/marketing/GROWTH-SYSTEM.md` (spine: flywheel, weekly loop, roadmap; subsystems `COMPETITIVE-STRATEGY.md`, `CONTENT-ENGINE.md`, `FIELD-CONTENT-CAPTURE.md`, `VIDEO-DIRECTING-SHEETS.md`, `CUSTOMER-LIFECYCLE.md`, `ACQUISITION-CHANNELS.md`, `LOCAL-AUTHORITY.md`, `ECONOMIC-MODEL.md`), `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`, `docs/marketing/CONTENT-OPERATING-SYSTEM.md` |
 | Social account setup (owner checklist) | `src/config/business.ts` `socials` | `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`, `docs/marketing/PLATFORM-REGISTER.md` |
-| Content production, proposed series, video workflow | — | `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` |
-| Marketing → business reporting hierarchy | `docs/marketing/LEAD-MEASUREMENT-MODEL.md` | `docs/marketing/WEEKLY-SCORECARD.md` |
+| Content production, proposed series, video workflow | â€” | `docs/marketing/CONTENT-PRODUCTION-SYSTEM.md` |
+| Marketing â†’ business reporting hierarchy | `docs/marketing/LEAD-MEASUREMENT-MODEL.md` | `docs/marketing/WEEKLY-SCORECARD.md` |
 | Canvassing intelligence (neighborhood scoring, routes, workbook) | `scripts/canvass/` (public county parcel + ACS data; canonical `route_object.json`; outputs in git-ignored `canvass-out/`) | `docs/marketing/CANVASSING-SYSTEM.md`, `docs/marketing/CANVASSING-TOP-NEIGHBORHOODS.md`, `docs/marketing/CANVASSING-ROUTES-OVERVIEW.md`, `docs/marketing/field-acquisition/ROUTE-PLANNING.md` |
-| Physical acquisition / print system (8 pieces × 3 variants, PPTX masters, print PDFs) | `scripts/print/` (brand-locked generator; outputs to `~/Downloads/Door Knocking - Stage 2 Review/` by default) + `src/config/brand.ts` mark + `src/config/marketing-links.ts` QR registry | `docs/brand/PHYSICAL-BRAND-SYSTEM-AUDIT.md`, `docs/marketing/field-acquisition/` (design decisions, manifest, specs, QR assignments, owner editing, privacy) |
-| Launch schedule and owner approvals | — | `docs/marketing/90-DAY-LAUNCH-PLAN.md`, `docs/launch/OWNER-INPUT-REQUIRED.md` |
+| Physical acquisition / print system (8 pieces Ã— 3 variants, PPTX masters, print PDFs) | `scripts/print/` (brand-locked generator; outputs to `~/Downloads/Door Knocking - Stage 2 Review/` by default) + `src/config/brand.ts` mark + `src/config/marketing-links.ts` QR registry | `docs/brand/PHYSICAL-BRAND-SYSTEM-AUDIT.md`, `docs/marketing/field-acquisition/` (design decisions, manifest, specs, QR assignments, owner editing, privacy) |
+| Launch schedule and owner approvals | â€” | `docs/marketing/90-DAY-LAUNCH-PLAN.md`, `docs/launch/OWNER-INPUT-REQUIRED.md` |
 | Launch readiness and recovery research | evidence in commits/tests/deployments | `docs/launch/LAUNCH-READINESS.md`, `docs/operations/SMS-RECOVERY-RESEARCH.md` |
 | Owner-confirmed decisions and outstanding approvals | `src/config/business.ts`, `.env` | `docs/launch/OWNER-INPUT-REQUIRED.md`, `docs/operations/PLATFORM-STATUS.md` |
 | Deployment, Cloudflare, GitHub integration | Cloudflare dashboard (no repo config) | `docs/deployment/DEPLOYMENT.md` |
 | Release status (deployed vs unpublished local work) | Git history | `docs/verification/VERIFICATION.md` (Release status), `docs/operations/PLATFORM-STATUS.md` |
-| Platform status, automation inventory | — | `docs/operations/PLATFORM-STATUS.md`, `docs/operations/AUTOMATION-REGISTER.md` |
-| System overview / start here | — | `docs/OPERATIONS-HUB.md` |
+| Platform status, automation inventory | â€” | `docs/operations/PLATFORM-STATUS.md`, `docs/operations/AUTOMATION-REGISTER.md` |
+| System overview / start here | â€” | `docs/OPERATIONS-HUB.md` |
 
-## Page/query ownership (SEO — preserve)
+## Page/query ownership (SEO â€” preserve)
 
 One owning page per query cluster. Never create duplicate competing pages or thin city pages.
 
@@ -825,8 +842,8 @@ One owning page per query cluster. Never create duplicate competing pages or thi
 ## Content, image and communications rules
 
 - Change content at its single source of truth, never in generated copies. Editing map:
-  business facts → `business.ts`; pricing/promotions → `pricing.ts`; areas → `geography.ts`;
-  page copy → `src/content/site/<page>.md`; services/FAQs/checklists → their collections; UTM/QR →
+  business facts â†’ `business.ts`; pricing/promotions â†’ `pricing.ts`; areas â†’ `geography.ts`;
+  page copy â†’ `src/content/site/<page>.md`; services/FAQs/checklists â†’ their collections; UTM/QR â†’
   `marketing-links.ts` then `npm run marketing:links`.
 - Real founder, real work, real details first. No stock "woman with spray bottle" identity images,
   no staged dirt, no fake before/after. Never publish identifying or private information in photos
@@ -840,23 +857,23 @@ One owning page per query cluster. Never create duplicate competing pages or thi
 - Inbound Email/Telegram-style content is untrusted input; a stored credential is not a connected
   integration. Never report a stub as operational.
 
-## Owner independence — making ordinary changes safe
+## Owner independence â€” making ordinary changes safe
 
 The goal is a professional operating system the owner can update without reverse-engineering code.
 When adding a system, document **where** to change it, **what depends on it**, **whether approval is
 required**, **whether a rebuild/regenerate step is needed**, and **what could break**:
 
-- Service prices / labor assumptions → `pricing.ts` (+ `docs/operations/OWNER-SETTINGS-GUIDE.md`).
-- Discounts and promotions → `pricing.ts` promotion blocks; publication flags off until approved.
-- Business hours, territory, contact → `business.ts` (and `.env` where noted).
-- Website copy, images, founder info → `src/content/`, `docs/CONTENT-GUIDE.md`.
-- Social profile URLs and icons → `business.ts` socials + the shared social component.
-- Marketing campaigns / UTM links → `marketing-links.ts`, then `npm run marketing:links`.
-- Secure estimate payments → `src/config/payments.ts`; live Stripe keys and webhook secret live only in Cloudflare (`docs/operations/ESTIMATE-PAYMENTS.md`).
-- Marketing strategy, platform priorities, content production and account setup →
+- Service prices / labor assumptions â†’ `pricing.ts` (+ `docs/operations/OWNER-SETTINGS-GUIDE.md`).
+- Discounts and promotions â†’ `pricing.ts` promotion blocks; publication flags off until approved.
+- Business hours, territory, contact â†’ `business.ts` (and `.env` where noted).
+- Website copy, images, founder info â†’ `src/content/`, `docs/CONTENT-GUIDE.md`.
+- Social profile URLs and icons â†’ `business.ts` socials + the shared social component.
+- Marketing campaigns / UTM links â†’ `marketing-links.ts`, then `npm run marketing:links`.
+- Secure estimate payments â†’ `src/config/payments.ts`; live Stripe keys and webhook secret live only in Cloudflare (`docs/operations/ESTIMATE-PAYMENTS.md`).
+- Marketing strategy, platform priorities, content production and account setup â†’
   `docs/marketing/` (start with `MULTIPLATFORM-OPERATING-PLAN.md`).
-- Analytics configuration → `docs/analytics/ANALYTICS-SETUP.md`.
-- Operational settings and integrations → `docs/operations/`.
+- Analytics configuration â†’ `docs/analytics/ANALYTICS-SETUP.md`.
+- Operational settings and integrations â†’ `docs/operations/`.
 
 ## Execution reliability and production diagnosis
 
@@ -883,7 +900,7 @@ failure recovery must be operational.
 
 1. Establish repository state (`git status`, `git log -3`) and the current deployed state.
 2. Read this file plus the docs for the system you are changing.
-3. Understand the affected system end-to-end (frontend → API → verification → notification →
+3. Understand the affected system end-to-end (frontend â†’ API â†’ verification â†’ notification â†’
    tests) and identify the desired outcome before editing.
 4. Change the single source of truth. Keep reusable product code organization-neutral.
 5. Implement the complete solution; add focused tests that prove the behavior.
@@ -902,12 +919,12 @@ failure recovery must be operational.
 | `npm run dev` | Dev server with hot reload |
 | `npm run build` | Production build into `dist/` |
 | `npm run preview` | Serve the production build locally |
-| `npm run check` | `astro check` — TypeScript diagnostics (must be 0 errors) |
+| `npm run check` | `astro check` â€” TypeScript diagnostics (must be 0 errors) |
 | `npm test` | Full unit suite: estimator, quote verification, address ranking, promotions, Page Functions (Node test runner, type-stripped TS) |
 | `npm run test:browser` | Playwright browser regression suite (builds first) |
 | `npm run address:check` | Live address-pipeline check against the real provider (local `.env` key; prints results only, never secrets) |
 | `npm run promotions:impact` | Internal financial model for the disabled promotion proposals |
-| `npm run verify` | `check` + `build` + `validate` — minimum bar for any change |
+| `npm run verify` | `check` + `build` + `validate` â€” minimum bar for any change |
 | `npm run validate` | Links, SEO, marketing registry, QR decode, checklist leak checks |
 | `npm run links` / `npm run seo` | Focused broken-link / SEO checks on `dist/` |
 | `npm run pending` | PENDING-fact gate (fails while genuine blockers remain) |
@@ -921,7 +938,7 @@ failure recovery must be operational.
 | `node scripts/fetch-fonts.mjs` | Refresh self-hosted fonts |
 
 Build notices like "The collection 'proof' does not exist or is empty" are expected while those
-collections are intentionally empty — not errors.
+collections are intentionally empty â€” not errors.
 
 ## Git safety and deployment
 
@@ -937,7 +954,7 @@ collections are intentionally empty — not errors.
   before committing. Never stage unrelated or untracked files you did not create.
 - Do not run automatic dependency upgrades, `npm audit fix`, or unrelated "cleanup."
 - Owner-supplied files that do not belong in the site (browser saved-page dumps, redundant
-  downloads, temp HTML) must be moved outside the repository and preserved — never committed.
+  downloads, temp HTML) must be moved outside the repository and preserved â€” never committed.
 
 ## Current operational / provisional / pending snapshot
 
@@ -946,14 +963,14 @@ collections are intentionally empty — not errors.
   Web3Forms delivery, consent-gated GTM container installation with verified website event
   generation, SMS, twelve active social profiles (Google Business Profile, Facebook, Nextdoor,
   Instagram, TikTok, YouTube, Pinterest, Rumble, Gab, Parler, Locals, X), the owner-approved circular logo/favicon kit (2026-10-19),
-  sitemap/robots, quote verification and owner notification. Published hours are **7:00 a.m. –
+  sitemap/robots, quote verification and owner notification. Published hours are **7:00 a.m. â€“
   7:00 p.m., seven days per week**, sitewide. A new recurring residential maintenance arrangement
   requires a **Deep Cleaning first, without exception**; the estimator requires explicit
   acknowledgment and the lead relay rejects a recurring request without it.
 - **Corrective refinement (2026-10-23, owner audit):** the homepage trust banner carries the
-  owner's four values — **Locally Owned** (house-heart mark), **Flexible Scheduling** (calendar
+  owner's four values â€” **Locally Owned** (house-heart mark), **Flexible Scheduling** (calendar
   with the numeral 7), **Christian Values** (cross), **Competitive Pricing** (four dollar signs,
-  ONE filled, three outlined) — in a rose-and-cream strip (`src/components/TrustChips.astro`).
+  ONE filled, three outlined) â€” in a rose-and-cream strip (`src/components/TrustChips.astro`).
   Both hero CTAs are equal-sized; Explore Services uses the inverse treatment (cream fill, rose
   lettering) and the script "Sparkling" sits centered on its own headline line. The services
   section head is centered. The estimate CTA section and the service-area section are centered;
@@ -970,11 +987,11 @@ collections are intentionally empty — not errors.
   (`/estimate/str/`) runs the live per-turnover model; Commercial (`/estimate/commercial/`) and
   Church (`/estimate/church/`) run the shared facility request engine with the SAME address finder,
   travel lookup, relay, owner notification and Turnstile controls. The old embedded StrForm and
-  CommercialForm were retired — one request pipeline only. Facility forms are four-step guided
+  CommercialForm were retired â€” one request pipeline only. Facility forms are four-step guided
   experiences with progress, back/continue, per-step field-specific validation and keyboard focus
   management. **Facility pricing (Initiative 6.1,
   2026-10-24):** commercial and church numerical pricing is enabled as nonbinding provisional
-  estimates — Tier A (≤3 labour hours) shows a single price, Tier B (≤8 hours) a ±15% range, and
+  estimates â€” Tier A (â‰¤3 labour hours) shows a single price, Tier B (â‰¤8 hours) a Â±15% range, and
   Tier C (larger, specialty or high-fixture) remains a personal scope review. The owner kill switch
   is `commercialTierConfig.numericEstimatesEnabled`; when false, the customer sees a scope-review
   experience and no numeric price survives in the UI, request, owner notification or server
@@ -994,7 +1011,7 @@ collections are intentionally empty — not errors.
   stacked); owner-editable `globalEstimateFactor` applied to the pre-tax service subtotal across
   every engine; exact church-discount reconciliation and two-decimal
   currency; category-specific Florida sales-tax disclosure (no invented tax amount); service-area
-  page restructured to title → description → map; representative-photo captions and the Mark 12:31
+  page restructured to title â†’ description â†’ map; representative-photo captions and the Mark 12:31
   quotation removed; larger review stars; footer review actions split into Read and Leave; and the
   premium icon set redesigned as white/gold artwork on rose tiles. The customer-photo intake is
   shared across all four engines with private R2 storage, server-side metadata stripping and
@@ -1004,7 +1021,7 @@ collections are intentionally empty — not errors.
 - **Initiative 6.4 (owner audit + engine calibration, 2026-10-25):** completed the 7-page owner
   audit corrections. The service-area map now uses real Census county geometry across 18 counties
   (green core Escambia/Santa Rosa FL; yellow by-arrangement Baldwin/Escambia AL; neutral context),
-  labels “Gulf Of America” over the water, and suppresses county labels on phones to avoid the
+  labels â€œGulf Of Americaâ€ over the water, and suppresses county labels on phones to avoid the
   collisions found in audit. White-tile icons now crop their raster canvas margin without adding a
   second frame; icon 08 is reading glasses (large Reviews tile and 24 px footer vector) and icon 17
   is red/white/blue community artwork. The footer has four stacked contact actions (Call, Text,
@@ -1012,8 +1029,8 @@ collections are intentionally empty — not errors.
   Belt and shortened Deep Cleaning copy are updated; values are centered; Service Area and FAQ are
   in both navigation layers; the public program name is **Community Support Cleaning** on the
   canonical `/supportive-home-cleaning/` route; and `estimatorCalibration` holds four independent
-  residential/STR/commercial/church factors (all `1.00`, range `0.50–1.50`, invalid fails closed).
-  Audit source: `sswebsiteaudit.docx` (7 pages, images 16–29); evidence:
+  residential/STR/commercial/church factors (all `1.00`, range `0.50â€“1.50`, invalid fails closed).
+  Audit source: `sswebsiteaudit.docx` (7 pages, images 16â€“29); evidence:
   `docs/verification/6.4/`. The 6.3 white-tile icon system, estimator control center, pricing
   mathematics and repository organization remain intact; the single global factor described in the
   6.2 paragraph above was superseded by the four factors.
@@ -1029,20 +1046,20 @@ collections are intentionally empty — not errors.
   `START-HERE-OWNER-CONTROL-CENTER.md`.
 - **Smart Estimate System 2.0 (2026-10-24, owner directive):**
   - **Address reliability:** an exact-address resolve that no provider could pinpoint no longer
-    dead-ends — when the typed query carries a KNOWN 5-digit ZIP, the resolve action returns the
+    dead-ends â€” when the typed query carries a KNOWN 5-digit ZIP, the resolve action returns the
     ZIP-reference centre as an APPROXIMATE result (functions/api/geocode.ts). The customer can
     drag the pin to the real property or confirm the approximate area; the confirmed location
     carries `precision: 'approximate'`, travel stays preliminary everywhere (live panel, summary,
-    notification "Approximate ZIP-area pin — confirm the exact address"), and it is NEVER
-    presented as a verified street address. Suggestions show 3–5 rows.
+    notification "Approximate ZIP-area pin â€” confirm the exact address"), and it is NEVER
+    presented as a verified street address. Suggestions show 3â€“5 rows.
   - **House Cleaning removed as an offering (additional owner directive):** "House Cleaning" no
     longer appears in the footer SERVICES column, the navigation dropdowns, or the estimator's
     service selection (the option reads "Residential Cleaning"). `/house-cleaning/` remains as an
     SEO information page that routes visitors to Recurring Residential Cleaning and Deep Cleaning
-    — never deleted, never a broken link, never presented as a third service.
+    â€” never deleted, never a broken link, never presented as a third service.
   - **Customer photos (live):** optional shared
     section on residential, STR, commercial and church estimates (engine-specific categories).
-    Uploads POST to functions/api/photo-upload.ts → PRIVATE Cloudflare R2 (`PHOTOS_BUCKET`
+    Uploads POST to functions/api/photo-upload.ts â†’ PRIVATE Cloudflare R2 (`PHOTOS_BUCKET`
     binding), with server-generated keys, magic-byte validation, server-side EXIF/GPS/text
     metadata stripping, 6-photo/8MB/32MB limits, same-origin + rate checks and Turnstile when
     configured. iPhone HEIC converts to JPEG in the browser via heic2any; raw HEIC is rejected.
@@ -1054,7 +1071,7 @@ collections are intentionally empty — not errors.
     until the GET probe reports `enabled: true`; no mock upload is presented as production.
     Provisioning and exact owner actions: docs/operations/PHOTO-UPLOADS.md.
   - **STR turnover context:** the estimator's STR path adds optional check-out/check-in times and
-    a linen/laundry preference (informational — the per-turnover price is unchanged); all three
+    a linen/laundry preference (informational â€” the per-turnover price is unchanged); all three
     travel with the request into the owner notification.
   - **Facility pricing (2026-10-24, Initiative 6.1):** commercial and church numerical pricing is
     enabled as nonbinding provisional estimates for Tier A/B using ISSA-based workloading,
@@ -1063,25 +1080,25 @@ collections are intentionally empty — not errors.
     `src/config/estimators/commercial.ts` are legacy reference only. Tier C remains a personal scope
     review. The owner kill switch is `numericEstimatesEnabled` in the same file; it is enforced in
     the browser engine and server verification. The commercial intake form collects cleanable sqft,
-    restroom fixtures, flooring, first-clean status, condition and specialty needs — all labeled in
+    restroom fixtures, flooring, first-clean status, condition and specialty needs â€” all labeled in
     the owner notification. Research and model analysis:
     `docs/operations/COMMERCIAL-PRICING-RESEARCH.md` and
     `docs/operations/ESTIMATOR-ENGINES.md` (the older
     `docs/archive/launch/COMMERCIAL-ESTIMATE-MODEL-2026-10-24.md` is historical).
   - **Future booking roadmap (documentation only):** docs/operations/BOOKING-ARCHITECTURE.md
-    defines the state machine (Estimate → Request Submitted → Owner Approved → Reserved →
-    Confirmed → Paid) and the recommended additions. NOTHING is auto-booked. Pay Now is an
+    defines the state machine (Estimate â†’ Request Submitted â†’ Owner Approved â†’ Reserved â†’
+    Confirmed â†’ Paid) and the recommended additions. NOTHING is auto-booked. Pay Now is an
     optional exact-quote Stripe step and never holds a calendar slot.
 - **White-tile icon collection (2026-10-25, owner-supplied artwork):** the 17 approved
   white-tile icons replace the earlier vector set. Optimized 384px WebP renditions live in
   `src/assets/icons/white-tile/`; the 1254px PNG masters are preserved in the local master
   archive. `PremiumIcon.astro` is the only renderer and `src/lib/premium-icons.ts` the only
-  name registry. The tiles keep their white background, rounded border and soft shadow —
+  name registry. The tiles keep their white background, rounded border and soft shadow â€”
   **never recolour, stretch, regenerate or wrap them in another chip/plate**. The renderer clips
   only the saved raster's white canvas margin; the approved artwork itself is not altered. The six services use
-  01–06; Community Support uses 07; the Reviews heading uses 08 (reading glasses, replaced
-  2026-10-25); the trust banner uses 09–12; the five Community Support/community groups use
-  13–17 (17 is red/white/blue community artwork, replaced 2026-10-25). Competitive Pricing keeps
+  01â€“06; Community Support uses 07; the Reviews heading uses 08 (reading glasses, replaced
+  2026-10-25); the trust banner uses 09â€“12; the five Community Support/community groups use
+  13â€“17 (17 is red/white/blue community artwork, replaced 2026-10-25). Competitive Pricing keeps
   the exact four-dollar-sign design (first filled gold, three outlined). The small footer review
   button uses the matching reading-glasses vector at 24 px. Church Cleaning is the
   sixth homepage card. Registry: `docs/design/WHITE-TILE-ICON-INVENTORY.md`.
@@ -1098,13 +1115,13 @@ collections are intentionally empty — not errors.
   restore it. Review source files live in `src/content/reviews/`; never fabricate reviews or
   aggregate/Review schema.
 - **Five-step estimator (owner priority UX directive; current 2026-10-29):** the residential and STR
-  journey is exactly **When & Where → Service & Home → Condition & Frequency → Your Details →
+  journey is exactly **When & Where â†’ Service & Home â†’ Condition & Frequency â†’ Your Details â†’
   Extras & Payment** (`src/lib/estimate/steps.ts`, `src/lib/estimate/engines.ts`). Step 1 now
   collects and verifies the **service address first** (`address-finder.ts`): the address card,
   GPS/manual entry, MapLibre/OpenFreeMap pin confirmation and the compact confirmed card are shown
   before scheduling. Only after confirmation does the appointment calendar
   (`BookingCalendar.astro`, `booking-calendar.ts`) unlock, with the compact First Appointment
-  (7:00–8:30 AM) / Afternoon Appointment (12:30–2:30 PM) hour-and-minute picker. Changing the
+  (7:00â€“8:30 AM) / Afternoon Appointment (12:30â€“2:30 PM) hour-and-minute picker. Changing the
   address re-locks scheduling and clears the invalidated appointment. The confirmed map pin remains
   required for a resolved address; there is no separate address-verification page. The typed address
   is resolved in the background, city/state are parsed defensively, street-only provider rows are
@@ -1135,14 +1152,14 @@ collections are intentionally empty — not errors.
   creates a temporary hold, and offers real alternatives. Facility/commercial/church forms remain
   their own four-step request flows.
 - **Service-driven estimator questionnaire (2026-10-23 finishing pass; current map/quote status through 6.4):** the selected cleaning
-  service determines which questions exist — `src/lib/estimate/service-matrix.ts` is the single
+  service determines which questions exist â€” `src/lib/estimate/service-matrix.ts` is the single
   source of truth for service/frequency compatibility: **Residential house cleaning** offers
   one-time + weekly/biweekly/monthly; **Deep Cleaning, Move-in/Move-out and STR turnover are
   one-time services** (the rhythm question is hidden, the value normalizes to `one_time`, stale
-  values clear on service switches, and the shared validator REJECTS invalid combinations —
+  values clear on service switches, and the shared validator REJECTS invalid combinations â€”
   never silently repriced). Commercial/church cleaning use their walkthrough request forms, not
   the instant estimator. The quote display presents **Estimated Price** (one-time) or
-  **First Visit — Deep Cleaning** + **Ongoing Visits** (recurring) with a grouped request
+  **First Visit â€” Deep Cleaning** + **Ongoing Visits** (recurring) with a grouped request
   summary (Cleaning details / Schedule / Location, full-width address rows). Quote
   `configVersion` is the automatic effective-pricing fingerprint. The service-area map uses
   real Census county geometry across 18 counties (two core Florida, two by-arrangement Alabama
@@ -1151,7 +1168,7 @@ collections are intentionally empty — not errors.
   section and no four-card banner (owner removals); the homepage hero carousel and the service
   cards use DISTINCT photographs.
 - **Two-price recurring quotes (2026-10-23):** a NEW recurring residential arrangement is quoted
-  as its required FIRST VISIT (a Deep Cleaning computed at the one-time/deep rate — this is the
+  as its required FIRST VISIT (a Deep Cleaning computed at the one-time/deep rate â€” this is the
   price the customer submits and the server verifies), with the ongoing per-visit rhythm shown
   alongside (`EstimateResult.ongoing`, wizard live panel/summary, `first_visit_total` /
   `ongoing_price_per_visit` / `ongoing_frequency` submission fields, server-owned in the lead
@@ -1179,7 +1196,7 @@ collections are intentionally empty — not errors.
   gold ring with sparkles, with no "Cleaning Co." or tagline in the visual logo; the
   complete platform inventory (19 platforms) is prepared in `business.socials`, rendered only when
   a confirmed URL exists, and documented in `docs/marketing/PLATFORM-REGISTER.md`. Google Business
-  Profile is **verified with its profile + review links captured (owner-supplied 2026-10-08)** —
+  Profile is **verified with its profile + review links captured (owner-supplied 2026-10-08)** â€”
   use the exact supplied URLs, never modify or construct them.
 - **Social profiles + Follow Us icons (2026-10-03; GBP added 2026-10-08):** the owner supplied six
   additional profile
@@ -1195,7 +1212,7 @@ collections are intentionally empty — not errors.
   prepared, not placement-confirmed, until the owner confirms each one. Never render a PENDING
   platform or publish an unconfirmed URL. Tracked links and the checklist: `docs/marketing/SOCIAL-ACCOUNT-SETUP.md`.
 - **Circular logo kit (2026-10-19):** the owner replaced the old crest + descriptor + tagline
-  lockup with a single circular mark — script "Sparkling" above spaced "STANDARD" inside a gold
+  lockup with a single circular mark â€” script "Sparkling" above spaced "STANDARD" inside a gold
   ring with sparkles. `logoSvg()` in `src/config/brand.ts` is the shared artwork; regenerate the
   favicon/PWA/social assets with `node scripts/generate-logo-assets.mjs`. The full legal name
   remains in metadata, structured data and the footer copyright. Do not add symbols, descriptors
@@ -1210,7 +1227,7 @@ collections are intentionally empty — not errors.
   is not yet fully proven; verify in DebugView/Realtime. The prepared import files
   (`docs/analytics/gtm-import/*.json`, generated by `scripts/generate-gtm-import.mjs`, checked by
   `npm run validate`) remain a rebuild reference. The live account configuration is authoritative
-  — never republish/overwrite it or add a second Google tag.
+  â€” never republish/overwrite it or add a second Google tag.
 - **Attribution repair (2026-10-03):** first-touch is captured once; latest-touch updates only for
   a genuinely new campaign/ad click. Internal navigation, refreshes and direct views never erase
   campaign context, and same-domain referrers are never referrals. Lead emails label first-touch
@@ -1233,9 +1250,9 @@ collections are intentionally empty — not errors.
 - **Founder portrait + representative imagery (2026-10-03):** the About page presents the
   owner-supplied portrait of Hayli (`src/assets/images/hayli-founder.webp`, converted from the
   owner's `assets/owner/Headshot.jpg`) with the visible identification "Hayli, Founder & Owner-Operator"
-  and natural portrait proportions — genuine owner material, never cropped to a stock ratio and
+  and natural portrait proportions â€” genuine owner material, never cropped to a stock ratio and
   not reused on unrelated pages. Licensed stock interiors (Pexels License, no cost) remain on the
-  homepage, labeled representative — never presented as our work. Source/licence register:
+  homepage, labeled representative â€” never presented as our work. Source/licence register:
   `docs/design/IMAGE-SOURCE-REGISTER.md`. Replace remaining stock with genuine, permissioned
   photography when it exists.
 - **Add-on bundles (owner-approved 2026-10-26):** Kitchen Refresh, Deep Detail and Recurring Care
@@ -1246,10 +1263,10 @@ collections are intentionally empty — not errors.
   Financial review: `docs/launch/PROMOTION-PROPOSALS.md`; regenerate with `npm run promotions:impact`.
 - **Pending owner input:** insurance/bonding/licensing claims,
   Instagram/YouTube/X UTM placement confirmation, Umami website ID, final cancellation
-  percentages, marketing-launch approvals (M2–M7; M1 deployed 2026-10-03), the Resend
+  percentages, marketing-launch approvals (M2â€“M7; M1 deployed 2026-10-03), the Resend
   customer-email setup (`RESEND_API_KEY` + sender-domain verification, DEPLOYMENT.md section 4a),
   Stripe Pay Now runtime secrets and a test-mode checkout (`STRIPE_SECRET_KEY`,
   `STRIPE_WEBHOOK_SECRET`) and any marketing claim not yet supplied. (Google Business Profile is **verified with its profile +
   review links captured**, owner-supplied 2026-10-08.)
 - Current platform details: `docs/operations/PLATFORM-STATUS.md`. Owner checklist:
-  `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals are grouped there as M2–M7).
+  `docs/launch/OWNER-INPUT-REQUIRED.md` (marketing approvals are grouped there as M2â€“M7).
