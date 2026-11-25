@@ -94,7 +94,21 @@ Migration `0058_document_library_review_state.sql` adds
 `document_family_state`. Template status and `archived_at` remain the historical
 evidence; family archiving is presentation and packet-selection control only.
 
-## 3b. Packet builder (2026-11-19)
+## 3b. Signing request controls (2026-11-24)
+
+- **Signing Requests** defaults to active requests (awaiting or partially signed).
+  Completed, expired and revoked requests remain available through the status
+  filter.
+- A pending or partially signed request can be **revoked**. Revocation sets the
+  request to `void`, clears the token hash and expiry, and immediately invalidates
+  the customer link. Signatures already captured remain retained as evidence.
+- Missing, renamed, retired or archived packet associations no longer crash the
+  request detail view. The request loads with a neutral fallback packet name and
+  its signature evidence remains visible.
+- Revocation is audit-recorded and does not delete the request, its signatures or
+  any executed copy.
+
+## 3c. Packet builder (2026-11-19)
 
 The Documents & Agreements section is now a complete packet builder, not only a
 template list:

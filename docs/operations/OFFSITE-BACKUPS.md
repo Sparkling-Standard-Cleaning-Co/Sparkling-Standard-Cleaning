@@ -1,20 +1,36 @@
 # Encrypted off-site backups and recovery
 
-**Status (2026-11-24 audit): the scheduled backup workflow is not running.**
-`backup.yml` exists on `production-safe` but not on the default branch (`main`).
-GitHub only registers scheduled/dispatchable workflows from the default branch, so
-`gh workflow run backup.yml` returns HTTP 404 and the daily schedule never fires.
-The newest local encrypted archive is `2026-11-21T21-10-15.ssbk`; it could not be
-verified in the audit session because the encryption key was not available.
+**Status (2026-11-25 correction): local scheduled backups are running and verified.**
+The previous audit checked only GitHub and incorrectly concluded that all backups
+were dormant. The Windows scheduled tasks were already active:
 
-A fresh production D1 export was created and independently restore-verified on
-2026-11-24 (57 migrations, 101 tables, 0 foreign-key violations) before migration
-`0058`. That proves exportability, not scheduled off-site protection.
+- `Sparkling Standard Encrypted Backup - Daily` - daily 02:30 local.
+- `Sparkling Standard Encrypted Backup - Weekly Restore Test` - Sunday 03:30.
+- `Sparkling Standard Backup Health Check` - every 6 hours.
 
-**Required owner action:** approve the branch cutover in
-`docs/audit/2026-11-24/BRANCH-CONSOLIDATION-PLAN.md` (or otherwise expose
-`backup.yml` on the default branch), confirm the repository backup secrets, then
-authorize one controlled backup run and verify the encrypted archive.
+Latest verified run: **2026-11-24 07:30-07:39 UTC**. Archive
+`sparkling-standard-backup-2026-11-24T07-30-34.ssbk` (421,632,532 bytes, 2,572
+files, 421,339,895 plaintext bytes, SHA-256
+`55fe217dc5dbfa4504ee97303174ef63847fe5a975a61f0b11fa5438e60bf2f6`).
+Verification passed with D1 integrity `ok` (102 tables). An isolated restore was
+run during this audit and the restored D1 export also verified
+(`4ce46b76dae06e206d9f84ceaf0bfe971643e0fc0f6458aab0b64042651e349f`, 57
+migrations, 101 tables, 0 foreign-key violations). The D1 `backup_runs` heartbeat
+was recorded and the stale `backup_stale` incident was resolved.
+
+**GitHub Actions status:** `backup.yml` is now present on the default branch
+`main` (commit `0b9bcd7`) and is visible/dispatchable. Its controlled dispatch
+failed fast because the repository has **zero Actions secrets or variables**.
+Missing: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_NAME`,
+`BACKUP_ENCRYPTION_KEY`, `BACKUP_R2_BUCKET`, R2 S3 keys, OneDrive client/token
+and the optional `OPS_ALERT_*`. Until those are added, the GitHub cloud path is
+dormant; the local encrypted schedule continues to run.
+
+**Owner actions still required:** add the repository secrets, decide whether to
+adopt the local schedule or the GitHub workflow as primary, and authorize one
+controlled GitHub dispatch after secrets exist. R2 application documents/photos
+are not yet covered by the daily local archive because listing them requires a
+bucket-scoped R2 S3 token.
 
 **Status (2026-11-19): first real manual backup created, encrypted, uploaded and
 restore-verified.** Cloudflare D1 and the local master workspace are covered.

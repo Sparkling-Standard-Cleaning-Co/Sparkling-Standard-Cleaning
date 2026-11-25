@@ -84,7 +84,29 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-24 platform audit, document library and customer review suppression):**
+- **Current release (2026-11-24/25 platform completion, change orders and backup correction):**
+  application code `aaa4c83` on `production-safe`, Cloudflare Pages deployment
+  `9cea2813-c777-4dd6-97ab-f8e62c2ea845`, verified live on 2026-11-25 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.DLPf6bre.js`). Migrations `0059` and
+  `0060` add one-primary-invoice enforcement and signed service change orders. The Customer
+  File now has jobs, payments, communications and one chronological activity timeline; the Job
+  File adds crew, primary/supplemental invoices, payments, photos, communications, change orders
+  and timeline. Change orders use the approved Additional Service and Add-On Authorization
+  template, preserve the original agreement/invoice, require owner approval, support electronic
+  signature and create one explicit supplemental invoice. Signing requests can be revoked, default
+  to active, and no longer crash when a packet is missing or renamed. The master workspace was
+  reconciled: the stale unspaced Downloads tree is a dated legacy archive, two duplicate scheduled
+  tasks are disabled, the start page/README are corrected, and a retained-path duplicate manifest
+  exists; no files were deleted. Backup status was corrected: the local Windows daily encrypted
+  backup is verified (2,572 files, D1 102 tables, isolated restore passed, heartbeat recorded and
+  stale incident resolved); the GitHub workflow is now visible on `main` but remains blocked by
+  zero repository secrets. Verified: unit **1,118** (1,117 pass, 1 pre-existing skip), browser
+  **279/279**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45518441282`
+  green; 60 production migrations and 0 foreign-key violations. No customer email, charge, review
+  invitation, production record or branch was mutated. Evidence:
+  `docs/verification/2026-11-24-PLATFORM-COMPLETION.md`, `docs/verification/2026-11-24-PLATFORM-CONSOLIDATION.md`
+  and `docs/audit/2026-11-24/`.
+- **Prior release (2026-11-24 platform audit, document library and customer review suppression):**
   application code `2a95955` on `production-safe`, Cloudflare Pages
   deployment `103a481a-b6aa-4162-b2f1-e1654c964c55`, verified live on 2026-11-24 (served admin
   asset `/_astro/index.astro_astro_type_script_index_0_lang.alIZjPxx.js`). Migration `0058` adds
@@ -101,8 +123,9 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   **278/278**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45504337889`
   green. The Leads workspace now defaults to active records and excludes archived, lost and
   converted inquiries unless explicitly selected. No customer email, charge, review invitation or production record was mutated. The audit
-  also found the scheduled backup workflow is absent from the default branch and cannot be manually
-  dispatched; branch cutover and master-workspace cleanup await owner approval. Evidence:
+  also found the scheduled backup workflow absent from the default branch; that was resolved in the
+  next release, and the local scheduled backup was confirmed operational. Branch cutover and
+  permanent duplicate deletion still await owner approval. Evidence:
   `docs/verification/2026-11-24-PLATFORM-CONSOLIDATION.md` and `docs/audit/2026-11-24/`.
 - **Prior release (2026-11-24 customer binding, review delivery and admin releases B/C):**
   application code `0e6fbf9` on `production-safe`, Cloudflare Pages deployment

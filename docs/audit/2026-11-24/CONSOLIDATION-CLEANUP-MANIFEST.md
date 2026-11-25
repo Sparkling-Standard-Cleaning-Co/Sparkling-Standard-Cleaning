@@ -1,30 +1,47 @@
 # Consolidation and cleanup manifest - 2026-11-24
 
-No file in either master workspace was moved, renamed or deleted during this
-audit. This is a reviewed manifest and a reversible proposal, as required before
-mass cleanup.
+The workspace was reconciled on 2026-11-24. A reversible cleanup was performed;
+no file was deleted.
 
-## 1. Actual roots found
+**Executed reversible actions:**
 
-| Root | Files | Size | Latest activity | Classification |
-| --- | --- | ---: | --- | --- |
-| `C:\Users\thoma\Documents\Sparkling-Standard-Master` | 24,190 (including build output) | about 1.25 GB | 2026-11-24 | **Active master** - contains the live checkout |
-| `C:\Users\thoma\Downloads\Sparkling-Standard-Master` | 21,401 (excluding private backups) | about 1.7 GB | 2026-11-23 | **Legacy/duplicate master** - contains a stale checkout and older archive tree |
+1. Disabled two obsolete scheduled tasks that pointed at the old unspaced
+   Downloads workspace.
+2. Renamed `Downloads\Sparkling-Standard-Master` to
+   `Downloads\Sparkling-Standard-Master-LEGACY-ARCHIVE-2026-11-24`.
+3. Updated its `OPEN BUSINESS WORKSPACE.lnk` target.
+4. Moved the obsolete `ARCHIVED-READ-ONLY.md` claim into the cleanup archive.
+5. Updated the active business start page and the Documents README.
+6. Generated a complete duplicate-file manifest in the cleanup archive.
 
-The active repository is `Documents\Sparkling-Standard-Master\01-Website-Repository`.
-The Downloads tree still contains an older `01_WEBSITE_REPOSITORY` last modified
-2026-11-07, which is not the deployed checkout.
+## 1. Actual roots found and final roles
+
+| Root | Files (non-build, non-backup) | Unique files | Final role |
+| --- | ---: | ---: | --- |
+| `C:\Users\thoma\Documents\Sparkling-Standard-Master` | 3,528 | 703 (32.8 MB) | **Active website/engineering workspace** - live Git checkout |
+| `C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER` | 3,108 | 963 (512.4 MB) | **Active business, legal and employee master** - owner start page and scheduled backup source |
+| `C:\Users\thoma\Downloads\Sparkling-Standard-Master-LEGACY-ARCHIVE-2026-11-24` | 3,979 | 330 (20.9 MB) | **Legacy archive** - previous unspaced workspace, preserved |
+
+The active live repository is
+`Documents\Sparkling-Standard-Master\01-Website-Repository`. The spaced
+Downloads master holds the largest unique legal/employee set and must not be
+merged or deleted blindly.
 
 ## 2. Duplicate analysis
 
-Method: SHA-256 hashes for 7,506 files after excluding `.git`, `node_modules`,
-`.astro`, `dist`, generated output folders and `_PRIVATE_BACKUPS`.
+Method: SHA-256 hashes for 10,615 files across the three roots after excluding
+`.git`, `node_modules`, `.astro`, `dist`, generated output folders, backup
+archives and `_PRIVATE_BACKUPS`.
 
 | Measure | Result |
 | --- | ---: |
-| Exact duplicate hash groups | 1,985 |
-| Files participating in duplicate groups | 6,247 |
-| Estimated duplicate bytes | about 1.03 GB |
+| Exact duplicate hash groups | 2,547 |
+| Files participating in duplicate groups | 8,619 |
+| Duplicate copies beyond the retained path | 6,072 |
+| Estimated duplicate bytes | about 2.4 GB |
+
+Detailed retained-path manifest:
+`Documents\Sparkling-Standard-Master\99-Archive-For-Review\2026-11-24-MASTER-CLEANUP\DUPLICATE-FILES-2026-11-24.csv`.
 
 Largest duplicate families:
 
@@ -37,8 +54,8 @@ Largest duplicate families:
   Downloads checkout, `02_BRANDING_AND_DESIGN` and the active repository.
 - Helpers such as `src/lib/admin/auth.ts` present in both checkout copies.
 
-Full hash inventory for this audit was generated outside the product repository
-and is not committed because it contains local file paths.
+The detailed retained-path manifest is stored in the cleanup archive at
+`Documents\Sparkling-Standard-Master\99-Archive-For-Review\2026-11-24-MASTER-CLEANUP\DUPLICATE-FILES-2026-11-24.csv`.
 
 ## 3. Active resources (keep in place)
 
@@ -48,63 +65,38 @@ and is not committed because it contains local file paths.
 | `Documents\...\08-Backups` | Protected backup material (110 MB). Never delete from this audit. |
 | `Documents\...\09_VERIFICATION_EVIDENCE` | Current release evidence. |
 | `Documents\...\backups\2026-11-10-reconciliation` | Contains encrypted production backup material and recovery notes. Protected. |
-| `Downloads\_PRIVATE_BACKUPS` | Protected private recovery material. Never delete from this audit. |
-| `Downloads\09_BACKUPS_AND_EXPORTS` | Older backup/export copies. Protected until restore verification and retention policy are confirmed. |
-| Legal, formation, insurance, financial and executed-document files in both trees | Business-critical. Preserve. |
+| `Downloads\Sparkling-Standard-Master-LEGACY-ARCHIVE-2026-11-24\_PRIVATE_BACKUPS` | Protected private recovery material. Never delete from this audit. |
+| `Downloads\Sparkling-Standard-Master-LEGACY-ARCHIVE-2026-11-24\09_BACKUPS_AND_EXPORTS` | Older backup/export copies. Protected until restore verification and retention policy are confirmed. |
+| Legal, formation, insurance, financial and executed-document files in all trees | Business-critical. Preserve. |
 
-## 4. Superseded or duplicate material (proposal only)
+## 4. Executed cleanup and remaining candidates
 
-| Candidate | Evidence | Proposed action |
+| Candidate | Evidence | Action taken or proposed |
 | --- | --- | --- |
-| `Downloads\01_WEBSITE_REPOSITORY` | Stale checkout last modified 2026-11-07; live checkout is in Documents | Archive, not delete. Verify no unique untracked owner files first. |
-| `Downloads\00_START_HERE` | Navigation for the older layout | Replace with a pointer to the active master start page, then archive. |
-| `Downloads\07_ARCHIVE_AND_REVIEW` | 290 MB, largely duplicated in the active master | Deduplicate exact hashes; keep one archive copy. |
-| `Documents\PRICING-AUDIT-2026-10-30` | 49 MB; duplicated audit CSVs inside itself and Downloads | Keep one canonical copy in the archive section. |
-| `Documents\99-Archive-For-Review` | 404 files, 10 MB | Keep as archive; do not mix into active folders. |
-| Empty directories listed below | No files | Safe to remove after approval. |
+| Old unspaced Downloads workspace | 3,979 files, 330 unique; not used by current tasks after the two duplicate tasks were disabled | **Renamed to the dated legacy archive.** No deletion. |
+| Two old scheduled backup tasks | Pointed into the legacy `_PRIVATE_BACKUPS\bin` | **Disabled.** Current daily/weekly/health tasks remain active. |
+| 6,072 redundant duplicate copies | About 2.4 GB; retained paths recorded in the manifest | **Proposed deletion only.** Owner approval required. |
+| 47 empty directories | `EMPTY-DIRECTORIES.txt` | Left for owner review. |
+| `Documents\99-Archive-For-Review` | Historical archive | Keep as archive; do not mix into active folders. |
 
-### Empty directories observed (examples)
+## 5. Reversal plan for executed actions
 
-- `Documents\...\05-Business-Operations\Business HQ\01_BUSINESS_ADMIN\Licensing_and_Insurance`
-- Several `Previous_Versions`, `Blank_Agreements`, `Customer_Communication_Templates`, `Customer_Intake_Forms`, `Residential_Sales`, `Deep_Cleaning`, `Move_In_Move_Out`, `Quality_Control`, `Residential_Cleaning`, `Safety_and_Procedures`, onboarding and growth subfolders.
-- `Downloads\...\_PRIVATE_BACKUPS\work\...` staging folders after completed backups.
+1. Rename `Downloads\Sparkling-Standard-Master-LEGACY-ARCHIVE-2026-11-24`
+   back to `Downloads\Sparkling-Standard-Master`.
+2. Re-enable the two historical scheduled tasks only if restoring the old
+   workspace.
+3. Restore the old `OPEN BUSINESS WORKSPACE.lnk` target if needed.
+4. Move `SUPERSEDED-ARCHIVED-READ-ONLY-2026-10-30.md` back only to correct the
+   historical record.
+5. No business record, backup or executed document was deleted, so no data
+   restoration is required for this cleanup.
 
-## 5. Proposed shallow target organization
+## 6. Deletion approval boundary
 
-Do not create another numbered maze. Use the existing active master and a
-single explicit archive:
-
-```text
-Documents\Sparkling-Standard-Master\
-  01-Website-Repository\        (active code and docs)
-  Brand\                        (current approved brand masters)
-  Marketing\                    (current marketing source assets)
-  Operations\                   (current procedures, templates, employee material)
-  Legal-and-Finance\            (current legal, formation, insurance, financial records)
-  Evidence\                     (current verification evidence)
-  Backups\                      (protected, never mixed with working files)
-  Archive-2026-11-24\           (superseded material with a manifest)
-```
-
-Moving to this layout is **not authorized by this audit**. The owner should
-approve the specific move list first.
-
-## 6. Reversal plan
-
-Because no move or deletion was performed, rollback is currently a no-op.
-
-If the proposal is approved:
-
-1. Record `git status` and close the repository checkout.
-2. Copy (do not move) the approved candidates to
-   `Documents\Sparkling-Standard-Master\Archive-2026-11-24` preserving relative
-   paths.
-3. Hash-verify each copied file against the source.
-4. Update `START-HERE` links and shortcuts.
-5. Only then remove the source duplicates, retaining a CSV move manifest with
-   old path, new path, size and SHA-256.
-6. Keep `Downloads\_PRIVATE_BACKUPS`, `Downloads\09_BACKUPS_AND_EXPORTS` and all
-   legal/financial/executed records untouched.
+No duplicate file may be permanently deleted until the owner reviews
+`DUPLICATE-FILES-2026-11-24.csv` and approves the retained paths. The manifest
+retains one copy under the priority: active Documents workspace, active spaced
+business master, legacy archive.
 
 ## 7. Protected records - never delete in cleanup
 

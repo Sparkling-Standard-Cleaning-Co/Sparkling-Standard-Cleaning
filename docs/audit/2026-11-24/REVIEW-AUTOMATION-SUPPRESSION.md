@@ -134,3 +134,10 @@ These are owner records and are audit-logged.
   `0058`. The existing sent request continues to suppress a duplicate invitation
   through the legacy `sent` count fallback.
 - No review email was sent during this milestone.
+- The `workers/review-requests` worker is implemented and unit-tested but **not
+  deployed**. It has no Cloudflare D1 binding or Resend secret configured and
+  cannot send while branch automation is off. Activation requires owner approval,
+  worker deployment/configuration, a controlled delivery test, and confirmation
+  that no historical backlog is released.
+- The production dashboard currently has no open review incident and no queued
+  review requests.

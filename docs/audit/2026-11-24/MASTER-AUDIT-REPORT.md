@@ -106,7 +106,7 @@ clean.
 
 | Finding | Evidence | Status |
 | --- | --- | --- |
-| Automatic encrypted backup is not scheduled | `backup.yml` exists on `production-safe`, not on default branch `main`; `gh workflow list --all` shows only `validate` and `photo-cleanup`; `gh workflow run backup.yml` returns 404; newest local archive is 2026-11-21 | Open; requires branch cutover or owner decision |
+| Backup coverage was misreported as entirely dormant | The audit initially checked GitHub only. The local Windows daily backup was already active and produced a verified archive on 2026-11-24 07:30 UTC. The GitHub workflow was absent from `main`; it is now present (commit `0b9bcd7`) but its dispatch fails because no repository secrets exist. | **Corrected and partially resolved:** local schedule verified; GitHub cloud path blocked on owner-supplied secrets |
 | Document Library displayed all versions | Production has 58 templates for 28 families; normal library showed retired and draft rows | Fixed in this release |
 | Review invitations were per appointment | `review_requests` had no customer-level state; repeat completed jobs could be re-invited after the frequency window | Fixed in this release |
 
@@ -114,19 +114,20 @@ clean.
 
 | Finding | Evidence | Status |
 | --- | --- | --- |
-| Two competing production branches | `main` 0 ahead / 125 behind; Cloudflare deploys `production-safe` | Plan documented; owner approval required |
-| Master workspace duplication | 7,506 non-build files compared; 1,985 duplicate hash groups; 6,247 files; about 1.03 GB duplicate | Manifest documented; no destructive action |
-| No first-class change-order workflow | Additional work after signing has no purpose-built amendment record | Not implemented |
-| Customer file is not yet one chronological timeline | Customer detail aggregates tables but does not merge communications, payments, photos and documents into one timeline | Partially improved; deferred |
-| Admin client is a 9,500-line monolith | `src/scripts/admin.ts` | Documented maintainability risk; not refactored |
-| Mojibake remains in several operating documents | e.g. arrows in `docs/operations/GOOGLE-REVIEWS.md` and `DOCUMENT-MANAGEMENT.md` | Fixed in documents touched by this release; other docs remain |
+| Two competing production branches | `main` 1 ahead / 133 behind; Cloudflare deploys `production-safe`; main's unique commit is the backup workflow visibility | Cutover merge plan documented; owner approval required |
+| Master workspace duplication | 10,615 non-build files across three roots; 2,547 duplicate groups; 8,619 files in groups; about 2.4 GB duplicate | Legacy workspace renamed to dated archive; two duplicate tasks disabled; deletion manifest prepared; no files deleted |
+| No first-class change-order workflow | Additional work after signing had no purpose-built amendment record | **Implemented 2026-11-24** with signature and supplemental invoice |
+| Customer file is not one chronological timeline | Customer detail aggregated tables but did not merge events | **Implemented 2026-11-24** |
+| Job view was not a full job file | No payments, photos, communications or change orders together | **Implemented 2026-11-24** |
+| Admin client is a 9,700-line monolith | `src/scripts/admin.ts` | Documented maintainability risk; not refactored |
+| Mojibake remains in several operating documents | e.g. older arrows in some docs | Fixed in documents touched by this release; other docs remain |
 | Stale local branches | 2 local branches with 9 unique commits from October; superseded | Deletion candidate after owner approval |
 
 ### P3 - cosmetic and optional enhancements
 
 - Document Library summary counts could later become a richer dashboard.
 - Review queue could add bulk suppression controls.
-- Master folder start page and shortcuts need update after the approved archive move.
+- Master folder empty directories (47) are listed and left for owner review.
 
 ## 5. Corrective actions completed in this milestone
 
@@ -144,6 +145,22 @@ clean.
   estimate, invoice and agreement flows.
 - Active-first Leads workspace: archived, lost and converted records are hidden
   by default and remain available through the explicit All or status filters.
+- Backup health corrected: latest scheduled archive verified, isolated restore
+  passed, `backup_runs` heartbeat recorded and stale incident resolved; GitHub
+  workflow exposed on `main` with an explicit missing-secret failure.
+- Master workspace reconciled: stale unspaced Downloads workspace renamed to a
+  dated legacy archive; two obsolete scheduled tasks disabled; start page and
+  README corrected; duplicate manifest generated. No files deleted.
+- Customer File now includes jobs, payments, communications and one
+  chronological activity timeline with source links.
+- Job File now includes crew, finance (primary + supplemental), payments, photos,
+  communications, change orders and timeline.
+- Signed change orders implemented through the approved Additional Service and
+  Add-On Authorization template with one explicit supplemental invoice.
+- One primary invoice per job enforced with migration `0059` and a partial unique
+  index; supplemental invoices are explicitly linked.
+- Signing requests can be revoked, default to active, and tolerate missing or
+  renamed packet associations without crashing.
 - Fresh production D1 export restore-verified (57 migrations, 101 tables, 0 FK
   violations) before applying migration 0058.
 

@@ -51,10 +51,12 @@ Rules:
 7. Invoice, invoice email and invoice PDF show a review invitation only for a completed
    service with an official branch link and only when the customer has never been
    invited and is not suppressed. Tampa has no link and shows no invitation.
-8. The scheduled `workers/review-requests` worker is optional and not deployed by the
-   website release. It sends only due, recent queued requests, rechecks the branch switch
-   and customer suppression, and records delivery outcomes. It cannot flush an old
-   backlog when automation is enabled later.
+8. The scheduled `workers/review-requests` worker is optional and **not deployed**.
+   It sends only due, recent queued requests, rechecks the branch switch and customer
+   suppression, and records delivery outcomes. It cannot flush an old backlog when
+   automation is enabled later. Activation requires owner approval, a Cloudflare D1
+   binding, a Resend secret and a controlled delivery test. No review email was sent
+   during the 2026-11-24/25 work; automation remains off for both branches.
 
 ## Customer review relationship
 

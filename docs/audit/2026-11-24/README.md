@@ -6,7 +6,7 @@ operational rebuild authorized on 2026-11-24.
 | Document | Purpose |
 | --- | --- |
 | [MASTER-AUDIT-REPORT.md](MASTER-AUDIT-REPORT.md) | Executive findings, verified baseline, module inventory, P0-P3 issues and corrective actions. |
-| [CONSOLIDATION-CLEANUP-MANIFEST.md](CONSOLIDATION-CLEANUP-MANIFEST.md) | Active, duplicate, superseded, protected and deletion-candidate resources in the two local master workspaces. No destructive action was taken. |
+| [CONSOLIDATION-CLEANUP-MANIFEST.md](CONSOLIDATION-CLEANUP-MANIFEST.md) | Active, duplicate, superseded, protected and deletion-candidate resources in the three local workspaces. Reversible cleanup was executed; no file was deleted. |
 | [CUSTOMER-FILE-JOB-LIFECYCLE.md](CUSTOMER-FILE-JOB-LIFECYCLE.md) | Current customer/job implementation, target structure, data relationships and remaining phases. |
 | [REVIEW-AUTOMATION-SUPPRESSION.md](REVIEW-AUTOMATION-SUPPRESSION.md) | Customer-level review eligibility, suppression, manual overrides, timing, delivery evidence and activation controls. |
 | [BRANCH-CONSOLIDATION-PLAN.md](BRANCH-CONSOLIDATION-PLAN.md) | `main` versus `production-safe` divergence, CI/CD consequences, cutover and rollback. Approval gate is explicit. |
@@ -33,3 +33,14 @@ Related operating references:
 
 No production customer, invoice, payment, signed document or lead record was
 mutated by the audit. Production reads were aggregate/schema inspection only.
+
+## Completion update
+
+The platform completion release is recorded in
+`docs/verification/2026-11-24-PLATFORM-COMPLETION.md`. It supersedes the
+"deferred" status for the Customer File, Job File, activity timeline, signed
+change orders, primary-invoice invariant and signing-request revocation. Backup
+findings were corrected: the local daily schedule is verified operational; the
+GitHub workflow is visible on `main` but blocked by missing repository secrets.
+The approved legal library, executed documents and production customer records
+were not deleted or rewritten.

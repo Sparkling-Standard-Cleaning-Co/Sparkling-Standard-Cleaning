@@ -18,13 +18,17 @@ milestone); partial; deferred; blocked.
 | Customer File quick actions | Medium | No | Implemented | Browser admin suites, type check | This release | Opens existing workflows; does not duplicate them. |
 | Customer File review card | Medium | No | Implemented | Browser admin suites | This release | Read-only summary with link to Google Reviews controls. |
 | Active-first lead workspace | High | No | Implemented | `lead-default-filter.test.ts` | This release | Default excludes archived, lost and converted; All is explicit. |
-| Backup automation | High | Yes | Blocked | Read-only audit only | Not changed | Workflow absent from default branch; manual dispatch 404; encryption key unavailable in session. |
-| Fresh D1 export + restore proof | High | No | Implemented | `verify-d1-export.mjs` | 2026-11-24 export | Export is local private evidence, not committed. |
-| Branch consolidation | High | Yes | Plan only | Read-only divergence analysis | Not changed | `main` 125 behind; cutover requires owner approval. |
-| Master workspace cleanup | Medium | Yes | Manifest only | Hash inventory | Not changed | 1,985 duplicate groups, about 1.03 GB; no moves without approval. |
-| Change orders / amendments | Medium | Yes | Deferred | None | Not started | Requires product design and new records. |
-| Unified customer timeline | Medium | Yes | Deferred | None | Not started | Current detail is grouped tables, not a merged feed. |
-| Full job file | Medium | Yes | Partial (inherited) | Prior job invoice tests | Prior release | Crew time, photos, payments and communications are not on one job page. |
+| Local backup schedule | High | No | **Verified operational** | Archive verify + isolated restore | 2026-11-24 daily run | Latest archive 07:30 UTC, 2,572 files, D1 102 tables, restore passed. |
+| GitHub backup workflow visibility | High | Partial | Implemented visibility, blocked on secrets | Controlled dispatch `45513633447` | `0b9bcd7` on `main` | Workflow visible/dispatchable; zero repository secrets; fails closed. |
+| Backup dashboard heartbeat | High | No | Implemented | D1 `backup_runs` query | 2026-11-24 | Stale incident resolved after verified run. |
+| Branch consolidation | High | Yes | Plan only | Read-only divergence analysis | Not changed | `main` 1 ahead / 133 behind; merge cutover requires owner approval. |
+| Master workspace cleanup | Medium | Partial | **Executed reversible cleanup** | Three-root hash inventory | 2026-11-24 | Legacy workspace renamed/archived; two duplicate tasks disabled; 6,072 duplicate copies listed; no deletions. |
+| Change orders / amendments | Medium | Yes | **Implemented** | `change-orders.test.ts` | This release | Admin/owner workflow; employee-initiated requests not exposed. |
+| Unified customer timeline | Medium | Yes | **Implemented** | `customer-timeline.test.ts`, browser test | This release | Source links for jobs, invoices and agreements. |
+| Full job file | Medium | Yes | **Implemented** | Browser customer/job test | This release | Crew, finance, photos, communications, change orders and timeline together. |
+| One primary invoice per job | High | No | **Implemented** | `migration-0059.test.ts` | Migration 0059 | Partial unique index; supplemental invoices explicit. |
+| Signing request revocation | High | No | **Implemented** | `documents.test.ts` | This release | Pending/partially signed only; captured signatures preserved. |
+| Missing packet association crash | High | No | **Fixed** | `documents.test.ts`, browser library test | This release | Null-safe request detail and family packet data. |
 | Admin monolith reduction | Low | Yes | Deferred | None | Not started | `src/scripts/admin.ts` remains large. |
 | Lead/reservation archive workflows | High | No | Inherited | Prior Release A tests | Prior release | Verified present; not re-driven against production data. |
 | Photo deletion and retention | High | No | Inherited | Prior Release B/C tests | Prior release | No photo was deleted in this audit. |
@@ -34,23 +38,23 @@ milestone); partial; deferred; blocked.
 | Check | Result |
 | --- | --- |
 | `npm run check` | 0 errors, 0 warnings (11 hints) |
-| Unit suite | 1,114 tests; 1,113 pass; 0 fail; 1 pre-existing skip |
-| Browser suite | 278/278 pass |
+| Unit suite | 1,118 tests; 1,117 pass; 0 fail; 1 pre-existing skip |
+| Browser suite | 279/279 pass |
 | Build | 41 pages |
 | Validation | 2,631 links, SEO, QRs, checklist leak checks pass |
 | Smoke | 21 pages |
-| Production D1 export restore | 57 migrations, 101 tables, 0 FK violations before migration 0058 |
+| Production D1 export restore | 57 migrations, 101 tables, 0 FK violations before migration 0058; latest backup restore passed |
+| Production migrations | 60 |
 | Production foreign keys | 0 violations |
 | Production orphan/duplicate checks | 0 orphans, 0 duplicate invoice numbers, 0 duplicate per-appointment invoices |
 | Review automation | Disabled on both branches; 1 historical sent request |
 
 ## Release identity
 
-- Application commit: `2a95955`
-- Documentation commits: `132c54e`, `1a81631`
-- Cloudflare Pages deployment: `103a481a-b6aa-4162-b2f1-e1654c964c55`
+- Application commit: `aaa4c83`
+- Cloudflare Pages deployment: `9cea2813-c777-4dd6-97ab-f8e62c2ea845`
 - Live verification: served admin asset
-  `/_astro/index.astro_astro_type_script_index_0_lang.alIZjPxx.js`
-- GitHub CI: `45504337889` (validate and browser passed)
-- Production migration: `0058` applied; 0 foreign-key violations
-- Release evidence: `docs/verification/2026-11-24-PLATFORM-CONSOLIDATION.md`
+  `/_astro/index.astro_astro_type_script_index_0_lang.DLPf6bre.js`
+- GitHub CI: `45518441282` (validate and browser passed)
+- Production migrations: `0059`, `0060`; 60 applied; 0 foreign-key violations
+- Release evidence: `docs/verification/2026-11-24-PLATFORM-COMPLETION.md`

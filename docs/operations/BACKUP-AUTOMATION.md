@@ -1,7 +1,13 @@
-# Backup Automation — 2026-11-22
+# Backup Automation - 2026-11-25
 
 This document records the automated encrypted backup path, its dependencies and
 the exact recovery procedure. It contains credential **names**, never values.
+
+**Verified status 2026-11-25:** the daily Windows task is operational. Latest
+archive `sparkling-standard-backup-2026-11-24T07-30-34.ssbk` verified locally and
+the restored D1 export passed integrity and foreign-key checks. The GitHub
+workflow is now visible on `main` but remains dormant because no repository
+secrets exist. See `docs/verification/2026-11-24-PLATFORM-COMPLETION.md`.
 
 ## Current automation
 
@@ -10,7 +16,7 @@ the exact recovery procedure. It contains credential **names**, never values.
 | `Sparkling Standard Encrypted Backup - Daily` | Daily 02:30 local | Fresh D1 export when wrangler is authorized; encrypted archive of legal registry, I-9 controls/records and website source; local verify; OneDrive upload; retention (7 daily / 4 weekly / 6 monthly) |
 | `Sparkling Standard Encrypted Backup - Weekly Restore Test` | Sunday 03:30 | Same archive/upload plus independent OneDrive download, hash comparison, verify and isolated restore + D1 verification |
 | `Sparkling Standard Backup Health Check` | Every 6 hours | Reads the last status; writes `HEALTH.json` and a visible `BACKUP-ALERT-*.txt` when missing, failed or older than 26 hours; exits non-zero so Task Scheduler records failure |
-| GitHub Actions `backup.yml` | Disabled schedule on `main`; manual or scheduler Worker | Cloud D1 + optional application R2 + metadata, R2/OneDrive round trip, restore verification and `backup_runs` reporting once secrets are configured |
+| GitHub Actions `backup.yml` | Visible on `main`; controlled dispatch fails without secrets | Cloud D1 + optional application R2 + metadata, R2/OneDrive round trip, restore verification and `backup_runs` reporting once secrets are configured |
 | `workers/backup-scheduler/` | Prepared | Dispatches `backup.yml` on `production-safe`; not deployed |
 
 Scripts:
@@ -34,6 +40,18 @@ Do not commit or paste any of these values.
 | GitHub Actions cloud backup | Repository secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_NAME`, `BACKUP_ENCRYPTION_KEY`, `BACKUP_R2_ENDPOINT`, `BACKUP_R2_BUCKET`, `BACKUP_R2_ACCESS_KEY_ID`, `BACKUP_R2_SECRET_ACCESS_KEY`, `ONEDRIVE_CLIENT_ID`, `ONEDRIVE_REFRESH_TOKEN`, `OPS_ALERT_URL`, `OPS_ALERT_TOKEN` | Owner must add them; the workflow remains dormant until then |
 
 ## Current verified evidence
+
+### 2026-11-24 daily run
+
+- Archive: `08 BACKUPS & ARCHIVE\SCHEDULED\sparkling-standard-backup-2026-11-24T07-30-34.ssbk`
+- SHA-256: `55fe217dc5dbfa4504ee97303174ef63847fe5a975a61f0b11fa5438e60bf2f6`
+- 2,572 files / 421,339,895 plaintext bytes
+- Local verify: passed; D1 integrity `ok`, 102 tables
+- Isolated restore: passed; restored D1 57 migrations, 101 tables, 0 foreign-key violations
+- OneDrive upload: accepted; retention applied
+- Production `backup_runs`: success recorded; stale incident resolved
+
+### Earlier weekly run
 
 - Archive: `08 BACKUPS & ARCHIVE\SCHEDULED\sparkling-standard-backup-2026-11-22T07-24-41.ssbk`
 - SHA-256: `69236a1cd11ef42c0834ed396cd0fdcfd2bbbec682d328adbbe09db457bdba3e`
