@@ -107,6 +107,9 @@ test('single-signature signing persists access fields, produces a PDF and retrie
     .prepare("INSERT INTO customer_contacts (id, customer_id, kind, value, normalized_value, is_primary) VALUES ('ct_signing_e2e', ?, 'email', 'jordan.example@example.test', 'jordan.example@example.test', 1)")
     .run(customerId);
   db.raw
+    .prepare("INSERT INTO customer_contacts (id, customer_id, kind, value, normalized_value, is_primary) VALUES ('ct_signing_e2e_phone', ?, 'phone', '(850) 555-0100', '8505550100', 1)")
+    .run(customerId);
+  db.raw
     .prepare("INSERT INTO properties (id, customer_id, branch_id, label, line1, city, state, postal_code, status) VALUES (?, ?, 'branch_pensacola', 'Home', '100 Example Street', 'Pensacola', 'FL', '32502', 'active')")
     .run(propertyId, customerId);
 
@@ -202,6 +205,8 @@ test('single-signature signing persists access fields, produces a PDF and retrie
   assert.match(stored.customer_fields_json, /Park in the driveway/);
   assert.match(stored.executed_copy_text, /CUSTOMER INSTRUCTIONS AND ACCESS SCHEDULE/);
   assert.match(stored.executed_copy_text, /Access method: I will be present/);
+  assert.match(stored.executed_copy_text, /Jordan Example/);
+  assert.match(stored.executed_copy_text, /\(850\) 555-0100/);
   assert.match(stored.executed_copy_text, /Pets: Yes/);
   assert.match(stored.executed_copy_text, /Signature: Jordan Example/);
   assert.doesNotMatch(stored.executed_copy_text, /SHA-?256|Version:|Consent|Signing request|Bundle:/i);

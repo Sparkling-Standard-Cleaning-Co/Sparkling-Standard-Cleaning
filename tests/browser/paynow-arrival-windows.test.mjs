@@ -185,6 +185,9 @@ async function chooseAddressAndDate(page) {
 async function finishToPayment(page, period) {
   await page.click(`[data-period="${period}"]`);
   await page.waitForSelector('[data-calendar-picker]', { state: 'visible' });
+  await page.waitForSelector('[data-calendar-time-options] button:not([disabled])', { state: 'visible' });
+  await page.locator('[data-calendar-time-options] button:not([disabled])').first().click();
+  await page.waitForFunction(() => (document.querySelector('[data-calendar-time-input]')?.value ?? '').length > 0);
   await page.click('[data-next]');
   await page.waitForFunction(() => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true');
 

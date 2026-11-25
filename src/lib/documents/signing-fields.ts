@@ -88,7 +88,7 @@ const accessFields = (facility: boolean): SigningFieldDefinition[] => [
           {
             value: 'authorized_person',
             label: 'An authorized person will be present',
-            description: 'Provide that person’s name and phone below.',
+            description: "Provide that person's name and phone below.",
           },
           {
             value: 'lockbox',
@@ -113,6 +113,25 @@ const accessFields = (facility: boolean): SigningFieldDefinition[] => [
         ],
   },
   {
+    key: 'access_contact_same',
+    label: 'Day-of-service contact',
+    type: 'radio',
+    required: false,
+    summaryLabel: 'Access contact choice',
+    options: [
+      {
+        value: 'same',
+        label: 'Same as my booking contact',
+        description: 'Use the verified name and phone from this booking. Nothing needs to be retyped.',
+      },
+      {
+        value: 'different',
+        label: 'Use a different day-of-service contact',
+        description: 'A property manager, tenant, relative or another authorized person.',
+      },
+    ],
+  },
+  {
     key: 'access_contact_name',
     label: facility ? 'On-site contact name' : 'Day-of-service contact name',
     type: 'text',
@@ -123,7 +142,7 @@ const accessFields = (facility: boolean): SigningFieldDefinition[] => [
   },
   {
     key: 'access_contact_phone',
-    label: 'Day-of-service contact phone',
+    label: facility ? 'On-site contact phone' : 'Day-of-service contact phone',
     type: 'tel',
     required: false,
     maxLength: 40,
@@ -195,6 +214,48 @@ export function signingFieldsForRequest(input: {
 
 function clip(value: unknown, max: number): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+export interface SigningBookingContact {
+  name: string;
+  phone: string;
+}
+
+/**
+ * Applies the day-of-service contact choice against the server-derived booking
+ * contact. "Same as booking" never trusts a client-supplied name or phone.
+ */
+export function applyBookingContactChoice(
+  definitions: SigningFieldDefinition[],
+  values: SigningFieldValues,
+  contact: SigningBookingContact,
+): { values: SigningFieldValues; error: string | null } {
+  if (!definitions.some((field) => field.key === 'access_contact_same')) {
+    return { values, error: null };
+  }
+  const choice = values.access_contact_same === 'different' ? 'different' : 'same';
+  const normalized: SigningFieldValues = { ...values, access_contact_same: choice };
+  if (choice === 'different') {
+    if (!clip(normalized.access_contact_name, 160)) {
+      return { values: normalized, error: 'access_contact_name_missing' };
+    }
+    if (!clip(normalized.access_contact_phone, 40)) {
+      return { values: normalized, error: 'access_contact_phone_missing' };
+    }
+    return { values: normalized, error: null };
+  }
+  const name = clip(contact.name, 160);
+  const phone = clip(contact.phone, 40);
+  if (!name) return { values: normalized, error: 'booking_contact_name_missing' };
+  if (!phone) return { values: normalized, error: 'booking_contact_phone_missing' };
+  return {
+    values: {
+      ...normalized,
+      access_contact_name: name,
+      access_contact_phone: phone,
+    },
+    error: null,
+  };
 }
 
 /**

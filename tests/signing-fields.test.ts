@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  applyBookingContactChoice,
   normalizeSigningFieldValues,
   signingFieldSummary,
   signingFieldsForRequest,
@@ -72,6 +73,59 @@ test('required access choices fail closed and unknown keys are discarded', () =>
   const summary = signingFieldSummary(fields, valid.values);
   assert.ok(summary.some((row) => row.label === 'Access method' && row.value.includes('I will be present')));
   assert.ok(summary.some((row) => row.label === 'Pet details' && row.value === 'One friendly dog.'));
+});
+
+test('same booking contact is derived from the authorized customer, never from submitted values', () => {
+  const fields = signingFieldsForRequest({
+    bundleCode: 'customer.deep',
+    subjectType: 'customer',
+  });
+  const same = applyBookingContactChoice(fields, {
+    access_method: 'customer_present',
+    access_contact_same: 'same',
+    access_contact_name: 'Someone Else',
+    access_contact_phone: '555-999-0000',
+  }, { name: 'Jordan Example', phone: '(850) 555-0100' });
+  assert.equal(same.error, null);
+  assert.equal(same.values.access_contact_name, 'Jordan Example');
+  assert.equal(same.values.access_contact_phone, '(850) 555-0100');
+
+  const missing = applyBookingContactChoice(fields, {
+    access_method: 'customer_present',
+    access_contact_same: 'same',
+  }, { name: 'Jordan Example' });
+  assert.equal(missing.error, 'booking_contact_phone_missing');
+  assert.equal(missing.values.access_contact_phone, undefined);
+});
+
+test('a different access contact requires both a name and phone', () => {
+  const fields = signingFieldsForRequest({
+    bundleCode: 'customer.deep',
+    subjectType: 'customer',
+  });
+  const missingName = applyBookingContactChoice(fields, {
+    access_method: 'customer_present',
+    access_contact_same: 'different',
+    access_contact_phone: '850-555-0101',
+  }, { name: 'Jordan Example', phone: '(850) 555-0100' });
+  assert.equal(missingName.error, 'access_contact_name_missing');
+
+  const missingPhone = applyBookingContactChoice(fields, {
+    access_method: 'customer_present',
+    access_contact_same: 'different',
+    access_contact_name: 'Alex Alternate',
+  }, { name: 'Jordan Example', phone: '(850) 555-0100' });
+  assert.equal(missingPhone.error, 'access_contact_phone_missing');
+
+  const valid = applyBookingContactChoice(fields, {
+    access_method: 'customer_present',
+    access_contact_same: 'different',
+    access_contact_name: 'Alex Alternate',
+    access_contact_phone: '850-555-0101',
+  }, { name: 'Jordan Example', phone: '(850) 555-0100' });
+  assert.equal(valid.error, null);
+  assert.equal(valid.values.access_contact_name, 'Alex Alternate');
+  assert.equal(valid.values.access_contact_phone, '850-555-0101');
 });
 
 test('pet details disappear from the schedule when none are provided', () => {

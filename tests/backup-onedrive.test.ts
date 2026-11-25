@@ -67,7 +67,7 @@ test('OneDrive uploads use the app-folder path and split large files into ranged
   assert.equal(smallCalls[0].auth, 'Bearer access-token');
   assert.equal(String(smallCalls[0].url).includes('access-token'), false);
 
-  const large = await tempFile(5 * 1024 * 1024 + 17);
+  const large = await tempFile(15 * 1024 * 1024 + 17);
   const ranges: string[] = [];
   let chunkIndex = 0;
   const largeResult = await uploadFile('access-token', 'Sparkling-Standard-Encrypted-Backups', large, 'large.ssbk', (async (url: string, init: RequestInit = {}) => {
@@ -75,15 +75,17 @@ test('OneDrive uploads use the app-folder path and split large files into ranged
       return new Response(JSON.stringify({ uploadUrl: 'https://upload.example/session' }), { status: 200 });
     }
     const headers = init.headers as Record<string, string>;
-    ranges.push(String(headers['Content-Range'] ?? ''));
+    const range = String(headers['Content-Range'] ?? '');
+    if (range) ranges.push(range);
     chunkIndex += 1;
     if (chunkIndex === 1) return new Response(null, { status: 202 });
-    return new Response(JSON.stringify({ id: 'large-item' }), { status: 201 });
+    if (chunkIndex === 2) return new Response(JSON.stringify({ id: 'large-item' }), { status: 201 });
+    return new Response(JSON.stringify({ id: 'large-item', size: String(15 * 1024 * 1024 + 17) }), { status: 200 });
   }) as typeof fetch);
-  assert.equal(largeResult.size, 5 * 1024 * 1024 + 17);
-  assert.equal(ranges.length, 1);
-  assert.match(ranges[0], /^bytes 0-/);
-  assert.match(ranges[0], /5242897$/);
+  assert.equal(largeResult.size, 15 * 1024 * 1024 + 17);
+  assert.equal(ranges.length, 2);
+  assert.match(ranges[0], /^bytes 0-10485759\/15728657$/);
+  assert.match(ranges[1], /^bytes 10485760-15728656\/15728657$/);
 });
 
 test('existing-folder mode uses the root path instead of the app folder', async () => {

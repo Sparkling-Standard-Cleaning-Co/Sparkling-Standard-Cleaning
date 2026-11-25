@@ -50,6 +50,7 @@ const payload = {
   context: {
     customerName: 'Jordan Example',
     customerEmail: 'jordan@example.test',
+    customerPhone: '(850) 555-0100',
     propertyAddress: '100 Example Street, Pensacola, FL 32502',
     bookingReference: 'SS-20261201-UX',
     serviceCode: 'residential-deep',
@@ -71,6 +72,33 @@ const payload = {
           { value: 'lockbox', label: 'Customer-controlled lockbox' },
           { value: 'temporary_code', label: 'Temporary door or alarm code' },
         ],
+      },
+      {
+        key: 'access_contact_same',
+        label: 'Day-of-service contact',
+        type: 'radio',
+        required: false,
+        summaryLabel: 'Access contact choice',
+        options: [
+          { value: 'same', label: 'Same as my booking contact' },
+          { value: 'different', label: 'Use a different day-of-service contact' },
+        ],
+      },
+      {
+        key: 'access_contact_name',
+        label: 'Day-of-service contact name',
+        type: 'text',
+        required: false,
+        maxLength: 160,
+        summaryLabel: 'Access contact',
+      },
+      {
+        key: 'access_contact_phone',
+        label: 'Day-of-service contact phone',
+        type: 'tel',
+        required: false,
+        maxLength: 40,
+        summaryLabel: 'Access contact phone',
       },
       {
         key: 'access_instructions',
@@ -156,6 +184,20 @@ test('a customer can complete one mobile signing ceremony without repeated names
     await page.locator('[data-signing-primary]').click();
     await page.getByRole('heading', { name: 'Access and service instructions' }).waitFor({ state: 'visible' });
     await page.locator('input[name="access_method"][value="customer_present"]').check();
+    const bookingSummary = page.locator('[data-signing-contact-summary]');
+    assert.equal(await bookingSummary.isVisible(), true, 'the booking contact is shown instead of blank fields');
+    assert.match((await bookingSummary.innerText()).replace(/\s+/g, ' '), /Jordan Example/);
+    assert.match((await bookingSummary.innerText()).replace(/\s+/g, ' '), /\(850\) 555-0100/);
+    assert.equal(await page.locator('input[name="access_contact_same"][value="same"]').isChecked(), true);
+    await page.locator('input[name="access_contact_same"][value="different"]').check();
+    assert.equal(await bookingSummary.isHidden(), true, 'alternate contact replaces the booking summary');
+    const alternateName = page.locator('input[name="access_contact_name"]');
+    assert.equal(await alternateName.isVisible(), true);
+    assert.equal(await alternateName.inputValue(), 'Jordan Example');
+    await alternateName.fill('Alex Alternate');
+    await page.locator('input[name="access_contact_phone"]').fill('850-555-0101');
+    await page.locator('input[name="access_contact_same"][value="same"]').check();
+    assert.equal(await bookingSummary.isVisible(), true, 'returning to the booking contact restores the summary');
     await page.locator('textarea[name="access_instructions"]').fill('Park in the driveway.');
     await page.locator('[data-signing-primary]').click();
 
@@ -180,6 +222,9 @@ test('a customer can complete one mobile signing ceremony without repeated names
 
     assert.ok(submitted, 'the signature request was submitted');
     assert.equal(submitted.customerFields.access_method, 'customer_present');
+    assert.equal(submitted.customerFields.access_contact_same, 'same');
+    assert.equal(submitted.customerFields.access_contact_name, 'Jordan Example');
+    assert.equal(submitted.customerFields.access_contact_phone, '(850) 555-0100');
     assert.equal(submitted.customerFields.access_instructions, 'Park in the driveway.');
     assert.equal(submitted.signerName, 'Jordan Example');
     assert.equal(submitted.signerEmail, 'jordan@example.test');

@@ -14,8 +14,10 @@ import {
   type RequirementSnapshot,
 } from '../../src/lib/documents/service.ts';
 import {
+  applyBookingContactChoice,
   normalizeSigningFieldValues,
   signingFieldsForRequest,
+  type SigningBookingContact,
 } from '../../src/lib/documents/signing-fields.ts';
 import { findInternalContentProblems } from '../../src/lib/documents/rich-text.ts';
 import {
@@ -71,6 +73,36 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
   });
+}
+
+function bookingContactFromVariables(variables: Record<string, string>): SigningBookingContact {
+  const name =
+    variables['customer.legal_name'] ||
+    [variables['customer.first_name'], variables['customer.last_name']].filter(Boolean).join(' ');
+  return { name: String(name ?? '').trim(), phone: String(variables['customer.phone'] ?? '').trim() };
+}
+
+async function bookingContactForRequest(
+  db: NonNullable<ReturnType<typeof adminDb>>,
+  request: Record<string, unknown>,
+): Promise<SigningBookingContact> {
+  const customerId = String(request.customer_id ?? '').trim();
+  if (!customerId) return { name: '', phone: '' };
+  const row = await db
+    .prepare(
+      `SELECT c.first_name, c.last_name, c.company_name,
+              (SELECT value FROM customer_contacts cc
+               WHERE cc.customer_id = c.id AND cc.kind = 'phone'
+               ORDER BY cc.is_primary DESC, cc.created_at ASC LIMIT 1) AS phone
+       FROM customers c WHERE c.id = ? LIMIT 1`,
+    )
+    .bind(customerId)
+    .first<{ first_name: string; last_name: string; company_name: string; phone: string | null }>();
+  return {
+    name: String(row?.company_name ?? '').trim() ||
+      [row?.first_name, row?.last_name].filter(Boolean).join(' ').trim(),
+    phone: String(row?.phone ?? '').trim(),
+  };
 }
 
 async function sha256Bytes(value: ArrayBuffer | Uint8Array): Promise<string> {
@@ -309,6 +341,11 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     } catch {
       customerFieldValues = {};
     }
+    const bookingContact = bookingContactFromVariables(variables);
+    if (fieldDefinitions.some((field) => field.key === 'access_contact_same')) {
+      const applied = applyBookingContactChoice(fieldDefinitions, customerFieldValues, bookingContact);
+      customerFieldValues = applied.values;
+    }
     return json({
       ok: true,
       request: {
@@ -324,6 +361,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       context: {
         customerName: variables['customer.legal_name'] ?? '',
         customerEmail: variables['customer.email'] ?? '',
+        customerPhone: bookingContact.phone,
         propertyAddress: pricing?.propertyAddress || variables['property.address'] || '',
         bookingReference: variables['booking.reference'] ?? '',
         serviceCode: pricing?.serviceCode || variables['service.code'] || '',
@@ -374,7 +412,31 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     });
     let customerFields: Record<string, string> | undefined;
     if (fieldDefinitions.length > 0) {
-      const normalized = normalizeSigningFieldValues(fieldDefinitions, body.customerFields);
+      const rawFields =
+        body.customerFields && typeof body.customerFields === 'object' && !Array.isArray(body.customerFields)
+          ? (body.customerFields as Record<string, unknown>)
+          : {};
+      const stringFields = Object.fromEntries(
+        Object.entries(rawFields)
+          .filter(([, value]) => typeof value === 'string' || typeof value === 'boolean')
+          .map(([key, value]) => [key, typeof value === 'boolean' ? (value ? 'yes' : '') : String(value)]),
+      ) as Record<string, string>;
+      const bookingContact = await bookingContactForRequest(
+        db,
+        resolved.request as unknown as Record<string, unknown>,
+      );
+      const contactChoice = applyBookingContactChoice(fieldDefinitions, stringFields, bookingContact);
+      if (contactChoice.error) {
+        return json(
+          {
+            ok: false,
+            error: 'signing_contact_invalid',
+            fields: [contactChoice.error],
+          },
+          400,
+        );
+      }
+      const normalized = normalizeSigningFieldValues(fieldDefinitions, contactChoice.values);
       if (normalized.errors.length > 0) {
         return json(
           {

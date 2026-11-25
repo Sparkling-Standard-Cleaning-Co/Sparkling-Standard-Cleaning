@@ -4,8 +4,9 @@
 // Calendar is connected and booking is enabled. Calendar, geocode and route
 // failures withhold slots rather than guessing.
 
-import { bookingConfig } from '../../src/config/booking.ts';
+import { bookingConfig, isPublicBookingStartMinutes } from '../../src/config/booking.ts';
 import { availabilityForDate, type BookingEnv } from '../../src/lib/booking/service.ts';
+import { localMinutesOfDay } from '../../src/lib/booking/time.ts';
 import { resolveServiceBranchForPoint, resolveServiceBranchStrict } from '../../src/lib/branches/registry.ts';
 import { reverseGeocode } from '../../src/lib/location/server-geocode.ts';
 
@@ -89,6 +90,12 @@ export async function onRequestGet(context: { request: Request; env: BookingEnv 
   if (!result.ok) {
     return json({ ok: true, enabled: false, reason: result.reason, slots: [] });
   }
+  // The public estimator offers morning and afternoon start windows only.
+  // Times outside those windows remain valid for owner/admin scheduling but
+  // are not customer-selectable here.
+  const publicSlots = result.availability.slots.filter((slot) =>
+    isPublicBookingStartMinutes(localMinutesOfDay(new Date(slot.start), result.timeZone)),
+  );
   return json({
     ok: true,
     timeZone: result.timeZone,
@@ -97,12 +104,15 @@ export async function onRequestGet(context: { request: Request; env: BookingEnv 
     date,
     durationMinutes: result.durationMinutes,
     confirmationMode: bookingConfig.confirmationMode,
-    available: result.availability.available,
+    available: result.availability.available && publicSlots.length > 0,
     enabled: result.availability.enabled,
     ...(result.availability.reason ? { reason: result.availability.reason } : {}),
+    ...(result.availability.available && publicSlots.length === 0
+      ? { reason: 'no_public_start_window' }
+      : {}),
     // Staffing assignments are server-owned; the public picker receives only
     // the times a customer may choose.
-    slots: result.availability.slots.map(({ start, end, startLabel, endLabel }) => ({
+    slots: publicSlots.map(({ start, end, startLabel, endLabel }) => ({
       start,
       end,
       startLabel,

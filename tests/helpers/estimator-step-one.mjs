@@ -25,6 +25,10 @@ export async function chooseAppointment(page, date, period = 'first') {
   await page.fill('#est-date', date);
   await page.waitForSelector(`[data-period="${period}"]:not([disabled])`, { state: 'visible' });
   await page.click(`[data-period="${period}"]`);
+  await page.waitForSelector('[data-calendar-time-options] button:not([disabled])', { state: 'visible' });
+  const choices = page.locator('[data-calendar-time-options] button:not([disabled])');
+  await choices.first().click();
+  await page.waitForFunction(() => (document.querySelector('[data-calendar-time-input]')?.value ?? '').length > 0);
 }
 
 export async function completeStepOne(page, options = {}) {

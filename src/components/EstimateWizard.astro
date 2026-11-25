@@ -10,7 +10,6 @@ import {
   RESIDENTIAL_INPUT_LIMITS,
   TURNOVER_FREQUENCY_OPTIONS,
 } from '../config/estimators/input-definitions';
-import { schedulingConfig } from '../config/scheduling';
 import { business, contactPhone, isPending } from '../config/business';
 import { ESTIMATE_STEPS } from '../lib/estimate/steps';
 import Icon from './Icon.astro';
@@ -374,8 +373,17 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </span>
         </label>
         <div class="policy-notice" data-recurring-deep hidden>
-          <p class="policy-notice__title">Your first visit is a Deep Cleaning</p>
-          <p>{schedulingConfig.recurringResidential.message}</p>
+          <p class="policy-notice__title">Your First Cleaning</p>
+          <p>
+            To establish the Sparkling Standard level of cleanliness, recurring service begins
+            with a detailed Deep Cleaning. After your first visit, your selected maintenance
+            schedule begins.
+          </p>
+          <div class="policy-notice__pricing" data-recurring-deep-pricing hidden>
+            <p><strong>First Visit:</strong> Deep Cleaning — <span data-recurring-deep-first>calculated after your home details</span></p>
+            <p><strong>Following Visits:</strong> <span data-recurring-deep-rhythm>maintenance</span> — <span data-recurring-deep-ongoing>calculated after your home details</span> per visit</p>
+          </div>
+          <p class="small text-muted">Your full pricing and service details will be shown before you confirm. This first visit is required for a new recurring arrangement and is never added twice.</p>
           <label class="policy-notice__confirm">
             <input
               type="checkbox"

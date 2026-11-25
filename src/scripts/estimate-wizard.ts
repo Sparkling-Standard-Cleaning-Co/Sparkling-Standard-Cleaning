@@ -550,6 +550,41 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return result.ongoing ? 'First Visit — Deep Cleaning' : 'Estimated Price';
   }
 
+  function updateRecurringDeepPricing(result: EstimateResult): void {
+    const block = form.querySelector<HTMLElement>('[data-recurring-deep-pricing]');
+    if (!block) return;
+    const firstEl = block.querySelector<HTMLElement>('[data-recurring-deep-first]');
+    const rhythmEl = block.querySelector<HTMLElement>('[data-recurring-deep-rhythm]');
+    const ongoingEl = block.querySelector<HTMLElement>('[data-recurring-deep-ongoing]');
+    if (!requiresInitialDeepClean()) {
+      block.hidden = true;
+      if (firstEl) firstEl.textContent = 'calculated after your home details';
+      if (rhythmEl) rhythmEl.textContent = 'maintenance';
+      if (ongoingEl) ongoingEl.textContent = 'calculated after your home details';
+      return;
+    }
+    block.hidden = false;
+    if (!result.ongoing || result.status !== 'estimated') {
+      if (firstEl) firstEl.textContent = 'calculated after your home details';
+      if (rhythmEl) {
+        const current = textValue('frequency');
+        const rhythm = current && current in FREQUENCY_RHYTHMS
+          ? FREQUENCY_RHYTHMS[current as keyof typeof FREQUENCY_RHYTHMS]
+          : 'maintenance';
+        rhythmEl.textContent = `${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)}`;
+      }
+      if (ongoingEl) ongoingEl.textContent = 'calculated after your home details';
+      return;
+    }
+    const first = latestQuote?.amount ?? result.expectedPrice ?? result.low;
+    if (firstEl) firstEl.textContent = typeof first === 'number' ? formatUsd(first) : 'calculated after your home details';
+    if (rhythmEl) {
+      const rhythm = FREQUENCY_RHYTHMS[result.ongoing.frequency] ?? result.ongoing.frequency;
+      rhythmEl.textContent = `${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)}`;
+    }
+    if (ongoingEl) ongoingEl.textContent = formatUsd(result.ongoing.perVisitPrice);
+  }
+
   function recalc(): EstimateResult {
     const input = gatherInput();
     const result = calculateEstimate(input, buildContext());
@@ -564,6 +599,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
             destinationConfirmed: location !== null,
           })
         : null;
+    updateRecurringDeepPricing(result);
     discountQuoteChanged();
     renderResult(result);
     renderAddonPrices(result);
@@ -1901,7 +1937,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
     const moveCleaning = service === 'move_in_out';
     const asksFrequency = !service || (serviceAsksFrequency(service) && !moveCleaning && !deepChosen);
     if (deepField) {
-      const deepAvailable = service === 'standard' && (deepChosen || !frequencyValue || frequencyValue === 'one_time');
+      // Never offer the optional reset before the customer has selected a
+      // frequency. Recurring arrangements receive the required first-visit
+      // Deep Cleaning notice instead of this optional checkbox.
+      const deepAvailable = service === 'standard' && (deepChosen || frequencyValue === 'one_time');
       deepField.hidden = !deepAvailable;
       if (!deepAvailable && deepInput) deepInput.checked = false;
     }

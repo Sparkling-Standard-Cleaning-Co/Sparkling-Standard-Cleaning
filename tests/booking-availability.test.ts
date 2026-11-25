@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { isPublicBookingStartMinutes } from '../src/config/booking.ts';
 import {
   addDays,
+  localMinutesOfDay,
   localWeekday,
   zonedTimeToUtc,
 } from '../src/lib/booking/time.ts';
@@ -57,6 +59,22 @@ test('Central Time conversion handles standard time and spring-forward DST', () 
   assert.equal(zonedTimeToUtc('2026-03-08', '08:00', tz).toISOString(), '2026-03-08T13:00:00.000Z');
   assert.equal(addDays('2026-12-31', 1), '2027-01-01');
   assert.equal(localWeekday('2026-11-10', tz), 2);
+});
+
+test('public booking starts are limited to the morning and afternoon windows', () => {
+  assert.equal(isPublicBookingStartMinutes(7 * 60), true);
+  assert.equal(isPublicBookingStartMinutes(7 * 60 + 15), true);
+  assert.equal(isPublicBookingStartMinutes(8 * 60 + 30), true);
+  assert.equal(isPublicBookingStartMinutes(8 * 60 + 45), false);
+  assert.equal(isPublicBookingStartMinutes(9 * 60), false);
+  assert.equal(isPublicBookingStartMinutes(12 * 60 + 15), false);
+  assert.equal(isPublicBookingStartMinutes(12 * 60 + 30), true);
+  assert.equal(isPublicBookingStartMinutes(14 * 60 + 30), true);
+  assert.equal(isPublicBookingStartMinutes(14 * 60 + 45), false);
+  assert.equal(isPublicBookingStartMinutes(15 * 60), false);
+
+  assert.equal(localMinutesOfDay(zonedTimeToUtc('2026-11-10', '07:00', tz), tz), 7 * 60);
+  assert.equal(localMinutesOfDay(zonedTimeToUtc('2026-11-10', '14:30', tz), tz), 14 * 60 + 30);
 });
 
 test('a free day offers only slots that fit the workday, travel and notice period', async () => {

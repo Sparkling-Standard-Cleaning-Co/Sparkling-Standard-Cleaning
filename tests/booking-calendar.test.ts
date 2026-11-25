@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bookingConfig } from '../src/config/booking.ts';
+import { bookingConfig, isPublicBookingStartMinutes } from '../src/config/booking.ts';
+import { localMinutesOfDay } from '../src/lib/booking/time.ts';
 import {
   calendarJobsForDate,
   calendarStatus,
@@ -229,6 +230,13 @@ test('enabled availability returns real slots and never includes customer detail
       assert.equal(data.timeZone, 'America/Chicago');
       assert.equal(data.available, true);
       assert.ok((data.slots?.length ?? 0) > 0);
+      for (const slot of data.slots ?? []) {
+        assert.equal(
+          isPublicBookingStartMinutes(localMinutesOfDay(new Date(slot.start), data.timeZone ?? 'America/Chicago')),
+          true,
+          `slot ${slot.startLabel} is outside the public start windows`,
+        );
+      }
       const serialized = JSON.stringify(data);
       assert.doesNotMatch(serialized, /customer|recipient|address/i);
     });

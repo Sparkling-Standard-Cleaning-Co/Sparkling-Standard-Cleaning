@@ -229,7 +229,7 @@ test('Morning and Afternoon selections keep the exact time picker in view', asyn
       const result = await page.evaluate(() => {
         const picker = document.querySelector('[data-calendar-picker]');
         const heading = picker?.querySelector('.booking-calendar__picker-heading');
-        const fields = picker?.querySelector('.booking-calendar__time-fields');
+        const fields = picker?.querySelector('.booking-calendar__times');
         if (!picker || !heading || !fields) return null;
         const pickerRect = picker.getBoundingClientRect();
         const headingRect = heading.getBoundingClientRect();
@@ -486,8 +486,13 @@ test('rapid date changes never let a stale availability response win', async () 
     assert.equal(await page.locator('[data-period="first"]').isDisabled(), true, 'stale morning slots never win');
     await page.click('[data-period="afternoon"]');
     await page.waitForSelector('[data-calendar-picker]', { state: 'visible' });
-    const hourOptions = (await page.locator('[data-time-hour] option').allTextContents()).map((value) => value.trim());
-    assert.deepEqual(hourOptions, ['12']);
+    const times = (await page.locator('[data-calendar-time-options] button').allTextContents()).map((value) => value.trim());
+    assert.deepEqual(times, [
+      '12:30 PM', '12:45 PM', '1:00 PM', '1:15 PM', '1:30 PM',
+      '1:45 PM', '2:00 PM', '2:15 PM', '2:30 PM',
+    ]);
+    const enabled = (await page.locator('[data-calendar-time-options] button:not([disabled])').allTextContents()).map((value) => value.trim());
+    assert.deepEqual(enabled, ['12:30 PM'], 'stale morning slots never appear in the new date');
   } finally {
     await context.close();
   }

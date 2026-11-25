@@ -1,7 +1,8 @@
 // POST /api/booking-hold — create an atomic, expiring hold for one available
 // slot. A hold is never a confirmed booking.
-import { bookingConfig } from '../../src/config/booking.ts';
+import { bookingConfig, isPublicBookingStartMinutes } from '../../src/config/booking.ts';
 import { availabilityForDate, type BookingEnv } from '../../src/lib/booking/service.ts';
+import { localMinutesOfDay } from '../../src/lib/booking/time.ts';
 import { bookingStore, createBookingHold, type BookingStorageEnv } from '../../src/lib/booking/holds.ts';
 import { resolveServiceBranchStrict } from '../../src/lib/branches/registry.ts';
 import { reverseGeocode } from '../../src/lib/location/server-geocode.ts';
@@ -103,6 +104,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     });
     if (!availability.ok) {
       return json({ ok: false, error: availability.reason }, 409);
+    }
+    if (
+      !isPublicBookingStartMinutes(
+        localMinutesOfDay(new Date(requestedStart), availability.timeZone),
+      )
+    ) {
+      return json({ ok: false, error: 'slot_outside_public_window' }, 409);
     }
     const exact = availability.availability.slots.find(
       (slot) => slot.start === requestedStart && slot.end === requestedEnd,

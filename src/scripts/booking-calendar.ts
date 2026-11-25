@@ -1,8 +1,9 @@
 // Owner-approved premium appointment calendar (2026-10-28).
 //
 // Residential/STR rules: the customer first chooses First Appointment
-// (7:00–8:30 AM) or Afternoon Appointment (12:30–2:30 PM), then a compact
-// hour-and-minute start in 15-minute increments. No large list of time buttons.
+// (7:00-8:30 AM) or Afternoon Appointment (12:30-2:30 PM), then an explicit
+// 15-minute start. Every public start is visible; unavailable starts are marked
+// rather than hidden so an auto-selected or shifted time cannot mislead.
 //
 // The choice is provisional. The final step revalidates the real duration and
 // destination against the two-resource scheduler, creates the temporary hold,
@@ -122,7 +123,19 @@ function minutesToLabel(minutes: number): string {
   const hour24 = Math.floor(minutes / 60);
   const minute = minutes % 60;
   const hour12 = ((hour24 + 11) % 12) + 1;
+
   return `${hour12}:${String(minute).padStart(2, '0')} ${hour24 >= 12 ? 'PM' : 'AM'}`;
+}
+
+function labelToMinutes(label: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(label.trim());
+  if (!match) return null;
+  const hour12 = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour12) || !Number.isFinite(minute)) return null;
+  const pm = match[3]!.toUpperCase() === 'PM';
+  const hour24 = (hour12 % 12) + (pm ? 12 : 0);
+  return hour24 * 60 + minute;
 }
 
 function periodMinutes(period: Period): number[] {
@@ -130,10 +143,6 @@ function periodMinutes(period: Period): number[] {
   const values: number[] = [];
   for (let minutes = startMinutes; minutes <= endMinutes; minutes += 15) values.push(minutes);
   return values;
-}
-
-function hour12(hour24: number): number {
-  return ((hour24 + 11) % 12) + 1;
 }
 
 export function initBookingCalendar(
@@ -151,9 +160,7 @@ export function initBookingCalendar(
   const periodEl = root.querySelector<HTMLElement>('[data-calendar-period]');
   const periodButtons = [...root.querySelectorAll<HTMLButtonElement>('[data-period]')];
   const picker = root.querySelector<HTMLElement>('[data-calendar-picker]');
-  const hourSelect = root.querySelector<HTMLSelectElement>('[data-time-hour]');
-  const minuteSelect = root.querySelector<HTMLSelectElement>('[data-time-minute]');
-  const meridiemEl = root.querySelector<HTMLElement>('[data-time-meridiem]');
+  const timeOptions = root.querySelector<HTMLElement>('[data-calendar-time-options]');
   const selectedLabel = root.querySelector<HTMLElement>('[data-calendar-selected-label]');
   const statusEl = root.querySelector<HTMLElement>('[data-calendar-status]');
   const retryButton = root.querySelector<HTMLButtonElement>('[data-calendar-retry]');
@@ -179,6 +186,7 @@ export function initBookingCalendar(
   let viewMonth = Number(initialMonth.slice(5, 7)) - 1;
   let selectedDate = '';
   let selectedTime: BookingCalendarSelection | null = null;
+  let selectedMinutes: number | null = null;
   let selectedPeriod: Period | null = null;
   let availableSlots: Slot[] = [];
   let liveAvailability = false;
@@ -260,67 +268,74 @@ export function initBookingCalendar(
       button.setAttribute('aria-pressed', String(pressed));
       button.classList.toggle('is-selected', pressed);
     }
+    if (selectedMinutes !== null && !periodMinutes(period).includes(selectedMinutes)) {
+      selectedMinutes = null;
+      selectedTime = null;
+      setInputs();
+    }
     populatePicker();
     revealPicker();
   }
 
   function populatePicker(): void {
-    if (!selectedPeriod || !picker || !hourSelect || !minuteSelect) return;
-    const times = periodMinutes(selectedPeriod).filter(timeIsEnabled);
-    if (times.length === 0) {
+    if (!selectedPeriod || !picker || !timeOptions) return;
+    const times = periodMinutes(selectedPeriod);
+    if (liveAvailability && !times.some(timeIsEnabled)) {
       picker.hidden = true;
       selectedTime = null;
+      selectedMinutes = null;
+      setInputs();
       if (selectedLabel && selectedDate) selectedLabel.textContent = shortDateLabel(selectedDate);
       setStatus('No online times are available in that window. Choose another window or date.', 'error');
       notify();
       return;
     }
     picker.hidden = false;
-    const hours = [...new Set(times.map((minutes) => Math.floor(minutes / 60)))];
-    const previousHour = Number(hourSelect.value);
-    const targetHour = hours.includes(previousHour) ? previousHour : hours[0]!;
-    hourSelect.innerHTML = '';
-    for (const hour of hours) {
-      const option = document.createElement('option');
-      option.value = String(hour);
-      option.textContent = String(hour12(hour)).padStart(2, '0');
-      hourSelect.appendChild(option);
+    timeOptions.innerHTML = '';
+    for (const minutes of times) {
+      const enabled = !liveAvailability || timeIsEnabled(minutes);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'booking-calendar__time';
+      button.dataset.timeMinutes = String(minutes);
+      button.textContent = minutesToLabel(minutes);
+      button.disabled = !enabled;
+      button.setAttribute('aria-pressed', String(selectedMinutes === minutes));
+      if (!enabled) {
+        button.title = 'Not available for this date. Crew travel or another booking may make this start unavailable.';
+      }
+      button.addEventListener('click', () => {
+        if (!enabled) return;
+        selectedMinutes = minutes;
+        for (const option of timeOptions.querySelectorAll<HTMLButtonElement>('[data-time-minutes]')) {
+          option.setAttribute('aria-pressed', String(Number(option.dataset.timeMinutes) === minutes));
+        }
+        updateSelectedTime();
+      });
+      timeOptions.appendChild(button);
     }
-    hourSelect.value = String(targetHour);
-    populateMinutes(targetHour);
+    if (selectedMinutes === null) {
+      selectedTime = null;
+      setInputs();
+      if (selectedLabel && selectedDate) selectedLabel.textContent = shortDateLabel(selectedDate);
+      setStatus('Choose a start time from the available options.', 'info');
+      notify();
+      return;
+    }
     updateSelectedTime();
   }
 
-  function populateMinutes(hour: number): void {
-    if (!minuteSelect || !selectedPeriod) return;
-    const times = periodMinutes(selectedPeriod).filter(
-      (minutes) => Math.floor(minutes / 60) === hour && timeIsEnabled(minutes),
-    );
-    const previousMinute = Number(minuteSelect.value);
-    minuteSelect.innerHTML = '';
-    for (const minutes of times) {
-      const minute = minutes % 60;
-      const option = document.createElement('option');
-      option.value = String(minute);
-      option.textContent = String(minute).padStart(2, '0');
-      minuteSelect.appendChild(option);
-    }
-    if (times.length === 0) return;
-    const previousAvailable = times.some((minutes) => minutes % 60 === previousMinute);
-    minuteSelect.value = String(
-      previousAvailable ? previousMinute : times[0]! % 60,
-    );
-  }
-
   function updateSelectedTime(): void {
-    if (!selectedPeriod || !hourSelect || !minuteSelect || !selectedDate) return;
-    const hour = Number(hourSelect.value);
-    const minute = Number(minuteSelect.value);
-    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return;
-    const minutes = hour * 60 + minute;
-    const label = minutesToLabel(minutes);
-    if (meridiemEl) meridiemEl.textContent = hour >= 12 ? 'PM' : 'AM';
-    const slot = slotForMinutes(minutes);
+    if (!selectedPeriod || selectedMinutes === null || !selectedDate) return;
+    const label = minutesToLabel(selectedMinutes);
+    const slot = slotForMinutes(selectedMinutes);
+    if (liveAvailability && !slot) {
+      selectedTime = null;
+      setInputs();
+      setStatus('That start time is no longer available. Choose another available time.', 'error');
+      notify();
+      return;
+    }
     selectedTime = {
       date: selectedDate,
       timeLabel: label,
@@ -407,6 +422,7 @@ export function initBookingCalendar(
     if (timesRetryButton) timesRetryButton.hidden = true;
     selectedPeriod = null;
     selectedTime = null;
+    selectedMinutes = null;
     if (picker) picker.hidden = true;
     renderPeriods();
     setStatus(message);
@@ -434,6 +450,7 @@ export function initBookingCalendar(
     if (dateChanged) {
       selectedPeriod = null;
       selectedTime = null;
+      selectedMinutes = null;
       if (picker) picker.hidden = true;
     }
     setTimesLoading(true);
@@ -700,14 +717,6 @@ export function initBookingCalendar(
     if (timesRetryButton) timesRetryButton.hidden = true;
     void refreshTimes();
   });
-  hourSelect?.addEventListener('change', () => {
-    populateMinutes(Number(hourSelect.value));
-    updateSelectedTime();
-  });
-  minuteSelect?.addEventListener('change', () => {
-    updateSelectedTime();
-  });
-
   if (dateInput) {
     dateInput.min = today;
     dateInput.max = latest;
@@ -745,6 +754,12 @@ export function initBookingCalendar(
     },
     selectSlot(start, end, startLabel) {
       if (!selectedDate) return;
+      const minutes = labelToMinutes(startLabel);
+      if (minutes !== null) {
+        selectedMinutes = minutes;
+        selectedPeriod = minutes <= 8 * 60 + 30 ? 'first' : 'afternoon';
+        populatePicker();
+      }
       selectedTime = {
         date: selectedDate,
         timeLabel: startLabel,

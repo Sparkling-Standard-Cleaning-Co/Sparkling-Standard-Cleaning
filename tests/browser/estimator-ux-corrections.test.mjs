@@ -231,23 +231,24 @@ test('Community Support is one small checkbox linked to the terms', async () => 
   }
 });
 
-test('the time picker is compact and uses the two residential windows', async () => {
+test('the time picker offers every 15-minute start in the two residential windows', async () => {
   const { context, page } = await open();
   try {
     await confirmAddressFirst(page);
     await page.fill('#est-date', BOOKING_DATE);
     await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-    assert.equal(await page.locator('.booking-calendar__time').count(), 0, 'no large time-button list');
+    assert.equal(await page.locator('[data-calendar-time-options] button').count(), 0, 'no times before a window is chosen');
     await page.click('[data-period="first"]');
-    const hourOptions = await page.locator('[data-time-hour] option').allTextContents();
-    assert.deepEqual(hourOptions, ['07', '08']);
-    const minuteOptions = await page.locator('[data-time-minute] option').allTextContents();
-    assert.deepEqual(minuteOptions, ['00', '15', '30', '45']);
-    assert.equal((await page.locator('[data-time-meridiem]').textContent())?.trim(), 'AM');
+    const morning = (await page.locator('[data-calendar-time-options] button').allTextContents()).map((value) => value.trim());
+    assert.deepEqual(morning, ['7:00 AM', '7:15 AM', '7:30 AM', '7:45 AM', '8:00 AM', '8:15 AM', '8:30 AM']);
+    assert.equal(await page.locator('[data-time-hour]').count(), 0, 'no ambiguous hour selector');
+    assert.equal(await page.locator('[data-time-minute]').count(), 0, 'no ambiguous minute selector');
     await page.click('[data-period="afternoon"]');
-    const afternoonHours = await page.locator('[data-time-hour] option').allTextContents();
-    assert.deepEqual(afternoonHours, ['12', '01', '02']);
-    assert.equal((await page.locator('[data-time-meridiem]').textContent())?.trim(), 'PM');
+    const afternoon = (await page.locator('[data-calendar-time-options] button').allTextContents()).map((value) => value.trim());
+    assert.deepEqual(afternoon, [
+      '12:30 PM', '12:45 PM', '1:00 PM', '1:15 PM', '1:30 PM',
+      '1:45 PM', '2:00 PM', '2:15 PM', '2:30 PM',
+    ]);
   } finally {
     await context.close();
   }

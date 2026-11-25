@@ -59,6 +59,7 @@ interface SigningPayload {
   context?: {
     customerName?: string;
     customerEmail?: string;
+    customerPhone?: string;
     propertyAddress?: string;
     bookingReference?: string;
     serviceCode?: string;
@@ -110,6 +111,8 @@ let step = 1;
 let documents: SigningDocument[] = [];
 let fields: SigningFieldDefinition[] = [];
 let fieldValues: Record<string, string> = {};
+let bookingContact: { name: string; phone: string } = { name: '', phone: '' };
+let alternateContact: { name: string; phone: string } = { name: '', phone: '' };
 let adoptedSignature: AdoptedSignature | null = null;
 let appliedSignatures: Record<string, AppliedSignature> = {};
 let submitting = false;
@@ -257,11 +260,85 @@ function renderFields(): string {
   if (fields.length === 0) {
     return '<div class="signing-card"><h2>Access and instructions</h2><p class="signing-muted">No additional access choices are required for this document set. If you need to provide instructions, reply to your Sparkling Standard message before the appointment.</p></div>';
   }
+  const sameField = fields.find((field) => field.key === 'access_contact_same');
+  const nameField = fields.find((field) => field.key === 'access_contact_name');
+  const phoneField = fields.find((field) => field.key === 'access_contact_phone');
+  const remaining = fields.filter(
+    (field) => !['access_contact_same', 'access_contact_name', 'access_contact_phone'].includes(field.key),
+  );
+  const sameValue = fieldValues.access_contact_same || 'same';
+  const contactSummary = `<div class="signing-contact-summary" data-signing-contact-summary>
+    <span class="signing-contact-summary__label">Day-of-service contact</span>
+    <strong data-signing-contact-name>${esc(bookingContact.name || 'Booking contact')}</strong>
+    <span data-signing-contact-phone>${esc(bookingContact.phone || 'No phone on file')}</span>
+    <span class="signing-muted">Same as your booking contact. Nothing needs to be retyped.</span>
+  </div>`;
+  const differentFields = nameField && phoneField
+    ? `<div class="signing-contact-fields" data-signing-contact-different${sameValue === 'different' ? '' : ' hidden'}>
+        ${fieldControl(nameField, fieldValues[nameField.key] ?? bookingContact.name)}
+        ${fieldControl(phoneField, fieldValues[phoneField.key] ?? bookingContact.phone)}
+      </div>`
+    : '';
   return `<div class="signing-card">
     <h2>Access and service instructions</h2>
     <p class="signing-muted">These choices become part of your signed service schedule. The approved agreement wording is unchanged. Do not enter a permanent master code or password.</p>
-    <div class="signing-fields">${fields.map((field) => fieldControl(field, fieldValues[field.key] ?? '')).join('')}</div>
+    <div class="signing-fields">
+      ${sameField ? `<div class="signing-field--wide signing-contact-choice">${fieldControl(sameField, sameValue)}</div>` : ''}
+      ${contactSummary}
+      ${differentFields}
+      ${remaining.map((field) => fieldControl(field, fieldValues[field.key] ?? '')).join('')}
+    </div>
   </div>`;
+}
+
+function bindAccessContact(): void {
+  if (!content) return;
+  const radios = [...content.querySelectorAll<HTMLInputElement>('input[name="access_contact_same"]')];
+  if (radios.length === 0) return;
+  const nameInput = content.querySelector<HTMLInputElement>('input[name="access_contact_name"]');
+  const phoneInput = content.querySelector<HTMLInputElement>('input[name="access_contact_phone"]');
+  const different = content.querySelector<HTMLElement>('[data-signing-contact-different]');
+  const summary = content.querySelector<HTMLElement>('[data-signing-contact-summary]');
+  const summaryName = content.querySelector<HTMLElement>('[data-signing-contact-name]');
+  const summaryPhone = content.querySelector<HTMLElement>('[data-signing-contact-phone]');
+  const selected = () => radios.find((radio) => radio.checked)?.value === 'different' ? 'different' : 'same';
+  const sync = () => {
+    const choice = selected();
+    if (different) different.hidden = choice !== 'different';
+    if (summary) summary.hidden = choice === 'different';
+    if (choice === 'different') {
+      if (nameInput && !nameInput.value.trim() && alternateContact.name) nameInput.value = alternateContact.name;
+      if (phoneInput && !phoneInput.value.trim() && alternateContact.phone) phoneInput.value = alternateContact.phone;
+    } else {
+      if (nameInput) nameInput.value = bookingContact.name;
+      if (phoneInput) phoneInput.value = bookingContact.phone;
+    }
+    if (summaryName) summaryName.textContent = bookingContact.name || 'Booking contact';
+    if (summaryPhone) {
+      summaryPhone.textContent = bookingContact.phone || 'No phone on file — choose a different contact below.';
+      summaryPhone.classList.toggle('signing-contact-summary__missing', !bookingContact.phone);
+    }
+  };
+  for (const radio of radios) {
+    radio.addEventListener('change', () => {
+      if (radio.value === 'different' && nameInput && phoneInput && !alternateContact.name && !alternateContact.phone) {
+        alternateContact = {
+          name: nameInput.value.trim() || bookingContact.name,
+          phone: phoneInput.value.trim() || bookingContact.phone,
+        };
+      }
+      sync();
+    });
+  }
+  for (const input of [nameInput, phoneInput]) {
+    input?.addEventListener('input', () => {
+      alternateContact = {
+        name: nameInput?.value.trim() ?? '',
+        phone: phoneInput?.value.trim() ?? '',
+      };
+    });
+  }
+  sync();
 }
 
 function documentMeta(document: SigningDocument): string {
@@ -345,6 +422,16 @@ function renderWizard(payload: SigningPayload): void {
   documents = payload.documents ?? [];
   fields = payload.customerFields?.definitions ?? [];
   fieldValues = { ...(payload.customerFields?.values ?? {}) };
+  bookingContact = {
+    name: payload.context?.customerName ?? '',
+    phone: payload.context?.customerPhone ?? '',
+  };
+  alternateContact = fieldValues.access_contact_same === 'different'
+    ? {
+        name: fieldValues.access_contact_name ?? '',
+        phone: fieldValues.access_contact_phone ?? '',
+      }
+    : { name: '', phone: '' };
   appliedSignatures = {};
   adoptedSignature = null;
   const required = unsignedRequired();
@@ -390,6 +477,7 @@ function renderWizard(payload: SigningPayload): void {
 
   step = 1;
   wireWizard();
+  bindAccessContact();
   updateStep();
 }
 
@@ -730,6 +818,35 @@ function validateStep(target: number): boolean {
         return false;
       }
     }
+    if (fields.some((field) => field.key === 'access_contact_same')) {
+      const choice =
+        content.querySelector<HTMLInputElement>('input[name="access_contact_same"]:checked')?.value ?? 'same';
+      if (choice !== 'different') {
+        if (!bookingContact.phone.trim()) {
+          message(
+            'Your booking has no phone on file. Choose "Use a different day-of-service contact" and enter a phone number.',
+            'error',
+          );
+          content.querySelector<HTMLInputElement>('input[name="access_contact_same"][value="different"]')?.focus();
+          return false;
+        }
+      } else {
+        const contactName = content
+          .querySelector<HTMLInputElement>('input[name="access_contact_name"]')
+          ?.value.trim() ?? '';
+        const contactPhone = content
+          .querySelector<HTMLInputElement>('input[name="access_contact_phone"]')
+          ?.value.trim() ?? '';
+        if (!contactName || !contactPhone) {
+          message('Enter the day-of-service contact name and phone before continuing.', 'error');
+          (!contactName
+            ? content.querySelector<HTMLInputElement>('input[name="access_contact_name"]')
+            : content.querySelector<HTMLInputElement>('input[name="access_contact_phone"]')
+          )?.focus();
+          return false;
+        }
+      }
+    }
     message('Access choices saved for this signing step.', 'ok');
     return true;
   }
@@ -870,6 +987,16 @@ async function submit(): Promise<void> {
     if (!response.ok || !result.ok) {
       if (result.error === 'signing_fields_invalid') {
         throw new Error('Some required access choices are missing. Review the highlighted step.');
+      }
+      if (result.error === 'signing_contact_invalid') {
+        const field = result.fields?.[0] ?? '';
+        if (field === 'booking_contact_phone_missing') {
+          throw new Error('Your booking has no phone on file for the day of service. Choose a different day-of-service contact and enter their phone.');
+        }
+        if (field === 'access_contact_phone_missing' || field === 'booking_contact_name_missing') {
+          throw new Error('Enter the day-of-service contact name and phone before signing.');
+        }
+        throw new Error('Review the day-of-service contact information before signing.');
       }
       throw new Error(result.error ?? 'signing_failed');
     }

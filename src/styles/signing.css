@@ -220,6 +220,48 @@
   margin-bottom: 0.4rem;
 }
 
+.signing-contact-choice,
+.signing-contact-summary,
+.signing-contact-fields {
+  grid-column: 1 / -1;
+}
+
+.signing-contact-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.signing-contact-summary {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid #d8c8b7;
+  border-radius: 0.7rem;
+  background: #fdf8f2;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.signing-contact-summary__label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7a5b60;
+}
+
+.signing-contact-summary__missing {
+  color: #9b2c2c;
+  font-weight: 700;
+}
+
+@media (min-width: 48rem) {
+  .signing-contact-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .signing-options {
   display: grid;
   gap: 0.5rem;
