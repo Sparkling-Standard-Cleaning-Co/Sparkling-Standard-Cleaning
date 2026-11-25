@@ -44,15 +44,20 @@ export function prepareContent(html: string): string {
   content.querySelectorAll('[data-cfemail]').forEach((node) => {
     const email = decodeCloudflareEmail(node.getAttribute('data-cfemail') ?? '');
     if (!email) return;
-    if (node.tagName === 'A') {
-      const link = node as HTMLAnchorElement;
-      link.href = `mailto:${email}`;
-      link.textContent = email;
-      link.target = '';
-      link.rel = 'noopener noreferrer';
-      return;
-    }
+    // Cloudflare commonly puts the encoded value on a nested span and leaves
+    // the outer anchor pointing at /cdn-cgi/l/email-protection. Rewrite the
+    // containing link too, otherwise the visible text is right but clicking it
+    // would still leave the page.
+    const anchor =
+      node.tagName === 'A'
+        ? (node as HTMLAnchorElement)
+        : (node.closest('a') as HTMLAnchorElement | null);
     node.textContent = email;
+    if (anchor) {
+      anchor.href = `mailto:${email}`;
+      anchor.target = '';
+      anchor.rel = 'noopener noreferrer';
+    }
   });
   content.querySelectorAll('a.__cf_email__, span.__cf_email__').forEach((node) => {
     const text = node.textContent?.trim() ?? '';

@@ -106,7 +106,7 @@ test('Cloudflare-obfuscated policy email renders as a real visible mailto link',
       route.fulfill({
         status: 200,
         contentType: 'text/html',
-        body: `<html><body><main id="main"><h1>Terms of service</h1><p>Questions? Email <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="${encoded}">[email protected]</a>.</p></main></body></html>`,
+        body: `<html><body><main id="main"><h1>Terms of service</h1><p>Questions? Email <a href="/cdn-cgi/l/email-protection#abc"><span class="__cf_email__" data-cfemail="${encoded}">[email protected]</span></a>.</p></main></body></html>`,
       }),
     );
     await page.goto(BASE + '/gift-certificates/', { waitUntil: 'load' });
