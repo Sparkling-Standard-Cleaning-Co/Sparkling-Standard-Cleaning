@@ -1,0 +1,60 @@
+name: Backup recoverability audit
+
+# Read-only audit of application object references. It exports production D1,
+# stages application R2 objects exactly as the backup does, and proves every
+# known database reference has a staged object. It never uploads an archive,
+# applies retention, or mutates production.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-recoverability-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      R2_APP_API_TOKEN: ${{ secrets.R2_APP_API_TOKEN }}
+      R2_APP_ACCOUNT_ID: ${{ secrets.R2_APP_ACCOUNT_ID }}
+      D1_DATABASE_NAME: ${{ secrets.D1_DATABASE_NAME }}
+      BACKUP_CONTROL_URL: ${{ vars.BACKUP_CONTROL_URL }}
+      BACKUP_CONTROL_TOKEN: ${{ secrets.BACKUP_CONTROL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Export production D1
+        run: |
+          mkdir -p audit-out
+          npx --yes wrangler@4 d1 export "$D1_DATABASE_NAME" --remote --output audit-out/d1.sql
+          test -s audit-out/d1.sql
+      - name: Verify the export restores independently
+        run: node scripts/backup/verify-d1-export.mjs audit-out/d1.sql | tee audit-out/verify-d1.json
+      - name: Stage application R2 objects
+        run: node scripts/backup/r2-app-objects.mjs --out audit-out/r2-app
+      - name: Verify every known database reference has an object
+        run: |
+          set -o pipefail
+          node scripts/backup/verify-r2-references.mjs \
+            --d1 audit-out/d1.sql \
+            --r2-manifest audit-out/r2-app/manifest.json | tee audit-out/verify-r2-references.json
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-recoverability-audit-${{ github.run_id }}
+          path: |
+            audit-out/verify-d1.json
+            audit-out/verify-r2-references.json
+            audit-out/r2-app/manifest.json
+          if-no-files-found: warn
+          retention-days: 30

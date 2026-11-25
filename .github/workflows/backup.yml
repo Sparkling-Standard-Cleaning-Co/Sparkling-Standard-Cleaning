@@ -116,6 +116,13 @@ jobs:
       - name: Stage application R2 objects
         if: inputs.include_app_objects
         run: node scripts/backup/r2-app-objects.mjs --out backup-out/r2-app
+      - name: Verify database references have staged R2 objects
+        if: inputs.include_app_objects
+        run: |
+          set -o pipefail
+          node scripts/backup/verify-r2-references.mjs \
+            --d1 backup-out/d1.sql \
+            --r2-manifest backup-out/r2-app/manifest.json | tee backup-out/verify-r2-references.json
       - name: Create and upload encrypted R2 backup
         run: |
           ARGS=(--d1 backup-out/d1.sql --source metadata=backup-out/metadata --out backup-out --label "$BACKUP_SCOPE" --upload)
