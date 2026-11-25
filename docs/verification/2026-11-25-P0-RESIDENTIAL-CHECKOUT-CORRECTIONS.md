@@ -3,13 +3,18 @@
 ## Release identity
 
 - Starting HEAD: `7e15e39` (`main` = `production-safe`, zero divergence)
-- Branch used for the work package: `production-safe`
-- Production baseline: 62 migrations, 106 application tables excluding SQLite
-  internals (107 in the backup manifest), foreign-key check clean
-- Production complete backup before this work package:
+- Release HEAD: `2fb4dc4`; `main` and `production-safe` identical
+- Cloudflare Pages production deployment:
+  `c33ce888-325d-4510-b227-b2a1ee510b8b` (source `2fb4dc4`), verified live
+- Production schema: 63 migrations after `0063_staffing_pending.sql`; 106
+  application tables in the D1 export, 107 live non-SQLite tables including
+  Cloudflare's `_cf_KV`, 0 foreign-key violations
+- Production complete backups before and after this work package:
   `sparkling-standard-backup-2026-11-25T21-38-15-complete.ssbk`
-  (GitHub run `45706016953`, 10,793,311 bytes, 227 files, SHA-256
-  `6cff79a3214dbd0cf0165b3816afa213f01ba12761045e411dc8ef0fc7dd5db8`)
+  (run `45706016953`, 62 migrations) and
+  `sparkling-standard-backup-2026-11-25T22-12-12-complete.ssbk`
+  (run `45711067126`, 63 migrations, 10,794,502 bytes, 227 files, SHA-256
+  `7fb93022172eb44168d50b503937caa4e421565f8f0a70b9af1a426f55c3423e`)
 
 ## 1. Appointment window defaults
 
@@ -103,6 +108,11 @@ selected time.
 - Existing scheduling regression suites remain green, including
   `booking-availability`, `booking-holds`, `booking-resources`,
   `paynow-arrival-windows` and the address-first scheduling tests.
+- Live read-only production probe on 2026-12-15:
+  - fixed 360-minute request returned afternoon starts only to 1:00 PM;
+  - the same request with `laborHours=6` returned 1:15 PM through 2:30 PM;
+  - the 2:30 PM start ends 5:45 PM, inside the 7:00 PM close. No hold,
+    booking, payment or customer record was created.
 
 ## 3. Terms and Privacy modal email display
 
@@ -118,6 +128,30 @@ policy pages are unchanged. Unit coverage:
 Cloudflare-obfuscated Terms response renders
 `customer-service@sparkling-standard.com` with a real `mailto:` link and no
 placeholder text (desktop and phone modal suites remain green).
+
+The live Terms modal was verified against the production Cloudflare response:
+the nested `data-cfemail` span now produces
+`mailto:customer-service@sparkling-standard.com`, with no `[email protected]`
+text.
+
+## Deployment and live verification
+
+| Check | Result |
+| --- | --- |
+| Commit | `2fb4dc4` on `main` and `production-safe` |
+| Migration | `0063_staffing_pending.sql` applied; 63 migrations |
+| Cloudflare Pages | `c33ce888-325d-4510-b227-b2a1ee510b8b`, source `2fb4dc4` |
+| Live code | served `EstimateWizard` bundle contains the staffing notice and policy decoder |
+| Live policy modal | real email and working mailto link |
+| Live availability | 6-hour afternoon job now offers 2:30 PM ending 5:45 PM |
+| Unit `npm test` | 1,137 tests, 1,136 pass, 0 fail, 1 pre-existing skip |
+| Browser `npm run test:browser` | 285/285 pass |
+| `astro check` | 0 errors |
+| Build / validate | 41 pages, 2,636 internal links |
+| Backup | final complete archive verified on R2 and OneDrive; isolated restore passed |
+
+No live customer email, charge, refund, booking, hold or signed agreement was
+created during verification.
 
 ## 4. Branding retirement
 
@@ -139,35 +173,40 @@ placeholder text (desktop and phone modal suites remain green).
 
 ### Table and migration reconciliation
 
-The earlier complete archive reported 106 tables / 60 migrations. Production
-reported 107 tables / 62 migrations. The difference is now explained and
-re-verified:
+The earlier archive reported 106 tables / 60 migrations while production
+reported 107 tables / 62 migrations. The exact reconciliation is now verified
+against live `sqlite_master` and a restored export:
 
-- The backup's D1 verifier excludes SQLite internal tables
-  (`name NOT LIKE 'sqlite_%'`), so 106 application tables is the correct
-  application count; the archive manifest lists 107 including
-  `sqlite_sequence`.
-- The earlier archive captured 60 migrations because migrations `0061` and
-  `0062` had not yet been recorded at export time. A fresh complete backup was
-  created on 2026-11-25 (run `45706016953`) and independently proved
-  **62 migrations, 106 application tables, 0 foreign-key violations**, with
-  D1 export SHA-256
-  `83db19c826c0a7b0d54601e96191dab2db9e9af36e042549159106803aa10b53`.
+- The D1 export contains **106 application tables** and all **63** migration
+  records after `0063`; 0 foreign-key violations.
+- Live `sqlite_master` contains 107 non-SQLite tables: the same 106 application
+  tables plus Cloudflare's internal `_cf_KV` table, which D1 exports do not
+  include.
+- The encrypted archive manifest reports 107 tables because it also counts
+  `sqlite_sequence` (106 application + 1).
+- The earlier 60-migration archive was captured before migrations `0061` and
+  `0062` were recorded, not because of a backup defect. The fresh archive
+  (run `45711067126`) captures 63 migrations and supersedes it for current
+  recoverability.
 
-### Fresh complete backup
+### Fresh complete backup after the migration
 
 | Evidence | Value |
 | --- | --- |
-| Workflow run | `45706016953` (success) |
-| Archive | `sparkling-standard-backup-2026-11-25T21-38-15-complete.ssbk` |
-| Bytes | 10,793,311 |
+| Workflow run | `45711067126` (success) |
+| Archive | `sparkling-standard-backup-2026-11-25T22-12-12-complete.ssbk` |
+| Bytes | 10,794,502 |
 | Files | 227 (database, metadata, application R2 objects) |
-| SHA-256 | `6cff79a3214dbd0cf0165b3816afa213f01ba12761045e411dc8ef0fc7dd5db8` |
+| SHA-256 | `7fb93022172eb44168d50b503937caa4e421565f8f0a70b9af1a426f55c3423e` |
 | R2 round-trip | verified |
 | OneDrive round-trip | verified |
-| Isolated restore | passed; 106 application tables, 62 migrations, 0 FK violations |
-| Business record counts restored | 12 customers, 14 properties, 21 appointments, 3 invoices, 45 leads, 0 career applications, 9 signing requests |
+| Isolated restore | passed; 106 application tables, 63 migrations, 0 FK violations |
+| R2 reference audit in the workflow | passed; 224 staged objects, 0 missing references |
 | Retention | not applied during this run (`apply_retention=false`); no archive deleted |
+
+The immediately preceding complete backup (`45706016953`) captured the
+pre-migration 62-migration state and remains a valid rollback archive. Both
+archives remain in R2 and OneDrive.
 
 ### Recoverability audit for application R2 objects
 
@@ -189,11 +228,14 @@ action; no secret value is displayed in this repository.
 
 ### Scheduled execution
 
-The Worker has a `*/15 * * * *` cron trigger and a saved schedule in
-`backup_schedule`; the cron dispatches the GitHub workflow when due, deduplicates
-per day and prevents concurrent jobs. Live scheduled-run evidence is recorded by
-the job history (`source = 'schedule'`) and remains visible in Admin → Data &
-Storage.
+The Worker has a `*/15 * * * *` cron trigger and a live saved schedule in
+production D1: enabled, daily at 08:30 UTC, complete scope, retention
+30 daily / 12 weekly / 12 monthly (saved 2026-11-25T20:22:33Z). The cron
+dispatches the GitHub workflow when due, deduplicates per day and prevents
+concurrent jobs. Scheduled-run history remains visible in Admin → Data &
+Storage (`source = 'schedule'`). The first scheduled run after this release is
+due 2026-11-26 08:30 UTC; live automatic-run evidence is pending that run,
+while the dispatch logic is covered by `tests/backup-scheduler.test.ts`.
 
 ### Retention safety
 
@@ -207,12 +249,14 @@ retention deletion was performed. The pre-existing 2026-11-21 archive and the
 
 The existing `/api/internal/backup-status` endpoint records the run heartbeat,
 opens an incident and notifies admin@ and owner@ through the established
-backup-monitor/Communications path when the workflow reports failure. The
-workflow's optional `OPS_ALERT_URL` / `OPS_ALERT_TOKEN` secrets are currently
-unset, so the GitHub-side failure report is skipped; job failure still appears
-in Admin → Data & Storage and the scheduler's failure state. Setting those two
-secrets (URL = production site, token = the Pages `OPS_ALERT_TOKEN`) completes
-the immediate email path without a code change.
+backup-monitor/Communications path when the workflow reports failure. On
+2026-11-25 the final missing configuration was completed without exposing
+values: GitHub variable `OPS_ALERT_URL=https://sparkling-standard.com`, a
+new random `OPS_ALERT_TOKEN` stored as a GitHub secret and as the production
+Pages secret. The workflow's success and failure steps now report to that
+endpoint. A failure email was not deliberately triggered during this session
+because that would create a false incident; the endpoint path and configured
+secrets are in place.
 
 ## Remaining limitations
 
