@@ -1,4 +1,4 @@
-# Copy to wrangler.toml and deploy:
+﻿# Copy to wrangler.toml and deploy:
 #   npx wrangler deploy --config wrangler.toml
 #
 # Required secrets:
@@ -29,3 +29,12 @@ database_id = "REPLACE_WITH_THE_D1_DATABASE_ID"
 [[r2_buckets]]
 binding = "BACKUP_BUCKET"
 bucket_name = "sparkling-standard-backups"
+
+[[r2_buckets]]
+binding = "DOCUMENTS_BUCKET"
+bucket_name = "sparkling-standard-documents"
+
+[[r2_buckets]]
+binding = "PHOTOS_BUCKET"
+bucket_name = "sparkling-standard-lead-photos"
+

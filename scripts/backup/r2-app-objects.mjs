@@ -1,8 +1,9 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 // Download application R2 objects for encryption/off-site backup.
 //
-// Uses the Cloudflare REST API with a least-privilege token that can read the
-// named buckets. It never prints object contents or the token.
+// Prefers the owner backup Worker, which reads application R2 through bucket
+// bindings. The direct Cloudflare REST path remains as a fallback. It never
+// prints object contents or a token.
 //
 // Usage:
 //   CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... \
@@ -19,14 +20,17 @@ function arg(name, fallback = '') {
 
 const token = (process.env.R2_APP_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN)?.trim();
 const account = (process.env.R2_APP_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID)?.trim();
+const controlUrl = (process.env.BACKUP_CONTROL_URL || '').trim().replace(/\\/+$/, '');
+const controlToken = (process.env.BACKUP_CONTROL_TOKEN || '').trim();
+const useWorker = Boolean(controlUrl && controlToken);
 const buckets = (process.env.APP_R2_BUCKETS || 'sparkling-standard-documents,sparkling-standard-lead-photos')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
 const out = path.resolve(arg('--out', 'backup-out/r2-app'));
 
-if (!token || !account) {
-  console.error('R2_APP_API_TOKEN (or CLOUDFLARE_API_TOKEN) and R2_APP_ACCOUNT_ID (or CLOUDFLARE_ACCOUNT_ID) are required.');
+if (!useWorker && (!token || !account)) {
+  console.error('Backup control Worker or R2_APP_API_TOKEN plus R2_APP_ACCOUNT_ID is required.');
   process.exit(1);
 }
 
@@ -81,3 +85,4 @@ for (const bucket of buckets) {
 }
 await fs.writeFile(path.join(out, 'manifest.json'), JSON.stringify(manifest, null, 2));
 console.log(`Downloaded ${manifest.files.length} object(s) to ${out}`);
+

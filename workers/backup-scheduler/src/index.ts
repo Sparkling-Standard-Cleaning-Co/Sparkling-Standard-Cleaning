@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Sparkling Standard backup control plane.
  *
  * This Worker is the server-side bridge between the owner-only admin screen and
@@ -56,6 +56,8 @@ interface Env {
   GITHUB_VERIFY_WORKFLOW?: string;
   DB?: D1Database;
   BACKUP_BUCKET?: R2Bucket;
+  DOCUMENTS_BUCKET?: R2Bucket;
+  PHOTOS_BUCKET?: R2Bucket;
 }
 
 interface ExecutionContext {
@@ -395,6 +397,44 @@ async function runScheduled(env: Env): Promise<Record<string, unknown>> {
   return { ok: true, ...result };
 }
 
+function appBucket(env: Env, name: string): R2Bucket | undefined {
+  if (name === 'documents') return env.DOCUMENTS_BUCKET;
+  if (name === 'photos') return env.PHOTOS_BUCKET;
+  return undefined;
+}
+
+async function appObjectList(env: Env, url: URL): Promise<Response> {
+  const bucketName = url.searchParams.get('bucket') === 'photos' ? 'photos' : 'documents';
+  const bucket = appBucket(env, bucketName);
+  if (!bucket) return json({ ok: false, error: 'app_storage_not_configured' }, 503);
+  const cursor = url.searchParams.get('cursor') ?? undefined;
+  const page = await bucket.list({ cursor, limit: 1000 });
+  return json({
+    ok: true,
+    bucket: bucketName,
+    objects: page.objects.map((object) => ({ key: object.key, size: object.size })),
+    truncated: page.truncated,
+    cursor: page.truncated ? page.cursor ?? '' : '',
+  });
+}
+
+async function appObjectGet(env: Env, url: URL): Promise<Response> {
+  const bucketName = url.searchParams.get('bucket') === 'photos' ? 'photos' : 'documents';
+  const bucket = appBucket(env, bucketName);
+  if (!bucket) return json({ ok: false, error: 'app_storage_not_configured' }, 503);
+  const key = url.searchParams.get('key') ?? '';
+  if (!key || key.includes('..')) return json({ ok: false, error: 'object_key_invalid' }, 400);
+  const object = await bucket.get(key);
+  if (!object) return json({ ok: false, error: 'object_not_found' }, 404);
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      ...(object.size !== undefined ? { 'Content-Length': String(object.size) } : {}),
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
 async function listArchives(env: Env): Promise<Record<string, unknown>> {
   if (!env.BACKUP_BUCKET) return { configured: false, archives: [], bytes: 0 };
   const archives: Array<Record<string, unknown>> = [];
@@ -615,6 +655,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
   if (url.pathname === '/archives' && request.method === 'GET') {
     return json({ ok: true, ...(await listArchives(env)) });
   }
+  if (url.pathname === '/app-objects/list' && request.method === 'GET') {
+    return appObjectList(env, url);
+  }
+  if (url.pathname === '/app-objects/get' && request.method === 'GET') {
+    return appObjectGet(env, url);
+  }
   if (url.pathname === '/jobs' && request.method === 'POST') {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const operation: JobOperation = body.operation === 'verify'
@@ -629,7 +675,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
       source: 'admin',
       scope,
       archiveKey,
-      requestedBy: String(body.requestedBy ?? '').trim(),
+      requestedBy: String(body.requestedBy ?? '').trim() || undefined,
       extra: {
         include_app_objects: scope === 'database' ? 'false' : 'true',
         retention_daily: String(Math.max(1, Math.min(365, Number(body.retentionDaily) || 30))),
@@ -678,3 +724,5 @@ export default {
     }
   },
 };
+
+
