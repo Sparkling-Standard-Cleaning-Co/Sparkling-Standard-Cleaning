@@ -5,19 +5,70 @@
 // navigating. The full page remains available in a separate tab, and the
 // acknowledgment checkbox is never changed by viewing a policy.
 
+import { EMAIL_ROUTING } from '../config/email-routing.ts';
+
 const cache = new Map<string, string>();
 
 function policyLabel(trigger: HTMLElement): string {
   return trigger.dataset.legalPolicyLabel?.trim() || trigger.textContent?.trim() || 'Policy';
 }
 
-function prepareContent(html: string): string {
+/**
+ * Cloudflare's Email Address Obfuscation rewrites plain addresses in served
+ * HTML into an encoded `data-cfemail` placeholder and injects a decoder
+ * script. This dialog removes scripts from the fetched policy fragment, so the
+ * injected decoder never runs and the customer sees "[email protected]".
+ * Decode the provider's own encoding locally and keep a working mailto link.
+ */
+export function decodeCloudflareEmail(encoded: string): string | null {
+  const value = encoded.trim();
+  if (!/^[a-f0-9]{4,}$/i.test(value) || value.length % 2 !== 0) return null;
+  const bytes: number[] = [];
+  for (let index = 0; index < value.length; index += 2) {
+    bytes.push(Number.parseInt(value.slice(index, index + 2), 16));
+  }
+  const key = bytes[0];
+  if (key === undefined) return null;
+  const decoded = bytes
+    .slice(1)
+    .map((byte) => byte ^ key)
+    .map((code) => String.fromCharCode(code))
+    .join('');
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(decoded) ? decoded : null;
+}
+
+export function prepareContent(html: string): string {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   const main = parsed.querySelector('#main') ?? parsed.querySelector('main') ?? parsed.body;
   const content = main.cloneNode(true) as HTMLElement;
+  content.querySelectorAll('[data-cfemail]').forEach((node) => {
+    const email = decodeCloudflareEmail(node.getAttribute('data-cfemail') ?? '');
+    if (!email) return;
+    if (node.tagName === 'A') {
+      const link = node as HTMLAnchorElement;
+      link.href = `mailto:${email}`;
+      link.textContent = email;
+      link.target = '';
+      link.rel = 'noopener noreferrer';
+      return;
+    }
+    node.textContent = email;
+  });
+  content.querySelectorAll('a.__cf_email__, span.__cf_email__').forEach((node) => {
+    const text = node.textContent?.trim() ?? '';
+    if (text.includes('[email protected]') || /^\[email/i.test(text)) {
+      const email = decodeCloudflareEmail(node.getAttribute('data-cfemail') ?? '');
+      node.textContent = email ?? EMAIL_ROUTING.customerService;
+    }
+  });
   content.querySelectorAll('script, style, template, .breadcrumbs').forEach((node) => node.remove());
   content.querySelectorAll('a[href]').forEach((anchor) => {
     const link = anchor as HTMLAnchorElement;
+    if (link.href.startsWith('mailto:')) {
+      link.target = '';
+      link.rel = 'noopener noreferrer';
+      return;
+    }
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
   });
@@ -99,4 +150,6 @@ function setup(group: HTMLElement): void {
   });
 }
 
-document.querySelectorAll<HTMLElement>('[data-terms-acceptance]').forEach(setup);
+if (typeof document !== 'undefined') {
+  document.querySelectorAll<HTMLElement>('[data-terms-acceptance]').forEach(setup);
+}

@@ -8,6 +8,7 @@ import { bookingConfig } from '../config/booking.ts';
 
 export interface BookingContext {
   durationMinutes: number;
+  laborHours?: number;
   destination: { lat: number; lng: number };
   reference: string;
   location: string;
@@ -194,7 +195,7 @@ export function initBookingPicker(
           String(context.durationMinutes),
         )}&lat=${encodeURIComponent(String(context.destination.lat))}&lng=${encodeURIComponent(
           String(context.destination.lng),
-        )}`,
+        )}${context.laborHours && context.laborHours > 0 ? `&laborHours=${encodeURIComponent(String(context.laborHours))}` : ''}`,
         { headers: { Accept: 'application/json' } },
       );
       const data = (await response.json().catch(() => ({}))) as {
@@ -242,6 +243,7 @@ export function initBookingPicker(
           start: slot.start,
           end: slot.end,
           durationMinutes: context.durationMinutes,
+          ...(context.laborHours && context.laborHours > 0 ? { laborHours: context.laborHours } : {}),
           destination: context.destination,
           reference: context.reference,
           location: context.location,

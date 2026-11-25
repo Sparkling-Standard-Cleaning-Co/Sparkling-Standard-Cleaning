@@ -816,6 +816,7 @@ function appointmentCardMarkup(
   const current = weekCycleIndices.get(sectionKey) ?? 0;
   const hidden = current === index ? '' : ' hidden';
   const active = ['pending', 'confirmed', 'in_progress'].includes(status);
+  const staffingPending = Number(appointment.staffing_pending) === 1;
   const actions = can('booking.write')
     ? `<div class="admin-appointment-actions">
         <button class="btn btn--ghost btn--small" type="button" data-admin-appointment-action="open" data-appointment-id="${esc(id)}">Open</button>
@@ -833,6 +834,7 @@ function appointmentCardMarkup(
     <p class="admin-appointment-card__meta">Crew: ${esc(String(appointment.assigned_names || 'Unassigned'))}</p>
     <p class="admin-appointment-card__meta">${esc(property)}</p>
     <span class="admin-appointment-card__status">${esc(titleCase(status.replaceAll('_', ' ')))}</span>
+    ${staffingPending ? '<span class="admin-appointment-card__warning">Staffing required</span>' : ''}
     <span class="admin-appointment-card__ref">${esc(appointmentReference(appointment))}</span>
     ${actions}
   </article>`;
@@ -1070,6 +1072,7 @@ async function openCalendarJob(appointmentId: string): Promise<void> {
   const timeline = data.timeline ?? [];
   container.innerHTML = `<div class="admin-calendar-dialog-card" role="dialog" aria-modal="true" aria-labelledby="calendar-job-title">
     <div class="admin-detail-head"><h2 class="admin-section-title" id="calendar-job-title">Job ${esc(String(job.reference ?? ''))}</h2><button class="btn btn--ghost btn--small" type="button" data-calendar-close>Close</button></div>
+    ${Number(job.staffing_pending) === 1 ? `<div class="admin-warning"><strong>Additional cleaner required.</strong> ${esc(String(job.staffing_reason || 'The assigned crew cannot finish inside the operating window.'))} Assign an eligible cleaner before the service, or contact the customer with a reschedule or refund option. The appointment time and payment are preserved.</div>` : ''}
     <dl class="admin-definition">
       <dt>Customer</dt><dd>${esc(customer)}</dd>
       <dt>Property</dt><dd>${esc(property || 'Not linked')}</dd>
@@ -1854,6 +1857,7 @@ async function openRequest(requestId: string): Promise<void> {
       </div>
     </div>
     ${duplicates.length ? `<div class="admin-warning"><strong>Possible duplicate requests.</strong> ${duplicates.map((duplicate) => `${esc(duplicate.quote_reference)} (${esc(dateTime(duplicate.start_at))})`).join(', ')}. Nothing was merged or deleted. Review before confirming.</div>` : ''}
+    ${Number(request.staffing_pending) === 1 ? `<div class="admin-warning"><strong>Additional cleaner required.</strong> ${esc(request.staffing_reason || 'The assigned crew cannot finish inside the operating window.')} Required crew: ${esc(String(request.appointment_crew_size ?? ''))}. Assign the missing cleaner before the service, or contact the customer with a reschedule or refund option.</div>` : ''}
     <dl class="admin-definition">
       <dt>Requested</dt><dd>${esc(dateTime(request.start_at, request.branch_id))} – ${esc(dateTime(request.end_at, request.branch_id))}</dd>
       <dt>Status</dt><dd>${esc(titleCase(status))}</dd>

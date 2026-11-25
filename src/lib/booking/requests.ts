@@ -30,6 +30,8 @@ export interface PendingBookingRequest {
   /** Assigned cleaning resources (absent on legacy requests: blocks all). */
   resourceIds?: string[];
   crewSize?: number;
+  requiredCrewSize?: number;
+  staffingPending?: boolean;
 }
 
 export function requestIdForHold(holdId: string): string {
@@ -73,6 +75,8 @@ export async function createPendingBookingRequest(
     updatedAt: now,
     ...(hold.resourceIds && hold.resourceIds.length > 0 ? { resourceIds: hold.resourceIds } : {}),
     ...(hold.crewSize ? { crewSize: hold.crewSize } : {}),
+    ...(hold.requiredCrewSize ? { requiredCrewSize: hold.requiredCrewSize } : {}),
+    ...(hold.staffingPending ? { staffingPending: true } : {}),
   };
   const created = await createLedgerJson(bucket, requestKey(id), request);
   if (created) return request;
@@ -95,6 +99,8 @@ export async function updatePendingBookingRequest(
       | 'durationMinutes'
       | 'resourceIds'
       | 'crewSize'
+      | 'requiredCrewSize'
+      | 'staffingPending'
     >
   >,
 ): Promise<PendingBookingRequest> {

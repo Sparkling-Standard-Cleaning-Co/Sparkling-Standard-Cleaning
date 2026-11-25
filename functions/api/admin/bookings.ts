@@ -114,7 +114,8 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       const job = await db
         .prepare(
           `SELECT a.id, a.status, a.source, a.reference, a.start_at, a.end_at, a.timezone,
-                  a.duration_minutes, a.crew_size, a.notes, a.customer_id, a.property_id,
+                  a.duration_minutes, a.crew_size, a.staffing_pending, a.staffing_reason,
+                  a.notes, a.customer_id, a.property_id,
                   a.estimate_id, a.booking_request_id,
                   c.first_name, c.last_name, c.company_name,
                   p.label AS property_label, p.line1, p.city, p.state, p.postal_code,

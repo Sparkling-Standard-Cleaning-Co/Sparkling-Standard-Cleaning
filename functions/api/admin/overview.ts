@@ -118,7 +118,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const tomorrowStart = zonedTimeToUtc(tomorrow, '00:00', bookingConfig.timeZone);
     const dayAfterTomorrow = new Date(Date.parse(`${tomorrow}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
     const dayAfterStart = zonedTimeToUtc(dayAfterTomorrow, '00:00', bookingConfig.timeZone);
-    const [customers, leads, requests, appointments, gifts, failedLeads, recent, failedCommitments, financialIssues, failedNotifications, failedPaymentEvents, failedWorkerRuns, todayJobs, tomorrowJobs, unassignedJobs, unsignedAgreements, outstandingInvoices, failedCommunications] = await Promise.all([
+    const [customers, leads, requests, appointments, gifts, failedLeads, recent, failedCommitments, financialIssues, failedNotifications, failedPaymentEvents, failedWorkerRuns, todayJobs, tomorrowJobs, unassignedJobs, staffingPending, staffingRows, unsignedAgreements, outstandingInvoices, failedCommunications] = await Promise.all([
       count(db, "SELECT COUNT(*) AS count FROM customers WHERE status = 'active'" + customerScope.where, customerScope.bind),
       count(db, "SELECT COUNT(*) AS count FROM leads WHERE status IN ('new','contacted')" + leadScope.where, leadScope.bind),
       count(db, "SELECT COUNT(*) AS count FROM booking_requests WHERE status = 'pending'" + requestScope.where, requestScope.bind),
@@ -172,6 +172,23 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       ),
       count(
         db,
+        `SELECT COUNT(*) AS count FROM appointments a
+         WHERE a.staffing_pending = 1 AND a.status IN ('pending','confirmed') AND a.start_at >= ?${appointmentScope.where.replace('branch_id', 'a.branch_id')}`,
+        [now, ...appointmentScope.bind],
+      ),
+      db
+        .prepare(
+          `SELECT a.id, a.reference, a.start_at, a.duration_minutes, a.crew_size, a.staffing_reason,
+                  c.first_name, c.last_name
+           FROM appointments a LEFT JOIN customers c ON c.id = a.customer_id
+           WHERE a.staffing_pending = 1 AND a.status IN ('pending','confirmed') AND a.start_at >= ?${appointmentScope.where.replace('branch_id', 'a.branch_id')}
+           ORDER BY a.start_at LIMIT 20`,
+        )
+        .bind(now, ...appointmentScope.bind)
+        .all<Record<string, unknown>>()
+        .catch(() => ({ results: [] as Array<Record<string, unknown>> })),
+      count(
+        db,
         "SELECT COUNT(*) AS count FROM signing_requests WHERE status IN ('pending','partially_signed')" + scope(actor, 'branch_id').where,
         scope(actor, 'branch_id').bind,
       ),
@@ -218,6 +235,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       'leads.delivery',
       'security.owner_mfa',
       'jobs.unassigned',
+      'staffing.pending',
     ];
     const alertStates = await readAlertStates(db, alertKeys);
     const nowMs = Date.now();
@@ -562,6 +580,29 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       canRecheck: true,
     });
     addAlert({
+      key: 'staffing.pending',
+      kind: 'staffing_pending',
+      severity: 'high',
+      title: 'Additional cleaners are required',
+      message: `${staffingPending} confirmed job(s) still need an additional cleaner.`,
+      explanation:
+        'The customer selected a time that is operationally feasible with a larger crew. The appointment time and any payment are preserved, but the missing crew is not secured yet.',
+      rootCause:
+        'The quoted labor hours cannot be completed by the assigned crew inside the published operating window.',
+      recommendation:
+        'Open the Job File, assign an eligible additional cleaner, or contact the customer with a reschedule or refund option. The warning clears when staffing is resolved.',
+      count: staffingPending,
+      firstSeen: stringOrNull((staffingRows.results ?? [])[0]?.start_at),
+      lastSeen: stringOrNull((staffingRows.results ?? []).at(-1)?.start_at),
+      view: 'jobs',
+      records: (staffingRows.results ?? []).slice(0, 8).map((row) => ({
+        label: String(row.reference ?? row.id ?? 'Appointment'),
+        detail: `${[row.first_name, row.last_name].filter(Boolean).join(' ') || 'Customer'} · ${new Date(String(row.start_at)).toLocaleString('en-US', { timeZone: bookingConfig.timeZone })} · crew ${String(row.crew_size ?? '?')} · ${String(row.staffing_reason ?? '')}`,
+        ...(row.id ? { id: String(row.id) } : {}),
+      })),
+      canRecheck: true,
+    });
+    addAlert({
       key: 'jobs.unassigned',
       kind: 'unassigned_jobs',
       severity: 'medium',
@@ -608,6 +649,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         todayJobs,
         tomorrowJobs,
         unassignedJobs,
+        staffingPending,
         unsignedAgreements,
         outstandingInvoices,
         failedCommunications,

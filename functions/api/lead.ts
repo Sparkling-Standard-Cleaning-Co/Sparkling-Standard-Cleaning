@@ -45,6 +45,8 @@ import {
   notificationRecipients,
   readCommunicationSettings,
   recordNotificationDelivery,
+  sendOperationalNotification,
+  type CommunicationEnv,
 } from '../../src/lib/admin/communications.ts';
 import { EMAIL_ROUTING } from '../../src/config/email-routing.ts';
 import { schedulingConfig } from '../../src/config/scheduling.ts';
@@ -798,6 +800,9 @@ export async function onRequestPost(context: {
           end?: string;
           expiresAt?: string;
           reference?: string;
+          crewSize?: number;
+          requiredCrewSize?: number;
+          staffingPending?: boolean;
         } = {};
         try {
           hold = JSON.parse((await object.text?.()) ?? '{}');
@@ -813,6 +818,12 @@ export async function onRequestPost(context: {
           if (hold.end) clean.booking_slot_end = hold.end;
           if (hold.expiresAt) clean.booking_hold_expires_at = hold.expiresAt;
           if (hold.reference) clean.booking_hold_reference = hold.reference;
+          if (hold.staffingPending) {
+            clean.staffing_pending = 'yes';
+            clean.required_crew_size = String(hold.requiredCrewSize ?? hold.crewSize ?? 2);
+            clean.staffing_reason =
+              'The requested start requires more than one cleaner to finish inside the published operating window.';
+          }
           if (hold.status === 'held') {
             try {
               const request = await createPendingBookingRequest(
@@ -1049,6 +1060,35 @@ export async function onRequestPost(context: {
     return json({ ok: false, error: 'provider_failed' }, 502);
   }
   await updateLeadDelivery(env.DB ?? null, persistedLead?.leadId ?? null, 'sent');
+
+  // A pay-later reservation that needs an additional cleaner is operationally
+  // critical even before payment. Notify the owner/admin inboxes through the
+  // existing Communications routing. Pay-now reservations emit the same notice
+  // when the verified payment commits the booking.
+  if (clean.staffing_pending === 'yes' && clean.payment_choice !== 'pay_now') {
+    const requiredCrew = clean.required_crew_size ?? '2';
+    const when = [clean.preferred_date, clean.preferred_time].filter(Boolean).join(' ') || 'requested time';
+    await sendOperationalNotification(env.DB ?? null, env as unknown as CommunicationEnv, {
+      eventKey: 'owner_escalation',
+      subject: `CRITICAL: additional cleaner required - ${clean.quote_reference || attachmentRequestId}`,
+      text: [
+        'A pay-later reservation request needs additional cleaning staff.',
+        '',
+        `Reference: ${clean.quote_reference || attachmentRequestId}`,
+        `Customer: ${clean.name || 'Customer'}`,
+        `Appointment: ${when}`,
+        `Estimated labor: ${clean.estimated_labor_hours || clean.labor_hours || 'not provided'} person-hours`,
+        `Required crew: ${requiredCrew}`,
+        `Reason: ${clean.staffing_reason || 'The requested start requires more than one cleaner.'}`,
+        '',
+        'The requested time is saved; payment has not been taken by this website.',
+        'Open Admin -> Calendar & Requests and the Job File to assign the missing crew or contact the customer with a reschedule option.',
+      ].join('\n'),
+      relatedType: 'lead',
+      ...(persistedLead?.leadId ? { relatedId: persistedLead.leadId } : {}),
+      idempotencyKey: `staffing-pending-request/${clean.booking_hold_id || clean.quote_reference || attachmentRequestId}`,
+    }).catch(() => undefined);
+  }
 
   // The department notification was accepted (not necessarily inbox-delivered).
   // The customer confirmation is a best-effort second path; its failure never

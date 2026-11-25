@@ -88,6 +88,31 @@ Screenshots:
 | Live restore test | success, 106 tables, 60 migrations |
 | Production D1 | 62 migrations, 107 tables, foreign-key check clean |
 
+## 2026-11-25 reconciliation and fresh archive
+
+The earlier complete archive reported 106 tables / 60 migrations; production
+reported 107 tables / 62 migrations. The backup verifier excludes SQLite
+internal tables (`sqlite_%`), so 106 is the application-table count and the
+manifest's 107 includes `sqlite_sequence`. The 60-migration count was captured
+before migrations `0061` and `0062` were recorded.
+
+A fresh complete backup (GitHub run `45706016953`) supersedes the earlier
+complete archive for current recoverability evidence:
+
+- `sparkling-standard-backup-2026-11-25T21-38-15-complete.ssbk`
+- 10,793,311 bytes, 227 files, SHA-256 `6cff79a3214dbd0cf0165b3816afa213f01ba12761045e411dc8ef0fc7dd5db8`
+- D1 export SHA-256 `83db19c826c0a7b0d54601e96191dab2db9e9af36e042549159106803aa10b53`
+- 62 migrations, 106 application tables (107 manifest tables), 0 FK violations
+- R2 and OneDrive round-trip verified; isolated restore 106 tables / 62 migrations
+- Restored business counts: 12 customers, 14 properties, 21 appointments,
+  3 invoices, 45 leads, 0 career applications, 9 signing requests
+- Retention was not applied during the run; no archive was deleted
+
+`scripts/backup/verify-r2-references.mjs` now verifies that document, signature,
+job-media and customer-photo references in the D1 export each have a staged
+application object. The read-only `backup-audit.yml` workflow runs that audit
+without uploading an archive or applying retention.
+
 ## Branch consolidation and preserving records
 
 - `main` and `production-safe` are now identical at `cf75d0b` with **zero divergence**.

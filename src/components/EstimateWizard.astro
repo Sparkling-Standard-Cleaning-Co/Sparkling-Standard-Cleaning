@@ -490,6 +490,13 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </button>
         </div>
         <div class="booking-alternatives" data-booking-alternatives hidden></div>
+        <div
+          class="estimate-notice estimate-notice--staffing"
+          data-staffing-pending-note
+          role="status"
+          aria-live="polite"
+          hidden
+        ></div>
 
         <div class="estimate-reveal-stage">
           <EstimateReveal />

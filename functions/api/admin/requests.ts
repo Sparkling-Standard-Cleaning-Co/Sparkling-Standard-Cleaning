@@ -397,6 +397,8 @@ async function requestRow(
               p.label AS property_label, p.line1, p.city, p.state, p.postal_code, p.access_notes,
               a.id AS appointment_id, a.status AS appointment_status, a.reference AS appointment_reference,
               a.start_at AS appointment_start, a.end_at AS appointment_end,
+              a.crew_size AS appointment_crew_size, a.staffing_pending AS staffing_pending,
+              a.staffing_reason AS staffing_reason,
               (SELECT GROUP_CONCAT(tm.display_name, ', ')
                  FROM appointment_resources ar JOIN team_members tm ON tm.id = ar.team_member_id
                 WHERE ar.appointment_id = a.id) AS assigned_names,
@@ -472,6 +474,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
                 r.payment_status, r.payment_reference, r.payment_amount_cents, r.paid_at,
                 c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
                 a.id AS appointment_id, a.status AS appointment_status,
+                a.staffing_pending, a.staffing_reason,
                 (SELECT provider_event_id FROM calendar_links cl WHERE cl.appointment_id = a.id
                  ORDER BY cl.last_synced_at DESC LIMIT 1) AS calendar_event_id
          FROM booking_requests r
@@ -483,6 +486,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       ).bind(...requestScope.bind, ...searchBind).all(),
       db.prepare(
         `SELECT a.id, a.status, a.start_at, a.end_at, a.reference, a.crew_size, a.source,
+                a.staffing_pending, a.staffing_reason,
                 a.duration_minutes, a.notes, a.customer_id, a.property_id, a.booking_request_id,
                 a.branch_id, a.recurring_plan_id, c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
                 br.payload_json AS request_payload, br.quote_reference,

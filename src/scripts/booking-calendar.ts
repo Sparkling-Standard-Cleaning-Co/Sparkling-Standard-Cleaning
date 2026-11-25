@@ -22,10 +22,16 @@ export interface BookingCalendarSelection {
   start: string;
   end: string;
   live: boolean;
+  /** The requested time is feasible but the full crew is not yet assigned. */
+  staffingPending?: boolean;
+  requiredCrewSize?: number;
+  staffingNote?: string;
 }
 
 export interface BookingFinalizeInput {
   durationMinutes: number;
+  /** Total person-hours from the verified quote; enables server crew planning. */
+  laborHours?: number;
   destination: { lat: number; lng: number };
   reference: string;
   location: string;
@@ -42,6 +48,9 @@ export interface BookingFinalizeResult {
   status: 'held' | 'preferred' | 'alternatives' | 'none' | 'unavailable';
   message: string;
   alternatives: BookingAlternative[];
+  staffingPending?: boolean;
+  requiredCrewSize?: number;
+  staffingNote?: string;
 }
 
 export interface BookingCalendarHandle {
@@ -263,6 +272,15 @@ export function initBookingCalendar(
     return Boolean(slotForMinutes(minutes));
   }
 
+  function defaultMinutesForPeriod(period: Period): number | null {
+    const times = periodMinutes(period);
+    if (!liveAvailability) return times[0] ?? null;
+    // The owner-approved default for each window is its first start. When that
+    // start is genuinely unavailable, use the earliest real alternative inside
+    // the same window instead of leaving the customer with empty placeholders.
+    return times.find((minutes) => timeIsEnabled(minutes)) ?? null;
+  }
+
   function setPeriod(period: Period): void {
     selectedPeriod = period;
     for (const button of periodButtons) {
@@ -275,7 +293,11 @@ export function initBookingCalendar(
       selectedTime = null;
       setInputs();
     }
+    if (selectedMinutes === null) {
+      selectedMinutes = defaultMinutesForPeriod(period);
+    }
     populatePicker();
+    if (selectedMinutes !== null) updateSelectedTime();
     revealPicker();
   }
 
@@ -854,6 +876,9 @@ export function initBookingCalendar(
         const params = new URLSearchParams({
           date: selectedDate,
           durationMinutes: String(Math.round(input.durationMinutes)),
+          ...(input.laborHours && input.laborHours > 0
+            ? { laborHours: String(input.laborHours) }
+            : {}),
           lat: String(input.destination.lat),
           lng: String(input.destination.lng),
         });
@@ -899,7 +924,12 @@ export function initBookingCalendar(
             date: selectedDate,
             start: exact.start,
             end: exact.end,
-            durationMinutes: Math.round(input.durationMinutes),
+            durationMinutes: Math.round(
+              (Date.parse(exact.end) - Date.parse(exact.start)) / 60_000,
+            ),
+            ...(input.laborHours && input.laborHours > 0
+              ? { laborHours: input.laborHours }
+              : {}),
             destination: input.destination,
             reference: input.reference,
             location: input.location,
@@ -910,6 +940,9 @@ export function initBookingCalendar(
           ok?: boolean;
           holdId?: string;
           expiresAt?: string;
+          staffingPending?: boolean;
+          requiredCrewSize?: number;
+          staffingNote?: string;
         };
         if (!hold.ok || holdData.ok !== true || !holdData.holdId || !holdData.expiresAt) {
           return {
@@ -925,6 +958,15 @@ export function initBookingCalendar(
           end: exact.end,
           timeLabel: exact.startLabel,
           live: true,
+          ...(holdData.staffingPending
+            ? {
+                staffingPending: true,
+                ...(holdData.requiredCrewSize
+                  ? { requiredCrewSize: holdData.requiredCrewSize }
+                  : {}),
+                ...(holdData.staffingNote ? { staffingNote: holdData.staffingNote } : {}),
+              }
+            : {}),
         };
         setInputs();
         const holdIdInput = document.createElement('input');
@@ -943,6 +985,15 @@ export function initBookingCalendar(
           message:
             'Your preferred time is temporarily held while you continue. Complete checkout to reserve when eligible, or send a pay-later request for review.',
           alternatives: [],
+          ...(holdData.staffingPending
+            ? {
+                staffingPending: true,
+                ...(holdData.requiredCrewSize
+                  ? { requiredCrewSize: holdData.requiredCrewSize }
+                  : {}),
+                ...(holdData.staffingNote ? { staffingNote: holdData.staffingNote } : {}),
+              }
+            : {}),
         };
       } catch {
         return {

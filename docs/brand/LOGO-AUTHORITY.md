@@ -19,7 +19,7 @@ Source files:
 | Vector master | `public/brand/logo-primary.svg` (identical artwork: `logo-mark.svg`, `logo-mark-soft.svg`) |
 | Official brand fonts | `public/fonts/great-vibes-normal-latin.woff2` (script "Sparkling") and `public/fonts/fraunces-normal-latin.woff2` (STANDARD) |
 | High-resolution raster master | `public/brand/sparkling-standard-circular-logo-1024.png` (rendered directly from `logo-primary.svg` with the embedded official fonts; SHA-256 `0253b65fba7a90e63325b00bda5dfb15fb6d08f049e3f680c0a75895518ba237`) |
-| Obsolete raster (do not use) | `public/brand/approved-icon-master-1024.png` — the earlier stylized S mark. It is retained only as history and must not be embedded in a legal document. |
+| Retired raster (not served) | `docs/brand/archive/retired-gold-s-monogram-1024.png` — the earlier stylized gold S with floral imagery. Archived outside `public/` on 2026-11-25; never embed it in a legal document. See `docs/brand/BRAND-ASSET-INVENTORY.md`. |
 | Browser/PWA icons | `public/brand/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `favicon.*` |
 | Owner master archive | `C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER\02 BRANDING & DESIGN\Brand Assets\02_Logos_and_Identity\Approved-Brand-Assets\` |
 
@@ -63,12 +63,15 @@ approved circular mark only.
 
 ## Obsolete artwork
 
-`public/brand/approved-icon-master-1024.png` is the earlier stylized **S** mark.
-It was mistakenly used by the abbreviated 2026-11-22 legal candidates. Do not
-use it for a legal document, email header, packet cover or generated PDF. It is
-retained only as historical inventory. The corrected documents use
-`sparkling-standard-circular-logo-1024.png`, rendered from the approved
-`logo-primary.svg` circular artwork.
+The earlier stylized gold **S** mark with floral imagery is retired. It was
+mistakenly used by the abbreviated 2026-11-22 legal candidates because its old
+filename (`public/brand/approved-icon-master-1024.png`) implied it was approved.
+On 2026-11-25 it was moved outside the served tree to
+`docs/brand/archive/retired-gold-s-monogram-1024.png` and must never be used for
+a legal document, email header, packet cover, marketing piece or generated PDF.
+The corrected documents use `sparkling-standard-circular-logo-1024.png`,
+rendered from the approved `logo-primary.svg` circular artwork. The complete
+active/retired inventory is `docs/brand/BRAND-ASSET-INVENTORY.md`.
 
 ## Legal document rule
 

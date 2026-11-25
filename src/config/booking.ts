@@ -70,6 +70,20 @@ export const bookingConfig = {
   defaultCrewSize: 1,
   maxCrewSize: 2,
 
+  /**
+   * Owner-approved multi-cleaner efficiency. Each additional cleaner adds this
+   * fraction of a solo cleaner's output. Used only to plan the on-site crew
+   * when a quote provides labor hours; the price itself is unchanged.
+   */
+  crewEfficiency: 0.85,
+
+  /**
+   * A job whose full crew cannot yet be assigned may still be reserved and
+   * paid when the time is operationally feasible. The reservation remains
+   * staffing-pending until management secures the crew.
+   */
+  allowStaffingPendingReservation: true,
+
   /** Defensive duration bounds; real durations come from the estimate. */
   minimumJobMinutes: 60,
   maximumJobMinutes: 600,

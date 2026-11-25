@@ -30,7 +30,15 @@ export interface BookingHold {
   calendarEventId?: string;
   /** Assigned cleaning resources. Absent on legacy holds, which block all. */
   resourceIds?: string[];
+  /** Resources currently assigned (legacy field: equals resourceIds.length). */
   crewSize?: number;
+  /** Crew the job requires to finish inside the operating window. */
+  requiredCrewSize?: number;
+  /**
+   * The full crew is not yet assigned. The hold conservatively blocks the
+   * whole window until management secures the missing seat.
+   */
+  staffingPending?: boolean;
 }
 
 export type BookingStorageEnv = PaymentStorageEnv;
@@ -181,13 +189,16 @@ export function holdIsActive(hold: BookingHold | null): boolean {
 
 /** Resources a hold blocks. A legacy hold without ids conservatively blocks all. */
 export function holdResourceIds(hold: BookingHold): string[] {
+  if (hold.staffingPending) return [];
   if (hold.resourceIds && hold.resourceIds.length > 0) return hold.resourceIds;
   return activeBookingResources().map((resource) => resource.id);
 }
 
 function resourceSetsOverlap(a: BookingHold, b: BookingHold): boolean {
+  // An empty set means "all resources" (legacy or staffing-pending hold).
   const aIds = holdResourceIds(a);
   const bIds = holdResourceIds(b);
+  if (aIds.length === 0 || bIds.length === 0) return true;
   return aIds.some((id) => bIds.includes(id));
 }
 
@@ -204,6 +215,8 @@ export async function createBookingHold(
     branchId?: string;
     resourceIds: ReadonlyArray<string>;
     crewSize?: number;
+    requiredCrewSize?: number;
+    staffingPending?: boolean;
   },
 ): Promise<{ ok: true; hold: BookingHold } | { ok: false; error: 'busy' | 'overlap' | 'invalid' }> {
   const start = new Date(input.start);
@@ -223,6 +236,15 @@ export async function createBookingHold(
     Math.max(1, Math.round(input.crewSize ?? resourceIds.length)),
   );
   if (crewSize !== resourceIds.length) return { ok: false, error: 'invalid' };
+  const requiredCrewSize = Math.min(
+    bookingConfig.maxCrewSize,
+    Math.max(crewSize, Math.round(input.requiredCrewSize ?? crewSize)),
+  );
+  const staffingPending =
+    Boolean(input.staffingPending) && requiredCrewSize > crewSize;
+  if (!staffingPending && requiredCrewSize !== crewSize) {
+    return { ok: false, error: 'invalid' };
+  }
   const expiresAt = new Date(Date.now() + bookingConfig.holdMinutes * 60_000).toISOString();
   const id = `${input.date}__${crypto.randomUUID()}`;
   const hold: BookingHold = {
@@ -241,6 +263,8 @@ export async function createBookingHold(
     ...(input.branchId ? { branchId: input.branchId } : {}),
     resourceIds,
     crewSize,
+    requiredCrewSize,
+    ...(staffingPending ? { staffingPending: true } : {}),
   };
   return withDayLock(bucket, input.date, async () => {
     const existing = await listActiveHolds(bucket, input.date);

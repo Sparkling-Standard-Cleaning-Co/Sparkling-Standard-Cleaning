@@ -42,6 +42,12 @@ async function open(width = 1280, height = 900) {
   return { context, page };
 }
 
+function cloudflareObfuscate(email, key = 0x42) {
+  return [key, ...[...email].map((character) => character.charCodeAt(0) ^ key)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 for (const viewport of [
   { name: 'desktop', width: 1280, height: 900 },
   { name: 'phone', width: 390, height: 844 },
@@ -85,9 +91,38 @@ for (const viewport of [
       await dialog.getByRole('button', { name: /Close and return to checkout/i }).click();
       await dialog.waitFor({ state: 'hidden' });
       assert.equal(page.url(), startUrl);
-      assert.equal(await page.locator('#gift-purchaser-name').isVisible(), true);
+      assert.equal(      await page.locator('#gift-purchaser-name').isVisible(), true);
     } finally {
       await context.close();
     }
   });
 }
+
+test('Cloudflare-obfuscated policy email renders as a real visible mailto link', async () => {
+  const { context, page } = await open(1280, 900);
+  try {
+    const encoded = cloudflareObfuscate('customer-service@sparkling-standard.com');
+    await page.route('**/terms/', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: `<html><body><main id="main"><h1>Terms of service</h1><p>Questions? Email <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="${encoded}">[email protected]</a>.</p></main></body></html>`,
+      }),
+    );
+    await page.goto(BASE + '/gift-certificates/', { waitUntil: 'load' });
+    const acceptance = page.locator('[data-terms-acceptance]').first();
+    await acceptance.getByRole('link', { name: 'Terms and Conditions' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.waitFor({ state: 'visible' });
+    await page.waitForFunction(() =>
+      document.querySelector('[data-legal-policy-body]')?.textContent?.includes('customer-service@sparkling-standard.com'),
+    );
+    const text = (await dialog.textContent()) ?? '';
+    assert.doesNotMatch(text, /\[email protected\]/i);
+    const emailLink = dialog.getByRole('link', { name: 'customer-service@sparkling-standard.com' });
+    assert.equal(await emailLink.isVisible(), true);
+    assert.equal(await emailLink.getAttribute('href'), 'mailto:customer-service@sparkling-standard.com');
+  } finally {
+    await context.close();
+  }
+});

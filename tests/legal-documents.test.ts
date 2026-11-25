@@ -58,7 +58,8 @@ test('autopay is explicitly inactive and the approved logo is the only legal-doc
   const autopay = fs.readFileSync(path.join(templateDir, '12-RECURRING-PAYMENT-AUTHORIZATION.md'), 'utf8');
   assert.match(autopay, /NOT ACTIVE/);
   assert.match(autopay, /not authorize a charge today/i);
-  assert.ok(fs.existsSync('public/brand/approved-icon-master-1024.png'));
+  assert.ok(!fs.existsSync('public/brand/approved-icon-master-1024.png'));
+  assert.ok(fs.existsSync('docs/brand/archive/retired-gold-s-monogram-1024.png'));
   assert.ok(fs.existsSync('public/brand/logo-primary.svg'));
   const logoAuthority = fs.readFileSync('docs/brand/LOGO-AUTHORITY.md', 'utf8');
   assert.match(logoAuthority, /Elegant Gold S Floral Emblem\.png/);

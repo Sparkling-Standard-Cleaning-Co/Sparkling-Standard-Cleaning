@@ -593,6 +593,7 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       const preferredDate = field('preferred_date');
       return {
         durationMinutes,
+        laborHours: latestWorkload.laborHours,
         destination: { lat: submitted.location.lat, lng: submitted.location.lng },
         reference: `FAC-${field('organization') || 'facility'}-${preferredDate}`.slice(0, 120),
         location: [submitted.street, submitted.city, submitted.state, submitted.zip]

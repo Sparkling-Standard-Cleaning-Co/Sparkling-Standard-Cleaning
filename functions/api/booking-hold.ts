@@ -60,6 +60,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const reference = typeof payload.reference === 'string' ? payload.reference : '';
   const locationText = typeof payload.location === 'string' ? payload.location : '';
   const durationMinutes = Number(payload.durationMinutes);
+  const laborHoursRaw = Number(payload.laborHours);
+  const laborHours =
+    Number.isFinite(laborHoursRaw) && laborHoursRaw > 0
+      ? Math.min(laborHoursRaw, 24)
+      : undefined;
   const destination = payload.destination as { lat?: unknown; lng?: unknown } | undefined;
   const lat = Number(destination?.lat);
   const lng = Number(destination?.lng);
@@ -99,6 +104,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const availability = await availabilityForDate(env, {
       date,
       durationMinutes,
+      ...(laborHours ? { laborHours } : {}),
       destination: { lat, lng },
       branchId: resolved.branch.id,
     });
@@ -118,17 +124,26 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!exact || exact.resourceIds.length === 0) {
       return json({ ok: false, error: 'slot_unavailable' }, 409);
     }
+    const requiredCrewSize = Math.max(1, Math.round(exact.crewSize ?? exact.resourceIds.length));
+    const staffingPending = exact.resourceIds.length < requiredCrewSize;
+    if (staffingPending && !bookingConfig.allowStaffingPendingReservation) {
+      return json({ ok: false, error: 'crew_unavailable' }, 409);
+    }
     const created = await createBookingHold(bucket, {
       date,
       start: requestedStart,
       end: requestedEnd,
-      durationMinutes: availability.durationMinutes,
+      durationMinutes: Math.round(
+        (Date.parse(requestedEnd) - Date.parse(requestedStart)) / 60_000,
+      ),
       destination: { lat, lng },
       locationText,
       reference,
       branchId: resolved.branch.id,
       resourceIds: exact.resourceIds,
-      crewSize: availability.crewSize,
+      crewSize: exact.resourceIds.length,
+      requiredCrewSize,
+      staffingPending,
     });
     if (created.ok) {
       return json({
@@ -139,6 +154,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         end: created.hold.end,
         timeZone: availability.timeZone,
         status: 'held',
+        staffingPending,
+        requiredCrewSize,
+        ...(staffingPending
+          ? {
+              staffingNote:
+                'This time is held for you. The cleaning needs a crew of ' +
+                requiredCrewSize +
+                ' cleaners; our team will confirm the crew before your service. Your appointment time is preserved.',
+            }
+          : {}),
         notice:
           'Temporary hold - not a confirmed appointment. Sparkling Standard confirms the booking personally.',
       });

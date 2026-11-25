@@ -761,6 +761,18 @@
   color: #9a8b82;
   overflow-wrap: anywhere;
 }
+.admin-appointment-card__warning {
+  justify-self: start;
+  margin-top: .15rem;
+  padding: .08rem .35rem;
+  border-radius: 999px;
+  background: #8f1d2c;
+  color: #fff7ef;
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
 
 /* Bulk reservation toolbar */
 .admin-bulk-toolbar {

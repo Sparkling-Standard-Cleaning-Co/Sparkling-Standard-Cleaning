@@ -409,6 +409,7 @@ async function deliverEstimateReceipt(
   amountCents: number | null,
   paidAt: string,
   reference: string,
+  staffingPending = false,
 ): Promise<{ status: string; sent: boolean }> {
   const attempt = session?.metadata?.checkout_attempt ?? '';
   const record = await readCheckoutRecord(env, attempt);
@@ -450,7 +451,12 @@ async function deliverEstimateReceipt(
     balanceCents: Math.max(0, totalCents - paidCents),
     paymentStatus: paidCents >= totalCents ? 'paid' : 'partially_paid',
     ...(session?.id ? { stripeSessionId: session.id } : {}),
-    ...(bookingConfirmed
+    ...(staffingPending
+      ? {
+          notes:
+            'Payment received and your appointment time is reserved. This cleaning requires a crew of more than one cleaner; we are confirming the additional crew now. Your time and payment are preserved, and we will contact you with the confirmed crew or a reschedule or refund option if needed. This receipt is your paid confirmation.',
+        }
+      : bookingConfirmed
       ? {
           notes:
             'Payment received and the requested appointment is confirmed. Sparkling Standard will send the final arrival details before the cleaning. This receipt is your paid confirmation.',
@@ -697,6 +703,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const holdId = metadata.booking_hold_id ?? '';
     const quoteReference = metadata.quote_reference ?? checkout?.reference ?? '';
     let duplicateBookingPayment = false;
+    let staffingPending = false;
     if (env.DB && /^[0-9]{4}-[0-9]{2}-[0-9]{2}__[a-f0-9-]{36}$/.test(holdId)) {
       const bookingRow = await env.DB
         .prepare('SELECT id FROM booking_requests WHERE hold_id = ? LIMIT 1')
@@ -809,6 +816,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
                 ...(confirmed.recurringStatus ? { recurringStatus: confirmed.recurringStatus } : {}),
               }
             : { status: 'pending_owner_review', reason: confirmed.reason };
+          if (confirmed.ok && confirmed.hold.staffingPending) {
+            staffingPending = true;
+          }
           if (!confirmed.ok && confirmed.reason === 'documents_required' && confirmed.documentRequest) {
             const recipient = confirmed.documentRequest.email.trim();
             if (recipient) {
@@ -912,6 +922,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       if (booking?.status === 'confirmed') {
         metadata.booking_status = 'confirmed';
         metadata.booking_event_id = booking.eventId ?? '';
+        if (staffingPending) metadata.staffing_pending = 'yes';
         if (booking.recurringPlanId) {
           metadata.recurring_plan_id = booking.recurringPlanId;
           metadata.recurring_status = booking.recurringStatus ?? 'pending';
@@ -970,8 +981,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           }
         : {}),
       'Paid at': paidAt,
-      Note:
-        metadata.booking_status === 'confirmed'
+      Note: staffingPending
+        ? 'CRITICAL: The paid appointment time is reserved, but the mandatory additional cleaner is not yet assigned. Secure the crew or contact the customer with a reschedule or refund option.'
+        : metadata.booking_status === 'confirmed'
           ? 'The paid booking was confirmed automatically against the live calendar and resource schedule. Review the scope and arrival details before the visit.'
           : 'The cleaning request was delivered separately by the website lead relay. Confirm the requested date, scope and final details personally before scheduling.',
     };
@@ -982,6 +994,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       amountCents,
       paidAt,
       reference,
+      staffingPending,
     );
     fields['Receipt email'] = receipt.status;
     if (!receipt.sent && receipt.status.startsWith('failed')) {

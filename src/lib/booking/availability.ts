@@ -17,9 +17,11 @@
 import {
   addDays,
   addMinutes,
+  localMinutesOfDay,
   localWeekday,
   zonedTimeToUtc,
 } from './time.ts';
+import { planCrew } from './crew.ts';
 import type { LatLng } from '../travel/server-routing.ts';
 
 export interface BookingResourceWindow {
@@ -64,11 +66,20 @@ export interface AvailabilityRequest {
   resources: ReadonlyArray<BookingResourceWindow>;
   /** How many resources this job needs (1 normally, 2 for a joint job). */
   crewSize: number;
+  /** Upper bound for the labor-hour planner. */
+  maxCrewSize?: number;
   /** Force a specific owner-selected assignment instead of auto-selecting. */
   requiredResourceIds?: ReadonlyArray<string>;
   minimumJobMinutes: number;
   maximumJobMinutes: number;
   durationMinutes: number;
+  /**
+   * When supplied, the planner converts total person-hours into the smallest
+   * crew and on-site duration that fit the requested start before closing.
+   * `durationMinutes` is then used only as a legacy fallback.
+   */
+  laborHours?: number;
+  crewEfficiency?: number;
   destination: LatLng;
   jobs: ExistingJob[];
   now: Date;
@@ -82,6 +93,12 @@ export interface AvailableSlot {
   endLabel: string;
   /** Server-owned resource assignment. Never sent to the public picker. */
   resourceIds: string[];
+  /**
+   * Crew required to finish inside the operating window. When the current
+   * roster cannot seat the whole crew, `resourceIds` is smaller and the slot
+   * is offered as a staffing-pending reservation.
+   */
+  crewSize?: number;
 }
 
 export interface AvailabilityResult {
@@ -318,22 +335,51 @@ export async function calculateAvailability(
   }
 
   const buffer = request.travelBufferMinutes + request.jobBufferMinutes;
-  const durationMs = request.durationMinutes * 60_000;
   const windowStart = new Date(Math.max(overallStart.getTime(), earliest.getTime()));
   const windowEnd = new Date(Math.min(overallEnd.getTime(), latest.getTime()));
   const slots: AvailableSlot[] = [];
   let sawTravelFailure = false;
   let cursor = new Date(windowStart);
+  const laborHours =
+    Number.isFinite(request.laborHours) && (request.laborHours ?? 0) > 0
+      ? (request.laborHours as number)
+      : null;
 
   // Align to the owner's local slot grid, not the UTC clock.
   const slotMs = request.slotMinutes * 60_000;
   const offset = cursor.getTime() - overallStart.getTime();
   const remainder = ((offset % slotMs) + slotMs) % slotMs;
   if (remainder !== 0) cursor = new Date(cursor.getTime() + (slotMs - remainder));
+  const workdayEndMinutes =
+    Number(request.workdayEnd.slice(0, 2)) * 60 + Number(request.workdayEnd.slice(3, 5));
 
-  while (cursor.getTime() + durationMs <= windowEnd.getTime()) {
+  while (cursor.getTime() < windowEnd.getTime()) {
     const candidateStart = new Date(cursor);
-    const candidateEnd = new Date(cursor.getTime() + durationMs);
+    let crewSize = request.crewSize;
+    let candidateDurationMs = request.durationMinutes * 60_000;
+    if (laborHours !== null) {
+      const plan = planCrew({
+        laborHours,
+        startMinutes: localMinutesOfDay(candidateStart, request.timeZone),
+        workdayEndMinutes,
+        minimumJobMinutes: request.minimumJobMinutes,
+        maximumJobMinutes: request.maximumJobMinutes,
+        maxCrewSize: request.maxCrewSize ?? 2,
+        efficiency: request.crewEfficiency ?? 1,
+        slotMinutes: request.slotMinutes,
+      });
+      if (!plan.feasible) {
+        cursor = new Date(cursor.getTime() + slotMs);
+        continue;
+      }
+      crewSize = plan.crewSize;
+      candidateDurationMs = plan.durationMinutes * 60_000;
+    }
+    const candidateEnd = new Date(candidateStart.getTime() + candidateDurationMs);
+    if (candidateEnd.getTime() > windowEnd.getTime()) {
+      cursor = new Date(cursor.getTime() + slotMs);
+      continue;
+    }
     const evaluations: ResourceEvaluation[] = [];
 
     for (const resource of candidateResources) {
@@ -362,7 +408,15 @@ export async function calculateAvailability(
     }
 
     const feasible = evaluations.filter((evaluation) => evaluation.feasible);
-    const chosen = chooseCrew(feasible, request.crewSize, resourcesById, resourceOrder);
+    // A partially staffable slot is still operationally feasible: the customer
+    // may reserve it as staffing-pending while management secures the second
+    // seat. Never offer a slot with no anchor cleaner at all.
+    const assignable = Math.max(1, Math.min(crewSize, candidateResources.length));
+    const chosen =
+      chooseCrew(feasible, assignable, resourcesById, resourceOrder) ??
+      (laborHours !== null && assignable > 1
+        ? chooseCrew(feasible, 1, resourcesById, resourceOrder)
+        : null);
     if (chosen) {
       slots.push({
         start: localPartsToIso(candidateStart),
@@ -370,6 +424,7 @@ export async function calculateAvailability(
         startLabel: formatTime(candidateStart, request.timeZone),
         endLabel: formatTime(candidateEnd, request.timeZone),
         resourceIds: chosen.map((evaluation) => evaluation.resourceId),
+        crewSize,
       });
     }
     cursor = new Date(cursor.getTime() + slotMs);

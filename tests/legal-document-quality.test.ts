@@ -14,7 +14,8 @@ import {
 
 const ROOT = process.cwd();
 const LOGO = path.join(ROOT, 'public', 'brand', 'sparkling-standard-circular-logo-1024.png');
-const OLD_LOGO = path.join(ROOT, 'public', 'brand', 'approved-icon-master-1024.png');
+const RETIRED_PUBLIC_LOGO = path.join(ROOT, 'public', 'brand', 'approved-icon-master-1024.png');
+const ARCHIVED_LOGO = path.join(ROOT, 'docs', 'brand', 'archive', 'retired-gold-s-monogram-1024.png');
 const MASTER_DIRS = [
   path.join(ROOT, 'docs', 'legal', 'templates-v3'),
   path.join(ROOT, 'docs', 'legal', 'employee-v3'),
@@ -35,14 +36,26 @@ function masterFiles() {
   return files;
 }
 
-test('the correct circular logo is installed and the obsolete S mark is not used', () => {
+test('the correct circular logo is installed and the obsolete S mark is retired', () => {
   assert.ok(fs.existsSync(LOGO), 'correct circular logo is missing');
-  assert.ok(fs.existsSync(OLD_LOGO), 'old logo should be retained only as history');
+  assert.ok(!fs.existsSync(RETIRED_PUBLIC_LOGO), 'the retired monogram must not be served from public/');
+  assert.ok(fs.existsSync(ARCHIVED_LOGO), 'the retired monogram must be archived as history');
   assert.equal(hash(LOGO), '0253b65fba7a90e63325b00bda5dfb15fb6d08f049e3f680c0a75895518ba237');
-  assert.notEqual(hash(OLD_LOGO), hash(LOGO));
+  assert.equal(hash(ARCHIVED_LOGO), '364ebc8350559d39f77d36bc22d559e98b332dc6354d3c4bbdced11f7b877e26');
   const renderer = fs.readFileSync(path.join(ROOT, 'scripts', 'render-legal-docs.mjs'), 'utf8');
   assert.ok(renderer.includes('sparkling-standard-circular-logo-1024.png'));
   assert.ok(!renderer.includes('approved-icon-master-1024.png'));
+  assert.ok(!renderer.includes('retired-gold-s-monogram'));
+});
+
+test('every served brand asset is named in the authoritative inventory', () => {
+  const inventory = fs.readFileSync(path.join(ROOT, 'docs', 'brand', 'BRAND-ASSET-INVENTORY.md'), 'utf8');
+  const served = fs.readdirSync(path.join(ROOT, 'public', 'brand'));
+  assert.ok(served.length > 0, 'expected the served brand directory');
+  for (const name of served) {
+    assert.ok(inventory.includes(`public/brand/${name}`), `${name} is not listed in the brand inventory`);
+  }
+  assert.ok(inventory.includes('docs/brand/archive/retired-gold-s-monogram-1024.png'));
 });
 
 test('customer and employee masters do not contain obsolete or internal drafting language', () => {

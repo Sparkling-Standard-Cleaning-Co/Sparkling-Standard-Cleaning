@@ -9,6 +9,7 @@
 import { bookingConfig } from '../../config/booking.ts';
 import type { D1Database } from '../admin/d1.ts';
 import { audit, type AdminActor } from '../admin/operations.ts';
+import { sendOperationalNotification, type CommunicationEnv } from '../admin/communications.ts';
 import { evaluateDocumentGate } from '../documents/service.ts';
 import {
   calendarEnvForBranchWithDb,
@@ -352,7 +353,12 @@ export async function commitConfirmedBooking(
   if (!isUsableLatLng(destination)) {
     return { ok: false, reason: 'destination_missing' };
   }
+  // Assigned resources for revalidation. A staffing-pending hold intentionally
+  // has fewer assigned resources than the full requirement; the missing seat is
+  // an operational gap, not a reason to reject the paid reservation.
   const crewSize = Math.max(1, hold?.crewSize ?? hold?.resourceIds?.length ?? 1);
+  const requiredCrewSize = Math.max(crewSize, hold?.requiredCrewSize ?? crewSize);
+  const staffingPending = Boolean(hold?.staffingPending) && requiredCrewSize > crewSize;
   const existingEventId = await deps.findEvent(calendarEnv, reference);
   const existingEvent = existingEventId ? await deps.getEvent(calendarEnv, existingEventId).catch(() => null) : null;
   const usableEvent = existingEvent && existingEvent.status !== 'cancelled' ? existingEvent : null;
@@ -371,6 +377,9 @@ export async function commitConfirmedBooking(
   );
   if (!exact) return { ok: false, reason: 'slot_unavailable' };
   const resourceIds = exact.resourceIds;
+  const staffingReason = staffingPending
+    ? `Requires ${requiredCrewSize} cleaners to finish inside the operating window; ${resourceIds.length} assigned.`
+    : '';
 
   let eventId = usableEvent?.id;
   let createdEvent = false;
@@ -402,18 +411,27 @@ export async function commitConfirmedBooking(
         .prepare(
           `UPDATE appointments
            SET status = 'confirmed', start_at = ?, end_at = ?, duration_minutes = ?, crew_size = ?,
-               cancelled_at = NULL, updated_at = ?
+               staffing_pending = ?, staffing_reason = ?, cancelled_at = NULL, updated_at = ?
            WHERE id = ?`,
         )
-        .bind(start, end, duration, resourceIds.length, new Date().toISOString(), appointmentId)
+        .bind(
+          start,
+          end,
+          duration,
+          requiredCrewSize,
+          staffingPending ? 1 : 0,
+          staffingPending ? staffingReason : '',
+          new Date().toISOString(),
+          appointmentId,
+        )
         .run();
     } else {
       await db
         .prepare(
           `INSERT INTO appointments
            (id, branch_id, customer_id, property_id, booking_request_id, status, start_at, end_at,
-            timezone, duration_minutes, crew_size, source, reference, notes)
-           VALUES (?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, ?, ?, ?, ?)`,
+            timezone, duration_minutes, crew_size, staffing_pending, staffing_reason, source, reference, notes)
+           VALUES (?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           appointmentId,
@@ -425,7 +443,9 @@ export async function commitConfirmedBooking(
           end,
           timeZone,
           duration,
-          resourceIds.length,
+          requiredCrewSize,
+          staffingPending ? 1 : 0,
+          staffingPending ? staffingReason : '',
           text(input.source, 40) || 'website',
           reference,
           text(input.notes, 1000),
@@ -451,6 +471,27 @@ export async function commitConfirmedBooking(
         .bind(new Date().toISOString(), requestRow.id)
         .run();
     }
+    // Record the assigned crew so the Job File and staffing warning show the
+    // real people. A staffing-pending booking deliberately records only the
+    // cleaners who are actually assigned.
+    if (resourceIds.length > 0) {
+      const placeholders = resourceIds.map(() => '?').join(',');
+      const members = await db
+        .prepare(
+          `SELECT id, booking_resource_id FROM team_members WHERE booking_resource_id IN (${placeholders})`,
+        )
+        .bind(...resourceIds)
+        .all<{ id: string; booking_resource_id: string }>();
+      for (const member of members.results ?? []) {
+        await db
+          .prepare(
+            `INSERT OR IGNORE INTO appointment_resources (appointment_id, team_member_id, role)
+             VALUES (?, ?, 'cleaner')`,
+          )
+          .bind(appointmentId, member.id)
+          .run();
+      }
+    }
   } catch (error) {
     if (createdEvent && eventId) {
       await deps.deleteEvent(calendarEnv, eventId).catch(() => undefined);
@@ -465,6 +506,8 @@ export async function commitConfirmedBooking(
       calendarEventId: eventId,
       resourceIds,
       crewSize: resourceIds.length,
+      requiredCrewSize,
+      ...(staffingPending ? { staffingPending: true } : {}),
     };
     await writeLedgerJson(bucket, holdKey(hold.id), updated);
     const pending = await getPendingBookingRequest(bucket, requestIdForHold(hold.id));
@@ -474,6 +517,8 @@ export async function commitConfirmedBooking(
         calendarEventId: eventId,
         resourceIds,
         crewSize: resourceIds.length,
+        requiredCrewSize,
+        ...(staffingPending ? { staffingPending: true } : {}),
       });
     }
   }
@@ -526,6 +571,43 @@ export async function commitConfirmedBooking(
     entityId: appointmentId,
     detail: `${reference}:${eventId}:${resourceIds.join(',')}`,
   });
+  if (staffingPending) {
+    // Critical operational notice: the customer's time and payment are
+    // preserved, but the crew is not secured yet. Never present this as a
+    // fully staffed booking.
+    const laborHours =
+      Number(text(fields.estimated_labor_hours, 20)) ||
+      Number(text(fields.labor_hours, 20)) ||
+      Math.round((duration / 60) * requiredCrewSize * 10) / 10;
+    const customerName =
+      [text(fields.first_name ?? fields.name, 120)].filter(Boolean).join(' ') ||
+      text(input.customerName, 120) ||
+      'Customer';
+    const when = `${localDate(start, timeZone)} ${localTime(start, timeZone)}`;
+    await sendOperationalNotification(db, env as unknown as CommunicationEnv, {
+      eventKey: 'owner_escalation',
+      subject: `CRITICAL: additional cleaner required - ${reference}`,
+      text: [
+        'A booking is confirmed but still needs additional cleaning staff.',
+        '',
+        `Reference: ${reference}`,
+        `Customer: ${customerName}`,
+        `Appointment: ${when} (${timeZone})`,
+        `Estimated labor: ${laborHours} person-hours`,
+        `Required crew: ${requiredCrewSize}`,
+        `Currently assigned: ${resourceIds.length}`,
+        `On-site duration: ${duration} minutes`,
+        `Reason: ${staffingReason}`,
+        '',
+        'The customer paid or requested the reservation; their time and payment are preserved.',
+        'Open Admin -> Calendar & Requests and the Job File to assign the missing crew or contact the customer with a reschedule or refund option.',
+        'This notice stays visible in the dashboard until the staffing requirement is resolved.',
+      ].join('\n'),
+      relatedType: 'appointment',
+      relatedId: appointmentId,
+      idempotencyKey: `staffing-pending/${reference}`,
+    }).catch(() => undefined);
+  }
   return {
     ok: true,
     appointmentId,

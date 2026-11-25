@@ -344,6 +344,28 @@ function initEstimateWizard(form: HTMLFormElement): void {
   let bookingFinalizedKey = '';
   let bookingFinalizeNote = '';
   let bookingFinalizedStatus = '';
+  let bookingStaffingPending = false;
+  let bookingStaffingNote = '';
+  let bookingRequiredCrewSize = 0;
+
+  function updateStaffingNotice(): void {
+    const notice = form.querySelector<HTMLElement>('[data-staffing-pending-note]');
+    if (!notice) return;
+    if (!bookingStaffingPending) {
+      notice.hidden = true;
+      notice.textContent = '';
+      return;
+    }
+    const crew = bookingRequiredCrewSize > 1 ? `${bookingRequiredCrewSize} cleaners` : 'an additional cleaner';
+    notice.hidden = false;
+    notice.innerHTML = `<strong>Additional cleaner required</strong>Your appointment time is held. This cleaning requires ${crew} to finish within our service hours. Our team will confirm the crew before your cleaning; your time and payment are preserved. If we cannot secure the crew, we will contact you with a reschedule or refund option.`;
+    if (bookingStaffingNote) {
+      const detail = document.createElement('span');
+      detail.className = 'estimate-notice__detail';
+      detail.textContent = ` ${bookingStaffingNote}`;
+      notice.appendChild(detail);
+    }
+  }
 
   let currentStep = 1;
   let location: ConfirmedLocation | null = null;
@@ -2168,6 +2190,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
         bookingFinalizedKey = '';
         bookingFinalizeNote = '';
         bookingFinalizedStatus = '';
+        bookingStaffingPending = false;
+        bookingStaffingNote = '';
+        bookingRequiredCrewSize = 0;
+        updateStaffingNotice();
         updateAppointmentSummary();
         const alternatives = form.querySelector<HTMLElement>('[data-booking-alternatives]');
         if (alternatives) {
@@ -2260,6 +2286,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
     bookingFinalizedKey = '';
     bookingFinalizeNote = '';
     bookingFinalizedStatus = '';
+    bookingStaffingPending = false;
+    bookingStaffingNote = '';
+    bookingRequiredCrewSize = 0;
+    updateStaffingNotice();
     photosDeferred = false;
     hidePhotoGate();
     clearAllErrors();
@@ -2655,6 +2685,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
         bookingCalendar?.selectSlot(slot.start, slot.end, slot.startLabel);
         bookingFinalizedKey = '';
         bookingFinalizedStatus = '';
+        bookingStaffingPending = false;
+        bookingStaffingNote = '';
+        bookingRequiredCrewSize = 0;
+        updateStaffingNotice();
         container.hidden = true;
         container.innerHTML = '';
         updateAppointmentSummary();
@@ -2712,6 +2746,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     bookingFinalizedKey = key;
     const outcome = await bookingCalendar.finalize({
       durationMinutes,
+      laborHours: result.pricing.totalLaborHours,
       destination,
       reference: latestQuote.reference,
       location: submission.location
@@ -2720,6 +2755,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
     });
     bookingFinalizeNote = outcome.message;
     bookingFinalizedStatus = outcome.status;
+    bookingStaffingPending = outcome.staffingPending === true;
+    bookingStaffingNote = outcome.staffingNote ?? '';
+    bookingRequiredCrewSize = outcome.requiredCrewSize ?? 0;
+    updateStaffingNotice();
     renderBookingAlternatives(outcome.alternatives, outcome.message);
     updateAppointmentSummary();
     return {

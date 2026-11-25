@@ -48,6 +48,8 @@ export async function onRequestGet(context: { request: Request; env: BookingEnv 
   }
   const durationRaw = Number(url.searchParams.get('durationMinutes'));
   if (!Number.isFinite(durationRaw)) return json({ ok: false, error: 'invalid_duration' }, 400);
+  const laborRaw = Number(url.searchParams.get('laborHours'));
+  const laborHours = Number.isFinite(laborRaw) && laborRaw > 0 ? Math.min(laborRaw, 24) : undefined;
   const lat = Number(url.searchParams.get('lat'));
   const lng = Number(url.searchParams.get('lng'));
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -84,6 +86,7 @@ export async function onRequestGet(context: { request: Request; env: BookingEnv 
   const result = await availabilityForDate(env, {
     date,
     durationMinutes: durationRaw,
+    ...(laborHours ? { laborHours } : {}),
     destination: { lat, lng },
     branchId: resolved.branch.id,
   });

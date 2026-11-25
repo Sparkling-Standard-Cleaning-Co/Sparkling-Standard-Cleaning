@@ -409,3 +409,13 @@ below.
 Still owner-dependent: the scheduled workflow on the default branch, live
 alert delivery, a current full media/master archive, key independence and a
 production D1/R2 re-import runbook.
+
+## Application object reference audit - 2026-11-25
+
+`scripts/backup/verify-r2-references.mjs` restores the D1 export in memory and proves every known object reference has a staged application R2 object: document template files, executed signature PDFs, job media, and customer photo keys recorded on leads and booking requests. The read-only `backup-audit.yml` workflow runs the audit without uploading an archive, applying retention or mutating production. Coverage: `tests/backup-r2-references.test.ts`.
+
+The complete backup also stages application R2 objects through the backup scheduler Worker bindings (documents and lead photos) and records their bytes and SHA-256 in the encrypted manifest.
+
+## Production schema migration order
+
+Apply pending D1 migrations before deploying code that reads new columns. `.github/workflows/d1-migrate.yml` is the controlled production migration workflow; it requires typing `APPLY`, lists pending migrations, applies them in order and verifies the migration count, application table count and foreign-key integrity. This is exceptional infrastructure administration, not routine owner work.

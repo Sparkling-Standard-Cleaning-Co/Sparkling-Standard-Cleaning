@@ -9,6 +9,7 @@ import {
 } from '../../../src/lib/admin/recurring-schedule.ts';
 import type { BookingEnv } from '../../../src/lib/booking/service.ts';
 import { recurringSchedulingEnabled } from '../../../src/lib/booking/recurring-gate.ts';
+import { refreshStaffingPendingState } from '../../../src/lib/booking/staffing.ts';
 import { queueReviewForAppointment } from '../../../src/lib/reviews/service.ts';
 import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import {
@@ -233,7 +234,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const appointmentId = String(body.appointmentId ?? '');
       await assignTeam(db, actor, appointmentId, memberIds);
       await syncAppointmentCalendarResources(context.env, db, appointmentId).catch(() => undefined);
-      return json({ ok: true });
+      const staffing = await refreshStaffingPendingState(db, appointmentId).catch(() => null);
+      return json({ ok: true, ...(staffing ? { staffing } : {}) });
     }
     if (action === 'set_team') {
       const memberIds = Array.isArray(body.teamMemberIds)
@@ -242,12 +244,14 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const appointmentId = String(body.appointmentId ?? '');
       const result = await setAppointmentTeam(db, actor, appointmentId, memberIds);
       await syncAppointmentCalendarResources(context.env, db, appointmentId).catch(() => undefined);
+      await refreshStaffingPendingState(db, appointmentId).catch(() => undefined);
       return json({ ok: true, ...result });
     }
     if (action === 'remove_team') {
       const appointmentId = String(body.appointmentId ?? '');
       await removeTeamMember(db, actor, appointmentId, String(body.teamMemberId ?? ''));
       await syncAppointmentCalendarResources(context.env, db, appointmentId).catch(() => undefined);
+      await refreshStaffingPendingState(db, appointmentId).catch(() => undefined);
       return json({ ok: true });
     }
     if (action === 'job_status') {

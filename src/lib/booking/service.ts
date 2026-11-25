@@ -71,6 +71,8 @@ export interface AvailabilityInput {
   branchId?: BranchId;
   /** Defaults to one cleaning resource. */
   crewSize?: number;
+  /** Total person-hours from the verified quote; enables crew planning. */
+  laborHours?: number;
   /** Force an owner-selected resource assignment. */
   requiredResourceIds?: ReadonlyArray<string>;
   now?: Date;
@@ -120,7 +122,12 @@ export async function availabilityForDate(
     start: new Date(hold.start),
     end: new Date(hold.end),
     location: hold.destination,
-    ...(hold.resourceIds && hold.resourceIds.length > 0 ? { resourceIds: hold.resourceIds } : {}),
+    // A staffing-pending hold reserves the time for the whole operation until
+    // management secures the missing seat. It must block more capacity, never
+    // less, so another customer cannot double-book the window.
+    ...(!hold.staffingPending && hold.resourceIds && hold.resourceIds.length > 0
+      ? { resourceIds: hold.resourceIds }
+      : {}),
   }));
   const excludedEvents = new Set(input.excludeEventIds ?? []);
   for (const job of calendar.jobs) {
@@ -177,6 +184,10 @@ export async function availabilityForDate(
       jobBufferMinutes: bookingConfig.jobBufferMinutes,
       resources,
       crewSize,
+      maxCrewSize: bookingConfig.maxCrewSize,
+      ...(input.laborHours && input.laborHours > 0
+        ? { laborHours: input.laborHours, crewEfficiency: bookingConfig.crewEfficiency }
+        : {}),
       ...(input.requiredResourceIds ? { requiredResourceIds: input.requiredResourceIds } : {}),
       minimumJobMinutes: bookingConfig.minimumJobMinutes,
       maximumJobMinutes: bookingConfig.maximumJobMinutes,
@@ -228,6 +239,7 @@ export async function availabilityForRange(
     destination: LatLng;
     branchId?: BranchId;
     crewSize?: number;
+    laborHours?: number;
     now?: Date;
     ignoreHoldId?: string;
     excludeEventIds?: ReadonlyArray<string>;
@@ -299,7 +311,9 @@ export async function availabilityForRange(
       start: new Date(hold.start),
       end: new Date(hold.end),
       location: hold.destination,
-      ...(hold.resourceIds && hold.resourceIds.length > 0 ? { resourceIds: hold.resourceIds } : {}),
+      ...(!hold.staffingPending && hold.resourceIds && hold.resourceIds.length > 0
+        ? { resourceIds: hold.resourceIds }
+        : {}),
     }));
     for (const job of jobsByDay.get(date) ?? []) {
       if (job.blocksDay) {
@@ -325,6 +339,10 @@ export async function availabilityForRange(
         jobBufferMinutes: bookingConfig.jobBufferMinutes,
         resources,
         crewSize,
+        maxCrewSize: bookingConfig.maxCrewSize,
+        ...(input.laborHours && input.laborHours > 0
+          ? { laborHours: input.laborHours, crewEfficiency: bookingConfig.crewEfficiency }
+          : {}),
         minimumJobMinutes: bookingConfig.minimumJobMinutes,
         maximumJobMinutes: bookingConfig.maximumJobMinutes,
         durationMinutes: durations,
