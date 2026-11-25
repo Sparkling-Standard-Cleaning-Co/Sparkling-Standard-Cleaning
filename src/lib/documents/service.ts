@@ -3233,6 +3233,45 @@ export async function listSigningRequests(
   }
 }
 
+/**
+ * Revokes an unsigned or partially signed request. The signing token is
+ * invalidated immediately; signatures already captured remain immutable
+ * evidence and are never deleted.
+ */
+export async function revokeSigningRequest(
+  db: D1Database,
+  actorUserId: string,
+  requestId: string,
+  reason = 'revoked_by_owner',
+): Promise<{ id: string; previousStatus: string }> {
+  const request = await db
+    .prepare('SELECT id, status FROM signing_requests WHERE id = ? LIMIT 1')
+    .bind(requestId)
+    .first<{ id: string; status: string }>();
+  if (!request) throw new AdminAuthError(404, 'signing_request_not_found');
+  if (!['pending', 'partially_signed'].includes(String(request.status))) {
+    throw new AdminAuthError(409, 'signing_request_not_revocable');
+  }
+  const timestamp = now();
+  const result = await db
+    .prepare(
+      `UPDATE signing_requests
+       SET status = 'void', token_hash = NULL, token_expires_at = ?, updated_at = ?
+       WHERE id = ? AND status IN ('pending','partially_signed')`,
+    )
+    .bind(timestamp, timestamp, requestId)
+    .run();
+  if (!result.success) throw new AdminAuthError(409, 'signing_request_revoke_failed');
+  await audit(db, {
+    actorUserId,
+    action: 'documents.signing_request_revoked',
+    entityType: 'signing_request',
+    entityId: requestId,
+    detail: text(reason, 300),
+  });
+  return { id: requestId, previousStatus: request.status };
+}
+
 export async function getSigningRequestDetails(
   db: D1Database,
   requestId: string,

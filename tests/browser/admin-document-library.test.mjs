@@ -39,6 +39,8 @@ after(async () => {
 test('the owner sees current documents by default with drafts and history separated', async () => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
   const page = await context.newPage();
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
   const families = [
     {
       familyKey: 'access-authorization',
@@ -82,6 +84,26 @@ test('the owner sees current documents by default with drafts and history separa
       archivedAt: '2026-11-24T09:00:00.000Z',
       state: 'archived',
     },
+    {
+      familyKey: 'legacy-no-packet-data',
+      title: 'Legacy Agreement Without Packet Data',
+      category: 'general',
+      approvedTemplateId: 'doc_legacy_no_packet',
+      approvedVersionLabel: 'Version 1.0',
+      approvedSourceKind: 'text',
+      approvedAt: '2026-11-20T12:00:00.000Z',
+      legalReviewStatus: 'owner_approved',
+      draftTemplateId: null,
+      draftVersionLabel: null,
+      draftUpdatedAt: null,
+      draftCount: 0,
+      retiredCount: 0,
+      versionCount: 1,
+      packetCount: 1,
+      activePacketCount: 1,
+      archivedAt: null,
+      state: 'active',
+    },
   ];
   const drafts = [{
     id: 'doc_access_draft',
@@ -122,7 +144,33 @@ test('the owner sees current documents by default with drafts and history separa
     } else if (view === 'bundles') {
       body.bundles = [];
     } else if (view === 'requests') {
-      body.requests = [];
+      body.requests = [{
+        id: 'req_no_packet',
+        status: 'pending',
+        signer_email: 'legacy@example.test',
+        first_name: 'Legacy',
+        last_name: 'Customer',
+        packet_name: null,
+        bundle_code: '',
+        signed_count: 0,
+        awaiting_verification: 0,
+        created_at: '2026-11-20T12:00:00.000Z',
+      }];
+    } else if (view === 'request') {
+      body.request = {
+        request: {
+          id: 'req_no_packet',
+          status: 'pending',
+          subject_type: 'customer',
+          branch_id: 'branch_pensacola',
+          signer_email: 'legacy@example.test',
+          booking_reference: '',
+          executed_at: null,
+          created_at: '2026-11-20T12:00:00.000Z',
+        },
+        signatures: [],
+      };
+      body.ownerEmail = null;
     } else if (view === 'reminder-settings') {
       body.settings = { enabled: false, firstHours: 24, secondHours: 72 };
     } else if (view === 'updates') {
@@ -176,10 +224,10 @@ test('the owner sees current documents by default with drafts and history separa
     const activeText = (await activePanel.textContent()) ?? '';
     assert.match(activeText, /Version 1\.2/);
     assert.match(activeText, /Version 1\.3 pending review/);
-    assert.doesNotMatch(activeText, /Version 1\.0/, 'retired versions never appear in the normal library');
+    assert.doesNotMatch(activeText, /Version 1\.1/, 'retired versions never appear in the normal library');
     assert.doesNotMatch(activeText, /Legacy Photo Notice/, 'archived families are hidden by default');
 
-    const draftButton = activePanel.getByRole('button', { name: /Edit & revise/i });
+    const draftButton = activePanel.getByRole('button', { name: /Edit & revise/i }).first();
     await draftButton.waitFor({ state: 'visible' });
 
     await page.locator('[data-document-library-tab="drafts"]').click();
@@ -194,13 +242,22 @@ test('the owner sees current documents by default with drafts and history separa
 
     await archivePanel.getByRole('button', { name: 'Versions' }).first().click();
     const historyPanel = page.locator('[data-document-family-history]');
-    await historyPanel.getByText('Residential Access Authorization — version history').waitFor({ state: 'visible' });
+    await historyPanel.getByText(/Residential Access Authorization/).waitFor({ state: 'visible' });
     const historyText = (await historyPanel.textContent()) ?? '';
     assert.match(historyText, /Version 1\.2/);
     assert.match(historyText, /Version 1\.1/);
     assert.match(historyText, /Restore as draft/);
     assert.match(historyText, /4/);
     assert.doesNotMatch(historyText, /customer-release|remediation/);
+
+    assert.match((await activePanel.textContent()) ?? '', /Legacy Agreement Without Packet Data/);
+    assert.match((await activePanel.textContent()) ?? '', /Not in a packet/);
+
+    await page.locator('[data-document-tab="requests"]').first().click();
+    await page.locator('[data-admin-documents-requests]').getByText('Signing request').first().waitFor();
+    await page.locator('[data-admin-documents-requests] button[data-admin-action="document-request-open"]').click();
+    await page.locator('[data-document-request-detail]').getByText('Signing request').waitFor();
+    assert.equal(pageErrors.length, 0, pageErrors.join('\n'));
   } finally {
     await context.close();
   }

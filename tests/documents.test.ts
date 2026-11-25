@@ -23,11 +23,13 @@ import {
   countersignSigningRequest,
   findReusableSigningRequest,
   getExecutedCopy,
+  getSigningRequestDetails,
   employeeOnboardingStatus,
   evaluateDocumentGate,
   listDocumentUpdates,
   listSigningRequests,
   removeBundleItem,
+  revokeSigningRequest,
   signSigningRequest,
   verifySignature,
 } from '../src/lib/documents/service.ts';
@@ -1123,4 +1125,85 @@ test('document revisions surface owner review, affected packets and a re-signing
   assert.equal(material?.status, 'resigning_recommended');
   assert.equal(material?.review.materialChange, true);
   assert.equal(material?.review.note, 'Synthetic material revision review.');
+});
+
+test('a pending signing request can be revoked and still loads when its packet is missing or renamed', async () => {
+  const f = await fixture();
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Revocable Agreement');
+  const secondTemplateId = await approvedTemplate(f.db, f.owner.id, 'Revocable Agreement Two');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.residential',
+    name: 'Residential documents',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId: secondTemplateId,
+    sortOrder: 1,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    frequency: 'one_time',
+    bookingReference: 'SS-20261124-REVOKE',
+  };
+  const request = await createSigningRequest(f.db, context, { createdByAdminUserId: f.owner.id });
+  assert.ok(request.token);
+  const before = await getSigningRequestDetails(f.db, String(request.requestId));
+  assert.equal((before?.request as Record<string, unknown>).packet_name, 'Residential documents');
+
+  const partial = await signSigningRequest(f.db, request.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'customer@example.test',
+    consent: true,
+    signatures: { [templateId]: { value: 'Synthetic Customer' } },
+    request: signingRequest(),
+  });
+  assert.equal(partial.status, 'partially_signed');
+
+  const revoked = await revokeSigningRequest(f.db, f.owner.id, String(request.requestId), 'Synthetic revoke');
+  assert.equal(revoked.previousStatus, 'partially_signed');
+  const stored = f.db.raw
+    .prepare('SELECT status, token_hash, token_expires_at FROM signing_requests WHERE id = ?')
+    .get(String(request.requestId)) as { status: string; token_hash: string | null; token_expires_at: string | null };
+  assert.equal(stored.status, 'void');
+  assert.equal(stored.token_hash, null);
+  assert.ok(stored.token_expires_at);
+  await assert.rejects(
+    () =>
+      signSigningRequest(f.db, request.token!, {
+        signerName: 'Synthetic Customer',
+        signerEmail: 'customer@example.test',
+        consent: true,
+        signatures: { [templateId]: { value: 'Synthetic Customer' } },
+        request: signingRequest(),
+      }),
+    /signing_(link_invalid|request)/,
+  );
+
+  // A retired or renamed packet must not break the request detail view.
+  f.db.raw
+    .prepare("UPDATE signing_requests SET packet_name = '', bundle_code = '' WHERE id = ?")
+    .run(String(request.requestId));
+  const after = await getSigningRequestDetails(f.db, String(request.requestId));
+  const row = after?.request as Record<string, unknown>;
+  assert.equal(row.packet_name, '');
+  assert.equal(row.bundle_code, '');
+  assert.equal((after?.signatures as Array<Record<string, unknown>>).length, 1);
+  assert.equal(
+    (after?.signatures as Array<Record<string, unknown>>)[0]?.status,
+    'signed',
+    'captured evidence survives revocation',
+  );
 });

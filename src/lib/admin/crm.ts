@@ -118,6 +118,187 @@ export async function countCustomers(
   return Number(row?.count ?? 0);
 }
 
+export interface CustomerTimelineEvent {
+  at: string;
+  kind: string;
+  title: string;
+  detail: string;
+  entityType: string;
+  entityId: string;
+  appointmentId?: string;
+  invoiceId?: string;
+  requestId?: string;
+  leadId?: string;
+}
+
+function human(value: unknown): string {
+  const raw = String(value ?? '').replaceAll('_', ' ').trim();
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '';
+}
+
+function customerMoney(value: unknown): string {
+  const cents = Number(value);
+  return Number.isFinite(cents) ? `$${(cents / 100).toFixed(2)}` : '$0.00';
+}
+
+function buildCustomerTimeline(input: {
+  leads: Array<Record<string, unknown>>;
+  estimates: Array<Record<string, unknown>>;
+  appointments: Array<Record<string, unknown>>;
+  invoices: Array<Record<string, unknown>>;
+  payments: Array<Record<string, unknown>>;
+  signingRequests: Array<Record<string, unknown>>;
+  reviewRequests: Array<Record<string, unknown>>;
+  communications: Array<Record<string, unknown>>;
+  jobMedia: Array<Record<string, unknown>>;
+  notes: Array<Record<string, unknown>>;
+  tipAllocations: Array<Record<string, unknown>>;
+}): CustomerTimelineEvent[] {
+  const events: CustomerTimelineEvent[] = [];
+  const add = (
+    at: unknown,
+    kind: string,
+    title: string,
+    detail: string,
+    links: Partial<CustomerTimelineEvent> = {},
+  ): void => {
+    const value = String(at ?? '').trim();
+    if (!value) return;
+    events.push({
+      at: value,
+      kind,
+      title,
+      detail,
+      entityType: links.entityType ?? '',
+      entityId: links.entityId ?? '',
+      ...links,
+    });
+  };
+  for (const row of input.leads) {
+    add(row.created_at, 'inquiry', 'Inquiry received', `${human(row.request_type)} · ${human(row.status)}`, {
+      entityType: 'lead',
+      entityId: String(row.id ?? ''),
+      leadId: String(row.id ?? ''),
+    });
+  }
+  for (const row of input.estimates) {
+    add(row.created_at, 'estimate', `Estimate ${String(row.quote_reference ?? '')}`.trim(), `${customerMoney(row.total_cents)} · ${human(row.status)}`, {
+      entityType: 'estimate',
+      entityId: String(row.id ?? ''),
+    });
+  }
+  for (const row of input.appointments) {
+    add(row.start_at, 'job', `Service ${human(row.status)}`, `Job ${String(row.reference ?? '')}`, {
+      entityType: 'appointment',
+      entityId: String(row.id ?? ''),
+      appointmentId: String(row.id ?? ''),
+    });
+    const updated = String(row.updated_at ?? '');
+    const started = String(row.start_at ?? '');
+    if (updated && updated !== started && ['completed', 'cancelled', 'no_show'].includes(String(row.status))) {
+      add(updated, 'job', `Service ${human(row.status)}`, `Job ${String(row.reference ?? '')}`, {
+        entityType: 'appointment',
+        entityId: String(row.id ?? ''),
+        appointmentId: String(row.id ?? ''),
+      });
+    }
+  }
+  for (const row of input.invoices) {
+    add(
+      row.created_at,
+      'invoice',
+      `${row.invoice_role === 'supplemental' ? 'Supplemental invoice' : 'Invoice'} ${String(row.number ?? '')}`.trim(),
+      `${customerMoney(row.total_cents)} · ${human(row.status)}`,
+      {
+        entityType: 'invoice',
+        entityId: String(row.id ?? ''),
+        invoiceId: String(row.id ?? ''),
+        ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+      },
+    );
+  }
+  for (const row of input.payments) {
+    const tip = Number(row.tip_cents ?? 0);
+    add(
+      row.received_at || row.created_at,
+      'payment',
+      `Payment ${human(row.status)}`,
+      `${customerMoney(row.amount_cents)}${tip > 0 ? ` including ${customerMoney(tip)} gratuity` : ''} via ${human(row.provider)}`,
+      {
+        entityType: 'payment',
+        entityId: String(row.id ?? ''),
+        ...(row.invoice_id ? { invoiceId: String(row.invoice_id) } : {}),
+        ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+      },
+    );
+  }
+  for (const row of input.signingRequests) {
+    const label = String(row.packet_name || row.bundle_code || 'Agreement');
+    if (row.executed_at) {
+      add(row.executed_at, 'agreement', 'Agreement executed', label, {
+        entityType: 'signing_request',
+        entityId: String(row.id ?? ''),
+        requestId: String(row.id ?? ''),
+        ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+      });
+    }
+    add(row.created_at, 'agreement', 'Agreement request created', `${label} · ${human(row.status)}`, {
+      entityType: 'signing_request',
+      entityId: String(row.id ?? ''),
+      requestId: String(row.id ?? ''),
+      ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+    });
+  }
+  for (const row of input.reviewRequests) {
+    add(
+      row.sent_at || row.created_at,
+      'review',
+      `Review invitation ${human(row.status)}`,
+      String(row.suppressed_reason || row.channel || ''),
+      { entityType: 'review_request', entityId: String(row.id ?? '') },
+    );
+  }
+  for (const row of input.communications) {
+    add(
+      row.created_at,
+      'communication',
+      `${human(row.channel)} ${human(row.direction)}`,
+      `${human(row.status)}${row.subject ? ` · ${String(row.subject)}` : row.template ? ` · ${String(row.template)}` : ''}`,
+      { entityType: 'communication', entityId: String(row.id ?? '') },
+    );
+  }
+  for (const row of input.jobMedia) {
+    add(row.created_at, 'photo', 'Photo added', human(row.kind), {
+      entityType: 'job_media',
+      entityId: String(row.id ?? ''),
+      ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+    });
+  }
+  for (const row of input.notes) {
+    add(row.created_at, 'note', 'Internal note', String(row.body ?? '').slice(0, 180), {
+      entityType: 'customer_note',
+      entityId: String(row.id ?? ''),
+    });
+  }
+  for (const row of input.tipAllocations) {
+    add(
+      row.created_at,
+      'tip',
+      'Gratuity allocation',
+      `${String(row.team_member_name || 'Unassigned')} · ${customerMoney(row.amount_cents)} · ${human(row.status)}`,
+      {
+        entityType: 'tip_allocation',
+        entityId: String(row.id ?? ''),
+        ...(row.invoice_id ? { invoiceId: String(row.invoice_id) } : {}),
+        ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+      },
+    );
+  }
+  return events
+    .sort((left, right) => right.at.localeCompare(left.at))
+    .slice(0, 150);
+}
+
 export async function getCustomer(
   db: D1Database,
   actor: AdminActor,
@@ -135,7 +316,7 @@ export async function getCustomer(
   if (!customer) return null;
   const canSeeNotes = actor.role === 'owner' || actor.role === 'manager';
   const canSeeFinance = actor.role === 'owner' || actor.permissions.includes('finance.read');
-  const [contacts, properties, notes, leads, estimates, appointments, recurring, invoices, paymentAuthorizations, signingRequests, gifts, quickEstimates, reviewState] = await Promise.all([
+  const [contacts, properties, notes, leads, estimates, appointments, recurring, invoices, paymentAuthorizations, signingRequests, gifts, quickEstimates, reviewState, payments, communications, reviewRequests, jobMedia, tipAllocations] = await Promise.all([
     db.prepare('SELECT * FROM customer_contacts WHERE customer_id = ? ORDER BY is_primary DESC, created_at').bind(customerId).all(),
     db.prepare('SELECT * FROM properties WHERE customer_id = ? ORDER BY is_primary DESC, created_at').bind(customerId).all(),
     canSeeNotes
@@ -143,9 +324,21 @@ export async function getCustomer(
       : Promise.resolve({ success: true, results: [] }),
     db.prepare('SELECT id, request_type, status, quote_reference, delivery_status, created_at FROM leads WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50').bind(customerId).all(),
     db.prepare('SELECT id, quote_reference, status, total_cents, created_at FROM estimates WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50').bind(customerId).all(),
-    db.prepare('SELECT id, reference, status, start_at, end_at FROM appointments WHERE customer_id = ? ORDER BY start_at DESC LIMIT 50').bind(customerId).all(),
+    db.prepare(
+      `SELECT id, reference, status, start_at, end_at, property_id, created_at, updated_at
+       FROM appointments WHERE customer_id = ? ORDER BY start_at DESC LIMIT 50`,
+    ).bind(customerId).all(),
     db.prepare('SELECT id, frequency, status, ongoing_price_cents, next_visit_date FROM recurring_plans WHERE customer_id = ? ORDER BY created_at DESC').bind(customerId).all(),
-    db.prepare('SELECT id, number, status, total_cents, balance_cents, due_date FROM invoices WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50').bind(customerId).all(),
+    db.prepare(
+      `SELECT id, number, status, total_cents, balance_cents, due_date, appointment_id,
+              invoice_role, related_invoice_id, created_at
+       FROM invoices WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+    ).bind(customerId).all().catch(() =>
+      db.prepare(
+        `SELECT id, number, status, total_cents, balance_cents, due_date, appointment_id, created_at
+         FROM invoices WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+      ).bind(customerId).all(),
+    ),
     canSeeFinance
       ? db.prepare(
           `SELECT pa.id, pa.service_code, pa.amount_cents, pa.max_amount_cents, pa.charge_after_service,
@@ -155,9 +348,16 @@ export async function getCustomer(
         ).bind(customerId).all()
       : Promise.resolve({ success: true, results: [] }),
     db.prepare(
-      `SELECT id, bundle_code, status, booking_reference, executed_at, created_at
+      `SELECT id, packet_name, bundle_code, status, booking_reference, appointment_id,
+              signer_email, executed_at, created_at
        FROM signing_requests WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
-    ).bind(customerId).all(),
+    ).bind(customerId).all().catch(() =>
+      db.prepare(
+        `SELECT id, bundle_code, status, booking_reference, appointment_id,
+                signer_email, executed_at, created_at
+         FROM signing_requests WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+      ).bind(customerId).all(),
+    ),
     db.prepare(
       `SELECT id, code, status, value_cents, balance_cents, valid_from_date, activates_at, created_at,
               CASE WHEN purchaser_customer_id = ? THEN 'purchased' ELSE 'received' END AS role
@@ -171,14 +371,55 @@ export async function getCustomer(
     ).bind(customerId).all().catch(() => ({ success: true, results: [] })),
     db.prepare('SELECT * FROM customer_review_state WHERE customer_id = ? LIMIT 1')
       .bind(customerId).first().catch(() => null),
+    canSeeFinance
+      ? db.prepare(
+          `SELECT id, invoice_id, appointment_id, provider, status, amount_cents,
+                  service_cents, tip_cents, tip_refunded_cents, received_at, created_at
+           FROM payments WHERE customer_id = ? ORDER BY COALESCE(received_at, created_at) DESC LIMIT 100`,
+        ).bind(customerId).all().catch(() =>
+          db.prepare(
+            `SELECT id, invoice_id, appointment_id, provider, status, amount_cents, received_at, created_at
+             FROM payments WHERE customer_id = ? ORDER BY COALESCE(received_at, created_at) DESC LIMIT 100`,
+          ).bind(customerId).all(),
+        )
+      : Promise.resolve({ success: true, results: [] }),
+    db.prepare(
+      `SELECT id, appointment_id, channel, direction, template, status, subject, created_at
+       FROM communications WHERE customer_id = ? ORDER BY created_at DESC LIMIT 100`,
+    ).bind(customerId).all().catch(() => ({ success: true, results: [] })),
+    db.prepare(
+      `SELECT id, status, channel, created_at, sent_at, suppressed_reason
+       FROM review_requests WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+    ).bind(customerId).all().catch(() => ({ success: true, results: [] })),
+    db.prepare(
+      `SELECT jm.id, jm.appointment_id, jm.kind, jm.content_type, jm.created_at
+       FROM job_media jm
+       WHERE jm.appointment_id IN (SELECT id FROM appointments WHERE customer_id = ?)
+       ORDER BY jm.created_at DESC LIMIT 100`,
+    ).bind(customerId).all().catch(() => ({ success: true, results: [] })),
+    canSeeFinance
+      ? db.prepare(
+          `SELECT ta.id, ta.payment_id, ta.invoice_id, ta.appointment_id, ta.team_member_id,
+                  ta.amount_cents, ta.refunded_cents, ta.status, ta.created_at,
+                  tm.display_name AS team_member_name
+           FROM tip_allocations ta LEFT JOIN team_members tm ON tm.id = ta.team_member_id
+           WHERE ta.customer_id = ? ORDER BY ta.created_at DESC LIMIT 100`,
+        ).bind(customerId).all().catch(() => ({ success: true, results: [] }))
+      : Promise.resolve({ success: true, results: [] }),
   ]);
+  const paymentRows = payments.results ?? [];
+  const communicationRows = communications.results ?? [];
+  const reviewRequestRows = reviewRequests.results ?? [];
+  const jobMediaRows = jobMedia.results ?? [];
+  const noteRows = notes.results ?? [];
+  const tipAllocationRows = tipAllocations.results ?? [];
   return {
     customer,
     contacts: contacts.results ?? [],
     properties: (properties.results ?? []).map((property) =>
       canSeeNotes ? property : { ...property, internal_notes: '' },
     ),
-    notes: notes.results ?? [],
+    notes: noteRows,
     leads: leads.results ?? [],
     estimates: estimates.results ?? [],
     appointments: appointments.results ?? [],
@@ -189,6 +430,24 @@ export async function getCustomer(
     gifts: gifts.results ?? [],
     quickEstimates: quickEstimates.results ?? [],
     reviewState,
+    payments: paymentRows,
+    communications: communicationRows,
+    reviewRequests: reviewRequestRows,
+    jobMedia: jobMediaRows,
+    tipAllocations: tipAllocationRows,
+    timeline: buildCustomerTimeline({
+      leads: leads.results ?? [],
+      estimates: estimates.results ?? [],
+      appointments: appointments.results ?? [],
+      invoices: invoices.results ?? [],
+      payments: paymentRows,
+      signingRequests: signingRequests.results ?? [],
+      reviewRequests: reviewRequestRows,
+      communications: communicationRows,
+      jobMedia: jobMediaRows,
+      notes: noteRows,
+      tipAllocations: tipAllocationRows,
+    }),
   };
 }
 

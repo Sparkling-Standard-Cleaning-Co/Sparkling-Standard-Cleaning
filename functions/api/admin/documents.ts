@@ -34,6 +34,7 @@ import {
   restoreTemplate,
   restoreTemplateFamily,
   retireTemplate,
+  revokeSigningRequest,
   rotateSigningRequestToken,
   sendSigningEmail,
   templateFamilyHistory,
@@ -746,6 +747,20 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         draft,
         signingUrl: `/document-sign/?token=${encodeURIComponent(created.token)}`,
       });
+    }
+    if (action === 'revoke_request') {
+      const requestId = text(body.requestId, 100);
+      const details = await getSigningRequestDetails(db, requestId);
+      if (!details) return json({ ok: false, error: 'signing_request_not_found' }, 404);
+      const request = (details.request ?? {}) as Record<string, unknown>;
+      if (!branchAllowed(actor, request.branch_id)) return json({ ok: false, error: 'forbidden' }, 403);
+      const revoked = await revokeSigningRequest(
+        db,
+        actor.id,
+        requestId,
+        text(body.reason, 300) || 'revoked_by_owner',
+      );
+      return json({ ok: true, ...revoked });
     }
     if (action === 'resend_request') {
       const requestId = text(body.requestId, 100);

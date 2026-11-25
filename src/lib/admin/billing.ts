@@ -160,6 +160,8 @@ export async function createInvoice(
   const propertyId = text(input.propertyId, 100) || null;
   const appointmentId = text(input.appointmentId, 100) || null;
   const bookingRequestId = text(input.bookingRequestId, 120) || null;
+  const invoiceRole = input.invoiceRole === 'supplemental' ? 'supplemental' : 'primary';
+  const relatedInvoiceId = text(input.relatedInvoiceId, 100) || null;
   if (bookingRequestId) {
     const existing = await db
       .prepare('SELECT id, number, total_cents FROM invoices WHERE booking_request_id = ? LIMIT 1')
@@ -169,13 +171,25 @@ export async function createInvoice(
       return { id: existing.id, number: existing.number, totalCents: Number(existing.total_cents) };
     }
   }
-  if (appointmentId) {
+  if (appointmentId && invoiceRole === 'primary') {
     const existing = await db
-      .prepare('SELECT id, number, total_cents FROM invoices WHERE appointment_id = ? LIMIT 1')
+      .prepare("SELECT id, number, total_cents FROM invoices WHERE appointment_id = ? AND invoice_role = 'primary' LIMIT 1")
       .bind(appointmentId)
       .first<{ id: string; number: string; total_cents: number }>();
     if (existing) {
       return { id: existing.id, number: existing.number, totalCents: Number(existing.total_cents) };
+    }
+  }
+  if (relatedInvoiceId) {
+    const related = await db
+      .prepare('SELECT id, customer_id, appointment_id FROM invoices WHERE id = ? LIMIT 1')
+      .bind(relatedInvoiceId)
+      .first<{ id: string; customer_id: string; appointment_id: string | null }>();
+    if (!related || related.customer_id !== customerId) {
+      throw new AdminAuthError(400, 'invoice_related_invalid');
+    }
+    if (appointmentId && related.appointment_id && related.appointment_id !== appointmentId) {
+      throw new AdminAuthError(400, 'invoice_related_appointment_mismatch');
     }
   }
   if (propertyId) {
@@ -243,8 +257,8 @@ export async function createInvoice(
       `INSERT INTO invoices
        (id, branch_id, customer_id, property_id, appointment_id, number, status, issue_date, due_date,
         service_code, service_label, service_date, subtotal_cents, discount_cents, tax_cents, total_cents, amount_paid_cents, balance_cents,
-        booking_request_id, created_by_admin_user_id)
-       VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+        booking_request_id, invoice_role, related_invoice_id, created_by_admin_user_id)
+       VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
     )
     .bind(
       invoiceId,
@@ -264,6 +278,8 @@ export async function createInvoice(
       totalCents,
       totalCents,
       bookingRequestId,
+      invoiceRole,
+      relatedInvoiceId,
       actor.id,
     )
     .run();

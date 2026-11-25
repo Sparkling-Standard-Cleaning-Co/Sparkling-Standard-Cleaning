@@ -30,6 +30,7 @@ import {
   markBookingCommitment,
 } from '../../../src/lib/booking/commitments.ts';
 import { getCalendarEvent } from '../../../src/lib/booking/google-calendar.ts';
+import { listChangeOrders } from '../../../src/lib/change-orders/service.ts';
 
 interface Env extends AdminDbEnv, ManualBookingEnv, StripeBillingEnv {}
 
@@ -129,7 +130,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
            LEFT JOIN properties p ON p.id = a.property_id
            LEFT JOIN estimates e ON e.id = a.estimate_id
            LEFT JOIN services s ON s.code = e.service_code
-           LEFT JOIN invoices i ON i.appointment_id = a.id
+           LEFT JOIN invoices i ON i.appointment_id = a.id AND i.invoice_role = 'primary'
            WHERE a.id = ?${branch.sql} LIMIT 1`,
         )
         .bind(appointmentId, ...branch.bind)
@@ -144,6 +145,106 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         )
         .bind(appointmentId, String(job.customer_id ?? ''), String(job.property_id ?? ''))
         .all<Record<string, unknown>>();
+      const [invoices, payments, photos, communications, crew, changeOrders] = await Promise.all([
+        db
+          .prepare(
+            `SELECT id, number, status, invoice_role, related_invoice_id, total_cents, balance_cents, due_date, created_at
+             FROM invoices WHERE appointment_id = ? ORDER BY created_at`,
+          )
+          .bind(appointmentId)
+          .all<Record<string, unknown>>(),
+        db
+          .prepare(
+            `SELECT p.id, p.invoice_id, p.provider, p.status, p.amount_cents, p.service_cents,
+                    p.tip_cents, p.tip_refunded_cents, p.received_at, p.created_at
+             FROM payments p
+             WHERE p.appointment_id = ?
+                OR p.invoice_id IN (SELECT id FROM invoices WHERE appointment_id = ?)
+             ORDER BY COALESCE(p.received_at, p.created_at) DESC`,
+          )
+          .bind(appointmentId, appointmentId)
+          .all<Record<string, unknown>>(),
+        db
+          .prepare(
+            `SELECT id, kind, content_type, created_at FROM job_media
+             WHERE appointment_id = ? ORDER BY created_at DESC LIMIT 100`,
+          )
+          .bind(appointmentId)
+          .all<Record<string, unknown>>(),
+        db
+          .prepare(
+            `SELECT id, channel, direction, status, subject, template, created_at
+             FROM communications
+             WHERE appointment_id = ? OR customer_id = ?
+             ORDER BY created_at DESC LIMIT 50`,
+          )
+          .bind(appointmentId, String(job.customer_id ?? ''))
+          .all<Record<string, unknown>>(),
+        db
+          .prepare(
+            `SELECT tm.id, tm.display_name
+             FROM appointment_resources ar JOIN team_members tm ON tm.id = ar.team_member_id
+             WHERE ar.appointment_id = ? ORDER BY tm.display_name`,
+          )
+          .bind(appointmentId)
+          .all<Record<string, unknown>>(),
+        listChangeOrders(db, { appointmentId }).catch(() => []),
+      ]);
+      const invoiceRows = invoices.results ?? [];
+      const paymentRows = payments.results ?? [];
+      const photoRows = photos.results ?? [];
+      const communicationRows = communications.results ?? [];
+      const moneyText = (value: unknown): string => {
+        const cents = Number(value);
+        return Number.isFinite(cents) ? `$${(cents / 100).toFixed(2)}` : '$0.00';
+      };
+      const label = (value: unknown): string => {
+        const raw = String(value ?? '').replaceAll('_', ' ').trim();
+        return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '';
+      };
+      const timeline = [
+        {
+          at: String(job.start_at ?? ''),
+          kind: 'job',
+          title: `Service ${label(job.status)}`,
+          detail: `Job ${String(job.reference ?? '')}`,
+        },
+        ...invoiceRows.map((row) => ({
+          at: String(row.created_at ?? ''),
+          kind: 'invoice',
+          title: `${row.invoice_role === 'supplemental' ? 'Supplemental invoice' : 'Invoice'} ${String(row.number ?? '')}`.trim(),
+          detail: `${moneyText(row.total_cents)} · ${label(row.status)}`,
+        })),
+        ...paymentRows.map((row) => {
+          const tip = Number(row.tip_cents ?? 0);
+          return {
+            at: String(row.received_at || row.created_at || ''),
+            kind: 'payment',
+            title: `Payment ${label(row.status)}`,
+            detail: `${moneyText(row.amount_cents)}${tip > 0 ? ` including ${moneyText(tip)} gratuity` : ''} via ${label(row.provider)}`,
+          };
+        }),
+        ...(documents.results ?? []).map((row) => ({
+          at: String(row.executed_at || row.created_at || ''),
+          kind: 'agreement',
+          title: row.executed_at ? 'Agreement executed' : 'Agreement request',
+          detail: `${String(row.packet_name || row.bundle_code || 'Agreement')} · ${label(row.status)}`,
+        })),
+        ...photoRows.map((row) => ({
+          at: String(row.created_at ?? ''),
+          kind: 'photo',
+          title: 'Photo added',
+          detail: label(row.kind),
+        })),
+        ...communicationRows.map((row) => ({
+          at: String(row.created_at ?? ''),
+          kind: 'communication',
+          title: `${label(row.channel)} ${label(row.direction)}`,
+          detail: `${label(row.status)}${row.subject ? ` · ${String(row.subject)}` : row.template ? ` · ${String(row.template)}` : ''}`,
+        })),
+      ]
+        .filter((event) => event.at)
+        .sort((left, right) => right.at.localeCompare(left.at));
       return json({
         ok: true,
         job,
@@ -157,6 +258,21 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
             }
           : null,
         documents: documents.results ?? [],
+        invoices: invoiceRows,
+        payments: paymentRows,
+        photos: photoRows,
+        communications: communicationRows,
+        crew: crew.results ?? [],
+        changeOrders,
+        timeline: [
+          ...changeOrders.map((changeOrder) => ({
+            at: String(changeOrder.created_at ?? ''),
+            kind: 'change_order',
+            title: `Change order ${String(changeOrder.reference ?? '')}`,
+            detail: `${moneyText(changeOrder.adjustment_cents)} · ${label(changeOrder.effective_status)}`,
+          })),
+          ...timeline,
+        ].sort((left, right) => right.at.localeCompare(left.at)),
       });
     }
     if (view === 'availability') {

@@ -1230,12 +1230,13 @@ import {
                   <label>Search <input type="search" data-document-request-search placeholder="Customer, packet, or reference" /></label>
                   <label>Status
                     <select data-document-request-status>
+                      <option value="active" selected>Active (awaiting signature)</option>
                       <option value="">All statuses</option>
                       <option value="pending">Awaiting signature</option>
                       <option value="partially_signed">Partially signed</option>
                       <option value="signed">Completed</option>
                       <option value="expired">Expired</option>
-                      <option value="void">Void</option>
+                      <option value="void">Revoked / void</option>
                     </select>
                   </label>
                 </div>

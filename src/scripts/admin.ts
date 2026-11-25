@@ -1047,6 +1047,13 @@ async function openCalendarJob(appointmentId: string): Promise<void> {
     job: Record<string, unknown>;
     invoice: Record<string, unknown> | null;
     documents: Array<Record<string, unknown>>;
+    invoices?: Array<Record<string, unknown>>;
+    payments?: Array<Record<string, unknown>>;
+    photos?: Array<Record<string, unknown>>;
+    communications?: Array<Record<string, unknown>>;
+    crew?: Array<Record<string, unknown>>;
+    changeOrders?: Array<Record<string, unknown>>;
+    timeline?: Array<Record<string, unknown>>;
   }>(`/api/admin/bookings?view=job&appointmentId=${encodeURIComponent(appointmentId)}`);
   const job = data.job;
   const invoice = data.invoice;
@@ -1054,6 +1061,13 @@ async function openCalendarJob(appointmentId: string): Promise<void> {
   const property = [job.property_label, job.line1, job.city, job.state, job.postal_code].filter(Boolean).join(', ');
   const service = String(job.service_name ?? job.service_code ?? 'Cleaning service');
   const documents = data.documents ?? [];
+  const invoices = data.invoices ?? [];
+  const payments = data.payments ?? [];
+  const photos = data.photos ?? [];
+  const communications = data.communications ?? [];
+  const crew = data.crew ?? [];
+  const changeOrders = data.changeOrders ?? [];
+  const timeline = data.timeline ?? [];
   container.innerHTML = `<div class="admin-calendar-dialog-card" role="dialog" aria-modal="true" aria-labelledby="calendar-job-title">
     <div class="admin-detail-head"><h2 class="admin-section-title" id="calendar-job-title">Job ${esc(String(job.reference ?? ''))}</h2><button class="btn btn--ghost btn--small" type="button" data-calendar-close>Close</button></div>
     <dl class="admin-definition">
@@ -1063,11 +1077,45 @@ async function openCalendarJob(appointmentId: string): Promise<void> {
       <dt>Status</dt><dd>${esc(titleCase(String(job.status ?? '').replaceAll('_', ' ')))}</dd>
       <dt>Date</dt><dd>${esc(dateTime(job.start_at, job.branch_id))}</dd>
       <dt>Agreed price</dt><dd>${esc(Number(job.total_cents) > 0 ? money(job.total_cents) : 'Not recorded')}</dd>
-      <dt>Crew</dt><dd>${esc(String(job.assigned_names || 'Unassigned'))}</dd>
-      <dt>Invoice</dt><dd>${invoice ? `${esc(invoice.number)} · ${esc(titleCase(String(invoice.status)))} · balance ${esc(money(invoice.balanceCents))}` : 'No invoice yet'}</dd>
+      <dt>Crew</dt><dd>${esc(crew.length ? crew.map((member) => String(member.display_name ?? '')).join(', ') : String(job.assigned_names || 'Unassigned'))}</dd>
+      <dt>Photos</dt><dd>${esc(String(photos.length))} linked</dd>
+      <dt>Primary invoice</dt><dd>${invoice ? `${esc(invoice.number)} · ${esc(titleCase(String(invoice.status)))} · balance ${esc(money(invoice.balanceCents))}` : 'No invoice yet'}</dd>
     </dl>
+    <h3>Change orders</h3>
+    ${changeOrders.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Reference</th><th>Status</th><th>Adjustment</th><th>Revised price</th><th>Actions</th></tr></thead><tbody>${changeOrders.map((row) => {
+      const status = String(row.effective_status ?? row.status ?? '');
+      const actions = [
+        status === 'pending_approval' ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="change-order-approve" data-id="${esc(row.id)}" data-appointment="${esc(appointmentId)}">Approve</button>` : '',
+        status === 'pending_approval' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="change-order-decline" data-id="${esc(row.id)}" data-appointment="${esc(appointmentId)}">Decline</button>` : '',
+        status === 'approved' ? `<button class="btn btn--primary btn--small" type="button" data-admin-action="change-order-send" data-id="${esc(row.id)}" data-appointment="${esc(appointmentId)}">Send for signature</button>` : '',
+        row.signing_request_id ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-open" data-id="${esc(row.signing_request_id)}">Open agreement</button>` : '',
+        status === 'signed' && !row.supplemental_invoice_id ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="change-order-invoice" data-id="${esc(row.id)}" data-appointment="${esc(appointmentId)}">Create supplemental invoice</button>` : '',
+        row.supplemental_invoice_id ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="invoice-open" data-id="${esc(row.supplemental_invoice_id)}">Open supplemental invoice</button>` : '',
+      ].filter(Boolean).join('');
+      return `<tr><td>${esc(row.reference)}</td><td><span class="admin-status">${esc(titleCase(status))}</span></td><td>${esc(money(row.adjustment_cents))}</td><td>${esc(money(row.revised_price_cents))}</td><td><div class="admin-actions">${actions || '<span class="admin-muted">No action</span>'}</div></td></tr>`;
+    }).join('')}</tbody></table></div>` : '<p class="admin-muted">No change orders are recorded for this job.</p>'}
+    <details class="admin-detail-toggle" style="margin-top:.75rem;"><summary>Create change order</summary>
+      <form class="admin-form" style="max-width:none" data-form="change-order-create">
+        <input type="hidden" name="appointmentId" value="${esc(appointmentId)}" />
+        <input type="hidden" name="customerId" value="${esc(String(job.customer_id ?? ''))}" />
+        <label>Original scope <textarea name="originalScope" rows="2" maxlength="4000">${esc(service)}</textarea></label>
+        <label>Revised / added scope <textarea name="revisedScope" rows="3" maxlength="4000" required></textarea></label>
+        <label>Additional amount (USD, negative for a reduction) <input name="adjustment" type="number" step="0.01" required /></label>
+        <label>Reason for the change <textarea name="reason" rows="2" maxlength="2000" required></textarea></label>
+        <label>Effective date <input name="effectiveDate" type="date" value="${localToday(0)}" /></label>
+        <button class="btn btn--primary btn--small" type="submit">Create change order for approval</button>
+      </form>
+    </details>
+    <div data-change-order-result role="status" aria-live="polite"></div>
+    <h3>Finance</h3>
+    ${invoices.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Invoice</th><th>Type</th><th>Status</th><th>Total</th><th>Balance</th><th></th></tr></thead><tbody>${invoices.map((row) => `<tr><td>${esc(row.number)}</td><td>${esc(titleCase(String(row.invoice_role || 'primary')))}</td><td>${esc(titleCase(String(row.status)))}</td><td>${esc(money(row.total_cents))}</td><td>${esc(money(row.balance_cents))}</td><td><button class="btn btn--ghost btn--small" type="button" data-admin-action="invoice-open" data-id="${esc(row.id)}">Open</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No invoice is linked to this job.</p>'}
+    ${payments.length ? `<div class="admin-history">${payments.map((payment) => `<div class="admin-record"><p><strong>${esc(money(payment.amount_cents))}</strong> · ${esc(titleCase(String(payment.status)))} · ${esc(titleCase(String(payment.provider)))}${Number(payment.tip_cents ?? 0) > 0 ? ` · ${esc(money(payment.tip_cents))} gratuity` : ''}</p><p class="admin-muted">${esc(dateTime(payment.received_at || payment.created_at))}</p></div>`).join('')}</div>` : '<p class="admin-muted">No payment is linked to this job.</p>'}
     <h3>Documents &amp; agreements</h3>
     ${documents.length ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Packet</th><th>Status</th><th>Executed</th><th></th></tr></thead><tbody>${documents.map((document) => `<tr><td>${esc(document.packet_name || document.bundle_code || 'Agreement')}</td><td>${esc(titleCase(String(document.status ?? '')))}</td><td>${esc(document.executed_at ? dateTime(document.executed_at) : '—')}</td><td>${document.executed_at ? `<a class="btn btn--ghost btn--small" href="/api/admin/documents?view=executed&id=${encodeURIComponent(String(document.id))}">Executed copy</a>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-muted">No document request is linked to this job.</p>'}
+    <h3>Communications</h3>
+    ${communications.length ? `<div class="admin-history">${communications.map((message) => `<div class="admin-record"><p><strong>${esc(titleCase(String(message.channel ?? '')))} ${esc(titleCase(String(message.direction ?? '')))}</strong> · ${esc(titleCase(String(message.status ?? '')))}</p><p class="admin-muted">${esc(message.subject || message.template || '')} · ${esc(dateTime(message.created_at))}</p></div>`).join('')}</div>` : '<p class="admin-muted">No communications are linked to this job.</p>'}
+    <h3>Activity timeline</h3>
+    ${timeline.length ? `<div class="admin-history">${timeline.map((event) => `<div class="admin-record"><p><strong>${esc(event.title)}</strong> <span class="admin-muted">· ${esc(dateTime(event.at))}</span></p><p class="admin-muted">${esc(event.detail)}</p></div>`).join('')}</div>` : '<p class="admin-muted">No activity is recorded for this job.</p>'}
     <div class="admin-actions" style="margin-top:1rem;">
       <button class="btn btn--secondary btn--small" type="button" data-calendar-job-action="customer" data-id="${esc(String(job.customer_id ?? ''))}">Open Customer</button>
       <button class="btn btn--primary btn--small" type="button" data-calendar-job-action="invoice" data-id="${esc(appointmentId)}">${invoice ? 'Open Invoice' : 'Create Invoice'}</button>
@@ -2132,6 +2180,10 @@ async function openCustomer(customerId: string): Promise<void> {  const data = a
   const quickEstimates = (data.quickEstimates as Array<Record<string, unknown>>) ?? [];
   const gifts = (data.gifts as Array<Record<string, unknown>>) ?? [];
   const reviewState = (data.reviewState as Record<string, unknown> | null) ?? null;
+  const payments = (data.payments as Array<Record<string, unknown>>) ?? [];
+  const communications = (data.communications as Array<Record<string, unknown>>) ?? [];
+  const jobMedia = (data.jobMedia as Array<Record<string, unknown>>) ?? [];
+  const timeline = (data.timeline as Array<Record<string, unknown>>) ?? [];
   const documentRequests = (data.signingRequests as Array<Record<string, unknown>> | undefined)?.length
     ? (data.signingRequests as Array<Record<string, unknown>>)
     : await api<{ requests?: Array<Record<string, unknown>> }>(
@@ -2201,12 +2253,28 @@ async function openCustomer(customerId: string): Promise<void> {  const data = a
     <h3>Properties</h3>
     ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}${Number(property.is_primary) === 1 ? ' · Primary' : ''}</strong>${propertyProfileSummary(property)}<details class="admin-detail-toggle"><summary>Edit property</summary><form class="admin-form" style="max-width:none" data-form="property-update"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="propertyId" value="${esc(property.id)}" />${propertyFields(property)}<label>Status <select name="status"><option value="active"${property.status !== 'archived' ? ' selected' : ''}>Active</option><option value="archived"${property.status === 'archived' ? ' selected' : ''}>Archived</option></select></label><button class="btn btn--secondary btn--small" type="submit">Save property</button></form></details></div>`).join('') || '<p class="admin-muted">No properties.</p>'}
     <details class="admin-detail-toggle"><summary>Add a property</summary><form class="admin-form" style="max-width:none" data-form="property-add"><input type="hidden" name="customerId" value="${esc(customerId)}" />${propertyFields({})}<button class="btn btn--secondary btn--small" type="submit">Add property</button></form></details>
+    <h3>Jobs</h3>
+    ${appointments.length ? appointments.map((appointment) => `<div class="admin-record"><p><strong>${esc(appointment.reference)}</strong> · ${esc(titleCase(String(appointment.status ?? '')))} · ${esc(dateTime(appointment.start_at))}</p><p class="admin-muted">${esc(jobMedia.filter((media) => String(media.appointment_id) === String(appointment.id)).length)} photo(s) linked</p><div class="admin-actions"><button class="btn btn--secondary btn--small" type="button" data-admin-action="job-open" data-id="${esc(appointment.id)}">Open Job File</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-invoice-open" data-id="${esc(appointment.id)}">${invoices.some((invoice) => String(invoice.appointment_id) === String(appointment.id)) ? 'Open Invoice' : 'Create Invoice'}</button></div></div>`).join('') : '<p class="admin-muted">No jobs are recorded.</p>'}
+    <h3>Payments</h3>
+    ${payments.length ? payments.map((payment) => `<div class="admin-record"><p><strong>${esc(money(payment.amount_cents))}</strong> · ${esc(titleCase(String(payment.status ?? '')))} · ${esc(titleCase(String(payment.provider ?? '')))}${Number(payment.tip_cents ?? 0) > 0 ? ` · ${esc(money(payment.tip_cents))} gratuity` : ''}</p><p class="admin-muted">${esc(dateTime(payment.received_at || payment.created_at))}${payment.invoice_id ? ` · invoice ${esc(payment.invoice_id)}` : ''}</p>${payment.invoice_id ? `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="invoice-open" data-id="${esc(payment.invoice_id)}">Open Invoice</button></div>` : ''}</div>`).join('') : '<p class="admin-muted">No payments are recorded.</p>'}
+    <h3>Communications</h3>
+    ${communications.length ? communications.map((message) => `<div class="admin-record"><p><strong>${esc(titleCase(String(message.channel ?? '')))} ${esc(titleCase(String(message.direction ?? '')))}</strong> · ${esc(titleCase(String(message.status ?? '')))}</p><p class="admin-muted">${esc(message.subject || message.template || '')} · ${esc(dateTime(message.created_at))}</p></div>`).join('') : '<p class="admin-muted">No customer communications are recorded.</p>'}
     ${benefitsHtml}
     ${anonymized ? '' : reviewCard}
+    <h3>Activity timeline</h3>
+    ${timeline.length ? `<div class="admin-history">${timeline.map((event) => {
+      const actions = [
+        event.appointmentId ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="job-open" data-id="${esc(event.appointmentId)}">Job</button>` : '',
+        event.invoiceId ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="invoice-open" data-id="${esc(event.invoiceId)}">Invoice</button>` : '',
+        event.requestId ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-open" data-id="${esc(event.requestId)}">Agreement</button>` : '',
+        event.leadId ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-open" data-id="${esc(event.leadId)}">Inquiry</button>` : '',
+      ].filter(Boolean).join('');
+      return `<div class="admin-record"><p><strong>${esc(event.title)}</strong> <span class="admin-muted">· ${esc(dateTime(event.at))}</span></p><p class="admin-muted">${esc(event.detail)}</p>${actions ? `<div class="admin-actions">${actions}</div>` : ''}</div>`;
+    }).join('')}</div>` : '<p class="admin-muted">No activity is recorded yet.</p>'}
     <h3>History</h3><div class="admin-history">${leads.length ? `<p><strong>Requests:</strong> ${leads.map((lead) => `${esc(lead.request_type)} (${esc(lead.status)})`).join(', ')}</p>` : ''}${estimates.length ? `<p><strong>Estimates:</strong> ${estimates.map((estimate) => `${esc(estimate.quote_reference)} (${money(estimate.total_cents)})`).join(', ')}</p>` : ''}${appointments.length ? `<p><strong>Appointments:</strong> ${appointments.map((appointment) => `${esc(appointment.reference)} (${esc(appointment.status)})`).join(', ')}</p>` : ''}${recurringPlans.length ? `<p><strong>Recurring plans:</strong> ${recurringPlans.map((plan) => `${esc(titleCase(plan.frequency))} (${esc(plan.status)})`).join(', ')}</p>` : ''}${invoices.length ? `<p><strong>Invoices:</strong> ${invoices.map((invoice) => `${esc(invoice.number)} (${money(invoice.balance_cents)} balance)`).join(', ')}</p>` : ''}</div>
     <h3>Quick Estimates</h3>${quickEstimates.length ? quickEstimates.map((estimate) => `<div class="admin-record"><p><strong>${esc(titleCase(estimate.engine))}</strong> · ${money(estimate.total_cents)} · ${esc(titleCase(estimate.status))}</p><p class="admin-muted">${esc(estimate.address_text || 'Address not recorded')} · ${esc(dateTime(estimate.created_at))}${estimate.converted_request_id ? ` · Converted to ${esc(estimate.converted_request_id)}` : ''}</p></div>`).join('') : '<p class="admin-muted">No Quick Estimates recorded.</p>'}
     <h3>Gift certificates</h3>${gifts.length ? gifts.map((gift) => `<div class="admin-record"><p><strong>${esc(gift.code)}</strong> · ${esc(titleCase(gift.status))} · ${money(gift.balance_cents)} remaining</p><p class="admin-muted">${esc(titleCase(gift.role))} · ${money(gift.value_cents)} original value · ${esc(dateTime(gift.created_at))}</p></div>`).join('') : '<p class="admin-muted">No gift certificates for this customer.</p>'}
-    <h3>Documents &amp; agreements</h3>${documentRequests.length ? documentRequests.map((request) => `<div class="admin-record"><p><strong>${esc(request.packet_name || request.bundle_code)}</strong> — ${esc(titleCase(request.status))}</p><p class="admin-muted">Signed ${esc(request.signed_count)} · Awaiting verification ${esc(request.awaiting_verification)} · ${esc(dateTime(request.created_at))}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded.</p>'}
+    <h3>Documents &amp; agreements</h3>${documentRequests.length ? documentRequests.map((request) => `<div class="admin-record"><p><strong>${esc(request.packet_name || request.bundle_code || 'Agreement')}</strong> — ${esc(titleCase(request.status))}</p><p class="admin-muted">Signed ${esc(request.signed_count)} · Awaiting verification ${esc(request.awaiting_verification)} · ${esc(dateTime(request.created_at))}</p></div>`).join('') : '<p class="admin-muted">No signing requests recorded.</p>'}
     <h3>Notes</h3>${notes.map((note) => `<div class="admin-record"><p>${esc(note.body)}</p><p class="admin-muted">${esc(dateTime(note.created_at))}</p></div>`).join('') || '<p class="admin-muted">No notes.</p>'}
     <form class="admin-form" data-form="note-add" style="max-width:none;"><input type="hidden" name="customerId" value="${esc(customerId)}" /><label>Add note <textarea name="body" rows="3" required></textarea></label><button class="btn btn--secondary btn--small" type="submit">Add note</button></form>
     <details class="admin-detail-toggle" data-customer-edit><summary>Edit customer</summary>${customerForm({ ...customer, email, phone })}</details>
@@ -5835,7 +5903,7 @@ async function loadDocuments(): Promise<void> {
             family.draftCount > 0
               ? `<span class="admin-status">${esc(family.draftVersionLabel ?? 'Draft')} pending review</span>`
               : '<span class="admin-muted">None</span>',
-            family.packetCount > 0
+            family.packetNames?.length
               ? esc(`${family.packetNames.join(', ')}${family.activePacketCount ? '' : ' (archived packet)'}`)
               : '<span class="admin-muted">Not in a packet</span>',
             `<div class="admin-actions">${actions}</div>`,
@@ -6083,7 +6151,11 @@ function renderDocumentRequests(): void {
   const query = (document.querySelector<HTMLInputElement>('[data-document-request-search]')?.value ?? '').trim().toLowerCase();
   const status = document.querySelector<HTMLSelectElement>('[data-document-request-status]')?.value ?? '';
   const filtered = requests.filter((request) => {
-    if (status && String(request.status) !== status) return false;
+    if (status === 'active') {
+      if (!['pending', 'partially_signed'].includes(String(request.status))) return false;
+    } else if (status && String(request.status) !== status) {
+      return false;
+    }
     if (!query) return true;
     const haystack = [
       request.first_name,
@@ -6109,12 +6181,12 @@ function renderDocumentRequests(): void {
           request.signer_email ||
           titleCase(String(request.subject_type ?? '')),
       ),
-      esc(request.packet_name || request.bundle_code),
+      esc(request.packet_name || request.bundle_code || 'Signing request'),
       `<span class="admin-status">${esc(titleCase(request.status))}</span>`,
       esc(`${Number(request.signed_count ?? 0)}`),
       esc(Number(request.awaiting_verification ?? 0) ? `Awaiting review (${request.awaiting_verification})` : 'Clear'),
       esc(dateTime(request.created_at)),
-      `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-open" data-id="${esc(request.id)}">Open</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-resend" data-id="${esc(request.id)}">Resend</button></div>`,
+      `<div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-open" data-id="${esc(request.id)}">Open</button>${['pending', 'partially_signed'].includes(String(request.status)) ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="document-request-resend" data-id="${esc(request.id)}">Resend</button><button class="btn btn--danger btn--small" type="button" data-admin-action="document-request-revoke" data-id="${esc(request.id)}">Revoke</button>` : ''}</div>`,
     ]),
     requests.length ? 'No signing requests match that search or status.' : 'No signing requests have been created yet.',
   );
@@ -6164,7 +6236,7 @@ async function renderDocumentOverview(
         ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Recipient</th><th>Packet</th><th>Status</th><th>Created</th></tr></thead><tbody>${recent
             .map(
               (request) =>
-                `<tr><td>${esc([request.first_name, request.last_name].filter(Boolean).join(' ') || request.display_name || request.signer_email || titleCase(String(request.subject_type ?? '')))}</td><td>${esc(request.packet_name || request.bundle_code)}</td><td><span class="admin-status">${esc(titleCase(request.status))}</span></td><td>${esc(dateTime(request.created_at))}</td></tr>`,
+                `<tr><td>${esc([request.first_name, request.last_name].filter(Boolean).join(' ') || request.display_name || request.signer_email || titleCase(String(request.subject_type ?? '')))}</td><td>${esc(request.packet_name || request.bundle_code || 'Signing request')}</td><td><span class="admin-status">${esc(titleCase(request.status))}</span></td><td>${esc(dateTime(request.created_at))}</td></tr>`,
             )
             .join('')}</tbody></table></div>`
         : '<p class="admin-muted">No signing requests yet. Use Send for Signature to create the first one.</p>'
@@ -6729,8 +6801,8 @@ async function openDocumentRequest(id: string): Promise<void> {
     ownerEmail?: { status: string; attempts: number; lastError: string } | null;
   }>(`/api/admin/documents?view=request&id=${encodeURIComponent(id)}`);
   const detail = data.request;
-  if (!detail) {
-    target.innerHTML = '<p class="admin-muted">That signing request could not be loaded.</p>';
+  if (!detail || !detail.request) {
+    target.innerHTML = '<p class="admin-muted">That signing request could not be loaded. It may have been removed, or your link may refer to a different record. Open it from Signing Requests.</p>';
     target.hidden = false;
     return;
   }
@@ -7936,6 +8008,27 @@ document.addEventListener('submit', (event) => {
       .then(() => openCustomer(customerId))
       .catch((error) => setAppError(friendly(error)));
   }
+  if (kind === 'change-order-create') {
+    const appointmentId = value('appointmentId');
+    const adjustmentCents = Math.round(Number(value('adjustment')) * 100);
+    void api('/api/admin/change-orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'create',
+        appointmentId,
+        originalScope: value('originalScope'),
+        revisedScope: value('revisedScope'),
+        reason: value('reason'),
+        adjustmentCents,
+        effectiveDate: value('effectiveDate'),
+      }),
+    })
+      .then(() => {
+        setSuccess('Change order created and waiting for owner approval.');
+        return openCalendarJob(appointmentId);
+      })
+      .catch((error) => setAppError(friendly(error)));
+  }
   if (kind === 'note-add') void action('/api/admin/customers', { action: 'add_note', customerId: value('customerId'), body: value('body') });
   if (kind === 'payment') void action('/api/admin/finance', { action: 'record_payment', invoiceId: value('invoiceId'), provider: value('provider'), amount: value('amount'), reference: value('reference'), idempotencyKey: value('idempotencyKey') });
   if (kind === 'refund') void action('/api/admin/finance', { action: 'record_refund', paymentId: value('paymentId'), amount: value('amount'), reason: value('reason'), idempotencyKey: value('idempotencyKey') });
@@ -8819,6 +8912,25 @@ document.addEventListener('click', (event) => {
     const detail = document.querySelector<HTMLElement>('[data-document-request-detail]');
     if (detail) { detail.hidden = true; detail.innerHTML = ''; }
   }
+  if (actionName === 'document-request-revoke') {
+    void adminConfirm({
+      title: 'Revoke this signing request?',
+      body: '<p>The signing link will stop working immediately. Signatures already captured remain preserved as evidence. This does not delete the request or any signed document.</p>',
+      confirmLabel: 'Revoke signing link',
+      danger: true,
+    }).then((confirmed) => {
+      if (!confirmed) return;
+      return api('/api/admin/documents', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'revoke_request', requestId: id, reason: 'Revoked by owner' }),
+      })
+        .then(() => {
+          documentResult('Signing request revoked. The signing link is no longer valid.');
+          return loadDocuments();
+        })
+        .catch((error) => setAppError(friendly(error)));
+    });
+  }
   if (actionName === 'document-request-resend') {
     setAppError();
     void api<{ signingUrl?: string; emailSent?: boolean }>('/api/admin/documents', {
@@ -8863,6 +8975,63 @@ document.addEventListener('click', (event) => {
   if (actionName === 'job-checklist') void openChecklist(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'checklist-create') void action('/api/admin/operations', { action: 'create_checklist', appointmentId: id }).then(() => openChecklist(id));
   if (actionName === 'invoice-open') void openInvoice(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'job-open') void openCalendarJob(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'job-invoice-open') void openCalendarJobInvoice(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'change-order-approve') {
+    const appointmentId = target.dataset.appointment ?? '';
+    void api('/api/admin/change-orders', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'approve', id }),
+    })
+      .then(() => openCalendarJob(appointmentId))
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'change-order-decline') {
+    const appointmentId = target.dataset.appointment ?? '';
+    void adminConfirm({
+      title: 'Decline this change order?',
+      body: '<p>The proposed change will be recorded as declined. The original agreement and invoice are unchanged.</p>',
+      confirmLabel: 'Decline change order',
+      danger: true,
+    }).then((confirmed) => {
+      if (!confirmed) return;
+      return api('/api/admin/change-orders', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'decline', id }),
+      })
+        .then(() => openCalendarJob(appointmentId))
+        .catch((error) => setAppError(friendly(error)));
+    });
+  }
+  if (actionName === 'change-order-send') {
+    const appointmentId = target.dataset.appointment ?? '';
+    void api<{ signingUrl?: string; emailSent?: boolean; recipient?: string }>('/api/admin/change-orders', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'send', id }),
+    })
+      .then(async (result) => {
+        await openCalendarJob(appointmentId);
+        const area = document.querySelector<HTMLElement>('[data-change-order-result]');
+        if (area) {
+          area.innerHTML = `<p class="admin-status-message">${result.emailSent ? 'Signing email accepted by the provider.' : 'Email was not sent; share this private link.'} <a href="${esc(result.signingUrl ?? '')}">${esc(result.signingUrl ?? '')}</a></p>`;
+        }
+      })
+      .catch((error) => setAppError(friendly(error)));
+  }
+  if (actionName === 'change-order-invoice') {
+    void api<{ invoice?: { id?: string; number?: string } }>('/api/admin/change-orders', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'create_invoice', id }),
+    })
+      .then(async (result) => {
+        if (!result.invoice?.id) throw new Error('invoice_not_created');
+        closeCalendarDialog();
+        setSuccess(`Supplemental invoice ${result.invoice.number ?? ''} created. No email or charge was sent.`);
+        await loadView('finance');
+        await openInvoice(result.invoice.id);
+      })
+      .catch((error) => setAppError(friendly(error)));
+  }
   if (actionName === 'request-create-invoice') {
     void (async () => {
       try {
