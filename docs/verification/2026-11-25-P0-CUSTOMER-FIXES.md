@@ -1,5 +1,12 @@
 # 2026-11-25 P0 Customer Fixes
 
+> **Superseded scheduling note (2026-11-25, same day):** the owner rejected
+> the large time-button picker and required the compact hour/minute interface
+> plus genuine 7:00 and 7:15 AM availability. The P0-1 scheduling UI section
+> below is historical and is superseded by
+> `docs/verification/2026-11-25-SCHEDULING-HOLIDAY15-CORRECTION.md`. The
+> first-clean and signing-contact sections remain current.
+
 ## Release identity
 
 - Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`

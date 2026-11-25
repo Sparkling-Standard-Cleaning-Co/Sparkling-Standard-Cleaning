@@ -84,7 +84,25 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-25 P0 customer fixes):** application code `ae77ac4` on
+- **Current release (2026-11-25 urgent scheduling and HOLIDAY15 correction):** application code
+  `a0b94c8` (feature commit `bf2b81c`, display alignment `a0b94c8`) on `production-safe`,
+  Cloudflare Pages deployment `643d14b8-2b4b-457c-9221-e1cec3d158ba`, verified live on
+  2026-11-25. The compact hour/minute selector is restored; 7:00 and 7:15 AM are first-job
+  starts when free, not displaced by origin travel or auto-selection. The Android-level root
+  cause was `earliestStart = workdayStart + originTravel` for the first job of the day; travel
+  now applies only after a real previous appointment. Operating hours are 7:00 AM-7:00 PM;
+  migration `0061` updated the bookable resource end time. HOLIDAY15 and Community Support are
+  independently scoped: HOLIDAY15 reduces the first-visit Deep Cleaning, Community Support
+  reduces future recurring maintenance, and they never compound on one service line. The
+  recurring regular/discounted rates, checkout amount, signing snapshot and recurring-plan
+  price are server-derived and preserved. Verified: unit **1,124** (1,123 pass, 1 pre-existing
+  skip), browser **282/282**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI
+  `45672275769` green. Live availability for 2026-11-30 returned **7:00 AM and 7:15 AM** first;
+  a live recurring estimator showed HOLIDAY15 `-$50.25` on a `$284.75` first visit and
+  Community Support at `$220.00` per weekly visit vs `$245.00` regular. No live booking, hold,
+  charge, email, customer record or signed agreement was created. Evidence:
+  `docs/verification/2026-11-25-SCHEDULING-HOLIDAY15-CORRECTION.md`.
+- **Prior release (2026-11-25 P0 customer fixes):** application code `ae77ac4` on
   `production-safe`, Cloudflare Pages deployment
   `53b472e6-7819-4da2-942e-bc5a0e91cede`, verified live on 2026-11-25. Public booking now exposes
   explicit 15-minute starts only inside the owner-defined Morning 7:00-8:30 AM and Afternoon
