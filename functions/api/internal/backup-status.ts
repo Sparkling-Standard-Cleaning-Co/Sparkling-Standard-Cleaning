@@ -60,6 +60,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     ...(body.startedAt ? { startedAt: String(body.startedAt).slice(0, 40) } : {}),
     ...(body.finishedAt ? { finishedAt: String(body.finishedAt).slice(0, 40) } : {}),
   });
-  const tick = await backupMonitorTick(db, context.env).catch(() => null);
+  const tick = await backupMonitorTick(db, context.env).catch((error) => {
+    // A recorded run must still be acknowledged so GitHub does not retry a
+    // duplicate. The failure is logged without customer data or secrets.
+    console.error('[backup-status] monitor_failed', {
+      name: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  });
   return json({ ok: true, recorded: true, monitor: tick });
 }

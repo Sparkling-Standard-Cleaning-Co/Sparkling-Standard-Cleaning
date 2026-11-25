@@ -456,6 +456,48 @@ test('a failed backup opens one critical incident, alerts both departments and e
   }
 });
 
+test('a new backup failure reopens a previously resolved incident', async () => {
+  const db = migratedDb();
+  db.raw
+    .prepare(
+      `INSERT INTO operations_incidents
+       (id, incident_key, kind, severity, status, summary, detail, opened_at, resolved_at, updated_at)
+       VALUES ('incident_old', 'backup_stale', 'backup', 'critical', 'resolved',
+               'Old incident', 'Old detail', '2026-11-20T00:00:00.000Z',
+               '2026-11-21T00:00:00.000Z', '2026-11-21T00:00:00.000Z')`,
+    )
+    .run();
+  await recordBackupRun(db, { runKey: 'github-backup-300', status: 'success', summary: 'old success' });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  await recordBackupRun(db, { runKey: 'github-backup-301', status: 'failure', summary: 'new failure' });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ id: 'email_reopen' }), { status: 200 })) as typeof fetch;
+  try {
+    const result = await backupMonitorTick(db, { RESEND_API_KEY: 're_synthetic' });
+    assert.equal(result.status, 'failed');
+    assert.equal(result.action, 'alerted_admin_and_owner');
+    const incident = db.raw
+      .prepare(
+        "SELECT id, status, opened_at, resolved_at, escalation_sent_at FROM operations_incidents WHERE incident_key = 'backup_stale'",
+      )
+      .get() as {
+      id: string;
+      status: string;
+      opened_at: string;
+      resolved_at: string | null;
+      escalation_sent_at: string | null;
+    };
+    assert.equal(incident.status, 'open');
+    assert.equal(incident.id, 'incident_old', 'the single incident record is reused');
+    assert.ok(incident.opened_at > '2026-11-20T00:00:00.000Z');
+    assert.equal(incident.resolved_at, null);
+    assert.equal(incident.escalation_sent_at, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('backup alerts fail closed and record suppression when Resend is absent', async () => {
   const db = migratedDb();
   await recordBackupRun(db, { runKey: 'github-backup-200', status: 'failure', summary: 'no provider' });

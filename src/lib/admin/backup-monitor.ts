@@ -265,11 +265,25 @@ export async function backupMonitorTick(
 
   if (!incident) {
     const id = `incident_${crypto.randomUUID()}`;
+    // incident_key is unique. A previously resolved backup incident must be
+    // reopened for a new failure instead of blocking the insert, otherwise the
+    // alert path would fail silently after the first recovery in production.
     await db
       .prepare(
         `INSERT INTO operations_incidents
          (id, incident_key, kind, severity, status, summary, detail, opened_at, last_notified_at, updated_at)
-         VALUES (?, 'backup_stale', 'backup', 'critical', 'open', ?, ?, ?, ?, ?)`,
+         VALUES (?, 'backup_stale', 'backup', 'critical', 'open', ?, ?, ?, ?, ?)
+         ON CONFLICT(incident_key) DO UPDATE SET
+           kind = excluded.kind,
+           severity = excluded.severity,
+           status = 'open',
+           summary = excluded.summary,
+           detail = excluded.detail,
+           opened_at = excluded.opened_at,
+           last_notified_at = excluded.last_notified_at,
+           escalation_sent_at = NULL,
+           resolved_at = NULL,
+           updated_at = excluded.updated_at`,
       )
       .bind(
         id,
