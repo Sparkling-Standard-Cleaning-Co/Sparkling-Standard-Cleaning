@@ -7071,6 +7071,20 @@ function backupStatusClass(value: string): string {
   return 'admin-status';
 }
 
+function backupEvidence(job: BackupControlJob): string {
+  const detail = job.detail ?? {};
+  const databases = Array.isArray(detail.databases) ? detail.databases as Array<Record<string, unknown>> : [];
+  const parts = [
+    detail.r2Verified ? 'R2 verified' : '',
+    detail.oneDriveVerified ? 'OneDrive verified' : '',
+    detail.restorePassed ? 'Isolated restore passed' : '',
+    databases.length
+      ? `${databases.map((database) => `${Number(database.tables) || 0} tables`).join(', ')} integrity checked`
+      : '',
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
 function backupScheduleText(schedule: BackupControlOverview['schedule']): string {
   if (!schedule) return 'Not configured';
   if (!schedule.enabled) return 'Automatic backups off';
@@ -7133,7 +7147,7 @@ function renderBackupControl(data: BackupControlOverview): void {
   const history = target.querySelector<HTMLElement>('[data-admin-backup-history]');
   if (history) {
     history.innerHTML = jobs.length
-      ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Requested</th><th>Operation</th><th>Scope</th><th>Status</th><th>Summary</th><th>Finished</th></tr></thead><tbody>${jobs.map((job) => `<tr><td>${esc(dateTime(job.requestedAt))}</td><td>${esc(backupOperationLabel(job.operation))}${job.source === 'schedule' ? ' (auto)' : ''}</td><td>${esc(job.scope === 'database' ? 'Database' : 'Complete')}</td><td><span class="${backupStatusClass(job.status)}">${esc(titleCase(job.status))}</span>${job.error ? `<div class="small text-muted">${esc(job.error)}</div>` : ''}</td><td>${esc(job.summary || '—')}</td><td>${esc(job.finishedAt ? dateTime(job.finishedAt) : '—')}</td></tr>`).join('')}</tbody></table></div>`
+      ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Requested</th><th>Operation</th><th>Scope</th><th>Status</th><th>Summary</th><th>Finished</th></tr></thead><tbody>${jobs.map((job) => `<tr><td>${esc(dateTime(job.requestedAt))}</td><td>${esc(backupOperationLabel(job.operation))}${job.source === 'schedule' ? ' (auto)' : ''}</td><td>${esc(job.scope === 'database' ? 'Database' : 'Complete')}</td><td><span class="${backupStatusClass(job.status)}">${esc(titleCase(job.status))}</span>${job.error ? `<div class="small text-muted">${esc(job.error)}</div>` : ''}</td><td>${esc(job.summary || '—')}${backupEvidence(job) ? `<div class="small text-muted">${esc(backupEvidence(job))}</div>` : ''}</td><td>${esc(job.finishedAt ? dateTime(job.finishedAt) : '—')}</td></tr>`).join('')}</tbody></table></div>`
       : '<p class="admin-muted">No backup jobs recorded yet.</p>';
   }
   const archiveTarget = target.querySelector<HTMLElement>('[data-admin-backup-archives]');

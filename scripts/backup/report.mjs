@@ -64,5 +64,6 @@ const detail = {
 };
 
 await fs.mkdir(path.dirname(out), { recursive: true });
-await fs.writeFile(out, JSON.stringify({ jobId, status, summary, ...detail }, null, 2));
-process.stdout.write(`${JSON.stringify({ jobId, status, summary, archiveName, archiveKey, archiveBytes, fileCount, r2Verified, oneDriveVerified, restorePassed })}\n`);
+const report = { jobId, status, summary, archiveKey, detail };
+await fs.writeFile(out, JSON.stringify(report, null, 2));
+process.stdout.write(`${JSON.stringify(report)}\n`);
