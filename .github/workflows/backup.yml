@@ -184,7 +184,7 @@ jobs:
       - name: Report backup success to operations
         if: success()
         env:
-          OPS_ALERT_URL: ${{ secrets.OPS_ALERT_URL }}
+          OPS_ALERT_URL: ${{ vars.OPS_ALERT_URL }}
           OPS_ALERT_TOKEN: ${{ secrets.OPS_ALERT_TOKEN }}
           RUN_KEY: github-backup-${{ github.run_id }}
         run: |
@@ -202,7 +202,7 @@ jobs:
       - name: Report backup failure to operations
         if: failure()
         env:
-          OPS_ALERT_URL: ${{ secrets.OPS_ALERT_URL }}
+          OPS_ALERT_URL: ${{ vars.OPS_ALERT_URL }}
           OPS_ALERT_TOKEN: ${{ secrets.OPS_ALERT_TOKEN }}
           RUN_KEY: github-backup-${{ github.run_id }}
         run: |
