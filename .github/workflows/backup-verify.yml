@@ -1,0 +1,100 @@
+name: Verify or restore an encrypted backup
+
+# Triggered only by the owner-authenticated backup control plane. It downloads
+# an existing encrypted archive from the private R2 bucket and verifies it.
+# Restore mode additionally restores into an isolated temporary directory and
+# checks the restored D1 SQL. Production is never overwritten.
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: Admin backup job id
+        required: true
+        type: string
+      archive_key:
+        description: Private R2 object key
+        required: true
+        type: string
+      operation:
+        description: Verification mode
+        required: true
+        default: verify
+        type: choice
+        options:
+          - verify
+          - restore_test
+
+permissions:
+  contents: read
+
+concurrency:
+  group: encrypted-backup-verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+      BACKUP_R2_ENDPOINT: ${{ secrets.BACKUP_R2_ENDPOINT }}
+      BACKUP_R2_BUCKET: ${{ secrets.BACKUP_R2_BUCKET }}
+      BACKUP_R2_ACCESS_KEY_ID: ${{ secrets.BACKUP_R2_ACCESS_KEY_ID }}
+      BACKUP_R2_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_R2_SECRET_ACCESS_KEY }}
+      BACKUP_CONTROL_URL: ${{ vars.BACKUP_CONTROL_URL }}
+      BACKUP_CONTROL_TOKEN: ${{ secrets.BACKUP_CONTROL_TOKEN }}
+      BACKUP_JOB_ID: ${{ inputs.job_id }}
+      ARCHIVE_KEY: ${{ inputs.archive_key }}
+      VERIFY_OPERATION: ${{ inputs.operation }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require verification configuration
+        run: |
+          test -n "$BACKUP_ENCRYPTION_KEY" || (echo "BACKUP_ENCRYPTION_KEY missing" && exit 1)
+          test -n "$BACKUP_R2_BUCKET" || (echo "BACKUP_R2_BUCKET missing" && exit 1)
+          test -n "$ARCHIVE_KEY" || (echo "ARCHIVE_KEY missing" && exit 1)
+          case "$ARCHIVE_KEY" in
+            sparkling-standard/backups/*.ssbk) ;;
+            *) echo "Unexpected archive key prefix" && exit 1 ;;
+          esac
+      - name: Download the encrypted archive from private R2
+        run: |
+          mkdir -p backup-out
+          node scripts/backup/r2-download.mjs --key "$ARCHIVE_KEY" --out backup-out/archive.ssbk
+      - name: Verify every file and the embedded database
+        run: |
+          set -o pipefail
+          node scripts/backup/verify.mjs backup-out/archive.ssbk | tee backup-out/verify.json
+      - name: Isolated restoration test
+        if: inputs.operation == 'restore_test'
+        run: |
+          set -o pipefail
+          RESTORE_DIR=$(mktemp -d)
+          node scripts/backup/restore.mjs backup-out/archive.ssbk --out "$RESTORE_DIR/restore" | tee backup-out/restore.json
+          D1_SQL=$(find "$RESTORE_DIR/restore/database" -name '*.sql' -print -quit)
+          test -n "$D1_SQL"
+          node scripts/backup/verify-d1-export.mjs "$D1_SQL" | tee backup-out/verify-restore.json
+      - name: Report result to the admin control plane
+        if: always()
+        run: |
+          ARCHIVE_NAME=$(basename "$ARCHIVE_KEY")
+          node scripts/backup/report.mjs \
+            --operation "$VERIFY_OPERATION" \
+            --status "${{ job.status }}" \
+            --archive-name "$ARCHIVE_NAME" \
+            --archive-key "$ARCHIVE_KEY" \
+            --out backup-out/report.json || true
+          if [ -z "$BACKUP_CONTROL_URL" ] || [ -z "$BACKUP_CONTROL_TOKEN" ] || [ -z "$BACKUP_JOB_ID" ]; then
+            echo "Admin control callback is not configured; skipping."
+            exit 0
+          fi
+          curl -fsS -X POST "$BACKUP_CONTROL_URL/callback" \
+            -H "Authorization: Bearer $BACKUP_CONTROL_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @backup-out/report.json || echo "Admin control callback failed."

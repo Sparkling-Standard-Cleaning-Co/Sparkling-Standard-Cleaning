@@ -1,13 +1,52 @@
-name: Encrypted off-site backup
+﻿name: Encrypted off-site backup
 
-# This workflow is dormant until the owner adds the repository secrets listed
-# in docs/operations/OFFSITE-BACKUPS.md. It never runs against local customer
-# data and never sends a backup to a public GitHub artifact.
+# GitHub is the execution engine, but the Sparkling Standard admin backup
+# control plane is the owner's operating surface. Routine operation never
+# requires opening GitHub, Cloudflare or OneDrive.
+#
+# The admin Worker triggers this workflow with workflow_dispatch and records
+# the result through the callback endpoint.
 
 on:
-  schedule:
-    - cron: '30 8 * * *'
   workflow_dispatch:
+    inputs:
+      job_id:
+        description: Admin backup job id
+        required: false
+        type: string
+      scope:
+        description: Backup scope
+        required: true
+        default: complete
+        type: choice
+        options:
+          - complete
+          - database
+      include_app_objects:
+        description: Include private application R2 objects
+        required: true
+        default: true
+        type: boolean
+      retention_daily:
+        description: Daily copies to retain
+        required: true
+        default: '30'
+        type: string
+      retention_weekly:
+        description: Weekly copies to retain
+        required: true
+        default: '12'
+        type: string
+      retention_monthly:
+        description: Monthly copies to retain
+        required: true
+        default: '12'
+        type: string
+      apply_retention:
+        description: Apply retention now
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -19,7 +58,7 @@ concurrency:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -36,8 +75,15 @@ jobs:
       ONEDRIVE_FOLDER: ${{ secrets.ONEDRIVE_FOLDER }}
       ONEDRIVE_TARGET_MODE: ${{ vars.ONEDRIVE_TARGET_MODE }}
       ONEDRIVE_CAPACITY_BYTES: ${{ secrets.ONEDRIVE_CAPACITY_BYTES }}
-      BACKUP_RETENTION_APPLY: ${{ vars.BACKUP_RETENTION_APPLY }}
-      R2_APP_BACKUP: ${{ vars.R2_APP_BACKUP }}
+      BACKUP_CONTROL_URL: ${{ vars.BACKUP_CONTROL_URL }}
+      BACKUP_CONTROL_TOKEN: ${{ secrets.BACKUP_CONTROL_TOKEN }}
+      BACKUP_JOB_ID: ${{ inputs.job_id }}
+      BACKUP_SCOPE: ${{ inputs.scope }}
+      INCLUDE_APP_OBJECTS: ${{ inputs.include_app_objects }}
+      RETENTION_DAILY: ${{ inputs.retention_daily }}
+      RETENTION_WEEKLY: ${{ inputs.retention_weekly }}
+      RETENTION_MONTHLY: ${{ inputs.retention_monthly }}
+      APPLY_RETENTION: ${{ inputs.apply_retention }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -66,8 +112,8 @@ jobs:
           if [ "$(date -u +%d)" = "01" ]; then PROFILE=monthly; fi
           echo "BACKUP_PROFILE=$PROFILE" >> "$GITHUB_ENV"
           node scripts/backup/metadata.mjs --out backup-out/metadata --d1 backup-out/d1.sql --profile "$PROFILE"
-      - name: Stage application R2 objects for weekly or monthly profile
-        if: env.BACKUP_PROFILE != 'daily' && vars.R2_APP_BACKUP == 'true'
+      - name: Stage application R2 objects
+        if: inputs.include_app_objects
         run: node scripts/backup/r2-app-objects.mjs --out backup-out/r2-app
       - name: Create and upload encrypted R2 backup
         run: |
@@ -76,39 +122,57 @@ jobs:
           node scripts/backup/create.mjs "${ARGS[@]}"
       - name: Independently download and verify the R2 copy
         run: |
+          set -o pipefail
           ARCHIVE=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write(r.archive)")
           NAME=$(basename "$ARCHIVE")
           R2_KEY=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write(r.upload.archive.key)")
           mkdir -p backup-out/r2-roundtrip
           node scripts/backup/r2-download.mjs --key "$R2_KEY" --out "backup-out/r2-roundtrip/$NAME"
-          node scripts/backup/verify.mjs "backup-out/r2-roundtrip/$NAME"
+          node scripts/backup/verify.mjs "backup-out/r2-roundtrip/$NAME" | tee backup-out/verify-r2.json
       - name: Upload encrypted backup to personal OneDrive
         run: |
           ARCHIVE=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write(r.archive)")
           node scripts/backup/onedrive.mjs upload --archive "$ARCHIVE"
       - name: Independently download and verify the OneDrive copy
         run: |
+          set -o pipefail
           ARCHIVE=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write(r.archive)")
           NAME=$(basename "$ARCHIVE")
           mkdir -p backup-out/roundtrip
           node scripts/backup/onedrive.mjs download --name "$NAME" --out "backup-out/roundtrip/$NAME"
-          node scripts/backup/verify.mjs "backup-out/roundtrip/$NAME"
+          node scripts/backup/verify.mjs "backup-out/roundtrip/$NAME" | tee backup-out/verify-onedrive.json
+      - name: Test an isolated restore
+        run: |
+          set -o pipefail
+          ARCHIVE=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write(r.archive)")
           RESTORE_DIR=$(mktemp -d)
-          node scripts/backup/restore.mjs "backup-out/roundtrip/$NAME" --out "$RESTORE_DIR/restore"
+          node scripts/backup/restore.mjs "$ARCHIVE" --out "$RESTORE_DIR/restore" | tee backup-out/restore.json
+          D1_SQL=$(find "$RESTORE_DIR/restore/database" -name '*.sql' -print -quit)
+          test -n "$D1_SQL"
+          node scripts/backup/verify-d1-export.mjs "$D1_SQL" | tee backup-out/verify-restore.json
       - name: Apply or preview encrypted backup retention
         run: |
-          if [ "$BACKUP_RETENTION_APPLY" = "true" ]; then APPLY=--apply; else APPLY=; fi
-          node scripts/backup/retention.mjs --daily 30 --weekly 12 --monthly 12 $APPLY
+          if [ "$APPLY_RETENTION" = "true" ]; then APPLY=--apply; else APPLY=; fi
+          node scripts/backup/retention.mjs --daily "${RETENTION_DAILY:-30}" --weekly "${RETENTION_WEEKLY:-12}" --monthly "${RETENTION_MONTHLY:-12}" $APPLY
           if [ -n "$BACKUP_R2_ENDPOINT" ] && [ -n "$BACKUP_R2_ACCESS_KEY_ID" ]; then
-            node scripts/backup/retention-r2.mjs --prefix sparkling-standard/backups --daily 30 --weekly 12 --monthly 12 $APPLY
+            node scripts/backup/retention-r2.mjs --prefix sparkling-standard/backups --daily "${RETENTION_DAILY:-30}" --weekly "${RETENTION_WEEKLY:-12}" --monthly "${RETENTION_MONTHLY:-12}" $APPLY
           fi
       - name: Verify the encrypted archive locally
         run: |
           ARCHIVE=$(node -e "const r=require('./backup-out/last-backup.json'); process.stdout.write(r.archive)")
           node scripts/backup/verify.mjs "$ARCHIVE"
-      - name: Record the backup result
+      - name: Report result to the admin control plane
+        if: always()
         run: |
-          node -e "const r=require('./backup-out/last-backup.json'); console.log(JSON.stringify({createdAt:r.createdAt,fileCount:r.fileCount,plainBytes:r.plainBytes,archiveSha256:r.archiveSha256,uploaded:Boolean(r.upload)},null,2))"
+          node scripts/backup/report.mjs --operation backup --status "${{ job.status }}" --out backup-out/report.json || true
+          if [ -z "$BACKUP_CONTROL_URL" ] || [ -z "$BACKUP_CONTROL_TOKEN" ] || [ -z "$BACKUP_JOB_ID" ]; then
+            echo "Admin control callback is not configured; skipping."
+            exit 0
+          fi
+          curl -fsS -X POST "$BACKUP_CONTROL_URL/callback" \
+            -H "Authorization: Bearer $BACKUP_CONTROL_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @backup-out/report.json || echo "Admin control callback failed."
       - name: Report backup success to operations
         if: success()
         env:
@@ -144,3 +208,4 @@ jobs:
             -H "Authorization: Bearer $OPS_ALERT_TOKEN" \
             -H "Content-Type: application/json" \
             --data-binary @/tmp/backup-status.json
+

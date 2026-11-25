@@ -7005,6 +7005,235 @@ async function loadStorage(): Promise<void> {
   }
   const status = document.querySelector<HTMLElement>('[data-admin-storage-status]');
   if (status) status.textContent = `Updated ${new Date().toLocaleString()}.${data.branch && data.branch !== 'all' ? ` Branch filter: ${data.branch}.` : ''}`;
+  void loadBackupControl().catch(() => undefined);
+}
+
+interface BackupControlArchive {
+  key: string;
+  name: string;
+  bytes: number;
+  uploadedAt: string | null;
+}
+
+interface BackupControlJob {
+  id: string;
+  operation: string;
+  status: string;
+  source: string;
+  scope: string;
+  archiveKey: string;
+  summary: string;
+  error: string;
+  requestedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  detail?: Record<string, unknown>;
+}
+
+interface BackupControlOverview {
+  configured?: boolean;
+  activeJob?: BackupControlJob | null;
+  jobs?: BackupControlJob[];
+  archives?: BackupControlArchive[];
+  storage?: { configured?: boolean; archives?: BackupControlArchive[]; bytes?: number };
+  schedule?: {
+    enabled: boolean;
+    cadence: string;
+    utcHour: number;
+    utcMinute: number;
+    dayOfWeek: number;
+    dayOfMonth: number;
+    scope: string;
+    retentionDaily: number;
+    retentionWeekly: number;
+    retentionMonthly: number;
+  } | null;
+}
+
+let backupControlPoll: number | null = null;
+
+function backupBytes(value: number | undefined | null): string {
+  const bytes = Math.max(0, Number(value) || 0);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+}
+
+function backupOperationLabel(value: string): string {
+  if (value === 'restore_test') return 'Isolated restore test';
+  return titleCase(value.replaceAll('_', ' '));
+}
+
+function backupStatusClass(value: string): string {
+  if (value === 'success') return 'admin-status admin-status--success';
+  if (value === 'failure' || value === 'cancelled') return 'admin-status admin-status--danger';
+  return 'admin-status';
+}
+
+function backupScheduleText(schedule: BackupControlOverview['schedule']): string {
+  if (!schedule) return 'Not configured';
+  if (!schedule.enabled) return 'Automatic backups off';
+  const time = `${String(schedule.utcHour).padStart(2, '0')}:${String(schedule.utcMinute).padStart(2, '0')} UTC`;
+  const cadence = schedule.cadence === 'weekly'
+    ? `${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][schedule.dayOfWeek] ?? 'Weekly'} weekly`
+    : schedule.cadence === 'monthly'
+      ? `Monthly on day ${schedule.dayOfMonth}`
+      : 'Daily';
+  return `${cadence} at ${time} (${schedule.scope === 'database' ? 'database only' : 'complete'})`;
+}
+
+function renderBackupControl(data: BackupControlOverview): void {
+  const target = document.querySelector<HTMLElement>('[data-admin-backup-control]');
+  if (!target) return;
+  const config = target.querySelector<HTMLElement>('[data-admin-backup-config]');
+  if (config) {
+    config.innerHTML = data.configured
+      ? '<p class="small text-muted">Control plane connected. Backups run in the background and continue if you close this page.</p>'
+      : '<div class="admin-alert admin-alert--danger"><strong>Backup control is not fully configured.</strong><p>The admin screen cannot start a backup until the existing Worker, D1, R2 backup bucket and owner secrets are connected. No backup was started.</p></div>';
+  }
+  const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+  const lastSuccess = jobs.find((job) => job.status === 'success');
+  const archives = Array.isArray(data.storage?.archives)
+    ? data.storage!.archives!
+    : Array.isArray(data.archives)
+      ? data.archives
+      : [];
+  const kpis = target.querySelector<HTMLElement>('[data-admin-backup-kpis]');
+  if (kpis) {
+    kpis.innerHTML = [
+      ['Schedule', backupScheduleText(data.schedule)],
+      ['Last successful', lastSuccess ? dateTime(lastSuccess.finishedAt ?? lastSuccess.requestedAt) : 'None recorded'],
+      ['Active job', data.activeJob ? `${backupOperationLabel(data.activeJob.operation)} - ${titleCase(data.activeJob.status)}` : 'None'],
+      ['Encrypted archives', `${archives.length} - ${backupBytes(data.storage?.bytes)}`],
+    ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('');
+  }
+  const active = target.querySelector<HTMLElement>('[data-admin-backup-active]');
+  if (active) {
+    const job = data.activeJob;
+    active.innerHTML = job
+      ? `<div class="admin-record"><p><strong>${esc(backupOperationLabel(job.operation))}</strong> <span class="${backupStatusClass(job.status)}">${esc(titleCase(job.status))}</span></p>
+          <p class="small text-muted">${esc(job.source === 'schedule' ? 'Automatic schedule' : 'Requested by owner')} · ${esc(dateTime(job.requestedAt))}</p>
+          <p class="small text-muted">Closing this page does not stop the background job. Refreshing updates the recorded status.</p></div>`
+      : '<p class="admin-muted">No backup or restore test is running.</p>';
+  }
+  const scheduleForm = target.querySelector<HTMLFormElement>('[data-backup-schedule-control]');
+  if (scheduleForm && data.schedule) {
+    (scheduleForm.elements.namedItem('enabled') as HTMLInputElement).checked = Boolean(data.schedule.enabled);
+    (scheduleForm.elements.namedItem('cadence') as HTMLSelectElement).value = data.schedule.cadence;
+    (scheduleForm.elements.namedItem('utcHour') as HTMLInputElement).value = String(data.schedule.utcHour);
+    (scheduleForm.elements.namedItem('utcMinute') as HTMLInputElement).value = String(data.schedule.utcMinute);
+    (scheduleForm.elements.namedItem('dayOfWeek') as HTMLSelectElement).value = String(data.schedule.dayOfWeek);
+    (scheduleForm.elements.namedItem('dayOfMonth') as HTMLInputElement).value = String(data.schedule.dayOfMonth);
+    (scheduleForm.elements.namedItem('scope') as HTMLSelectElement).value = data.schedule.scope;
+    (scheduleForm.elements.namedItem('retentionDaily') as HTMLInputElement).value = String(data.schedule.retentionDaily);
+    (scheduleForm.elements.namedItem('retentionWeekly') as HTMLInputElement).value = String(data.schedule.retentionWeekly);
+    (scheduleForm.elements.namedItem('retentionMonthly') as HTMLInputElement).value = String(data.schedule.retentionMonthly);
+  }
+  const history = target.querySelector<HTMLElement>('[data-admin-backup-history]');
+  if (history) {
+    history.innerHTML = jobs.length
+      ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Requested</th><th>Operation</th><th>Scope</th><th>Status</th><th>Summary</th><th>Finished</th></tr></thead><tbody>${jobs.map((job) => `<tr><td>${esc(dateTime(job.requestedAt))}</td><td>${esc(backupOperationLabel(job.operation))}${job.source === 'schedule' ? ' (auto)' : ''}</td><td>${esc(job.scope === 'database' ? 'Database' : 'Complete')}</td><td><span class="${backupStatusClass(job.status)}">${esc(titleCase(job.status))}</span>${job.error ? `<div class="small text-muted">${esc(job.error)}</div>` : ''}</td><td>${esc(job.summary || '—')}</td><td>${esc(job.finishedAt ? dateTime(job.finishedAt) : '—')}</td></tr>`).join('')}</tbody></table></div>`
+      : '<p class="admin-muted">No backup jobs recorded yet.</p>';
+  }
+  const archiveTarget = target.querySelector<HTMLElement>('[data-admin-backup-archives]');
+  if (archiveTarget) {
+    archiveTarget.innerHTML = archives.length
+      ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Archive</th><th>Size</th><th>Uploaded</th><th>Actions</th></tr></thead><tbody>${archives.map((archive) => `<tr><td>${esc(archive.name)}</td><td>${esc(backupBytes(archive.bytes))}</td><td>${esc(archive.uploadedAt ? dateTime(archive.uploadedAt) : '—')}</td><td><div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-backup-action="download" data-key="${esc(archive.key)}">Download</button><button class="btn btn--ghost btn--small" type="button" data-admin-backup-action="verify" data-key="${esc(archive.key)}">Verify</button><button class="btn btn--ghost btn--small" type="button" data-admin-backup-action="restore" data-key="${esc(archive.key)}">Restore test</button></div></td></tr>`).join('')}</tbody></table></div>`
+      : '<p class="admin-muted">No encrypted archives are listed. Configure the private backup bucket or start a backup.</p>';
+  }
+  if (backupControlPoll) {
+    window.clearTimeout(backupControlPoll);
+    backupControlPoll = null;
+  }
+  if (data.activeJob && (data.activeJob.status === 'queued' || data.activeJob.status === 'running')) {
+    backupControlPoll = window.setTimeout(() => {
+      const view = document.querySelector<HTMLElement>('[data-admin-view="storage"]');
+      if (view && !view.hasAttribute('hidden')) void loadBackupControl().catch(() => undefined);
+    }, 5000);
+  }
+}
+
+async function loadBackupControl(): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-admin-backup-control]');
+  if (!target) return;
+  const status = target.querySelector<HTMLElement>('[data-admin-backup-status]');
+  if (status) status.textContent = 'Checking backup status…';
+  try {
+    const data = await api<BackupControlOverview>('/api/admin/backup');
+    renderBackupControl(data);
+    if (status) status.textContent = `Backup controls checked ${new Date().toLocaleString()}.`;
+  } catch (error) {
+    if (status) status.textContent = friendly(error);
+    const config = target.querySelector<HTMLElement>('[data-admin-backup-config]');
+    if (config) config.innerHTML = '<p class="small text-muted">Backup control status could not be read. Existing backups and records are unchanged.</p>';
+  }
+}
+
+async function startBackup(scope: 'complete' | 'database'): Promise<void> {
+  const status = document.querySelector<HTMLElement>('[data-admin-backup-status]');
+  const confirmed = await adminConfirm({
+    title: scope === 'complete' ? 'Start a complete application backup?' : 'Start a database backup?',
+    body: `<p>${scope === 'complete' ? 'The operations database and private application objects will be included.' : 'Only the operations database will be included.'} The encrypted archive is uploaded to the private backup bucket and OneDrive, then independently verified.</p><p>No customer email or payment is affected. The job continues if you close this page.</p>`,
+    confirmLabel: 'Start backup',
+  });
+  if (!confirmed) return;
+  if (status) status.textContent = 'Starting backup…';
+  try {
+    await api('/api/admin/backup', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'start_backup', scope }),
+    });
+    if (status) status.textContent = 'Backup started. It will continue in the background.';
+    await loadBackupControl();
+  } catch (error) {
+    if (status) status.textContent = friendly(error);
+  }
+}
+
+async function archiveBackupAction(action: 'verify' | 'restore' | 'download', key: string): Promise<void> {
+  const status = document.querySelector<HTMLElement>('[data-admin-backup-status]');
+  if (!key) return;
+  if (action === 'download') {
+    try {
+      const result = await api<{ ok?: boolean; url?: string; error?: string }>('/api/admin/backup', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'download', archiveKey: key }),
+      });
+      if (!result.url) throw new Error(result.error || 'download_link_failed');
+      const link = document.createElement('a');
+      link.href = result.url;
+      link.rel = 'noopener';
+      link.download = key.split('/').pop() ?? 'backup.ssbk';
+      document.body.append(link);
+      link.click();
+      link.remove();
+      if (status) status.textContent = 'Encrypted download link opened. The link is short-lived.';
+    } catch (error) {
+      if (status) status.textContent = friendly(error);
+    }
+    return;
+  }
+  const confirmed = await adminConfirm({
+    title: action === 'verify' ? 'Verify this encrypted archive?' : 'Run an isolated restore test?',
+    body: action === 'verify'
+      ? '<p>The background job downloads the encrypted archive from private R2, checks every file hash and verifies the embedded database. It does not touch production.</p>'
+      : '<p>The background job downloads the encrypted archive, verifies it, restores it into an isolated temporary directory and checks the restored database. Production is never overwritten.</p>',
+    confirmLabel: action === 'verify' ? 'Verify archive' : 'Start restore test',
+    danger: action === 'restore',
+  });
+  if (!confirmed) return;
+  if (status) status.textContent = action === 'verify' ? 'Starting verification…' : 'Starting isolated restore test…';
+  try {
+    await api('/api/admin/backup', {
+      method: 'POST',
+      body: JSON.stringify({ action: action === 'verify' ? 'verify_archive' : 'restore_test', archiveKey: key }),
+    });
+    if (status) status.textContent = 'Background job started.';
+    await loadBackupControl();
+  } catch (error) {
+    if (status) status.textContent = friendly(error);
+  }
 }
 
 async function storageCleanup(dryRun: boolean): Promise<void> {
@@ -7082,6 +7311,60 @@ document.querySelector<HTMLElement>('[data-admin-view="storage"]')?.addEventList
       if (confirmed) void storageCleanup(false);
     });
   }
+});
+
+document.querySelector<HTMLElement>('[data-admin-view="storage"]')?.addEventListener('click', (event) => {
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-backup-action]');
+  const action = target?.dataset.adminBackupAction;
+  if (!action) return;
+  if (action === 'refresh') {
+    void loadBackupControl().catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (action === 'start-complete') {
+    void startBackup('complete');
+    return;
+  }
+  if (action === 'start-database') {
+    void startBackup('database');
+    return;
+  }
+  const key = target?.dataset.key ?? '';
+  if (action === 'download' || action === 'verify' || action === 'restore') {
+    void archiveBackupAction(action, key);
+  }
+});
+
+document.addEventListener('submit', (event) => {
+  const form = event.target as HTMLFormElement;
+  if (!form.matches('[data-backup-schedule-control]')) return;
+  event.preventDefault();
+  const data = new FormData(form);
+  const status = document.querySelector<HTMLElement>('[data-admin-backup-schedule-status]');
+  if (status) status.textContent = 'Saving backup schedule…';
+  void api('/api/admin/backup', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'save_schedule',
+      enabled: data.get('enabled') === 'on',
+      cadence: data.get('cadence'),
+      utcHour: data.get('utcHour'),
+      utcMinute: data.get('utcMinute'),
+      dayOfWeek: data.get('dayOfWeek'),
+      dayOfMonth: data.get('dayOfMonth'),
+      scope: data.get('scope'),
+      retentionDaily: data.get('retentionDaily'),
+      retentionWeekly: data.get('retentionWeekly'),
+      retentionMonthly: data.get('retentionMonthly'),
+    }),
+  })
+    .then(() => {
+      if (status) status.textContent = 'Backup schedule saved.';
+      return loadBackupControl();
+    })
+    .catch((error) => {
+      if (status) status.textContent = friendly(error);
+    });
 });
 
 document.addEventListener('submit', (event) => {

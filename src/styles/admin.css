@@ -784,8 +784,12 @@
   border-radius: .55rem;
   background: #fffdfa;
 }
-.admin-alert--high { border-left-color: #9b2f38; }
+.admin-alert--high,
+.admin-alert--danger { border-left-color: #9b2f38; background: #fff8f6; }
 .admin-alert--low { border-left-color: #2f6a45; }
+.admin-alert p { margin: .4rem 0 0; padding: 0 .75rem .75rem; }
+.admin-status--success { background: #e8f2e8; color: #2f5a38; }
+.admin-status--danger { background: #f8e5e3; color: #8b2b33; }
 .admin-alert > summary {
   padding: .6rem .7rem;
   cursor: pointer;

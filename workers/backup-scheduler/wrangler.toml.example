@@ -3,20 +3,29 @@
 #
 # Required secrets:
 #   npx wrangler secret put GITHUB_DISPATCH_TOKEN --config wrangler.toml
-#   npx wrangler secret put BACKUP_SCHEDULER_TOKEN --config wrangler.toml
+#   npx wrangler secret put BACKUP_CONTROL_TOKEN --config wrangler.toml
 #
-# The token must be a fine-grained GitHub token with Actions: write access only
-# to Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning. Do not use a
-# classic personal access token with broad repository or organization access.
+# The GitHub token should be limited to Actions: write on this repository.
+# Never commit real secret values or the production D1 database id.
 
 name = "sparkling-standard-backup-scheduler"
 main = "src/index.ts"
 compatibility_date = "2026-11-01"
 
 [triggers]
-crons = ["30 8 * * *"]
+crons = ["*/15 * * * *"]
 
 [vars]
 GITHUB_REPO = "Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning"
 GITHUB_REF = "production-safe"
 GITHUB_WORKFLOW = "backup.yml"
+GITHUB_VERIFY_WORKFLOW = "backup-verify.yml"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sparkling-standard-operations"
+database_id = "REPLACE_WITH_THE_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "sparkling-standard-backups"

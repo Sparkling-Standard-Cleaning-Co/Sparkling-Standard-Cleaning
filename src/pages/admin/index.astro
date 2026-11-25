@@ -1487,6 +1487,59 @@ import {
               <h2 class="admin-section-title">Backup health</h2>
               <div data-admin-storage-backup></div>
             </div>
+            <div class="admin-card" style="margin-top:1rem;" data-admin-backup-control>
+              <h2 class="admin-section-title">Backup control center</h2>
+              <p class="admin-muted">Start, monitor, verify and restore encrypted backups without opening GitHub, Cloudflare or OneDrive. A complete backup includes the operations database and private application objects; a database backup includes the operations database only.</p>
+              <div data-admin-backup-config></div>
+              <div class="admin-grid" data-admin-backup-kpis></div>
+              <div class="admin-actions" style="margin-top:1rem;">
+                <button class="btn btn--primary btn--small" type="button" data-admin-backup-action="start-complete">Start complete backup</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-backup-action="start-database">Start database backup</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-backup-action="refresh">Refresh</button>
+              </div>
+              <p class="admin-status-message" data-admin-backup-status role="status" aria-live="polite"></p>
+              <div data-admin-backup-active></div>
+
+              <h3 class="admin-section-title" style="font-size:1.05rem;margin-top:1.25rem;">Automatic schedule &amp; retention</h3>
+              <form class="admin-form admin-form--grid" data-backup-schedule-control>
+                <label><input type="checkbox" name="enabled" /> Automatic backups enabled</label>
+                <label>Frequency
+                  <select name="cadence">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </label>
+                <label>UTC hour <input name="utcHour" type="number" min="0" max="23" required /></label>
+                <label>UTC minute <input name="utcMinute" type="number" min="0" max="59" required /></label>
+                <label>Weekly day (0 Sun)
+                  <select name="dayOfWeek">
+                    <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+                    <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option>
+                    <option value="6">Saturday</option>
+                  </select>
+                </label>
+                <label>Monthly day <input name="dayOfMonth" type="number" min="1" max="28" required /></label>
+                <label>Backup scope
+                  <select name="scope">
+                    <option value="complete">Complete application backup</option>
+                    <option value="database">Database only</option>
+                  </select>
+                </label>
+                <label>Daily copies kept <input name="retentionDaily" type="number" min="1" max="365" required /></label>
+                <label>Weekly copies kept <input name="retentionWeekly" type="number" min="1" max="104" required /></label>
+                <label>Monthly copies kept <input name="retentionMonthly" type="number" min="1" max="120" required /></label>
+                <div class="admin-field--wide"><button class="btn btn--secondary btn--small" type="submit">Save backup schedule</button></div>
+              </form>
+              <p class="admin-status-message" data-admin-backup-schedule-status role="status" aria-live="polite"></p>
+
+              <h3 class="admin-section-title" style="font-size:1.05rem;margin-top:1.25rem;">Backup history</h3>
+              <div data-admin-backup-history></div>
+
+              <h3 class="admin-section-title" style="font-size:1.05rem;margin-top:1.25rem;">Encrypted archives</h3>
+              <p class="admin-muted">Archives are encrypted before upload. Downloads are short-lived owner-only links; no encryption key is sent to the browser.</p>
+              <div data-admin-backup-archives></div>
+            </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Retention registry and legal holds</h2>
               <p class="admin-muted">Records retention intent and legal holds only. Saving a policy never deletes or anonymizes a record. Permanent deletion remains a separate, explicit owner operation.</p>
