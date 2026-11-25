@@ -28,6 +28,22 @@ These are fixed architecture. The interface may not change them.
 - Subject and body of approved notification templates using only the listed
   variables.
 - Alert escalation minutes (5-1440) and failure threshold (1-100).
+- Optional per-branch recipient overrides for ordinary events. Critical
+  alerts cannot be redirected.
+
+## Operational event coverage
+
+The event list includes booking requests and confirmations, paid bookings,
+payments and failures, refunds and credits, invoice delivery, signing requests
+and executed agreements, contact inquiries and complaints, commercial/church
+inquiries, commercial agreements, staffing-pending bookings, customer
+cancellations and reschedules, employee callouts and late arrivals, security
+and backup alerts, critical operational failures, and the weekly digest.
+
+Complaints, mandatory additional staffing, critical operational failures,
+security and backup alerts always go to admin and owner. A contact-form
+complaint selects the complaint event automatically; commercial/church
+inquiries select the commercial event.
 
 Every save:
 

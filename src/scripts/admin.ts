@@ -5385,6 +5385,7 @@ interface CommunicationSettingsShape {
   schemaVersion: number;
   departments: Record<string, { address: string; enabled: boolean }>;
   routing: Record<string, string[]>;
+  branchRouting: Record<string, Record<string, string[]>>;
   replyTo: Record<string, string>;
   templates: Record<string, { subject: string; body: string; enabled: boolean }>;
   alerts: { escalationMinutes: number; failureThreshold: number };
@@ -5395,6 +5396,7 @@ interface CommunicationMetadataShape {
   events: Array<{ key: string; label: string; critical: boolean; defaults: string[]; description: string }>;
   replyTo: Array<{ key: string; label: string }>;
   templates: Array<{ key: string; label?: string; variables?: readonly string[] }>;
+  branches: Array<{ id: string; name: string }>;
 }
 
 interface CommunicationsPayload {
@@ -5436,6 +5438,25 @@ function populateCommunicationForm(): void {
         return `<label style="display:inline-flex;align-items:center;gap:.35rem;margin-right:1rem;"><input type="checkbox" data-communication-route="${esc(event.key)}" value="${esc(department.key)}"${checked ? ' checked' : ''}${event.critical ? ' disabled' : ''} /> ${esc(department.label)}</label>`;
       }).join('');
       return `<div class="admin-record"><p><strong>${esc(event.label)}</strong>${event.critical ? ' <span class="admin-status">Critical</span>' : ''}</p><p class="admin-muted">${esc(event.description)}</p><div>${options}</div>${event.critical ? '<p class="admin-muted">Admin and Owner are required and cannot be changed.</p>' : ''}</div>`;
+    }).join('');
+  }
+  const branchTarget = document.querySelector<HTMLElement>('[data-communications-branch-routing]');
+  if (branchTarget) {
+    branchTarget.innerHTML = (payload.metadata.branches ?? []).map((branch) => {
+      const overrides = settings.branchRouting?.[branch.id] ?? {};
+      const events = payload.metadata!.events.map((event) => {
+        if (event.critical) return '';
+        const selected = overrides[event.key] ?? [];
+        const options = payload.metadata!.departments
+          .filter((department) => department.key !== 'owner')
+          .map((department) => {
+            const checked = selected.includes(department.key);
+            return `<label style="display:inline-flex;align-items:center;gap:.35rem;margin-right:1rem;"><input type="checkbox" data-branch-route="${esc(branch.id)}" data-branch-event="${esc(event.key)}" value="${esc(department.key)}"${checked ? ' checked' : ''} /> ${esc(department.label)}</label>`;
+          })
+          .join('');
+        return `<div class="admin-record"><p><strong>${esc(event.label)}</strong></p><div>${options}</div></div>`;
+      }).filter(Boolean).join('');
+      return `<details class="admin-detail-toggle"${branch.id === 'branch_pensacola' ? ' open' : ''}><summary>${esc(branch.name)} overrides</summary>${events}</details>`;
     }).join('');
   }
   const replyTarget = document.querySelector<HTMLElement>('[data-communications-reply-to]');
@@ -5587,6 +5608,7 @@ function readCommunicationSettingsFromForm(): CommunicationSettingsShape | null 
     schemaVersion: payload.settings.schemaVersion,
     departments: payload.settings.departments,
     routing: { ...payload.settings.routing },
+    branchRouting: JSON.parse(JSON.stringify(payload.settings.branchRouting ?? {})) as Record<string, Record<string, string[]>>,
     replyTo: { ...payload.settings.replyTo },
     templates: { ...payload.settings.templates },
     alerts: { ...payload.settings.alerts },
@@ -5597,6 +5619,18 @@ function readCommunicationSettingsFromForm(): CommunicationSettingsShape | null 
     const current = new Set(settings.routing[eventKey] ?? []);
     if (checkbox.checked) current.add(checkbox.value); else current.delete(checkbox.value);
     settings.routing[eventKey] = [...current];
+  }
+  for (const checkbox of document.querySelectorAll<HTMLInputElement>('[data-branch-route]')) {
+    const branchId = checkbox.dataset.branchRoute ?? '';
+    const eventKey = checkbox.dataset.branchEvent ?? '';
+    if (!branchId || !eventKey) continue;
+    const branch = settings.branchRouting[branchId] ?? {};
+    const current = new Set(branch[eventKey] ?? []);
+    if (checkbox.checked) current.add(checkbox.value); else current.delete(checkbox.value);
+    if (current.size > 0) branch[eventKey] = [...current];
+    else delete branch[eventKey];
+    if (Object.keys(branch).length > 0) settings.branchRouting[branchId] = branch;
+    else delete settings.branchRouting[branchId];
   }
   for (const select of document.querySelectorAll<HTMLSelectElement>('[data-communication-reply-to]')) {
     const key = select.dataset.communicationReplyTo ?? '';

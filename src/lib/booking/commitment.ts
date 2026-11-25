@@ -585,7 +585,7 @@ export async function commitConfirmedBooking(
       'Customer';
     const when = `${localDate(start, timeZone)} ${localTime(start, timeZone)}`;
     await sendOperationalNotification(db, env as unknown as CommunicationEnv, {
-      eventKey: 'owner_escalation',
+      eventKey: 'staffing_pending',
       subject: `CRITICAL: additional cleaner required - ${reference}`,
       text: [
         'A booking is confirmed but still needs additional cleaning staff.',
@@ -605,6 +605,7 @@ export async function commitConfirmedBooking(
       ].join('\n'),
       relatedType: 'appointment',
       relatedId: appointmentId,
+      branchId,
       idempotencyKey: `staffing-pending/${reference}`,
     }).catch(() => undefined);
   }

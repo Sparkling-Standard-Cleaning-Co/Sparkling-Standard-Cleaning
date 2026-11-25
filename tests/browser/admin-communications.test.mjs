@@ -34,6 +34,7 @@ const settings = {
     security_alert: ['admin', 'owner'], backup_failure: ['admin', 'owner'],
     owner_escalation: ['admin', 'owner'], weekly_health_digest: ['admin', 'owner'],
   },
+  branchRouting: {},
   replyTo: { bookingConfirmations: 'bookings', invoices: 'billing', receipts: 'billing', careers: 'hiring', contact: 'customerService' },
   templates: {
     booking_confirmation: { subject: 'Confirmed {{reference}}', body: 'Hello {{customer_name}}', enabled: true },
@@ -59,6 +60,7 @@ const metadata = {
     { key: 'security_alert', label: 'Critical security alert', critical: true, defaults: ['admin', 'owner'], description: 'Critical events.' },
   ],
   replyTo: [{ key: 'bookingConfirmations', label: 'Booking confirmations' }, { key: 'invoices', label: 'Invoice email' }],
+  branches: [{ id: 'branch_pensacola', name: 'Pensacola' }, { id: 'branch_tampa', name: 'Tampa' }],
   templates: [
     { key: 'booking_confirmation', label: 'Booking confirmation', variables: ['customer_name', 'reference'] },
     { key: 'security_alert', label: 'Critical security alert', variables: ['event_detail'] },
@@ -129,6 +131,8 @@ test('the owner communications center renders routing, previews templates and ne
     assert.equal(await page.locator('[data-communications-body] .admin-email-token').count(), tokensBefore + 1);
     assert.match(await page.textContent('[data-communications-template-guide]') ?? '', /Booking confirmation|Customer name/);
 
+    await page.locator('details', { hasText: 'Tampa overrides' }).locator('summary').click();
+    await page.locator('[data-branch-route="branch_tampa"][data-branch-event="booking_confirmation"][value="billing"]').check();
     await page.locator('[data-communication-route="booking_confirmation"][value="owner"]').check();
     await page.fill('[data-communications-note]', 'Owner oversight for booking confirmations');
     await page.locator('[data-communications-form] button[type="submit"]').click();
@@ -136,6 +140,7 @@ test('the owner communications center renders routing, previews templates and ne
     const saved = posts.find((body) => body.action === 'save');
     assert.ok(saved);
     assert.ok(saved.settings.routing.booking_confirmation.includes('owner'));
+    assert.ok(saved.settings.branchRouting.branch_tampa.booking_confirmation.includes('billing'));
     assert.equal(saved.note, 'Owner oversight for booking confirmations');
 
     await page.selectOption('[data-communications-test-department]', 'bookings');

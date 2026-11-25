@@ -294,23 +294,29 @@ export async function backupMonitorTick(
         nowIso,
       )
       .run();
+    // The upsert keeps the existing row id when reopening a resolved incident,
+    // so resolve the durable id before linking delivery events and audit rows.
+    const stored = await db
+      .prepare("SELECT id FROM operations_incidents WHERE incident_key = 'backup_stale' LIMIT 1")
+      .first<{ id: string }>();
+    const incidentId = stored?.id ?? id;
     const text = alertText(escalationMinutes, detail, nowIso);
     const subject = 'CRITICAL: Sparkling Standard backup failure';
     const results = await Promise.all([
-      sendAlert(db, env, 'admin', subject, text, id),
-      sendAlert(db, env, 'owner', subject, text, id),
+      sendAlert(db, env, 'admin', subject, text, incidentId),
+      sendAlert(db, env, 'owner', subject, text, incidentId),
     ]);
     await audit(db, {
       actorUserId: null,
       action: 'backup.incident_opened',
       entityType: 'operations_incident',
-      entityId: id,
+      entityId: incidentId,
       detail: health.status,
     }).catch(() => undefined);
     return {
       status: health.status,
       action: results.some((result) => result.sent) ? 'alerted_admin_and_owner' : 'none',
-      incidentId: id,
+      incidentId,
     };
   }
 

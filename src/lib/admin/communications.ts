@@ -11,6 +11,7 @@
 // message bodies in delivery records and never exposes provider secrets.
 
 import { EMAIL_ROUTING } from '../../config/email-routing.ts';
+import { branchList } from '../../config/branches.ts';
 import { AdminAuthError, audit, type AdminActor } from './operations.ts';
 import type { D1Database } from './d1.ts';
 import { sendAdminEmailDetailed, type AdminEmailAttachment } from './email.ts';
@@ -61,6 +62,16 @@ export const NOTIFICATION_EVENTS = [
   'document_executed',
   'document_revision',
   'staff_assignment',
+  'staffing_pending',
+  'customer_cancellation',
+  'appointment_reschedule',
+  'refund_processed',
+  'commercial_inquiry',
+  'commercial_agreement',
+  'customer_complaint',
+  'employee_callout',
+  'employee_late',
+  'critical_operational_failure',
   'security_alert',
   'backup_failure',
   'owner_escalation',
@@ -168,6 +179,67 @@ export const EVENT_DEFINITIONS: Record<
     critical: false,
     defaults: ['bookings'],
     description: 'A job assignment changed, or dispatch could not cover a confirmed job.',
+  },
+  staffing_pending: {
+    label: 'Mandatory additional staffing',
+    critical: true,
+    defaults: ['admin', 'owner'],
+    description:
+      'A paid or accepted booking is feasible but needs an additional cleaner before service.',
+  },
+  customer_cancellation: {
+    label: 'Customer cancellation',
+    critical: false,
+    defaults: ['bookings', 'customerService', 'owner'],
+    description: 'A customer cancelled a booked service and the time must be released.',
+  },
+  appointment_reschedule: {
+    label: 'Appointment reschedule',
+    critical: false,
+    defaults: ['bookings', 'owner'],
+    description: 'A booked appointment was moved and the old and new times need review.',
+  },
+  refund_processed: {
+    label: 'Refund or credit issued',
+    critical: false,
+    defaults: ['billing', 'owner'],
+    description: 'A refund or account credit was recorded and needs financial follow-up.',
+  },
+  commercial_inquiry: {
+    label: 'Commercial or church inquiry',
+    critical: false,
+    defaults: ['bookings', 'owner'],
+    description: 'A facility walkthrough request or commercial scope inquiry was submitted.',
+  },
+  commercial_agreement: {
+    label: 'Commercial agreement executed',
+    critical: false,
+    defaults: ['admin', 'owner'],
+    description: 'A commercial or church agreement is fully signed and ready for service setup.',
+  },
+  customer_complaint: {
+    label: 'Customer complaint',
+    critical: true,
+    defaults: ['admin', 'owner'],
+    description: 'A complaint or service concern requires immediate owner attention.',
+  },
+  employee_callout: {
+    label: 'Employee callout',
+    critical: false,
+    defaults: ['bookings', 'admin'],
+    description: 'An employee reported an absence that may affect assigned work.',
+  },
+  employee_late: {
+    label: 'Employee late arrival',
+    critical: false,
+    defaults: ['bookings'],
+    description: 'An employee is late for an assigned job and customer service may be affected.',
+  },
+  critical_operational_failure: {
+    label: 'Critical operational failure',
+    critical: true,
+    defaults: ['admin', 'owner'],
+    description: 'A critical operational subsystem failed and requires immediate attention.',
   },
   security_alert: {
     label: 'Critical security alert',
@@ -336,6 +408,11 @@ export interface CommunicationSettings {
   schemaVersion: 1;
   departments: Record<DepartmentKey, DepartmentConfig>;
   routing: Record<NotificationEventKey, DepartmentKey[]>;
+  /**
+   * Optional per-branch overrides. A missing event keeps the global routing;
+   * critical events can never be redirected away from admin and owner.
+   */
+  branchRouting: Record<string, Partial<Record<NotificationEventKey, DepartmentKey[]>>>;
   replyTo: Record<ReplyToKey, DepartmentKey>;
   templates: Record<TemplateKey, TemplateConfig>;
   alerts: {
@@ -390,6 +467,7 @@ export function defaultCommunicationSettings(): CommunicationSettings {
     schemaVersion: 1,
     departments: departmentsRecord(true),
     routing: routingRecord(),
+    branchRouting: {},
     replyTo: { ...DEFAULT_REPLY_TO },
     templates: templatesRecord(),
     alerts: { escalationMinutes: 30, failureThreshold: 3 },
@@ -503,6 +581,58 @@ export function validateCommunicationSettings(input: unknown): {
     routing[key] = unique;
   }
 
+  const branchRouting: Record<string, Partial<Record<NotificationEventKey, DepartmentKey[]>>> = {};
+  const branchInput = isRecord(input.branchRouting) ? input.branchRouting : {};
+  const branchIds = new Set<string>(branchList.map((branch) => branch.id));
+  for (const [branchId, rawEvents] of Object.entries(branchInput)) {
+    if (!branchIds.has(branchId)) {
+      errors.push(`branchRouting.${branchId}: unknown branch`);
+      continue;
+    }
+    if (!isRecord(rawEvents)) {
+      errors.push(`branchRouting.${branchId}: must be an object`);
+      continue;
+    }
+    const overrides: Partial<Record<NotificationEventKey, DepartmentKey[]>> = {};
+    for (const eventKey of NOTIFICATION_EVENTS) {
+      const raw = rawEvents[eventKey];
+      if (raw === undefined) continue;
+      const requested = Array.isArray(raw)
+        ? raw
+            .map((entry) => text(entry, 40))
+            .filter((entry): entry is DepartmentKey =>
+              (DEPARTMENT_KEYS as readonly string[]).includes(entry),
+            )
+        : [];
+      const unique = [...new Set(requested)];
+      if (unique.length === 0) continue;
+      if (unique.length !== requested.length) {
+        errors.push(`branchRouting.${branchId}.${eventKey}: duplicate department`);
+      }
+      if (unique.length > 3) {
+        errors.push(`branchRouting.${branchId}.${eventKey}: too many departments`);
+      }
+      if (EVENT_DEFINITIONS[eventKey].critical) {
+        const expected = ['admin', 'owner'];
+        const matches =
+          unique.length === expected.length &&
+          expected.every((entry) => unique.includes(entry as DepartmentKey));
+        if (!matches) {
+          errors.push(
+            `branchRouting.${branchId}.${eventKey}: critical alerts must include admin and owner only`,
+          );
+        }
+      }
+      for (const department of unique) {
+        if (!departments[department].enabled) {
+          errors.push(`branchRouting.${branchId}.${eventKey}: ${department} is disabled`);
+        }
+      }
+      overrides[eventKey] = unique;
+    }
+    if (Object.keys(overrides).length > 0) branchRouting[branchId] = overrides;
+  }
+
   const replyTo = { ...DEFAULT_REPLY_TO };
   const replyInput = isRecord(input.replyTo) ? input.replyTo : {};
   for (const key of REPLY_TO_KEYS) {
@@ -544,6 +674,7 @@ export function validateCommunicationSettings(input: unknown): {
     schemaVersion: 1,
     departments,
     routing,
+    branchRouting,
     replyTo,
     templates,
     alerts,
@@ -587,12 +718,16 @@ export interface NotificationRecipient {
 export function notificationRecipients(
   settings: CommunicationSettings,
   eventKey: NotificationEventKey,
+  branchId?: string | null,
 ): NotificationRecipient[] {
   if (!(NOTIFICATION_EVENTS as readonly string[]).includes(eventKey)) return [];
   const definition = EVENT_DEFINITIONS[eventKey];
+  const override = branchId ? settings.branchRouting?.[branchId]?.[eventKey] : undefined;
   const configured: readonly DepartmentKey[] = definition.critical
     ? ['admin', 'owner']
-    : settings.routing[eventKey] ?? definition.defaults;
+    : override && override.length > 0
+      ? override
+      : settings.routing[eventKey] ?? definition.defaults;
   const recipients: NotificationRecipient[] = [];
   const seen = new Set<string>();
   for (const key of [...new Set<DepartmentKey>(configured)]) {
@@ -620,6 +755,7 @@ export interface OperationalNotificationInput {
   attachments?: AdminEmailAttachment[];
   relatedType?: string;
   relatedId?: string;
+  branchId?: string | null;
   idempotencyKey: string;
 }
 
@@ -659,7 +795,7 @@ export async function sendOperationalNotification(
   } else {
     settings = defaultCommunicationSettings();
   }
-  const recipients = notificationRecipients(settings, input.eventKey);
+  const recipients = notificationRecipients(settings, input.eventKey, input.branchId ?? null);
   const result = {
     recipients: recipients.map((entry) => entry.address),
     departments: recipients.map((entry) => entry.department),

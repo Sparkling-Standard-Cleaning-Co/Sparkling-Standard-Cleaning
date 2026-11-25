@@ -359,7 +359,14 @@ async function sendForRequest(
     outcome,
     actorId: actor.id,
   });
-  const eventKey = kind === 'confirmation' ? 'booking_confirmation' : 'booking_change';
+  const eventKey =
+    kind === 'confirmation'
+      ? 'booking_confirmation'
+      : kind === 'cancellation'
+        ? 'customer_cancellation'
+        : kind === 'reschedule' || kind === 'proposal'
+          ? 'appointment_reschedule'
+          : 'booking_change';
   await sendOperationalNotification(db, context.env, {
     eventKey,
     subject: `${kind === 'confirmation' ? 'Booking confirmed' : `Booking ${kind}`} - ${String(row.quote_reference ?? row.id ?? '')}`,
@@ -381,6 +388,7 @@ async function sendForRequest(
     idempotencyKey: `booking-${String(row.id ?? '')}-${kind}-${Date.now()}`,
     relatedType: 'booking_request',
     ...(row.id ? { relatedId: String(row.id) } : {}),
+    ...(row.branch_id ? { branchId: String(row.branch_id) } : {}),
   }).catch(() => undefined);
   return { ...outcome, recipient: Boolean(email) };
 }

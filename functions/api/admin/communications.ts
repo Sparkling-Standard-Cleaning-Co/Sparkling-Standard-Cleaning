@@ -1,4 +1,5 @@
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
+import { branchList } from '../../../src/config/branches.ts';
 import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import {
   DEPARTMENT_KEYS,
@@ -42,6 +43,7 @@ function metadata(): Record<string, unknown> {
     events: NOTIFICATION_EVENTS.map((key) => ({ key, ...EVENT_DEFINITIONS[key] })),
     replyTo: REPLY_TO_KEYS.map((key) => ({ key, label: REPLY_TO_LABELS[key] })),
     templates: TEMPLATE_KEYS.map((key) => ({ key: key as TemplateKey, label: TEMPLATE_DEFINITIONS[key].label, variables: TEMPLATE_DEFINITIONS[key].variables })),
+    branches: branchList.map((branch) => ({ id: branch.id, name: branch.name })),
   };
 }
 

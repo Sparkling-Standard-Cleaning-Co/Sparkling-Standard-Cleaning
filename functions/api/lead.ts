@@ -32,6 +32,7 @@ import { taxPresentationForService } from '../../src/lib/estimate/tax.ts';
 import { calculateServiceTax } from '../../src/lib/tax/engine.ts';
 import type { Frequency } from '../../src/lib/estimate/types.ts';
 import { buildLeadNotification } from '../../src/lib/forms/lead-notification.ts';
+import { leadNotificationEvent } from '../../src/lib/forms/lead-routing.ts';
 import { buildLeadReadiness } from '../../src/lib/forms/delivery-readiness.ts';
 import { customerEmailProblem, normalizeCustomerEmail } from '../../src/lib/forms/contact-email.ts';
 import {
@@ -937,7 +938,10 @@ export async function onRequestPost(context: {
     ? await readCommunicationSettings(env.DB).catch(() => null)
     : null;
   const communicationSettings = communicationState?.settings ?? defaultCommunicationSettings();
-  const notificationEvent = clean.request_type === 'contact' ? 'contact_inquiry' : 'booking_request';
+  const notificationEvent = leadNotificationEvent({
+    ...(clean.request_type ? { requestType: clean.request_type } : {}),
+    ...(clean.inquiry_type ? { inquiryType: clean.inquiry_type } : {}),
+  });
   let recipients = notificationRecipients(communicationSettings, notificationEvent);
   if (recipients.length === 0) {
     recipients = [
@@ -1069,7 +1073,7 @@ export async function onRequestPost(context: {
     const requiredCrew = clean.required_crew_size ?? '2';
     const when = [clean.preferred_date, clean.preferred_time].filter(Boolean).join(' ') || 'requested time';
     await sendOperationalNotification(env.DB ?? null, env as unknown as CommunicationEnv, {
-      eventKey: 'owner_escalation',
+      eventKey: 'staffing_pending',
       subject: `CRITICAL: additional cleaner required - ${clean.quote_reference || attachmentRequestId}`,
       text: [
         'A pay-later reservation request needs additional cleaning staff.',
@@ -1086,6 +1090,7 @@ export async function onRequestPost(context: {
       ].join('\n'),
       relatedType: 'lead',
       ...(persistedLead?.leadId ? { relatedId: persistedLead.leadId } : {}),
+      branchId: clean.branch_id,
       idempotencyKey: `staffing-pending-request/${clean.booking_hold_id || clean.quote_reference || attachmentRequestId}`,
     }).catch(() => undefined);
   }

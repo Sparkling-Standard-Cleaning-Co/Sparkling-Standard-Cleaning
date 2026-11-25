@@ -104,8 +104,51 @@ test('approved defaults route each event to its department and keep critical ale
   assert.deepEqual(settings.routing.document_executed, ['admin', 'owner']);
   assert.deepEqual(settings.routing.security_alert, ['admin', 'owner']);
   assert.deepEqual(settings.routing.backup_failure, ['admin', 'owner']);
+  assert.deepEqual(settings.routing.staffing_pending, ['admin', 'owner']);
+  assert.deepEqual(settings.routing.customer_complaint, ['admin', 'owner']);
+  assert.deepEqual(settings.routing.commercial_inquiry, ['bookings', 'owner']);
+  assert.deepEqual(settings.routing.customer_cancellation, [
+    'bookings',
+    'customerService',
+    'owner',
+  ]);
+  assert.deepEqual(settings.routing.appointment_reschedule, ['bookings', 'owner']);
+  assert.deepEqual(settings.routing.critical_operational_failure, ['admin', 'owner']);
   assert.equal(settings.replyTo.invoices, 'billing');
   assert.equal(settings.replyTo.bookingConfirmations, 'bookings');
+  assert.deepEqual(settings.branchRouting, {});
+});
+
+test('branch routing overrides ordinary events but never critical alerts', () => {
+  const settings = defaultCommunicationSettings();
+  settings.branchRouting = {
+    branch_tampa: {
+      booking_request: ['bookings'],
+      staffing_pending: ['owner'],
+    },
+  };
+  assert.deepEqual(
+    notificationRecipients(settings, 'booking_request', 'branch_tampa').map((entry) => entry.department),
+    ['bookings'],
+  );
+  assert.deepEqual(
+    notificationRecipients(settings, 'booking_request', 'branch_pensacola').map((entry) => entry.department),
+    ['bookings', 'owner'],
+  );
+  assert.deepEqual(
+    notificationRecipients(settings, 'staffing_pending', 'branch_tampa').map((entry) => entry.department),
+    ['admin', 'owner'],
+    'critical routing cannot be redirected by a branch override',
+  );
+
+  const tampered = structuredClone(settings);
+  tampered.branchRouting.branch_tampa.staffing_pending = ['owner'];
+  const validation = validateCommunicationSettings(tampered);
+  assert.equal(validation.ok, false);
+  assert.ok(validation.errors.some((error) => error.includes('branchRouting.branch_tampa.staffing_pending')));
+  const unknown = structuredClone(settings);
+  unknown.branchRouting.branch_unknown = { booking_request: ['bookings'] };
+  assert.equal(validateCommunicationSettings(unknown).ok, false);
 });
 
 test('settings saved before a new event existed stay valid and use the new default route', () => {
@@ -477,6 +520,7 @@ test('a new backup failure reopens a previously resolved incident', async () => 
     const result = await backupMonitorTick(db, { RESEND_API_KEY: 're_synthetic' });
     assert.equal(result.status, 'failed');
     assert.equal(result.action, 'alerted_admin_and_owner');
+    assert.equal(result.incidentId, 'incident_old');
     const incident = db.raw
       .prepare(
         "SELECT id, status, opened_at, resolved_at, escalation_sent_at FROM operations_incidents WHERE incident_key = 'backup_stale'",
