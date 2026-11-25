@@ -412,13 +412,37 @@ export async function uploadLargeFile(accessToken, folderName, localPath, name, 
         body: buffer,
         signal: AbortSignal.timeout(120_000),
       });
-      if (!response.ok && response.status !== 202) {
+      if (response.status === 200 || response.status === 201) {
+        finalItem = await response.json().catch(() => null);
+        if (finalItem?.id) break;
+      } else if (!response.ok && response.status !== 202) {
         throw new Error(`OneDrive upload session failed: HTTP ${response.status}`);
       }
       offset += length;
     }
+    if (!finalItem?.id) {
+      // A 202 on the final chunk means the session is not finalized. Ask the
+      // upload session for the completed item before declaring success.
+      const statusResponse = await fetchImpl(session.uploadUrl, {
+        method: 'GET',
+        signal: AbortSignal.timeout(60_000),
+      }).catch(() => null);
+      if (statusResponse?.ok) {
+        const payload = await statusResponse.json().catch(() => null);
+        if (payload?.id) finalItem = payload;
+      }
+    }
+    if (!finalItem?.id) {
+      throw new Error('OneDrive upload did not finalize. The archive was not stored.');
+    }
+    // Confirm the stored item exists and has the expected size. Provider
+    // acceptance alone is not proof that the recovery copy is usable.
+    const verified = await getItemByPath(accessToken, folderName, name, fetchImpl, mode).catch(() => null);
+    if (!verified?.id || Number(verified.size) !== stat.size) {
+      throw new Error('OneDrive upload verification failed: stored item is missing or incomplete.');
+    }
     return {
-      id: String(finalItem?.id ?? session.id ?? ''),
+      id: String(finalItem.id),
       name,
       size: stat.size,
       sha256: hash.digest('hex'),
@@ -439,13 +463,34 @@ export async function downloadFileByPath(accessToken, folderName, name, outPath,
   const response = await graphRequest(
     accessToken,
     `/me/drive/${remotePath(folderName, name, mode)}:/content`,
-    {},
+    // Large encrypted archives can take far longer than the default 60-second
+    // API timeout to stream. The download is streamed to disk, not buffered.
+    { signal: AbortSignal.timeout(30 * 60_000) },
     fetchImpl,
   );
-  const bytes = Buffer.from(await response.arrayBuffer());
-  await fsp.mkdir(path.dirname(path.resolve(outPath)), { recursive: true });
-  await fsp.writeFile(outPath, bytes, { mode: 0o600 });
-  return { path: path.resolve(outPath), bytes: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') };
+  const target = path.resolve(outPath);
+  await fsp.mkdir(path.dirname(target), { recursive: true });
+  const hash = crypto.createHash('sha256');
+  let bytes = 0;
+  const handle = await fsp.open(target, 'w', 0o600);
+  try {
+    if (!response.body) {
+      const buffer = Buffer.from(await response.arrayBuffer());
+      hash.update(buffer);
+      bytes = buffer.length;
+      await handle.write(buffer);
+    } else {
+      for await (const chunk of response.body) {
+        const buffer = Buffer.from(chunk);
+        hash.update(buffer);
+        bytes += buffer.length;
+        await handle.write(buffer);
+      }
+    }
+  } finally {
+    await handle.close();
+  }
+  return { path: target, bytes, sha256: hash.digest('hex') };
 }
 
 export async function getItemByPath(accessToken, folderName, name, fetchImpl = fetch, mode = 'appfolder') {
