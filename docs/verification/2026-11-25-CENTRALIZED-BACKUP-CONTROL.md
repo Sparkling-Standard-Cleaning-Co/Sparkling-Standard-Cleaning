@@ -3,9 +3,9 @@
 ## Release identity
 
 - Starting HEAD: `2f7e96d`
-- Application HEAD: `3881a8f`
-- Branch: `production-safe` (and `main`, now identical at `3881a8f`)
-- Cloudflare Pages deployment with the admin control screen and current secrets: `9b6f5cd7` (production, source `3881a8f`; the automatic deployment for `3881a8f` is `361f9856`)
+- Application HEAD: `3881a8f`; final HEAD: `cf75d0b` (documentation only)
+- Branch: `production-safe` (and `main`, identical at `cf75d0b`)
+- Cloudflare Pages application deployment: `9b6f5cd7` (production, source `3881a8f`); final docs deployment: `83bdb913` (source `cf75d0b`)
 - Backup Worker: `https://sparkling-standard-backup-scheduler.owner-e75.workers.dev`
 - Worker code version: `4824f6f4-0f37-4ce8-853d-04e4ef45877d`
 - CI: `45688412800` (validate + browser, green)
@@ -83,13 +83,14 @@ Screenshots:
 | `astro check` / build / validate | 0 errors, 41 pages, 2,631 links |
 | Smoke | 21 pages |
 | Live Worker overview | configured, archive list and schedule returned |
+| Admin schedule form | live save succeeded and returned `Backup schedule saved.` |
 | Live complete backup | success, R2 + OneDrive verified, isolated restore passed |
 | Live restore test | success, 106 tables, 60 migrations |
 | Production D1 | 62 migrations, 107 tables, foreign-key check clean |
 
 ## Branch consolidation and preserving records
 
-- `main` and `production-safe` are now identical at `3881a8f` with **zero divergence**.
+- `main` and `production-safe` are now identical at `cf75d0b` with **zero divergence**.
 - Main was merged with production-safe using a merge commit; no history was rewritten and no branch was force-pushed.
 - `production-safe` remains the Cloudflare production branch as a rollback reference. Changing that setting is a separate dashboard decision.
 - All existing business records and the pre-existing backup archive remain. No production records were deleted, anonymized or overwritten.
