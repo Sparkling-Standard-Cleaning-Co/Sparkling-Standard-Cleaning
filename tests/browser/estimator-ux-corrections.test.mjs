@@ -231,24 +231,78 @@ test('Community Support is one small checkbox linked to the terms', async () => 
   }
 });
 
-test('the time picker offers every 15-minute start in the two residential windows', async () => {
+test('the compact hour and minute controls offer every valid start in the two residential windows', async () => {
   const { context, page } = await open();
   try {
     await confirmAddressFirst(page);
     await page.fill('#est-date', BOOKING_DATE);
     await page.waitForSelector('[data-calendar-period]', { state: 'visible' });
-    assert.equal(await page.locator('[data-calendar-time-options] button').count(), 0, 'no times before a window is chosen');
+    assert.equal(await page.locator('[data-calendar-picker]').isHidden(), true, 'no picker before a window is chosen');
+    assert.equal(await page.locator('[data-calendar-time-options]').count(), 0, 'no large time-button collection');
     await page.click('[data-period="first"]');
-    const morning = (await page.locator('[data-calendar-time-options] button').allTextContents()).map((value) => value.trim());
-    assert.deepEqual(morning, ['7:00 AM', '7:15 AM', '7:30 AM', '7:45 AM', '8:00 AM', '8:15 AM', '8:30 AM']);
-    assert.equal(await page.locator('[data-time-hour]').count(), 0, 'no ambiguous hour selector');
-    assert.equal(await page.locator('[data-time-minute]').count(), 0, 'no ambiguous minute selector');
+    const morningHours = (await page.locator('[data-time-hour] option').allTextContents()).map((value) => value.trim());
+    assert.deepEqual(morningHours, ['Hour', '07', '08']);
+    await page.selectOption('[data-time-hour]', '7');
+    const morningMinutes = (await page.locator('[data-time-minute] option').allTextContents()).map((value) => value.trim());
+    assert.deepEqual(morningMinutes, ['Minute', '00', '15', '30', '45']);
+    assert.equal((await page.locator('[data-time-meridiem]').textContent())?.trim(), 'AM');
+    await page.selectOption('[data-time-minute]', { label: '00' });
+    await page.waitForFunction(() => document.querySelector('[data-calendar-time-input]')?.value === '7:00 AM');
     await page.click('[data-period="afternoon"]');
-    const afternoon = (await page.locator('[data-calendar-time-options] button').allTextContents()).map((value) => value.trim());
-    assert.deepEqual(afternoon, [
-      '12:30 PM', '12:45 PM', '1:00 PM', '1:15 PM', '1:30 PM',
-      '1:45 PM', '2:00 PM', '2:15 PM', '2:30 PM',
-    ]);
+    const afternoonHours = (await page.locator('[data-time-hour] option').allTextContents()).map((value) => value.trim());
+    assert.deepEqual(afternoonHours, ['Hour', '12', '01', '02']);
+    assert.equal((await page.locator('[data-time-meridiem]').textContent())?.trim(), 'PM');
+    await page.selectOption('[data-time-hour]', '12');
+    const afternoonMinutes = (await page.locator('[data-time-minute] option').allTextContents()).map((value) => value.trim());
+    assert.deepEqual(afternoonMinutes, ['Minute', '30', '45']);
+    await page.selectOption('[data-time-minute]', { label: '30' });
+    await page.waitForFunction(() => document.querySelector('[data-calendar-time-input]')?.value === '12:30 PM');
+  } finally {
+    await context.close();
+  }
+});
+
+test('7:00 AM and 7:15 AM remain selectable when the server reports them available', async () => {
+  const { context, page } = await open();
+  try {
+    await page.route('**/api/availability**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith('/availability-month')) {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, enabled: true, days: [] }) });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          enabled: true,
+          timeZone: 'America/Chicago',
+          date: BOOKING_DATE,
+          durationMinutes: 120,
+          available: true,
+          slots: [
+            { start: `${BOOKING_DATE}T13:00:00.000Z`, end: `${BOOKING_DATE}T15:00:00.000Z`, startLabel: '7:00 AM', endLabel: '9:00 AM' },
+            { start: `${BOOKING_DATE}T13:15:00.000Z`, end: `${BOOKING_DATE}T15:15:00.000Z`, startLabel: '7:15 AM', endLabel: '9:15 AM' },
+            { start: `${BOOKING_DATE}T13:30:00.000Z`, end: `${BOOKING_DATE}T15:30:00.000Z`, startLabel: '7:30 AM', endLabel: '9:30 AM' },
+            { start: `${BOOKING_DATE}T18:30:00.000Z`, end: `${BOOKING_DATE}T20:30:00.000Z`, startLabel: '12:30 PM', endLabel: '2:30 PM' },
+          ],
+        }),
+      });
+    });
+    await confirmAddressFirst(page);
+    await page.fill('#est-date', BOOKING_DATE);
+    await page.waitForSelector('[data-period="first"]:not([disabled])', { state: 'visible' });
+    await page.click('[data-period="first"]');
+    await page.selectOption('[data-time-hour]', '7');
+    const minutes = await page.locator('[data-time-minute] option').evaluateAll((options) =>
+      options.filter((option) => option.value && !option.disabled).map((option) => option.textContent?.trim()),
+    );
+    assert.deepEqual(minutes, ['00', '15', '30']);
+    await page.selectOption('[data-time-minute]', { label: '00' });
+    await page.waitForFunction(() => document.querySelector('[data-calendar-time-input]')?.value === '7:00 AM');
+    await page.selectOption('[data-time-minute]', { label: '15' });
+    await page.waitForFunction(() => document.querySelector('[data-calendar-time-input]')?.value === '7:15 AM');
   } finally {
     await context.close();
   }
@@ -523,14 +577,81 @@ test('the final price breakdown is one full-width row per financial item', async
   }
 });
 
+test('HOLIDAY15 on the first visit and Community Support on recurring visits are shown separately', async () => {
+  const { context, page } = await open(1280, 1000);
+  try {
+    await reachRecurringFinal(page);
+    const money = async (locator) => Number((await locator.innerText()).replace(/[^0-9.]/g, ''));
+    const before = await money(page.locator('[data-reservation-price]'));
+    await page.route('**/api/promotion', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          code: 'HOLIDAY15',
+          name: 'Holidays',
+          discountCents: 5000,
+          supportiveStackable: true,
+        }),
+      });
+    });
+    const applyHoliday = async () => {
+      await page.fill('#est-promo-code', 'HOLIDAY15');
+      await page.click('[data-apply-discounts]');
+      await page.waitForFunction(() =>
+        /HOLIDAY15/.test(document.querySelector('[data-discount-status]')?.textContent ?? ''),
+      );
+    };
+    const assertBothBenefits = async () => {
+      const breakdown = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
+      const ongoing = (await page.locator('[data-reservation-ongoing]').innerText()).replace(/\s+/g, ' ');
+      assert.match(breakdown, /Initial Deep Cleaning \(regular price\)/);
+      assert.match(breakdown, /HOLIDAY15 promotion applied/);
+      assert.match(ongoing, /Community Support discount \(10%\)/i);
+      assert.match(ongoing, /regular/i);
+      assert.match(ongoing, /Your rate:/i);
+      const total = await money(page.locator('[data-reservation-price]'));
+      assert.equal(total, before - 50, 'the first-visit promotion reduces only the current charge');
+    };
+
+    // Reported order: promo first, then Community Support.
+    await applyHoliday();
+    await page.check('[data-supportive-eligible]');
+    await page.waitForFunction(() =>
+      /Community Support/i.test(document.querySelector('[data-reservation-ongoing]')?.textContent ?? ''),
+    );
+    await assertBothBenefits();
+    assert.equal(await page.isChecked('[data-supportive-eligible]'), true, 'the future benefit remains recorded');
+
+    // Removing Community Support leaves HOLIDAY15 intact.
+    await page.uncheck('[data-supportive-eligible]');
+    await page.waitForFunction(() =>
+      !/Community Support/i.test(document.querySelector('[data-reservation-ongoing]')?.textContent ?? ''),
+    );
+    assert.match((await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' '), /HOLIDAY15 promotion applied/);
+
+    // Community Support first, then HOLIDAY15, preserves both.
+    await page.click('[data-promo-remove]');
+    await page.check('[data-supportive-eligible]');
+    await page.waitForFunction(() =>
+      /Community Support/i.test(document.querySelector('[data-reservation-ongoing]')?.textContent ?? ''),
+    );
+    await applyHoliday();
+    await assertBothBenefits();
+  } finally {
+    await context.close();
+  }
+});
+
 test('recurring first-visit pricing keeps the true price and totals on separate rows', async () => {
   const { context, page } = await open(390, 844);
   try {
     await reachRecurringFinal(page);
     const breakdown = await priceRowText(page);
-    assert.match(breakdown, /True Deep Cleaning Price/);
+    assert.match(breakdown, /Initial Deep Cleaning \(regular price\)/);
     assert.match(breakdown, /FIRST VISIT TOTAL/);
-    assert.match((await page.locator('[data-reservation-ongoing]').innerText()).trim(), /\$[\d,.]+ .*Biweekly Thereafter/);
+    assert.match((await page.locator('[data-reservation-ongoing]').innerText()).trim(), /Recurring maintenance.*per biweekly visit/i);
     const tops = await page.locator('[data-price-breakdown] li').evaluateAll((items) =>
       items.map((item) => Math.round(item.getBoundingClientRect().top)),
     );

@@ -113,7 +113,7 @@ interface Env extends QuoteVerificationEnv {
 
 // The estimator sends structured scope + quote + attribution fields; the cap
 // stays bounded (a hard server-side limit) while fitting the full request.
-const MAX_FIELDS = 70;
+const MAX_FIELDS = 80;
 const MAX_VALUE_LENGTH = 2000;
 const MAX_SUBJECT_LENGTH = 200;
 const SAFE_KEY = /^[a-z0-9_]{1,40}$/i;
@@ -180,8 +180,11 @@ const SERVER_OWNED_KEYS = new Set([
   'travel_destination_source',
   'initial_deep_clean_required',
   'first_visit_total',
+  'ongoing_regular_price_per_visit',
   'ongoing_price_per_visit',
   'ongoing_frequency',
+  'ongoing_discount_label',
+  'ongoing_discount_amount',
   'photo_count',
   'photo_note',
   'photos_outstanding',
@@ -671,8 +674,16 @@ export async function onRequestPost(context: {
       // diverging client figure surfaced as a verification uncertainty above.
       if (verification.ongoing) {
         if (verification.verifiedPrice !== null) clean.first_visit_total = String(verification.verifiedPrice);
+        clean.ongoing_regular_price_per_visit = String(verification.ongoing.regularPerVisitPrice);
         clean.ongoing_price_per_visit = String(verification.ongoing.perVisitPrice);
         clean.ongoing_frequency = verification.ongoing.frequency;
+        const allocation = verification.ongoing.discounts.find(
+          (discount) => discount.source === 'supportive',
+        );
+        if (allocation) {
+          clean.ongoing_discount_label = allocation.label;
+          clean.ongoing_discount_amount = allocation.amount.toFixed(2);
+        }
       }
 
       const nonTaxableService = ['standard', 'deep', 'move_in_out', 'str_turnover'].includes(

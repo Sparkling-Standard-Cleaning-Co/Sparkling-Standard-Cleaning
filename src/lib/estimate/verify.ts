@@ -22,7 +22,7 @@ import { parseDirtLevel } from './dirt-levels.ts';
 import { requiresInitialDeepClean } from './frequency.ts';
 import { selectInstantAmount } from './quote.ts';
 import { validateEstimateInput } from './validation.ts';
-import type { EstimateInputDraft, PricingBreakdown, RoutedTravelInfo } from './types.ts';
+import type { DiscountAllocation, EstimateInputDraft, PricingBreakdown, RoutedTravelInfo } from './types.ts';
 import {
   configuredReferenceGasPrice,
   gulfCoastGasPrice,
@@ -108,7 +108,12 @@ export interface QuoteVerification {
    * this carries the per-visit price that follows it. Null when the request
    * is not a new recurring arrangement.
    */
-  ongoing: { frequency: string; perVisitPrice: number } | null;
+  ongoing: {
+    frequency: string;
+    regularPerVisitPrice: number;
+    perVisitPrice: number;
+    discounts: DiscountAllocation[];
+  } | null;
   travel: QuoteVerificationTravel;
   /**
    * The full transparent price breakdown the server recalculated. Null only
@@ -358,7 +363,7 @@ export async function verifyReservationQuote(
   const referenceValid = clientReference !== null && QUOTE_REFERENCE_PATTERN.test(clientReference);
   const clientPrice = numberFrom(fields, 'quoted_price') ?? null;
   const clientOngoingPrice = numberFrom(fields, 'ongoing_price_per_visit') ?? null;
-  let ongoingServer: { frequency: string; perVisitPrice: number } | null = null;
+  let ongoingServer: QuoteVerification['ongoing'] = null;
   const travel: QuoteVerificationTravel = {
     method: 'zone',
     provider: 'none',
@@ -475,7 +480,12 @@ export async function verifyReservationQuote(
   const estimate = calculateEstimate(draft, buildEstimateContext(routed, fields, config));
   breakdown = estimate.pricing;
   ongoingServer = estimate.ongoing
-    ? { frequency: estimate.ongoing.frequency, perVisitPrice: estimate.ongoing.perVisitPrice }
+    ? {
+        frequency: estimate.ongoing.frequency,
+        regularPerVisitPrice: estimate.ongoing.regularPerVisitPrice,
+        perVisitPrice: estimate.ongoing.perVisitPrice,
+        discounts: estimate.ongoing.pricing.discounts,
+      }
     : null;
   if (estimate.status !== 'estimated') {
     return result(

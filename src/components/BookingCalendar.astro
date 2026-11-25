@@ -101,11 +101,25 @@ const { id = 'estimate-calendar' } = Astro.props;
       </div>
 
       <div class="booking-calendar__time-picker" data-calendar-picker hidden>
-        <p class="booking-calendar__picker-heading">Choose your exact start time</p>
-        <div class="booking-calendar__times" data-calendar-time-options role="group" aria-label="Available start times"></div>
+        <p class="booking-calendar__picker-heading">Choose your start time</p>
+        <div class="booking-calendar__time-fields">
+          <label class="booking-calendar__time-field">
+            <span>Hour</span>
+            <select class="select select--small" data-time-hour aria-label="Preferred start hour">
+              <option value="">Hour</option>
+            </select>
+          </label>
+          <span class="booking-calendar__time-separator" aria-hidden="true">:</span>
+          <label class="booking-calendar__time-field">
+            <span>Minute</span>
+            <select class="select select--small" data-time-minute aria-label="Preferred start minute" disabled>
+              <option value="">Minute</option>
+            </select>
+          </label>
+          <span class="booking-calendar__meridiem" data-time-meridiem aria-hidden="true">AM</span>
+        </div>
         <p class="booking-calendar__picker-help small" data-calendar-picker-help>
-          Every 15-minute start in the selected window is shown. A crossed-out time is not
-          available for this date; crew travel or another booking may make it unavailable.
+          Choose an hour and minute. Only available 15-minute starts can be selected.
         </p>
       </div>
 

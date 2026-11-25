@@ -22,6 +22,7 @@ import { validateEstimateInput } from './validation.ts';
 import type {
   AddonPriceLine,
   CalculationTraceEntry,
+  DiscountAllocationScope,
   EstimateFlag,
   EstimateInputDraft,
   EstimateResult,
@@ -137,6 +138,7 @@ const EMPTY_PRICING: PricingBreakdown = {
   selectedExtras: [],
   extrasSubtotal: 0,
   discount: null,
+  discounts: [],
   roundingAdjustment: 0,
   subtotal: 0,
   globalFactor: 1,
@@ -192,23 +194,20 @@ export function calculateEstimate(
       campaignArrangement: { serviceType: input.serviceType, frequency: input.frequency },
     },
   };
-  const firstVisitNormal = computeCore(
-    { ...input, serviceType: 'deep', frequency: 'one_time' },
+  // Community Support is allocated to the separately eligible ongoing
+  // maintenance visits, never compounded onto the first-visit Deep Cleaning.
+  // A claimed first-visit campaign (or a checkout code such as HOLIDAY15)
+  // therefore owns this charge line cleanly.
+  const firstVisit = computeCore(
+    {
+      ...input,
+      supportiveEligible: false,
+      serviceType: 'deep',
+      frequency: 'one_time',
+    },
     firstVisitContext,
+    'first_visit',
   );
-  // A claimed campaign owns the eligible first visit. Community Support may
-  // still apply to separately eligible ongoing visits (evaluated below), but
-  // it never displaces a valid campaign on the same first-visit component.
-  let firstVisit = firstVisitNormal;
-  if (input.supportiveEligible === true && context.promotions?.claimedCampaignCode) {
-    const campaignFirst = computeCore(
-      { ...input, supportiveEligible: false, serviceType: 'deep', frequency: 'one_time' },
-      firstVisitContext,
-    );
-    if (campaignFirst.status === 'estimated' && campaignFirst.pricing.discount?.source === 'campaign') {
-      firstVisit = campaignFirst;
-    }
-  }
   if (firstVisit.status !== 'estimated') {
     // The custom-confirmation gates depend on the home, extras and travel —
     // not on service/frequency — so the ongoing rhythm hits the same
@@ -223,31 +222,52 @@ export function calculateEstimate(
   // Standard's standard, so the one-time condition/history penalties are not
   // applied forever. Actual workload factors (size, rooms, pets/add-ons and
   // frequency) still apply.
+  const ongoingContext: EstimateContext = {
+    ...context,
+    promotions: {
+      ...context.promotions,
+      claimedCampaignCode: null,
+      campaignArrangement: null,
+    },
+  };
   const ongoing = computeCore(
     {
       ...input,
       condition: 'maintained',
       lastClean: 'within_month',
     },
+    ongoingContext,
+    'ongoing_visit',
+  );
+  const ongoingRegular = computeCore(
     {
-      ...context,
-      promotions: {
-        ...context.promotions,
-        claimedCampaignCode: null,
-        campaignArrangement: null,
-      },
+      ...input,
+      condition: 'maintained',
+      lastClean: 'within_month',
+      supportiveEligible: false,
     },
+    ongoingContext,
+    'ongoing_visit',
   );
 
-  const ongoingSummary: OngoingVisitSummary | undefined =
+  const ongoingBasePrice =
     ongoing.status === 'estimated' && ongoing.expectedPrice !== null
+      ? selectInstantAmount(ongoing, undefined, activeConfig) ?? ongoing.expectedPrice
+      : null;
+  const ongoingRegularPrice =
+    ongoingRegular.status === 'estimated' && ongoingRegular.expectedPrice !== null
+      ? selectInstantAmount(ongoingRegular, undefined, activeConfig) ?? ongoingRegular.expectedPrice
+      : null;
+  const ongoingSummary: OngoingVisitSummary | undefined =
+    ongoingBasePrice !== null && ongoingRegularPrice !== null && ongoing.status === 'estimated'
       ? {
           frequency: input.frequency,
-          perVisitPrice: selectInstantAmount(ongoing, undefined, activeConfig) ?? ongoing.expectedPrice,
-          modelPrice: ongoing.expectedPrice,
+          regularPerVisitPrice: ongoingRegularPrice,
+          perVisitPrice: ongoingBasePrice,
+          modelPrice: ongoing.expectedPrice ?? ongoingBasePrice,
           range: {
-            low: ongoing.low ?? ongoing.expectedPrice,
-            high: ongoing.high ?? ongoing.expectedPrice,
+            low: ongoing.low ?? ongoingBasePrice,
+            high: ongoing.high ?? ongoingBasePrice,
           },
           laborHours: ongoing.laborHours ?? 0,
           pricing: ongoing.pricing,
@@ -298,7 +318,11 @@ export function calculateEstimate(
  * gates, rate, promotions, breakdown, confidence and range. Pure — the P12
  * recurring split above is the only behavior layered on top of it.
  */
-function computeCore(input: NormalizedEstimateInput, context: EstimateContext): EstimateResult {
+function computeCore(
+  input: NormalizedEstimateInput,
+  context: EstimateContext,
+  discountScope: DiscountAllocationScope = 'service',
+): EstimateResult {
   const cfg = context.pricingConfig ?? pricing;
   const travelZone = zoneForZip(input.zip);
   const travel = calculateTravelAdjustment({ ...context.travel, zone: travelZone });
@@ -434,6 +458,16 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
     supportiveEligible: input.supportiveEligible === true,
   });
   const discount = evaluation.discount;
+  const discounts = discount
+    ? [{
+        id: discount.id ?? discount.source ?? 'discount',
+        source: discount.source ?? 'promotion',
+        label: discount.label,
+        percent: discount.percent,
+        amount: discount.amount,
+        scope: discountScope,
+      }]
+    : [];
   // 2. One discount (never stacked) applies to the original service value.
   const discountedBase = discount ? round2(gross - discount.amount) : gross;
   // 3. The selected engine calibration factor applies to the discounted service subtotal.
@@ -464,6 +498,7 @@ function computeCore(input: NormalizedEstimateInput, context: EstimateContext): 
     selectedExtras,
     extrasSubtotal,
     discount,
+    discounts,
     travelAdjustment: travel.adjustment,
     roundingAdjustment,
     subtotal: expectedPrice,

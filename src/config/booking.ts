@@ -52,9 +52,9 @@ export const bookingConfig = {
    */
   slotMinutes: 15,
 
-  /** Public working window (local Central Time). Normal cleaning ends by 6:00 PM. */
+  /** Published operating window (local Central Time): 7:00 AM to 7:00 PM. */
   workdayStart: '07:00',
-  workdayEnd: '18:00',
+  workdayEnd: '19:00',
 
   /** 0=Sunday … 6=Saturday. The published service days are seven days. */
   workdays: [0, 1, 2, 3, 4, 5, 6] as ReadonlyArray<number>,

@@ -216,6 +216,13 @@ interface VerifiedCandidate {
   automaticDiscountCents?: number;
   automaticDiscountLabel?: string;
   automaticDiscountSource?: string;
+  recurring?: {
+    frequency: string;
+    regularPerVisitCents: number;
+    discountCents: number;
+    discountLabel: string;
+    perVisitCents: number;
+  };
   receipt: {
     service: string;
     serviceLocation: string;
@@ -488,6 +495,17 @@ export function buildCheckoutPricingSnapshot(
     remainingBalanceCents: 0,
     paymentTerms:
       'Payment is completed through the secure payment page. A signed copy is provided before payment.',
+    ...(candidate.recurring
+      ? {
+          recurring: {
+            frequency: candidate.recurring.frequency,
+            regularPerVisitCents: candidate.recurring.regularPerVisitCents,
+            discountCents: candidate.recurring.discountCents,
+            discountLabel: candidate.recurring.discountLabel,
+            perVisitCents: candidate.recurring.perVisitCents,
+          },
+        }
+      : {}),
     lines,
     note: 'Verified by the Sparkling Standard checkout engine.',
   });
@@ -937,6 +955,30 @@ async function verifyResidentialPayment(
   const serviceType = fields.service_type ?? 'standard';
   const cleaningAmountCents = cents(verification.verifiedPrice);
   const quotedCents = cents(quoted);
+  let recurring: CandidateSuccess['recurring'];
+  if (verification.ongoing) {
+    const allocation = verification.ongoing.discounts.find(
+      (discount) => discount.source === 'supportive',
+    );
+    const regularPerVisitCents = cents(verification.ongoing.regularPerVisitPrice);
+    const perVisitCents = cents(verification.ongoing.perVisitPrice);
+    recurring = {
+      frequency: verification.ongoing.frequency,
+      regularPerVisitCents,
+      discountCents: allocation ? cents(allocation.amount) : Math.max(0, regularPerVisitCents - perVisitCents),
+      discountLabel: allocation?.label ?? '',
+      perVisitCents,
+    };
+    // The recurring plan and every later surface use the server's verified
+    // ongoing rate, never the browser's assertion.
+    fields.ongoing_regular_price_per_visit = verification.ongoing.regularPerVisitPrice.toFixed(2);
+    fields.ongoing_price_per_visit = verification.ongoing.perVisitPrice.toFixed(2);
+    fields.ongoing_frequency = verification.ongoing.frequency;
+    if (allocation) {
+      fields.ongoing_discount_label = allocation.label;
+      fields.ongoing_discount_amount = allocation.amount.toFixed(2);
+    }
+  }
   if (!withinAcceptance(quotedCents, cleaningAmountCents)) {
     return { ok: false, reason: 'price_mismatch' };
   }
@@ -963,6 +1005,7 @@ async function verifyResidentialPayment(
     tax,
     verifiedState: verification.travel.destinationState ?? null,
     verifiedZip: verification.travel.destinationZip ?? null,
+    ...(recurring ? { recurring } : {}),
     ...(verification.breakdown?.discount
       ? {
           automaticDiscountCents: cents(verification.breakdown.discount.amount),
@@ -1434,11 +1477,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!evaluation.ok || !evaluation.promotion || !evaluation.discountCents) {
       return json({ ok: false, error: 'promotion_invalid', reason: evaluation.reason }, 409);
     }
-    const stacksWithSupportive =
-      candidate.automaticDiscountSource === 'supportive' && evaluation.promotion.supportiveStackable === true;
-    if (stacksWithSupportive || evaluation.discountCents > automaticDiscountCents) {
+    // Benefits are allocated to charge lines and never compounded on the same
+    // line. A new recurring first visit carries only this promotion; Community
+    // Support is preserved on the separately priced ongoing visits.
+    if (evaluation.discountCents > automaticDiscountCents) {
       const discount = evaluation.discountCents;
-      const combinedDiscount = stacksWithSupportive ? automaticDiscountCents + discount : discount;
+      const combinedDiscount = discount;
       const cleaningAfter = Math.max(0, promotionBaseCents - combinedDiscount);
       const taxAfter = calculateServiceTax({
         serviceType: candidate.serviceType,
@@ -1451,16 +1495,14 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       const amountAfter = cents(cleaningAfter / 100 + (taxAfter.taxAmount ?? 0));
       const receiptLines = [
-        ...(stacksWithSupportive
-          ? candidate.receipt.lines
-          : candidate.receipt.lines.filter(
-              (line) =>
-                !(
-                  line.kind === 'discount' &&
-                  automaticDiscountLabel &&
-                  line.label === automaticDiscountLabel
-                ),
-            )),
+        ...candidate.receipt.lines.filter(
+          (line) =>
+            !(
+              line.kind === 'discount' &&
+              automaticDiscountLabel &&
+              line.label === automaticDiscountLabel
+            ),
+        ),
         {
           label: `Promotion - ${evaluation.promotion.name}`,
           amountCents: -discount,
@@ -1480,10 +1522,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         amountCents: amountAfter,
         tax: taxAfter,
         automaticDiscountCents: combinedDiscount,
-        automaticDiscountLabel: stacksWithSupportive
-          ? automaticDiscountLabel
-          : `Promotion - ${evaluation.promotion.name}`,
-        ...(stacksWithSupportive ? { automaticDiscountSource: 'supportive+promotion' } : {}),
+        automaticDiscountLabel: `Promotion - ${evaluation.promotion.name}`,
+        automaticDiscountSource: 'promotion',
         receipt: {
           ...candidate.receipt,
           lines: reconciled,

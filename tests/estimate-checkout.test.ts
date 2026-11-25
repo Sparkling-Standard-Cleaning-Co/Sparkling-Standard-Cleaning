@@ -632,8 +632,12 @@ test('a facility payment without a server-confirmed street address is reservatio
   assert.equal(provider.postCount(), 0);
 });
 
-function validResidentialInput(serviceType: 'standard' | 'str_turnover', options: { supportive?: boolean } = {}) {
+function validResidentialInput(
+  serviceType: 'standard' | 'str_turnover',
+  options: { supportive?: boolean; frequency?: 'one_time' | 'weekly' | 'biweekly' | 'monthly' } = {},
+) {
   const isStr = serviceType === 'str_turnover';
+  const frequency = options.frequency ?? 'one_time';
   const input = {
     serviceType,
     propertyType: isStr ? ('condo' as const) : ('house' as const),
@@ -642,7 +646,7 @@ function validResidentialInput(serviceType: 'standard' | 'str_turnover', options
     fullBaths: 2,
     halfBaths: 0,
     ...(isStr ? { beds: 2 } : {}),
-    frequency: 'one_time' as const,
+    frequency,
     condition: 'maintained' as const,
     lastClean: 'within_month' as const,
     addonIds: [],
@@ -691,11 +695,21 @@ function validResidentialInput(serviceType: 'standard' | 'str_turnover', options
       full_baths: '2',
       half_baths: '0',
       ...(isStr ? { beds: '2' } : {}),
-      frequency: 'one_time',
+      frequency,
       condition: 'maintained',
       last_cleaned: 'within_month',
       pets: 'none',
       ...(options.supportive ? { supportive_eligible: 'yes' } : {}),
+      ...(result.ongoing
+        ? {
+            initial_deep_clean_required: 'yes',
+            initial_deep_clean_acknowledged: 'yes',
+            first_visit_total: String(amount),
+            ongoing_regular_price_per_visit: String(result.ongoing.regularPerVisitPrice),
+            ongoing_price_per_visit: String(result.ongoing.perVisitPrice),
+            ongoing_frequency: result.ongoing.frequency,
+          }
+        : {}),
       addon_ids: '',
       zip: '32502',
       service_address: '100 S Baylen St',
@@ -1105,7 +1119,7 @@ test('checkout accepts a confirmed property pin for structural payment eligibili
     );
 }
 
-test('an explicitly compatible promotion stacks with Community Support', async () => {
+test('a promotion and Community Support never compound on the same charge', async () => {
   const ledger = new FakeLedger();
   const db = checkoutDb();
   await activeCheckoutPromotion(db, {
@@ -1120,6 +1134,7 @@ test('an explicitly compatible promotion stacks with Community Support', async (
   const { amount, result, fields: baseFields } = validResidentialInput('standard', { supportive: true });
   const fields = withHold(baseFields, ledger);
   const automaticCents = Math.round((result.pricing.discount?.amount ?? 0) * 100);
+  const promotionBaseCents = Math.round(amount * 100) + automaticCents;
   let unitAmount = '';
   let promotionCode = '';
   let receiptDiscount = '';
@@ -1145,7 +1160,7 @@ test('an explicitly compatible promotion stacks with Community Support', async (
   );
 
   assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
-  assert.equal(unitAmount, String(Math.round(amount * 100) - 7500));
+  assert.equal(unitAmount, String(promotionBaseCents - 7500), 'the larger promotion replaces—not stacks on—the same line');
   assert.equal(promotionCode, 'THANKS75');
   assert.equal(receiptDiscount, '7500');
 });
@@ -1162,9 +1177,10 @@ test('a displayed promotion total is accepted against the matching server promot
   });
   const env = { ...makeEnv(ledger), DB: db };
   const provider = providerStub();
-  const { amount, fields: baseFields } = validResidentialInput('standard', { supportive: true });
+  const { amount, result, fields: baseFields } = validResidentialInput('standard', { supportive: true });
   const fields = withHold(baseFields, ledger);
-  const finalCents = Math.round(amount * 100) - 7500;
+  const automaticCents = Math.round((result.pricing.discount?.amount ?? 0) * 100);
+  const finalCents = Math.round(amount * 100) + automaticCents - 7500;
   let unitAmount = '';
   const response = await withFetch(
     async (url, init) => {
@@ -1238,6 +1254,61 @@ test('FRIENDS15 never stacks with Community Support and replaces it only when la
   assert.equal(unitAmount, String(promotionBaseCents - expectedDiscount));
 });
 
+test('HOLIDAY15 applies to the first visit while Community Support stays on future recurring visits', async () => {
+  const ledger = new FakeLedger();
+  const db = checkoutDb();
+  await activeCheckoutPromotion(db, {
+    code: 'HOLIDAY15',
+    name: 'Holidays',
+    valueCents: 0,
+    percent: 15,
+    kind: 'percent',
+    supportiveStackable: true,
+  });
+  const env = { ...makeEnv(ledger), DB: db, RECURRING_SCHEDULING_ENABLED: 'true' };
+  const provider = providerStub();
+  const { amount, result, fields: baseFields } = validResidentialInput('standard', {
+    supportive: true,
+    frequency: 'weekly',
+  });
+  assert.ok(result.ongoing, 'the recurring rate is present');
+  assert.equal(result.pricing.discount, null, 'Community Support is not taken off the first visit');
+  const ongoingDiscount = result.ongoing.pricing.discounts.find((discount) => discount.source === 'supportive');
+  assert.ok(ongoingDiscount && ongoingDiscount.amount > 0, 'Community Support is allocated to ongoing visits');
+  assert.ok(result.ongoing.regularPerVisitPrice > result.ongoing.perVisitPrice);
+  const fields = withHold(baseFields, ledger);
+  const promotionBaseCents = Math.round(amount * 100);
+  const expectedDiscount = Math.round((promotionBaseCents * 15) / 100);
+  let unitAmount = '';
+  let promotionCode = '';
+  let receiptDiscount = '';
+
+  const response = await withFetch(
+    async (url, init) => {
+      if (String(url).includes('/v1/checkout/sessions') && !String(url).includes('/v1/checkout/sessions/')) {
+        const body = init?.body as URLSearchParams;
+        unitAmount = body.get('line_items[0][price_data][unit_amount]') ?? '';
+        promotionCode = body.get('metadata[promotion_code]') ?? '';
+        receiptDiscount = body.get('metadata[promotion_discount_cents]') ?? '';
+      }
+      return provider.stub(url, init);
+    },
+    () =>
+      onRequestPost({
+        request: jsonRequest({
+          fields: { ...fields, promotion_code: 'HOLIDAY15' },
+          returnPath: '/estimate/residential/',
+        }),
+        env,
+      } as never),
+  );
+
+  assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
+  assert.equal(promotionCode, 'HOLIDAY15');
+  assert.equal(receiptDiscount, String(expectedDiscount));
+  assert.equal(unitAmount, String(promotionBaseCents - expectedDiscount), 'only HOLIDAY15 reduces the first-visit charge');
+});
+
 test('a valid but smaller submitted promotion never removes the better automatic discount', async () => {
   const ledger = new FakeLedger();
   const db = checkoutDb();
@@ -1291,6 +1362,7 @@ test('a promotion is applied before gift-certificate value at checkout', async (
   const { amount, result, fields: baseFields } = validResidentialInput('standard', { supportive: true });
   const fields = withHold(baseFields, ledger);
   const automaticCents = Math.round((result.pricing.discount?.amount ?? 0) * 100);
+  const promotionBaseCents = Math.round(amount * 100) + automaticCents;
   let unitAmount = '';
   let giftApplied = '';
 
@@ -1321,7 +1393,7 @@ test('a promotion is applied before gift-certificate value at checkout', async (
 
   assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
   assert.equal(giftApplied, '10000');
-  assert.equal(unitAmount, String(Math.round(amount * 100) - 7500 - 10_000));
+  assert.equal(unitAmount, String(promotionBaseCents - 7500 - 10_000));
 });
 
 test('pre-payment signing blocks checkout, then the resume token completes the same session without a duplicate Stripe call', async () => {

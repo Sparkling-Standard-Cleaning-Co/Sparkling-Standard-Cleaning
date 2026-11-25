@@ -369,6 +369,56 @@ test('rich HTML is sanitized but formatting and dynamic fields survive', () => {
   assert.equal(sanitizeDocumentHtml('<p>Hello</p>'), '<p>Hello</p>');
 });
 
+test('a recurring checkout snapshot preserves the first-visit promotion and ongoing Community Support rate', () => {
+  const snapshot = buildCheckoutPricingSnapshot(
+    { frequency: 'weekly', preferred_date: '2026-12-01' },
+    {
+      amountCents: 28500,
+      cleaningAmountCents: 28500,
+      quotedCents: 33500,
+      quotedTotalCents: 33500,
+      reference: 'SS-20261201-ABC123',
+      serviceType: 'standard',
+      tax: { taxAmount: 0, ratePercent: 0, jurisdictionLabel: 'Florida' },
+      verifiedState: 'FL',
+      verifiedZip: '32502',
+      receipt: {
+        service: 'Residential cleaning',
+        serviceLocation: '100 Example Street, Pensacola, FL 32502',
+        customerEmail: 'customer@example.test',
+        lines: [
+          { label: 'Cleaning service', amountCents: 33500, kind: 'charge' },
+          { label: 'Promotion - Holidays', amountCents: -5025, kind: 'discount' },
+        ],
+        subtotalCents: 28500,
+        taxCents: 0,
+        taxRatePercent: 0,
+        taxJurisdiction: 'Florida',
+        totalCents: 28500,
+      },
+      recurring: {
+        frequency: 'weekly',
+        regularPerVisitCents: 25000,
+        discountCents: 2500,
+        discountLabel: 'Community Support discount (10%)',
+        perVisitCents: 22500,
+      },
+      priceChanged: false,
+    } as never,
+  );
+  assert.equal(snapshot.totalCents, 28500);
+  assert.equal(snapshot.discountLabel, 'Promotion - Holidays');
+  assert.ok(snapshot.recurring);
+  assert.equal(snapshot.recurring.regularPerVisitCents, 25000);
+  assert.equal(snapshot.recurring.discountCents, 2500);
+  assert.equal(snapshot.recurring.perVisitCents, 22500);
+  const text = pricingSnapshotText(snapshot).join('\n');
+  assert.match(text, /Recurring maintenance \(regular\): \$250\.00 per visit/);
+  assert.match(text, /Community Support discount \(10%\): -\$25\.00/);
+  assert.match(text, /Recurring rate: \$225\.00 per weekly visit \(not charged today\)/);
+  assert.equal(snapshot.amountDueNowCents, 28500);
+});
+
 test('owner-facing version labels are conventional and stable', () => {
   assert.equal(conventionalVersionLabel(1), '1.0');
   assert.equal(conventionalVersionLabel(2), '1.1');

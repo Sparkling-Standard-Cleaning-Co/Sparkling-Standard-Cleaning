@@ -38,6 +38,17 @@ export interface PricingSnapshot {
   amountDueNowCents: number | null;
   remainingBalanceCents: number | null;
   paymentTerms: string;
+  /**
+   * Future recurring maintenance terms. These amounts are informational today
+   * and are not part of the amount charged on this checkout.
+   */
+  recurring?: {
+    frequency: string;
+    regularPerVisitCents: number;
+    discountCents: number;
+    discountLabel: string;
+    perVisitCents: number;
+  } | null;
   lines: PricingSnapshotLine[];
   note: string;
 }
@@ -183,6 +194,18 @@ export function createPricingSnapshot(input: Partial<PricingSnapshot>): PricingS
     typeof input.remainingBalanceCents === 'number' && Number.isFinite(input.remainingBalanceCents)
       ? Math.round(input.remainingBalanceCents)
       : 0;
+  const recurring =
+    input.recurring &&
+    Number.isFinite(input.recurring.regularPerVisitCents) &&
+    Number.isFinite(input.recurring.perVisitCents)
+      ? {
+          frequency: text(input.recurring.frequency, 40),
+          regularPerVisitCents: Math.round(input.recurring.regularPerVisitCents),
+          discountCents: Math.max(0, Math.round(Number(input.recurring.discountCents) || 0)),
+          discountLabel: text(input.recurring.discountLabel, 300),
+          perVisitCents: Math.round(input.recurring.perVisitCents),
+        }
+      : null;
   return {
     version: 1,
     currency: 'USD',
@@ -212,6 +235,7 @@ export function createPricingSnapshot(input: Partial<PricingSnapshot>): PricingS
     amountDueNowCents,
     remainingBalanceCents,
     paymentTerms: text(input.paymentTerms, 4000),
+    ...(recurring ? { recurring } : { recurring: null }),
     lines,
     note: text(input.note, 1000),
   };
@@ -292,6 +316,9 @@ export function pricingSnapshotFromFields(source: PricingFieldSource): PricingSn
     fields.address_state,
     fields.zip,
   ].filter(Boolean).join(', ');
+  const recurringPerVisit = parseMoneyCents(fields.ongoing_price_per_visit);
+  const recurringRegular = parseMoneyCents(fields.ongoing_regular_price_per_visit);
+  const recurringDiscount = parseMoneyCents(fields.ongoing_discount_amount);
   return createPricingSnapshot({
     version: 1,
     currency: 'USD',
@@ -318,6 +345,17 @@ export function pricingSnapshotFromFields(source: PricingFieldSource): PricingSn
     amountDueNowCents: total,
     remainingBalanceCents: 0,
     paymentTerms: source.paymentTerms || fields.payment_terms || 'Payment is due as stated in the signed agreement.',
+    ...(recurringPerVisit !== null
+      ? {
+          recurring: {
+            frequency: fields.ongoing_frequency || source.frequency || fields.frequency || '',
+            regularPerVisitCents: recurringRegular ?? recurringPerVisit,
+            discountCents: recurringDiscount ?? 0,
+            discountLabel: fields.ongoing_discount_label || '',
+            perVisitCents: recurringPerVisit,
+          },
+        }
+      : {}),
     lines: receiptLines,
     note: fields.verification_note || '',
   });
@@ -389,9 +427,21 @@ export function pricingSnapshotFromAdmin(
 export function pricingDocumentVariables(snapshot: PricingSnapshot): Record<string, string> {
   const total = formatPricingMoney(snapshot.totalCents);
   const due = formatPricingMoney(snapshot.amountDueNowCents);
-  const priceLines = snapshot.lines
-    .map((line) => `${line.label}: ${formatPricingMoney(line.amountCents)}`)
-    .join('\n');
+  const recurringLines = snapshot.recurring
+    ? [
+        `Recurring maintenance (regular): ${formatPricingMoney(snapshot.recurring.regularPerVisitCents)} per visit`,
+        ...(snapshot.recurring.discountCents > 0
+          ? [
+              `${snapshot.recurring.discountLabel || 'Recurring discount'}: -${formatPricingMoney(snapshot.recurring.discountCents)}`,
+            ]
+          : []),
+        `Recurring rate: ${formatPricingMoney(snapshot.recurring.perVisitCents)} per ${snapshot.recurring.frequency} visit (not charged today)`,
+      ]
+    : [];
+  const priceLines = [
+    ...snapshot.lines.map((line) => `${line.label}: ${formatPricingMoney(line.amountCents)}`),
+    ...recurringLines,
+  ].join('\n');
   const summary = total
     ? `${total} total due under this agreement.${due && due !== total ? ` Amount due now: ${due}.` : ''}`
     : 'The price is stated in the signed schedule.';
@@ -417,6 +467,19 @@ export function pricingSnapshotText(snapshot: PricingSnapshot): string[] {
   if (snapshot.arrivalWindow) rows.push(`Arrival window: ${snapshot.arrivalWindow}`);
   for (const line of snapshot.lines) {
     rows.push(`${line.label}: ${formatPricingMoney(line.amountCents)}`);
+  }
+  if (snapshot.recurring) {
+    rows.push(
+      `Recurring maintenance (regular): ${formatPricingMoney(snapshot.recurring.regularPerVisitCents)} per visit`,
+    );
+    if (snapshot.recurring.discountCents > 0) {
+      rows.push(
+        `${snapshot.recurring.discountLabel || 'Recurring discount'}: -${formatPricingMoney(snapshot.recurring.discountCents)}`,
+      );
+    }
+    rows.push(
+      `Recurring rate: ${formatPricingMoney(snapshot.recurring.perVisitCents)} per ${snapshot.recurring.frequency} visit (not charged today)`,
+    );
   }
   const total = formatPricingMoney(snapshot.totalCents);
   if (total) rows.push(`Total: ${total}`);

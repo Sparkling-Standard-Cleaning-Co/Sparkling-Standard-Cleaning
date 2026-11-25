@@ -379,10 +379,16 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   function stackingWithSupport(): boolean {
-    return (
-      appliedPromotion?.supportiveStackable === true &&
-      latestResult?.pricing.discount?.source === 'supportive'
-    );
+    // Benefits are scoped by charge line. A first-visit promotion and the
+    // ongoing Community Support rate are independent, never compounded on the
+    // same service line.
+    return false;
+  }
+
+  function ongoingDiscount(result: EstimateResult) {
+    return result.ongoing?.pricing.discounts.find(
+      (discount) => discount.source === 'supportive',
+    ) ?? result.ongoing?.pricing.discounts[0] ?? null;
   }
 
   function winningPromotion(): AppliedPromotion | null {
@@ -556,11 +562,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
     const firstEl = block.querySelector<HTMLElement>('[data-recurring-deep-first]');
     const rhythmEl = block.querySelector<HTMLElement>('[data-recurring-deep-rhythm]');
     const ongoingEl = block.querySelector<HTMLElement>('[data-recurring-deep-ongoing]');
+    const savingEl = block.querySelector<HTMLElement>('[data-recurring-deep-saving]');
     if (!requiresInitialDeepClean()) {
       block.hidden = true;
       if (firstEl) firstEl.textContent = 'calculated after your home details';
       if (rhythmEl) rhythmEl.textContent = 'maintenance';
       if (ongoingEl) ongoingEl.textContent = 'calculated after your home details';
+      if (savingEl) savingEl.hidden = true;
       return;
     }
     block.hidden = false;
@@ -574,6 +582,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         rhythmEl.textContent = `${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)}`;
       }
       if (ongoingEl) ongoingEl.textContent = 'calculated after your home details';
+      if (savingEl) savingEl.hidden = true;
       return;
     }
     const first = latestQuote?.amount ?? result.expectedPrice ?? result.low;
@@ -583,6 +592,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
       rhythmEl.textContent = `${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)}`;
     }
     if (ongoingEl) ongoingEl.textContent = formatUsd(result.ongoing.perVisitPrice);
+    if (savingEl) {
+      const allocation = ongoingDiscount(result);
+      savingEl.hidden = !allocation;
+      savingEl.textContent = allocation
+        ? `${allocation.label} (${allocation.percent}%): -${formatUsd(allocation.amount, { forceCents: true })} off the ${formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true })} regular recurring rate.`
+        : '';
+    }
   }
 
   function recalc(): EstimateResult {
@@ -704,11 +720,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const ongoing = result.ongoing;
         if (ongoing) {
           liveOngoing.hidden = false;
-          const ongoingDiscount =
-            ongoing.pricing.discount?.source === 'supportive'
-              ? ' Community Support applies to these ongoing visits only and does not stack with the first-visit promotion.'
-              : '';
-          liveOngoing.textContent = `After the required first-visit Deep Cleaning above, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are ${formatUsd(ongoing.perVisitPrice)} each.${ongoingDiscount}`;
+          const allocation = ongoingDiscount(result);
+          const allocationCopy = allocation
+            ? ` ${allocation.label} (${allocation.percent}%): -${formatUsd(allocation.amount, { forceCents: true })} off the ${formatUsd(ongoing.regularPerVisitPrice, { forceCents: true })} regular rate.`
+            : '';
+          liveOngoing.textContent = `After the required first-visit Deep Cleaning above, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are ${formatUsd(ongoing.perVisitPrice)} each.${allocationCopy}`;
         } else {
           liveOngoing.hidden = true;
           liveOngoing.textContent = '';
@@ -966,7 +982,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       lines.push({ label: 'Minimum visit price', value: formatUsd(p.basePrice) });
     } else {
       lines.push({
-        label: firstVisit ? 'True Deep Cleaning Price' : 'Base cleaning',
+        label: firstVisit ? 'Initial Deep Cleaning (regular price)' : 'Base cleaning',
         value: formatUsd(p.basePrice, { forceCents: true }),
       });
     }
@@ -1318,11 +1334,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const rhythm =
           FREQUENCY_RHYTHMS[result.ongoing.frequency] ?? result.ongoing.frequency;
         reservationOngoing.hidden = false;
-        const ongoingDiscount =
-          result.ongoing.pricing.discount?.source === 'supportive'
-            ? ' (Community Support applied to ongoing visits only)'
-            : '';
-        reservationOngoing.textContent = `${formatUsd(result.ongoing.perVisitPrice)} — ${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)} Thereafter${ongoingDiscount}`;
+        const allocation = ongoingDiscount(result);
+        const regular = formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true });
+        const rate = formatUsd(result.ongoing.perVisitPrice, { forceCents: true });
+        const allocationCopy = allocation
+          ? ` · ${allocation.label} (${allocation.percent}%): -${formatUsd(allocation.amount, { forceCents: true })} · Your rate: ${rate} per ${rhythm} visit (regular ${regular})`
+          : ` · ${rate} per ${rhythm} visit`;
+        reservationOngoing.textContent = `Recurring maintenance${allocationCopy}`;
       } else {
         reservationOngoing.hidden = true;
         reservationOngoing.textContent = '';
@@ -1373,6 +1391,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
             'Ongoing visits',
             `${formatUsd(result.ongoing.perVisitPrice)} per ${FREQUENCY_RHYTHMS[result.ongoing.frequency]} visit`,
           );
+          const allocation = ongoingDiscount(result);
+          if (allocation) {
+            addSummaryRow(
+              cleaningRows,
+              'Recurring benefit',
+              `${allocation.label} (${allocation.percent}%): -${formatUsd(allocation.amount, { forceCents: true })} off the ${formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true })} regular rate`,
+            );
+          }
         }
         const homeParts = [
           input.propertyType ? input.propertyType.charAt(0).toUpperCase() + input.propertyType.slice(1) : '',
@@ -2399,8 +2425,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
       // fields so the owner email can show both without any ambiguity.
       if (result.ongoing) {
         fields.first_visit_total = String(latestQuote.amount);
+        fields.ongoing_regular_price_per_visit = String(result.ongoing.regularPerVisitPrice);
         fields.ongoing_price_per_visit = String(result.ongoing.perVisitPrice);
         fields.ongoing_frequency = result.ongoing.frequency;
+        const allocation = ongoingDiscount(result);
+        if (allocation) {
+          fields.ongoing_discount_label = allocation.label;
+          fields.ongoing_discount_amount = allocation.amount.toFixed(2);
+        }
       }
     }
     // Customer photos (optional): private storage references only — the

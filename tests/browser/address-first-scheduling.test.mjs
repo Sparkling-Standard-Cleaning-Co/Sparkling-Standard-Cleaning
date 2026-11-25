@@ -155,7 +155,7 @@ for (const [label, width, height] of [
       await page.waitForSelector('[data-period="first"]:not([disabled])', { state: 'visible' });
       await page.click('[data-period="first"]');
       await page.locator('[data-calendar-picker]').waitFor({ state: 'visible' });
-      await page.waitForSelector('[data-calendar-time-options] button:not([disabled])', { state: 'visible' });
+      await page.waitForSelector('[data-time-hour]', { state: 'visible' });
       const picker = await page.evaluate(() => {
         const element = document.querySelector('[data-calendar-picker]');
         if (!element) return null;
@@ -165,7 +165,8 @@ for (const [label, width, height] of [
       assert.ok(picker);
       assert.ok(inViewport(picker, picker.viewport), 'time picker is positioned in view');
 
-      await page.locator('[data-calendar-time-options] button:not([disabled])').first().click();
+      await page.selectOption('[data-time-hour]', '7');
+      await page.selectOption('[data-time-minute]', { label: '00' });
       await page.waitForFunction(() => (document.querySelector('[data-calendar-time-input]')?.value ?? '').length > 0);
       assert.equal(await page.locator('[data-calendar-time-input]').inputValue(), '7:00 AM');
       await page.waitForFunction(() => {

@@ -230,6 +230,12 @@ test('enabled availability returns real slots and never includes customer detail
       assert.equal(data.timeZone, 'America/Chicago');
       assert.equal(data.available, true);
       assert.ok((data.slots?.length ?? 0) > 0);
+      assert.equal(data.slots?.[0]?.startLabel, '7:00 AM', 'a free day starts at 7:00 AM');
+      assert.equal(
+        data.slots?.some((slot) => slot.startLabel === '7:15 AM'),
+        true,
+        '7:15 AM is offered when free',
+      );
       for (const slot of data.slots ?? []) {
         assert.equal(
           isPublicBookingStartMinutes(localMinutesOfDay(new Date(slot.start), data.timeZone ?? 'America/Chicago')),

@@ -196,6 +196,18 @@ function renderPricing(payload: SigningPayload): string {
         )
         .join('')}</div>`
     : '';
+  const recurring = pricing.recurring
+    ? `<div class="signing-price-block"><h3>Recurring maintenance</h3>
+        <div class="signing-price-lines">
+          <div class="signing-price-line"><span>Regular per-visit price</span><strong>${esc(formatPricingMoney(pricing.recurring.regularPerVisitCents))}</strong></div>
+          ${pricing.recurring.discountCents > 0
+            ? `<div class="signing-price-line signing-price-line--credit"><span>${esc(pricing.recurring.discountLabel || 'Recurring discount')}</span><strong>-${esc(formatPricingMoney(pricing.recurring.discountCents))}</strong></div>`
+            : ''}
+          <div class="signing-price-line"><span>Your recurring rate</span><strong>${esc(formatPricingMoney(pricing.recurring.perVisitCents))} / ${esc(pricing.recurring.frequency)} visit</strong></div>
+        </div>
+        <p class="signing-muted">Future recurring visits are not charged today.</p>
+      </div>`
+    : '';
   const total = formatPricingMoney(pricing.totalCents);
   const due = formatPricingMoney(pricing.amountDueNowCents);
   const remaining = formatPricingMoney(pricing.remainingBalanceCents);
@@ -204,6 +216,7 @@ function renderPricing(payload: SigningPayload): string {
     ${pricing.scope ? `<div class="signing-price-block"><h3>Included scope</h3><p>${esc(pricing.scope)}</p></div>` : ''}
     ${pricing.addOns && !/^none$/i.test(pricing.addOns) ? `<div class="signing-price-block"><h3>Add-ons</h3><p>${esc(pricing.addOns)}</p></div>` : ''}
     ${lines}
+    ${recurring}
     <div class="signing-price-total">
       ${total ? `<div><span>Final total</span><strong>${esc(total)}</strong></div>` : ''}
       ${due && due !== total ? `<div><span>Amount due now</span><strong>${esc(due)}</strong></div>` : ''}

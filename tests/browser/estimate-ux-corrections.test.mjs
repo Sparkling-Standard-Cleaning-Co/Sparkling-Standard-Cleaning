@@ -229,7 +229,7 @@ test('Morning and Afternoon selections keep the exact time picker in view', asyn
       const result = await page.evaluate(() => {
         const picker = document.querySelector('[data-calendar-picker]');
         const heading = picker?.querySelector('.booking-calendar__picker-heading');
-        const fields = picker?.querySelector('.booking-calendar__times');
+        const fields = picker?.querySelector('.booking-calendar__time-fields');
         if (!picker || !heading || !fields) return null;
         const pickerRect = picker.getBoundingClientRect();
         const headingRect = heading.getBoundingClientRect();
@@ -486,13 +486,17 @@ test('rapid date changes never let a stale availability response win', async () 
     assert.equal(await page.locator('[data-period="first"]').isDisabled(), true, 'stale morning slots never win');
     await page.click('[data-period="afternoon"]');
     await page.waitForSelector('[data-calendar-picker]', { state: 'visible' });
-    const times = (await page.locator('[data-calendar-time-options] button').allTextContents()).map((value) => value.trim());
-    assert.deepEqual(times, [
-      '12:30 PM', '12:45 PM', '1:00 PM', '1:15 PM', '1:30 PM',
-      '1:45 PM', '2:00 PM', '2:15 PM', '2:30 PM',
-    ]);
-    const enabled = (await page.locator('[data-calendar-time-options] button:not([disabled])').allTextContents()).map((value) => value.trim());
-    assert.deepEqual(enabled, ['12:30 PM'], 'stale morning slots never appear in the new date');
+    await page.waitForSelector('[data-time-hour]', { state: 'visible' });
+    const hourValues = await page.locator('[data-time-hour] option').evaluateAll((options) => options.map((option) => option.value));
+    assert.equal(hourValues.includes('7'), false, 'stale morning hours never appear');
+    assert.equal(hourValues.includes('12'), true);
+    await page.selectOption('[data-time-hour]', '12');
+    const enabledMinutes = await page.locator('[data-time-minute] option').evaluateAll((options) =>
+      options.filter((option) => option.value && !option.disabled).map((option) => option.textContent?.trim()),
+    );
+    assert.deepEqual(enabledMinutes, ['30'], 'only the newer date\'s 12:30 start is enabled');
+    await page.selectOption('[data-time-minute]', { label: '30' });
+    await page.waitForFunction(() => document.querySelector('[data-calendar-time-input]')?.value === '12:30 PM');
   } finally {
     await context.close();
   }
@@ -608,7 +612,7 @@ test('a valid promo updates the itemized total, highlights the saving and scroll
   }
 });
 
-test('Community Support and an explicitly compatible promo stack with separate itemized lines', async () => {
+test('Community Support and a same-line promotion never compound; the larger offer wins', async () => {
   const { context, page } = await setupPage({ reducedMotion: 'reduce' });
   try {
     await completeToFinalStep(page);
@@ -643,10 +647,10 @@ test('Community Support and an explicitly compatible promo stack with separate i
       () => document.querySelector('[data-discount-status]')?.textContent?.includes('THANKS75'),
     );
     const breakdown = (await page.locator('[data-price-breakdown]').innerText()).replace(/\s+/g, ' ');
-    assert.match(breakdown, /Community Support discount/i);
+    assert.doesNotMatch(breakdown, /Community Support discount/i, 'the same service line is not discounted twice');
     assert.match(breakdown, /THANKS75 promotion applied/);
     const total = moneyValue(await page.locator('[data-reservation-price]').innerText());
-    assert.equal(total, communityTotal - 75, 'both authorized reductions apply');
+    assert.ok(total < communityTotal, 'the larger authorized promotion still applies');
   } finally {
     await context.close();
   }

@@ -91,6 +91,25 @@ test('a claimed campaign owns the first visit while Community Support applies to
   assert.equal(result.ongoing.pricing.discount?.amount, Math.round(result.ongoing.pricing.basePrice * 0.1 * 100) / 100);
 });
 
+test('Community Support is scoped to ongoing visits, never the first-visit Deep Cleaning', () => {
+  const result = calculateEstimate(
+    input({ frequency: 'weekly', supportiveEligible: true }),
+    context(),
+  );
+  assert.equal(result.status, 'estimated');
+  assert.ok(result.ongoing);
+  assert.equal(result.pricing.discount, null, 'no Community Support discount on the first visit');
+  assert.deepEqual(result.pricing.discounts, []);
+  const allocation = result.ongoing.pricing.discounts.find((discount) => discount.source === 'supportive');
+  assert.ok(allocation, 'the ongoing line carries the Community Support allocation');
+  assert.equal(allocation.scope, 'ongoing_visit');
+  assert.ok(result.ongoing.regularPerVisitPrice > result.ongoing.perVisitPrice);
+  assert.equal(
+    result.ongoing.pricing.discount?.amount,
+    Math.round(result.ongoing.pricing.basePrice * 0.1 * 100) / 100,
+  );
+});
+
 test('a monthly arrangement receives the campaign and prices the deep first visit', () => {
   const monthly = calculateEstimate(input({ frequency: 'monthly' }), context(CLAIMED));
   assert.equal(monthly.status, 'estimated');

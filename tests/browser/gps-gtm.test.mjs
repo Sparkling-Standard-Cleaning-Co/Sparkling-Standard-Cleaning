@@ -266,12 +266,7 @@ test('a street-level reverse result never invents a street address', async () =>
     assert.equal(await page.inputValue('#est-address'), '', 'street is not invented');
     assert.equal(await page.locator('[data-address-confirm]').count(), 1);
     await page.locator('[data-address-confirm]').click();
-    await page.fill('#est-date', BOOKING_DATE);
-    await page.waitForSelector('[data-period="first"]:not([disabled])', { state: 'visible' });
-    await page.click('[data-period="first"]');
-    await page.waitForSelector('[data-calendar-time-options] button:not([disabled])', { state: 'visible' });
-    await page.locator('[data-calendar-time-options] button:not([disabled])').first().click();
-    await page.waitForFunction(() => (document.querySelector('[data-calendar-time-input]')?.value ?? '').length > 0);
+    await chooseAppointment(page, BOOKING_DATE, 'first');
     await page.click('[data-next]');
     assert.equal(
       await page.locator('.wizard__step[data-active="true"][data-step="2"]').count(),

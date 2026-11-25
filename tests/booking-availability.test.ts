@@ -77,23 +77,23 @@ test('public booking starts are limited to the morning and afternoon windows', (
   assert.equal(localMinutesOfDay(zonedTimeToUtc('2026-11-10', '14:30', tz), tz), 14 * 60 + 30);
 });
 
-test('a free day offers only slots that fit the workday, travel and notice period', async () => {
+test('a free day offers slots from the workday start without a home-origin delay', async () => {
   const result = await calculateAvailability(request(), label);
   assert.equal(result.enabled, true);
   assert.equal(result.available, true);
   const first = result.slots[0]!;
-  assert.equal(label(new Date(first.start)), '8:30 AM');
+  assert.equal(label(new Date(first.start)), '8:00 AM');
   const last = result.slots.at(-1)!;
   assert.ok(new Date(last.end) <= zonedTimeToUtc('2026-11-10', '18:00', tz));
 });
 
-test('the first appointment may start at 7:00 AM with zero travel', async () => {
+test('origin travel never delays the first job of the day, including 7:00 and 7:15', async () => {
   const result = await calculateAvailability(
     request({
       workdayStart: '07:00',
       slotMinutes: 15,
       resources: resources.map((resource) => ({ ...resource, workdayStart: '07:00' })),
-      travelMinutes: async () => 0,
+      travelMinutes: async () => 30,
     }),
     label,
   );
@@ -164,9 +164,18 @@ test('a job without a location blocks the day instead of inventing travel', asyn
   assert.equal(result.reason, 'travel_unavailable');
 });
 
-test('an unavailable route withholds every slot and never guesses', async () => {
+test('an unavailable route withholds every slot when a previous job requires travel', async () => {
   const result = await calculateAvailability(
-    request({ travelMinutes: async () => null }),
+    request({
+      jobs: [
+        {
+          start: zonedTimeToUtc('2026-11-10', '08:00', tz),
+          end: zonedTimeToUtc('2026-11-10', '09:30', tz),
+          location: destination,
+        },
+      ],
+      travelMinutes: async () => null,
+    }),
     label,
   );
   assert.equal(result.available, false);
@@ -202,7 +211,7 @@ test('a job assigned to one cleaner leaves the other cleaner available', async (
   );
   assert.equal(result.available, true);
   const first = result.slots[0]!;
-  assert.equal(label(new Date(first.start)), '8:30 AM');
+  assert.equal(label(new Date(first.start)), '8:00 AM');
   assert.deepEqual(first.resourceIds, ['family-cleaner']);
 });
 

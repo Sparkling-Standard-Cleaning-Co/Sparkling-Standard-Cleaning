@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
+import { chooseTime } from '../helpers/estimator-step-one.mjs';
 
 const PORT = 4527;
 const BASE = `http://localhost:${PORT}`;
@@ -185,9 +186,7 @@ async function chooseAddressAndDate(page) {
 async function finishToPayment(page, period) {
   await page.click(`[data-period="${period}"]`);
   await page.waitForSelector('[data-calendar-picker]', { state: 'visible' });
-  await page.waitForSelector('[data-calendar-time-options] button:not([disabled])', { state: 'visible' });
-  await page.locator('[data-calendar-time-options] button:not([disabled])').first().click();
-  await page.waitForFunction(() => (document.querySelector('[data-calendar-time-input]')?.value ?? '').length > 0);
+  await chooseTime(page);
   await page.click('[data-next]');
   await page.waitForFunction(() => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true');
 

@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { checkEstimateTerms } from './terms-ready.mjs';
+import { chooseAppointment } from '../helpers/estimator-step-one.mjs';
 
 const PORT = 4417;
 const BASE = `http://localhost:${PORT}`;
@@ -135,12 +136,7 @@ async function addressAndHome(page, { service = 'standard', beds } = {}) {
     () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
   );
   await page.locator('[data-schedule-section]').waitFor({ state: 'visible' });
-  await page.fill('#est-date', bookingDate);
-  await page.waitForSelector('[data-period="first"]:not([disabled])', { state: 'visible' });
-  await page.click('[data-period="first"]');
-  await page.waitForSelector('[data-calendar-time-options] button:not([disabled])', { state: 'visible' });
-  await page.locator('[data-calendar-time-options] button:not([disabled])').first().click();
-  await page.waitForFunction(() => (document.querySelector('[data-calendar-time-input]')?.value ?? '').length > 0);
+  await chooseAppointment(page, bookingDate, 'first');
   await page.click('[data-next]');
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',

@@ -115,6 +115,22 @@ export interface AddonPriceLine {
  * the estimate and the quote. The client renders these values and the server
  * recomputes them identically for the owner notification.
  */
+export type DiscountAllocationScope = 'first_visit' | 'ongoing_visit' | 'service';
+
+/**
+ * One independently scoped benefit. A new recurring quote has a first-visit
+ * allocation and an ongoing-visit allocation; they never compound on one
+ * charge.
+ */
+export interface DiscountAllocation {
+  id: string;
+  source: string;
+  label: string;
+  percent: number;
+  amount: number;
+  scope: DiscountAllocationScope;
+}
+
 export interface PricingBreakdown {
   /** Internal gross revenue per labor-hour actually applied (owner only). */
   ratePerLaborHour: number;
@@ -133,9 +149,9 @@ export interface PricingBreakdown {
   selectedExtras: Array<{ id: string; label: string; charge: number }>;
   extrasSubtotal: number;
   /**
-   * The single applied promotion (never stacked), or null when none is
-   * active. `id`/`source` identify the exact configured program so a quote's
-   * provenance is auditable.
+   * The applied benefit on THIS charge line, kept for backward compatibility.
+   * New code must read `discounts`, which records the independent allocation
+   * scope (first visit, ongoing visit or a one-time service).
    */
   discount: {
     id?: string;
@@ -144,6 +160,8 @@ export interface PricingBreakdown {
     amount: number;
     label: string;
   } | null;
+  /** Independently scoped allocations for this charge line. */
+  discounts: DiscountAllocation[];
   /** proposedTotal − (basePrice + extrasSubtotal − discountAmount); ≥ 0. */
   roundingAdjustment: number;
   /** The offered price before the $5 round-up (expectedPrice equivalent). */
@@ -209,9 +227,11 @@ export interface CalculationTraceEntry {
 export interface OngoingVisitSummary {
   /** The recurring rhythm the customer chose (weekly / biweekly / monthly). */
   frequency: Frequency;
+  /** Per-visit price before the independently scoped ongoing benefit. */
+  regularPerVisitPrice: number;
   /**
-   * The ongoing per-visit price, rounded with the SAME instant-quote rule as
-   * the primary price (margin floor + minimum job + round-up step).
+   * The ongoing per-visit price after the applicable benefit, rounded with the
+   * SAME instant-quote rule as the primary price.
    */
   perVisitPrice: number;
   /** Model price before the final round-up (transparency/debug only). */

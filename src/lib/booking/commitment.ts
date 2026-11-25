@@ -80,6 +80,7 @@ export interface CommitmentInput {
   serviceCode?: string;
   frequency?: string;
   ongoingPriceCents?: number;
+  baseOngoingPriceCents?: number;
   ongoingDurationMinutes?: number;
   termsVersion?: string;
   notes?: string;
@@ -501,6 +502,10 @@ export async function commitConfirmedBooking(
           Number(fields.ongoing_duration_minutes) ||
           duration,
         ongoingPriceCents: ongoingPrice,
+        baseOngoingPriceCents:
+          Number(input.baseOngoingPriceCents) ||
+          Math.round(Number(fields.ongoing_regular_price_per_visit || 0) * 100) ||
+          ongoingPrice,
         crewSize: resourceIds.length,
         resourceIds,
         appointmentId,
@@ -546,6 +551,7 @@ export async function ensureRecurringPlan(
     duration: number;
     ongoingDuration: number;
     ongoingPriceCents: number;
+    baseOngoingPriceCents?: number;
     crewSize: number;
     resourceIds: string[];
     appointmentId: string;
@@ -592,9 +598,9 @@ export async function ensureRecurringPlan(
     .prepare(
       `INSERT INTO recurring_plans
        (id, customer_id, property_id, branch_id, service_code, frequency, status,
-        ongoing_price_cents, start_date, next_visit_date, terms_version, window, start_time,
+        ongoing_price_cents, base_ongoing_price_cents, start_date, next_visit_date, terms_version, window, start_time,
         duration_minutes, crew_size, first_duration_minutes, booking_reference, sync_status)
-       VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
     )
     .bind(
       planId,
@@ -604,6 +610,7 @@ export async function ensureRecurringPlan(
       input.serviceCode,
       input.frequency,
       input.ongoingPriceCents,
+      input.baseOngoingPriceCents ?? input.ongoingPriceCents,
       startDate,
       nextDate,
       input.termsVersion,
