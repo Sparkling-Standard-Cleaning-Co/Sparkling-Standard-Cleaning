@@ -258,6 +258,18 @@ endpoint. A failure email was not deliberately triggered during this session
 because that would create a false incident; the endpoint path and configured
 secrets are in place.
 
+## Branch consolidation
+
+- `main` is now the GitHub default branch and the Cloudflare Pages production
+  branch.
+- `main` and `production-safe` are identical at `5e35a00` (zero divergence);
+  `production-safe` remains as the protected rollback reference and must not be
+  developed independently.
+- The backup scheduler's dispatch ref remains `production-safe`; because both
+  branches are identical, scheduled backups run the same code. Update the
+  Worker variable to `main` at the next scheduled Worker deployment.
+- No branch was force-pushed, rewritten or deleted.
+
 ## Remaining limitations
 
 - Production deployment of this work package requires applying migration
