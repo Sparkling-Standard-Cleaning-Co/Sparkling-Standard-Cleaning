@@ -32,15 +32,19 @@ const verifyRestore = await readJson(path.resolve('backup-out/verify-restore.jso
 const archivePath = String(last?.archive ?? arg('--archive', ''));
 const archiveName = archivePath ? path.basename(archivePath) : arg('--archive-name', '');
 const archiveKey = String(last?.upload?.archive?.key ?? arg('--archive-key', ''));
-const archiveBytes = Number(last?.archiveBytes ?? 0) || null;
-const fileCount = Number(last?.fileCount ?? 0) || null;
+const archiveBytes = Number(last?.archiveBytes ?? verifyArchive?.bytes ?? 0) || null;
+const fileCount = Number(last?.fileCount ?? verifyArchive?.fileCount ?? 0) || null;
 const archiveSha256 = String(last?.archiveSha256 ?? verifyArchive?.archive_sha256 ?? '');
 const verifiedArchive = verifyR2 ?? verifyArchive;
 const r2Verified = Boolean(verifiedArchive?.ok && (!verifiedArchive.databases || verifiedArchive.databases.every((db) => db.integrity === 'ok')));
 const oneDriveVerified = Boolean(verifyOneDrive?.ok && (!verifyOneDrive.databases || verifyOneDrive.databases.every((db) => db.integrity === 'ok')));
 const restorePassed = Boolean(verifyRestore?.ok);
 const d1 = verifyRestore ?? verifyR2 ?? verifyOneDrive ?? verifyArchive;
-const databases = Array.isArray(d1?.databases) ? d1.databases : [];
+const databases = Array.isArray(d1?.databases)
+  ? d1.databases
+  : d1?.tables
+    ? [{ path: 'restored-d1.sql', integrity: d1.ok ? 'ok' : 'failed', tables: Number(d1.tables), migrations: Number(d1.migrations) }]
+    : [];
 const summary = status === 'success'
   ? operation === 'backup'
     ? `Encrypted ${archiveName || 'backup'} created and independently verified.`

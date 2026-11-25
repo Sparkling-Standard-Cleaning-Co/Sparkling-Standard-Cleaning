@@ -226,11 +226,13 @@ async function dispatch(env: Env, job: JobRow, extra: Record<string, string> = {
     ? (env.GITHUB_WORKFLOW?.trim() || DEFAULT_WORKFLOW)
     : (env.GITHUB_VERIFY_WORKFLOW?.trim() || DEFAULT_VERIFY_WORKFLOW);
   const ref = env.GITHUB_REF?.trim() || DEFAULT_REF;
-  const inputs: Record<string, string> = {
-    job_id: job.id,
-    scope: job.scope,
-    ...extra,
-  };
+  const inputs: Record<string, string> = job.operation === 'backup'
+    ? { job_id: job.id, scope: job.scope, ...extra }
+    : {
+        job_id: job.id,
+        archive_key: job.archive_key || String(extra.archive_key ?? ''),
+        operation: job.operation === 'restore_test' ? 'restore_test' : 'verify',
+      };
   const body = await githubJson(env, `/actions/workflows/${encodeURIComponent(workflow)}/dispatches`, {
     method: 'POST',
     body: JSON.stringify({ ref, inputs, return_run_details: true }),
