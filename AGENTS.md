@@ -84,31 +84,35 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-25 P0 residential checkout corrections, crew sizing and branding retirement):**
-  application code `2fb4dc4` on `main` and `production-safe` (identical), Cloudflare Pages production
-  deployment `c33ce888-325d-4510-b227-b2a1ee510b8b`, verified live. Migration `0063` adds
+- **Current release (2026-11-25 P0 residential corrections, backup closeout and communications expansion):**
+  application code `43922c9` on `main` and `production-safe` (identical), Cloudflare Pages production
+  deployment `e3616887-95be-4c4e-a84d-7671982b0067`, verified live. Migration `0063` adds
   `appointments.staffing_pending` and `staffing_reason` (63 production migrations; the D1 export has
   106 application tables, live `sqlite_master` 107 including `_cf_KV`, 0 foreign-key violations).
-  Morning/Afternoon now default to 7:00 AM / 12:30 PM with the earliest real fallback. Quoted labor
+  Morning/Afternoon default to 7:00 AM / 12:30 PM with the earliest real fallback. Quoted labor
   hours are converted to the smallest crew that finishes before 7:00 PM; a required second cleaner
-  no longer rejects the afternoon slot. A time that is feasible but not yet fully staffed becomes a
-  paid/Pay-Later **staffing-pending reservation**: the slot, price and payment are preserved, the
-  customer sees a disclosure, both payment paths remain, and a critical owner/admin notice plus a
-  persistent dashboard/calendar/Job File warning stay until the crew is assigned. The Terms/Privacy
-  modal decodes Cloudflare's encoded email and renders a working
-  `mailto:customer-service@sparkling-standard.com` link. The retired gold-S floral monogram was
-  moved out of `public/` to `docs/brand/archive/` with an authoritative brand inventory and tests.
-  A fresh complete backup after the migration (run `45711067126`) captured 63 migrations/106
-  application tables, 227 files, 10,794,502 bytes, SHA-256
-  `7fb93022172eb44168d50b503937caa4e421565f8f0a70b9af1a426f55c3423e`, R2 and OneDrive verified,
-  isolated restore passed, and all known database→R2 references present. Backup failure alerts are
-  now wired to `/api/internal/backup-status` through configured `OPS_ALERT_URL`/`OPS_ALERT_TOKEN`.
-  Verified: unit **1,137** (1,136 pass, 1 pre-existing skip), browser **285/285**, `astro check`
-  0 errors, 41 pages, 2,636 links; live availability returned a 2:30-5:45 PM option for a 6-hour job.
-  No live customer email, charge, refund, booking, hold or signed agreement was created. Owner
-  infrastructure actions still pending: rotate the backup Worker's GitHub token to a fine-grained
-  Actions-only token; first automatic cron run evidence due 2026-11-26 08:30 UTC. Evidence:
-  `docs/verification/2026-11-25-P0-RESIDENTIAL-CHECKOUT-CORRECTIONS.md`.
+  no longer rejects the afternoon slot. A feasible but unstaffed time becomes a paid/Pay-Later
+  **staffing-pending reservation**: slot, price and payment are preserved, the customer sees a
+  disclosure, both payment paths remain, and a critical admin/owner notice plus dashboard, calendar
+  and Job File warnings stay until the crew is assigned. The Terms/Privacy modal decodes Cloudflare's
+  encoded email and renders a working `mailto:customer-service@sparkling-standard.com` link. The
+  retired gold-S floral monogram is archived outside `public/` with an authoritative brand inventory.
+  Centralized communications now covers staffing, complaints, cancellations, reschedules, refunds,
+  commercial/church inquiries and agreements, employee callouts/late arrivals and critical operational
+  failures, with optional per-branch recipient overrides that can never redirect critical alerts.
+  Contact-form complaints escalate to admin and owner; commercial/church inquiries route to their
+  dedicated recipients. Backup alerting reads `vars.OPS_ALERT_URL`, a controlled failure/recovery
+  notification test passed, the Worker dispatch ref is `main`, and a live scheduled backup succeeded
+  (`source=schedule`, run `45717896707`, archive `2026-11-25T23-01-23`, R2 + OneDrive verified,
+  isolated restore 63 migrations/106 tables). A post-migration complete backup (run `45711067126`)
+  captured 63 migrations/106 application tables, 227 files, 10,794,502 bytes, SHA-256
+  `7fb93022172eb44168d50b503937caa4e421565f8f0a70b9af1a426f55c3423e`. Verified: unit **1,140**
+  (1,139 pass, 1 pre-existing skip), browser **285/285**, `astro check` 0 errors, 41 pages, 2,636 links.
+  No live customer email, charge, refund, booking, hold or signed agreement was created. Owner action
+  remaining: rotate the backup Worker GitHub token to a fine-grained Actions-only token. Commercial
+  proposals/agreements, employee payroll/training and Tampa activation remain the next packages.
+  Evidence: `docs/verification/2026-11-25-P0-RESIDENTIAL-CHECKOUT-CORRECTIONS.md` and
+  `docs/verification/2026-11-25-COMMUNICATIONS-EXPANSION.md`.
 - **Prior release (2026-11-25 centralized backup control and branch consolidation):** application code
   3881a8f on production-safe and main (identical, zero divergence), Cloudflare Pages deployment
   9b6f5cd7 with the current secrets, verified live on 2026-11-25. Admin -> Data & Storage is now the
