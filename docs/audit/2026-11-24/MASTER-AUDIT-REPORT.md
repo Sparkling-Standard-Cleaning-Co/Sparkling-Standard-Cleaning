@@ -106,7 +106,7 @@ clean.
 
 | Finding | Evidence | Status |
 | --- | --- | --- |
-| Backup coverage was misreported as entirely dormant | The audit initially checked GitHub only. The local Windows daily backup was already active and produced a verified archive on 2026-11-24 07:30 UTC. The GitHub workflow was absent from `main`; it is now present (commit `0b9bcd7`) but its dispatch fails because no repository secrets exist. | **Corrected and partially resolved:** local schedule verified; GitHub cloud path blocked on owner-supplied secrets |
+| Backup coverage was misreported as entirely dormant | The audit initially checked GitHub only. The local Windows daily/weekly tasks were active. Latest weekly run 2026-11-25 14:46 UTC: 2,595 files, D1 60 migrations/104 tables, independent OneDrive download hash matched, isolated restore passed. Two upload/download defects were found and fixed. The GitHub workflow is now on `main` (`0b9bcd7`) but dispatch fails because no repository secrets exist. | **Corrected:** local schedule verified end to end; GitHub cloud path blocked on owner-supplied secrets |
 | Document Library displayed all versions | Production has 58 templates for 28 families; normal library showed retired and draft rows | Fixed in this release |
 | Review invitations were per appointment | `review_requests` had no customer-level state; repeat completed jobs could be re-invited after the frequency window | Fixed in this release |
 

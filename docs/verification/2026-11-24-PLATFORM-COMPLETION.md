@@ -20,16 +20,22 @@
 - The previous audit incorrectly concluded backups were entirely dormant because
   it checked GitHub only. The Windows scheduled tasks were already active and
   healthy.
-- Latest verified scheduled run: 2026-11-24 07:30-07:39 UTC.
-- Archive: `sparkling-standard-backup-2026-11-24T07-30-34.ssbk`,
-  421,632,532 bytes, 2,572 files, SHA-256
-  `55fe217dc5dbfa4504ee97303174ef63847fe5a975a61f0b11fa5438e60bf2f6`.
-- Archive verification: passed; D1 integrity `ok`, 102 tables.
+- Latest full weekly verification: **2026-11-25 14:46-15:02 UTC**.
+- Archive: `sparkling-standard-backup-2026-11-25T14-46-33.ssbk`,
+  421,622,405 bytes, 2,595 files, SHA-256
+  `aeb732fffdd951a9d6c2984e8cf2b9b84acb39ac4042a513ca09f21e885afa03`.
+- Archive verification: passed; D1 integrity `ok`, 104 tables.
+- Independent OneDrive download: hash and archive verification passed.
 - Isolated restore rehearsal: passed; restored D1 export
-  `4ce46b76dae06e206d9f84ceaf0bfe971643e0fc0f6458aab0b64042651e349f`,
-  57 migrations, 101 tables, 0 foreign-key violations.
-- Dashboard heartbeat: success recorded in `backup_runs`; stale
+  `5886df4d75e0e29a8bc516d57955dd7367f80c946a30e155fad5cd98157ddfd0`,
+  60 migrations, 104 tables, 0 foreign-key violations.
+- Dashboard heartbeat: weekly success recorded in `backup_runs`; stale
   `backup_stale` incident resolved.
+- Daily run 2026-11-24 07:30 UTC remains verified (2,572 files, D1 102 tables).
+- Two backup-tool defects were fixed during verification: large OneDrive
+  uploads were not confirming finalization, and large downloads timed out after
+  60 seconds. Uploads now verify the stored item and size; downloads stream to
+  disk with a 30-minute limit. Task battery stop conditions were removed.
 - Two obsolete tasks pointing at the old unspaced workspace were disabled.
 - `backup.yml` is now visible on default branch `main` (commit `0b9bcd7`) and
   dispatch is possible. Controlled run `45513633447` failed fast because the

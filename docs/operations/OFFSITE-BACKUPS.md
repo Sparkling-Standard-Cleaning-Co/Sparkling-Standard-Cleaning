@@ -8,15 +8,18 @@ were dormant. The Windows scheduled tasks were already active:
 - `Sparkling Standard Encrypted Backup - Weekly Restore Test` - Sunday 03:30.
 - `Sparkling Standard Backup Health Check` - every 6 hours.
 
-Latest verified run: **2026-11-24 07:30-07:39 UTC**. Archive
-`sparkling-standard-backup-2026-11-24T07-30-34.ssbk` (421,632,532 bytes, 2,572
-files, 421,339,895 plaintext bytes, SHA-256
-`55fe217dc5dbfa4504ee97303174ef63847fe5a975a61f0b11fa5438e60bf2f6`).
-Verification passed with D1 integrity `ok` (102 tables). An isolated restore was
-run during this audit and the restored D1 export also verified
-(`4ce46b76dae06e206d9f84ceaf0bfe971643e0fc0f6458aab0b64042651e349f`, 57
-migrations, 101 tables, 0 foreign-key violations). The D1 `backup_runs` heartbeat
-was recorded and the stale `backup_stale` incident was resolved.
+Latest full weekly verification: **2026-11-25 14:46-15:02 UTC**. Archive
+`sparkling-standard-backup-2026-11-25T14-46-33.ssbk` (421,622,405 bytes, 2,595
+files, SHA-256 `aeb732fffdd951a9d6c2984e8cf2b9b84acb39ac4042a513ca09f21e885afa03`).
+Local archive verification passed (D1 integrity `ok`, 104 tables), the
+independent OneDrive download hash matched, and the isolated restored D1 verified
+at 60 migrations, 104 tables and 0 foreign-key violations. The D1 `backup_runs`
+heartbeat was recorded and the stale `backup_stale` incident was resolved.
+
+The verification exposed and fixed two backup-tool defects: large OneDrive
+uploads did not confirm finalization, and large downloads hit a 60-second
+timeout. Uploads now verify the stored item size, downloads stream to disk with a
+30-minute limit, and the backup tasks no longer stop on battery power.
 
 **GitHub Actions status:** `backup.yml` is now present on the default branch
 `main` (commit `0b9bcd7`) and is visible/dispatchable. Its controlled dispatch

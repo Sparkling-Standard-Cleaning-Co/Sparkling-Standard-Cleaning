@@ -3,11 +3,13 @@
 This document records the automated encrypted backup path, its dependencies and
 the exact recovery procedure. It contains credential **names**, never values.
 
-**Verified status 2026-11-25:** the daily Windows task is operational. Latest
-archive `sparkling-standard-backup-2026-11-24T07-30-34.ssbk` verified locally and
-the restored D1 export passed integrity and foreign-key checks. The GitHub
-workflow is now visible on `main` but remains dormant because no repository
-secrets exist. See `docs/verification/2026-11-24-PLATFORM-COMPLETION.md`.
+**Verified status 2026-11-25:** the daily and weekly Windows tasks are
+operational. The latest weekly archive
+`sparkling-standard-backup-2026-11-25T14-46-33.ssbk` passed local verification,
+independent OneDrive download hash comparison and an isolated restore at 60
+migrations / 104 tables / 0 foreign-key violations. The GitHub workflow is
+visible on `main` but remains dormant because no repository secrets exist. See
+`docs/verification/2026-11-24-PLATFORM-COMPLETION.md`.
 
 ## Current automation
 
@@ -40,6 +42,18 @@ Do not commit or paste any of these values.
 | GitHub Actions cloud backup | Repository secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_NAME`, `BACKUP_ENCRYPTION_KEY`, `BACKUP_R2_ENDPOINT`, `BACKUP_R2_BUCKET`, `BACKUP_R2_ACCESS_KEY_ID`, `BACKUP_R2_SECRET_ACCESS_KEY`, `ONEDRIVE_CLIENT_ID`, `ONEDRIVE_REFRESH_TOKEN`, `OPS_ALERT_URL`, `OPS_ALERT_TOKEN` | Owner must add them; the workflow remains dormant until then |
 
 ## Current verified evidence
+
+### 2026-11-25 weekly run (latest)
+
+- Archive: `08 BACKUPS & ARCHIVE\SCHEDULED\sparkling-standard-backup-2026-11-25T14-46-33.ssbk`
+- SHA-256: `aeb732fffdd951a9d6c2984e8cf2b9b84acb39ac4042a513ca09f21e885afa03`
+- 2,595 files / 421,622,405 bytes
+- Local verify: passed; D1 integrity `ok`, 104 tables
+- OneDrive upload: finalized and stored item size verified
+- Independent download: hash and archive verification passed
+- Isolated restore: passed; D1 60 migrations, 104 tables, 0 foreign-key violations
+- Production `backup_runs`: weekly success recorded
+- Task settings: no battery stop; 30-minute streamed download limit
 
 ### 2026-11-24 daily run
 

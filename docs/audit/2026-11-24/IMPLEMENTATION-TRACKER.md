@@ -18,9 +18,10 @@ milestone); partial; deferred; blocked.
 | Customer File quick actions | Medium | No | Implemented | Browser admin suites, type check | This release | Opens existing workflows; does not duplicate them. |
 | Customer File review card | Medium | No | Implemented | Browser admin suites | This release | Read-only summary with link to Google Reviews controls. |
 | Active-first lead workspace | High | No | Implemented | `lead-default-filter.test.ts` | This release | Default excludes archived, lost and converted; All is explicit. |
-| Local backup schedule | High | No | **Verified operational** | Archive verify + isolated restore | 2026-11-24 daily run | Latest archive 07:30 UTC, 2,572 files, D1 102 tables, restore passed. |
+| Local backup schedule | High | No | **Verified operational (daily + weekly)** | Archive verify, independent download, isolated restore | 2026-11-25 weekly run | Latest weekly: 2,595 files, D1 60 migrations/104 tables, upload finalized, download hash matched, restore passed. |
+| Backup tool finalization/stream fixes | High | No | **Fixed and verified** | Weekly task result 0 | `0347b9c` | Large OneDrive uploads now verify stored size; downloads stream with 30-minute limit; battery stop removed. |
 | GitHub backup workflow visibility | High | Partial | Implemented visibility, blocked on secrets | Controlled dispatch `45513633447` | `0b9bcd7` on `main` | Workflow visible/dispatchable; zero repository secrets; fails closed. |
-| Backup dashboard heartbeat | High | No | Implemented | D1 `backup_runs` query | 2026-11-24 | Stale incident resolved after verified run. |
+| Backup dashboard heartbeat | High | No | Implemented | D1 `backup_runs` query | 2026-11-25 | Daily and weekly successes recorded; stale incident resolved. |
 | Branch consolidation | High | Yes | Plan only | Read-only divergence analysis | Not changed | `main` 1 ahead / 133 behind; merge cutover requires owner approval. |
 | Master workspace cleanup | Medium | Partial | **Executed reversible cleanup** | Three-root hash inventory | 2026-11-24 | Legacy workspace renamed/archived; two duplicate tasks disabled; 6,072 duplicate copies listed; no deletions. |
 | Change orders / amendments | Medium | Yes | **Implemented** | `change-orders.test.ts` | This release | Admin/owner workflow; employee-initiated requests not exposed. |
@@ -43,7 +44,7 @@ milestone); partial; deferred; blocked.
 | Build | 41 pages |
 | Validation | 2,631 links, SEO, QRs, checklist leak checks pass |
 | Smoke | 21 pages |
-| Production D1 export restore | 57 migrations, 101 tables, 0 FK violations before migration 0058; latest backup restore passed |
+| Production D1 export restore | Latest weekly backup restored: 60 migrations, 104 tables, 0 FK violations |
 | Production migrations | 60 |
 | Production foreign keys | 0 violations |
 | Production orphan/duplicate checks | 0 orphans, 0 duplicate invoice numbers, 0 duplicate per-appointment invoices |
